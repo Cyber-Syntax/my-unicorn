@@ -5,6 +5,7 @@ repository and saves the credentials to a file.
 import json
 import os
 import subprocess
+import hashlib
 import requests
 
 class AppImageDownloader:
@@ -24,25 +25,43 @@ class AppImageDownloader:
         self.hash_type = None
         self.appimages = {}
 
+    def list_json_files(self):
+        """
+        List the json files in the current directory, if json file exists,
+        then ask user to backup old appimage
+        """
+        # ask user if wants to load new credentials or use the old ones
+        if input("Do you want to load new credentials for new appimage? (y/n): ") == "y":
+            self.ask_inputs()
+        else:
+            json_files = [file for file in os.listdir() if file.endswith(".json")]
+            if len(json_files) > 1:
+                print("There are more than one .json file, please choose one of them.")
+                for index, file in enumerate(json_files):
+                    print(f"{index + 1}. {file}")
+                choice = int(input("Enter your choice: "))
+                self.repo = json_files[choice - 1].replace(".json", "")
+                self.load_credentials()
+            elif len(json_files) == 1:
+                self.repo = json_files[0].replace(".json", "")
+                self.load_credentials()
+            else:
+                print("There are no credentials in the current directory")
+                self.ask_inputs()
+
     def ask_inputs(self):
         """Ask the user for the owner and repo"""
-        # Check if the credentials file exists
-        # if it does, load the credentials
-        # if it doesn't, ask the user for the credentials
-        if len(os.listdir()) > 0:
-            self.load_credentials()
+        self.owner = input("Enter the owner: ")
+        self.repo = input("Enter the repo: ")
+        self.sha_name = input("Enter the sha name: ")
+        self.appimage_folder = input("Which directory to save appimage: ")
+        self.hash_type = input("Enter the hash type for your sha (e.g md5, sha256, sha1) file: ")
+        # ask user the save the credentials to a file
+        save_credentials = input("Save credentials to file? (y/n): ")
+        if save_credentials == "y":
+            self.save_credentials()
         else:
-            self.owner = input("Enter the owner: ")
-            self.repo = input("Enter the repo: ")
-            self.sha_name = input("Enter the sha name: ")
-            self.appimage_folder = input("Where do you want to save appimage: ")
-            self.hash_type = input("Enter the hash type for your sha file: ")
-            # ask user the save the credentials to a file
-            save_credentials = input("Save credentials to file? (y/n): ")
-            if save_credentials == "y":
-                self.save_credentials()
-            else:
-                self.load_credentials()
+            self.download()
 
     def save_credentials(self):
         """Save the credentials to a file in json format, one file per owner and repo"""
@@ -53,48 +72,35 @@ class AppImageDownloader:
         self.appimages["version"] = self.version
         self.appimages["sha"] = self.sha_name
         self.appimages["hash_type"] = self.hash_type
-        self.appimages["appimage_folder"] = self.appimage_folder
+        self.appimages["appimage_folder"] = "~" + self.appimage_folder
         with open(f"{self.repo}.json", "w", encoding="utf-8") as file:
             json.dump(self.appimages, file, indent=4)
-        # if json needs to be update with new credentials
-        if self.appimage_name is None or self.sha_name is None:
-            self.load_credentials()
+        print(f"Saved credentials to {self.repo}.json file")
 
     def load_credentials(self):
         """
-        If there are more than one file, ask the user to choose one of them.
         Load the credentials from a file in json format, one file per owner and repo
         """
-        if len(os.listdir()) >= 1:
-            json_files = []
-            for file in os.listdir():
-                if file.endswith(".json"):
-                    json_files.append(file)
-            if len(json_files) > 1:
-                print("There are more than one .json file, please choose one of them.")
-                for index, file in enumerate(json_files):
-                    print(f"{index + 1}. {file}")
-                choice = int(input("Enter your choice: "))
-                self.repo = json_files[choice - 1].replace(".json", "")
-            else:
-                self.repo = json_files[0].replace(".json", "")
-
+        if os.path.exists(f"{self.repo}.json"):
             with open(f"{self.repo}.json", "r", encoding="utf-8") as file:
-                data = json.load(file)
-                self.owner = data["owner"]
-                self.repo = data["repo"]
-                self.appimage_name = data["appimage"]
-                self.version = data["version"]
-                self.sha_name = data["sha"]
-                self.hash_type = data["hash_type"]
-                self.appimage_folder = data["appimage_folder"]
-                print(f"Loaded owner: {self.owner}, repo: {self.repo}, appimage: {self.appimage_name}")
-                print(f"Loaded {self.repo}.json")
+                self.appimages = json.load(file)
+            self.owner = self.appimages["owner"]
+            self.repo = self.appimages["repo"]
+            self.appimage_name = self.appimages["appimage"]
+            self.version = self.appimages["version"]
+            self.sha_name = self.appimages["sha"]
+            self.hash_type = self.appimages["hash_type"]
+            self.appimage_folder = self.appimages["appimage_folder"]
+            backup_appimage = input(f"Do you want to backup {self.repo}.AppImage to backup folder (y/n): ")
+            if backup_appimage == "y":
+                self.backup_old_appimage()
+            else:
+                self.download()
+        else:
+            print(f"{self.repo}.json file not found while trying to load credentials")
 
     def download(self):
         """Get the credentials, urls from the api"""
-        # get the appimage name on credentials file, if not found, get it from the api
-        # find appimage name from latest release api with endswifh .AppImage
         self.api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
         response = requests.get(self.api_url, timeout=10)
         if response.status_code == 200:
@@ -113,41 +119,57 @@ class AppImageDownloader:
         if response.status_code == 200:
             with open(self.appimage_name, "wb") as file:
                 file.write(response.content)
-            print(f"Downloaded {self.appimage_name}")
+            print(f"Downloaded {self.appimage_name} and {self.sha_name} file")
         else:
             print(f"Error downloading {self.appimage_name} and {self.sha_name} file")
 
     def verify_sha(self):
         """ Verify the sha of the downloaded appimage """
-        """! TODO: Solve the problem with subprocess.run() returning zero even if the appimage is not verified"""
-        if self.hash_type == "sha256":
-            cmd = subprocess.run(["sha256sum", self.appimage_name, "-c", self.sha_name], check=True, text=False)
-            result = subprocess.run(cmd, capture_output=True, text=False, check=True)
-            if result.returncode == 0:
-                print(f"{self.appimage_name} is verified")
-            else:
-                print(f"{self.appimage_name} is not verified")
-        elif self.hash_type == "sha512":
-            cmd = subprocess.run(["sha512sum", self.appimage_name, "-c", self.sha_name], check=True)
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            if result.returncode == 0:
-                print(f"{self.appimage_name} is verified")
-            else:
-                print(f"{self.appimage_name} is not verified")             
+        print(f"Verifying {self.appimage_name}...")
+        if hashlib.new(self.hash_type, open(self.appimage_name, "rb").read()).hexdigest() == \
+                requests.get(self.sha_url, timeout=10).text.split(" ")[0]:
+            print(f"{self.appimage_name} verified")
+            self.make_executable()
+        else:
+            print(f"Error verifying {self.appimage_name}")
 
-    def save_old_appimage(self):
+    def make_executable(self):
+        """ Make the downloaded appimage executable """
+        # if already executable, return
+        if os.access(self.appimage_name, os.X_OK):
+            return
+        print("Making the appimage executable...")
+        subprocess.run(["chmod", "+x", self.appimage_name], check=True)
+        print("Appimage is now executable")
+
+    def backup_old_appimage(self):
         """ Save old {self.repo}.AppImage to a backup folder, ask user for approval """
-        if os.path.exists(f"{self.appimage_folder}/{self.repo}.AppImage"):
-            if input(f"Do you want to save the old {self.repo}.AppImage? (y/n): ") == "y":
-                if not os.path.exists(f"{self.appimage_folder}/backup"):
-                    os.mkdir(f"{self.appimage_folder}/backup")
-                subprocess.run(["mv", f"{self.appimage_folder}/{self.repo}.AppImage",
-                                 f"{self.appimage_folder}/backup"], check=True)
+        backup_folder = f"{self.appimage_folder}backup" # ~/Documents/appimages/backup
+
+        if not os.path.exists(backup_folder):
+            if input(f"Backup folder {backup_folder} not found, do you want to create it (y/n): ") == "y":
+                os.makedirs(backup_folder, exist_ok=True)
+                print(f"Created backup folder: {backup_folder}")
+            else:
+                print(f"Overwriting {self.repo}.AppImage")
+                self.download()
+                return
+        else:
+            print(f"Backup folder {backup_folder} found")                
+            if os.path.exists(f"{self.appimage_folder}{self.repo}.AppImage"):
+                print(f"Found {self.repo}.AppImage in {self.appimage_folder}")
+                if input(f"Do you want to backup {self.repo}.AppImage to {backup_folder} (y/n): ") == "y":
+                    print(f"Backing up {self.repo}.AppImage to backup folder")
+                    subprocess.run(["mv", f"{self.appimage_folder}{self.repo}.AppImage", f"{backup_folder}"], check=True)
+                else:
+                    print(f"Not backing up {self.repo}.AppImage")
+            else:
+                print(f"{self.repo}.AppImage not found in {self.appimage_folder}")
+
 
     def change_name(self):
         """ Change appimage name for .desktop file on linux, ask user for approval """
         new_name = f"{self.repo}.AppImage"
-        # ask user if he wants to change the name
         if input(f"Do you want to change the name of the appimage to {new_name}? (y/n): ") == "y":
             if self.appimage_name != new_name:
                 print(f"Changing {self.appimage_name} to {new_name}")
@@ -158,17 +180,13 @@ class AppImageDownloader:
 
     def move_appimage(self):
         """ Move appimages to a appimage folder """
-        if not os.path.exists(self.appimage_folder):
-            os.mkdir(self.appimage_folder)
-        subprocess.run(["mv", self.appimage_name, self.appimage_folder], check=True)
-
-
+        print(f"Moving {self.appimage_name} to {self.appimage_folder}")
+        subprocess.run(["mv", f"{self.appimage_name}", f"{self.appimage_folder}"], check=True)
 
 # main
 if __name__ == "__main__":
-    appimage = AppImageDownloader()
-    appimage.ask_inputs()
-    appimage.download()
-    appimage.verify_sha()
-    appimage.save_old_appimage()
+    appimage = AppImageDownloader()  
+    appimage.list_json_files()
+    appimage.backup_old_appimage()
     appimage.change_name()
+    appimage.move_appimage()
