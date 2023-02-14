@@ -9,7 +9,7 @@ import hashlib
 import requests
 
 class AppImageDownloader:
-    """
+    """ 
     This class downloads the latest AppImage from a given
     repository and saves the credentials to a file.
     """

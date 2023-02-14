@@ -131,3 +131,5 @@ dmypy.json
 # ignore appimages
 *.AppImage
 *.appimage
+.AppImage
+.appimage
