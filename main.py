@@ -213,5 +213,4 @@ class AppImageDownloader:
 # main
 if __name__ == "__main__":
     appimage = AppImageDownloader()
-    appimage.list_json_files()
-
+    appimage.ask_user()
