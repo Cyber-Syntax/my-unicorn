@@ -68,10 +68,7 @@ class AppImageDownloader:
             self.verify_sha()
         else:
             print("Invalid choice, try again")
-            #self.ask_user()
-            # TODO: don't forget to delete this line
-            self.list_json_files()
-            self.verify_sha()
+            self.ask_user()            
     
     def learn_owner_repo(self):
         """
