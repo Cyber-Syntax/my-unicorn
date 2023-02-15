@@ -1,0 +1,11 @@
+version: 7.12.2
+files:
+  - url: superProductivity-7.12.2.AppImage
+    sha512: S0IpTnE/kwdP/i2C+ywznf/Mu8jO7kqydEBoecOAuVeUblqjbB79tGpMO8akClplHcKcDGx6+C3Kqu1RsjY0kQ==
+    size: 102654079
+    blockMapSize: 106643
+path: superProductivity-7.12.2.AppImage
+sha512: S0IpTnE/kwdP/i2C+ywznf/Mu8jO7kqydEBoecOAuVeUblqjbB79tGpMO8akClplHcKcDGx6+C3Kqu1RsjY0kQ==
+releaseNotes: |
+  [Window version is best downloaded from Microsoft Store](https://www.microsoft.com/de-de/p/super-productivity/9nhfvg8361tw?cid=storebadge&ocid=badge&rtc=1&activetab=pivot:overviewtab)
+releaseDate: '2023-02-10T15:03:36.963Z'

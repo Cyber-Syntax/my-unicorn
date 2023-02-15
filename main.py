@@ -7,6 +7,8 @@ import os
 import subprocess
 import hashlib
 import requests
+import base64
+import yaml
 
 class AppImageDownloader:
     """ 
@@ -23,6 +25,7 @@ class AppImageDownloader:
         self.version = None
         self.appimage_folder = None
         self.hash_type = None
+        self.url = None
         self.appimages = {}
 
     def ask_user(self):
@@ -43,17 +46,19 @@ class AppImageDownloader:
         choice = int(input("Enter your choice: "))
         if choice == 1:
             self.ask_inputs()
+            self.learn_owner_repo()
             self.save_credentials()
             self.download()
             self.backup_old_appimage()
             self.verify_sha()
         elif choice == 2:
             self.ask_inputs()
+            self.learn_owner_repo()
             self.save_credentials()
             self.download()
             self.verify_sha()
         elif choice == 3:
-            self.list_json_files()
+            self.list_json_files()            
             self.backup_old_appimage()
             self.download()
             self.verify_sha()
@@ -63,7 +68,31 @@ class AppImageDownloader:
             self.verify_sha()
         else:
             print("Invalid choice, try again")
-            self.ask_user()
+            #self.ask_user()
+            # TODO: don't forget to delete this line
+            self.list_json_files()
+            self.verify_sha()
+    
+    def learn_owner_repo(self):
+        """
+        Learn github owner and repo from github url
+        """
+        while True:
+            if "github.com" not in self.url:
+                print("Invalid URL, please try again.")
+                continue
+            
+            # Parse the owner and repo from the URL
+            # https://github.com/johannesjo/super-productivity
+            try:
+                self.owner = self.url.split("/")[3]
+                self.repo = self.url.split("/")[4]
+                self.url = f"https://github.com/{self.owner}/{self.repo}"
+                break
+            except:
+                print("Invalid URL, please try again.")
+                self.ask_user()
+
 
     def list_json_files(self):
         """
@@ -87,8 +116,7 @@ class AppImageDownloader:
 
     def ask_inputs(self):
         """Ask the user for the owner and repo"""
-        self.owner = input("Enter the owner: ")
-        self.repo = input("Enter the repo: ")
+        self.url = input("Enter the app github url: ")
         self.sha_name = input("Enter the sha name: ")
         self.appimage_folder = input("Which directory(e.g /Documents/appimages)to save appimage: ")
         self.hash_type = input("Enter the hash type for your sha (e.g md5, sha256, sha1) file: ")
@@ -96,7 +124,7 @@ class AppImageDownloader:
 
     def save_credentials(self):
         """Save the credentials to a file in json format, one file per owner and repo"""
-        self.download()
+        self.download()      
         self.appimages["owner"] = self.owner
         self.appimages["repo"] = self.repo
         self.appimages["appimage"] = self.appimage_name
@@ -162,10 +190,36 @@ class AppImageDownloader:
             print(f"Error downloading {self.appimage_name} and {self.sha_name} file")
 
     def verify_sha(self):
-        """ Verify the sha of the downloaded appimage """
-        print(f"Verifying {self.appimage_name}...")
-        if hashlib.new(self.hash_type, open(self.appimage_name, "rb").read()).hexdigest() == \
-                requests.get(self.sha_url, timeout=10).text.split(" ")[0]:
+        """ Verify the sha of the downloaded appimage """                
+        print(f"Verifying {self.appimage_name}...")   
+
+        if self.hash_type == "sha512":
+                # open yml file to encode hash
+            with open(self.sha_name, "r") as f:
+                encoded_hash = yaml.safe_load(f)["sha512"]  # Get the hash value from the yml file            
+            try:
+                # Decode the Base64 encoded hash value
+                decoded_hash = base64.b64decode(encoded_hash)
+                print("yml file decoding...")
+                # Calculate the SHA-512 hash of the file
+                sha512 = hashlib.sha512()
+                with open(self.appimage_name, "rb") as f:
+                    while True:
+                        data = f.read(4096)
+                        if not data:
+                            break
+                        sha512.update(data)
+                file_hash = sha512.digest()
+                
+                # Compare the two hash values
+                if file_hash == decoded_hash:
+                    print(f"{self.appimage_name} verified")
+                    self.make_executable()
+            except:
+                print("Unknown error while verify file!")
+
+        elif hashlib.new(self.hash_type, open(self.appimage_name, "rb").read()).hexdigest() == \
+            requests.get(self.sha_url, timeout=10).text.split(" ")[0]:
             print(f"{self.appimage_name} verified")
             self.make_executable()
         else:
@@ -173,8 +227,11 @@ class AppImageDownloader:
             # ask user if he wants to delete the downloaded appimage
             if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
                 os.remove(self.appimage_name)
-                print(f"Deleted {self.appimage_name}")
-
+                print(f"Deleted {self.appimage_name}")            
+            else:
+                # continue
+                pass        
+                
     def make_executable(self):
         """ Make the downloaded appimage executable """
         # if already executable, return
@@ -205,8 +262,9 @@ class AppImageDownloader:
             if os.path.exists(f"{self.appimage_folder}{self.repo}.AppImage"):
                 print(f"Found {self.repo}.AppImage in {self.appimage_folder}")
                 if input(f"Do you want to backup {self.repo}.AppImage to {backup_folder} (y/n): ") == "y":
+                    old_appimage_folder = os.path.expanduser(f"{self.appimage_folder}{self.repo}.AppImage")
+                    subprocess.run(["mv", f"{old_appimage_folder}", f"{backup_folder}"], check=True)
                     print(f"Backing up {self.repo}.AppImage to backup folder")
-                    subprocess.run(["mv", os.path.expanduser(f"{self.appimage_folder}{self.repo}.AppImage"), f"{backup_folder}"], check=True)
                 else:
                     print(f"Not backing up {self.repo}.AppImage")
             else:
