@@ -45,7 +45,7 @@ class AppImageDownloader:
             self.save_credentials()
             self.download()
             self.backup_old_appimage()
-            self.verify_sha()                     
+            self.verify_sha()
         elif choice == 2:
             self.ask_inputs()
             self.save_credentials()
@@ -62,7 +62,10 @@ class AppImageDownloader:
             self.verify_sha()
         else:
             print("Invalid choice, try again")
-            self.ask_user()
+            #!, TODO: change this later 
+            #self.ask_user()
+            self.list_json_files()
+            self.backup_old_appimage()
 
     def list_json_files(self):
         """
@@ -89,7 +92,7 @@ class AppImageDownloader:
         self.owner = input("Enter the owner: ")
         self.repo = input("Enter the repo: ")
         self.sha_name = input("Enter the sha name: ")
-        self.appimage_folder = input("Which directory to save appimage: ")
+        self.appimage_folder = input("Which directory (e.g /Documents/appimages) to save appimage: ")
         self.hash_type = input("Enter the hash type for your sha (e.g md5, sha256, sha1) file: ")
 
 
@@ -102,10 +105,19 @@ class AppImageDownloader:
         self.appimages["version"] = self.version
         self.appimages["sha"] = self.sha_name
         self.appimages["hash_type"] = self.hash_type
-        self.appimages["appimage_folder"] = "~" + self.appimage_folder
+        # add "/" to the end of the path if not exists
+        if not self.appimage_folder.endswith("/") and not self.appimage_folder.startswith("~"):
+            self.appimages["appimage_folder"] = os.path.expanduser("~") + self.appimage_folder + "/"
+        elif self.appimage_folder.startswith("~") and self.appimage_folder.endswith("/"):
+            self.appimage_folder = os.path.expanduser("~") + self.appimage_folder
+        elif self.appimage_folder.startswith("~") and not self.appimage_folder.endswith("/"):
+            self.appimages["appimage_folder"] = os.path.expanduser("~") + self.appimage_folder + "/"
+
         with open(f"{self.repo}.json", "w", encoding="utf-8") as file:
             json.dump(self.appimages, file, indent=4)
         print(f"Saved credentials to {self.repo}.json file")
+        
+        self.load_credentials()
 
     def load_credentials(self):
         """
@@ -120,7 +132,10 @@ class AppImageDownloader:
             self.version = self.appimages["version"]
             self.sha_name = self.appimages["sha"]
             self.hash_type = self.appimages["hash_type"]
-            self.appimage_folder = self.appimages["appimage_folder"]
+            if self.appimages["appimage_folder"].startswith("~"):
+                self.appimage_folder = os.path.expanduser(self.appimage_folder)
+            else:
+                self.appimage_folder = self.appimages["appimage_folder"]
         else:
             print(f"{self.repo}.json file not found while trying to load credentials")
 
@@ -157,6 +172,11 @@ class AppImageDownloader:
             self.make_executable()
         else:
             print(f"Error verifying {self.appimage_name}")
+            # ask user if he wants to delete the downloaded appimage
+            if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
+                os.remove(self.appimage_name)
+                print(f"Deleted {self.appimage_name}")
+                exit(1)                
 
     def make_executable(self):
         """ Make the downloaded appimage executable """
@@ -170,28 +190,30 @@ class AppImageDownloader:
 
     def backup_old_appimage(self):
         """ Save old {self.repo}.AppImage to a backup folder, ask user for approval """
-        backup_folder = f"{self.appimage_folder}backup" # ~/Documents/appimages/backup
+        
+        backup_folder = os.path.expanduser(f"{self.appimage_folder}backup/")
 
+        print(f"Checking for backup folder: {backup_folder}")
+        print(f"Checking for {self.repo}.AppImage in {self.appimage_folder}")
         if not os.path.exists(backup_folder):
             if input(f"Backup folder {backup_folder} not found, do you want to create it (y/n): ") == "y":
-                os.makedirs(backup_folder, exist_ok=True)
+                subprocess.run(["mkdir", "-p", backup_folder], check=True)
                 print(f"Created backup folder: {backup_folder}")
             else:
                 print(f"Overwriting {self.repo}.AppImage")
                 self.download()
                 return
         else:
-            print(f"Backup folder {backup_folder} found")                
+            print(f"Backup folder {backup_folder} found")
             if os.path.exists(f"{self.appimage_folder}{self.repo}.AppImage"):
                 print(f"Found {self.repo}.AppImage in {self.appimage_folder}")
                 if input(f"Do you want to backup {self.repo}.AppImage to {backup_folder} (y/n): ") == "y":
                     print(f"Backing up {self.repo}.AppImage to backup folder")
-                    subprocess.run(["mv", f"{self.appimage_folder}{self.repo}.AppImage", f"{backup_folder}"], check=True)
+                    subprocess.run(["mv", os.path.expanduser(f"{self.appimage_folder}{self.repo}.AppImage"), f"{backup_folder}"], check=True)
                 else:
                     print(f"Not backing up {self.repo}.AppImage")
             else:
                 print(f"{self.repo}.AppImage not found in {self.appimage_folder}")
-
 
     def change_name(self):
         """ Change appimage name for .desktop file on linux, ask user for approval """
