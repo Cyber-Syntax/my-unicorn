@@ -29,7 +29,8 @@ class AppImageDownloader:
         """
         All questions are asked to the user and their answers are recorded. 
         Based on the recorded answers, 
-        it is learned which functions to go and in which order, and these functions are called accordingly.
+        it is learned which functions to go and in which order, 
+        and these functions are called accordingly.
         """
         print("Welcome to the AppImage Downloader")
         print("Choose one of the following options:")
@@ -68,7 +69,7 @@ class AppImageDownloader:
         """
         List the json files in the current directory, if json file exists,
         then ask user to backup old appimage
-        """        
+        """
         json_files = [file for file in os.listdir() if file.endswith(".json")]
         if len(json_files) > 1:
             print("There are more than one .json file, please choose one of them.")
@@ -89,7 +90,7 @@ class AppImageDownloader:
         self.owner = input("Enter the owner: ")
         self.repo = input("Enter the repo: ")
         self.sha_name = input("Enter the sha name: ")
-        self.appimage_folder = input("Which directory (e.g /Documents/appimages) to save appimage: ")
+        self.appimage_folder = input("Which directory(e.g /Documents/appimages)to save appimage: ")
         self.hash_type = input("Enter the hash type for your sha (e.g md5, sha256, sha1) file: ")
 
 
@@ -113,7 +114,7 @@ class AppImageDownloader:
         with open(f"{self.repo}.json", "w", encoding="utf-8") as file:
             json.dump(self.appimages, file, indent=4)
         print(f"Saved credentials to {self.repo}.json file")
-        
+
         self.load_credentials()
 
     def load_credentials(self):
@@ -173,7 +174,6 @@ class AppImageDownloader:
             if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
                 os.remove(self.appimage_name)
                 print(f"Deleted {self.appimage_name}")
-                exit(1)                
 
     def make_executable(self):
         """ Make the downloaded appimage executable """
@@ -187,7 +187,7 @@ class AppImageDownloader:
 
     def backup_old_appimage(self):
         """ Save old {self.repo}.AppImage to a backup folder, ask user for approval """
-        
+
         backup_folder = os.path.expanduser(f"{self.appimage_folder}backup/")
 
         print(f"Checking for backup folder: {backup_folder}")
@@ -222,11 +222,10 @@ class AppImageDownloader:
             self.move_appimage()
         else:
             print("The appimage name is already the new name")
-  
 
     def move_appimage(self):
         """ Move appimages to a appimage folder """
-        print(f"Moving {self.appimage_name} to {self.appimage_folder}")        
+        print(f"Moving {self.appimage_name} to {self.appimage_folder}")
         subprocess.run(["mv", f"{self.repo}.AppImage", f"{self.appimage_folder}"], check=True)
 
 # main
