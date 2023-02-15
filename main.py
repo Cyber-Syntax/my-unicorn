@@ -62,10 +62,7 @@ class AppImageDownloader:
             self.verify_sha()
         else:
             print("Invalid choice, try again")
-            #!, TODO: change this later 
-            #self.ask_user()
-            self.list_json_files()
-            self.backup_old_appimage()
+            self.ask_user()
 
     def list_json_files(self):
         """
