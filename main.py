@@ -47,15 +47,15 @@ class AppImageDownloader:
         if choice == 1:
             self.ask_inputs()
             self.learn_owner_repo()
-            self.save_credentials()
             self.download()
+            self.save_credentials()
             self.backup_old_appimage()
             self.verify_sha()
         elif choice == 2:
             self.ask_inputs()
             self.learn_owner_repo()
-            self.save_credentials()
             self.download()
+            self.save_credentials()
             self.verify_sha()
         elif choice == 3:
             self.list_json_files()            
@@ -68,7 +68,7 @@ class AppImageDownloader:
             self.verify_sha()
         else:
             print("Invalid choice, try again")
-            self.ask_user()            
+            self.ask_user()                        
     
     def learn_owner_repo(self):
         """
@@ -121,7 +121,6 @@ class AppImageDownloader:
 
     def save_credentials(self):
         """Save the credentials to a file in json format, one file per owner and repo"""
-        self.download()      
         self.appimages["owner"] = self.owner
         self.appimages["repo"] = self.repo
         self.appimages["appimage"] = self.appimage_name
@@ -139,7 +138,6 @@ class AppImageDownloader:
         with open(f"{self.repo}.json", "w", encoding="utf-8") as file:
             json.dump(self.appimages, file, indent=4)
         print(f"Saved credentials to {self.repo}.json file")
-
         self.load_credentials()
 
     def load_credentials(self):
@@ -244,24 +242,26 @@ class AppImageDownloader:
 
         backup_folder = os.path.expanduser(f"{self.appimage_folder}backup/")
 
-        print(f"Checking for backup folder: {backup_folder}")
-        print(f"Checking for {self.repo}.AppImage in {self.appimage_folder}")
+        old_appimage_folder = os.path.expanduser(f"{self.appimage_folder}{self.repo}.AppImage")
+
+        print(f"Moving {old_appimage_folder} to {backup_folder}")
+
         if not os.path.exists(backup_folder):
             if input(f"Backup folder {backup_folder} not found, do you want to create it (y/n): ") == "y":
                 subprocess.run(["mkdir", "-p", backup_folder], check=True)
                 print(f"Created backup folder: {backup_folder}")
             else:
                 print(f"Overwriting {self.repo}.AppImage")
-                self.download()
-                return
         else:
             print(f"Backup folder {backup_folder} found")
             if os.path.exists(f"{self.appimage_folder}{self.repo}.AppImage"):
                 print(f"Found {self.repo}.AppImage in {self.appimage_folder}")
                 if input(f"Do you want to backup {self.repo}.AppImage to {backup_folder} (y/n): ") == "y":
-                    old_appimage_folder = os.path.expanduser(f"{self.appimage_folder}{self.repo}.AppImage")
-                    subprocess.run(["mv", f"{old_appimage_folder}", f"{backup_folder}"], check=True)
-                    print(f"Backing up {self.repo}.AppImage to backup folder")
+                  
+                    try:
+                        subprocess.run(["mv", f"{old_appimage_folder}", f"{backup_folder}"], check=True)
+                    except subprocess.CalledProcessError:
+                        print(f"Error moving {old_appimage_folder} to {backup_folder}")                        
                 else:
                     print(f"Not backing up {self.repo}.AppImage")
             else:

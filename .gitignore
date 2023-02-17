@@ -133,3 +133,6 @@ dmypy.json
 *.appimage
 .AppImage
 .appimage
+
+# ignore flowchart
+.xopp
