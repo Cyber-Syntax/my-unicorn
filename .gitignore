@@ -135,4 +135,8 @@ dmypy.json
 .appimage
 
 # ignore flowchart
+*.xopp
 .xopp
+
+# ignore vscode
+.vscode
