@@ -2,6 +2,10 @@
 - **Please consider giving stars ⭐, it will help me stay motivated for learn to code.** 
 - 🤯 **It is it difficult for me to stay motivated while writing scripts and learning coding**
 
+# <samp>Attention<samp>
+- **Do not use without taking old version backup.** This script is in alpha version. Therefore, you may encounter some errors.
+
+
 ## ‎ 🦄 <samp>About my-unicorn<samp>
 - Script that downloads appimage github latest version via api. It also validates the file with:
     - 🛠️ Tested; 
