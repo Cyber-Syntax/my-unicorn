@@ -1,5 +1,5 @@
 ## 🙏 If this script helped you;
-- **Please consider giving stars ⭐, it will help me stay motivated and learn to code.** 
+- **Please consider giving stars ⭐, it will help me stay motivated for learn to code.** 
 - 🤯 **It is it difficult for me to stay motivated while writing scripts and learning coding**
 
 ## ‎ 🦄 <samp>About my-unicorn<samp>
