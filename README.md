@@ -1,15 +1,16 @@
-# If this script helped you;
-- **Please consider giving stars, it will help me stay motivated and learn to code. I find it difficult to stay motivated while learning and writing such scripts.**
+## 🙏 If this script helped you;
+- **Please consider giving stars ⭐, it will help me stay motivated and learn to code.** 
+- 🤯 **It is it difficult for me to stay motivated while writing scripts and learning coding**
 
-# About my-unicorn
-Script that downloads appimage github latest version via api. It also validates the file with:
-- Tested; 
-    - [X] sha256
-    - [X] sha512
-    - [ ] md5 
-    - [ ] sha1
+## ‎ 🦄 <samp>About my-unicorn<samp>
+- Script that downloads appimage github latest version via api. It also validates the file with:
+    - 🛠️ Tested; 
+        - [X] sha256
+        - [X] sha512
+        - [ ] md5 
+        - [ ] sha1
 
-# Usage
+## ‎ <samp>How to use<samp>
 - Example:
     - 1.Download the new latest AppImage, save old AppImage
     - Enter your choice: 1
