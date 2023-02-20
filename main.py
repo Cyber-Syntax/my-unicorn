@@ -9,6 +9,7 @@ import hashlib
 import requests
 import base64
 import yaml
+import sys
 
 class AppImageDownloader:
     """ 
@@ -35,7 +36,7 @@ class AppImageDownloader:
         it is learned which functions to go and in which order, 
         and these functions are called accordingly.
         """
-        print("Welcome to the AppImage Downloader")
+        print("Welcome to the 🦄 my-unicorn!")
         print("Choose one of the following options:")
         print("1. Download the new latest AppImage, save old AppImage")
         print("2. Download the new latest AppImage, don't save old AppImage")
@@ -68,19 +69,14 @@ class AppImageDownloader:
             self.verify_sha()
         else:
             print("Invalid choice, try again")
-            self.ask_user()                        
+            self.ask_user()
     
     def learn_owner_repo(self):
         """
         Learn github owner and repo from github url
         """
-        while True:
-            if "github.com" not in self.url:
-                print("Invalid URL, please try again.")
-                continue
-            
+        while True:                                  
             # Parse the owner and repo from the URL
-            # https://github.com/johannesjo/super-productivity
             try:
                 self.owner = self.url.split("/")[3]
                 self.repo = self.url.split("/")[4]
@@ -113,11 +109,17 @@ class AppImageDownloader:
 
     def ask_inputs(self):
         """Ask the user for the owner and repo"""
-        self.url = input("Enter the app github url: ")
-        self.sha_name = input("Enter the sha name: ")
-        self.appimage_folder = input("Which directory(e.g /Documents/appimages)to save appimage: ")
-        self.hash_type = input("Enter the hash type for your sha (e.g md5, sha256, sha1) file: ")
-
+        # if user enter wrong inputs, then ask again
+        while True:
+            self.url = input("Enter the app github url: ").strip(" ")
+            self.sha_name = input("Enter the sha name: ").strip(" ")
+            self.appimage_folder = input("Which directory(e.g /Documents/appimages)to save appimage: ").strip(" ")
+            self.hash_type = input("Enter the hash type for your sha (e.g md5, sha256, sha1) file: ").strip(" ")
+        
+            if self.url and self.sha_name and self.appimage_folder and self.hash_type:
+                break
+            else:
+                print("Invalid inputs, please try again.")
 
     def save_credentials(self):
         """Save the credentials to a file in json format, one file per owner and repo"""
@@ -185,48 +187,87 @@ class AppImageDownloader:
             print(f"Error downloading {self.appimage_name} and {self.sha_name} file")
 
     def verify_sha(self):
-        """ Verify the sha of the downloaded appimage """                
+        """ Verify the sha of the downloaded appimage """               
         print(f"Verifying {self.appimage_name}...")   
-
-        if self.hash_type == "sha512":
-                # open yml file to encode hash
-            with open(self.sha_name, "r") as f:
-                encoded_hash = yaml.safe_load(f)["sha512"]  # Get the hash value from the yml file            
+        # if the sha_name endswith .yml or .yaml, then use the yaml module to parse the file
+        if self.sha_name.endswith(".yml") or self.sha_name.endswith(".yaml"):
             try:
-                # Decode the Base64 encoded hash value
-                decoded_hash = base64.b64decode(encoded_hash)
-                print("yml file decoding...")
-                # Calculate the SHA-512 hash of the file
-                sha512 = hashlib.sha512()
-                with open(self.appimage_name, "rb") as f:
-                    while True:
-                        data = f.read(4096)
-                        if not data:
-                            break
-                        sha512.update(data)
-                file_hash = sha512.digest()
-                
-                # Compare the two hash values
-                if file_hash == decoded_hash:
+                # request the sha file
+                response = requests.get(self.sha_url, timeout=10)
+                if response.status_code == 200:
+                    with open(self.sha_name, "w") as file:
+                        file.write(response.text)
+                    # parse the sha file
+                    with open(self.sha_name, "r") as file:
+                        sha = yaml.load(file, Loader=yaml.FullLoader)
+                    # get the sha from the sha file
+                    sha = sha[self.hash_type]
+                    # decode the sha
+                    decoded_hash = base64.b64decode(sha).hex()     
+                    # find appimage sha
+                    appimage_sha = hashlib.new(self.hash_type, open(self.appimage_name, "rb").read()).hexdigest() 
+                    
+                    if appimage_sha == decoded_hash:
+                        print(f"{self.appimage_name} verified")
+                        self.make_executable()
+                    else:
+                        print(f"Error verifying {self.appimage_name}")
+                        # ask user if he wants to delete the downloaded appimage
+                        if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
+                            os.remove(self.appimage_name)
+                            print(f"Deleted {self.appimage_name}")
+                        else:
+                            # Do you wanna continue really without verifiation?
+                            if input("Do you want to continue without verification? (y/n): ").lower() == "y":
+                                self.make_executable()
+                            else:
+                                sys.exit(1)
+            except Exception as e:
+                print(f"Error verifying {self.appimage_name}: {e}")
+                # ask user if he wants to delete the downloaded appimage
+                if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
+                    os.remove(self.appimage_name)
+                    print(f"Deleted {self.appimage_name}")
+                else:
+                    # Do you wanna continue really without verifiation?
+                    if input("Do you want to continue without verification? (y/n): ").lower() == "y":
+                        self.make_executable()
+                    else:
+                        sys.exit(1)
+        else:
+            # if the sha_name doesn't endswith .yml or .yaml, then use the normal sha verification        
+            try:
+                print(f"Verifying {self.appimage_name}...")
+                if hashlib.new(self.hash_type, open(self.appimage_name, "rb").read()).hexdigest() == \
+                    requests.get(self.sha_url, timeout=10).text.split(" ")[0]:
                     print(f"{self.appimage_name} verified")
                     self.make_executable()
-            except:
-                print("Unknown error while verify file!")
+                else:
+                    print(f"Error verifying {self.appimage_name}")
+                    # ask user if he wants to delete the downloaded appimage
+                    if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
+                        os.remove(self.appimage_name)
+                        print(f"Deleted {self.appimage_name}")            
+                    else:
+                        # Do you wanna continue really without verifiation?
+                        if input("Do you want to continue without verification? (y/n): ").lower() == "y":
+                            self.make_executable()
+                        else:
+                            print("Exiting...")
+                            sys.exit()
+            except ValueError as e:
+                print(f"Error verifying {self.appimage_name}, {e}")
+                # ask user if he wants to delete the downloaded appimage
+                if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
+                    os.remove(self.appimage_name)
+                    print(f"Deleted {self.appimage_name}")
+                else:
+                    # Do you wanna continue really without verifiation?
+                    if input("Do you want to continue without verification? (y/n): ").lower() == "y":
+                        self.make_executable()
+                    else:
+                        sys.exit(1)
 
-        elif hashlib.new(self.hash_type, open(self.appimage_name, "rb").read()).hexdigest() == \
-            requests.get(self.sha_url, timeout=10).text.split(" ")[0]:
-            print(f"{self.appimage_name} verified")
-            self.make_executable()
-        else:
-            print(f"Error verifying {self.appimage_name}")
-            # ask user if he wants to delete the downloaded appimage
-            if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
-                os.remove(self.appimage_name)
-                print(f"Deleted {self.appimage_name}")            
-            else:
-                # continue
-                pass        
-                
     def make_executable(self):
         """ Make the downloaded appimage executable """
         # if already executable, return
@@ -281,7 +322,11 @@ class AppImageDownloader:
     def move_appimage(self):
         """ Move appimages to a appimage folder """
         print(f"Moving {self.appimage_name} to {self.appimage_folder}")
-        subprocess.run(["mv", f"{self.repo}.AppImage", f"{self.appimage_folder}"], check=True)
+        # ask user
+        if input(f"Do you want to move {self.appimage_name} to {self.appimage_folder} (y/n): ") == "y":
+            subprocess.run(["mv", f"{self.repo}.AppImage", f"{self.appimage_folder}"], check=True)
+        else:
+            print(f"Not moving {self.appimage_name} to {self.appimage_folder}")
 
 # main
 if __name__ == "__main__":

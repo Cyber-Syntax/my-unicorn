@@ -140,3 +140,7 @@ dmypy.json
 
 # ignore vscode
 .vscode
+
+# ignore
+.sha512
+*.sha512

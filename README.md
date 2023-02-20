@@ -13,6 +13,11 @@
         - [X] sha512
         - [ ] md5 
         - [ ] sha1
+- <samp>Which projects work with this script?<samp>
+    - 🛠️ Tested; 
+        - [X] super-productivity
+        - [X] siyuan-note
+        - [X] Joplin        
 
 ## ‎ <samp>How to use<samp>
 - Example:
