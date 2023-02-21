@@ -1,3 +1,4 @@
+#!/usr/bin/python3 
 """
 This script downloads the latest AppImage from a given
 repository and saves the credentials to a file.
@@ -36,7 +37,7 @@ class AppImageDownloader:
         it is learned which functions to go and in which order, 
         and these functions are called accordingly.
         """
-        print("Welcome to the 🦄 my-unicorn!")
+        print("Welcome to the my-unicorn 🦄!")
         print("Choose one of the following options:")
         print("1. Download the new latest AppImage, save old AppImage")
         print("2. Download the new latest AppImage, don't save old AppImage")
@@ -59,12 +60,14 @@ class AppImageDownloader:
             self.save_credentials()
             self.verify_sha()
         elif choice == 3:
-            self.list_json_files()            
+            self.list_json_files()    
+            self.update_json()        
             self.backup_old_appimage()
             self.download()
             self.verify_sha()
         elif choice == 4:
             self.list_json_files()
+            self.update_json()
             self.download()
             self.verify_sha()
         else:
@@ -161,6 +164,7 @@ class AppImageDownloader:
                 self.appimage_folder = self.appimages["appimage_folder"]
         else:
             print(f"{self.repo}.json file not found while trying to load credentials")
+            self.ask_user()        
 
     def download(self):
         """Get the credentials, urls from the api"""
@@ -186,6 +190,11 @@ class AppImageDownloader:
         else:
             print(f"Error downloading {self.appimage_name} and {self.sha_name} file")
 
+        # update version in the json file
+        self.appimages["version"] = self.version
+        with open(f"{self.repo}.json", "w", encoding="utf-8") as file:
+            json.dump(self.appimages, file, indent=4)        
+
     def verify_sha(self):
         """ Verify the sha of the downloaded appimage """               
         print(f"Verifying {self.appimage_name}...")   
@@ -210,6 +219,12 @@ class AppImageDownloader:
                     if appimage_sha == decoded_hash:
                         print(f"{self.appimage_name} verified")
                         self.make_executable()
+                        # ask user if he wants to delete the downloaded sha file
+                        if input("Do you want to delete the downloaded sha file? (y/n): ").lower() == "y":
+                            os.remove(self.sha_name)
+                            print(f"Deleted {self.sha_name}")
+                        else:
+                            print(f"Saved {self.sha_name}")                        
                     else:
                         print(f"Error verifying {self.appimage_name}")
                         # ask user if he wants to delete the downloaded appimage
@@ -322,11 +337,41 @@ class AppImageDownloader:
     def move_appimage(self):
         """ Move appimages to a appimage folder """
         print(f"Moving {self.appimage_name} to {self.appimage_folder}")
+        self.load_credentials()
         # ask user
         if input(f"Do you want to move {self.appimage_name} to {self.appimage_folder} (y/n): ") == "y":
             subprocess.run(["mv", f"{self.repo}.AppImage", f"{self.appimage_folder}"], check=True)
         else:
             print(f"Not moving {self.appimage_name} to {self.appimage_folder}")
+
+    def update_json(self):
+        """Update json files with new version and if user want to change appimage file, sha name etc."""
+        if input("Do you want to change some credentials? (y/n): ").lower() == "y":
+            with open(f"{self.repo}.json", "r", encoding="utf-8") as file:
+                self.appimages = json.load(file)
+            
+            if input("Do you want to change the appimage folder? (y/n): ").lower() == "y":
+                self.appimages["appimage_folder"] = input("Enter new appimage folder: ")
+                if not self.appimages["appimage_folder"].endswith("/") and not self.appimages["appimage_folder"].startswith("~"):
+                    self.appimages["appimage_folder"] = os.path.expanduser("~") + self.appimages["appimage_folder"] + "/"
+                elif self.appimages["appimage_folder"].startswith("~") and self.appimages["appimage_folder"].endswith("/"):
+                    self.appimages["appimage_folder"] = os.path.expanduser("~") + self.appimages["appimage_folder"]
+                elif self.appimages["appimage_folder"].startswith("~") and not self.appimages["appimage_folder"].endswith("/"):
+                    self.appimages["appimage_folder"] = os.path.expanduser("~") + self.appimages["appimage_folder"] + "/"
+                else:
+                    self.appimages["appimage_folder"] = os.path.expanduser("~") + self.appimages["appimage_folder"]
+            
+            # ask for sha_name and hash_type
+            keys = {"sha_name", "hash_type"}
+            for key in keys:
+                if input(f"Do you want to change the {key}? (y/n): ").lower() == "y":
+                    self.appimages[key] = input(f"Enter new {key}: ")            
+
+            # write new credentials to json file
+            with open(f"{self.repo}.json", "w", encoding="utf-8") as file:
+                json.dump(self.appimages, file, indent=4)
+        else:
+            print("Not changing credentials")
 
 # main
 if __name__ == "__main__":
