@@ -1,4 +1,4 @@
-#!/usr/bin/python3 
+#!/usr/bin/python3
 """
 This script downloads the latest AppImage from a given
 repository and saves the credentials to a file.
@@ -7,10 +7,11 @@ import json
 import os
 import subprocess
 import hashlib
-import requests
 import base64
-import yaml
 import sys
+import requests
+import yaml
+
 
 class AppImageDownloader:
     """ 
@@ -45,37 +46,42 @@ class AppImageDownloader:
         print("3. Update the latest AppImage from a json file, save old AppImage")
         print("4. Update the latest AppImage from a json file, don't save old AppImage")
         print("6. Exit")
-        if choice in self.repo.json:
-            choice == self.appimages['choice']
-        else:
-            choice = int(input("Enter your choice: "))
-            if choice == 1:
-                self.ask_inputs()
-                self.learn_owner_repo()
-                self.download()
-                self.save_credentials()
-                self.backup_old_appimage()
-                self.verify_sha()
-            elif choice == 2:
-                self.ask_inputs()
-                self.learn_owner_repo()
-                self.download()
-                self.save_credentials()
-                self.verify_sha()
-            elif choice == 3:
-                self.list_json_files()    
-                self.update_json()        
-                self.backup_old_appimage()
-                self.download()
-                self.verify_sha()
-            elif choice == 4:
-                self.list_json_files()
-                self.update_json()
-                self.download()
-                self.verify_sha()
-            else:
+        # Save choices to json file
+        while True:
+            try:
+                self.choice = int(input("Enter your choice: "))
+                
+                if self.choice == 1:
+                    self.ask_inputs()
+                    self.learn_owner_repo()
+                    self.download()
+                    self.save_credentials()
+                    self.backup_old_appimage()
+                    self.verify_sha()
+                elif self.choice == 2:
+                    self.ask_inputs()
+                    self.learn_owner_repo()
+                    self.download()
+                    self.save_credentials()
+                    self.verify_sha()
+                elif self.choice == 3:
+                    self.list_json_files()    
+                    self.update_json()        
+                    self.backup_old_appimage()
+                    self.download()
+                    self.verify_sha()
+                elif self.choice == 4:
+                    self.list_json_files()
+                    self.update_json()
+                    self.download()
+                    self.verify_sha()
+                else:
+                    print("Invalid choice, try again")
+                    self.ask_user() 
+            except ValueError:
                 print("Invalid choice, try again")
-                self.ask_user()
+                self.ask_user()        
+           
     
     def learn_owner_repo(self):
         while True:                                  
@@ -85,7 +91,7 @@ class AppImageDownloader:
                 self.repo = self.url.split("/")[4]
                 self.url = f"https://github.com/{self.owner}/{self.repo}"
                 break
-            except:
+            except IndexError:
                 print("Invalid URL, please try again.")
                 self.ask_user()
 
@@ -203,7 +209,7 @@ class AppImageDownloader:
             try:
                 response = requests.get(self.sha_url, timeout=10)
                 if response.status_code == 200:
-                    with open(self.sha_name, "w") as file:
+                    with open(self.sha_name, "w") as file: 
                         file.write(response.text)
                     # parse the sha file
                     with open(self.sha_name, "r") as file:
