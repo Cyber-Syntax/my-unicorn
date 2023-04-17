@@ -1,9 +1,10 @@
 {
+    "version": "7.13.2",
     "owner": "johannesjo",
     "repo": "super-productivity",
-    "appimage": "superProductivity-7.12.2.AppImage",
-    "version": "7.12.2",
+    "appimage": "superProductivity-7.13.2.AppImage",
     "sha": "latest-linux.yml",
+    "choice": "4",
     "hash_type": "sha512",
-    "appimage_folder": "/home/developer/Documents/appimages/"
+    "appimage_folder": "/home/codespace/workspaces/my-unicorn/"
 }

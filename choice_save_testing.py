@@ -33,58 +33,59 @@ class AppImageDownloader:
         self.appimages = {}
 
     def ask_user(self):
-        """
-        All questions are asked to the user and their answers are recorded. 
-        Based on the recorded answers, 
-        it is learned which functions to go and in which order, 
-        and these functions are called accordingly.
-        """
+        """All questions are asked to the user and their answers are recorded. """
         print("Welcome to the my-unicorn 🦄!")
-        print("Choose one of the following options:")
-        print("1. Download the new latest AppImage, save old AppImage")
-        print("2. Download the new latest AppImage, don't save old AppImage")
-        print("3. Update the latest AppImage from a json file, save old AppImage")
-        print("4. Update the latest AppImage from a json file, don't save old AppImage")
-        print("6. Exit")
-        # Save choices to json file
-        while True:
-            try:
-                self.choice = int(input("Enter your choice: "))
-                
-                if self.choice == 1:
-                    self.ask_inputs()
-                    self.learn_owner_repo()
-                    self.download()
-                    self.save_credentials()
-                    self.backup_old_appimage()
-                    self.verify_sha()
-                elif self.choice == 2:
-                    self.ask_inputs()
-                    self.learn_owner_repo()
-                    self.download()
-                    self.save_credentials()
-                    self.verify_sha()
-                elif self.choice == 3:
-                    self.list_json_files()    
-                    self.update_json()        
-                    self.backup_old_appimage()
-                    self.download()
-                    self.verify_sha()
-                elif self.choice == 4:
-                    self.list_json_files()
-                    self.update_json()
-                    self.download()
-                    self.verify_sha()
-                else:
-                    print("Invalid choice, try again")
-                    self.ask_user() 
-            except ValueError:
-                print("Invalid choice, try again")
-                self.ask_user()        
-           
-    
+        
+        if input("Do you want to download new appimage? (y/n): ").lower() == "y":
+            print("Choose one of the following options:")
+            print("1. Download the new latest AppImage, save old AppImage")
+            print("2. Download the new latest AppImage, don't save old AppImage")
+            print("3. Exit")
+            self.choice = int(input("Enter your choice: "))
+            if self.choice == 1:
+                self.ask_inputs()
+                self.learn_owner_repo()
+                self.download()
+                self.save_credentials()
+                self.backup_old_appimage()
+                self.verify_sha()
+            elif self.choice == 2:
+                self.ask_inputs()
+                self.learn_owner_repo()
+                self.download()
+                self.verify_sha()
+            elif self.choice == 3:
+                sys.exit()            
+        else:
+            self.list_json_files()
+
+        if self.choice is None or self.choice in [0, 1, 2]:
+            print("Choose one of the following options:")                    
+            print("3. Update the latest AppImage from a json file, save old AppImage")
+            print("4. Update the latest AppImage from a json file, don't save old AppImage")
+            print("5. 'Ctrl + c' for exit")                    
+            self.choice = int(input("Enter your choice: "))
+            self.appimages["choice"] = self.choice
+            if self.choice == 3:
+                self.update_json()
+                self.backup_old_appimage()
+                self.download()
+                self.verify_sha()
+            elif self.choice == 4:
+                self.update_json()
+                self.download()
+                self.verify_sha()
+            # save choice to json file
+            self.save_credentials()
+
+        elif self.appimages["choice"] is not None:
+            self.choice = self.appimages["choice"]
+        else:
+            print("Invalid choice, try again")
+            self.ask_user()  
+
     def learn_owner_repo(self):
-        while True:                                  
+        while True:
             # Parse the owner and repo from the URL
             try:
                 self.owner = self.url.split("/")[3]
@@ -98,8 +99,7 @@ class AppImageDownloader:
 
     def list_json_files(self):
         """
-        List the json files in the current directory, if json file exists,
-        then ask user to backup old appimage
+        List the json files in the current directory, if json file exists.
         """
         json_files = [file for file in os.listdir() if file.endswith(".json")]
         if len(json_files) > 1:
@@ -118,13 +118,12 @@ class AppImageDownloader:
 
     def ask_inputs(self):
         """Ask the user for the owner and repo"""
-        # if user enter wrong inputs, then ask again
         while True:
             self.url = input("Enter the app github url: ").strip(" ")
             self.sha_name = input("Enter the sha name: ").strip(" ")
             self.appimage_folder = input("Which directory(e.g /Documents/appimages)to save appimage: ").strip(" ")
             self.hash_type = input("Enter the hash type for your sha (e.g md5, sha256, sha1) file: ").strip(" ")
-        
+
             if self.url and self.sha_name and self.appimage_folder and self.hash_type:
                 break
             else:
@@ -153,9 +152,7 @@ class AppImageDownloader:
         self.load_credentials()
 
     def load_credentials(self):
-        """
-        Load the credentials from a file in json format, one file per owner and repo
-        """
+        """Load the credentials from a file in json format, one file per owner and repo"""
         if os.path.exists(f"{self.repo}.json"):
             with open(f"{self.repo}.json", "r", encoding="utf-8") as file:
                 self.appimages = json.load(file)
@@ -175,6 +172,7 @@ class AppImageDownloader:
             self.ask_user()        
 
     def download(self):
+        """ Download the appimage from the github api"""
         self.api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
         response = requests.get(self.api_url, timeout=10)
         if response.status_code == 200:
@@ -206,78 +204,56 @@ class AppImageDownloader:
         print(f"Verifying {self.appimage_name}...")   
         # if the sha_name endswith .yml or .yaml, then use the yaml module to parse the file
         if self.sha_name.endswith(".yml") or self.sha_name.endswith(".yaml"):
-            try:
-                response = requests.get(self.sha_url, timeout=10)
-                if response.status_code == 200:
-                    with open(self.sha_name, "w") as file: 
-                        file.write(response.text)
-                    # parse the sha file
-                    with open(self.sha_name, "r") as file:
-                        sha = yaml.load(file, Loader=yaml.FullLoader)
-                    # get the sha from the sha file
-                    sha = sha[self.hash_type]
-                    decoded_hash = base64.b64decode(sha).hex()     
-                    # find appimage sha
-                    appimage_sha = hashlib.new(self.hash_type, open(self.appimage_name, "rb").read()).hexdigest() 
-                    
-                    if appimage_sha == decoded_hash:
-                        print(f"{self.appimage_name} verified")
-                        self.make_executable()
-                        if input("Do you want to delete the downloaded sha file? (y/n): ").lower() == "y":
-                            os.remove(self.sha_name)
-                            print(f"Deleted {self.sha_name}")
-                        else:
-                            print(f"Saved {self.sha_name}")                        
-                    else:
-                        print(f"Error verifying {self.appimage_name}")
-                        if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
-                            os.remove(self.appimage_name)
-                            print(f"Deleted {self.appimage_name}")
-                        else:
-                            if input("Do you want to continue without verification? (y/n): ").lower() == "y":
-                                self.make_executable()
-                            else:
-                                sys.exit(1)
-            except Exception as e:
-                print(f"Error verifying {self.appimage_name}: {e}")
-                if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
-                    os.remove(self.appimage_name)
-                    print(f"Deleted {self.appimage_name}")
-                else:
-                    if input("Do you want to continue without verification? (y/n): ").lower() == "y":
-                        self.make_executable()
-                    else:
-                        sys.exit(1)
-        else:
-            # if the sha_name doesn't endswith .yml or .yaml, then use the normal sha verification        
-            try:
-                print(f"Verifying {self.appimage_name}...")
-                if hashlib.new(self.hash_type, open(self.appimage_name, "rb").read()).hexdigest() == \
-                    requests.get(self.sha_url, timeout=10).text.split(" ")[0]:
+            response = requests.get(self.sha_url, timeout=10)
+            if response.status_code == 200:
+                with open(self.sha_name, "w", encoding="utf-8") as file: 
+                    file.write(response.text)
+                # parse the sha file
+                with open(self.sha_name, "r", encoding="utf-8") as file:
+                    sha = yaml.load(file, Loader=yaml.FullLoader)
+                # get the sha from the sha file
+                sha = sha[self.hash_type]
+                decoded_hash = base64.b64decode(sha).hex()     
+                # find appimage sha
+                appimage_sha = hashlib.new(self.hash_type, open(self.appimage_name, "rb").read()).hexdigest() 
+                
+                if appimage_sha == decoded_hash:
                     print(f"{self.appimage_name} verified")
                     self.make_executable()
+                    if input("Do you want to delete the downloaded sha file? (y/n): ").lower() == "y":
+                        os.remove(self.sha_name)
+                        print(f"Deleted {self.sha_name}")
+                    else:
+                        print(f"Saved {self.sha_name}")                        
                 else:
                     print(f"Error verifying {self.appimage_name}")
-                    # ask user if he wants to delete the downloaded appimage
                     if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
                         os.remove(self.appimage_name)
-                        print(f"Deleted {self.appimage_name}")            
+                        print(f"Deleted {self.appimage_name}")
                     else:
                         if input("Do you want to continue without verification? (y/n): ").lower() == "y":
-                            self.make_executable()
+                            self.make_executable()                
                         else:
-                            print("Exiting...")
-                            sys.exit()
-            except ValueError as e:
-                print(f"Error verifying {self.appimage_name}, {e}")
+                            sys.exit(1)
+        else:
+            # if the sha_name doesn't endswith .yml or .yaml, then use the normal sha verification        
+            print(f"Verifying {self.appimage_name}...")
+            if hashlib.new(self.hash_type, open(self.appimage_name, "rb").read()).hexdigest() == \
+                requests.get(self.sha_url, timeout=10).text.split(" ")[0]:
+                print(f"{self.appimage_name} verified")
+                self.make_executable()
+            else:
+                print(f"Error verifying {self.appimage_name}")
+                # ask user if he wants to delete the downloaded appimage
                 if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
                     os.remove(self.appimage_name)
-                    print(f"Deleted {self.appimage_name}")
+                    print(f"Deleted {self.appimage_name}")            
                 else:
                     if input("Do you want to continue without verification? (y/n): ").lower() == "y":
                         self.make_executable()
                     else:
-                        sys.exit(1)
+                        print("Exiting...")
+                        sys.exit()
 
     def make_executable(self):
         # if already executable, return
@@ -357,7 +333,7 @@ class AppImageDownloader:
                     self.appimages["appimage_folder"] = os.path.expanduser("~") + self.appimages["appimage_folder"]
             
             # ask for sha_name and hash_type
-            keys = {"sha_name", "hash_type"}
+            keys = {"sha_name", "hash_type", "choice"}
             for key in keys:
                 if input(f"Do you want to change the {key}? (y/n): ").lower() == "y":
                     self.appimages[key] = input(f"Enter new {key}: ")            
