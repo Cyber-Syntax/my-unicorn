@@ -129,18 +129,13 @@ dmypy.json
 .pyre/
 
 # ignore appimages
-*.AppImage
-*.appimage
-.AppImage
-.appimage
-
+*AppImage*
+*appimage*
 # ignore flowchart
-*.xopp
-.xopp
-
+*xopp*
 # ignore vscode
 .vscode
-
 # ignore
-.sha512
-*.sha512
+*sha512*
+# test
+*test*
