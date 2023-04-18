@@ -21,6 +21,7 @@
 
 ## ‎ <samp>How to use<samp>
 - Example:
+    - `python3 main.py`
     - Do you want to download new appimage? (y/n): y
     - Enter your choice: 1
     - Enter the app github url: https://github.com/siyuan-note/siyuan
