@@ -53,6 +53,7 @@ class AppImageDownloader:
                 self.ask_inputs()
                 self.learn_owner_repo()
                 self.download()
+                self.save_credentials()
                 self.verify_sha()
             elif self.choice == 3:
                 sys.exit()
