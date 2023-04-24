@@ -53,17 +53,18 @@ class AppImageDownloader:
                 self.ask_inputs()
                 self.learn_owner_repo()
                 self.download()
+                self.save_credentials()
                 self.verify_sha()
             elif self.choice == 3:
-                sys.exit()            
+                sys.exit()
         else:
             self.list_json_files()
 
         if self.choice is None or self.choice in [0, 1, 2]:
-            print("Choose one of the following options:")                    
+            print("Choose one of the following options:")
             print("3. Update the latest AppImage from a json file, save old AppImage")
             print("4. Update the latest AppImage from a json file, don't save old AppImage")
-            print("5. 'Ctrl + c' for exit")                    
+            print("5. 'Ctrl + c' for exit")
             self.choice = int(input("Enter your choice: "))
             self.appimages["choice"] = self.choice
             if self.choice == 3:
@@ -82,7 +83,7 @@ class AppImageDownloader:
             self.choice = self.appimages["choice"]
         else:
             print("Invalid choice, try again")
-            self.ask_user()  
+            self.ask_user()
 
     def learn_owner_repo(self):
         while True:
@@ -169,7 +170,7 @@ class AppImageDownloader:
                 self.appimage_folder = self.appimages["appimage_folder"]
         else:
             print(f"{self.repo}.json file not found while trying to load credentials")
-            self.ask_user()        
+            self.ask_user()
 
     def download(self):
         """ Download the appimage from the github api"""
@@ -198,15 +199,15 @@ class AppImageDownloader:
         # update version in the json file
         self.appimages["version"] = self.version
         with open(f"{self.repo}.json", "w", encoding="utf-8") as file:
-            json.dump(self.appimages, file, indent=4)        
+            json.dump(self.appimages, file, indent=4)
 
     def verify_sha(self):
-        print(f"Verifying {self.appimage_name}...")   
+        print(f"Verifying {self.appimage_name}...")
         # if the sha_name endswith .yml or .yaml, then use the yaml module to parse the file
         if self.sha_name.endswith(".yml") or self.sha_name.endswith(".yaml"):
             response = requests.get(self.sha_url, timeout=10)
             if response.status_code == 200:
-                with open(self.sha_name, "w", encoding="utf-8") as file: 
+                with open(self.sha_name, "w", encoding="utf-8") as file:
                     file.write(response.text)
                 # parse the sha file
                 with open(self.sha_name, "r", encoding="utf-8") as file:
