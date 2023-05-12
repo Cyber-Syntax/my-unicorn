@@ -1,8 +1,4 @@
 #!/usr/bin/python3
-"""
-This script downloads the latest AppImage from a given
-repository and saves the credentials to a file.
-"""
 import json
 import os
 import subprocess
@@ -12,12 +8,7 @@ import sys
 import requests
 import yaml
 
-
 class AppImageDownloader:
-    """ 
-    This class downloads the latest AppImage from a given
-    repository and saves the credentials to a file.
-    """
     def __init__(self):
         self.owner = None
         self.repo = None
@@ -34,31 +25,36 @@ class AppImageDownloader:
 
     def ask_user(self):
         """All questions are asked to the user and their answers are recorded. """
-        print("Welcome to the my-unicorn 🦄!")
-        
+        print("Welcome to the my-unicorn 🦄!")                
+
         if input("Do you want to download new appimage? (y/n): ").lower() == "y":
             print("Choose one of the following options:")
             print("1. Download the new latest AppImage, save old AppImage")
             print("2. Download the new latest AppImage, don't save old AppImage")
             print("3. Exit")
-            self.choice = int(input("Enter your choice: "))
-            if self.choice == 1:
+            # TODO, 3 don't save choice 1,2
+            choice = int(input("Enter your choice: "))
+            if choice == 1:
                 self.ask_inputs()
                 self.learn_owner_repo()
                 self.download()
                 self.save_credentials()
                 self.backup_old_appimage()
                 self.verify_sha()
-            elif self.choice == 2:
+            elif choice == 2:
                 self.ask_inputs()
                 self.learn_owner_repo()
                 self.download()
                 self.save_credentials()
                 self.verify_sha()
-            elif self.choice == 3:
+            elif choice == 3:
                 sys.exit()
-        else:
-            self.list_json_files()
+        # NOTE, 4 is working
+        # !, test 3,2,1
+        METHODS = {
+            3: ['list_json_files', 'update_json', 'download', 'backup_old_appimage', 'verify_sha'],
+            4: ['list_json_files', 'update_json', 'download', 'verify_sha']
+        }
 
         if self.choice is None or self.choice in [0, 1, 2]:
             print("Choose one of the following options:")
@@ -66,25 +62,27 @@ class AppImageDownloader:
             print("4. Update the latest AppImage from a json file, don't save old AppImage")
             print("5. 'Ctrl + c' for exit")
             self.choice = int(input("Enter your choice: "))
-            self.appimages["choice"] = self.choice
-            if self.choice == 3:
-                self.update_json()
-                self.backup_old_appimage()
-                self.download()
-                self.verify_sha()
-            elif self.choice == 4:
-                self.update_json()
-                self.download()
-                self.verify_sha()
             # save choice to json file
-            self.save_credentials()
+            self.appimages["choice"] = self.choice
+            
+            # !, Worked.
+            
+            for method_name in METHODS[self.choice]:
+                print(METHODS[self.choice][0])
+                method = getattr(self, method_name)
+                method()
 
-        elif self.appimages["choice"] is not None:
+        elif self.appimages["choice"] is not None or self.choice in [3, 4]:
             self.choice = self.appimages["choice"]
+            
+            for method_name in METHODS[self.choice]:
+                print(METHODS[self.choice][0])
+                method = getattr(self, method_name)
+                method()
         else:
             print("Invalid choice, try again")
             self.ask_user()
-
+    
     def learn_owner_repo(self):
         while True:
             # Parse the owner and repo from the URL
@@ -97,14 +95,13 @@ class AppImageDownloader:
                 print("Invalid URL, please try again.")
                 self.ask_user()
 
-
     def list_json_files(self):
         """
         List the json files in the current directory, if json file exists.
         """
         json_files = [file for file in os.listdir() if file.endswith(".json")]
         if len(json_files) > 1:
-            print("There are more than one .json file, please choose one of them.")
+            print("There are more than one .json file, please choose one of them:")
             for index, file in enumerate(json_files):
                 print(f"{index + 1}. {file}")
             choice = int(input("Enter your choice: "))
@@ -139,13 +136,16 @@ class AppImageDownloader:
         self.appimages["sha"] = self.sha_name
         self.appimages["choice"] = self.choice
         self.appimages["hash_type"] = self.hash_type
-        # add "/" to the end of the path if not exists
-        if not self.appimage_folder.endswith("/") and not self.appimage_folder.startswith("~"):
-            self.appimages["appimage_folder"] = os.path.expanduser("~") + self.appimage_folder + "/"
-        elif self.appimage_folder.startswith("~") and self.appimage_folder.endswith("/"):
-            self.appimage_folder = os.path.expanduser("~") + self.appimage_folder
-        elif self.appimage_folder.startswith("~") and not self.appimage_folder.endswith("/"):
-            self.appimages["appimage_folder"] = self.appimage_folder + "/"
+
+        if not self.appimage_folder.endswith("/"):
+            self.appimages["appimage_folder"] = self.appimage_folder + "/"            
+        else:
+            self.appimages["appimage_folder"] = self.appimage_folder
+
+        if not self.appimage_folder.startswith("~"):
+            self.appimages["appimage_folder"] = os.path.expanduser("~") + self.appimage_folder        
+        else:
+            self.appimages["appimage_folder"] = os.path.expanduser(self.appimage_folder)
 
         with open(f"{self.repo}.json", "w", encoding="utf-8") as file:
             json.dump(self.appimages, file, indent=4)
