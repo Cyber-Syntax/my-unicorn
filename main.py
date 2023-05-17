@@ -25,7 +25,14 @@ class AppImageDownloader:
 
     def ask_user(self):
         """All questions are asked to the user and their answers are recorded. """
-        print("Welcome to the my-unicorn 🦄!")                
+        print("Welcome to the my-unicorn 🦄!")  
+
+        METHODS = {
+            1: ['ask_inputs', 'learn_owner_repo', 'download', 'save_credentials', 'backup_old_appimage', 'verify_sha'],
+            2: ['ask_inputs', 'learn_owner_repo', 'download', 'save_credentials', 'verify_sha'],
+            3: ['list_json_files', 'update_json', 'download', 'backup_old_appimage', 'verify_sha'],
+            4: ['list_json_files', 'update_json', 'download', 'verify_sha']
+        }
 
         if input("Do you want to download new appimage? (y/n): ").lower() == "y":
             print("Choose one of the following options:")
@@ -34,47 +41,38 @@ class AppImageDownloader:
             print("3. Exit")
             # TODO, 3 don't save choice 1,2
             choice = int(input("Enter your choice: "))
-            if choice == 1:
-                self.ask_inputs()
-                self.learn_owner_repo()
-                self.download()
-                self.save_credentials()
-                self.backup_old_appimage()
-                self.verify_sha()
-            elif choice == 2:
-                self.ask_inputs()
-                self.learn_owner_repo()
-                self.download()
-                self.save_credentials()
-                self.verify_sha()
-            elif choice == 3:
-                sys.exit()
-        # NOTE, 4 is working
-        # !, test 3,2,1
-        METHODS = {
-            3: ['list_json_files', 'update_json', 'download', 'backup_old_appimage', 'verify_sha'],
-            4: ['list_json_files', 'update_json', 'download', 'verify_sha']
-        }
 
-        if self.choice is None or self.choice in [0, 1, 2]:
+            if choice in [1, 2]:
+                choice = choice
+                for method_name in METHODS[choice]:
+                    print(METHODS[choice][0])
+                    method = getattr(self, method_name)
+                    method()
+            elif choice == 3:
+                sys.exit(1)
+            else:
+                print("Invalid choice, try again")
+                self.ask_user()
+
+        elif self.choice is None or null or self.choice in [0, 1, 2]:
             print("Choose one of the following options:")
             print("3. Update the latest AppImage from a json file, save old AppImage")
             print("4. Update the latest AppImage from a json file, don't save old AppImage")
-            print("5. 'Ctrl + c' for exit")
+            print("5. \"Ctrl + c\" for exit")
             self.choice = int(input("Enter your choice: "))
             # save choice to json file
             self.appimages["choice"] = self.choice
-            
+
             # !, Worked.
-            
+
             for method_name in METHODS[self.choice]:
                 print(METHODS[self.choice][0])
                 method = getattr(self, method_name)
                 method()
 
-        elif self.appimages["choice"] is not None or self.choice in [3, 4]:
+        if self.appimages["choice"] is not None or self.choice in [3, 4]:
             self.choice = self.appimages["choice"]
-            
+
             for method_name in METHODS[self.choice]:
                 print(METHODS[self.choice][0])
                 method = getattr(self, method_name)
@@ -192,7 +190,7 @@ class AppImageDownloader:
         if response.status_code == 200:
             with open(self.appimage_name, "wb") as file:
                 file.write(response.content)
-            print(f"Downloaded {self.appimage_name} and {self.sha_name} file")
+            print(f"\n{self.appimage_name} and {self.sha_name} downloaded ")
         else:
             print(f"Error downloading {self.appimage_name} and {self.sha_name} file")
 
