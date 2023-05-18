@@ -17,7 +17,17 @@
     - 🛠️ Tested; 
         - [X] super-productivity
         - [X] siyuan-note
-        - [X] Joplin        
+        - [X] Joplin    
+
+## ‎ <samp>Dependencies<samp>
+- Install dependencies if you don't have them.
+    - Dependencies:
+        - `python3`
+        - `git`
+        - `pip3`
+        - `python3-pip`
+    - Install dependencies:    
+        - `pip3 install json os subprocess hashlib base64 sys requests yaml`
 
 ## ‎ <samp>What you need to know before using<samp>
 1. Github url (https://github.com/johannesjo/super-productivity)
