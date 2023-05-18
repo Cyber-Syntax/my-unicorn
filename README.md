@@ -91,4 +91,4 @@
 
 ## ‎ <samp>LICENSE<samp>
 - This script is licensed under the [GPL 3.0 License].
-You can find a copy of the license in the [LICENSE] file or at https://www.gnu.org/licenses/gpl-3.0.en.html
+You can find a copy of the license in the [LICENSE](https://github.com/Cyber-Syntax/my-unicorn/blob/main/LICENSE) file or at [www.gnu.org](https://www.gnu.org/licenses/gpl-3.0.en.html)
