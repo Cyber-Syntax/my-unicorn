@@ -39,11 +39,10 @@ class AppImageDownloader:
             print("1. Download the new latest AppImage, save old AppImage")
             print("2. Download the new latest AppImage, don't save old AppImage")
             print("3. Exit")
-            # TODO, 3 don't save choice 1,2
-            choice = int(input("Enter your choice: "))
-
+            choice = int(input("Enter your choice: "))            
             if choice in [1, 2]:
                 choice = choice
+                # choose methods from METHODS dict
                 for method_name in METHODS[choice]:
                     print(METHODS[choice][0])
                     method = getattr(self, method_name)
@@ -53,7 +52,11 @@ class AppImageDownloader:
             else:
                 print("Invalid choice, try again")
                 self.ask_user()
-
+        
+        #TODO,super productivity cause error even null added. 
+        # That's gonna be need to fix because new appimages cannot be downloaded.
+        # 
+    
         elif self.choice is None or null or self.choice in [0, 1, 2]:
             print("Choose one of the following options:")
             print("3. Update the latest AppImage from a json file, save old AppImage")
@@ -63,8 +66,7 @@ class AppImageDownloader:
             # save choice to json file
             self.appimages["choice"] = self.choice
 
-            # !, Worked.
-
+            # choose methods from METHODS dict NOTE maybe this is not necessary. TEST IT!
             for method_name in METHODS[self.choice]:
                 print(METHODS[self.choice][0])
                 method = getattr(self, method_name)
@@ -73,6 +75,7 @@ class AppImageDownloader:
         if self.appimages["choice"] is not None or self.choice in [3, 4]:
             self.choice = self.appimages["choice"]
 
+            #NOTE, This is choose methods from METHODS dict but it's not usable because we already asking user to choose 3 or 4.
             for method_name in METHODS[self.choice]:
                 print(METHODS[self.choice][0])
                 method = getattr(self, method_name)
