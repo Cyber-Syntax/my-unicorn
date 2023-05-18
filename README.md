@@ -89,3 +89,6 @@
                 - Enter new hash type:sha512
             - Downloading started...
 
+## ‎ <samp>LICENSE<samp>
+- This script is licensed under the [GPL 3.0 License].
+You can find a copy of the license in the [LICENSE] file or at https://www.gnu.org/licenses/gpl-3.0.en.html
