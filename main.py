@@ -21,68 +21,52 @@ class AppImageDownloader:
         self.hash_type = None
         self.url = None
         self.choice = None
-        self.appimages = {}
-
-    def ask_user(self):
-        """All questions are asked to the user and their answers are recorded. """
-        print("Welcome to the my-unicorn 🦄!")  
-
-        METHODS = {
+        self.functions = {
             1: ['ask_inputs', 'learn_owner_repo', 'download', 'save_credentials', 'backup_old_appimage', 'verify_sha'],
             2: ['ask_inputs', 'learn_owner_repo', 'download', 'save_credentials', 'verify_sha'],
-            3: ['list_json_files', 'update_json', 'download', 'backup_old_appimage', 'verify_sha'],
-            4: ['list_json_files', 'update_json', 'download', 'verify_sha']
+            3: ['update_json', 'download', 'backup_old_appimage', 'verify_sha'],
+            4: ['update_json', 'download', 'verify_sha']
         }
+        self.appimages = {}
 
-        if input("Do you want to download new appimage? (y/n): ").lower() == "y":
-            print("Choose one of the following options:")
-            print("1. Download the new latest AppImage, save old AppImage")
-            print("2. Download the new latest AppImage, don't save old AppImage")
-            print("3. Exit")
-            choice = int(input("Enter your choice: "))            
-            if choice in [1, 2]:
-                choice = choice
-                # choose methods from METHODS dict
-                for method_name in METHODS[choice]:
-                    print(METHODS[choice][0])
-                    method = getattr(self, method_name)
-                    method()
-            elif choice == 3:
-                sys.exit(1)
+    def menu(self):
+        print("Welcome to the my-unicorn 🦄!")  
+        print("Choose one of the following options:")
+        print("1. Update appimage from json file")
+        print("2. Download new appimage")
+        print("3. Exit")
+        choice = int(input("Enter your choice: "))
+        if choice == 1:
+            self.list_json_files()
+            if self.choice in [3, 4]:
+                self.execute_functions(self.functions[self.choice])
             else:
-                print("Invalid choice, try again")
-                self.ask_user()
-        
-        #TODO,super productivity cause error even null added. 
-        # That's gonna be need to fix because new appimages cannot be downloaded.
-        # 
-    
-        elif self.choice is None or null or self.choice in [0, 1, 2]:
-            print("Choose one of the following options:")
-            print("3. Update the latest AppImage from a json file, save old AppImage")
-            print("4. Update the latest AppImage from a json file, don't save old AppImage")
-            print("5. \"Ctrl + c\" for exit")
-            self.choice = int(input("Enter your choice: "))
-            # save choice to json file
-            self.appimages["choice"] = self.choice
-
-            # choose methods from METHODS dict NOTE maybe this is not necessary. TEST IT!
-            for method_name in METHODS[self.choice]:
-                print(METHODS[self.choice][0])
-                method = getattr(self, method_name)
-                method()
-
-        if self.appimages["choice"] is not None or self.choice in [3, 4]:
-            self.choice = self.appimages["choice"]
-
-            #NOTE, This is choose methods from METHODS dict but it's not usable because we already asking user to choose 3 or 4.
-            for method_name in METHODS[self.choice]:
-                print(METHODS[self.choice][0])
-                method = getattr(self, method_name)
-                method()
-        else:
-            print("Invalid choice, try again")
+                print("Invalid choice. Look json file.")
+        elif choice == 2:
+            print("Downloading new appimage...")
             self.ask_user()
+            self.execute_functions(self.functions[self.choice])
+        elif choice == 3:
+            sys.exit()
+        else:
+            print("Unknown error. Exiting...")
+            sys.exit(1)
+    
+    def execute_functions(self, functions):
+        """Execute the functions in the list"""
+        for function in functions:
+            function = getattr(self, function)
+            function()
+
+    def ask_user(self):
+        """New appimage installation options"""
+        print("Choose one of the following options:")
+        print("1. Download new appimage, save old appimage")
+        print("2. Download new appimage, don't save old appimage")
+        self.choice = int(input("Enter your choice: "))
+        if self.choice not in [1, 2]:
+            print("Invalid choice. Try again.")
+            self.ask_user()        
     
     def learn_owner_repo(self):
         while True:
@@ -94,7 +78,7 @@ class AppImageDownloader:
                 break
             except IndexError:
                 print("Invalid URL, please try again.")
-                self.ask_user()
+                self.ask_inputs()
 
     def list_json_files(self):
         """
@@ -126,7 +110,7 @@ class AppImageDownloader:
             if self.url and self.sha_name and self.appimage_folder and self.hash_type:
                 break
             else:
-                print("Invalid inputs, please try again.")
+                print("Invalid inputs, please try again.")                
 
     def save_credentials(self):
         """Save the credentials to a file in json format, one file per owner and repo"""
@@ -134,9 +118,14 @@ class AppImageDownloader:
         self.appimages["repo"] = self.repo
         self.appimages["appimage"] = self.appimage_name
         self.appimages["version"] = self.version
-        self.appimages["sha"] = self.sha_name
-        self.appimages["choice"] = self.choice
+        self.appimages["sha"] = self.sha_name                
         self.appimages["hash_type"] = self.hash_type
+
+        if self.choice == 1:
+            # save choice "3" to json file for future use
+            self.appimages["choice"] = 3
+        elif self.choice == 2:
+            self.appimages["choice"] = 4        
 
         if not self.appimage_folder.endswith("/"):
             self.appimages["appimage_folder"] = self.appimage_folder + "/"            
@@ -349,4 +338,4 @@ class AppImageDownloader:
 # main
 if __name__ == "__main__":
     appimage = AppImageDownloader()
-    appimage.ask_user()
+    appimage.menu()
