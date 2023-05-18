@@ -4,7 +4,7 @@
     "repo": "joplin",
     "appimage": "Joplin-2.10.19.AppImage",
     "sha": "latest-linux.yml",
+    "choice": 3,
     "hash_type": "sha256",
-    "choice": "3",
     "appimage_folder": "/home/developerDoc2/"
 }
