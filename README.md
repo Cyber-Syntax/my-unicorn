@@ -21,14 +21,49 @@
 
 ## ‎ <samp>How to use<samp>
 - Example:
-    - `python3 main.py`
-    - Do you want to download new appimage? (y/n): y
-    - Enter your choice: 1
-    - Enter the app github url: https://github.com/siyuan-note/siyuan
-    - Enter the sha name: SHA256SUMS.txt
-    - Which directory(e.g /Documents/appimages)to save appimage: /Documents/appimages
-    - Enter the hash type for your sha (e.g md5, sha256, sha1) file: sha256
-    - Do you want to backup siyuan.AppImage to /home/developer/Documents/appimages/backup/ (y/n): y
+    1. Open terminal and install all files 
+        - `git clone https://github.com/Cyber-Syntax/my-unicorn.git`
+    2. Go that location 
+        - Example: `cd ~/Downloads/`
+    3. Start script   
+        - `python3 main.py`
+    4. Follow the instructions:
+        - Example for new appimage download. (This is need for json file create):
+            Welcome to the my-unicorn 🦄!
+            Choose one of the following options:
+            1. Update appimage from json file
+            2. Download new appimage
+            3. Exit
+            Enter your choice:2
+            
+            Choose one of the following options:
+            1. Download new appimage, save old appimage
+            2. Download new appimage, don't save old appimage
+            Enter your choice:2
+
+            Enter the app github url:https://github.com/laurent22/joplin
+            Enter the sha name:latest-linux.yml
+            Which directory(e.g /Documents/appimages)to save appimage:/Documents/appimages
+            Enter the hash type for your sha (e.g md5, sha256, sha1) file:sha512
+            Downloading started...      
+        - Example for update appimage via json file:
+            Enter your choice:1
+            There are more than one .json file, please choose one of them:
+            1. joplin.json
+            2. siyuan.json
+            3. super-productivity.json
+            Enter your choice:1
+            Do you want to change some credentials? (y/n):y
+            Do you want to change the appimage folder? (y/n):y
+            Enter new appimage folder:/Documents/appimages/anotherFolder
+            Do you want to change the choice? (y/n): y
+            Enter new choice: 3
+            Do you want to change the sha name? (y/n):y
+            Enter new sha name:latest-linux.yml
+            Do you want to change the hash type? (y/n):y
+            Enter new hash type:sha512
+            Downloading started...
+
 
 - Detailed:
     - You can use it by choosing what to do from the list.
