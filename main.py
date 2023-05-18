@@ -324,10 +324,14 @@ class AppImageDownloader:
                     self.appimages["appimage_folder"] = os.path.expanduser("~") + self.appimages["appimage_folder"]
             
             # ask for sha_name and hash_type
-            keys = {"sha_name", "hash_type", "choice"}
+            keys = {"sha_name", "hash_type"}
             for key in keys:
                 if input(f"Do you want to change the {key}? (y/n): ").lower() == "y":
-                    self.appimages[key] = input(f"Enter new {key}: ")            
+                    self.appimages[key] = input(f"Enter new {key}: ")  
+
+            # ask for choice update
+            if input("Do you want to change the choice? (y/n): ").lower() == "y":
+                self.appimages["choice"] = int(input("Enter new choice: "))                          
 
             # write new credentials to json file
             with open(f"{self.repo}.json", "w", encoding="utf-8") as file:
