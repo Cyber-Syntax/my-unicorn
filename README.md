@@ -77,7 +77,8 @@
                 2. siyuan.json
                 3. super-productivity.json
                     - Enter your choice:1
-
+            
+            *if you want to change something:*
             - Do you want to change some credentials? (y/n):y
             - Do you want to change the appimage folder? (y/n):y
             - Enter new appimage folder:/Documents/appimages/anotherFolder
@@ -86,8 +87,13 @@
             - Do you want to change the sha name? (y/n):y
                 - Enter new sha name:latest-linux.yml
             - Do you want to change the hash type? (y/n):y
-                - Enter new hash type:sha512
+                - Enter new hash type:sha512            
             - Downloading started...
+            
+            *if you don't want to change anything:*
+            - Do you want to change some credentials? (y/n):n
+            - Downloading started...
+
 
 ## ‎ <samp>LICENSE<samp>
 - This script is licensed under the [GPL 3.0 License].
