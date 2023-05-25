@@ -130,7 +130,7 @@ dmypy.json
 .pyre/
 
 # ignore appimages
-*AppImage*
+*AppImage
 *appimage*
 # ignore flowchart
 *xopp*

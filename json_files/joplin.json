@@ -4,7 +4,8 @@
     "repo": "joplin",
     "appimage": "Joplin-2.10.19.AppImage",
     "sha": "latest-linux.yml",
-    "choice": 4,
-    "hash_type": "sha512",
-    "appimage_folder": "/home/developer/Documents/appimages/"
+    "choice": 3,
+    "hash_type": "sha123",
+    "appimage_folder": "/home/developerensonnew/",
+    "sha_name": "enson"
 }
