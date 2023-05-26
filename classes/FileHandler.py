@@ -1,7 +1,7 @@
+"""Handle the file operations"""
 from classes.AppImageDownloader import AppImageDownloader
 import base64
 import hashlib
-import json
 import os
 import requests
 import yaml
@@ -11,7 +11,6 @@ class FileHandler(AppImageDownloader):
     """Handle the file operations"""
     def __init__(self):
         super().__init__()
-
 
     def verify_sha(self):
         print(f"Verifying {self.appimage_name}...")
@@ -70,8 +69,9 @@ class FileHandler(AppImageDownloader):
                             sys.exit()
         except KeyError:
             print(f"Error verifying {self.appimage_name}")
-            if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
+            if input("Do you want to delete the downloaded appimage and verify file? (y/n): ").lower() == "y":
                 os.remove(self.appimage_name)
+                os.remove(self.sha_name)
                 print(f"Deleted {self.appimage_name}")          
                 print("Exiting...")
                 sys.exit()  

@@ -1,9 +1,4 @@
 #!/usr/bin/python3
-import json
-import os
-import subprocess
-import hashlib
-import base64
 import sys
 import requests
 import yaml
