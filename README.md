@@ -12,7 +12,6 @@
         - [X] sha256
         - [X] sha512
         - [ ] md5 
-        - [ ] sha1
 - <samp>Which apps work with this script?<samp>
     - 🛠️ Tested; 
         - [X] super-productivity
@@ -25,9 +24,9 @@
         - `python3`
         - `git`
         - `pip3`
-        - `python3-pip`
+        - `python3-pip` -maybe-
     - Install dependencies:    
-        - `pip3 install json os subprocess hashlib base64 sys requests yaml`
+        - `pip3 install requests yaml`
 
 ## ‎ <samp>What you need to know before using<samp>
 1. Github url (https://github.com/johannesjo/super-productivity)
