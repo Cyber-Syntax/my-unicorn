@@ -5,7 +5,7 @@
     "appimage": "Joplin-2.10.19.AppImage",
     "sha": "latest-linux.yml",
     "choice": 3,
-    "hash_type": "sha123",
-    "appimage_folder": "/home/developerensonnew/",
-    "sha_name": "enson"
+    "hash_type": "sha512",
+    "appimage_folder": "/home/developer/Documents/appiamges",
+    "sha_name": "latest-linux.yml"
 }

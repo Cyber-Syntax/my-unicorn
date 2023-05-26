@@ -72,7 +72,9 @@ class FileHandler(AppImageDownloader):
             print(f"Error verifying {self.appimage_name}")
             if input("Do you want to delete the downloaded appimage? (y/n): ").lower() == "y":
                 os.remove(self.appimage_name)
-                print(f"Deleted {self.appimage_name}")            
+                print(f"Deleted {self.appimage_name}")          
+                print("Exiting...")
+                sys.exit()  
             else:
                 if input("Do you want to continue without verification? (y/n): ").lower() == "y":
                     self.make_executable()

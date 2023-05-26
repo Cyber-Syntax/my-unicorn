@@ -8,6 +8,8 @@ import json
 import yaml
 
 class AppImageDownloader:
+    file_path = "json_files/"
+
     def __init__(self):
         self.owner = None
         self.repo = None
@@ -48,8 +50,7 @@ class AppImageDownloader:
         """
         List the json files in the current directory, if json file exists.
         """
-        file_path = "json_files/"
-        json_files = [file for file in os.listdir(file_path) if file.endswith(".json")]
+        json_files = [file for file in os.listdir(self.file_path) if file.endswith(".json")]
         if len(json_files) > 1:
             print("There are more than one .json file, please choose one of them:")
             for index, file in enumerate(json_files):
@@ -101,18 +102,16 @@ class AppImageDownloader:
         else:
             self.appimages["appimage_folder"] = os.path.expanduser(self.appimage_folder)
         
-        file_path = "json_files/"
         # save the credentials to a json_files folder
-        with open(f"{file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+        with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
             json.dump(self.appimages, file, indent=4)
         print(f"Saved credentials to json_files/{self.repo}.json file")
         self.load_credentials()
 
     def load_credentials(self):
         """Load the credentials from a file in json format, one file per owner and repo"""
-        file_path = "json_files/"
-        if os.path.exists(f"{file_path}{self.repo}.json"):
-            with open(f"{file_path}{self.repo}.json", "r", encoding="utf-8") as file:
+        if os.path.exists(f"{self.file_path}{self.repo}.json"):
+            with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
                 self.appimages = json.load(file)
             self.owner = self.appimages["owner"]
             self.repo = self.appimages["repo"]
@@ -126,7 +125,7 @@ class AppImageDownloader:
             else:
                 self.appimage_folder = self.appimages["appimage_folder"]
         else:
-            print(f"{file_path}{self.repo}.json file not found while trying to load credentials")
+            print(f"{self.file_path}{self.repo}.json file not found while trying to load credentials")
             self.ask_user()
 
     def download(self):
@@ -152,17 +151,15 @@ class AppImageDownloader:
             print(f"\n{self.appimage_name} and {self.sha_name} downloaded ")
         else:
             print(f"Error downloading {self.appimage_name} and {self.sha_name} file")
-        file_path = "json_files/"
         # update version in the json file
         self.appimages["version"] = self.version
-        with open(f"{file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+        with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
             json.dump(self.appimages, file, indent=4)
 
     def update_json(self):
         """Update json files with new version and if user want to change appimage file, sha name etc."""
-        file_path = "json_files/"
         if input("Do you want to change some credentials? (y/n): ").lower() == "y":
-            with open(f"{file_path}{self.repo}.json", "r", encoding="utf-8") as file:
+            with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
                 self.appimages = json.load(file)
             
             if input("Do you want to change the appimage folder? (y/n): ").lower() == "y":
@@ -187,7 +184,7 @@ class AppImageDownloader:
                 self.appimages["choice"] = int(input("Enter new choice: "))                          
 
             # write new credentials to json file
-            with open(f"{file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+            with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
                 json.dump(self.appimages, file, indent=4)
         else:
             print("Not changing credentials") 
