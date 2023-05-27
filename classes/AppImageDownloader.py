@@ -64,7 +64,7 @@ class AppImageDownloader:
             self.ask_inputs()
 
     def ask_inputs(self):
-        """Ask the user for the owner and repo"""
+        """Ask the user for the inputs"""
         while True:
             self.url = input("Enter the app github url: ").strip(" ")
             self.sha_name = input("Enter the sha name: ").strip(" ")
@@ -81,7 +81,7 @@ class AppImageDownloader:
                 print("Invalid inputs, please try again.")
 
     def save_credentials(self):
-        """Save the credentials to a file in json format, one file per owner and repo"""
+        """Save the credentials to a file in json format"""
         self.appimages["owner"] = self.owner
         self.appimages["repo"] = self.repo
         self.appimages["appimage"] = self.appimage_name
@@ -108,7 +108,7 @@ class AppImageDownloader:
         self.load_credentials()
 
     def load_credentials(self):
-        """Load the credentials from a file in json format, one file per owner and repo"""
+        """Load the credentials from a json file"""
         if os.path.exists(f"{self.file_path}{self.repo}.json"):
             with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
                 self.appimages = json.load(file)
@@ -162,7 +162,7 @@ class AppImageDownloader:
             json.dump(self.appimages, file, indent=4)
 
     def update_json(self):
-        """if user want to change appimage file, sha name etc."""
+        """Update the json file with the new version"""
         if input("Do you want to change some credentials? (y/n): ").lower() == "y":
             with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
                 self.appimages = json.load(file)
@@ -186,7 +186,8 @@ class AppImageDownloader:
                     self.appimages[key] = input(f"Enter new {key}: ")
 
             # ask for choice update
-            if input("Do you want to change the choice? (y/n): ").lower() == "y":
+            if input("Do you want to change the choice?"
+                    "(3: backup, 4: don't backup) (y/n): ").lower() == "y":
                 self.appimages["choice"] = int(input("Enter new choice: "))
 
             # write new credentials to json file
