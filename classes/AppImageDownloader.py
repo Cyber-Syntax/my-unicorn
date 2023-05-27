@@ -91,15 +91,15 @@ class AppImageDownloader:
         self.appimages["choice"] = 3 if self.choice == 1 else 4
 
         # Handle expansion of ~ in the path
-        if not self.appimage_folder.endswith("/"):
-            self.appimages["appimage_folder"] = self.appimage_folder + "/"
-        else:
+        if self.appimage_folder.endswith("/"):
             self.appimages["appimage_folder"] = self.appimage_folder
-
-        if not self.appimage_folder.startswith("~"):
-            self.appimages["appimage_folder"] = os.path.expanduser("~") + self.appimage_folder
         else:
+            self.appimages["appimage_folder"] = self.appimage_folder + "/"
+
+        if self.appimage_folder.startswith("~"):
             self.appimages["appimage_folder"] = os.path.expanduser(self.appimage_folder)
+        else:
+            self.appimages["appimage_folder"] = os.path.expanduser("~") + self.appimage_folder
 
         # save the credentials to a json_files folder
         with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
