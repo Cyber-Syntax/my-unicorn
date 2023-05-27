@@ -1,4 +1,3 @@
-""" Download the appimage from the github release page"""
 import os
 import json
 import requests
@@ -70,10 +69,11 @@ class AppImageDownloader:
             self.url = input("Enter the app github url: ").strip(" ")
             self.sha_name = input("Enter the sha name: ").strip(" ")
             self.appimage_folder = input(
-                "Which directory(e.g /Documents/appimages)to save appimage: "
+                "Which directory(e.g /Documents/appimages)to save appimage: " 
                 ).strip(" ")
-            self.hash_type = input("Enter the hash type for your sha(e.g md5, sha256, sha1) file: "
-                                   ).strip(" ")
+            self.hash_type = input(
+                "Enter the hash type for your sha(e.g md5, sha256, sha1) file: "
+                ).strip(" ")
 
             if self.url and self.sha_name and self.appimage_folder and self.hash_type:
                 break

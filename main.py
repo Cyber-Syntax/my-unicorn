@@ -1,14 +1,16 @@
 #!/usr/bin/python3
 import sys
-import requests
-import yaml
 from classes.FileHandler import FileHandler
 
 def main():
+    """Create an instance of FileHandler and call the methods. 
+    The methods are called based on the user's choice.    
+    """
     file_handler = FileHandler()
 
     functions = {
-        1: ['ask_inputs', 'learn_owner_repo', 'download', 'save_credentials', 'verify_sha', 'backup_old_appimage'],
+        1: ['ask_inputs', 'learn_owner_repo', 'download',
+           'save_credentials', 'verify_sha', 'backup_old_appimage'],
         2: ['ask_inputs', 'learn_owner_repo', 'download', 'save_credentials', 'verify_sha'],
         3: ['update_json', 'download', 'verify_sha', 'backup_old_appimage'],
         4: ['update_json', 'download', 'verify_sha']
@@ -20,7 +22,7 @@ def main():
     print("2. Download new appimage")
     print("3. Exit")
     choice = int(input("Enter your choice: "))
-
+    # Call the methods based on the user's choice
     if choice == 1:
         file_handler.list_json_files()
         if file_handler.choice in [3, 4]:
@@ -45,7 +47,7 @@ def main():
     else:
         print("Invalid choice")
         sys.exit()
-      
+
 
 if __name__ == "__main__":
     main()
