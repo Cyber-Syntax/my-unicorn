@@ -74,15 +74,19 @@ class FileHandler(AppImageDownloader):
                         else:
                             print("Exiting...")
                             sys.exit()
-        except KeyError:
-            print(f"Error verifying {self.appimage_name}")
+        except KeyError as error:
+            print(f"Error verifying {self.appimage_name}: {error}")
             if input("Do you want to delete the downloaded appimage and verify file? (y/n): "
                     ).lower() == "y":
-                os.remove(self.appimage_name)
-                os.remove(self.sha_name)
-                print(f"Deleted {self.appimage_name}")
-                print("Exiting...")
-                sys.exit()
+                try:
+                    os.remove(self.appimage_name)
+                    os.remove(self.sha_name)
+                except FileNotFoundError as error:
+                    print(f"Error deleting {self.appimage_name} or {self.sha_name}: {error}")
+                else:
+                    print(f"Deleted {self.appimage_name}")
+                    print("Exiting...")
+                    sys.exit()
             else:
                 if input("Do you want to continue without verification? (y/n): "
                         ).lower() == "y":
