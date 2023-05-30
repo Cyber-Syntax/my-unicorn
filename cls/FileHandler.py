@@ -5,6 +5,7 @@ import subprocess
 import sys
 import requests
 import yaml
+import logging
 from cls.AppImageDownloader import AppImageDownloader
 
 class FileHandler(AppImageDownloader):
@@ -75,14 +76,16 @@ class FileHandler(AppImageDownloader):
                             print("Exiting...")
                             sys.exit()
         except KeyError as error:
+            logging.error(f"Error: {error}", exc_info=True)
             print(f"Error verifying {self.appimage_name}: {error}")
             if input("Do you want to delete the downloaded appimage and verify file? (y/n): "
                     ).lower() == "y":
                 try:
                     os.remove(self.appimage_name)
                     os.remove(self.sha_name)
-                except FileNotFoundError as error:
-                    print(f"Error deleting {self.appimage_name} or {self.sha_name}: {error}")
+                except FileNotFoundError as error2:
+                    logging.error(f"Error: {error2}", exc_info=True)
+                    print(f"Error deleting {self.appimage_name} or {self.sha_name}: {error2}")
                 else:
                     print(f"Deleted {self.appimage_name}")
                     print("Exiting...")
@@ -123,7 +126,8 @@ class FileHandler(AppImageDownloader):
                     try:
                         subprocess.run(["mv", f"{old_appimage_folder}",
                                      f"{backup_folder}"], check=True)
-                    except subprocess.CalledProcessError:
+                    except subprocess.CalledProcessError as error:
+                        logging.error(f"Error: {error}", exc_info=True)
                         print(f"Error moving {old_appimage_folder} to {backup_folder}")
                 else:
                     print(f"Not backing up {self.repo}.AppImage")
