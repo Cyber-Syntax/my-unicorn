@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 import sys
-from classes.FileHandler import FileHandler
+from cls.FileHandler import FileHandler
 
 def main():
     """Create an instance of FileHandler and call the methods. 
@@ -21,7 +21,11 @@ def main():
     print("1. Update appimage from JSON file")
     print("2. Download new appimage")
     print("3. Exit")
-    choice = int(input("Enter your choice: "))
+    try: 
+        choice = int(input("Enter your choice: "))
+    except ValueError as error:
+        print(f"Invalid choice. Please write a number. \n Error: {error}")
+        sys.exit()
     # Call the methods based on the user's choice
     if choice == 1:
         file_handler.list_json_files()

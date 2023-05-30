@@ -5,7 +5,7 @@ import subprocess
 import sys
 import requests
 import yaml
-from classes.AppImageDownloader import AppImageDownloader
+from cls.AppImageDownloader import AppImageDownloader
 
 class FileHandler(AppImageDownloader):
     """Handle the file operations"""
