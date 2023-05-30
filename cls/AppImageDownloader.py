@@ -10,18 +10,18 @@ class AppImageDownloader:
     file_path = "json_files/"
 
     def __init__(self):
-        self.owner = None
-        self.repo = None
-        self.api_url = None
-        self.sha_name = None
-        self.sha_url = None
-        self.appimage_name = None
+        self.owner: str = None
+        self.repo: str = None
+        self.api_url: str = None
+        self.sha_name: str = None
+        self.sha_url: str = None
+        self.appimage_name: str = None
         self.version = None
-        self.appimage_folder = None
-        self.hash_type = None
-        self.url = None
-        self.choice = None
-        self.appimages = {}
+        self.appimage_folder: str = None
+        self.hash_type: str = None
+        self.url: str = None
+        self.choice: int = None
+        self.appimages: dict = {}
 
     def ask_user(self):
         """New appimage installation options"""
