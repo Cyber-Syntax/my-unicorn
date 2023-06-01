@@ -56,7 +56,7 @@ coverage.xml
 *.pot
 
 # Django stuff:
-*.log
+#*.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -130,7 +130,7 @@ dmypy.json
 .pyre/
 
 # ignore appimages
-*AppImage*
+*AppImage
 *appimage*
 # ignore flowchart
 *xopp*
@@ -141,3 +141,5 @@ dmypy.json
 # test
 *test*
 *None*
+
+.pylintrc
