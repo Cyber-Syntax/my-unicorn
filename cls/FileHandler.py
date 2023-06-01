@@ -156,7 +156,7 @@ class FileHandler(AppImageDownloader):
         """ Move appimages to a appimage folder """
         print(f"Moving {self.appimage_name} to {self.appimage_folder}")
         # ask user
-        if input(f"Do you want to move"
+        if input(f"Do you want to move "
                 f"{self.repo}.AppImage to {self.appimage_folder} (y/n):") == "y":
             subprocess.run(["mv", f"{self.repo}.AppImage", f"{self.appimage_folder}"], check=True)
         else:

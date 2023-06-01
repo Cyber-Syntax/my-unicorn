@@ -14,7 +14,7 @@ class AppImageDownloader:
         self.repo: str = None
         self.api_url: str = None
         self.sha_name: str = None
-        self.sha_url: str = None
+        self.sha_url = None
         self.appimage_name: str = None
         self.version = None
         self.appimage_folder: str = None
@@ -184,36 +184,65 @@ class AppImageDownloader:
             logging.error(f"Error: {error}", exc_info=True)
             print(f"Error: {error}")
             sys.exit()
-        if response.status_code == 200:
-            print(f"{self.appimage_name} and {self.sha_name} downloading."
-                "Grab a cup of coffee :), it will take some time depending on your internet speed."
-                )
-            # get the download url from the api
-            data = json.loads(response.text)
-            # get the version from the tag_name
-            self.version = data["tag_name"].replace("v", "")
-            # get the download url from the assets
-            for asset in data["assets"]:
-                if asset["name"].endswith(".AppImage"):
-                    self.api_url = asset["browser_download_url"]
-                    self.appimage_name = asset["name"]
-                elif asset["name"] == self.sha_name:
-                    self.sha_url = asset["browser_download_url"]
-                    self.sha_name = asset["name"]
-
-            # download the appimage
-            with open(self.appimage_name, "wb") as file:
-                file.write(response.content)
-            print(f"\n{self.appimage_name} and {self.sha_name} downloaded ")
+        except requests.exceptions.ConnectionError as error2:
+            logging.error(f"Error: {error2}", exc_info=True)
+            print(f"Error: {error2}")
+            sys.exit()
+        except requests.exceptions.RequestException as error3:
+            logging.error(f"Error: {error3}", exc_info=True)
+            print(f"Error: {error3}")
+            sys.exit()
         else:
-            print(f"Error downloading {self.appimage_name} and {self.sha_name} file")
 
-        # update version in the json file
-        self.appimages["version"] = self.version
+            if response.status_code == 200:
+                print(f"{self.appimage_name} downloading..."
+                    "Grab a cup of coffee :), it will take some time depending on your internet speed."
+                    )
+                # get the download url from the api
+                data = json.loads(response.text)
+                # get the version from the tag_name
+                self.version = data["tag_name"].replace("v", "")
+                # get the download url from the assets
+                for asset in data["assets"]:
+                    if asset["name"].endswith(".AppImage"):
+                        self.api_url = asset["browser_download_url"]
+                        self.appimage_name = asset["name"]
+                    elif asset["name"] == self.sha_name:
+                        self.sha_url = asset["browser_download_url"]
+                        self.sha_name = asset["name"]
 
-        # save the credentials to a json file
-        with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
-            json.dump(self.appimages, file, indent=4)
+                # download the appimage
+                try:
+                    response = requests.get(self.api_url, timeout=10)
+                except requests.exceptions.Timeout as error:
+                    logging.error(f"Error: {error}", exc_info=True)
+                    print(f"Error: {error}")
+                    sys.exit()
+                except requests.exceptions.ConnectionError as error2:
+                    logging.error(f"Error: {error2}", exc_info=True)
+                    print(f"Error: {error2}")
+                    sys.exit()
+                except requests.exceptions.RequestException as error3:
+                    logging.error(f"Error: {error3}", exc_info=True)
+                    print(f"Error: {error3}")
+                    sys.exit()
+                else:
+                    if response.status_code == 200:
+                        # save the appimage to the appimage folder
+                        with open(f"{self.appimage_name}", "wb") as file:
+                            file.write(response.content)
+                        print(f"Downloaded {self.appimage_name}")
+                    else:
+                        print(f"Error downloading {self.appimage_name}")
+            else:
+                print(f"Error downloading {self.appimage_name}")
+
+            # update version in the json file
+            self.appimages["version"] = self.version
+
+            # save the credentials to a json file
+            with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+                json.dump(self.appimages, file, indent=4)
 
     def update_json(self):
         """Update the json file with the new version"""
