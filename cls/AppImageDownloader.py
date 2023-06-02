@@ -263,12 +263,6 @@ class AppImageDownloader:
             if input("Do you want to change some credentials? (y/n): ").lower() == "y":
                 with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
                     self.appimages = json.load(file)
-        except KeyboardInterrupt as error:
-            logging.error(f"Error: {error}", exc_info=True)
-            print("Error: Keyboard interrupt.")
-            sys.exit()
-        else:
-            try:
                 if input("Do you want to change the appimage folder? (y/n): ").lower() == "y":
                     new_folder = input("Enter new appimage folder: ")
                     if not new_folder.endswith("/"):
@@ -301,19 +295,19 @@ class AppImageDownloader:
                 else:
                     print("Not changing credentials")
                     self.load_credentials()
-            except KeyboardInterrupt as error:
-                logging.error(f"Error: {error}", exc_info=True)
-                print("Error: Keyboard interrupt.")
-                sys.exit()
-            except EOFError as error2:
-                logging.error(f"Error: {error2}", exc_info=True)
-                print(f"Error: {error2}")
-                sys.exit()
-            except ValueError as error3:
-                logging.error(f"Error: {error3}", exc_info=True)
-                print(f"Error: {error3}")
-                sys.exit()
-            except KeyError as error4:
-                logging.error(f"Error: {error4}", exc_info=True)
-                print(f"Error: {error4}")
-                sys.exit()
+        except KeyboardInterrupt as error:
+            logging.error(f"Error: {error}", exc_info=True)
+            print("Error: Keyboard interrupt.")
+            sys.exit()
+        except EOFError as error2:
+            logging.error(f"Error: {error2}", exc_info=True)
+            print(f"Error: {error2}")
+            sys.exit()
+        except ValueError as error3:
+            logging.error(f"Error: {error3}", exc_info=True)
+            print(f"Error: {error3}")
+            sys.exit()
+        except KeyError as error4:
+            logging.error(f"Error: {error4}", exc_info=True)
+            print(f"Error: {error4}")
+            sys.exit()
