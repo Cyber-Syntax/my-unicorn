@@ -32,40 +32,40 @@ def main():
     print("1. Update appimage from JSON file")
     print("2. Download new appimage")
     print("3. Exit")
-    while True:
-        try:
-            choice = int(input("Enter your choice: "))
-        except ValueError as error:
-            logging.error(f"Error: {error}", exc_info=True)
-            print("Invalid choice. Use 1, 2 or 3.")
-            continue
-        else:
-            break
-    # Call the methods based on the user's choice
-    if choice == 1:
-        file_handler.list_json_files()
-        if file_handler.choice in [3, 4]:
-            for function in functions[file_handler.choice]:
+    try:
+        choice = int(input("Enter your choice: "))
+    except ValueError as error:
+        logging.error(f"Error: {error}", exc_info=True)
+        print("Invalid choice. Use 1, 2 or 3.")
+    except KeyboardInterrupt as error2:
+        logging.error(f"Error: {error2}", exc_info=True)
+        print("Keyboard interrupt. Exiting...")
+        sys.exit()
+    else:
+        # Call the methods based on the user's choice
+        if choice == 1:
+            file_handler.list_json_files()
+            if file_handler.choice in [3, 4]:
+                for function in functions[file_handler.choice]:
+                    if function in dir(file_handler):
+                        method = getattr(file_handler, function)
+                        method()
+                    else:
+                        print(f"Function {function} not found")
+        elif choice == 2:
+            print("Downloading new appimage")
+            for function in functions[choice]:
                 if function in dir(file_handler):
                     method = getattr(file_handler, function)
                     method()
                 else:
                     print(f"Function {function} not found")
-    elif choice == 2:
-        print("Downloading new appimage")
-        file_handler.ask_inputs()
-        for function in functions[choice]:
-            if function in dir(file_handler):
-                method = getattr(file_handler, function)
-                method()
-            else:
-                print(f"Function {function} not found")
-    elif choice == 3:
-        print("Exiting...")
-        sys.exit()
-    else:
-        print("Invalid choice")
-        sys.exit()
+        elif choice == 3:
+            print("Exiting...")
+            sys.exit()
+        else:
+            print("Invalid choice")
+            sys.exit()
 
 
 if __name__ == "__main__":
