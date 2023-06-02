@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import sys
-from cls.FileHandler import FileHandler
 import logging
+from cls.FileHandler import FileHandler
 
 def main():
     # Set up the logging configuration
