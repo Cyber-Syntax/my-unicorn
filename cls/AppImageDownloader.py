@@ -295,19 +295,8 @@ class AppImageDownloader:
                 else:
                     print("Not changing credentials")
                     self.load_credentials()
-        except KeyboardInterrupt as error:
+        except (KeyboardInterrupt, EOFError, ValueError, KeyError) as error:
             logging.error(f"Error: {error}", exc_info=True)
-            print("Error: Keyboard interrupt.")
+            print(f"Error: {error}")
             sys.exit()
-        except EOFError as error2:
-            logging.error(f"Error: {error2}", exc_info=True)
-            print(f"Error: {error2}")
-            sys.exit()
-        except ValueError as error3:
-            logging.error(f"Error: {error3}", exc_info=True)
-            print(f"Error: {error3}")
-            sys.exit()
-        except KeyError as error4:
-            logging.error(f"Error: {error4}", exc_info=True)
-            print(f"Error: {error4}")
-            sys.exit()
+            
