@@ -14,7 +14,7 @@ class FileHandler(AppImageDownloader):
         super().__init__()
 
     def verify_sha(self):
-        print(f"Verifying {self.appimage_name}...\n")
+        print(f"Verifying {self.appimage_name}...")
         # if the sha_name endswith .yml or .yaml, then use the yaml module to parse the file
         if self.sha_name.endswith(".yml") or self.sha_name.endswith(".yaml"):
             try:
@@ -46,7 +46,7 @@ class FileHandler(AppImageDownloader):
                         appimage_sha = hashlib.new(self.hash_type, file.read()).hexdigest()
 
                     if appimage_sha == decoded_hash:
-                        print(f"{self.appimage_name} verified")
+                        print(f"{self.appimage_name} verified. \n")
                         self.make_executable()
                         if input("Do you want to delete the downloaded sha file? (y/n): "
                                 ).lower() == "y":
@@ -60,6 +60,7 @@ class FileHandler(AppImageDownloader):
                                 ).lower() == "y":
                             os.remove(self.appimage_name)
                             print(f"Deleted {self.appimage_name}")
+                            sys.exit(1)
                         else:
                             if input("Do you want to continue without verification? (y/n): "
                                     ).lower() == "y":
@@ -69,11 +70,10 @@ class FileHandler(AppImageDownloader):
         else:
             # if the sha_name doesn't endswith .yml or .yaml,
             # then use the normal sha verification
-            print(f"Verifying {self.appimage_name}...")
             if hashlib.new(self.hash_type, open(self.appimage_name, "rb"
                             ).read()).hexdigest() == \
                 requests.get(self.sha_url, timeout=10).text.split(" ")[0]:
-                print(f"{self.appimage_name} verified")
+                print(f"{self.appimage_name} verified. \n")
                 self.make_executable()
             else:
                 print(f"Error verifying {self.appimage_name}")
@@ -82,6 +82,7 @@ class FileHandler(AppImageDownloader):
                         ).lower() == "y":
                     os.remove(self.appimage_name)
                     print(f"Deleted {self.appimage_name}")
+                    sys.exit()
                 else:
                     if input("Do you want to continue without verification? (y/n): "
                             ).lower() == "y":
@@ -96,6 +97,7 @@ class FileHandler(AppImageDownloader):
         if os.access(self.appimage_name, os.X_OK):
             print("Appimage is already executable")
             return
+            
         print("Making the appimage executable...")
         subprocess.run(["chmod", "+x", self.appimage_name], check=True)
         print("Appimage is now executable")
@@ -138,7 +140,7 @@ class FileHandler(AppImageDownloader):
         """ Change appimage name for .desktop file on linux, ask user for approval """
         new_name = f"{self.repo}.AppImage"
         if self.appimage_name != new_name:
-            print(f"Changing {self.appimage_name} to {new_name}")
+            print(f"Changing {self.appimage_name} name to {new_name}")
             subprocess.run(["mv", f"{self.appimage_name}", f"{new_name}"], check=True)
             self.appimage_name = new_name
             self.move_appimage()
