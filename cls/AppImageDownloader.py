@@ -240,6 +240,9 @@ class AppImageDownloader:
             # update version in the json file
             self.appimages["version"] = self.version
 
+            # update appimage name in the json file
+            self.appimages["appimage"] = self.appimage_name
+
             # save the credentials to a json file
             with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
                 json.dump(self.appimages, file, indent=4)
