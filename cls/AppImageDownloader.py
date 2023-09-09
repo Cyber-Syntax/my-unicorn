@@ -1,8 +1,8 @@
 import os
 import json
 import sys
-import requests
 import logging
+import requests
 
 class AppImageDownloader:
     """This class downloads the appimage from the github release page"""
@@ -47,6 +47,7 @@ class AppImageDownloader:
         """Learn the owner and repo from the url"""
         while True:
             # Parse the owner and repo from the URL
+            print("Parsing the owner and repo from the url...")
             try:
                 self.owner = self.url.split("/")[3]
                 self.repo = self.url.split("/")[4]
@@ -101,7 +102,7 @@ class AppImageDownloader:
                     "Which directory(e.g /Documents/appimages)to save appimage: " 
                     ).strip(" ")
                 self.hash_type = input(
-                    "Enter the hash type for your sha(e.g md5, sha256, sha1) file: "
+                    "Enter the hash type for your sha(sha256, sha512) file: "
                     ).strip(" ")
             except KeyboardInterrupt as error:
                 logging.error(f"Error: {error}", exc_info=True)
@@ -132,15 +133,18 @@ class AppImageDownloader:
         self.appimages["choice"] = 3 if self.choice == 1 else 4
 
         # Handle expansion of ~ in the path
-        if self.appimage_folder.endswith("/"):
-            self.appimages["appimage_folder"] = self.appimage_folder
-        else:
-            self.appimages["appimage_folder"] = self.appimage_folder + "/"
+        if not self.appimage_folder.endswith("/"):
+            self.appimage_folder += "/"
+
+        if not self.appimage_folder.startswith("/"):
+            self.appimage_folder = "/" + self.appimage_folder
 
         if self.appimage_folder.startswith("~"):
-            self.appimages["appimage_folder"] = os.path.expanduser(self.appimage_folder)
+            self.appimage_folder = os.path.expanduser(self.appimage_folder)
         else:
-            self.appimages["appimage_folder"] = os.path.expanduser("~") + self.appimage_folder
+            self.appimage_folder = os.path.expanduser("~") + self.appimage_folder
+
+        self.appimages["appimage_folder"] = self.appimage_folder
 
         # save the credentials to a json_files folder
         with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
@@ -180,103 +184,102 @@ class AppImageDownloader:
         try:
             # get the latest release from the api
             response = requests.get(self.api_url, timeout=10)
-        except requests.exceptions.Timeout as error:
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
+                requests.exceptions.RequestException) as error:
             logging.error(f"Error: {error}", exc_info=True)
             print(f"Error: {error}")
             sys.exit()
-        except requests.exceptions.ConnectionError as error2:
-            logging.error(f"Error: {error2}", exc_info=True)
-            print(f"Error: {error2}")
-            sys.exit()
-        except requests.exceptions.RequestException as error3:
-            logging.error(f"Error: {error3}", exc_info=True)
-            print(f"Error: {error3}")
-            sys.exit()
         else:
-
-            if response.status_code == 200:
-                print(f"{self.appimage_name} downloading..."
-                    "Grab a cup of coffee :), it will take some time depending on your internet speed."
-                    )
-                # get the download url from the api
-                data = json.loads(response.text)
-                # get the version from the tag_name
-                self.version = data["tag_name"].replace("v", "")
-                # get the download url from the assets
-                for asset in data["assets"]:
-                    if asset["name"].endswith(".AppImage"):
-                        self.api_url = asset["browser_download_url"]
-                        self.appimage_name = asset["name"]
-                    elif asset["name"] == self.sha_name:
-                        self.sha_url = asset["browser_download_url"]
-                        self.sha_name = asset["name"]
-
-                # download the appimage
-                try:
-                    response = requests.get(self.api_url, timeout=10)
-                except requests.exceptions.Timeout as error:
-                    logging.error(f"Error: {error}", exc_info=True)
-                    print(f"Error: {error}")
-                    sys.exit()
-                except requests.exceptions.ConnectionError as error2:
-                    logging.error(f"Error: {error2}", exc_info=True)
-                    print(f"Error: {error2}")
-                    sys.exit()
-                except requests.exceptions.RequestException as error3:
-                    logging.error(f"Error: {error3}", exc_info=True)
-                    print(f"Error: {error3}")
-                    sys.exit()
-                else:
-                    if response.status_code == 200:
-                        # save the appimage to the appimage folder
-                        with open(f"{self.appimage_name}", "wb") as file:
-                            file.write(response.content)
-                        print(f"Downloaded {self.appimage_name}")
+            try:
+                if response.status_code == 200:
+                    print(f"{self.repo} downloading..."
+                        "Grab a cup of coffee :)," 
+                        "it will take some time depending on your internet speed."
+                        )
+                    # get the download url from the api
+                    data = json.loads(response.text)
+                    # get the version from the tag_name
+                    self.version = data["tag_name"].replace("v", "")
+                    # get the download url from the assets
+                    for asset in data["assets"]:
+                        if asset["name"].endswith(".AppImage"):
+                            self.api_url = asset["browser_download_url"]
+                            self.appimage_name = asset["name"]
+                        elif asset["name"] == self.sha_name:
+                            self.sha_url = asset["browser_download_url"]
+                            self.sha_name = asset["name"]
+                    # download the appimage
+                    try:
+                        response = requests.get(self.api_url, timeout=10)
+                    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
+                            requests.exceptions.RequestException) as error:
+                        logging.error(f"Error: {error}", exc_info=True)
+                        print(f"Error: {error}")
+                        sys.exit()
                     else:
-                        print(f"Error downloading {self.appimage_name}")
+                        if response.status_code == 200:
+                            # save the appimage to the appimage folder
+                            with open(f"{self.appimage_name}", "wb") as file:
+                                file.write(response.content)
+                            print(f"Downloaded {self.appimage_name}")
+                        else:
+                            print(f"Error downloading {self.appimage_name}")
+                else:
+                    print(f"Error downloading {self.appimage_name}")
+            except KeyboardInterrupt as error:
+                logging.error(f"Error: {error}", exc_info=True)
+                print("Error: Keyboard interrupt.")
+                sys.exit()
             else:
-                print(f"Error downloading {self.appimage_name}")
+                # update appimage version in the json file
+                self.appimages["version"] = self.version
 
-            # update version in the json file
-            self.appimages["version"] = self.version
+                # update appimage name in the json file
+                self.appimages["appimage"] = self.appimage_name
 
-            # save the credentials to a json file
-            with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
-                json.dump(self.appimages, file, indent=4)
+                # save the credentials to a json file
+                with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+                    json.dump(self.appimages, file, indent=4)
 
     def update_json(self):
         """Update the json file with the new version"""
-        if input("Do you want to change some credentials? (y/n): ").lower() == "y":
-            with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
-                self.appimages = json.load(file)
+        try:
+            if input("Do you want to change some credentials? (y/n): ").lower() == "y":
+                with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
+                    self.appimages = json.load(file)
+                if input("Do you want to change the appimage folder? (y/n): ").lower() == "y":
+                    new_folder = input("Enter new appimage folder: ")
+                    if not new_folder.endswith("/"):
+                        new_folder += "/"
 
-            if input("Do you want to change the appimage folder? (y/n): ").lower() == "y":
-                new_folder = input("Enter new appimage folder: ")
-                if not new_folder.endswith("/"):
-                    new_folder += "/"
+                    if not new_folder.startswith("/"):
+                        new_folder = "/" + new_folder
 
-                if new_folder.startswith("~"):
-                    new_folder = os.path.expanduser(new_folder)
+                    if new_folder.startswith("~"):
+                        new_folder = os.path.expanduser(new_folder)
+                    else:
+                        new_folder = os.path.expanduser("~") + new_folder
+
+                    self.appimages["appimage_folder"] = new_folder
+
+                    # ask for sha_name and hash_type
+                    keys = {"sha_name", "hash_type"}
+                    for key in keys:
+                        if input(f"Do you want to change the {key}? (y/n): ").lower() == "y":
+                            self.appimages[key] = input(f"Enter new {key}: ")
+
+                    # ask for choice update
+                    if input("Do you want to change the choice?"
+                            "(3: backup, 4: don't backup) (y/n): ").lower() == "y":
+                        self.appimages["choice"] = int(input("Enter new choice: "))
+
+                    # write new credentials to json file
+                    with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+                        json.dump(self.appimages, file, indent=4)
                 else:
-                    new_folder = os.path.expanduser("~") + new_folder
-
-                self.appimages["appimage_folder"] = new_folder
-
-            # ask for sha_name and hash_type
-            keys = {"sha_name", "hash_type"}
-            for key in keys:
-                if input(f"Do you want to change the {key}? (y/n): ").lower() == "y":
-                    self.appimages[key] = input(f"Enter new {key}: ")
-
-            # ask for choice update
-            if input("Do you want to change the choice?"
-                    "(3: backup, 4: don't backup) (y/n): ").lower() == "y":
-                self.appimages["choice"] = int(input("Enter new choice: "))
-
-            # write new credentials to json file
-            with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
-                json.dump(self.appimages, file, indent=4)
-        else:
-            print("Not changing credentials")
-        self.load_credentials()
-      
+                    print("Not changing credentials")
+                    self.load_credentials()
+        except (KeyboardInterrupt, EOFError, ValueError, KeyError) as error:
+            logging.error(f"Error: {error}", exc_info=True)
+            print(f"Error: {error}")
+            sys.exit()

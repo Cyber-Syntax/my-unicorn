@@ -1,11 +1,10 @@
 {
-    "version": "2.10.19",
+    "version": "2.12.15",
     "owner": "laurent22",
     "repo": "joplin",
-    "appimage": "Joplin-2.10.19.AppImage",
+    "appimage": "Joplin-2.12.15.AppImage",
     "sha": "latest-linux.yml",
-    "choice": 4,
     "hash_type": "sha512",
-    "appimage_folder": "/home/developer/Documents/appimages",
-    "sha_name": "latest-linux.yml"
+    "choice": 4,
+    "appimage_folder": "/home/developer/Documents/appimages/"
 }
