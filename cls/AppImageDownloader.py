@@ -184,20 +184,12 @@ class AppImageDownloader:
         try:
             # get the latest release from the api
             response = requests.get(self.api_url, timeout=10)
-        except requests.exceptions.Timeout as error:
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
+                requests.exceptions.RequestException) as error:
             logging.error(f"Error: {error}", exc_info=True)
-            print("Error: Timeout error when accessing the api. Look logs for more info")
-            sys.exit()
-        except requests.exceptions.ConnectionError as error2:
-            logging.error(f"Error: {error2}", exc_info=True)
-            print("Error: Connection error when accessing the api. Look logs for more info.")
-            sys.exit()
-        except requests.exceptions.RequestException as error3:
-            logging.error(f"Error: {error3}", exc_info=True)
-            print("Error: Request error when accessing the api. Look logs for more info.")
+            print(f"Error: {error}")
             sys.exit()
         else:
-
             try:
                 if response.status_code == 200:
                     print(f"{self.repo} downloading..."
@@ -216,24 +208,13 @@ class AppImageDownloader:
                         elif asset["name"] == self.sha_name:
                             self.sha_url = asset["browser_download_url"]
                             self.sha_name = asset["name"]
-
                     # download the appimage
                     try:
                         response = requests.get(self.api_url, timeout=10)
-                    except requests.exceptions.Timeout as error:
+                    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
+                            requests.exceptions.RequestException) as error:
                         logging.error(f"Error: {error}", exc_info=True)
-                        print(f"Error: Timeout error when downloading {self.appimage_name}."
-                            "Look logs for more info")
-                        sys.exit()
-                    except requests.exceptions.ConnectionError as error2:
-                        logging.error(f"Error: {error2}", exc_info=True)
-                        print(f"Error: Connection error when downloading {self.appimage_name}."
-                           "Look logs for more info.")
-                        sys.exit()
-                    except requests.exceptions.RequestException as error3:
-                        logging.error(f"Error: {error3}", exc_info=True)
-                        print(f"Error: Request error when downloading {self.appimage_name}."
-                        "Look logs for more info.")
+                        print(f"Error: {error}")
                         sys.exit()
                     else:
                         if response.status_code == 200:
@@ -299,4 +280,3 @@ class AppImageDownloader:
             logging.error(f"Error: {error}", exc_info=True)
             print(f"Error: {error}")
             sys.exit()
-            
