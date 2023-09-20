@@ -3,6 +3,7 @@ import json
 import sys
 import logging
 import requests
+from tqdm import tqdm
 
 class AppImageDownloader:
     """This class downloads the appimage from the github release page"""
@@ -190,56 +191,68 @@ class AppImageDownloader:
             print(f"Error: {error}")
             sys.exit()
         else:
-            try:
-                if response.status_code == 200:
-                    print(f"{self.repo} downloading..."
-                        "Grab a cup of coffee :)," 
-                        "it will take some time depending on your internet speed."
-                        )
-                    # get the download url from the api
-                    data = json.loads(response.text)
-                    # get the version from the tag_name
-                    self.version = data["tag_name"].replace("v", "")
-                    # get the download url from the assets
-                    for asset in data["assets"]:
-                        if asset["name"].endswith(".AppImage"):
-                            self.api_url = asset["browser_download_url"]
-                            self.appimage_name = asset["name"]
-                        elif asset["name"] == self.sha_name:
-                            self.sha_url = asset["browser_download_url"]
-                            self.sha_name = asset["name"]
-                    # download the appimage
-                    try:
-                        response = requests.get(self.api_url, timeout=10)
-                    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
-                            requests.exceptions.RequestException) as error:
-                        logging.error(f"Error: {error}", exc_info=True)
-                        print(f"Error: {error}")
-                        sys.exit()
-                    else:
-                        if response.status_code == 200:
-                            # save the appimage to the appimage folder
-                            with open(f"{self.appimage_name}", "wb") as file:
-                                file.write(response.content)
-                            print(f"Downloaded {self.appimage_name}")
-                        else:
-                            print(f"Error downloading {self.appimage_name}")
+
+            if response.status_code == 200:
+                print(f"{self.repo} downloading..."
+                    "Grab a cup of coffee :), it will take some time depending on your internet speed."
+                    )
+                # get the download url from the api
+                data = json.loads(response.text)
+                # get the version from the tag_name
+                self.version = data["tag_name"].replace("v", "")
+                # get the download url from the assets
+                for asset in data["assets"]:
+                    if asset["name"].endswith(".AppImage"):
+                        self.api_url = asset["browser_download_url"]
+                        self.appimage_name = asset["name"]
+                    elif asset["name"] == self.sha_name:
+                        self.sha_url = asset["browser_download_url"]
+                        self.sha_name = asset["name"]
+
+                # download the appimage
+                try:
+                    response = requests.get(self.api_url, timeout=10, stream=True)
+                    total_size_in_bytes = int(response.headers.get("content-length", 0))
+                except requests.exceptions.Timeout as error:
+                    logging.error(f"Error: {error}", exc_info=True)
+                    print(f"Error: {error}")
+                    sys.exit()
+                except requests.exceptions.ConnectionError as error2:
+                    logging.error(f"Error: {error2}", exc_info=True)
+                    print(f"Error: {error2}")
+                    sys.exit()
+                except requests.exceptions.RequestException as error3:
+                    logging.error(f"Error: {error3}", exc_info=True)
+                    print(f"Error: {error3}")
+                    sys.exit()
                 else:
-                    print(f"Error downloading {self.appimage_name}")
-            except KeyboardInterrupt as error:
-                logging.error(f"Error: {error}", exc_info=True)
-                print("Error: Keyboard interrupt.")
-                sys.exit()
+                    if response.status_code == 200:
+                        # save the appimage to the appimage folder
+                        with open(f"{self.appimage_name}", "wb") as file, tqdm(
+                            desc=self.appimage_name,
+                            total=total_size_in_bytes,
+                            unit="iB",
+                            unit_scale=True,
+                            unit_divisor=1024,
+                        ) as bar:
+                            for data in response.iter_content(chunk_size=1024):
+                                size = file.write(data)
+                                bar.update(size)
+                        print(f"Downloaded {self.appimage_name}")
+                    else:
+                        print(f"Error downloading {self.appimage_name}")
             else:
-                # update appimage version in the json file
+                print(f"Response error: {response.status_code}")
+
+            # update appimage version in the json file
                 self.appimages["version"] = self.version
 
-                # update appimage name in the json file
-                self.appimages["appimage"] = self.appimage_name
+            # update appimage name in the json file
+            self.appimages["appimage"] = self.appimage_name
 
-                # save the credentials to a json file
-                with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
-                    json.dump(self.appimages, file, indent=4)
+            # save the credentials to a json file
+            with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+                json.dump(self.appimages, file, indent=4)
 
     def update_json(self):
         """Update the json file with the new version"""
