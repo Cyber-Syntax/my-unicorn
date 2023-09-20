@@ -3,6 +3,7 @@ import json
 import sys
 import requests
 import logging
+from tqdm import tqdm
 
 class AppImageDownloader:
     """This class downloads the appimage from the github release page"""
@@ -213,7 +214,8 @@ class AppImageDownloader:
 
                 # download the appimage
                 try:
-                    response = requests.get(self.api_url, timeout=10)
+                    response = requests.get(self.api_url, timeout=10, stream=True)
+                    total_size_in_bytes = int(response.headers.get("content-length", 0))
                 except requests.exceptions.Timeout as error:
                     logging.error(f"Error: {error}", exc_info=True)
                     print(f"Error: {error}")
@@ -229,8 +231,16 @@ class AppImageDownloader:
                 else:
                     if response.status_code == 200:
                         # save the appimage to the appimage folder
-                        with open(f"{self.appimage_name}", "wb") as file:
-                            file.write(response.content)
+                        with open(f"{self.appimage_name}", "wb") as file, tqdm(
+                            desc=self.appimage_name,
+                            total=total_size_in_bytes,
+                            unit="iB",
+                            unit_scale=True,
+                            unit_divisor=1024,
+                        ) as bar:
+                            for data in response.iter_content(chunk_size=1024):
+                                size = file.write(data)
+                                bar.update(size)
                         print(f"Downloaded {self.appimage_name}")
                     else:
                         print(f"Error downloading {self.appimage_name}")
