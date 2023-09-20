@@ -117,29 +117,34 @@ class FileHandler(AppImageDownloader):
 
         print(f"Moving {old_appimage_folder} to {backup_folder}")
 
+        # Create a backup folder if it doesn't exist
         if os.path.exists(backup_folder):
             print(f"Backup folder {backup_folder} found")
-            if os.path.exists(f"{self.appimage_folder}{self.repo}.AppImage"):
-                print(f"Found {self.repo}.AppImage in {self.appimage_folder}")
-                if input(f"Do you want to backup"
-                        f"{self.repo}.AppImage to {backup_folder} (y/n):") == "y":
-                    try:
-                        subprocess.run(["mv", f"{old_appimage_folder}",
-                                     f"{backup_folder}"], check=True)
-                    except subprocess.CalledProcessError as error:
-                        logging.error(f"Error: {error}", exc_info=True)
-                        print(f"Error moving {old_appimage_folder} to {backup_folder}")
-                else:
-                    print(f"Not backing up {self.repo}.AppImage")
-            else:
-                print(f"{self.repo}.AppImage not found in {self.appimage_folder}")
         else:
             if input(f"Backup folder {backup_folder} not found,"
                     "do you want to create it (y/n): ") == "y":
                 subprocess.run(["mkdir", "-p", backup_folder], check=True)
                 print(f"Created backup folder: {backup_folder}")
             else:
+                print("Backup folder not created.")
+
+        # Move old appimage to backup folder
+
+        if os.path.exists(f"{self.appimage_folder}{self.repo}.AppImage"):
+            print(f"Found {self.repo}.AppImage in {self.appimage_folder}")
+            if input(f"Do you want to backup"
+                    f"{self.repo}.AppImage to {backup_folder} (y/n):") == "y":
+                try:
+                    subprocess.run(["mv", f"{old_appimage_folder}",
+                                    f"{backup_folder}"], check=True)
+                except subprocess.CalledProcessError as error:
+                    logging.error(f"Error: {error}", exc_info=True)
+                    print(f"Error moving {old_appimage_folder} to {backup_folder}")
+            else:
                 print(f"Overwriting {self.repo}.AppImage")
+        else:
+            print(f"{self.repo}.AppImage not found in {self.appimage_folder}")
+
 
     def change_name(self):
         """ Change appimage name for .desktop file on linux, ask user for approval """
