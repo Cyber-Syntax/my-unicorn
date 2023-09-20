@@ -14,9 +14,10 @@ class FileHandler(AppImageDownloader):
         super().__init__()
 
     def verify_sha(self):
+        
         # if the sha_name endswith .yml or .yaml, then use the yaml module to parse the file
-        try:
-            if self.sha_name.endswith(".yml") or self.sha_name.endswith(".yaml"):
+        if self.sha_name.endswith(".yml") or self.sha_name.endswith(".yaml"):
+            try:
                 print(f"Verifying {self.appimage_name}...")
                 response = requests.get(self.sha_url, timeout=10)
             except requests.exceptions.ConnectionError as error:
