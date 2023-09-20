@@ -195,7 +195,7 @@ class AppImageDownloader:
         else:
 
             if response.status_code == 200:
-                print(f"{self.appimage_name} downloading..."
+                print(f"{self.repo} downloading..."
                     "Grab a cup of coffee :), it will take some time depending on your internet speed."
                     )
                 # get the download url from the api
