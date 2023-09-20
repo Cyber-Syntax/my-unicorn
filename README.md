@@ -3,7 +3,7 @@
 - 🤯 **It is it difficult for me to stay motivated while writing scripts and learning coding**
 
 # <samp>Attention<samp>
-- **Do not use without taking old version backup.** This script is in alpha version. Therefore, you may encounter some errors.
+- **Do not use without taking old version backup.** This script is in **beta** version. Therefore, you may encounter some errors.
 
 
 ## ‎ 🦄 <samp>About my-unicorn<samp>
@@ -11,7 +11,6 @@
     - 🛠️ Tested; 
         - [X] sha256
         - [X] sha512
-        - [ ] md5 
 - <samp>Which apps work with this script?<samp>
     - 🛠️ Tested; 
         - [X] super-productivity
@@ -27,6 +26,17 @@
         - `python3-pip` -maybe-
     - Install dependencies:    
         - `pip3 install requests yaml`
+    - Libraries
+        - [requests](https://pypi.org/project/requests/)
+        - [yaml](https://pypi.org/project/PyYAML/)
+        - [json](https://docs.python.org/3/library/json.html)
+        - [tqdm](https://pypi.org/project/tqdm/)
+        - [os](https://docs.python.org/3/library/os.html)
+        - [sys](https://docs.python.org/3/library/sys.html)
+        - [hashlib](https://docs.python.org/3/library/hashlib.html)
+        - [logging](https://docs.python.org/3/library/logging.html)
+        - [base64](https://docs.python.org/3/library/base64.html)
+        - [subprocess](https://docs.python.org/3/library/subprocess.html)
 
 ## ‎ <samp>What you need to know before using<samp>
 1. Github url (https://github.com/johannesjo/super-productivity)
