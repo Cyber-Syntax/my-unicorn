@@ -234,10 +234,10 @@ class AppImageDownloader:
                             unit="iB",
                             unit_scale=True,
                             unit_divisor=1024,
-                        ) as bar:
+                        ) as progress_bar:
                             for data in response.iter_content(chunk_size=1024):
                                 size = file.write(data)
-                                bar.update(size)
+                                progress_bar.update(size)
                         print(f"Downloaded {self.appimage_name}")
                     else:
                         print(f"Error downloading {self.appimage_name}")
@@ -245,7 +245,7 @@ class AppImageDownloader:
                 print(f"Response error: {response.status_code}")
 
             # update appimage version in the json file
-                self.appimages["version"] = self.version
+            self.appimages["version"] = self.version
 
             # update appimage name in the json file
             self.appimages["appimage"] = self.appimage_name
