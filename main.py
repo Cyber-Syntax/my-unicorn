@@ -20,9 +20,9 @@ def main():
     # A dictionary of functions to call based on the user's choice
     functions = {
         1: ['ask_inputs', 'learn_owner_repo', 'download',
-           'save_credentials', 'verify_sha', 'backup_old_appimage'],
+           'save_credentials', 'backup_old_appimage', 'verify_sha'],
         2: ['ask_inputs', 'learn_owner_repo', 'download', 'save_credentials', 'verify_sha'],
-        3: ['update_json', 'download', 'verify_sha', 'backup_old_appimage'],
+        3: ['update_json', 'download', 'backup_old_appimage', 'verify_sha'],
         4: ['update_json', 'download', 'verify_sha']
     }
 
@@ -66,7 +66,6 @@ def main():
         else:
             print("Invalid choice")
             sys.exit()
-
 
 if __name__ == "__main__":
     main()

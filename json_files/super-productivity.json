@@ -2,7 +2,7 @@
     "version": "7.13.2",
     "owner": "johannesjo",
     "repo": "super-productivity",
-    "appimage": "superProductivity-7.13.2.AppImage",
+    "appimage": "superProductivity-7.14.3.AppImage",
     "sha": "latest-linux.yml",
     "choice": 3,
     "hash_type": "sha512",
