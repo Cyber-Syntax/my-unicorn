@@ -193,13 +193,22 @@ class AppImageDownloader:
         else:
 
             if response.status_code == 200:
-                print(f"{self.repo} downloading..."
-                    "Grab a cup of coffee :), it will take some time depending on your internet speed."
-                    )
                 # get the download url from the api
                 data = json.loads(response.text)
                 # get the version from the tag_name
                 self.version = data["tag_name"].replace("v", "")
+                # Check version and if it's the same, then exit
+                if self.version == self.appimages["version"]:
+                    print(f"{self.repo}.AppImage is up to date")
+                    print(f"Version: {self.version}")
+                    print("Exiting...")
+                    sys.exit()
+
+                print(f"{self.repo} downloading..."
+                    "Grab a cup of coffee :), "
+                    "it will take some time depending on your internet speed."
+                    )
+
                 # get the download url from the assets
                 for asset in data["assets"]:
                     if asset["name"].endswith(".AppImage"):
