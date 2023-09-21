@@ -14,7 +14,6 @@ class FileHandler(AppImageDownloader):
         super().__init__()
 
     def verify_sha(self):
-        
         # if the sha_name endswith .yml or .yaml, then use the yaml module to parse the file
         if self.sha_name.endswith(".yml") or self.sha_name.endswith(".yaml"):
             try:
@@ -107,11 +106,11 @@ class FileHandler(AppImageDownloader):
     def backup_old_appimage(self):
         """ Save old {self.repo}.AppImage to a backup folder, ask user for approval """
 
-        backup_folder = os.path.expanduser(f"{self.appimage_folder}backup/")
+        backup_folder = os.path.expanduser(f"{self.appimage_folder}backup")
 
-        old_appimage_folder = os.path.expanduser(f"{self.appimage_folder}{self.repo}.AppImage")
+        old_appimage = os.path.expanduser(f"{self.appimage_folder}{self.repo}.AppImage")
 
-        print(f"Moving {old_appimage_folder} to {backup_folder}")
+        print(f"Moving {old_appimage} to {backup_folder}")
 
         # Create a backup folder if it doesn't exist
         if os.path.exists(backup_folder):
@@ -126,16 +125,16 @@ class FileHandler(AppImageDownloader):
 
         # Move old appimage to backup folder
 
-        if os.path.exists(f"{self.appimage_folder}{self.repo}.AppImage"):
+        if os.path.exists(f"{self.appimage_folder}/{self.repo}.AppImage"):
             print(f"Found {self.repo}.AppImage in {self.appimage_folder}")
-            if input(f"Do you want to backup"
+            if input(f"Do you want to backup "
                     f"{self.repo}.AppImage to {backup_folder} (y/n):") == "y":
                 try:
-                    subprocess.run(["mv", f"{old_appimage_folder}",
+                    subprocess.run(["mv", f"{old_appimage}",
                                     f"{backup_folder}"], check=True)
                 except subprocess.CalledProcessError as error:
                     logging.error(f"Error: {error}", exc_info=True)
-                    print(f"Error moving {old_appimage_folder} to {backup_folder}")
+                    print(f"Error moving {old_appimage} to {backup_folder}")
             else:
                 print(f"Overwriting {self.repo}.AppImage")
         else:
