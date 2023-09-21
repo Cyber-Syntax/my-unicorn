@@ -102,6 +102,10 @@ class AppImageDownloader:
                 self.appimage_folder = input(
                     "Which directory(e.g /Documents/appimages)to save appimage: " 
                     ).strip(" ")
+                # setup default appimage folder
+                if not self.appimage_folder:
+                    self.appimage_folder = "/Documents/appimages"
+
                 self.hash_type = input(
                     "Enter the hash type for your sha(sha256, sha512) file: "
                     ).strip(" ")
@@ -197,12 +201,15 @@ class AppImageDownloader:
                 data = json.loads(response.text)
                 # get the version from the tag_name
                 self.version = data["tag_name"].replace("v", "")
+                
                 # Check version and if it's the same, then exit
-                if self.version == self.appimages["version"]:
-                    print(f"{self.repo}.AppImage is up to date")
-                    print(f"Version: {self.version}")
-                    print("Exiting...")
-                    sys.exit()
+                if self.choice in [3, 4]:
+                    if self.version == self.appimages["version"]:
+                        print(f"{self.repo}.AppImage is up to date")
+                        print(f"Version: {self.version}")
+                        print("Exiting...")
+                        sys.exit()
+
 
                 print(f"{self.repo} downloading..."
                     "Grab a cup of coffee :), "
