@@ -42,29 +42,41 @@ def main():
         print("Keyboard interrupt. Exiting...")
         sys.exit()
     else:
-        # Call the methods based on the user's choice
-        if choice == 1:
-            file_handler.list_json_files()
-            if file_handler.choice in [3, 4]:
+        try:
+            # Call the methods based on the user's choice
+            if choice == 1:
+                file_handler.list_json_files()
+                if file_handler.choice in [3, 4]:
+                    for function in functions[file_handler.choice]:
+                        if function in dir(file_handler):
+                            method = getattr(file_handler, function)
+                            method()
+                        else:
+                            print(f"Function {function} not found")
+            elif choice == 2:
+                print("Downloading new appimage")
+                # ask user which choice they want to use from functions
+                print("Choose one of the following options: \n")
+                print("1. Backup old appimage and download new appimage")
+                print("2. Download new appimage and overwrite old appimage")
+                file_handler.choice = int(input("Enter your choice: "))
                 for function in functions[file_handler.choice]:
                     if function in dir(file_handler):
                         method = getattr(file_handler, function)
                         method()
                     else:
                         print(f"Function {function} not found")
-        elif choice == 2:
-            print("Downloading new appimage")
-            for function in functions[choice]:
-                if function in dir(file_handler):
-                    method = getattr(file_handler, function)
-                    method()
-                else:
-                    print(f"Function {function} not found")
-        elif choice == 3:
-            print("Exiting...")
-            sys.exit()
-        else:
-            print("Invalid choice")
+                        sys.exit()
+
+            elif choice == 3:
+                print("Exiting...")
+                sys.exit()
+            else:
+                print("Invalid choice")
+                sys.exit()
+        except KeyboardInterrupt as error:
+            logging.error(f"Error: {error}", exc_info=True)
+            print("Keyboard interrupt. Exiting...")
             sys.exit()
 
 if __name__ == "__main__":

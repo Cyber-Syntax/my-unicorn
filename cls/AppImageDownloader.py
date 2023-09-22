@@ -254,6 +254,10 @@ class AppImageDownloader:
                     logging.error(f"Error: {error3}", exc_info=True)
                     print(f"Error: {error3}")
                     sys.exit()
+                except KeyboardInterrupt as error4:
+                    logging.error(f"Error: {error4}", exc_info=True)
+                    print("\nExiting...")
+                    sys.exit()
                 else:
                     if response.status_code == 200:
                         # save the appimage to the appimage folder
