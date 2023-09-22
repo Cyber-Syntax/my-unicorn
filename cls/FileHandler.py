@@ -56,10 +56,16 @@ class FileHandler(AppImageDownloader):
                             print(f"Saved {self.sha_name}")
                     else:
                         print(f"Error verifying {self.appimage_name}")
+                        logging.error(f"Error verifying {self.appimage_name}")
                         if input("Do you want to delete the downloaded appimage? (y/n): "
                                 ).lower() == "y":
                             os.remove(self.appimage_name)
                             print(f"Deleted {self.appimage_name}")
+                            sys.exit(1)
+                        elif input("Do you want to delete the downloaded sha file? (y/n): "
+                                ).lower() == "y":
+                            os.remove(self.sha_name)
+                            print(f"Deleted {self.sha_name}")
                             sys.exit(1)
                         else:
                             if input("Do you want to continue without verification? (y/n): "
@@ -77,6 +83,7 @@ class FileHandler(AppImageDownloader):
                 self.make_executable()
             else:
                 print(f"Error verifying {self.appimage_name}")
+                logging.error(f"Error verifying {self.appimage_name}")
                 # ask user if he wants to delete the downloaded appimage
                 if input("Do you want to delete the downloaded appimage? (y/n): "
                         ).lower() == "y":
@@ -158,6 +165,17 @@ class FileHandler(AppImageDownloader):
         # ask user
         if input(f"Do you want to move "
                 f"{self.repo}.AppImage to {self.appimage_folder} (y/n):") == "y":
-            subprocess.run(["mv", f"{self.repo}.AppImage", f"{self.appimage_folder}"], check=True)
+                # check if appimage folder exists
+            if not os.path.exists(self.appimage_folder):
+                subprocess.run(["mkdir", "-p", self.appimage_folder], check=True)
+                print(f"Created {self.appimage_folder}")
+            
+            # move appimage to appimage folder
+            try:
+                subprocess.run(["mv", f"{self.repo}.AppImage", f"{self.appimage_folder}"], check=True)
+            except subprocess.CalledProcessError as error:
+                logging.error(f"Error: {error}", exc_info=True)
+                print(f"Error moving {self.appimage_name} to {self.appimage_folder}")
+
         else:
             print(f"Not moving {self.appimage_name} to {self.appimage_folder}")

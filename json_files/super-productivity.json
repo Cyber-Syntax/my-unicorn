@@ -1,10 +1,10 @@
 {
-    "version": "7.13.2",
+    "version": "7.14.3",
+    "appimage": "superProductivity-7.14.3.AppImage",
     "owner": "johannesjo",
     "repo": "super-productivity",
-    "appimage": "superProductivity-7.14.3.AppImage",
     "sha": "latest-linux.yml",
-    "choice": 3,
     "hash_type": "sha512",
-    "appimage_folder": "/home/developer/Documents/appimages"
+    "choice": 3,
+    "appimage_folder": "/home/developer/Documents/appimages/"
 }

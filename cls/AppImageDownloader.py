@@ -98,9 +98,9 @@ class AppImageDownloader:
         while True:
             try:
                 self.url = input("Enter the app github url: ").strip(" ")
-                self.sha_name = input("Enter the sha name: ").strip(" ")
                 self.appimage_folder = input(
-                    "Which directory(e.g /Documents/appimages)to save appimage: " 
+                    "Which directory to save appimage \n"
+                    "(Default: '/Documents/appimages' if you leave it blank):" 
                     ).strip(" ")
                 # setup default appimage folder
                 if not self.appimage_folder:
@@ -122,7 +122,7 @@ class AppImageDownloader:
                 print(f"Error: {error3}")
                 sys.exit()
 
-            if self.url and self.sha_name and self.appimage_folder and self.hash_type:
+            if self.url and self.appimage_folder and self.hash_type:
                 break
             else:
                 print("Invalid inputs, please try again.")
@@ -216,18 +216,31 @@ class AppImageDownloader:
                     "it will take some time depending on your internet speed."
                     )
 
+                # Define keywords for the assets
+                keywords = {"linux", "sum", "sha" "checksum"}
+                valid_extensions = {".sha256", ".sha512", ".yml", ".yaml"}
+                
                 # get the download url from the assets
                 for asset in data["assets"]:
                     if asset["name"].endswith(".AppImage"):
-                        self.api_url = asset["browser_download_url"]
                         self.appimage_name = asset["name"]
-                    elif asset["name"] == self.sha_name:
-                        self.sha_url = asset["browser_download_url"]
+                        self.url = asset["browser_download_url"]
+                    elif any(keyword in asset["name"] for keyword in keywords) and \
+                            asset["name"].endswith(tuple(valid_extensions)):
                         self.sha_name = asset["name"]
+                        self.sha_url = asset["browser_download_url"]
+                        if self.sha_name == None:
+                            print("Couldn't find the sha file")
+                            logging.error("Couldn't find the sha file")
+                            # ask user exact SHA name
+                            self.sha_name = input("Enter the exact sha name: ")
+                            self.sha_url = asset["browser_download_url"]
+                        else:
+                            continue
 
                 # download the appimage
                 try:
-                    response = requests.get(self.api_url, timeout=10, stream=True)
+                    response = requests.get(self.url, timeout=10, stream=True)
                     total_size_in_bytes = int(response.headers.get("content-length", 0))
                 except requests.exceptions.Timeout as error:
                     logging.error(f"Error: {error}", exc_info=True)
@@ -241,6 +254,10 @@ class AppImageDownloader:
                     logging.error(f"Error: {error3}", exc_info=True)
                     print(f"Error: {error3}")
                     sys.exit()
+                except KeyboardInterrupt as error4:
+                    logging.error(f"Error: {error4}", exc_info=True)
+                    print("\nExiting...")
+                    sys.exit()
                 else:
                     if response.status_code == 200:
                         # save the appimage to the appimage folder
@@ -251,7 +268,7 @@ class AppImageDownloader:
                             unit_scale=True,
                             unit_divisor=1024,
                         ) as progress_bar:
-                            for data in response.iter_content(chunk_size=1024):
+                            for data in response.iter_content(chunk_size=8192):
                                 size = file.write(data)
                                 progress_bar.update(size)
                         print(f"Downloaded {self.appimage_name}")

@@ -3,6 +3,12 @@ import sys
 import logging
 from cls.FileHandler import FileHandler
 
+def custom_excepthook(exc_type, exc_value, exc_traceback):
+    # Log the exception
+    logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+    # Call the original excepthook to ensure Python's default error handling
+    sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
 def main():
     # Set up the logging configuration
     logging.basicConfig(
@@ -40,32 +46,47 @@ def main():
     except KeyboardInterrupt as error2:
         logging.error(f"Error: {error2}", exc_info=True)
         print("Keyboard interrupt. Exiting...")
-        sys.exit()
+        sys.exit(1)
     else:
-        # Call the methods based on the user's choice
-        if choice == 1:
-            file_handler.list_json_files()
-            if file_handler.choice in [3, 4]:
+        try:
+            # Call the methods based on the user's choice
+            if choice == 1:
+                file_handler.list_json_files()
+                if file_handler.choice in [3, 4]:
+                    for function in functions[file_handler.choice]:
+                        if function in dir(file_handler):
+                            method = getattr(file_handler, function)
+                            method()
+                        else:
+                            print(f"Function {function} not found")
+            elif choice == 2:
+                print("Downloading new appimage")
+                
+                # ask user which choice they want to use from functions
+                print("Choose one of the following options: \n")
+                print("1. Backup old appimage and download new appimage")
+                print("2. Download new appimage and overwrite old appimage")
+                file_handler.choice = int(input("Enter your choice: "))
                 for function in functions[file_handler.choice]:
                     if function in dir(file_handler):
                         method = getattr(file_handler, function)
                         method()
                     else:
                         print(f"Function {function} not found")
-        elif choice == 2:
-            print("Downloading new appimage")
-            for function in functions[choice]:
-                if function in dir(file_handler):
-                    method = getattr(file_handler, function)
-                    method()
-                else:
-                    print(f"Function {function} not found")
-        elif choice == 3:
-            print("Exiting...")
-            sys.exit()
-        else:
-            print("Invalid choice")
-            sys.exit()
+                        logging.error(f"Function {function} not found", exc_info=True)
+                        sys.exit()
+
+            elif choice == 3:
+                print("Exiting...")
+                sys.exit()
+            else:
+                print("Invalid choice")
+                sys.exit()
+        except KeyboardInterrupt as error:
+            logging.error(f"Error: {error}", exc_info=True)
+            print("Keyboard interrupt. Exiting...")
+            sys.exit(1)
 
 if __name__ == "__main__":
+    sys.excepthook = custom_excepthook
     main()
