@@ -1,7 +1,0 @@
-22-Sep-23 14:37:43 - ERROR - Uncaught exception
-Traceback (most recent call last):
-  File "/home/developer/Documents/repository/my-unicorn/main.py", line 95, in <module>
-    main()
-  File "/home/developer/Documents/repository/my-unicorn/main.py", line 42, in main
-    raise ValueError("This is an unhandled exception")
-ValueError: This is an unhandled exception
