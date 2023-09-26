@@ -217,8 +217,8 @@ class AppImageDownloader:
                     )
 
                 # Define keywords for the assets
-                keywords = {"linux", "sum", "sha" "checksum"}
-                valid_extensions = {".sha256", ".sha512", ".yml", ".yaml"}
+                keywords = {"linux", "sum", "sha" "checksum", "SHA", "SHA256", "SHA512", "SHA-256", "SHA-512", "checksums", "checksums.txt"}
+                valid_extensions = {".sha256", ".sha512", ".yml", ".yaml", ".txt", ".sum", ".sha"}
                 
                 # get the download url from the assets
                 for asset in data["assets"]:
@@ -235,8 +235,6 @@ class AppImageDownloader:
                             # ask user exact SHA name
                             self.sha_name = input("Enter the exact sha name: ")
                             self.sha_url = asset["browser_download_url"]
-                        else:
-                            continue
 
                 # download the appimage
                 try:
