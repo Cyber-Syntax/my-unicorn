@@ -9,17 +9,17 @@ Project Description
 - [ ] .apk should be able to be downloaded  
 - [ ] Auto Update  
 
-
 ### Todo
 
+- [ ] Text Coloring  
 - [ ] Parse Sha Type  
 - [ ] Update readme  
 - [ ] Nuclear app  
 
 ### In Progress
 
+- [ ] Do not update version if problem occurs  
 - [ ] Clear Code  
-- [ ] Text Coloring  
 
 ### Done ✓
 

@@ -6,6 +6,7 @@ import sys
 import logging
 import requests
 import yaml
+import json
 from cls.AppImageDownloader import AppImageDownloader
 
 class FileHandler(AppImageDownloader):
@@ -19,18 +20,12 @@ class FileHandler(AppImageDownloader):
             try:
                 print(f"Verifying {self.appimage_name}...")
                 response = requests.get(self.sha_url, timeout=10)
-            except requests.exceptions.ConnectionError as error:
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout,
+                    requests.exceptions.HTTPError, requests.exceptions.RequestException) as error:
                 logging.error(f"Error: {error}", exc_info=True)
-                print("Error while installing hash file. Check your internet connection")
+                print("Connection error. Exiting...")
                 sys.exit(1)
-            except requests.exceptions.Timeout as error2:
-                logging.error(f"Error: {error2}", exc_info=True)
-                print("Error while installing hash file. Check your internet connection")
-                sys.exit(1)
-            except requests.exceptions.RequestException as error3:
-                logging.error(f"Error: {error3}", exc_info=True)
-                print("Error while installing hash file. Check your internet connection")
-                sys.exit(1)
+
             else:
                 if response.status_code == 200:
                     with open(self.sha_name, "w", encoding="utf-8") as file:
@@ -61,18 +56,20 @@ class FileHandler(AppImageDownloader):
                                 ).lower() == "y":
                             os.remove(self.appimage_name)
                             print(f"Deleted {self.appimage_name}")
-                            sys.exit(1)
-                        elif input("Do you want to delete the downloaded sha file? (y/n): "
-                                ).lower() == "y":
-                            os.remove(self.sha_name)
-                            print(f"Deleted {self.sha_name}")
-                            sys.exit(1)
-                        else:
-                            if input("Do you want to continue without verification? (y/n): "
+                            
+                            # Delete the downloaded sha file too
+                            if input("Do you want to delete the downloaded sha file? (y/n): "
                                     ).lower() == "y":
-                                self.make_executable()
+                                os.remove(self.sha_name)
+                                print(f"Deleted {self.sha_name}")
+                                sys.exit()
                             else:
-                                sys.exit(1)
+                                if input("Do you want to continue without verification? (y/n): "
+                                        ).lower() == "y":
+                                    self.make_executable()
+                                else:
+                                    print("Exiting...")
+                                    sys.exit()
         else:
             # if the sha_name doesn't endswith .yml or .yaml,
             # then use the normal sha verification
@@ -89,14 +86,21 @@ class FileHandler(AppImageDownloader):
                         ).lower() == "y":
                     os.remove(self.appimage_name)
                     print(f"Deleted {self.appimage_name}")
-                    sys.exit()
-                else:
-                    if input("Do you want to continue without verification? (y/n): "
+                    
+                    # Delete the downloaded sha file too
+                    if input("Do you want to delete the downloaded sha file? (y/n): "
                             ).lower() == "y":
-                        self.make_executable()
-                    else:
-                        print("Exiting...")
+                        os.remove(self.sha_name)
+                        print(f"Deleted {self.sha_name}")
                         sys.exit()
+                    else:
+                        if input("Do you want to continue without verification? (y/n): "
+                                ).lower() == "y":
+                            self.make_executable()
+                        else:
+                            print("Exiting...")
+                            sys.exit()
+
 
     def make_executable(self):
         """Make the appimage executable"""
@@ -179,3 +183,25 @@ class FileHandler(AppImageDownloader):
 
         else:
             print(f"Not moving {self.appimage_name} to {self.appimage_folder}")
+    
+    def update_version(self):
+        """Update the version-appimage_name in the json file"""
+        # request
+        try:
+            response = requests.get(self.url, timeout=10)
+            if response == 200:
+                data = json.loads(response.text)
+
+                # update version and appimage_name
+                self.appimages["version"] = data["tag_name"].replace("v", "")
+                self.appimages["appimage"] = self.appimage_name
+                self.appimages["version"] = self.version
+            else:
+                print(f"Error updating version: {response.status_code}")
+                logging.error(f"Error updating version: {response.status_code}")
+                sys.exit()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
+                    requests.exceptions.RequestException) as error:
+            logging.error(f"Error: {error}", exc_info=True)
+            print(f"Error: {error}")
+            sys.exit()

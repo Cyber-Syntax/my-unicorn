@@ -229,7 +229,7 @@ class AppImageDownloader:
                             asset["name"].endswith(tuple(valid_extensions)):
                         self.sha_name = asset["name"]
                         self.sha_url = asset["browser_download_url"]
-                        if self.sha_name == None:
+                        if self.sha_name is None:
                             print("Couldn't find the sha file")
                             logging.error("Couldn't find the sha file")
                             # ask user exact SHA name
@@ -238,23 +238,12 @@ class AppImageDownloader:
 
                 # download the appimage
                 try:
-                    with requests.get(self.url, timeout=10, stream=True) as response:
-                        total_size_in_bytes = int(response.headers.get("content-length", 0))
-                except requests.exceptions.Timeout as error:
+                    response = requests.get(self.url, timeout=10, stream=True)
+                    total_size_in_bytes = int(response.headers.get("content-length", 0))
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
+                        requests.exceptions.RequestException) as error:
                     logging.error(f"Error: {error}", exc_info=True)
                     print(f"Error: {error}")
-                    sys.exit()
-                except requests.exceptions.ConnectionError as error2:
-                    logging.error(f"Error: {error2}", exc_info=True)
-                    print(f"Error: {error2}")
-                    sys.exit()
-                except requests.exceptions.RequestException as error3:
-                    logging.error(f"Error: {error3}", exc_info=True)
-                    print(f"Error: {error3}")
-                    sys.exit()
-                except KeyboardInterrupt as error4:
-                    logging.error(f"Error: {error4}", exc_info=True)
-                    print("\nExiting...")
                     sys.exit()
                 else:
                     if response.status_code == 200:
@@ -274,12 +263,6 @@ class AppImageDownloader:
                         print(f"Error downloading {self.appimage_name}")
             else:
                 print(f"Response error: {response.status_code}")
-
-            # update appimage version in the json file
-            self.appimages["version"] = self.version
-
-            # update appimage name in the json file
-            self.appimages["appimage"] = self.appimage_name
 
             # save the credentials to a json file
             with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
