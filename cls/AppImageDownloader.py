@@ -238,8 +238,8 @@ class AppImageDownloader:
 
                 # download the appimage
                 try:
-                    response = requests.get(self.url, timeout=10, stream=True)
-                    total_size_in_bytes = int(response.headers.get("content-length", 0))
+                    with requests.get(self.url, timeout=10, stream=True) as response:
+                        total_size_in_bytes = int(response.headers.get("content-length", 0))
                 except requests.exceptions.Timeout as error:
                     logging.error(f"Error: {error}", exc_info=True)
                     print(f"Error: {error}")
