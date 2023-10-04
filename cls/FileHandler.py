@@ -14,6 +14,9 @@ class FileHandler(AppImageDownloader):
     def __init__(self):
         super().__init__()
 
+    def get_sha(self):
+        
+    
     def verify_sha(self):
         # if the sha_name endswith .yml or .yaml, then use the yaml module to parse the file
         if self.sha_name.endswith(".yml") or self.sha_name.endswith(".yaml"):
