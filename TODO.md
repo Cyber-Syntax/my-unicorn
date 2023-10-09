@@ -19,7 +19,7 @@ Project Description
 ### In Progress
 
 - [ ] Do not update version if problem occurs  
-- [ ] Clear Code  
+- [ ] Clear Code  (Decrease functions smaller)
 
 ### Done ✓
 

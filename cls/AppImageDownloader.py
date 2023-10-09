@@ -295,10 +295,10 @@ class AppImageDownloader:
                         if input(f"Do you want to change the {key}? (y/n): ").lower() == "y":
                             self.appimages[key] = input(f"Enter new {key}: ")
 
-                    # ask for choice update
-                    if input("Do you want to change the choice?"
-                            "(3: backup, 4: don't backup) (y/n): ").lower() == "y":
-                        self.appimages["choice"] = int(input("Enter new choice: "))
+                        # ask for choice update
+                        if input("Do you want to change the choice?"
+                                "(3: backup, 4: don't backup) (y/n): ").lower() == "y":
+                            self.appimages["choice"] = int(input("Enter new choice: "))
 
                     # write new credentials to json file
                     with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
