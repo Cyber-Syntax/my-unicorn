@@ -15,6 +15,7 @@ Project Description
 - [ ] Parse Sha Type  
 - [ ] Update readme  
 - [ ] Nuclear app  
+- [ ] Downgrade version
 
 ### In Progress
 
