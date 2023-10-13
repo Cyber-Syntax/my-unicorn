@@ -173,7 +173,7 @@ class FileHandler(AppImageDownloader):
             if not os.path.exists(self.appimage_folder):
                 subprocess.run(["mkdir", "-p", self.appimage_folder], check=True)
                 print(f"Created {self.appimage_folder}")
-            
+
             # move appimage to appimage folder
             try:
                 subprocess.run(["mv", f"{self.repo}.AppImage", f"{self.appimage_folder}"], check=True)
@@ -183,25 +183,18 @@ class FileHandler(AppImageDownloader):
 
         else:
             print(f"Not moving {self.appimage_name} to {self.appimage_folder}")
-    
+
     def update_version(self):
         """Update the version-appimage_name in the json file"""
-        # request
-        try:
-            response = requests.get(self.url, timeout=10)
-            if response == 200:
-                data = json.loads(response.text)
+        # if appimage installed successfully and verified, update the version
+        new_name = f"{self.repo}.AppImage"
+        if self.appimage_name == new_name:
+            print("Updating credentials...")
+            # update the version
+            self.appimages["version"] = self.version
+            # update the appimage_name
+            self.appimages["appimage_name"] = self.appimage_name
 
-                # update version and appimage_name
-                self.appimages["version"] = data["tag_name"].replace("v", "")
-                self.appimages["appimage"] = self.appimage_name
-                self.appimages["version"] = self.version
-            else:
-                print(f"Error updating version: {response.status_code}")
-                logging.error(f"Error updating version: {response.status_code}")
-                sys.exit()
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
-                    requests.exceptions.RequestException) as error:
-            logging.error(f"Error: {error}", exc_info=True)
-            print(f"Error: {error}")
-            sys.exit()
+            # write the updated version and appimage_name to the json file
+            with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
+                self.appimages = json.load(file)
