@@ -14,7 +14,6 @@ Project Description
 
 - [ ] Text Coloring  
 - [ ] Parse Sha Type  
-- [ ] Update readme  
 - [ ] Downgrade version  
 
 ### In Progress
@@ -24,4 +23,5 @@ Project Description
 
 ### Done ✓
 
+- [x] Update readme  
 
