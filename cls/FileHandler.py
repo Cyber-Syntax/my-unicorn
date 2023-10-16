@@ -196,5 +196,5 @@ class FileHandler(AppImageDownloader):
             self.appimages["appimage_name"] = self.appimage_name
 
             # write the updated version and appimage_name to the json file
-            with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
-                self.appimages = json.load(file)
+            with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+                json.dump(self.appimages, file, indent=4)

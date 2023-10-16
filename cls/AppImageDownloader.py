@@ -187,7 +187,7 @@ class AppImageDownloader:
         """ Download the appimage from the github api"""
         self.api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
         try:
-            # get the latest release from the api
+            # get the api response
             response = requests.get(self.api_url, timeout=10)
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
                 requests.exceptions.RequestException) as error:
@@ -195,21 +195,20 @@ class AppImageDownloader:
             print(f"Error: {error}")
             sys.exit()
         else:
-
+            # check the response status code
             if response.status_code == 200:
                 # get the download url from the api
                 data = json.loads(response.text)
-                # get the version from the tag_name
+                # get the version from the tag_name, remove the v from the version
                 self.version = data["tag_name"].replace("v", "")
                 
-                # Check version and if it's the same, then exit
+                # version control
                 if self.choice in [3, 4]:
                     if self.version == self.appimages["version"]:
                         print(f"{self.repo}.AppImage is up to date")
                         print(f"Version: {self.version}")
                         print("Exiting...")
                         sys.exit()
-
 
                 print(f"{self.repo} downloading..."
                     "Grab a cup of coffee :), "
@@ -289,23 +288,28 @@ class AppImageDownloader:
 
                     self.appimages["appimage_folder"] = new_folder
 
-                    # ask for sha_name and hash_type
-                    keys = {"sha_name", "hash_type"}
-                    for key in keys:
-                        if input(f"Do you want to change the {key}? (y/n): ").lower() == "y":
+                # ask for sha_name and hash_type
+                keys = {"sha_name", "hash_type", "choice"}
+                for key in keys:
+                    if input(f"Do you want to change the {key}? (y/n): ").lower() == "y":
+                        if key == "choice":
+                            new_choice = input("Enter new choice (3: backup, 4: don't backup): ")
+                            while new_choice not in ["3", "4"]:
+                                new_choice = input("Invalid input. Enter new choice (3: backup, 4: don't backup): ")
+                            self.appimages[key] = int(new_choice)
+                        else:
                             self.appimages[key] = input(f"Enter new {key}: ")
 
-                        # ask for choice update
-                        if input("Do you want to change the choice?"
-                                "(3: backup, 4: don't backup) (y/n): ").lower() == "y":
-                            self.appimages["choice"] = int(input("Enter new choice: "))
+                        with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+                            json.dump(self.appimages, file, indent=4)
 
-                    # write new credentials to json file
-                    with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
-                        json.dump(self.appimages, file, indent=4)
-                else:
-                    print("Not changing credentials")
-                    self.load_credentials()
+                        # Reload the JSON file
+                        self.load_credentials()
+
+                    else:
+                        print("Not changing credentials")
+                        self.load_credentials()
+
         except (KeyboardInterrupt, EOFError, ValueError, KeyError) as error:
             logging.error(f"Error: {error}", exc_info=True)
             print(f"Error: {error}")

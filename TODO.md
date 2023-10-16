@@ -8,19 +8,19 @@ Project Description
 
 - [ ] .apk should be able to be downloaded  
 - [ ] Auto Update  
+- [ ] Nuclear app  
 
 ### Todo
 
 - [ ] Text Coloring  
 - [ ] Parse Sha Type  
 - [ ] Update readme  
-- [ ] Nuclear app  
-- [ ] Downgrade version
+- [ ] Downgrade version  
 
 ### In Progress
 
+- [ ] Clear Code  (Decrease functions smaller)  
 - [ ] Do not update version if problem occurs  
-- [ ] Clear Code  (Decrease functions smaller)
 
 ### Done ✓
 
