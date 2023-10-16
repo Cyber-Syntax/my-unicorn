@@ -101,7 +101,6 @@ class FileHandler(AppImageDownloader):
                             print("Exiting...")
                             sys.exit()
 
-
     def make_executable(self):
         """Make the appimage executable"""
         # if already executable, return
@@ -151,7 +150,6 @@ class FileHandler(AppImageDownloader):
         else:
             print(f"{self.repo}.AppImage not found in {self.appimage_folder}")
 
-
     def change_name(self):
         """ Change appimage name for .desktop file on linux, ask user for approval """
         new_name = f"{self.repo}.AppImage"
@@ -187,14 +185,16 @@ class FileHandler(AppImageDownloader):
     def update_version(self):
         """Update the version-appimage_name in the json file"""
         # if appimage installed successfully and verified, update the version
+        print("Updating credentials...")
         new_name = f"{self.repo}.AppImage"
         if self.appimage_name == new_name:
             print("Updating credentials...")
             # update the version
             self.appimages["version"] = self.version
             # update the appimage_name
-            self.appimages["appimage_name"] = self.appimage_name
+            self.appimages["appimage"] = self.repo + "-" + self.version + ".AppImage"
 
             # write the updated version and appimage_name to the json file
             with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
                 json.dump(self.appimages, file, indent=4)
+

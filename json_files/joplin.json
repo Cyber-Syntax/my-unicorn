@@ -1,6 +1,6 @@
 {
-    "version": "2.12.17",
-    "appimage": "Joplin-2.12.17.AppImage",
+    "version": "2.12.18",
+    "appimage": "joplin-2.12.18.AppImage",
     "owner": "laurent22",
     "repo": "joplin",
     "sha": "latest-linux.yml",
