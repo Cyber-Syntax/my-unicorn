@@ -23,7 +23,7 @@ class FileHandler(AppImageDownloader):
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout,
                     requests.exceptions.HTTPError, requests.exceptions.RequestException) as error:
                 logging.error(f"Error: {error}", exc_info=True)
-                print("Connection error. Exiting...")
+                print(f"Error verifying {self.appimage_name}. Error:{error} Exiting...")
                 sys.exit(1)
 
             else:
@@ -185,10 +185,10 @@ class FileHandler(AppImageDownloader):
     def update_version(self):
         """Update the version-appimage_name in the json file"""
         # if appimage installed successfully and verified, update the version
-        print("Updating credentials...")
         new_name = f"{self.repo}.AppImage"
         if self.appimage_name == new_name:
             print("Updating credentials...")
+            
             # update the version
             self.appimages["version"] = self.version
             # update the appimage_name
@@ -197,4 +197,9 @@ class FileHandler(AppImageDownloader):
             # write the updated version and appimage_name to the json file
             with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
                 json.dump(self.appimages, file, indent=4)
+            # start the script again except update_version function
+            print("Updated credentials")
+            print("Restarting...")
+            self.load_credentials()
+
 
