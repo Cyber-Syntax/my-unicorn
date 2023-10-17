@@ -18,6 +18,7 @@ class FileHandler(AppImageDownloader):
         # if the sha_name endswith .yml or .yaml, then use the yaml module to parse the file
         if self.sha_name.endswith(".yml") or self.sha_name.endswith(".yaml"):
             try:
+                print("************************************")
                 print(f"Verifying {self.appimage_name}...")
                 response = requests.get(self.sha_url, timeout=10)
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout,
@@ -41,7 +42,8 @@ class FileHandler(AppImageDownloader):
                         appimage_sha = hashlib.new(self.hash_type, file.read()).hexdigest()
 
                     if appimage_sha == decoded_hash:
-                        print(f"{self.appimage_name} verified. \n")
+                        print(f"{self.appimage_name} verified.")
+                        print("************************************")
                         self.make_executable()
                         if input("Do you want to delete the downloaded sha file? (y/n): "
                                 ).lower() == "y":
@@ -76,7 +78,8 @@ class FileHandler(AppImageDownloader):
             if hashlib.new(self.hash_type, open(self.appimage_name, "rb"
                             ).read()).hexdigest() == \
                 requests.get(self.sha_url, timeout=10).text.split(" ")[0]:
-                print(f"{self.appimage_name} verified. \n")
+                print(f"{self.appimage_name} verified.")
+                print("************************************")
                 self.make_executable()
             else:
                 print(f"Error verifying {self.appimage_name}")
@@ -184,7 +187,8 @@ class FileHandler(AppImageDownloader):
             # ask user if he wants to delete the downloaded appimage
             new_name = f"{self.repo}.AppImage"
 
-            if input("Do you want to delete the downloaded appimage? (y/n): ").lower == "y":
+            if input("Do you want to delete the downloaded appimage? (y/n): "
+                    ).lower() == "y":
                 os.remove(new_name)
                 print(f"Deleted {self.repo}.AppImage")
             else:
@@ -195,7 +199,7 @@ class FileHandler(AppImageDownloader):
         # if appimage installed successfully and verified, update the version
         new_name = f"{self.repo}.AppImage"
         if self.appimage_name == new_name:
-            print("Updating credentials...")
+            print("\nUpdating credentials...")
             
             # update the version
             self.appimages["version"] = self.version

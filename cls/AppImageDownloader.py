@@ -72,8 +72,8 @@ class AppImageDownloader:
             print(f"Error listing json files: {error}")
             self.ask_inputs()
         if len(json_files) > 1:
-            print("There are more than one .json file, please choose one of them:")
-            print("====================================")
+            print("\nThere are more than one .json file, please choose one of them:")
+            print("================================================================")
             for index, file in enumerate(json_files):
                 print(f"{index + 1}. {file}")
             try:
@@ -173,8 +173,8 @@ class AppImageDownloader:
                   "File not found while trying to load credentials or unknown error.")
             self.ask_user()
 
-    def download(self):
-        """ Download the appimage from the github api"""
+    def get_response(self):
+        """ get the api response from the github api"""
         self.api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
         try:
             # get the api response
@@ -199,11 +199,14 @@ class AppImageDownloader:
                         print(f"Version: {self.version}")
                         print("Exiting...")
                         sys.exit()
-
+                print("-------------------------------------------------")
+                print(f"Current version: {self.appimages['version']}")
+                print(f"Latest version: {self.version}")
                 print(f"{self.repo} downloading..."
                     "Grab a cup of coffee :), "
                     "it will take some time depending on your internet speed."
                     )
+                print("-------------------------------------------------")
 
                 # Define keywords for the assets
                 keywords = {"linux", "sum", "sha" "checksum", "SHA", "SHA256", "SHA512", "SHA-256", "SHA-512", "checksums", "checksums.txt"}
@@ -225,52 +228,53 @@ class AppImageDownloader:
                             self.sha_name = input("Enter the exact sha name: ")
                             self.sha_url = asset["browser_download_url"]
 
-                # download the appimage
-                try:
-                    response = requests.get(self.url, timeout=10, stream=True)
-                    total_size_in_bytes = int(response.headers.get("content-length", 0))
-                except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
-                        requests.exceptions.RequestException) as error:
-                    logging.error(f"Error: {error}", exc_info=True)
-                    print(f"Error: {error}")
-                    sys.exit()
-                else:
-                    if response.status_code == 200:
-                        # save the appimage to the appimage folder
-                        with open(f"{self.appimage_name}", "wb") as file, tqdm(
-                            desc=self.appimage_name,
-                            total=total_size_in_bytes,
-                            unit="iB",
-                            unit_scale=True,
-                            unit_divisor=1024,
-                        ) as progress_bar:
-                            for data in response.iter_content(chunk_size=8192):
-                                size = file.write(data)
-                                progress_bar.update(size)
-                        print(f"Downloaded {self.appimage_name}")
-                    else:
-                        print(f"Error downloading {self.appimage_name}")
-                        logging.error(f"Error downloading {self.appimage_name}")
-                        sys.exit()
-
+    def download(self):
+        """ Download the appimage from the github api"""
+        # download the appimage
+        try:
+            response = requests.get(self.url, timeout=10, stream=True)
+            total_size_in_bytes = int(response.headers.get("content-length", 0))
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
+                requests.exceptions.RequestException) as error:
+            logging.error(f"Error: {error}", exc_info=True)
+            print(f"Error: {error}")
+            sys.exit()
+        else:
+            if response.status_code == 200:
+                # save the appimage to the appimage folder
+                with open(f"{self.appimage_name}", "wb") as file, tqdm(
+                    desc=self.appimage_name,
+                    total=total_size_in_bytes,
+                    unit="iB",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                ) as progress_bar:
+                    for data in response.iter_content(chunk_size=8192):
+                        size = file.write(data)
+                        progress_bar.update(size)
+                print(f"Downloaded {self.appimage_name}")
             else:
-                print(f"Response error: {response.status_code}")
-
+                print(f"Error downloading {self.appimage_name}")
+                logging.error(f"Error downloading {self.appimage_name}")
+                sys.exit()
+        finally:
             # save the credentials to a json file
             with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
                 json.dump(self.appimages, file, indent=4)
-        finally:
+
             # make sure to close the response
-            response.close()
-            print("\n")
-            print("'-' * 50")
-            print("Download completed, response successfully closed.")
-            print("'-' * 50")
+            if response is not None:
+                response.close()
+                print("\n")
+                print("-------------------------------------------------")
+                print("Download completed, response successfully closed.")
+                print("-------------------------------------------------")
+
 
     def update_json(self):
         """Update the json file with the new credentials"""
         try:
-            if input("Do you want to change some credentials? (y/n): ").lower() == "y":
+            if input("\nDo you want to change some credentials? (y/n): ").lower() == "y":
                 with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
                     self.appimages = json.load(file)
                 if input("Do you want to change the appimage folder? (y/n): ").lower() == "y":

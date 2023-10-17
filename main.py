@@ -25,11 +25,11 @@ def main():
 
     # A dictionary of functions to call based on the user's choice
     functions = {
-        1: ['ask_inputs', 'learn_owner_repo', 'download',
+        1: ['ask_inputs', 'learn_owner_repo', 'get_response', 'download',
            'save_credentials', 'backup_old_appimage', 'verify_sha', 'update_version'],
-        2: ['ask_inputs', 'learn_owner_repo', 'download', 'save_credentials', 'verify_sha', 'update_version'],
-        3: ['update_json', 'download', 'backup_old_appimage', 'verify_sha', 'update_version'],
-        4: ['update_json', 'download', 'verify_sha', 'update_version']
+        2: ['ask_inputs', 'learn_owner_repo', 'get_response', 'download', 'save_credentials', 'verify_sha', 'update_version'],
+        3: ['update_json', 'get_response', 'download', 'backup_old_appimage', 'verify_sha', 'update_version'],
+        4: ['update_json', 'get_response', 'download', 'verify_sha', 'update_version']
     }
 
     # Ask the user for their choice
