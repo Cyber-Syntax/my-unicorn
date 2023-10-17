@@ -35,6 +35,7 @@ def main():
     # Ask the user for their choice
     print("Welcome to the my-unicorn 🦄!")
     print("Choose one of the following options:")
+    print("====================================")
     print("1. Update appimage from JSON file")
     print("2. Download new appimage")
     print("3. Exit")
@@ -61,6 +62,7 @@ def main():
                 
                 # ask user which choice they want to use from functions
                 print("Choose one of the following options: \n")
+                print("====================================")
                 print("1. Backup old appimage and download new appimage")
                 print("2. Download new appimage and overwrite old appimage")
                 file_handler.choice = int(input("Enter your choice: "))

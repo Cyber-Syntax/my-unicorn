@@ -27,6 +27,7 @@ class AppImageDownloader:
     def ask_user(self):
         """New appimage installation options"""
         print("Choose one of the following options:")
+        print("====================================")
         print("1. Download new appimage, save old appimage")
         print("2. Download new appimage, don't save old appimage")
         try:
@@ -72,6 +73,7 @@ class AppImageDownloader:
             self.ask_inputs()
         if len(json_files) > 1:
             print("There are more than one .json file, please choose one of them:")
+            print("====================================")
             for index, file in enumerate(json_files):
                 print(f"{index + 1}. {file}")
             try:
@@ -248,12 +250,22 @@ class AppImageDownloader:
                         print(f"Downloaded {self.appimage_name}")
                     else:
                         print(f"Error downloading {self.appimage_name}")
+                        logging.error(f"Error downloading {self.appimage_name}")
+                        sys.exit()
+
             else:
                 print(f"Response error: {response.status_code}")
 
             # save the credentials to a json file
             with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
                 json.dump(self.appimages, file, indent=4)
+        finally:
+            # make sure to close the response
+            response.close()
+            print("\n")
+            print("'-' * 50")
+            print("Download completed, response successfully closed.")
+            print("'-' * 50")
 
     def update_json(self):
         """Update the json file with the new credentials"""
