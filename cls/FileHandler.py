@@ -181,6 +181,14 @@ class FileHandler(AppImageDownloader):
 
         else:
             print(f"Not moving {self.appimage_name} to {self.appimage_folder}")
+            # ask user if he wants to delete the downloaded appimage
+            new_name = f"{self.repo}.AppImage"
+
+            if input("Do you want to delete the downloaded appimage? (y/n): ").lower == "y":
+                os.remove(new_name)
+                print(f"Deleted {self.repo}.AppImage")
+            else:
+                print(f"Saved {self.repo}.AppImage")
 
     def update_version(self):
         """Update the version-appimage_name in the json file"""
@@ -197,9 +205,5 @@ class FileHandler(AppImageDownloader):
             # write the updated version and appimage_name to the json file
             with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
                 json.dump(self.appimages, file, indent=4)
-            # start the script again except update_version function
-            print("Updated credentials")
-            print("Restarting...")
-            self.load_credentials()
-
-
+            
+            print(f"Updated {self.repo}.json")

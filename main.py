@@ -40,12 +40,9 @@ def main():
     print("3. Exit")
     try:
         choice = int(input("Enter your choice: "))
-    except ValueError as error:
+    except (ValueError, KeyboardInterrupt) as error:
         logging.error(f"Error: {error}", exc_info=True)
-        print("Invalid choice. Use 1, 2 or 3.")
-    except KeyboardInterrupt as error2:
-        logging.error(f"Error: {error2}", exc_info=True)
-        print("Keyboard interrupt. Exiting...")
+        print(f"Error: {error}. Exiting...")
         sys.exit(1)
     else:
         try:
@@ -82,9 +79,9 @@ def main():
             else:
                 print("Invalid choice")
                 sys.exit()
-        except KeyboardInterrupt as error:
+        except (ValueError, KeyboardInterrupt) as error:
             logging.error(f"Error: {error}", exc_info=True)
-            print("Keyboard interrupt. Exiting...")
+            print(f"Error: {error}. Exiting...")
             sys.exit(1)
 
 if __name__ == "__main__":

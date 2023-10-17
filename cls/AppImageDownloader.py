@@ -269,6 +269,8 @@ class AppImageDownloader:
 
     def update_json(self):
         """Update the json file with the new version"""
+        from cls.FileHandler import FileHandler
+        self.file_handler = FileHandler()
         try:
             if input("Do you want to change some credentials? (y/n): ").lower() == "y":
                 with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
@@ -303,7 +305,7 @@ class AppImageDownloader:
                         with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
                             json.dump(self.appimages, file, indent=4)
 
-                        # Reload the JSON file
+                        # load the credentials
                         self.load_credentials()
 
                     else:
