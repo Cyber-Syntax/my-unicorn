@@ -31,14 +31,10 @@ class AppImageDownloader:
         print("2. Download new appimage, don't save old appimage")
         try:
             self.choice = int(input("Enter your choice: "))
-        except ValueError as error:
+        except (ValueError, KeyboardInterrupt) as error:
             logging.error(f"Error: {error}", exc_info=True)
-            print(f"Invalid choice. Please write a number. \n Error: {error}")
-            self.ask_user()
-        except KeyboardInterrupt as error2:
-            logging.error(f"Error: {error2}", exc_info=True)
-            print("\nExiting...")
-            sys.exit()
+            print(f"Error: {error}. Exiting...")
+            sys.exit(1)
         else:
             if self.choice not in [1, 2]:
                 print("Invalid choice. Try again.")
@@ -109,17 +105,9 @@ class AppImageDownloader:
                 self.hash_type = input(
                     "Enter the hash type for your sha(sha256, sha512) file: "
                     ).strip(" ")
-            except KeyboardInterrupt as error:
+            except (KeyboardInterrupt, EOFError, ValueError) as error:
                 logging.error(f"Error: {error}", exc_info=True)
-                print("\nExiting...")
-                sys.exit()
-            except EOFError as error2:
-                logging.error(f"Error: {error2}", exc_info=True)
-                print(f"Error: {error2}")
-                sys.exit()
-            except ValueError as error3:
-                logging.error(f"Error: {error3}", exc_info=True)
-                print(f"Error: {error3}")
+                print(f"\n Error: {error}Exiting...")
                 sys.exit()
 
             if self.url and self.appimage_folder and self.hash_type:
@@ -268,9 +256,7 @@ class AppImageDownloader:
                 json.dump(self.appimages, file, indent=4)
 
     def update_json(self):
-        """Update the json file with the new version"""
-        from cls.FileHandler import FileHandler
-        self.file_handler = FileHandler()
+        """Update the json file with the new credentials"""
         try:
             if input("Do you want to change some credentials? (y/n): ").lower() == "y":
                 with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
