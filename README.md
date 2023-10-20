@@ -4,6 +4,7 @@
 
 # <samp>Attention<samp>
 - **Do not use without taking old version backup.** This script is in **beta** version. Therefore, you may encounter some errors.
+- **Script only works for Linux for now. Maybe work on MacOS but I didn't test it.**
 
 
 ## ‎ 🦄 <samp>About my-unicorn<samp>
@@ -25,7 +26,7 @@
         - `pip3`
         - `python3-pip` -maybe-
     - Install dependencies:    
-        - `pip3 install requests yaml`
+        - `pip3 install tqdm`
     - Libraries
         - [requests](https://pypi.org/project/requests/)
         - [yaml](https://pypi.org/project/PyYAML/)
@@ -48,11 +49,15 @@
     1. Open terminal and clone this repo (make sure you have git installed)
         - `git clone https://github.com/Cyber-Syntax/my-unicorn.git`
     2. Go that location (You can use `pwd` command to see your location. `cd` for change directory)
-        - Example: `cd ~/Downloads/`
+        - Example: `cd ~/Downloads/Cyber-Syntax/my-unicorn`
     3. Start script   
         - `python3 main.py`
     4. Follow the instructions:
 ## ‎ <samp>How to install new appimage (This is need for json file create)<samp>
+- **You can skip this step:**
+    - if you have already installed the appimage with this script.
+    - if you created json file manually.
+
             Welcome to the my-unicorn 🦄!
             Choose one of the following options:
             1. Update appimage from json file
@@ -66,8 +71,8 @@
                 - Enter your choice:2
 
             - Enter the app github url:https://github.com/laurent22/joplin
-            - Enter the sha name:latest-linux.yml
-            - Which directory(e.g /Documents/appimages)to save appimage:/Documents/appimages
+            - Enter the sha name:latest-linux.yml (It's finding automatically but if script can't find it, you have to enter it manually)
+            - Which directory(Default: /Documents/appimages)to save appimage:/Documents/appimages
             - Enter the hash type for your sha (e.g md5, sha256, sha1) file:sha512
             - Downloading started...      
         
