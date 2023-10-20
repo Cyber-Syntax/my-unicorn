@@ -34,7 +34,7 @@ class AppImageDownloader:
             self.choice = int(input("Enter your choice: "))
         except (ValueError, KeyboardInterrupt) as error:
             logging.error(f"Error: {error}", exc_info=True)
-            print(f"Error: {error}. Exiting...")
+            print(f"\033[41;30mError: {error}. Exiting...\033[0m")
             sys.exit(1)
         else:
             if self.choice not in [1, 2]:
@@ -69,7 +69,7 @@ class AppImageDownloader:
                          if file.endswith(".json")]
         except FileNotFoundError as error:
             logging.error(f"Error: {error}", exc_info=True)
-            print(f"Error listing json files: {error}")
+            print(f"\033[41;30mError: {error}. Exiting...\033[0m")
             self.ask_inputs()
         if len(json_files) > 1:
             print("\nThere are more than one .json file, please choose one of them:")
@@ -109,7 +109,7 @@ class AppImageDownloader:
                     ).strip(" ")
             except (KeyboardInterrupt, EOFError, ValueError) as error:
                 logging.error(f"Error: {error}", exc_info=True)
-                print(f"\n Error: {error}Exiting...")
+                print(f"\n\033[41;30mError: {error}. Exiting...\033[0m")
                 sys.exit()
 
             if self.url and self.appimage_folder and self.hash_type:
@@ -182,7 +182,7 @@ class AppImageDownloader:
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
                 requests.exceptions.RequestException) as error:
             logging.error(f"Error: {error}", exc_info=True)
-            print(f"Error: {error}")
+            print(f"\033[41;30mError: {error}. Exiting...\033[0m")
             sys.exit()
         else:
             # check the response status code
@@ -230,14 +230,19 @@ class AppImageDownloader:
 
     def download(self):
         """ Download the appimage from the github api"""
-        # download the appimage
+        # Check if the appimage already exists
+        if os.path.exists(self.appimage_name) or os.path.exists(self.repo + ".AppImage"):
+            print(f"{self.appimage_name} already exists in the current directory")
+            return
+        
+        # Request the appimage from the url
         try:
             response = requests.get(self.url, timeout=10, stream=True)
             total_size_in_bytes = int(response.headers.get("content-length", 0))
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
                 requests.exceptions.RequestException) as error:
             logging.error(f"Error: {error}", exc_info=True)
-            print(f"Error: {error}")
+            print(f"\033[41;30mError: {error}. Exiting...\033[0m")
             sys.exit()
         else:
             if response.status_code == 200:
@@ -252,9 +257,8 @@ class AppImageDownloader:
                     for data in response.iter_content(chunk_size=8192):
                         size = file.write(data)
                         progress_bar.update(size)
-                print(f"Downloaded {self.appimage_name}")
             else:
-                print(f"Error downloading {self.appimage_name}")
+                print(f"\033[41;30mError downloading {self.appimage_name}\033[0m")
                 logging.error(f"Error downloading {self.appimage_name}")
                 sys.exit()
         finally:
@@ -265,9 +269,12 @@ class AppImageDownloader:
             # make sure to close the response
             if response is not None:
                 response.close()
-                print("\n")
                 print("-------------------------------------------------")
-                print("Download completed, response successfully closed.")
+                print(f"\033[42mDownload completed! {self.appimage_name} installed.\033[0m")
+                print("-------------------------------------------------")
+            else:
+                print("-------------------------------------------------")
+                print(f"\033[41;30mError downloading {self.appimage_name}\033[0m")
                 print("-------------------------------------------------")
 
 
@@ -316,5 +323,5 @@ class AppImageDownloader:
 
         except (KeyboardInterrupt, EOFError, ValueError, KeyError) as error:
             logging.error(f"Error: {error}", exc_info=True)
-            print(f"Error: {error}")
+            print(f"\033[41;30mError: {error}. Exiting...\033[0m")
             sys.exit()

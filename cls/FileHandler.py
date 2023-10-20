@@ -14,79 +14,52 @@ class FileHandler(AppImageDownloader):
     def __init__(self):
         super().__init__()
 
-    def verify_sha(self):
-        # if the sha_name endswith .yml or .yaml, then use the yaml module to parse the file
-        if self.sha_name.endswith(".yml") or self.sha_name.endswith(".yaml"):
-            try:
-                print("************************************")
-                print(f"Verifying {self.appimage_name}...")
-                response = requests.get(self.sha_url, timeout=10)
-            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout,
-                    requests.exceptions.HTTPError, requests.exceptions.RequestException) as error:
-                logging.error(f"Error: {error}", exc_info=True)
-                print(f"Error verifying {self.appimage_name}. Error:{error} Exiting...")
-                sys.exit(1)
+    def get_sha(self):
+        """ Get the sha name and url """
+        try:
+            print("************************************")
+            print(f"Downloading {self.sha_name}...")
+            response = requests.get(self.sha_url, timeout=10)
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout,
+                requests.exceptions.HTTPError, requests.exceptions.RequestException) as error:
+            logging.error(f"Error: {error}", exc_info=True)
+            print(f"\033[41;30mError downloading {self.sha_name}. Error:{error} Exiting...\033[0m")
+            sys.exit(1)
+        return response
 
-            else:
-                if response.status_code == 200:
-                    print(f"Downloaded {self.sha_name}")
-                    # save the sha file
-                    with open(self.sha_name, "w", encoding="utf-8") as file:
-                        file.write(response.text)
-                    # parse the sha file
-                    with open(self.sha_name, "r", encoding="utf-8") as file:
-                        sha = yaml.load(file, Loader=yaml.FullLoader)
-                    # get the sha from the sha file
-                    sha = sha[self.hash_type]
-                    decoded_hash = base64.b64decode(sha).hex()
-                    # find appimage sha
-                    with open(self.appimage_name, "rb") as file:
-                        appimage_sha = hashlib.new(self.hash_type, file.read()).hexdigest()
-                    
-                    # compare the two hashes
-                    if appimage_sha == decoded_hash:
-                        print(f"{self.appimage_name} verified.")
-                        self.make_executable()
-                        if input("Do you want to delete the downloaded sha file? (y/n): "
-                                ).lower() == "y":
-                            os.remove(self.sha_name)
-                            print(f"Deleted {self.sha_name}")
-                        else:
-                            print(f"Saved {self.sha_name}")
-                    else:
-                        print(f"Error verifying {self.appimage_name}")
-                        logging.error(f"Error verifying {self.appimage_name}")
-                        if input("Do you want to delete the downloaded appimage? (y/n): "
-                                ).lower() == "y":
-                            os.remove(self.appimage_name)
-                            print(f"Deleted {self.appimage_name}")
-                            
-                            # Delete the downloaded sha file too
-                            if input("Do you want to delete the downloaded sha file? (y/n): "
-                                    ).lower() == "y":
-                                os.remove(self.sha_name)
-                                print(f"Deleted {self.sha_name}")
-                                sys.exit()
-                            else:
-                                if input("Do you want to continue without verification? (y/n): "
-                                        ).lower() == "y":
-                                    self.make_executable()
-                                else:
-                                    print("Exiting...")
-                                    sys.exit()
-        else:
-            # if the sha_name doesn't endswith .yml or .yaml,
-            # then use the normal sha verification
-            if hashlib.new(self.hash_type, open(self.appimage_name, "rb"
-                            ).read()).hexdigest() == \
-                requests.get(self.sha_url, timeout=10).text.split(" ")[0]:
-                print(f"{self.appimage_name} verified.")
-                print("************************************")
+    def verify_yml(self, response):
+        """ Verify yml/yaml sha files """
+        if response.status_code == 200:
+            # save the sha file
+            with open(self.sha_name, "w", encoding="utf-8") as file:
+                file.write(response.text)
+            
+            print(f"\033[42mDownloaded {self.sha_name}\033[0m")
+            print("************************************")
+
+            # parse the sha file
+            with open(self.sha_name, "r", encoding="utf-8") as file:
+                sha = yaml.load(file, Loader=yaml.FullLoader)
+            # get the sha from the sha file
+            sha = sha[self.hash_type]
+            decoded_hash = base64.b64decode(sha).hex()
+            # find appimage sha
+            with open(self.appimage_name, "rb") as file:
+                appimage_sha = hashlib.new(self.hash_type, file.read()).hexdigest()
+            
+            # compare the two hashes
+            if appimage_sha == decoded_hash:
+                print(f"\033[42m{self.appimage_name} verified.\033[0m")
                 self.make_executable()
+                if input("Do you want to delete the downloaded sha file? (y/n): "
+                        ).lower() == "y":
+                    os.remove(self.sha_name)
+                    print(f"Deleted {self.sha_name}")
+                else:
+                    print(f"Saved {self.sha_name}")
             else:
-                print(f"Error verifying {self.appimage_name}")
+                print(f"\033[41;30mError verifying {self.appimage_name}\033[0m")
                 logging.error(f"Error verifying {self.appimage_name}")
-                # ask user if he wants to delete the downloaded appimage
                 if input("Do you want to delete the downloaded appimage? (y/n): "
                         ).lower() == "y":
                     os.remove(self.appimage_name)
@@ -105,6 +78,79 @@ class FileHandler(AppImageDownloader):
                         else:
                             print("Exiting...")
                             sys.exit()
+        else:
+            print(f"\033[41;30mError connecting to {self.sha_url}\033[0m")
+            logging.error(f"Error connecting to {self.sha_url}")
+            sys.exit()
+        
+        # close response
+        response.close()
+
+    def verify_other(self, response):
+        """ Verify other sha files """
+        if response.status_code == 200:
+            # save the sha file
+            with open(self.sha_name, "w", encoding="utf-8") as file:
+                file.write(response.text)
+
+            print(f"\033[42mDownloaded {self.sha_name}\033[0m")
+            print("************************************")
+
+            # parse the sha file
+            with open(self.sha_name, "r", encoding="utf-8") as file:
+                for line in file:
+                    if self.appimage_name in line:
+                        appimage_sha = line.split()[0]
+                        break
+                    else:
+                        print(f"{self.appimage_name} not found in {self.sha_name}")
+
+                # compare the two hashes
+                if appimage_sha == response.text.split()[0]:
+                    print(f"\033[42m{self.appimage_name} verified.\033[0m")
+                    print("************************************")
+                    self.make_executable()
+                    if input("Do you want to delete the downloaded sha file? (y/n): "
+                            ).lower() == "y":
+                        os.remove(self.sha_name)
+                        print(f"Deleted {self.sha_name}")
+                    else:
+                        print(f"Saved {self.sha_name}")
+                else:
+                    print(f"\033[41;30mError verifying {self.appimage_name}\033[0m")
+                    logging.error(f"Error verifying {self.appimage_name}")
+                    if input("Do you want to delete the downloaded appimage? (y/n): "
+                            ).lower() == "y":
+                        os.remove(self.appimage_name)
+                        print(f"Deleted {self.appimage_name}")
+                        
+                        # Delete the downloaded sha file too
+                        if input("Do you want to delete the downloaded sha file? (y/n): "
+                                ).lower() == "y":
+                            os.remove(self.sha_name)
+                            print(f"Deleted {self.sha_name}")
+                            sys.exit()
+                    else:
+                        if input("Do you want to continue without verification? (y/n): "
+                                ).lower() == "y":
+                            self.make_executable()
+                        else:
+                            print("Exiting...")
+                            sys.exit()
+        else:
+            print(f"\033[41;30mError connecting to {self.sha_url}\033[0m")
+            logging.error(f"Error connecting to {self.sha_url}")
+            sys.exit()
+
+        # close response
+        response.close()
+
+    def verify_sha(self):
+        """ Verify the downloaded appimage """
+        if self.sha_name.endswith(".yml") or self.sha_name.endswith(".yaml"):
+            self.verify_yml(response=self.get_sha())
+        else:
+            self.verify_other(response=self.get_sha())
 
     def make_executable(self):
         """Make the appimage executable"""
@@ -112,7 +158,7 @@ class FileHandler(AppImageDownloader):
         if os.access(self.appimage_name, os.X_OK):
             print("Appimage is already executable")
             return
-        print("************************************")    
+        print("************************************")
         print("Making the appimage executable...")
         subprocess.run(["chmod", "+x", self.appimage_name], check=True)
         print("Appimage is now executable")
@@ -127,7 +173,7 @@ class FileHandler(AppImageDownloader):
         old_appimage = os.path.expanduser(f"{self.appimage_folder}{self.repo}.AppImage")
 
         print(f"Moving {old_appimage} to {backup_folder}")
-
+        print("----------------------------------------")
         # Create a backup folder if it doesn't exist
         if os.path.exists(backup_folder):
             print(f"Backup folder {backup_folder} found")
@@ -150,7 +196,7 @@ class FileHandler(AppImageDownloader):
                                     f"{backup_folder}"], check=True)
                 except subprocess.CalledProcessError as error:
                     logging.error(f"Error: {error}", exc_info=True)
-                    print(f"Error moving {old_appimage} to {backup_folder}")
+                    print(f"\033[41;30mError moving {self.repo}.AppImage to {backup_folder}\033[0m")
             else:
                 print(f"Overwriting {self.repo}.AppImage")
         else:
@@ -183,7 +229,7 @@ class FileHandler(AppImageDownloader):
                 subprocess.run(["mv", f"{self.repo}.AppImage", f"{self.appimage_folder}"], check=True)
             except subprocess.CalledProcessError as error:
                 logging.error(f"Error: {error}", exc_info=True)
-                print(f"Error moving {self.appimage_name} to {self.appimage_folder}")
+                print(f"\033[41;30mError moving {self.repo}.AppImage to {self.appimage_folder}\033[0m")
 
         else:
             print(f"Not moving {self.appimage_name} to {self.appimage_folder}")
@@ -213,4 +259,4 @@ class FileHandler(AppImageDownloader):
             with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
                 json.dump(self.appimages, file, indent=4)
             
-            print(f"Updated {self.repo}.json")
+            print(f"\033[42mCredentials updated to {self.repo}.json\033[0m")
