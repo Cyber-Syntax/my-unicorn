@@ -19,9 +19,9 @@ Project Description
 ### In Progress
 
 - [ ] Clear Code  (Decrease functions smaller)  
-- [ ] Do not update version if problem occurs  
 
 ### Done ✓
 
+- [x] Do not update version if problem occurs  
 - [x] Update readme  
 

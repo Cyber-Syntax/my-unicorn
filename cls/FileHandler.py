@@ -29,6 +29,8 @@ class FileHandler(AppImageDownloader):
 
             else:
                 if response.status_code == 200:
+                    print(f"Downloaded {self.sha_name}")
+                    # save the sha file
                     with open(self.sha_name, "w", encoding="utf-8") as file:
                         file.write(response.text)
                     # parse the sha file
@@ -40,10 +42,10 @@ class FileHandler(AppImageDownloader):
                     # find appimage sha
                     with open(self.appimage_name, "rb") as file:
                         appimage_sha = hashlib.new(self.hash_type, file.read()).hexdigest()
-
+                    
+                    # compare the two hashes
                     if appimage_sha == decoded_hash:
                         print(f"{self.appimage_name} verified.")
-                        print("************************************")
                         self.make_executable()
                         if input("Do you want to delete the downloaded sha file? (y/n): "
                                 ).lower() == "y":
@@ -110,10 +112,11 @@ class FileHandler(AppImageDownloader):
         if os.access(self.appimage_name, os.X_OK):
             print("Appimage is already executable")
             return
-            
+        print("************************************")    
         print("Making the appimage executable...")
         subprocess.run(["chmod", "+x", self.appimage_name], check=True)
         print("Appimage is now executable")
+        print("************************************")
         self.change_name()
 
     def backup_old_appimage(self):
