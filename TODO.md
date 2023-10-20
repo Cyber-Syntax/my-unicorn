@@ -12,16 +12,16 @@ Project Description
 
 ### Todo
 
-- [ ] Text Coloring  
 - [ ] Parse Sha Type  
 - [ ] Downgrade version  
 
 ### In Progress
 
-- [ ] Clear Code  (Decrease functions smaller)  
 
 ### Done ✓
 
+- [x] Clear Code  (Decrease functions smaller)  
+- [x] Text Coloring  
 - [x] Do not update version if problem occurs  
 - [x] Update readme  
 
