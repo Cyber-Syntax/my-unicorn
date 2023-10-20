@@ -12,11 +12,12 @@ Project Description
 
 ### Todo
 
-- [ ] Parse Sha Type  
 - [ ] Downgrade version  
 
 ### In Progress
 
+- [ ] Parse Sha Type  
+- [ ] sha already exists  
 
 ### Done ✓
 

@@ -209,7 +209,7 @@ class AppImageDownloader:
                 print("-------------------------------------------------")
 
                 # Define keywords for the assets
-                keywords = {"linux", "sum", "sha" "checksum", "SHA", "SHA256", "SHA512", "SHA-256", "SHA-512", "checksums", "checksums.txt"}
+                keywords = {"linux", "sum", "sha", "SHA", "SHA256", "SHA512", "SHA-256", "SHA-512", "checksum", "checksums"}
                 valid_extensions = {".sha256", ".sha512", ".yml", ".yaml", ".txt", ".sum", ".sha"}
                 
                 # get the download url from the assets
