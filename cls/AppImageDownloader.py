@@ -234,7 +234,7 @@ class AppImageDownloader:
         if os.path.exists(self.appimage_name) or os.path.exists(self.repo + ".AppImage"):
             print(f"{self.appimage_name} already exists in the current directory")
             return
-        
+
         # Request the appimage from the url
         try:
             response = requests.get(self.url, timeout=10, stream=True)

@@ -4,9 +4,9 @@ import os
 import subprocess
 import sys
 import logging
+import json
 import requests
 import yaml
-import json
 from cls.AppImageDownloader import AppImageDownloader
 
 class FileHandler(AppImageDownloader):
@@ -27,15 +27,47 @@ class FileHandler(AppImageDownloader):
             sys.exit(1)
         return response
 
+    def download_sha(self, response):
+        """ Install the sha file """
+        if response.status_code == 200:
+            # Check if the sha file already exists
+            if not os.path.exists(self.sha_name):
+                with open(self.sha_name, "w", encoding="utf-8") as file:
+                    file.write(response.text)
+
+                print(f"\033[42mDownloaded {self.sha_name}\033[0m")
+                print("************************************")
+            else:
+                print(f"{self.sha_name} already exists")
+                print("************************************")
+
+    def handle_verification_error(self):
+        """ Handle verification errors """
+        print(f"\033[41;30mError verifying {self.appimage_name}\033[0m")
+        logging.error(f"Error verifying {self.appimage_name}")
+        if input("Do you want to delete the downloaded appimage? (y/n): "
+                ).lower() == "y":
+            os.remove(self.appimage_name)
+            print(f"Deleted {self.appimage_name}")
+
+            # Delete the downloaded sha file too
+            if input("Do you want to delete the downloaded sha file? (y/n): "
+                    ).lower() == "y":
+                os.remove(self.sha_name)
+                print(f"Deleted {self.sha_name}")
+                sys.exit()
+            else:
+                if input("Do you want to continue without verification? (y/n): "
+                        ).lower() == "y":
+                    self.make_executable()
+                else:
+                    print("Exiting...")
+                    sys.exit()
+
     def verify_yml(self, response):
         """ Verify yml/yaml sha files """
         if response.status_code == 200:
-            # save the sha file
-            with open(self.sha_name, "w", encoding="utf-8") as file:
-                file.write(response.text)
-            
-            print(f"\033[42mDownloaded {self.sha_name}\033[0m")
-            print("************************************")
+            self.download_sha(response=response)
 
             # parse the sha file
             with open(self.sha_name, "r", encoding="utf-8") as file:
@@ -58,26 +90,7 @@ class FileHandler(AppImageDownloader):
                 else:
                     print(f"Saved {self.sha_name}")
             else:
-                print(f"\033[41;30mError verifying {self.appimage_name}\033[0m")
-                logging.error(f"Error verifying {self.appimage_name}")
-                if input("Do you want to delete the downloaded appimage? (y/n): "
-                        ).lower() == "y":
-                    os.remove(self.appimage_name)
-                    print(f"Deleted {self.appimage_name}")
-                    
-                    # Delete the downloaded sha file too
-                    if input("Do you want to delete the downloaded sha file? (y/n): "
-                            ).lower() == "y":
-                        os.remove(self.sha_name)
-                        print(f"Deleted {self.sha_name}")
-                        sys.exit()
-                    else:
-                        if input("Do you want to continue without verification? (y/n): "
-                                ).lower() == "y":
-                            self.make_executable()
-                        else:
-                            print("Exiting...")
-                            sys.exit()
+                self.handle_verification_error()
         else:
             print(f"\033[41;30mError connecting to {self.sha_url}\033[0m")
             logging.error(f"Error connecting to {self.sha_url}")
@@ -89,12 +102,7 @@ class FileHandler(AppImageDownloader):
     def verify_other(self, response):
         """ Verify other sha files """
         if response.status_code == 200:
-            # save the sha file
-            with open(self.sha_name, "w", encoding="utf-8") as file:
-                file.write(response.text)
-
-            print(f"\033[42mDownloaded {self.sha_name}\033[0m")
-            print("************************************")
+            self.download_sha(response=response)
 
             # parse the sha file
             with open(self.sha_name, "r", encoding="utf-8") as file:
@@ -117,26 +125,7 @@ class FileHandler(AppImageDownloader):
                     else:
                         print(f"Saved {self.sha_name}")
                 else:
-                    print(f"\033[41;30mError verifying {self.appimage_name}\033[0m")
-                    logging.error(f"Error verifying {self.appimage_name}")
-                    if input("Do you want to delete the downloaded appimage? (y/n): "
-                            ).lower() == "y":
-                        os.remove(self.appimage_name)
-                        print(f"Deleted {self.appimage_name}")
-                        
-                        # Delete the downloaded sha file too
-                        if input("Do you want to delete the downloaded sha file? (y/n): "
-                                ).lower() == "y":
-                            os.remove(self.sha_name)
-                            print(f"Deleted {self.sha_name}")
-                            sys.exit()
-                    else:
-                        if input("Do you want to continue without verification? (y/n): "
-                                ).lower() == "y":
-                            self.make_executable()
-                        else:
-                            print("Exiting...")
-                            sys.exit()
+                    self.handle_verification_error()
         else:
             print(f"\033[41;30mError connecting to {self.sha_url}\033[0m")
             logging.error(f"Error connecting to {self.sha_url}")
