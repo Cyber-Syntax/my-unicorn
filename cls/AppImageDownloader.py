@@ -201,11 +201,7 @@ class AppImageDownloader:
                         sys.exit()
                 print("-------------------------------------------------")
                 print(f"Current version: {self.appimages['version']}")
-                print(f"Latest version: {self.version}")
-                print(f"{self.repo} downloading..."
-                    "Grab a cup of coffee :), "
-                    "it will take some time depending on your internet speed."
-                    )
+                print(f"\033[42mLatest version: {self.version}\033[0m")
                 print("-------------------------------------------------")
 
                 # Define keywords for the assets
@@ -235,6 +231,10 @@ class AppImageDownloader:
             print(f"{self.appimage_name} already exists in the current directory")
             return
 
+        print(f"{self.repo} downloading..."
+        "Grab a cup of coffee :), "
+        "it will take some time depending on your internet speed."
+        )
         # Request the appimage from the url
         try:
             response = requests.get(self.url, timeout=10, stream=True)
