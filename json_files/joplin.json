@@ -5,6 +5,6 @@
     "repo": "joplin",
     "sha": "latest-linux.yml",
     "hash_type": "sha512",
-    "choice": 4,
+    "choice": 3,
     "appimage_folder": "/home/developer/Documents/appimages/"
 }

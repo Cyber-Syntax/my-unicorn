@@ -28,18 +28,19 @@ def main():
         1: ['ask_inputs', 'learn_owner_repo', 'get_response', 'download',
            'save_credentials', 'backup_old_appimage', 'verify_sha', 'update_version'],
         2: ['ask_inputs', 'learn_owner_repo', 'get_response', 'download', 'save_credentials', 'verify_sha', 'update_version'],
-        3: ['update_json', 'get_response', 'download', 'backup_old_appimage', 'verify_sha', 'update_version'],
-        4: ['update_json', 'get_response', 'download', 'verify_sha', 'update_version']
+        3: ['get_response', 'download', 'backup_old_appimage', 'verify_sha', 'update_version'],
+        4: ['get_response', 'download', 'verify_sha', 'update_version']
     }
 
     # Ask the user for their choice
     print("Welcome to the my-unicorn 🦄!")
     print("Choose one of the following options:")
     print("====================================")
-    print("1. Update appimage from JSON file")
+    print("1. Update existing appimage")
     print("2. Download new appimage")
-    print("3. Change the JSON file credentials")
+    print("3. Update json file")
     print("4. Exit")
+    print("====================================")
     try:
         choice = int(input("Enter your choice: "))
     except (ValueError, KeyboardInterrupt) as error:
@@ -60,8 +61,6 @@ def main():
                             print(f"Function {function} not found")
             elif choice == 2:
                 print("Downloading new appimage")
-                
-                # ask user which choice they want to use from functions
                 print("Choose one of the following options: \n")
                 print("====================================")
                 print("1. Backup old appimage and download new appimage")
@@ -76,8 +75,9 @@ def main():
                         logging.error(f"Function {function} not found", exc_info=True)
                         sys.exit()
             elif choice == 3:
-                self.update_json()
-
+                # choose the json file first
+                file_handler.list_json_files()
+                file_handler.update_json()
             elif choice == 4:
                 print("Exiting...")
                 sys.exit()

@@ -32,6 +32,7 @@ class AppImageDownloader:
         print("====================================")
         print("1. Download new appimage, save old appimage")
         print("2. Download new appimage, don't save old appimage")
+        print("====================================")
         self.choice = int(input("Enter your choice: "))
 
         if self.choice not in [1, 2]:
@@ -66,6 +67,7 @@ class AppImageDownloader:
             for index, file in enumerate(json_files):
                 print(f"{index + 1}. {file}")
             try:
+                print("================================================================")
                 choice = int(input("Enter your choice: "))
             except ValueError as error2:
                 logging.error(f"Error: {error2}", exc_info=True)
@@ -254,42 +256,46 @@ class AppImageDownloader:
     @handle_common_errors
     def update_json(self):
         """Update the json file with the new credentials"""
-        if input("\nDo you want to change some credentials? (y/n): ").lower() == "y":
-            with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
-                self.appimages = json.load(file)
-            if input("Do you want to change the appimage folder? (y/n): ").lower() == "y":
-                new_folder = input("Enter new appimage folder: ")
-                if not new_folder.endswith("/"):
-                    new_folder += "/"
+        with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
+            self.appimages = json.load(file)
 
-                if not new_folder.startswith("/"):
-                    new_folder = "/" + new_folder
+        print("=================================================")
+        print("1. sha_name")
+        print("2. hash_type")
+        print("3. choice")
+        print("4. appimage_folder")
+        print("5. Exit")
+        print("=================================================")
 
-                if new_folder.startswith("~"):
-                    new_folder = os.path.expanduser(new_folder)
-                else:
-                    new_folder = os.path.expanduser("~") + new_folder
+        choice = int(input("Enter your choice: "))
+        if choice == 1:
+            self.appimages["sha_name"] = input("Enter the sha name: ")                
+        elif choice == 2:
+            self.appimages["hash_type"] = input("Enter the hash type: ")
+        elif choice == 3:
+            self.appimages["choice"] = int(input("Enter the choice: "))
+        elif choice == 4:
+            new_folder = input("Enter new appimage folder: ")
+            if not new_folder.endswith("/"):
+                new_folder += "/"
+            if not new_folder.startswith("/"):
+                new_folder = "/" + new_folder
+            if new_folder.startswith("~"):
+                new_folder = os.path.expanduser(new_folder)
+            else:
+                new_folder = os.path.expanduser("~") + new_folder
 
-                self.appimages["appimage_folder"] = new_folder
-
-            # ask for sha_name and hash_type
-            keys = {"sha_name", "hash_type", "choice"}
-            for key in keys:
-                if input(f"Do you want to change the {key}? (y/n): ").lower() == "y":
-                    if key == "choice":
-                        new_choice = input("Enter new choice (3: backup, 4: don't backup): ")
-                        while new_choice not in ["3", "4"]:
-                            new_choice = input("Invalid input. Enter new choice (3: backup, 4: don't backup): ")
-                        self.appimages[key] = int(new_choice)
-                    else:
-                        self.appimages[key] = input(f"Enter new {key}: ")
-
-                    with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
-                        json.dump(self.appimages, file, indent=4)
-                else:
-                    print(f"Not changing {key}")
-
-            # load the credentials again
-            self.load_credentials()
+            self.appimages["appimage_folder"] = new_folder
+        elif choice == 5:
+            sys.exit()
         else:
-            print("Not changing credentials")
+            print("Invalid choice")
+            sys.exit()
+        # save the credentials to a json file
+        with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+            json.dump(self.appimages, file, indent=4)
+
+        print("-------------------------------------------------")
+        print("\033[42mCredentials updated successfully\033[0m")
+        print("-------------------------------------------------")
+
