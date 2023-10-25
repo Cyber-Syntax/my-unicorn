@@ -38,7 +38,8 @@ def main():
     print("====================================")
     print("1. Update appimage from JSON file")
     print("2. Download new appimage")
-    print("3. Exit")
+    print("3. Change the JSON file credentials")
+    print("4. Exit")
     try:
         choice = int(input("Enter your choice: "))
     except (ValueError, KeyboardInterrupt) as error:
@@ -74,8 +75,10 @@ def main():
                         print(f"Function {function} not found")
                         logging.error(f"Function {function} not found", exc_info=True)
                         sys.exit()
-
             elif choice == 3:
+                self.update_json()
+
+            elif choice == 4:
                 print("Exiting...")
                 sys.exit()
             else:

@@ -4,6 +4,7 @@ import sys
 import logging
 import requests
 from tqdm import tqdm
+from cls.decorators import handle_api_errors, handle_common_errors
 
 class AppImageDownloader:
     """This class downloads the appimage from the github release page"""
@@ -24,41 +25,29 @@ class AppImageDownloader:
         self.choice: int = None
         self.appimages: dict = {}
 
+    @handle_common_errors
     def ask_user(self):
         """New appimage installation options"""
         print("Choose one of the following options:")
         print("====================================")
         print("1. Download new appimage, save old appimage")
         print("2. Download new appimage, don't save old appimage")
-        try:
-            self.choice = int(input("Enter your choice: "))
-        except (ValueError, KeyboardInterrupt) as error:
-            logging.error(f"Error: {error}", exc_info=True)
-            print(f"\033[41;30mError: {error}. Exiting...\033[0m")
-            sys.exit(1)
-        else:
-            if self.choice not in [1, 2]:
-                print("Invalid choice. Try again.")
-                self.ask_user()
+        self.choice = int(input("Enter your choice: "))
 
+        if self.choice not in [1, 2]:
+            print("Invalid choice. Try again.")
+            self.ask_user()
+
+    @handle_common_errors
     def learn_owner_repo(self):
         """Learn the owner and repo from the url"""
         while True:
             # Parse the owner and repo from the URL
             print("Parsing the owner and repo from the url...")
-            try:
-                self.owner = self.url.split("/")[3]
-                self.repo = self.url.split("/")[4]
-                self.url = f"https://github.com/{self.owner}/{self.repo}"
-                break
-            except IndexError as error:
-                logging.error(f"Error: {error}", exc_info=True)
-                print("Invalid URL, please try again.")
-                self.ask_inputs()
-            except KeyboardInterrupt as error2:
-                logging.error(f"Error: {error2}", exc_info=True)
-                print("\nExiting...")
-                sys.exit()
+            self.owner = self.url.split("/")[3]
+            self.repo = self.url.split("/")[4]
+            self.url = f"https://github.com/{self.owner}/{self.repo}"
+            break
 
     def list_json_files(self):
         """
@@ -80,7 +69,8 @@ class AppImageDownloader:
                 choice = int(input("Enter your choice: "))
             except ValueError as error2:
                 logging.error(f"Error: {error2}", exc_info=True)
-                print(f"Invalid choice. Please write a number. \n Error: {error2}")
+                print("Invalid choice. Please write a number.")
+                self.list_json_files()
             else:
                 self.repo = json_files[choice - 1].replace(".json", "")
                 self.load_credentials()
@@ -91,32 +81,27 @@ class AppImageDownloader:
             print("There is no .json file in the current directory")
             self.ask_inputs()
 
+    @handle_common_errors
     def ask_inputs(self):
         """Ask the user for the inputs"""
         while True:
-            try:
-                self.url = input("Enter the app github url: ").strip(" ")
-                self.appimage_folder = input(
-                    "Which directory to save appimage \n"
-                    "(Default: '/Documents/appimages' if you leave it blank):" 
-                    ).strip(" ")
-                # setup default appimage folder
-                if not self.appimage_folder:
-                    self.appimage_folder = "/Documents/appimages"
+            self.url = input("Enter the app github url: ").strip(" ")
+            self.appimage_folder = input(
+                "Which directory to save appimage \n"
+                "(Default: '/Documents/appimages' if you leave it blank):" 
+                ).strip(" ")
+            # setup default appimage folder
+            if not self.appimage_folder:
+                self.appimage_folder = "/Documents/appimages"
 
-                self.hash_type = input(
-                    "Enter the hash type for your sha(sha256, sha512) file: "
-                    ).strip(" ")
-            except (KeyboardInterrupt, EOFError, ValueError) as error:
-                logging.error(f"Error: {error}", exc_info=True)
-                print(f"\n\033[41;30mError: {error}. Exiting...\033[0m")
-                sys.exit()
+            self.hash_type = input(
+                "Enter the hash type for your sha(sha256, sha512) file: "
+                ).strip(" ")
 
             if self.url and self.appimage_folder and self.hash_type:
                 break
-            else:
-                print("Invalid inputs, please try again.")
-
+    
+    @handle_common_errors
     def save_credentials(self):
         """Save the credentials to a file in json format"""
         self.appimages["owner"] = self.owner
@@ -147,9 +132,11 @@ class AppImageDownloader:
         print(f"Saved credentials to json_files/{self.repo}.json file")
         self.load_credentials()
 
+    @handle_common_errors
     def load_credentials(self):
         """Load the credentials from a json file"""
-        if os.path.exists(f"{self.file_path}{self.repo}.json"):
+        json_path = f"{self.file_path}{self.repo}.json"
+        if os.path.exists(json_path):
             with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
                 self.appimages = json.load(file)
             self.owner = self.appimages["owner"]
@@ -159,71 +146,64 @@ class AppImageDownloader:
             self.sha_name = self.appimages["sha"]
             self.choice = self.appimages["choice"]
             self.hash_type = self.appimages["hash_type"]
-            try:
-                if self.appimages["appimage_folder"].startswith("~"):
-                    self.appimage_folder = os.path.expanduser(self.appimage_folder)
-                else:
-                    self.appimage_folder = self.appimages["appimage_folder"]
-            except KeyError as error:
-                logging.error(f"Error: {error}", exc_info=True)
-                print(f"appimage_folder key not found in json file. \n Error: {error}")
-                self.ask_user()
+            
+            if self.appimages["appimage_folder"].startswith("~"):
+                self.appimage_folder = os.path.expanduser(self.appimage_folder)
+            else:
+                self.appimage_folder = self.appimages["appimage_folder"]
+
         else:
             print(f"{self.file_path}{self.repo}.json"
                   "File not found while trying to load credentials or unknown error.")
             self.ask_user()
 
+    @handle_api_errors
     def get_response(self):
         """ get the api response from the github api"""
         self.api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
-        try:
-            # get the api response
-            response = requests.get(self.api_url, timeout=10)
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
-                requests.exceptions.RequestException) as error:
-            logging.error(f"Error: {error}", exc_info=True)
-            print(f"\033[41;30mError: {error}. Exiting...\033[0m")
-            sys.exit()
-        else:
-            # check the response status code
-            if response.status_code == 200:
-                # get the download url from the api
-                data = json.loads(response.text)
-                # get the version from the tag_name, remove the v from the version
-                self.version = data["tag_name"].replace("v", "")
-                
-                # version control
-                if self.choice in [3, 4]:
-                    if self.version == self.appimages["version"]:
-                        print(f"{self.repo}.AppImage is up to date")
-                        print(f"Version: {self.version}")
-                        print("Exiting...")
-                        sys.exit()
-                print("-------------------------------------------------")
-                print(f"Current version: {self.appimages['version']}")
-                print(f"\033[42mLatest version: {self.version}\033[0m")
-                print("-------------------------------------------------")
+        # get the api response
+        response = requests.get(self.api_url, timeout=10)
 
-                # Define keywords for the assets
-                keywords = {"linux", "sum", "sha", "SHA", "SHA256", "SHA512", "SHA-256", "SHA-512", "checksum", "checksums"}
-                valid_extensions = {".sha256", ".sha512", ".yml", ".yaml", ".txt", ".sum", ".sha"}
-                
-                # get the download url from the assets
-                for asset in data["assets"]:
-                    if asset["name"].endswith(".AppImage"):
-                        self.appimage_name = asset["name"]
-                        self.url = asset["browser_download_url"]
-                    elif any(keyword in asset["name"] for keyword in keywords) and \
-                            asset["name"].endswith(tuple(valid_extensions)):
-                        self.sha_name = asset["name"]
+        # check the response status code
+        if response.status_code == 200:
+            # get the download url from the api
+            data = json.loads(response.text)
+            # get the version from the tag_name, remove the v from the version
+            self.version = data["tag_name"].replace("v", "")
+            
+            # version control
+            if self.choice in [3, 4]:
+                if self.version == self.appimages["version"]:
+                    print(f"{self.repo}.AppImage is up to date")
+                    print(f"Version: {self.version}")
+                    print("Exiting...")
+                    sys.exit()
+            print("-------------------------------------------------")
+            print(f"Current version: {self.appimages['version']}")
+            print(f"\033[42mLatest version: {self.version}\033[0m")
+            print("-------------------------------------------------")
+
+            # Define keywords for the assets
+            keywords = {"linux", "sum", "sha", "SHA", "SHA256", "SHA512", "SHA-256", "SHA-512", "checksum", "checksums"}
+            valid_extensions = {".sha256", ".sha512", ".yml", ".yaml", ".txt", ".sum", ".sha"}
+
+            # get the download url from the assets
+            for asset in data["assets"]:
+                if asset["name"].endswith(".AppImage"):
+                    self.appimage_name = asset["name"]
+                    self.url = asset["browser_download_url"]
+                elif any(keyword in asset["name"] for keyword in keywords) and \
+                        asset["name"].endswith(tuple(valid_extensions)):
+                    self.sha_name = asset["name"]
+                    self.sha_url = asset["browser_download_url"]
+                    if self.sha_name is None:
+                        print("Couldn't find the sha file")
+                        logging.error("Couldn't find the sha file")
+                        # ask user exact SHA name
+                        self.sha_name = input("Enter the exact sha name: ")
                         self.sha_url = asset["browser_download_url"]
-                        if self.sha_name is None:
-                            print("Couldn't find the sha file")
-                            logging.error("Couldn't find the sha file")
-                            # ask user exact SHA name
-                            self.sha_name = input("Enter the exact sha name: ")
-                            self.sha_url = asset["browser_download_url"]
 
+    @handle_api_errors
     def download(self):
         """ Download the appimage from the github api"""
         # Check if the appimage already exists
@@ -236,92 +216,80 @@ class AppImageDownloader:
         "it will take some time depending on your internet speed."
         )
         # Request the appimage from the url
-        try:
-            response = requests.get(self.url, timeout=10, stream=True)
-            total_size_in_bytes = int(response.headers.get("content-length", 0))
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
-                requests.exceptions.RequestException) as error:
-            logging.error(f"Error: {error}", exc_info=True)
-            print(f"\033[41;30mError: {error}. Exiting...\033[0m")
-            sys.exit()
+        response = requests.get(self.url, timeout=10, stream=True)
+        total_size_in_bytes = int(response.headers.get("content-length", 0))
+
+        if response.status_code == 200:
+            # save the appimage to the appimage folder
+            with open(f"{self.appimage_name}", "wb") as file, tqdm(
+                desc=self.appimage_name,
+                total=total_size_in_bytes,
+                unit="iB",
+                unit_scale=True,
+                unit_divisor=1024,
+            ) as progress_bar:
+                for data in response.iter_content(chunk_size=8192):
+                    size = file.write(data)
+                    progress_bar.update(size)
         else:
-            if response.status_code == 200:
-                # save the appimage to the appimage folder
-                with open(f"{self.appimage_name}", "wb") as file, tqdm(
-                    desc=self.appimage_name,
-                    total=total_size_in_bytes,
-                    unit="iB",
-                    unit_scale=True,
-                    unit_divisor=1024,
-                ) as progress_bar:
-                    for data in response.iter_content(chunk_size=8192):
-                        size = file.write(data)
-                        progress_bar.update(size)
-            else:
-                print(f"\033[41;30mError downloading {self.appimage_name}\033[0m")
-                logging.error(f"Error downloading {self.appimage_name}")
-                sys.exit()
-        finally:
-            # save the credentials to a json file
-            with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
-                json.dump(self.appimages, file, indent=4)
+            print(f"\033[41;30mError downloading {self.appimage_name}\033[0m")
+            logging.error(f"Error downloading {self.appimage_name}")
+            sys.exit()
 
-            # make sure to close the response
-            if response is not None:
-                response.close()
-                print("-------------------------------------------------")
-                print(f"\033[42mDownload completed! {self.appimage_name} installed.\033[0m")
-                print("-------------------------------------------------")
-            else:
-                print("-------------------------------------------------")
-                print(f"\033[41;30mError downloading {self.appimage_name}\033[0m")
-                print("-------------------------------------------------")
+        # save the credentials to a json file
+        with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+            json.dump(self.appimages, file, indent=4)
 
+        # make sure to close the response
+        if response is not None:
+            response.close()
+            print("-------------------------------------------------")
+            print(f"\033[42mDownload completed! {self.appimage_name} installed.\033[0m")
+            print("-------------------------------------------------")
+        else:
+            print("-------------------------------------------------")
+            print(f"\033[41;30mError downloading {self.appimage_name}\033[0m")
+            print("-------------------------------------------------")
 
+    @handle_common_errors
     def update_json(self):
         """Update the json file with the new credentials"""
-        try:
-            if input("\nDo you want to change some credentials? (y/n): ").lower() == "y":
-                with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
-                    self.appimages = json.load(file)
-                if input("Do you want to change the appimage folder? (y/n): ").lower() == "y":
-                    new_folder = input("Enter new appimage folder: ")
-                    if not new_folder.endswith("/"):
-                        new_folder += "/"
+        if input("\nDo you want to change some credentials? (y/n): ").lower() == "y":
+            with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
+                self.appimages = json.load(file)
+            if input("Do you want to change the appimage folder? (y/n): ").lower() == "y":
+                new_folder = input("Enter new appimage folder: ")
+                if not new_folder.endswith("/"):
+                    new_folder += "/"
 
-                    if not new_folder.startswith("/"):
-                        new_folder = "/" + new_folder
+                if not new_folder.startswith("/"):
+                    new_folder = "/" + new_folder
 
-                    if new_folder.startswith("~"):
-                        new_folder = os.path.expanduser(new_folder)
+                if new_folder.startswith("~"):
+                    new_folder = os.path.expanduser(new_folder)
+                else:
+                    new_folder = os.path.expanduser("~") + new_folder
+
+                self.appimages["appimage_folder"] = new_folder
+
+            # ask for sha_name and hash_type
+            keys = {"sha_name", "hash_type", "choice"}
+            for key in keys:
+                if input(f"Do you want to change the {key}? (y/n): ").lower() == "y":
+                    if key == "choice":
+                        new_choice = input("Enter new choice (3: backup, 4: don't backup): ")
+                        while new_choice not in ["3", "4"]:
+                            new_choice = input("Invalid input. Enter new choice (3: backup, 4: don't backup): ")
+                        self.appimages[key] = int(new_choice)
                     else:
-                        new_folder = os.path.expanduser("~") + new_folder
+                        self.appimages[key] = input(f"Enter new {key}: ")
 
-                    self.appimages["appimage_folder"] = new_folder
+                    with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+                        json.dump(self.appimages, file, indent=4)
+                else:
+                    print(f"Not changing {key}")
 
-                # ask for sha_name and hash_type
-                keys = {"sha_name", "hash_type", "choice"}
-                for key in keys:
-                    if input(f"Do you want to change the {key}? (y/n): ").lower() == "y":
-                        if key == "choice":
-                            new_choice = input("Enter new choice (3: backup, 4: don't backup): ")
-                            while new_choice not in ["3", "4"]:
-                                new_choice = input("Invalid input. Enter new choice (3: backup, 4: don't backup): ")
-                            self.appimages[key] = int(new_choice)
-                        else:
-                            self.appimages[key] = input(f"Enter new {key}: ")
-
-                        with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
-                            json.dump(self.appimages, file, indent=4)
-
-                        # load the credentials
-                        self.load_credentials()
-
-                    else:
-                        print("Not changing credentials")
-                        self.load_credentials()
-
-        except (KeyboardInterrupt, EOFError, ValueError, KeyError) as error:
-            logging.error(f"Error: {error}", exc_info=True)
-            print(f"\033[41;30mError: {error}. Exiting...\033[0m")
-            sys.exit()
+            # load the credentials again
+            self.load_credentials()
+        else:
+            print("Not changing credentials")

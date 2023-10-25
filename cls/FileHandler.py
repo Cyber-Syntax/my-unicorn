@@ -14,6 +14,20 @@ class FileHandler(AppImageDownloader):
     def __init__(self):
         super().__init__()
 
+    def response_error(func):
+        """ Handle response errors """
+        def wrapper(self, response):
+            if response.status_code == 200:
+                self.download_sha(response=response)
+                result = func(self, response)
+            else:
+                response.close()
+                self.handle_connection_error()
+                result = None
+            return result
+        
+        return wrapper
+
     def get_sha(self):
         """ Get the sha name and url """
         try:
@@ -29,19 +43,16 @@ class FileHandler(AppImageDownloader):
 
     def download_sha(self, response):
         """ Install the sha file """
-        if response.status_code == 200:
-            # Check if the sha file already exists
-            if not os.path.exists(self.sha_name):
-                with open(self.sha_name, "w", encoding="utf-8") as file:
-                    file.write(response.text)
-
-                print(f"\033[42mDownloaded {self.sha_name}\033[0m")
-                print("************************************")
-            else:
-                print(f"{self.sha_name} already exists")
-                print("************************************")
+        # Check if the sha file already exists
+        if not os.path.exists(self.sha_name):
+            with open(self.sha_name, "w", encoding="utf-8") as file:
+                file.write(response.text)
+            print(f"\033[42mDownloaded {self.sha_name}\033[0m")
+            print("************************************")
         else:
-            self.handle_connection_error()
+            print(f"{self.sha_name} already exists")
+            print("************************************")
+
 
     def handle_verification_error(self):
         """ Handle verification errors """
@@ -80,58 +91,52 @@ class FileHandler(AppImageDownloader):
         else:
             print(f"{self.sha_name} saved in {os.getcwd()}")
 
+    @response_error
     def verify_yml(self, response):
         """ Verify yml/yaml sha files """
-        if response.status_code == 200:
-            self.download_sha(response=response)
 
-            # parse the sha file
-            with open(self.sha_name, "r", encoding="utf-8") as file:
-                sha = yaml.load(file, Loader=yaml.FullLoader)
-            # get the sha from the sha file
-            sha = sha[self.hash_type]
-            decoded_hash = base64.b64decode(sha).hex()
-            # find appimage sha
-            with open(self.appimage_name, "rb") as file:
-                appimage_sha = hashlib.new(self.hash_type, file.read()).hexdigest()
+        # parse the sha file
+        with open(self.sha_name, "r", encoding="utf-8") as file:
+            sha = yaml.load(file, Loader=yaml.FullLoader)
+        # get the sha from the sha file
+        sha = sha[self.hash_type]
+        decoded_hash = base64.b64decode(sha).hex()
+        # find appimage sha
+        with open(self.appimage_name, "rb") as file:
+            appimage_sha = hashlib.new(self.hash_type, file.read()).hexdigest()
 
-            # compare the two hashes
-            if appimage_sha == decoded_hash:
-                print(f"\033[42m{self.appimage_name} verified.\033[0m")
-                self.make_executable()
-                self.delete_sha()
-            else:
-                self.handle_verification_error()
+        # compare the two hashes
+        if appimage_sha == decoded_hash:
+            print(f"\033[42m{self.appimage_name} verified.\033[0m")
+            self.make_executable()
+            self.delete_sha()
         else:
-            self.handle_connection_error()
+            self.handle_verification_error()
 
         # close response
         response.close()
 
+    @response_error
     def verify_other(self, response):
         """ Verify other sha files """
-        if response.status_code == 200:
-            self.download_sha(response=response)
 
-            # parse the sha file
-            with open(self.sha_name, "r", encoding="utf-8") as file:
-                for line in file:
-                    if self.appimage_name in line:
-                        appimage_sha = line.split()[0]
-                        break
-                    else:
-                        print(f"{self.appimage_name} not found in {self.sha_name}")
-
-                # compare the two hashes
-                if appimage_sha == response.text.split()[0]:
-                    print(f"\033[42m{self.appimage_name} verified.\033[0m")
-                    print("************************************")
-                    self.make_executable()
-                    self.delete_sha()
+        # parse the sha file
+        with open(self.sha_name, "r", encoding="utf-8") as file:
+            for line in file:
+                if self.appimage_name in line:
+                    appimage_sha = line.split()[0]
+                    break
                 else:
-                    self.handle_verification_error()
-        else:
-            self.handle_connection_error()
+                    print(f"{self.appimage_name} not found in {self.sha_name}")
+
+            # compare the two hashes
+            if appimage_sha == response.text.split()[0]:
+                print(f"\033[42m{self.appimage_name} verified.\033[0m")
+                print("************************************")
+                self.make_executable()
+                self.delete_sha()
+            else:
+                self.handle_verification_error()
 
         # close response
         response.close()
@@ -206,7 +211,6 @@ class FileHandler(AppImageDownloader):
         if input(f"Do you want to move {self.appimage_name} to {self.appimage_folder} (y/n):") == "y":
             print(f"Moving {self.appimage_name} to {self.appimage_folder}")
             print("-----------------------------------------------------")
-
             # Change name before moving
             self.change_name()
 
@@ -221,7 +225,6 @@ class FileHandler(AppImageDownloader):
             except subprocess.CalledProcessError as error:
                 logging.error(f"Error: {error}", exc_info=True)
                 print(f"\033[41;30mError moving {self.repo}.AppImage to {self.appimage_folder}\033[0m")
-
         else:
             print(f"Not moving {self.appimage_name} to {self.appimage_folder}")
             print(f"{self.appimage_name} saved in {os.getcwd()}")
@@ -240,7 +243,6 @@ class FileHandler(AppImageDownloader):
         new_name = f"{self.repo}.AppImage"
         if self.appimage_name == new_name:
             print("\nUpdating credentials...")
-
             # update the version, appimage_name
             self.appimages["version"] = self.version
             self.appimages["appimage"] = self.repo + "-" + self.version + ".AppImage"

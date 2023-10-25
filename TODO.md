@@ -16,11 +16,11 @@ Project Description
 
 ### In Progress
 
-- [ ] sha already exists  
 - [ ] Parse Sha Type  
 
 ### Done ✓
 
+- [x] sha already exists  
 - [x] Clear Code  (Decrease functions smaller)  
 - [x] Text Coloring  
 - [x] Do not update version if problem occurs  
