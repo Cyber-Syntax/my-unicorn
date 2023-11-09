@@ -1,8 +1,8 @@
 {
-    "version": "2.10.12",
+    "version": "2.10.14",
     "owner": "siyuan-note",
     "repo": "siyuan",
-    "appimage": "siyuan-2.10.12.AppImage",
+    "appimage": "siyuan-2.10.14.AppImage",
     "sha": "SHA256SUMS.txt",
     "choice": 3,
     "hash_type": "sha256",

@@ -4,12 +4,14 @@ import logging
 from cls.FileHandler import FileHandler
 
 def custom_excepthook(exc_type, exc_value, exc_traceback):
+    """Custom excepthook to log uncaught exceptions"""
     # Log the exception
     logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
     # Call the original excepthook to ensure Python's default error handling
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 def main():
+
     # Set up the logging configuration
     logging.basicConfig(
         level=logging.INFO,
@@ -25,11 +27,33 @@ def main():
 
     # A dictionary of functions to call based on the user's choice
     functions = {
-        1: ['ask_inputs', 'learn_owner_repo', 'get_response', 'download',
-           'save_credentials', 'backup_old_appimage', 'verify_sha', 'update_version'],
-        2: ['ask_inputs', 'learn_owner_repo', 'get_response', 'download', 'save_credentials', 'verify_sha', 'update_version'],
-        3: ['get_response', 'download', 'backup_old_appimage', 'verify_sha', 'update_version'],
-        4: ['get_response', 'download', 'verify_sha', 'update_version']
+        1: ['ask_inputs',
+            'learn_owner_repo', 
+            'get_response', 
+            'download',
+            'save_credentials', 
+            'backup_old_appimage', 
+            'verify_sha', 
+            'update_version'],
+
+        2: ['ask_inputs',
+            'learn_owner_repo',
+            'get_response',
+            'download',
+            'save_credentials',
+            'verify_sha',
+            'update_version'],
+
+        3: ['get_response',
+            'download',
+            'backup_old_appimage',
+            'verify_sha',
+            'update_version'],
+
+        4: ['get_response',
+            'download', 
+            'verify_sha',
+            'update_version']
     }
 
     # Ask the user for their choice

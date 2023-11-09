@@ -94,7 +94,7 @@ class AppImageDownloader:
                 ).strip(" ")
             # setup default appimage folder
             if not self.appimage_folder:
-                self.appimage_folder = "/Documents/appimages"
+                self.appimage_folder = ("/Documents/appimages")
 
             self.hash_type = input(
                 "Enter the hash type for your sha(sha256, sha512) file: "
@@ -102,7 +102,7 @@ class AppImageDownloader:
 
             if self.url and self.appimage_folder and self.hash_type:
                 break
-    
+
     @handle_common_errors
     def save_credentials(self):
         """Save the credentials to a file in json format"""
@@ -148,7 +148,7 @@ class AppImageDownloader:
             self.sha_name = self.appimages["sha"]
             self.choice = self.appimages["choice"]
             self.hash_type = self.appimages["hash_type"]
-            
+
             if self.appimages["appimage_folder"].startswith("~"):
                 self.appimage_folder = os.path.expanduser(self.appimage_folder)
             else:
@@ -172,7 +172,7 @@ class AppImageDownloader:
             data = json.loads(response.text)
             # get the version from the tag_name, remove the v from the version
             self.version = data["tag_name"].replace("v", "")
-            
+
             # version control
             if self.choice in [3, 4]:
                 if self.version == self.appimages["version"]:
@@ -186,7 +186,8 @@ class AppImageDownloader:
             print("-------------------------------------------------")
 
             # Define keywords for the assets
-            keywords = {"linux", "sum", "sha", "SHA", "SHA256", "SHA512", "SHA-256", "SHA-512", "checksum", "checksums"}
+            keywords = {"linux", "sum", "sha", "SHA", "SHA256", "SHA512", "SHA-256",
+                        "SHA-512", "checksum", "checksums", "CHECKSUM", "CHECKSUMS"}
             valid_extensions = {".sha256", ".sha512", ".yml", ".yaml", ".txt", ".sum", ".sha"}
 
             # get the download url from the assets
@@ -269,7 +270,7 @@ class AppImageDownloader:
 
         choice = int(input("Enter your choice: "))
         if choice == 1:
-            self.appimages["sha_name"] = input("Enter the sha name: ")                
+            self.appimages["sha_name"] = input("Enter the sha name: ")
         elif choice == 2:
             self.appimages["hash_type"] = input("Enter the hash type: ")
         elif choice == 3:
@@ -298,4 +299,3 @@ class AppImageDownloader:
         print("-------------------------------------------------")
         print("\033[42mCredentials updated successfully\033[0m")
         print("-------------------------------------------------")
-
