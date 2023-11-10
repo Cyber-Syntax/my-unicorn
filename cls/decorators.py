@@ -51,3 +51,4 @@ def handle_api_errors(func):
             print(f"Error: {error}")
             sys.exit()
     return wrapper
+    

@@ -16,7 +16,7 @@ Project Description
 
 ### In Progress
 
-- [ ] Parse Sha Type  
+- [ ] Parse Sha Type
 
 ### Done ✓
 

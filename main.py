@@ -56,7 +56,6 @@ def main():
             'update_version']
     }
 
-    # Ask the user for their choice
     print("Welcome to the my-unicorn 🦄!")
     print("Choose one of the following options:")
     print("====================================")

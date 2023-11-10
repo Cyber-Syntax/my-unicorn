@@ -5,6 +5,7 @@ import subprocess
 import sys
 import logging
 import json
+import shutil
 import requests
 import yaml
 from cls.AppImageDownloader import AppImageDownloader
@@ -13,7 +14,10 @@ class FileHandler(AppImageDownloader):
     """Handle the file operations"""
     def __init__(self):
         super().__init__()
+        self.sha_name = None
+        self.sha_url = None
 
+    @staticmethod
     def response_error(func):
         """ Handle response errors """
         def wrapper(self, response):
@@ -25,7 +29,7 @@ class FileHandler(AppImageDownloader):
                 self.handle_connection_error()
                 result = None
             return result
-        
+
         return wrapper
 
     def get_sha(self):
@@ -52,7 +56,6 @@ class FileHandler(AppImageDownloader):
         else:
             print(f"{self.sha_name} already exists")
             print("************************************")
-
 
     def handle_verification_error(self):
         """ Handle verification errors """
@@ -175,7 +178,7 @@ class FileHandler(AppImageDownloader):
         else:
             if input(f"Backup folder {backup_folder} not found,"
                     "do you want to create it (y/n): ") == "y":
-                subprocess.run(["mkdir", "-p", backup_folder], check=True)
+                os.makedirs(os.path.dirname(backup_folder), exist_ok=True)
                 print(f"Created backup folder: {backup_folder}")
             else:
                 print("Backup folder not created.")
@@ -186,9 +189,8 @@ class FileHandler(AppImageDownloader):
             if input(f"Do you want to backup "
                     f"{self.repo}.AppImage to {backup_folder} (y/n):") == "y":
                 try:
-                    subprocess.run(["mv", f"{old_appimage}",
-                                    f"{backup_folder}"], check=True)
-                except subprocess.CalledProcessError as error:
+                    shutil.move(old_appimage, backup_folder)
+                except shutil.Error as error:
                     logging.error(f"Error: {error}", exc_info=True)
                     print(f"\033[41;30mError moving {self.repo}.AppImage to {backup_folder}\033[0m")
             else:
@@ -201,30 +203,29 @@ class FileHandler(AppImageDownloader):
         new_name = f"{self.repo}.AppImage"
         if self.appimage_name != new_name:
             print(f"Changing {self.appimage_name} name to {new_name}")
-            subprocess.run(["mv", f"{self.appimage_name}", f"{new_name}"], check=True)
+            shutil.move(self.appimage_name, new_name)
             self.appimage_name = new_name
         else:
             print("The appimage name is already the new name")
 
     def move_appimage(self):
         """ Move appimages to a appimage folder """        
-        if input(f"Do you want to move {self.appimage_name} to {self.appimage_folder} (y/n):") == "y":
+        if input(f"Do you want to move"
+                f" {self.appimage_name} to {self.appimage_folder} (y/n): ") == "y":
             print(f"Moving {self.appimage_name} to {self.appimage_folder}")
             print("-----------------------------------------------------")
             # Change name before moving
             self.change_name()
-
             # check if appimage folder exists
-            if not os.path.exists(self.appimage_folder):
-                subprocess.run(["mkdir", "-p", self.appimage_folder], check=True)
-                print(f"Created {self.appimage_folder}")
+            os.makedirs(os.path.dirname(self.appimage_folder), exist_ok=True)
 
             # move appimage to appimage folder
             try:
-                subprocess.run(["mv", f"{self.repo}.AppImage", f"{self.appimage_folder}"], check=True)
-            except subprocess.CalledProcessError as error:
+                shutil.move(f"{self.repo}.AppImage", self.appimage_folder)
+            except shutil.Error as error:
                 logging.error(f"Error: {error}", exc_info=True)
-                print(f"\033[41;30mError moving {self.repo}.AppImage to {self.appimage_folder}\033[0m")
+                print(f"\033[41;30mError moving"
+                        f" {self.repo}.AppImage to {self.appimage_folder}\033[0m")
         else:
             print(f"Not moving {self.appimage_name} to {self.appimage_folder}")
             print(f"{self.appimage_name} saved in {os.getcwd()}")
