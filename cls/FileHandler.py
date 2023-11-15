@@ -8,6 +8,7 @@ import json
 import shutil
 import requests
 import yaml
+from cls.decorators import handle_api_errors, handle_common_errors
 from cls.AppImageDownloader import AppImageDownloader
 
 class FileHandler(AppImageDownloader):
@@ -18,7 +19,7 @@ class FileHandler(AppImageDownloader):
         self.sha_url = None
 
     @staticmethod
-    def response_error(func):
+    def sha_response_error(func):
         """ Handle response errors """
         def wrapper(self, response):
             if response.status_code == 200:
@@ -32,17 +33,14 @@ class FileHandler(AppImageDownloader):
 
         return wrapper
 
+    @handle_api_errors
     def get_sha(self):
         """ Get the sha name and url """
-        try:
-            print("************************************")
-            print(f"Downloading {self.sha_name}...")
-            response = requests.get(self.sha_url, timeout=10)
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout,
-                requests.exceptions.HTTPError, requests.exceptions.RequestException) as error:
-            logging.error(f"Error: {error}", exc_info=True)
-            print(f"\033[41;30mError downloading {self.sha_name}. Error:{error} Exiting...\033[0m")
-            sys.exit(1)
+
+        print("************************************")
+        print(f"Downloading {self.sha_name}...")
+        response = requests.get(self.sha_url, timeout=10)
+
         return response
 
     def download_sha(self, response):
@@ -94,7 +92,7 @@ class FileHandler(AppImageDownloader):
         else:
             print(f"{self.sha_name} saved in {os.getcwd()}")
 
-    @response_error
+    @sha_response_error
     def verify_yml(self, response):
         """ Verify yml/yaml sha files """
 
@@ -119,7 +117,7 @@ class FileHandler(AppImageDownloader):
         # close response
         response.close()
 
-    @response_error
+    @sha_response_error
     def verify_other(self, response):
         """ Verify other sha files """
 
@@ -226,6 +224,9 @@ class FileHandler(AppImageDownloader):
                 logging.error(f"Error: {error}", exc_info=True)
                 print(f"\033[41;30mError moving"
                         f" {self.repo}.AppImage to {self.appimage_folder}\033[0m")
+            else:
+                print(f"Moved {self.repo}.AppImage to {self.appimage_folder}")
+                self.update_version()
         else:
             print(f"Not moving {self.appimage_name} to {self.appimage_folder}")
             print(f"{self.appimage_name} saved in {os.getcwd()}")
@@ -241,14 +242,13 @@ class FileHandler(AppImageDownloader):
 
     def update_version(self):
         """Update the version-appimage_name in the json file"""
-        new_name = f"{self.repo}.AppImage"
-        if self.appimage_name == new_name:
-            print("\nUpdating credentials...")
-            # update the version, appimage_name
-            self.appimages["version"] = self.version
-            self.appimages["appimage"] = self.repo + "-" + self.version + ".AppImage"
 
-            # write the updated version and appimage_name to the json file
-            with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
-                json.dump(self.appimages, file, indent=4)
-            print(f"\033[42mCredentials updated to {self.repo}.json\033[0m")
+        print("\nUpdating credentials...")
+        # update the version, appimage_name
+        self.appimages["version"] = self.version
+        self.appimages["appimage"] = self.repo + "-" + self.version + ".AppImage"
+
+        # write the updated version and appimage_name to the json file
+        with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+            json.dump(self.appimages, file, indent=4)
+        print(f"\033[42mCredentials updated to {self.repo}.json\033[0m")

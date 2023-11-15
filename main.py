@@ -33,27 +33,23 @@ def main():
             'download',
             'save_credentials', 
             'backup_old_appimage', 
-            'verify_sha', 
-            'update_version'],
+            'verify_sha',],
 
         2: ['ask_inputs',
             'learn_owner_repo',
             'get_response',
             'download',
             'save_credentials',
-            'verify_sha',
-            'update_version'],
+            'verify_sha',],
 
         3: ['get_response',
             'download',
             'backup_old_appimage',
-            'verify_sha',
-            'update_version'],
+            'verify_sha',],
 
         4: ['get_response',
             'download', 
-            'verify_sha',
-            'update_version']
+            'verify_sha',]
     }
 
     print("Welcome to the my-unicorn 🦄!")

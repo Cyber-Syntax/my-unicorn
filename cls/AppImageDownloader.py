@@ -159,12 +159,17 @@ class AppImageDownloader:
                   "File not found while trying to load credentials or unknown error.")
             self.ask_user()
 
-    @handle_api_errors
     def get_response(self):
         """ get the api response from the github api"""
         self.api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
         # get the api response
         response = requests.get(self.api_url, timeout=10)
+
+        if response is None:
+            print("-------------------------------------------------")
+            print(f"Failed to get response from API: {self.api_url}")
+            print("-------------------------------------------------")
+            return
 
         # check the response status code
         if response.status_code == 200:
