@@ -1,14 +1,8 @@
-15-Nov-23 10:38:38 - ERROR - Error: Destination path '/home/developer/Documents/appimages/backup/siyuan.AppImage' already exists
+15-Nov-23 11:21:28 - ERROR - An error occured in get_response: 
 Traceback (most recent call last):
-  File "/home/developer/Documents/repository/my-unicorn/cls/FileHandler.py", line 190, in backup_old_appimage
-    shutil.move(old_appimage, backup_folder)
-  File "/usr/lib64/python3.11/shutil.py", line 823, in move
-    raise Error("Destination path '%s' already exists" % real_dst)
-shutil.Error: Destination path '/home/developer/Documents/appimages/backup/siyuan.AppImage' already exists
-15-Nov-23 10:38:49 - ERROR - Error: Destination path '/home/developer/Documents/appimages/siyuan.AppImage' already exists
-Traceback (most recent call last):
-  File "/home/developer/Documents/repository/my-unicorn/cls/FileHandler.py", line 222, in move_appimage
-    shutil.move(f"{self.repo}.AppImage", self.appimage_folder)
-  File "/usr/lib64/python3.11/shutil.py", line 823, in move
-    raise Error("Destination path '%s' already exists" % real_dst)
-shutil.Error: Destination path '/home/developer/Documents/appimages/siyuan.AppImage' already exists
+  File "/home/developer/Documents/repository/my-unicorn/cls/decorators.py", line 41, in wrapper
+    response = func(*args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/developer/Documents/repository/my-unicorn/cls/AppImageDownloader.py", line 170, in get_response
+    raise requests.exceptions.Timeout
+requests.exceptions.Timeout

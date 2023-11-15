@@ -162,7 +162,7 @@ class FileHandler(AppImageDownloader):
         print("\033[42mAppimage is now executable\033[0m")
         print("************************************")
         self.move_appimage()
-
+    
     def backup_old_appimage(self):
         """ Save old {self.repo}.AppImage to a backup folder, ask user for approval"""
         backup_folder = os.path.expanduser(f"{self.appimage_folder}backup")
@@ -187,7 +187,8 @@ class FileHandler(AppImageDownloader):
             if input(f"Do you want to backup "
                     f"{self.repo}.AppImage to {backup_folder} (y/n):") == "y":
                 try:
-                    shutil.move(old_appimage, backup_folder)
+                    shutil.copy2(old_appimage, backup_folder)
+                    os.remove(old_appimage)
                 except shutil.Error as error:
                     logging.error(f"Error: {error}", exc_info=True)
                     print(f"\033[41;30mError moving {self.repo}.AppImage to {backup_folder}\033[0m")

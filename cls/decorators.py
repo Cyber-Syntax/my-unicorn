@@ -40,7 +40,6 @@ def handle_api_errors(func):
         try:
             response = func(*args, **kwargs)
             return response
-
         except requests.exceptions.TooManyRedirects as error:
             logging.error(f"An error occured in {func.__name__}: {str(error)}", exc_info=True)
             print('+' + '-'*50 + '+')
@@ -51,15 +50,27 @@ def handle_api_errors(func):
             sys.exit()
         except requests.exceptions.InvalidURL as error:
             logging.error(f"An error occured in {func.__name__}: {str(error)}", exc_info=True)
+            print('+' + '-'*50 + '+')
+            print('|' + ' '*50 + '|')
             print("\033[41;30mInvalid URL. Try again.\033[0m")
+            print('|' + ' '*50 + '|')
+            print('+' + '-'*50 + '+')
             sys.exit()
         except requests.exceptions.Timeout as error:
             logging.error(f"An error occured in {func.__name__}: {str(error)}", exc_info=True)
+            print('+' + '-'*50 + '+')
+            print('|' + ' '*50 + '|')
             print("\033[41;30mTimeout error. Try again.\033[0m")
+            print('|' + ' '*50 + '|')
+            print('+' + '-'*50 + '+')
             sys.exit()
         except requests.exceptions.ConnectionError as error:
             logging.error(f"An error occured in {func.__name__}: {str(error)}", exc_info=True)
+            print('+' + '-'*50 + '+')
+            print('|' + ' '*50 + '|')
             print("\033[41;30mConnection error. Try again.\033[0m")
+            print('|' + ' '*50 + '|')
+            print('+' + '-'*50 + '+')
             sys.exit()
         except requests.exceptions.RequestException as error:
             logging.error(f"An error occured in '{func.__name__}': {str(error)}", exc_info=True)
@@ -80,7 +91,11 @@ def handle_api_errors(func):
         except Exception as error:
             logging.error("An unknown error occured in"
                             f" {func.__name__}: {str(error)}", exc_info=True)
+            print('+' + '-'*50 + '+')
+            print('|' + ' '*50 + '|')                
             print("\033[41;30mAn unknown error occurred.\033[0m")
             print(f"Error: {error}")
+            print('|' + ' '*50 + '|')
+            print('+' + '-'*50 + '+')
             sys.exit()
     return wrapper
