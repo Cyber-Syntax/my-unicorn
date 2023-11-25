@@ -4,6 +4,7 @@ import logging
 from cls.FileHandler import FileHandler
 
 def custom_excepthook(exc_type, exc_value, exc_traceback):
+    """Custom excepthook to log uncaught exceptions"""
     # Log the exception
     logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
     # Call the original excepthook to ensure Python's default error handling
@@ -25,20 +26,39 @@ def main():
 
     # A dictionary of functions to call based on the user's choice
     functions = {
-        1: ['ask_inputs', 'learn_owner_repo', 'get_response', 'download',
-           'save_credentials', 'backup_old_appimage', 'verify_sha', 'update_version'],
-        2: ['ask_inputs', 'learn_owner_repo', 'get_response', 'download', 'save_credentials', 'verify_sha', 'update_version'],
-        3: ['update_json', 'get_response', 'download', 'backup_old_appimage', 'verify_sha', 'update_version'],
-        4: ['update_json', 'get_response', 'download', 'verify_sha', 'update_version']
+        1: ['ask_inputs',
+            'learn_owner_repo', 
+            'get_response', 
+            'download',
+            'save_credentials', 
+            'backup_old_appimage', 
+            'verify_sha',],
+
+        2: ['ask_inputs',
+            'learn_owner_repo',
+            'get_response',
+            'download',
+            'save_credentials',
+            'verify_sha',],
+
+        3: ['get_response',
+            'download',
+            'backup_old_appimage',
+            'verify_sha',],
+
+        4: ['get_response',
+            'download', 
+            'verify_sha',]
     }
 
-    # Ask the user for their choice
     print("Welcome to the my-unicorn 🦄!")
     print("Choose one of the following options:")
     print("====================================")
-    print("1. Update appimage from JSON file")
+    print("1. Update existing appimage")
     print("2. Download new appimage")
-    print("3. Exit")
+    print("3. Update json file")
+    print("4. Exit")
+    print("====================================")
     try:
         choice = int(input("Enter your choice: "))
     except (ValueError, KeyboardInterrupt) as error:
@@ -59,8 +79,6 @@ def main():
                             print(f"Function {function} not found")
             elif choice == 2:
                 print("Downloading new appimage")
-                
-                # ask user which choice they want to use from functions
                 print("Choose one of the following options: \n")
                 print("====================================")
                 print("1. Backup old appimage and download new appimage")
@@ -74,8 +92,11 @@ def main():
                         print(f"Function {function} not found")
                         logging.error(f"Function {function} not found", exc_info=True)
                         sys.exit()
-
             elif choice == 3:
+                # choose the json file first
+                file_handler.list_json_files()
+                file_handler.update_json()
+            elif choice == 4:
                 print("Exiting...")
                 sys.exit()
             else:
