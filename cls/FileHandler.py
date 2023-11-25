@@ -162,7 +162,7 @@ class FileHandler(AppImageDownloader):
         print("\033[42mAppimage is now executable\033[0m")
         print("************************************")
         self.move_appimage()
-    
+
     def backup_old_appimage(self):
         """ Save old {self.repo}.AppImage to a backup folder, ask user for approval"""
         backup_folder = os.path.expanduser(f"{self.appimage_folder}backup")
@@ -188,10 +188,12 @@ class FileHandler(AppImageDownloader):
                     f"{self.repo}.AppImage to {backup_folder} (y/n):") == "y":
                 try:
                     shutil.copy2(old_appimage, backup_folder)
-                    os.remove(old_appimage)
                 except shutil.Error as error:
                     logging.error(f"Error: {error}", exc_info=True)
                     print(f"\033[41;30mError moving {self.repo}.AppImage to {backup_folder}\033[0m")
+                else:
+                    print(f"Old {self.repo}.AppImage saved in {backup_folder}")
+                    os.remove(old_appimage)
             else:
                 print(f"Overwriting {self.repo}.AppImage")
         else:
@@ -220,13 +222,14 @@ class FileHandler(AppImageDownloader):
 
             # move appimage to appimage folder
             try:
-                shutil.move(f"{self.repo}.AppImage", self.appimage_folder)
+                shutil.copy2(f"{self.repo}.AppImage", self.appimage_folder)
             except shutil.Error as error:
                 logging.error(f"Error: {error}", exc_info=True)
                 print(f"\033[41;30mError moving"
                         f" {self.repo}.AppImage to {self.appimage_folder}\033[0m")
             else:
                 print(f"Moved {self.repo}.AppImage to {self.appimage_folder}")
+                os.remove(f"{self.repo}.AppImage")
                 self.update_version()
         else:
             print(f"Not moving {self.appimage_name} to {self.appimage_folder}")

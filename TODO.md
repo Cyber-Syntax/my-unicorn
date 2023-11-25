@@ -13,10 +13,11 @@ Project Description
 ### Todo
 
 - [ ] Downgrade version  
+- [ ] Check same names for sha files  
 
 ### In Progress
 
-- [ ] Parse Sha Type
+- [ ] Parse Sha Type  
 
 ### Done ✓
 

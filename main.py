@@ -11,7 +11,6 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 def main():
-
     # Set up the logging configuration
     logging.basicConfig(
         level=logging.INFO,

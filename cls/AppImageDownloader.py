@@ -94,7 +94,7 @@ class AppImageDownloader:
                 ).strip(" ")
             # setup default appimage folder
             if not self.appimage_folder:
-                self.appimage_folder = ("/Documents/appimages")
+                self.appimage_folder = "/Documents/appimages"
 
             self.hash_type = input(
                 "Enter the hash type for your sha(sha256, sha512) file: "
