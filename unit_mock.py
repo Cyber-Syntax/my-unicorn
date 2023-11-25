@@ -1,3 +1,7 @@
+""" 
+Do not use or modify this file if you don't know what you are doing.
+This file is used to test the script using unittest and mock.
+"""
 import unittest
 from unittest.mock import Mock, patch
 from requests.models import Response
