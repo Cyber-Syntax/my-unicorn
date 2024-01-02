@@ -6,5 +6,6 @@
     "sha": "SHA256SUMS.txt",
     "choice": 3,
     "hash_type": "sha256",
+    "appimage_folder_backup": "/home/developer/Documents/appimages/backup/",
     "appimage_folder": "/home/developer/Documents/appimages/"
 }

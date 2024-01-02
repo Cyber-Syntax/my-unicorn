@@ -27,28 +27,38 @@ def main():
     # A dictionary of functions to call based on the user's choice
     functions = {
         1: ['ask_inputs',
-            'learn_owner_repo', 
-            'get_response', 
+            'learn_owner_repo',
+            'get_response',
             'download',
-            'save_credentials', 
-            'backup_old_appimage', 
-            'verify_sha',],
+            'save_credentials',
+            'verify_sha',
+            'make_executable',
+            'handle_file_operations',
+            ],
 
         2: ['ask_inputs',
             'learn_owner_repo',
             'get_response',
             'download',
             'save_credentials',
-            'verify_sha',],
+            'verify_sha',
+            'make_executable',
+            'handle_file_operations',
+            ],
 
         3: ['get_response',
             'download',
-            'backup_old_appimage',
-            'verify_sha',],
+            'verify_sha',
+            'make_executable',
+            'handle_file_operations',
+            ],
 
         4: ['get_response',
-            'download', 
-            'verify_sha',]
+            'download',
+            'verify_sha',
+            'make_executable',
+            'handle_file_operations',
+            ]
     }
 
     print("Welcome to the my-unicorn 🦄!")

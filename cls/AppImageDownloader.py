@@ -20,6 +20,7 @@ class AppImageDownloader:
         self.appimage_name: str = None
         self.version = None
         self.appimage_folder: str = None
+        self.appimage_folder_backup: str = None
         self.hash_type: str = None
         self.url: str = None
         self.choice: int = None
@@ -87,20 +88,31 @@ class AppImageDownloader:
     def ask_inputs(self):
         """Ask the user for the inputs"""
         while True:
+            print("=================================================")
             self.url = input("Enter the app github url: ").strip(" ")
             self.appimage_folder = input(
                 "Which directory to save appimage \n"
-                "(Default: '/Documents/appimages' if you leave it blank):" 
+                "(Default: '/Documents/appimages' if you leave it blank):"
                 ).strip(" ")
+            self.appimage_folder_backup = input(
+                "Which directory to save old appimage \n"
+                "(Default: '/Documents/appimages/backup' if you leave it blank):"
+                ).strip(" ")
+
+            # setup default backup folder
+            if not self.appimage_folder_backup:
+                self.appimage_folder_backup = "~/Documents/appimages/backup"
+
             # setup default appimage folder
             if not self.appimage_folder:
-                self.appimage_folder = "/Documents/appimages"
+                self.appimage_folder = "~/Documents/appimages"
 
             self.hash_type = input(
                 "Enter the hash type for your sha(sha256, sha512) file: "
                 ).strip(" ")
+            print("=================================================")
 
-            if self.url and self.appimage_folder and self.hash_type:
+            if self.url and self.appimage_folder and self.hash_type and self.appimage_folder_backup:
                 break
 
     @handle_common_errors
@@ -114,18 +126,25 @@ class AppImageDownloader:
         self.appimages["hash_type"] = self.hash_type
         self.appimages["choice"] = 3 if self.choice == 1 else 4
 
-        # Handle expansion of ~ in the path
-        if not self.appimage_folder.endswith("/"):
-            self.appimage_folder += "/"
-
-        if not self.appimage_folder.startswith("/"):
-            self.appimage_folder = "/" + self.appimage_folder
+        # Handle expansion of "~" in the path
+        if self.appimage_folder_backup.startswith("~"):
+            self.appimage_folder_backup = os.path.expanduser(self.appimage_folder_backup)
+        else:
+            self.appimage_folder_backup = self.appimage_folder_backup
 
         if self.appimage_folder.startswith("~"):
             self.appimage_folder = os.path.expanduser(self.appimage_folder)
         else:
-            self.appimage_folder = os.path.expanduser("~") + self.appimage_folder
+            self.appimage_folder = self.appimage_folder
 
+        # Handle the trailing slash
+        if not self.appimage_folder_backup.endswith("/"):
+            self.appimage_folder_backup += "/"
+
+        if not self.appimage_folder.endswith("/"):
+            self.appimage_folder += "/"
+
+        self.appimages["appimage_folder_backup"] = self.appimage_folder_backup
         self.appimages["appimage_folder"] = self.appimage_folder
 
         # save the credentials to a json_files folder
@@ -153,6 +172,11 @@ class AppImageDownloader:
                 self.appimage_folder = os.path.expanduser(self.appimage_folder)
             else:
                 self.appimage_folder = self.appimages["appimage_folder"]
+
+            if self.appimages["appimage_folder_backup"].startswith("~"):
+                self.appimage_folder_backup = os.path.expanduser(self.appimage_folder_backup)
+            else:
+                self.appimage_folder_backup = self.appimages["appimage_folder_backup"]
 
         else:
             print(f"{self.file_path}{self.repo}.json"
@@ -187,10 +211,12 @@ class AppImageDownloader:
                     print(f"Version: {self.version}")
                     print("Exiting...")
                     sys.exit()
-            print("-------------------------------------------------")
-            print(f"Current version: {self.appimages['version']}")
-            print(f"\033[42mLatest version: {self.version}\033[0m")
-            print("-------------------------------------------------")
+                else:
+                    print("-------------------------------------------------")
+                    print(f"Current version: {self.appimages['version']}")
+                    print(f"\033[42mLatest version: {self.version}\033[0m")
+                    print("-------------------------------------------------")
+
 
             # Define keywords for the assets
             keywords = {"linux", "sum", "sha", "SHA", "SHA256", "SHA512", "SHA-256",
@@ -272,7 +298,8 @@ class AppImageDownloader:
         print("2. hash_type")
         print("3. choice")
         print("4. appimage_folder")
-        print("5. Exit")
+        print("5. appimage_folder_backup")
+        print("6. Exit")
         print("=================================================")
 
         choice = int(input("Enter your choice: "))
@@ -295,6 +322,18 @@ class AppImageDownloader:
 
             self.appimages["appimage_folder"] = new_folder
         elif choice == 5:
+            new_folder = input("Enter new appimage folder backup: ")
+            if not new_folder.endswith("/"):
+                new_folder += "/"
+            if not new_folder.startswith("/"):
+                new_folder = "/" + new_folder
+            if new_folder.startswith("~"):
+                new_folder = os.path.expanduser(new_folder)
+            else:
+                new_folder = os.path.expanduser("~") + new_folder
+
+            self.appimages["appimage_folder_backup"] = new_folder
+        elif choice == 6:
             sys.exit()
         else:
             print("Invalid choice")

@@ -1,6 +1,6 @@
 import sys
 import logging
-import requests 
+import requests
 
 def handle_common_errors(func):
     """Handle common errors"""
@@ -92,7 +92,7 @@ def handle_api_errors(func):
             logging.error("An unknown error occured in"
                             f" {func.__name__}: {str(error)}", exc_info=True)
             print('+' + '-'*50 + '+')
-            print('|' + ' '*50 + '|')                
+            print('|' + ' '*50 + '|')
             print("\033[41;30mAn unknown error occurred.\033[0m")
             print(f"Error: {error}")
             print('|' + ' '*50 + '|')

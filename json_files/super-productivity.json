@@ -6,5 +6,6 @@
     "sha": "latest-linux.yml",
     "hash_type": "sha512",
     "choice": 4,
+    "appimage_folder_backup": "/home/developer/Documents/appimages/backup/",
     "appimage_folder": "/home/developer/Documents/appimages/"
 }

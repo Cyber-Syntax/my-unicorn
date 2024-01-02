@@ -50,7 +50,6 @@ class FileHandler(AppImageDownloader):
             with open(self.sha_name, "w", encoding="utf-8") as file:
                 file.write(response.text)
             print(f"\033[42mDownloaded {self.sha_name}\033[0m")
-            print("************************************")
         else:
             print(f"{self.sha_name} already exists")
             print("************************************")
@@ -83,14 +82,22 @@ class FileHandler(AppImageDownloader):
         logging.error(f"Error connecting to {self.sha_url}")
         sys.exit()
 
-    def delete_sha(self):
-        """ Delete the downloaded sha file """
-        if input("Do you want to delete the downloaded sha file? (y/n): "
+    def ask_delete_appimage(self):
+        """ Delete the downloaded appimage """
+        new_name = f"{self.repo}.AppImage"
+
+        if input("Do you want to delete the downloaded appimage? (y/n): "
                 ).lower() == "y":
-            os.remove(self.sha_name)
-            print(f"Deleted {self.sha_name}")
+            if self.appimage_name != new_name:
+                os.remove(self.appimage_name)
+                print(f"Deleted {self.appimage_name}")
+            else:
+                os.remove(new_name)
+                print(f"Deleted {new_name}")
+
+            print(f"Deleted {self.appimage_name}")
         else:
-            print(f"{self.sha_name} saved in {os.getcwd()}")
+            print(f"{self.appimage_name} saved in {os.getcwd()}")
 
     @sha_response_error
     def verify_yml(self, response):
@@ -109,8 +116,7 @@ class FileHandler(AppImageDownloader):
         # compare the two hashes
         if appimage_sha == decoded_hash:
             print(f"\033[42m{self.appimage_name} verified.\033[0m")
-            self.make_executable()
-            self.delete_sha()
+            print("************************************")
         else:
             self.handle_verification_error()
 
@@ -134,8 +140,6 @@ class FileHandler(AppImageDownloader):
             if appimage_sha == response.text.split()[0]:
                 print(f"\033[42m{self.appimage_name} verified.\033[0m")
                 print("************************************")
-                self.make_executable()
-                self.delete_sha()
             else:
                 self.handle_verification_error()
 
@@ -149,27 +153,54 @@ class FileHandler(AppImageDownloader):
         else:
             self.verify_other(response=self.get_sha())
 
+    def handle_file_operations(self):
+        """ Handle the file operations with one user's approval """
+        # 1. backup old appimage
+        print("--------------------- CHANGES  ----------------------")
+        if self.choice == 1 or self.choice == 3:
+            print(f"Moving old {self.repo}.AppImage to {self.appimage_folder_backup}")
+
+        # 2. Changing appimage name to {self.repo}.AppImage
+        print(f"Changing {self.appimage_name} name to {self.repo}.AppImage")
+        # 3. moving appimage to appimage folder
+        print(f"Moving updated appimage to {self.appimage_folder}")
+        # 4. update the version, appimage_name in the json file
+        print(f"Updating credentials in {self.repo}.json")
+        # 5. Delete the downloaded sha file if verification is successful
+        print(f"Deleting {self.sha_name}")
+        print("-----------------------------------------------------")
+
+        # 6. Ask user for approval
+        if input("Do you want to continue? (y/n): ").lower() == "y":
+            if self.choice == 1 or self.choice == 3:
+                self.backup_old_appimage()
+
+            self.change_name()
+            self.move_appimage()
+            self.update_version()
+            os.remove(self.sha_name)
+        else:
+            print("Exiting...")
+            sys.exit()
+
     def make_executable(self):
         """Make the appimage executable"""
         # if already executable, return
         if os.access(self.appimage_name, os.X_OK):
-            print("Appimage is already executable")
-            self.move_appimage()
             return
+
         print("************************************")
         print("Making the appimage executable...")
         subprocess.run(["chmod", "+x", self.appimage_name], check=True)
         print("\033[42mAppimage is now executable\033[0m")
         print("************************************")
-        self.move_appimage()
 
     def backup_old_appimage(self):
-        """ Save old {self.repo}.AppImage to a backup folder, ask user for approval"""
-        backup_folder = os.path.expanduser(f"{self.appimage_folder}backup")
+        """ Save old {self.repo}.AppImage to a backup folder"""
+        backup_folder = os.path.expanduser(f"{self.appimage_folder_backup}")
         old_appimage = os.path.expanduser(f"{self.appimage_folder}{self.repo}.AppImage")
+        backup_file = os.path.expanduser(f"{backup_folder}{self.repo}.AppImage")
 
-        print(f"Moving {old_appimage} to {backup_folder}")
-        print("----------------------------------------")
         # Create a backup folder if it doesn't exist
         if os.path.exists(backup_folder):
             print(f"Backup folder {backup_folder} found")
@@ -181,26 +212,26 @@ class FileHandler(AppImageDownloader):
             else:
                 print("Backup folder not created.")
 
-        # Move old appimage to backup folder
+        # Check if old appimage exists
         if os.path.exists(f"{self.appimage_folder}/{self.repo}.AppImage"):
+
             print(f"Found {self.repo}.AppImage in {self.appimage_folder}")
-            if input(f"Do you want to backup "
-                    f"{self.repo}.AppImage to {backup_folder} (y/n):") == "y":
-                try:
-                    shutil.copy2(old_appimage, backup_folder)
-                except shutil.Error as error:
-                    logging.error(f"Error: {error}", exc_info=True)
-                    print(f"\033[41;30mError moving {self.repo}.AppImage to {backup_folder}\033[0m")
-                else:
-                    print(f"Old {self.repo}.AppImage saved in {backup_folder}")
-                    os.remove(old_appimage)
+
+            # Move old appimage to backup folder
+            try:
+                # overwrite the old appimage to the backup folder if it already exists
+                shutil.copy2(old_appimage, backup_file)
+            except shutil.Error as error:
+                logging.error(f"Error: {error}", exc_info=True)
+                print(f"\033[41;30mError moving {self.repo}.AppImage to {backup_folder}\033[0m")
             else:
-                print(f"Overwriting {self.repo}.AppImage")
+                print(f"Old {old_appimage} copied to {backup_folder}")
+                print("-----------------------------------------------------")
         else:
             print(f"{self.repo}.AppImage not found in {self.appimage_folder}")
 
     def change_name(self):
-        """ Change appimage name for .desktop file on linux"""
+        """ Change the appimage name to {self.repo}.AppImage """
         new_name = f"{self.repo}.AppImage"
         if self.appimage_name != new_name:
             print(f"Changing {self.appimage_name} name to {new_name}")
@@ -210,39 +241,22 @@ class FileHandler(AppImageDownloader):
             print("The appimage name is already the new name")
 
     def move_appimage(self):
-        """ Move appimages to a appimage folder """        
-        if input(f"Do you want to move"
-                f" {self.appimage_name} to {self.appimage_folder} (y/n): ") == "y":
-            print(f"Moving {self.appimage_name} to {self.appimage_folder}")
-            print("-----------------------------------------------------")
-            # Change name before moving
-            self.change_name()
-            # check if appimage folder exists
-            os.makedirs(os.path.dirname(self.appimage_folder), exist_ok=True)
+        """ Move appimages to a appimage folder """
 
-            # move appimage to appimage folder
-            try:
-                shutil.copy2(f"{self.repo}.AppImage", self.appimage_folder)
-            except shutil.Error as error:
-                logging.error(f"Error: {error}", exc_info=True)
-                print(f"\033[41;30mError moving"
-                        f" {self.repo}.AppImage to {self.appimage_folder}\033[0m")
-            else:
-                print(f"Moved {self.repo}.AppImage to {self.appimage_folder}")
-                os.remove(f"{self.repo}.AppImage")
-                self.update_version()
+        # check if appimage folder exists
+        os.makedirs(os.path.dirname(self.appimage_folder), exist_ok=True)
+
+        # move appimage to appimage folder
+        try:
+            shutil.copy2(f"{self.repo}.AppImage", self.appimage_folder)
+        except shutil.Error as error:
+            logging.error(f"Error: {error}", exc_info=True)
+            print(f"\033[41;30mError moving"
+                    f" {self.repo}.AppImage to {self.appimage_folder}\033[0m")
         else:
-            print(f"Not moving {self.appimage_name} to {self.appimage_folder}")
-            print(f"{self.appimage_name} saved in {os.getcwd()}")
-            print("-----------------------------------------------------")
-            # ask user if he wants to delete the downloaded appimage
-            new_name = f"{self.repo}.AppImage"
-            if input("Do you want to delete the downloaded appimage? (y/n): "
-                    ).lower() == "y":
-                os.remove(new_name)
-                print(f"Deleted {self.repo}.AppImage")
-            else:
-                print(f"{self.repo}.AppImage saved in {os.getcwd()}")
+            print(f"Moved {self.repo}.AppImage to {self.appimage_folder}")
+            # remove the appimage from the current directory because shutil uses copy2
+            os.remove(f"{self.repo}.AppImage")
 
     def update_version(self):
         """Update the version-appimage_name in the json file"""
@@ -256,3 +270,4 @@ class FileHandler(AppImageDownloader):
         with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
             json.dump(self.appimages, file, indent=4)
         print(f"\033[42mCredentials updated to {self.repo}.json\033[0m")
+
