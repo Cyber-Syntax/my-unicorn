@@ -7,20 +7,25 @@ Project Description
 ### Backlog
 
 - [ ] .apk should be able to be downloaded  
-- [ ] Auto Update  
 - [ ] Nuclear app  
+- [ ] Auto Update  
+- [ ] Downgrade version  
 
 ### Todo
 
-- [ ] Downgrade version  
-- [ ] Check same names for sha files  
+- [ ] add dependencies requirements.txt  
 
 ### In Progress
 
-- [ ] Parse Sha Type  
+- [ ] Check same names for sha files, if it exist ask user for overwriting  
+- [ ] Update all appimages that have json file  
 
 ### Done ✓
 
+- [x] add "appimage_folder_backup" to json files and delete user question about it  
+- [x] Don't ask delete sha file if download success  
+- [x] Don't ask user to move appimage to appimage folder if download success  
+- [x] Parse Sha Type  
 - [x] sha already exists  
 - [x] Clear Code  (Decrease functions smaller)  
 - [x] Text Coloring  
