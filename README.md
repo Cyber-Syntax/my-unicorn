@@ -58,7 +58,7 @@
             ====================================
             Enter your choice: 2
             Downloading new appimage
-            Choose one of the following options: 
+            Choose one of the following options:
 
             ====================================
             1. Backup old appimage and download new appimage
@@ -66,9 +66,9 @@
             Enter your choice: 1
             =================================================
             Enter the app github url: https://github.com/laurent22/joplin
-            Which directory to save appimage 
+            Which directory to save appimage
             (Default: '~/Documents/appimages' if you leave it blank):
-            Which directory to save old appimage 
+            Which directory to save old appimage
             (Default: '~/Documents/appimages/backup' if you leave it blank):
             Enter the hash type for your sha(sha256, sha512) file: sha512
             =================================================
