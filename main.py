@@ -11,6 +11,8 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 def main():
+    """ Main function to call the methods based on the user's choice """
+
     # Set up the logging configuration
     logging.basicConfig(
         level=logging.INFO,
@@ -20,11 +22,19 @@ def main():
     )
     # Create a FileHandler with write mode
     file_handler = logging.FileHandler("logs/my-unicorn.log", "w")
-
     # Create an instance of the FileHandler class
     file_handler = FileHandler()
 
     # A dictionary of functions to call based on the user's choice
+    """
+    @param choice: The user's choice to update the appimage or download a new appimage
+    @type choice: int
+    @param choice 1: Download new appimage and backup old appimage
+    @param choice 2: Download new appimage and overwrite old appimage
+    @param choice 3: Update json file and backup old appimage
+    @param choice 4: Update json file and overwrite old appimage
+    """
+
     functions = {
         1: ['ask_inputs',
             'learn_owner_repo',

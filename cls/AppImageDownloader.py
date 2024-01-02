@@ -92,11 +92,11 @@ class AppImageDownloader:
             self.url = input("Enter the app github url: ").strip(" ")
             self.appimage_folder = input(
                 "Which directory to save appimage \n"
-                "(Default: '/Documents/appimages' if you leave it blank):"
+                "(Default: '~/Documents/appimages' if you leave it blank):"
                 ).strip(" ")
             self.appimage_folder_backup = input(
                 "Which directory to save old appimage \n"
-                "(Default: '/Documents/appimages/backup' if you leave it blank):"
+                "(Default: '~/Documents/appimages/backup' if you leave it blank):"
                 ).strip(" ")
 
             # setup default backup folder
