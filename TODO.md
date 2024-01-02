@@ -7,20 +7,22 @@ Project Description
 ### Backlog
 
 - [ ] .apk should be able to be downloaded  
-- [ ] Auto Update  
 - [ ] Nuclear app  
 
 ### Todo
 
+- [ ] Auto Update  
 - [ ] Downgrade version  
-- [ ] Check same names for sha files  
+- [ ] add dependencies requirements.txt  
 
 ### In Progress
 
-- [ ] Parse Sha Type  
+- [ ] Check same names for sha files, if it exist ask user for overwriting  
+- [ ] Update all appimages that have json file.  
 
 ### Done ✓
 
+- [x] Parse Sha Type  
 - [x] sha already exists  
 - [x] Clear Code  (Decrease functions smaller)  
 - [x] Text Coloring  

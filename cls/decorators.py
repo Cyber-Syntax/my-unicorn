@@ -1,6 +1,6 @@
 import sys
 import logging
-import requests
+import requests 
 
 def handle_common_errors(func):
     """Handle common errors"""
