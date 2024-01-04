@@ -51,8 +51,19 @@ class FileHandler(AppImageDownloader):
                 file.write(response.text)
             print(f"\033[42mDownloaded {self.sha_name}\033[0m")
         else:
-            print(f"{self.sha_name} already exists")
-            print("************************************")
+            # If the sha file already exists, check if it is the same as the downloaded one
+            with open(self.sha_name, "r", encoding="utf-8") as file:
+                if response.text == file.read():
+                    print(f"{self.sha_name} already exists")
+                else:
+                    print(f"{self.sha_name} already exists but it is different from the downloaded one")
+                    if input("Do you want to overwrite it? (y/n): ").lower() == "y":
+                        with open(self.sha_name, "w", encoding="utf-8") as file:
+                            file.write(response.text)
+                        print(f"\033[42mDownloaded {self.sha_name}\033[0m")
+                    else:
+                        print("Exiting...")
+                        sys.exit()
 
     def handle_verification_error(self):
         """ Handle verification errors """
@@ -153,6 +164,7 @@ class FileHandler(AppImageDownloader):
         else:
             self.verify_other(response=self.get_sha())
 
+    @handle_common_errors
     def handle_file_operations(self):
         """ Handle the file operations with one user's approval """
         # 1. backup old appimage
@@ -194,7 +206,8 @@ class FileHandler(AppImageDownloader):
         subprocess.run(["chmod", "+x", self.appimage_name], check=True)
         print("\033[42mAppimage is now executable\033[0m")
         print("************************************")
-
+    
+    @handle_common_errors
     def backup_old_appimage(self):
         """ Save old {self.repo}.AppImage to a backup folder"""
         backup_folder = os.path.expanduser(f"{self.appimage_folder_backup}")
@@ -240,6 +253,7 @@ class FileHandler(AppImageDownloader):
         else:
             print("The appimage name is already the new name")
 
+    @handle_common_errors
     def move_appimage(self):
         """ Move appimages to a appimage folder """
 
@@ -258,6 +272,7 @@ class FileHandler(AppImageDownloader):
             # remove the appimage from the current directory because shutil uses copy2
             os.remove(f"{self.repo}.AppImage")
 
+    @handle_common_errors
     def update_version(self):
         """Update the version-appimage_name in the json file"""
 
@@ -270,4 +285,3 @@ class FileHandler(AppImageDownloader):
         with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
             json.dump(self.appimages, file, indent=4)
         print(f"\033[42mCredentials updated to {self.repo}.json\033[0m")
-

@@ -77,7 +77,8 @@ def main():
     print("1. Update existing appimage")
     print("2. Download new appimage")
     print("3. Update json file")
-    print("4. Exit")
+    print("4. Check updates for all appimages")
+    print("5. Exit")
     print("====================================")
     try:
         choice = int(input("Enter your choice: "))
@@ -117,6 +118,8 @@ def main():
                 file_handler.list_json_files()
                 file_handler.update_json()
             elif choice == 4:
+                file_handler.check_updates_json_all()
+            elif choice == 5:
                 print("Exiting...")
                 sys.exit()
             else:
