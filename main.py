@@ -11,7 +11,15 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 def main():
-    """ Main function to call the methods based on the user's choice """
+    """
+        ## How method works:
+        1. Call list_json_files() method to list all json files.
+        2. We selecting .json file (e.g joplin.json)
+        3. We loading credentials from joplin.json file via load_credentials() method.
+        4. We geting response from github api via get_response() method.
+        5. We downloading appimage via download() method.
+        6. Other stuff just file handling.
+    """
 
     # Set up the logging configuration
     logging.basicConfig(
@@ -74,10 +82,10 @@ def main():
     print("Welcome to the my-unicorn 🦄!")
     print("Choose one of the following options:")
     print("====================================")
-    print("1. Update existing appimage")
-    print("2. Download new appimage")
-    print("3. Update json file")
-    print("4. Check updates for all appimages")
+    print("1. Update existing AppImage")
+    print("2. Download new AppImage")
+    print("3. Update AppImage config(.json) file")
+    print("4. Check updates for all AppImages and update all")
     print("5. Exit")
     print("====================================")
     try:

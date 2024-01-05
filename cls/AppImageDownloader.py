@@ -346,30 +346,5 @@ class AppImageDownloader:
         print("\033[42mCredentials updated successfully\033[0m")
         print("-------------------------------------------------")
 
-    # INFO: Cause API RATE LIMIT EXCEEDED if used more than 15 - 20 times
-    # KeyError: 'tag_name' means that API RATE LIMIT EXCEEDED.
-    @handle_common_errors
-    def check_updates_json_all(self):
-        """Check for updates for all json files"""
-        json_files = [file for file in os.listdir(self.file_path)
-                    if file.endswith(".json")]
 
-        # Print appimages name and versions from json files
-        for file in json_files:
-            with open(f"{self.file_path}{file}", "r", encoding="utf-8") as file:
-                appimages = json.load(file)
 
-            # Check version via github api
-            response = requests.get(f"https://api.github.com/repos/{appimages['owner']}/"
-                                            f"{appimages['repo']}/releases/latest")
-            latest_version = response.json()["tag_name"].replace("v", "")
-
-            # Compare with above versions
-            if latest_version == appimages["version"]:
-                print(f"{appimages['appimage']} is up to date")
-            else:
-                print("-------------------------------------------------")
-                print(f"{appimages['appimage']} is not up to date")
-                print(f"\033[42mLatest version: {latest_version}\033[0m")
-                print(f"Current version: {appimages['version']}")
-                print("-------------------------------------------------")

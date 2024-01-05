@@ -192,8 +192,8 @@ class FileHandler(AppImageDownloader):
             self.update_version()
             os.remove(self.sha_name)
         else:
-            print("Exiting...")
-            sys.exit()
+            print("Appimage installed but not moved to the appimage folder")
+            print(f"{self.appimage_name} saved in {os.getcwd()}")
 
     def make_executable(self):
         """Make the appimage executable"""
@@ -206,7 +206,7 @@ class FileHandler(AppImageDownloader):
         subprocess.run(["chmod", "+x", self.appimage_name], check=True)
         print("\033[42mAppimage is now executable\033[0m")
         print("************************************")
-    
+
     @handle_common_errors
     def backup_old_appimage(self):
         """ Save old {self.repo}.AppImage to a backup folder"""
@@ -285,3 +285,61 @@ class FileHandler(AppImageDownloader):
         with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
             json.dump(self.appimages, file, indent=4)
         print(f"\033[42mCredentials updated to {self.repo}.json\033[0m")
+
+    # INFO: Cause API RATE LIMIT EXCEEDED if used more than 15 - 20 times
+    # KeyError: 'tag_name' means that API RATE LIMIT EXCEEDED.
+    @handle_common_errors
+    def check_updates_json_all(self):
+        """Check for updates for all json files"""
+        json_files = [file for file in os.listdir(self.file_path)
+                    if file.endswith(".json")]
+
+        # Create a queque for not up to date appimages
+        appimages_to_update = []
+
+        # Print appimages name and versions from json files
+        for file in json_files:
+            with open(f"{self.file_path}{file}", "r", encoding="utf-8") as file:
+                appimages = json.load(file)
+
+            # Check version via github api
+            response = requests.get(f"https://api.github.com/repos/{appimages['owner']}/"
+                                            f"{appimages['repo']}/releases/latest")
+            latest_version = response.json()["tag_name"].replace("v", "")
+
+            # Compare with above versions
+            if latest_version == appimages["version"]:
+                print(f"{appimages['appimage']} is up to date")
+            else:
+                print("-------------------------------------------------")
+                print(f"{appimages['appimage']} is not up to date")
+                print(f"\033[42mLatest version: {latest_version}\033[0m")
+                print(f"Current version: {appimages['version']}")
+                print("-------------------------------------------------")
+
+                # append to queque appimages who is not up to date
+                appimages_to_update.append(appimages["repo"])
+
+        # Ask user to update all appimages
+        print("=================================================")
+        print("All appimages who is not up to date:")
+        print("=================================================")
+        for appimage in appimages_to_update:
+            print(appimage)
+        print("=================================================")
+        if input("Do you want to update to above appimages? (y/n): ").lower() == "y":
+            self.update_all_appimages(appimages_to_update)
+        else:
+            sys.exit()
+
+    @handle_common_errors
+    def update_all_appimages(self, appimages_to_update):
+        """Update all appimages"""
+        for appimage in appimages_to_update:
+            self.repo = appimage
+            self.load_credentials()
+            self.get_response()
+            self.download()
+            self.verify_sha()
+            self.make_executable()
+            self.handle_file_operations()
