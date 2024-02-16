@@ -36,11 +36,9 @@ class FileHandler(AppImageDownloader):
     @handle_api_errors
     def get_sha(self):
         """ Get the sha name and url """
-
         print("************************************")
         print(f"Downloading {self.sha_name}...")
         response = requests.get(self.sha_url, timeout=10)
-
         return response
 
     def download_sha(self, response):
@@ -113,7 +111,6 @@ class FileHandler(AppImageDownloader):
     @sha_response_error
     def verify_yml(self, response):
         """ Verify yml/yaml sha files """
-
         # parse the sha file
         with open(self.sha_name, "r", encoding="utf-8") as file:
             sha = yaml.load(file, Loader=yaml.FullLoader)
@@ -256,10 +253,8 @@ class FileHandler(AppImageDownloader):
     @handle_common_errors
     def move_appimage(self):
         """ Move appimages to a appimage folder """
-
         # check if appimage folder exists
         os.makedirs(os.path.dirname(self.appimage_folder), exist_ok=True)
-
         # move appimage to appimage folder
         try:
             shutil.copy2(f"{self.repo}.AppImage", self.appimage_folder)
@@ -316,7 +311,6 @@ class FileHandler(AppImageDownloader):
                 print(f"\033[42mLatest version: {latest_version}\033[0m")
                 print(f"Current version: {appimages['version']}")
                 print("-------------------------------------------------")
-
                 # append to queque appimages who is not up to date
                 appimages_to_update.append(appimages["repo"])
 
@@ -327,10 +321,14 @@ class FileHandler(AppImageDownloader):
         for appimage in appimages_to_update:
             print(appimage)
         print("=================================================")
-        if input("Do you want to update to above appimages? (y/n): ").lower() == "y":
-            self.update_all_appimages(appimages_to_update)
-        else:
-            sys.exit()
+
+        # if there is update
+        if appimages_to_update:
+            # Ask user if there is updates to update all appimages
+            if input("Do you want to update to above appimages? (y/n): ").lower() == "y":
+                self.update_all_appimages(appimages_to_update)
+            else:
+                sys.exit()
 
     @handle_common_errors
     def update_all_appimages(self, appimages_to_update):

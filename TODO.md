@@ -9,10 +9,10 @@ Project Description
 - [ ] .apk should be able to be downloaded  
 - [ ] Nuclear app  
 - [ ] Auto Update  
-- [ ] Downgrade version  
 
 ### Todo
 
+- [ ] Downgrade version  
 
 ### In Progress
 
