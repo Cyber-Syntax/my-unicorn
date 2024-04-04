@@ -102,6 +102,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+myenv/
 .env
 .venv
 env/
@@ -138,8 +139,12 @@ dmypy.json
 .vscode
 # ignore
 *sha512*
+*SHA*
 # test
 *test*
 *None*
 
 .pylintrc
+
+# syncthing conflict files
+*.sync-conflict-*

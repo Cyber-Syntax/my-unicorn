@@ -217,7 +217,6 @@ class AppImageDownloader:
                     print(f"\033[42mLatest version: {self.version}\033[0m")
                     print("-------------------------------------------------")
 
-
             # Define keywords for the assets
             keywords = {"linux", "sum", "sha", "SHA", "SHA256", "SHA512", "SHA-256",
                         "SHA-512", "checksum", "checksums", "CHECKSUM", "CHECKSUMS"}

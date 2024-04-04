@@ -9,19 +9,20 @@ Project Description
 - [ ] .apk should be able to be downloaded  
 - [ ] Nuclear app  
 - [ ] Auto Update  
-- [ ] Downgrade version  
 
 ### Todo
 
-- [ ] add dependencies requirements.txt  
+- [ ] Downgrade version 
+- [ ] All appimages up to date output for choice 4.
 
 ### In Progress
 
-- [ ] Check same names for sha files, if it exist ask user for overwriting  
-- [ ] Update all appimages that have json file  
 
 ### Done ✓
 
+- [x] Update all appimages that have json file  
+- [x] Check same names for sha files, if it exist ask user for overwriting  
+- [x] add dependencies requirements.txt  
 - [x] add "appimage_folder_backup" to json files and delete user question about it  
 - [x] Don't ask delete sha file if download success  
 - [x] Don't ask user to move appimage to appimage folder if download success  

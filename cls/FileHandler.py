@@ -36,11 +36,9 @@ class FileHandler(AppImageDownloader):
     @handle_api_errors
     def get_sha(self):
         """ Get the sha name and url """
-
         print("************************************")
         print(f"Downloading {self.sha_name}...")
         response = requests.get(self.sha_url, timeout=10)
-
         return response
 
     def download_sha(self, response):
@@ -51,8 +49,19 @@ class FileHandler(AppImageDownloader):
                 file.write(response.text)
             print(f"\033[42mDownloaded {self.sha_name}\033[0m")
         else:
-            print(f"{self.sha_name} already exists")
-            print("************************************")
+            # If the sha file already exists, check if it is the same as the downloaded one
+            with open(self.sha_name, "r", encoding="utf-8") as file:
+                if response.text == file.read():
+                    print(f"{self.sha_name} already exists")
+                else:
+                    print(f"{self.sha_name} already exists but it is different from the downloaded one")
+                    if input("Do you want to overwrite it? (y/n): ").lower() == "y":
+                        with open(self.sha_name, "w", encoding="utf-8") as file:
+                            file.write(response.text)
+                        print(f"\033[42mDownloaded {self.sha_name}\033[0m")
+                    else:
+                        print("Exiting...")
+                        sys.exit()
 
     def handle_verification_error(self):
         """ Handle verification errors """
@@ -102,7 +111,6 @@ class FileHandler(AppImageDownloader):
     @sha_response_error
     def verify_yml(self, response):
         """ Verify yml/yaml sha files """
-
         # parse the sha file
         with open(self.sha_name, "r", encoding="utf-8") as file:
             sha = yaml.load(file, Loader=yaml.FullLoader)
@@ -153,6 +161,7 @@ class FileHandler(AppImageDownloader):
         else:
             self.verify_other(response=self.get_sha())
 
+    @handle_common_errors
     def handle_file_operations(self):
         """ Handle the file operations with one user's approval """
         # 1. backup old appimage
@@ -180,8 +189,8 @@ class FileHandler(AppImageDownloader):
             self.update_version()
             os.remove(self.sha_name)
         else:
-            print("Exiting...")
-            sys.exit()
+            print("Appimage installed but not moved to the appimage folder")
+            print(f"{self.appimage_name} saved in {os.getcwd()}")
 
     def make_executable(self):
         """Make the appimage executable"""
@@ -195,6 +204,7 @@ class FileHandler(AppImageDownloader):
         print("\033[42mAppimage is now executable\033[0m")
         print("************************************")
 
+    @handle_common_errors
     def backup_old_appimage(self):
         """ Save old {self.repo}.AppImage to a backup folder"""
         backup_folder = os.path.expanduser(f"{self.appimage_folder_backup}")
@@ -240,12 +250,11 @@ class FileHandler(AppImageDownloader):
         else:
             print("The appimage name is already the new name")
 
+    @handle_common_errors
     def move_appimage(self):
         """ Move appimages to a appimage folder """
-
         # check if appimage folder exists
         os.makedirs(os.path.dirname(self.appimage_folder), exist_ok=True)
-
         # move appimage to appimage folder
         try:
             shutil.copy2(f"{self.repo}.AppImage", self.appimage_folder)
@@ -258,6 +267,7 @@ class FileHandler(AppImageDownloader):
             # remove the appimage from the current directory because shutil uses copy2
             os.remove(f"{self.repo}.AppImage")
 
+    @handle_common_errors
     def update_version(self):
         """Update the version-appimage_name in the json file"""
 
@@ -271,3 +281,69 @@ class FileHandler(AppImageDownloader):
             json.dump(self.appimages, file, indent=4)
         print(f"\033[42mCredentials updated to {self.repo}.json\033[0m")
 
+    # INFO: Cause API RATE LIMIT EXCEEDED if used more than 15 - 20 times
+    # KeyError: 'tag_name' means that API RATE LIMIT EXCEEDED.
+    @handle_common_errors
+    def check_updates_json_all(self):
+        """Check for updates for all json files"""
+        json_files = [file for file in os.listdir(self.file_path)
+                    if file.endswith(".json")]
+
+        # Create a queque for not up to date appimages
+        appimages_to_update = []
+
+        # Print appimages name and versions from json files
+        for file in json_files:
+            with open(f"{self.file_path}{file}", "r", encoding="utf-8") as file:
+                appimages = json.load(file)
+
+            # Check version via github api
+            response = requests.get(f"https://api.github.com/repos/{appimages['owner']}/"
+                                            f"{appimages['repo']}/releases/latest")
+            latest_version = response.json()["tag_name"].replace("v", "")
+
+            # Compare with above versions
+            if latest_version == appimages["version"]:
+                print(f"{appimages['appimage']} is up to date")
+            else:
+                print("-------------------------------------------------")
+                print(f"{appimages['appimage']} is not up to date")
+                print(f"\033[42mLatest version: {latest_version}\033[0m")
+                print(f"Current version: {appimages['version']}")
+                print("-------------------------------------------------")
+                # append to queque appimages who is not up to date
+                appimages_to_update.append(appimages["repo"])
+        
+        # if all appimages up to date
+        if not appimages_to_update:
+            print("All appimages are up to date")
+            sys.exit()
+        else:
+             # Ask user to update all appimages
+            print("=================================================")
+            print("All appimages who is not up to date:")
+            print("=================================================")
+            for appimage in appimages_to_update:
+                print(appimage)
+            print("=================================================")
+
+
+         # if there is update
+        if appimages_to_update:
+            # Ask user if there is updates to update all appimages
+            if input("Do you want to update to above appimages? (y/n): ").lower() == "y":
+                self.update_all_appimages(appimages_to_update)
+            else:
+                sys.exit()
+
+    @handle_common_errors
+    def update_all_appimages(self, appimages_to_update):
+        """Update all appimages"""
+        for appimage in appimages_to_update:
+            self.repo = appimage
+            self.load_credentials()
+            self.get_response()
+            self.download()
+            self.verify_sha()
+            self.make_executable()
+            self.handle_file_operations()
