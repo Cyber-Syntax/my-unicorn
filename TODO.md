@@ -12,7 +12,8 @@ Project Description
 
 ### Todo
 
-- [ ] Downgrade version  
+- [ ] Downgrade version 
+- [ ] All appimages up to date output for choice 4.
 
 ### In Progress
 

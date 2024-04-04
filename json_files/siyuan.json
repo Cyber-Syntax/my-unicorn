@@ -1,11 +1,11 @@
 {
-    "version": "2.12.8",
+    "version": "3.0.6",
     "owner": "siyuan-note",
     "repo": "siyuan",
-    "appimage": "siyuan-2.12.8.AppImage",
+    "appimage": "siyuan-3.0.6.AppImage",
     "sha": "SHA256SUMS.txt",
     "choice": 3,
     "hash_type": "sha256",
-    "appimage_folder_backup": "/home/developer/Documents/appimages/backup/",
-    "appimage_folder": "/home/developer/Documents/appimages/"
+    "appimage_folder_backup": "~/Documents/appimages/backup/",
+    "appimage_folder": "~/Documents/appimages/"
 }

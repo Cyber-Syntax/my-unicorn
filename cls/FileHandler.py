@@ -313,16 +313,22 @@ class FileHandler(AppImageDownloader):
                 print("-------------------------------------------------")
                 # append to queque appimages who is not up to date
                 appimages_to_update.append(appimages["repo"])
+        
+        # if all appimages up to date
+        if not appimages_to_update:
+            print("All appimages are up to date")
+            sys.exit()
+        else:
+             # Ask user to update all appimages
+            print("=================================================")
+            print("All appimages who is not up to date:")
+            print("=================================================")
+            for appimage in appimages_to_update:
+                print(appimage)
+            print("=================================================")
 
-        # Ask user to update all appimages
-        print("=================================================")
-        print("All appimages who is not up to date:")
-        print("=================================================")
-        for appimage in appimages_to_update:
-            print(appimage)
-        print("=================================================")
 
-        # if there is update
+         # if there is update
         if appimages_to_update:
             # Ask user if there is updates to update all appimages
             if input("Do you want to update to above appimages? (y/n): ").lower() == "y":
