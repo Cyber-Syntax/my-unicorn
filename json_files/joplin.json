@@ -1,11 +1,11 @@
 {
     "owner": "laurent22",
     "repo": "joplin",
-    "appimage": "joplin-2.14.17.AppImage",
-    "version": "2.14.17",
+    "appimage": "joplin-2.14.20.AppImage",
+    "version": "2.14.20",
     "sha": "latest-linux.yml",
     "hash_type": "sha512",
-    "choice": 3,
-    "appimage_folder_backup": "/home/developer/Documents/appimages/backup/",
-    "appimage_folder": "/home/developer/Documents/appimages/"
+    "choice": 4,
+    "appimage_folder_backup": "~/Documents/appimages/backup/",
+    "appimage_folder": "~/Documents/appimages/"
 }

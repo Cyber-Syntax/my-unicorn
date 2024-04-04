@@ -126,17 +126,6 @@ class AppImageDownloader:
         self.appimages["hash_type"] = self.hash_type
         self.appimages["choice"] = 3 if self.choice == 1 else 4
 
-        # Handle expansion of "~" in the path
-        if self.appimage_folder_backup.startswith("~"):
-            self.appimage_folder_backup = os.path.expanduser(self.appimage_folder_backup)
-        else:
-            self.appimage_folder_backup = self.appimage_folder_backup
-
-        if self.appimage_folder.startswith("~"):
-            self.appimage_folder = os.path.expanduser(self.appimage_folder)
-        else:
-            self.appimage_folder = self.appimage_folder
-
         # Handle the trailing slash
         if not self.appimage_folder_backup.endswith("/"):
             self.appimage_folder_backup += "/"
@@ -169,12 +158,12 @@ class AppImageDownloader:
             self.hash_type = self.appimages["hash_type"]
 
             if self.appimages["appimage_folder"].startswith("~"):
-                self.appimage_folder = os.path.expanduser(self.appimage_folder)
+                self.appimage_folder = os.path.expanduser(self.appimages["appimage_folder"])
             else:
                 self.appimage_folder = self.appimages["appimage_folder"]
 
             if self.appimages["appimage_folder_backup"].startswith("~"):
-                self.appimage_folder_backup = os.path.expanduser(self.appimage_folder_backup)
+                self.appimage_folder_backup = os.path.expanduser(self.appimages["appimage_folder_backup"])
             else:
                 self.appimage_folder_backup = self.appimages["appimage_folder_backup"]
 
