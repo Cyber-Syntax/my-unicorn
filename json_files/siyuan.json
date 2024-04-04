@@ -4,7 +4,7 @@
     "repo": "siyuan",
     "appimage": "siyuan-3.0.7.AppImage",
     "sha": "SHA256SUMS.txt",
-    "choice": 3,
+    "choice": 4,
     "hash_type": "sha256",
     "appimage_folder_backup": "~/Documents/appimages/backup/",
     "appimage_folder": "~/Documents/appimages/"
