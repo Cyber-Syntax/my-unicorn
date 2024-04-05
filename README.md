@@ -4,8 +4,9 @@
 - Make sure to **read the instructions on releases section** before updating the script because I am adding new features and changing the script. Therefore, the instructions may change so different from the previous version. But I will try to keep the instructions as simple as possible.
 
 ## 🙏 If this script helped you;
-- **Please consider giving stars ⭐, it will help me stay motivated for learn to code.**
-- 🤯 **It is it difficult for me to stay motivated while writing scripts and learning coding**
+- **Please consider giving stars ⭐, it will help me stay motivated to learn coding.**
+- 🤯 **It is difficult for me to stay motivated while writing scripts and learning coding.**
+
 
 ## ‎ 🦄 <samp>About my-unicorn<samp>
 - Script that downloads appimage github latest version via api. It also validates the file with:
