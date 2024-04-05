@@ -1,7 +1,7 @@
 # <samp>Attention<samp>
-- **Do not use without taking old version backup.** This script is in **beta** version. Therefore, you may encounter some errors.
-- **Script only works for Linux for now. Maybe work on MacOS but I didn't test it.**
-- Make sure to **read the instructions on releases section** before updating the script because I am adding new features and changing the script. Therefore, the instructions may change so different from the previous version. But I will try to keep the instructions as simple as possible.
+- **Do not utilize without making a backup of the previous version.** This script is in its **beta phase**. Hence, you may experience some glitches.
+- **This script works only on Linux for the moment. It may work on MacOS, however, I have not tested it.**
+-  Make sure to **follow the instructions in the releases section** before updating the script, as I am adding new features and making changes to the script. Therefore, the instructions may be different from the previous version. However, I will try to keep the instructions as simple as possible.
 
 ## 🙏 If this script helped you;
 - **Please consider giving stars ⭐, it will help me stay motivated to learn coding.**
@@ -9,18 +9,18 @@
 
 
 ## ‎ 🦄 <samp>About my-unicorn<samp>
-- Script that downloads appimage github latest version via api. It also validates the file with:
+-  Script that downloads AppImage from Github’s latest version through API. It also verifies the file using:
     - 🛠️ Tested;
         - [X] sha256
         - [X] sha512
-- <samp>Which apps work with this script?<samp>
+- <samp>Which applications work with this script?<samp>
     - 🛠️ Tested;
         - [X] super-productivity
         - [X] siyuan-note
         - [X] Joplin
 
 ## ‎ <samp>Dependencies<samp>
-- Install dependencies if you don't have them.
+-   Install necessary dependencies if you do not have them.
     - Install dependencies:
         - `pip3 install tqdm`
     - Dependencies:
@@ -28,7 +28,7 @@
         - [yaml](https://pypi.org/project/PyYAML/)
         - [tqdm](https://pypi.org/project/tqdm/)
 
-## ‎ <samp>What you need to know before using<samp>
+## ‎ <samp> What you need to be aware of before utilizing<samp>
 1. Github url (https://github.com/johannesjo/super-productivity)
 2. If not work for your appimage:
     - Github sha name e.g - latest-linux.yml here - (https://github.com/johannesjo/super-productivity/releases)
