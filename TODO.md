@@ -13,13 +13,13 @@ Project Description
 ### Todo
 
 - [ ] Downgrade version 
-- [ ] All appimages up to date output for choice 4.
 
 ### In Progress
 
 
 ### Done ✓
 
+- [x] All appimages up to date output for choice 4.
 - [x] Update all appimages that have json file  
 - [x] Check same names for sha files, if it exist ask user for overwriting  
 - [x] add dependencies requirements.txt  
