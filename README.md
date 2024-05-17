@@ -26,11 +26,13 @@
   3. Activate virtual environment
         - `source .venv/bin/activate`
   4. Install dependencies for pip.
-        - `pip3 install tqdm` 
-        - Dependencies:
-            - [requests](https://pypi.org/project/requests/)
-            - [yaml](https://pypi.org/project/PyYAML/)
-            - [tqdm](https://pypi.org/project/tqdm/)
+        - `pip install -r requirements.txt`
+        - if that isn't work, install manually:
+            - `pip3 install tqdm` 
+            - Dependencies:
+                - [requests](https://pypi.org/project/requests/)
+                - [yaml](https://pypi.org/project/PyYAML/)
+                - [tqdm](https://pypi.org/project/tqdm/)
 
 ## ‎ <samp> What you need to be aware of before utilizing<samp>
 1. Github url (https://github.com/johannesjo/super-productivity)
