@@ -27,7 +27,7 @@
         - `source .venv/bin/activate`
   4. Install dependencies for pip.
         - `pip install -r requirements.txt`
-        - if that isn't work, install manually:
+        - if this doesn't work, install manually:
             - `pip3 install tqdm` 
             - Dependencies:
                 - [requests](https://pypi.org/project/requests/)
