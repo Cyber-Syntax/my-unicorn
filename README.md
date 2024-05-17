@@ -23,15 +23,15 @@
 - If you want, create virtual environment:
   1. Go to location where you cloned.
   2. Create virtual env
-    - `python3 -m venv .venv`
+        - `python3 -m venv .venv`
   3. Activate virtual environment
-    - `source .venv/bin/activate`
+        - `source .venv/bin/activate`
   4. Install dependencies for pip.
-    - `pip3 install tqdm` 
-    - Dependencies:
-        - [requests](https://pypi.org/project/requests/)
-        - [yaml](https://pypi.org/project/PyYAML/)
-        - [tqdm](https://pypi.org/project/tqdm/)
+        - `pip3 install tqdm` 
+        - Dependencies:
+            - [requests](https://pypi.org/project/requests/)
+            - [yaml](https://pypi.org/project/PyYAML/)
+            - [tqdm](https://pypi.org/project/tqdm/)
 
 ## ‎ <samp> What you need to be aware of before utilizing<samp>
 1. Github url (https://github.com/johannesjo/super-productivity)
