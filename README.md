@@ -13,17 +13,24 @@
     - 🛠️ Tested;
         - [X] sha256
         - [X] sha512
-- <samp>Which applications work with this script?<samp>
+- <samp>Which applications work > [!WARNING]
+> ith this script?<samp>
     - 🛠️ Tested;
         - [X] super-productivity
         - [X] siyuan-note
         - [X] Joplin
 
 ## ‎ <samp>Dependencies<samp>
--   Install necessary dependencies if you do not have them.
-    - Install dependencies:
-        - `pip3 install tqdm`
-    - Dependencies:
+- If you want, create virtual environment:
+  1. Go to location where you cloned.
+  2. Create virtual env
+    - `python3 -m venv .venv`
+  3. Activate virtual environment
+    - `source .venv/bin/activate`
+  4. Install dependencies for pip.
+    - `pip3 install tqdm`
+  
+  - Dependencies:
         - [requests](https://pypi.org/project/requests/)
         - [yaml](https://pypi.org/project/PyYAML/)
         - [tqdm](https://pypi.org/project/tqdm/)
@@ -40,9 +47,11 @@
         - `git clone https://github.com/Cyber-Syntax/my-unicorn.git`
     2. Go that location (You can use `pwd` command to see your location. `cd` for change directory)
         - Example: `cd ~/Downloads/Cyber-Syntax/my-unicorn`
-    3. Start script
+    3. Activate virtual environment if you created:
+        - `source .venv/bin/activate `
+    4. Start script
         - `python3 main.py`
-    4. Follow the instructions:
+    5. Follow the instructions:
 ## ‎ <samp>How to install new appimage (This is need for json file create)<samp>
 - **You can skip this step:**
     - if you have already installed the appimage with this script or if you created json file manually.
