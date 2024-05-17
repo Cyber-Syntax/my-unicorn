@@ -13,8 +13,7 @@
     - 🛠️ Tested;
         - [X] sha256
         - [X] sha512
-- <samp>Which applications work > [!WARNING]
-> ith this script?<samp>
+- <samp>Which applications work with this script?<samp>
     - 🛠️ Tested;
         - [X] super-productivity
         - [X] siyuan-note
@@ -28,9 +27,8 @@
   3. Activate virtual environment
     - `source .venv/bin/activate`
   4. Install dependencies for pip.
-    - `pip3 install tqdm`
-  
-  - Dependencies:
+    - `pip3 install tqdm` 
+    - Dependencies:
         - [requests](https://pypi.org/project/requests/)
         - [yaml](https://pypi.org/project/PyYAML/)
         - [tqdm](https://pypi.org/project/tqdm/)
