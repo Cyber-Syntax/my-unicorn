@@ -114,9 +114,11 @@ class FileHandler(AppImageDownloader):
         # parse the sha file
         with open(self.sha_name, "r", encoding="utf-8") as file:
             sha = yaml.load(file, Loader=yaml.FullLoader)
+        
         # get the sha from the sha file
         sha = sha[self.hash_type]
         decoded_hash = base64.b64decode(sha).hex()
+        
         # find appimage sha
         with open(self.appimage_name, "rb") as file:
             appimage_sha = hashlib.new(self.hash_type, file.read()).hexdigest()
@@ -125,6 +127,10 @@ class FileHandler(AppImageDownloader):
         if appimage_sha == decoded_hash:
             print(f"\033[42m{self.appimage_name} verified.\033[0m")
             print("************************************")
+            print("--------------------- HASHES ----------------------")
+            print(f"AppImage Hash: {appimage_sha}")
+            print(f"Parsed Hash: {decoded_hash}")
+            print("----------------------------------------------------")
         else:
             self.handle_verification_error()
 
@@ -134,25 +140,28 @@ class FileHandler(AppImageDownloader):
     @sha_response_error
     def verify_other(self, response):
         """ Verify other sha files """
-
-        # parse the sha file
+        # Parse the sha file
         with open(self.sha_name, "r", encoding="utf-8") as file:
             for line in file:
                 if self.appimage_name in line:
-                    appimage_sha = line.split()[0]
+                    decoded_hash = line.split()[0]
                     break
-                else:
-                    print(f"{self.appimage_name} not found in {self.sha_name}")
+        
+        # Find appimage sha
+        with open(self.appimage_name, "rb") as file:
+            appimage_hash = hashlib.new(self.hash_type, file.read()).hexdigest()
 
-            # compare the two hashes
-            if appimage_sha == response.text.split()[0]:
-                print(f"\033[42m{self.appimage_name} verified.\033[0m")
-                print("************************************")
-            else:
-                self.handle_verification_error()
+        # Compare the two hashes
+        if appimage_hash == decoded_hash:
+            print(f"\033[42m{self.appimage_name} verified.\033[0m")
+            print("************************************")
+            print("--------------------- HASHES ----------------------")
+            print(f"AppImage Hash: {appimage_hash}")
+            print(f"Parsed Hash: {decoded_hash}")
+            print("----------------------------------------------------")
+        else:
+            self.handle_verification_error()
 
-        # close response
-        response.close()
 
     def verify_sha(self):
         """ Verify the downloaded appimage """
