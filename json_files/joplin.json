@@ -1,8 +1,8 @@
 {
     "owner": "laurent22",
     "repo": "joplin",
-    "appimage": "joplin-2.14.22.AppImage",
-    "version": "2.14.22",
+    "appimage": "joplin-3.0.15.AppImage",
+    "version": "3.0.15",
     "sha": "latest-linux.yml",
     "hash_type": "sha512",
     "choice": 4,
