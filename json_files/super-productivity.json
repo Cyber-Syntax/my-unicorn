@@ -1,6 +1,6 @@
 {
-    "version": "10.0.11",
-    "appimage": "super-productivity-10.0.11.AppImage",
+    "version": "11.0.3",
+    "appimage": "super-productivity-11.0.3.AppImage",
     "owner": "johannesjo",
     "repo": "super-productivity",
     "sha": "latest-linux.yml",
