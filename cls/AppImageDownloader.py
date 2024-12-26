@@ -101,13 +101,13 @@ class AppImageDownloader:
                 "(Default: '~/Documents/appimages/backup' if you leave it blank):"
             ).strip(" ")
 
-            # setup default backup folder
+            DEFAULT_APPIMAGE_FOLDER_BACKUP = "~/Documents/appimages/backup"
             if not self.appimage_folder_backup:
-                self.appimage_folder_backup = "~/Documents/appimages/backup"
+                self.appimage_folder_backup = DEFAULT_APPIMAGE_FOLDER_BACKUP
 
-            # setup default appimage folder
+            DEFAULT_APPIMAGE_FOLDER = "~/Documents/appimages"
             if not self.appimage_folder:
-                self.appimage_folder = "~/Documents/appimages"
+                self.appimage_folder = DEFAULT_APPIMAGE_FOLDER
 
             self.hash_type = input(
                 "Enter the hash type for your sha(sha256, sha512) file: "
