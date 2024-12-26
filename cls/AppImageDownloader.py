@@ -6,8 +6,10 @@ import requests
 from tqdm import tqdm
 from cls.decorators import handle_api_errors, handle_common_errors
 
+
 class AppImageDownloader:
     """This class downloads the appimage from the github release page"""
+
     # The path to the json files
     file_path = "json_files/"
 
@@ -42,7 +44,6 @@ class AppImageDownloader:
 
     @handle_common_errors
     def learn_owner_repo(self):
-        """Learn the owner and repo from the url"""
         while True:
             # Parse the owner and repo from the URL
             print("Parsing the owner and repo from the url...")
@@ -52,12 +53,11 @@ class AppImageDownloader:
             break
 
     def list_json_files(self):
-        """
-        List the json files in the current directory, if json file exists.
-        """
+        """List the json files in the current directory, if json file exists."""
         try:
-            json_files = [file for file in os.listdir(self.file_path)
-                         if file.endswith(".json")]
+            json_files = [
+                file for file in os.listdir(self.file_path) if file.endswith(".json")
+            ]
         except FileNotFoundError as error:
             logging.error(f"Error: {error}", exc_info=True)
             print(f"\033[41;30mError: {error}. Exiting...\033[0m")
@@ -68,7 +68,9 @@ class AppImageDownloader:
             for index, file in enumerate(json_files):
                 print(f"{index + 1}. {file}")
             try:
-                print("================================================================")
+                print(
+                    "================================================================"
+                )
                 choice = int(input("Enter your choice: "))
             except ValueError as error2:
                 logging.error(f"Error: {error2}", exc_info=True)
@@ -93,11 +95,11 @@ class AppImageDownloader:
             self.appimage_folder = input(
                 "Which directory to save appimage \n"
                 "(Default: '~/Documents/appimages' if you leave it blank):"
-                ).strip(" ")
+            ).strip(" ")
             self.appimage_folder_backup = input(
                 "Which directory to save old appimage \n"
                 "(Default: '~/Documents/appimages/backup' if you leave it blank):"
-                ).strip(" ")
+            ).strip(" ")
 
             # setup default backup folder
             if not self.appimage_folder_backup:
@@ -109,10 +111,15 @@ class AppImageDownloader:
 
             self.hash_type = input(
                 "Enter the hash type for your sha(sha256, sha512) file: "
-                ).strip(" ")
+            ).strip(" ")
             print("=================================================")
 
-            if self.url and self.appimage_folder and self.hash_type and self.appimage_folder_backup:
+            if (
+                self.url
+                and self.appimage_folder
+                and self.hash_type
+                and self.appimage_folder_backup
+            ):
                 break
 
     @handle_common_errors
@@ -147,7 +154,9 @@ class AppImageDownloader:
         """Load the credentials from a json file"""
         json_path = f"{self.file_path}{self.repo}.json"
         if os.path.exists(json_path):
-            with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
+            with open(
+                f"{self.file_path}{self.repo}.json", "r", encoding="utf-8"
+            ) as file:
                 self.appimages = json.load(file)
             self.owner = self.appimages["owner"]
             self.repo = self.appimages["repo"]
@@ -158,24 +167,34 @@ class AppImageDownloader:
             self.hash_type = self.appimages["hash_type"]
 
             if self.appimages["appimage_folder"].startswith("~"):
-                self.appimage_folder = os.path.expanduser(self.appimages["appimage_folder"])
+                self.appimage_folder = os.path.expanduser(
+                    self.appimages["appimage_folder"]
+                )
             else:
                 self.appimage_folder = self.appimages["appimage_folder"]
 
             if self.appimages["appimage_folder_backup"].startswith("~"):
-                self.appimage_folder_backup = os.path.expanduser(self.appimages["appimage_folder_backup"])
+                self.appimage_folder_backup = os.path.expanduser(
+                    self.appimages["appimage_folder_backup"]
+                )
             else:
                 self.appimage_folder_backup = self.appimages["appimage_folder_backup"]
 
         else:
-            print(f"{self.file_path}{self.repo}.json"
-                  "File not found while trying to load credentials or unknown error.")
+            print(
+                f"{self.file_path}{self.repo}.json"
+                "File not found while trying to load credentials or unknown error."
+            )
             self.ask_user()
 
     @handle_api_errors
     def get_response(self):
-        """ get the api response from the github api"""
-        self.api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
+        """get the api response from the github api"""
+        self.api_url = (
+            # TODO: specific tag, maybe feature enhancement
+            # https://api.github.com/repos/johannesjo/super-productivity/releases/tags/v10.0.11
+            f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
+        )
 
         # get the api response
         response = requests.get(self.api_url, timeout=10)
@@ -207,17 +226,38 @@ class AppImageDownloader:
                     print("-------------------------------------------------")
 
             # Define keywords for the assets
-            keywords = {"linux", "sum", "sha", "SHA", "SHA256", "SHA512", "SHA-256",
-                        "SHA-512", "checksum", "checksums", "CHECKSUM", "CHECKSUMS"}
-            valid_extensions = {".sha256", ".sha512", ".yml", ".yaml", ".txt", ".sum", ".sha"}
+            keywords = {
+                "linux",
+                "sum",
+                "sha",
+                "SHA",
+                "SHA256",
+                "SHA512",
+                "SHA-256",
+                "SHA-512",
+                "checksum",
+                "checksums",
+                "CHECKSUM",
+                "CHECKSUMS",
+            }
+            valid_extensions = {
+                ".sha256",
+                ".sha512",
+                ".yml",
+                ".yaml",
+                ".txt",
+                ".sum",
+                ".sha",
+            }
 
             # get the download url from the assets
             for asset in data["assets"]:
                 if asset["name"].endswith(".AppImage"):
                     self.appimage_name = asset["name"]
                     self.url = asset["browser_download_url"]
-                elif any(keyword in asset["name"] for keyword in keywords) and \
-                        asset["name"].endswith(tuple(valid_extensions)):
+                elif any(keyword in asset["name"] for keyword in keywords) and asset[
+                    "name"
+                ].endswith(tuple(valid_extensions)):
                     self.sha_name = asset["name"]
                     self.sha_url = asset["browser_download_url"]
                     if self.sha_name is None:
@@ -229,15 +269,18 @@ class AppImageDownloader:
 
     @handle_api_errors
     def download(self):
-        """ Download the appimage from the github api"""
+        """Download the appimage from the github api"""
         # Check if the appimage already exists
-        if os.path.exists(self.appimage_name) or os.path.exists(self.repo + ".AppImage"):
+        if os.path.exists(self.appimage_name) or os.path.exists(
+            self.repo + ".AppImage"
+        ):
             print(f"{self.appimage_name} already exists in the current directory")
             return
 
-        print(f"{self.repo} downloading..."
-        "Grab a cup of coffee :), "
-        "it will take some time depending on your internet speed."
+        print(
+            f"{self.repo} downloading..."
+            "Grab a cup of coffee :), "
+            "it will take some time depending on your internet speed."
         )
         # Request the appimage from the url
         response = requests.get(self.url, timeout=10, stream=True)

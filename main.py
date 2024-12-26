@@ -3,6 +3,7 @@ import sys
 import logging
 from cls.FileHandler import FileHandler
 
+
 def custom_excepthook(exc_type, exc_value, exc_traceback):
     """Custom excepthook to log uncaught exceptions"""
     # Log the exception
@@ -10,15 +11,16 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
     # Call the original excepthook to ensure Python's default error handling
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
+
 def main():
     """
-        ## How method works:
-        1. Call list_json_files() method to list all json files.
-        2. We selecting .json file (e.g joplin.json)
-        3. We loading credentials from joplin.json file via load_credentials() method.
-        4. We geting response from github api via get_response() method.
-        5. We downloading appimage via download() method.
-        6. Other stuff just file handling.
+    ## How method works:
+    1. Call list_json_files() method to list all json files.
+    2. We selecting .json file (e.g joplin.json)
+    3. We loading credentials from joplin.json file via load_credentials() method.
+    4. We geting response from github api via get_response() method.
+    5. We downloading appimage via download() method.
+    6. Other stuff just file handling.
     """
 
     # Set up the logging configuration
@@ -44,39 +46,40 @@ def main():
     """
 
     functions = {
-        1: ['ask_inputs',
-            'learn_owner_repo',
-            'get_response',
-            'download',
-            'save_credentials',
-            'verify_sha',
-            'make_executable',
-            'handle_file_operations',
-            ],
-
-        2: ['ask_inputs',
-            'learn_owner_repo',
-            'get_response',
-            'download',
-            'save_credentials',
-            'verify_sha',
-            'make_executable',
-            'handle_file_operations',
-            ],
-
-        3: ['get_response',
-            'download',
-            'verify_sha',
-            'make_executable',
-            'handle_file_operations',
-            ],
-
-        4: ['get_response',
-            'download',
-            'verify_sha',
-            'make_executable',
-            'handle_file_operations',
-            ]
+        1: [
+            "ask_inputs",
+            "learn_owner_repo",
+            "get_response",
+            "download",
+            "save_credentials",
+            "verify_sha",
+            "make_executable",
+            "handle_file_operations",
+        ],
+        2: [
+            "ask_inputs",
+            "learn_owner_repo",
+            "get_response",
+            "download",
+            "save_credentials",
+            "verify_sha",
+            "make_executable",
+            "handle_file_operations",
+        ],
+        3: [
+            "get_response",
+            "download",
+            "verify_sha",
+            "make_executable",
+            "handle_file_operations",
+        ],
+        4: [
+            "get_response",
+            "download",
+            "verify_sha",
+            "make_executable",
+            "handle_file_operations",
+        ],
     }
 
     print("Welcome to the my-unicorn 🦄!")
@@ -137,6 +140,7 @@ def main():
             logging.error(f"Error: {error}", exc_info=True)
             print(f"Error: {error}. Exiting...")
             sys.exit(1)
+
 
 if __name__ == "__main__":
     sys.excepthook = custom_excepthook
