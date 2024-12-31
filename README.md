@@ -22,11 +22,9 @@
 
 ## ‎ <samp>Dependencies<samp>
 
-- Dependencies:
-
-  - [requests](https://pypi.org/project/requests/)
-  - [yaml](https://pypi.org/project/PyYAML/)
-  - [tqdm](https://pypi.org/project/tqdm/)
+- [requests](https://pypi.org/project/requests/)
+- [yaml](https://pypi.org/project/PyYAML/)
+- [tqdm](https://pypi.org/project/tqdm/)
 
 - If you want, create virtual environment:
   1. Go to location where you cloned.
