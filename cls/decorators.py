@@ -53,7 +53,11 @@ def handle_api_errors(func):
         except requests.exceptions.ConnectionError as error:
             handle_error(func.__name__, error, "Connection error. Try again.")
         except requests.exceptions.RequestException as error:
-            handle_error(func.__name__, error, "Request error. Try again.")
+            handle_error(
+                func.__name__,
+                error,
+                "Request error. Check network connection and try again.",
+            )
         except requests.exceptions.HTTPError as error:
             handle_error(
                 func.__name__,

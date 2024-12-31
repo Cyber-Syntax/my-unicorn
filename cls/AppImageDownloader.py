@@ -28,20 +28,26 @@ class AppImageDownloader:
         self.choice: int = None
         self.appimages: dict = {}
 
+    # FIX: is try except needed or decorator handle it?
     @handle_common_errors
     def ask_user(self):
         """New appimage installation options"""
-        print("Choose one of the following options:")
-        print("====================================")
-        print("1. Download new appimage, save old appimage")
-        print("2. Download new appimage, don't save old appimage")
-        print("====================================")
-        self.choice = int(input("Enter your choice: "))
+        while True:
+            print("Choose one of the following options:")
+            print("====================================")
+            print("1. Download new appimage, save old appimage")
+            print("2. Download new appimage, don't save old appimage")
+            print("====================================")
+            try:
+                self.choice = int(input("Enter your choice: "))
 
-        if self.choice not in [1, 2]:
-            print("Invalid choice. Try again.")
-            self.ask_user()
+                if self.choice not in [1, 2]:
+                    print("Invalid choice. Try again.")
+                    self.ask_user()
+            except ValueError:
+                print("Invalid input. Please enter a valid number.")
 
+    # FIX: Is while true realy needed ?
     @handle_common_errors
     def learn_owner_repo(self):
         while True:
@@ -62,8 +68,9 @@ class AppImageDownloader:
             logging.error(f"Error: {error}", exc_info=True)
             print(f"\033[41;30mError: {error}. Exiting...\033[0m")
             self.ask_inputs()
+
         if len(json_files) > 1:
-            print("\nThere are more than one .json file, please choose one of them:")
+            print("\nAvailable json files:")
             print("================================================================")
             for index, file in enumerate(json_files):
                 print(f"{index + 1}. {file}")
@@ -284,6 +291,7 @@ class AppImageDownloader:
         )
         # Request the appimage from the url
         response = requests.get(self.url, timeout=10, stream=True)
+
         total_size_in_bytes = int(response.headers.get("content-length", 0))
 
         if response.status_code == 200:
