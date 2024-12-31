@@ -40,9 +40,10 @@
 ## ‎ <samp> What you need to be aware of before utilizing<samp>
 
 1. Github url (https://github.com/johannesjo/super-productivity)
-2. If not work for your appimage:
+2. Hash type (e.g - sha512 for super-productivity)
+3. If hash verification not work, add manually to json file:
    - Github sha name e.g - latest-linux.yml here - (https://github.com/johannesjo/super-productivity/releases)
-3. Hash type (e.g - sha512 for super-productivity)
+   - See json_files folder for example. All of the json files is work as expected.
 
 ## ‎ <samp>How to use<samp>
 
