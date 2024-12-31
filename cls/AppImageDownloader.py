@@ -101,11 +101,11 @@ class AppImageDownloader:
             self.url = input("Enter the app github url: ").strip(" ")
             self.appimage_folder = input(
                 "Which directory to save appimage \n"
-                "(Default: '~/Documents/appimages' if you leave it blank):"
+                "(Default: '~/Documents/appimages/' if you leave it blank):"
             ).strip(" ")
             self.appimage_folder_backup = input(
                 "Which directory to save old appimage \n"
-                "(Default: '~/Documents/appimages/backup' if you leave it blank):"
+                "(Default: '~/Documents/appimages/backup/' if you leave it blank):"
             ).strip(" ")
 
             DEFAULT_APPIMAGE_FOLDER_BACKUP = "~/Documents/appimages/backup"
@@ -138,14 +138,12 @@ class AppImageDownloader:
         self.appimages["version"] = self.version
         self.appimages["sha"] = self.sha_name
         self.appimages["hash_type"] = self.hash_type
+        # Backup or not choice. 3 is backup(self.choice == 1), 4 is overwrite(self.choice == 2)
         self.appimages["choice"] = 3 if self.choice == 1 else 4
 
-        # Handle the trailing slash
-        if not self.appimage_folder_backup.endswith("/"):
-            self.appimage_folder_backup += "/"
-
-        if not self.appimage_folder.endswith("/"):
-            self.appimage_folder += "/"
+        # Handling trailing slashes
+        self.appimage_folder_backup = os.path.join(self.appimage_folder_backup, "")
+        self.appimage_folder = os.path.join(self.appimage_folder, "")
 
         self.appimages["appimage_folder_backup"] = self.appimage_folder_backup
         self.appimages["appimage_folder"] = self.appimage_folder
