@@ -55,15 +55,12 @@ def handle_api_errors(func):
         except requests.exceptions.RequestException as error:
             handle_error(func.__name__, error, "Request error. Try again.")
         except requests.exceptions.HTTPError as error:
-            logging.error(
-                f"An error occurred in {func.__name__}: {str(error)}", exc_info=True
+            handle_error(
+                func.__name__,
+                error,
+                "HTTP error.Check network connection and try again.",
             )
-            print("+" + "-" * 50 + "+")
-            print("|" + " " * 50 + "|")
-            print("\033[41;30mHTTP error. Try again.\033[0m")
-            print("|" + " " * 50 + "|")
-            print("+" + "-" * 50 + "+")
-            return response
+
         except Exception as error:
             handle_error(func.__name__, error, "An unknown error occurred.")
 
