@@ -29,7 +29,7 @@ class AppImageDownloader:
     appimages: dict = field(default_factory=dict)
     file_path: str = "config_files/"
 
-    # FIX: is try except needed or decorator handle it?
+    # TODO: is try except needed or decorator handle it?
     @handle_common_errors
     def ask_user(self):
         """New appimage installation options"""
@@ -48,7 +48,7 @@ class AppImageDownloader:
             except ValueError:
                 print("Invalid input. Please enter a valid number.")
 
-    # FIX: Is while true realy needed ?
+    # TODO: Is while true realy needed ?
     @handle_common_errors
     def learn_owner_repo(self):
         while True:
@@ -96,7 +96,6 @@ class AppImageDownloader:
 
     @handle_common_errors
     def ask_inputs(self):
-        """Ask the user for the inputs"""
         while True:
             print("=================================================")
             self.url = input("Enter the app github url: ").strip(" ")
@@ -130,7 +129,7 @@ class AppImageDownloader:
 
     @handle_common_errors
     def save_credentials(self):
-        """Save the credentials to a file in json format"""
+        """Save the credentials to a file in json format from response"""
         self.appimages["owner"] = self.owner
         self.appimages["repo"] = self.repo
         self.appimages["appimage"] = self.appimage_name
@@ -325,7 +324,7 @@ class AppImageDownloader:
 
     @handle_common_errors
     def update_json(self):
-        """Update the json file with the new credentials"""
+        """Update the json file with the new credentials (e.g change json file)"""
         with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
             self.appimages = json.load(file)
 

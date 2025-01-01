@@ -4,9 +4,8 @@ import logging
 from src.file_handler import FileHandler
 
 
+# Custom excepthook to log uncaught exceptions
 def custom_excepthook(exc_type, exc_value, exc_traceback):
-    """Custom excepthook to log uncaught exceptions"""
-    # Log the exception
     logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
     # Call the original excepthook to ensure Python's default error handling
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
@@ -14,13 +13,15 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
 
 def main():
     """
-    ## How method works:
-    1. Call list_json_files() method to list all json files.
-    2. We selecting .json file (e.g joplin.json)
-    3. We loading credentials from joplin.json file via load_credentials() method.
-    4. We geting response from github api via get_response() method.
-    5. We downloading appimage via download() method.
-    6. Other stuff just file handling.
+    Main function workflow:
+    1. List all JSON files using list_json_files().
+    2. Select a JSON file (e.g., joplin.json).
+    3. Load credentials from the selected JSON file via load_credentials().
+    4. Get a response from the GitHub API using get_response().
+    5. Download the AppImage using download().
+    6. Use save_credentials function to save owner,repo,hash_type,choice...
+    7. Verify file integrity with hash file and appimage
+    8. Make executable, delete version from appimage_name and move directory
     """
 
     # Set up the logging configuration
@@ -37,12 +38,12 @@ def main():
 
     # A dictionary of functions to call based on the user's choice
     """
-    @param choice: The user's choice to update the appimage or download a new appimage
+    @param choice: The user's choice to update the AppImage or download a new AppImage
     @type choice: int
-    @param choice 1: Download new appimage and backup old appimage
-    @param choice 2: Download new appimage and overwrite old appimage
-    @param choice 3: Update json file and backup old appimage
-    @param choice 4: Update json file and overwrite old appimage
+    @param choice 1: Download new AppImage and backup old AppImage
+    @param choice 2: Download new AppImage and overwrite old AppImage
+    @param choice 3: Update JSON file and backup old appimage
+    @param choice 4: Update JSON file and overwrite old appimage
     """
 
     functions = {
@@ -87,7 +88,7 @@ def main():
     print("====================================")
     print("1. Update existing AppImage")
     print("2. Download new AppImage")
-    print("3. Update AppImage config(.json) file")
+    print("3. Update/Customize AppImage config(.json) file")
     print("4. Check updates for all AppImages and update all")
     print("5. Exit")
     print("====================================")
