@@ -187,8 +187,8 @@ class FileHandler(AppImageDownloader):
         else:
             self.verify_other(response=self.get_sha())
 
-    @handle_common_errors
-    def handle_file_operations(self):
+       @handle_common_errors
+    def handle_file_operations(self, batch_mode=False):
         """Handle the file operations with one user's approval"""
         # 1. backup old appimage
         print("--------------------- CHANGES  ----------------------")
@@ -201,19 +201,20 @@ class FileHandler(AppImageDownloader):
         print(f"Deleting {self.sha_name}")
         print("-----------------------------------------------------")
 
-        # 6. Ask user for approval
-        if input("Do you want to continue? (y/n): ").lower() == "y":
-            if self.choice == 1 or self.choice == 3:
-                self.backup_old_appimage()
+        # 6. Ask user for approval if not in batch mode
+        if not batch_mode:
+            if input("Do you want to continue? (y/n): ").lower() != "y":
+                print("Appimage installed but not moved to the appimage folder")
+                print(f"{self.appimage_name} saved in {os.getcwd()}")
+                return
 
-            self.change_name()
-            self.move_appimage()
-            self.update_version()
-            os.remove(self.sha_name)
-        else:
-            print("Appimage installed but not moved to the appimage folder")
-            print(f"{self.appimage_name} saved in {os.getcwd()}")
+        if self.choice == 1 or self.choice == 3:
+            self.backup_old_appimage()
 
+        self.change_name()
+        self.move_appimage()
+        self.update_version()
+        os.remove(self.sha_name)
     def make_executable(self):
         """Make the appimage executable"""
         # if already executable, return
@@ -380,13 +381,33 @@ class FileHandler(AppImageDownloader):
             self.update_selected_appimages(selected_appimages)
 
     @handle_common_errors
-    def update_selected_appimages(self, selected_appimages):
-        """Update selected appimages"""
-        for appimage in selected_appimages:
+    def update_selected_appimages(self, appimages_to_update):
+        """Update all appimages"""
+        if len(appimages_to_update) > 1:
+            if input("Do you want to enable batch mode? (y/n): ").lower() != "y":
+                batch_mode = False
+            else:
+                batch_mode = True
+        else:
+            batch_mode = False
+
+        if batch_mode:
+            print(
+                "Batch mode is enabled. All selected appimages will be updated without further prompts."
+            )
+        else:
+            print(
+                "Batch mode is disabled. You will be prompted for each appimage update."
+            )
+
+        for appimage in appimages_to_update:
+            print(f"Updating {appimage}...")
             self.repo = appimage
             self.load_credentials()
             self.get_response()
             self.download()
             self.verify_sha()
             self.make_executable()
-            self.handle_file_operations()
+            self.handle_file_operations(batch_mode=batch_mode)
+
+        print("Update process completed for all selected appimages.")
