@@ -1,0 +1,11 @@
+{
+    "version": "11.0.3",
+    "appimage": "super-productivity-11.0.3.AppImage",
+    "owner": "johannesjo",
+    "repo": "super-productivity",
+    "sha": "latest-linux.yml",
+    "hash_type": "sha512",
+    "choice": 4,
+    "appimage_folder_backup": "~/Documents/appimages/backup/",
+    "appimage_folder": "~/Documents/appimages/"
+}
