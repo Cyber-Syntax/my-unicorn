@@ -4,44 +4,51 @@ import sys
 import logging
 import requests
 from tqdm import tqdm
+from dataclasses import dataclass, field
 from cls.decorators import handle_api_errors, handle_common_errors
 
 
+@dataclass
 class AppImageDownloader:
     """This class downloads the appimage from the github release page"""
 
-    # The path to the json files
-    file_path = "json_files/"
+    owner: str = None
+    repo: str = None
+    api_url: str = None
+    sha_name: str = None
+    sha_url: str = None
+    appimage_name: str = None
+    version: str = None
+    appimage_folder: str = field(default_factory=lambda: "~/Documents/appimages")
+    appimage_folder_backup: str = field(
+        default_factory=lambda: "~/Documents/appimages/backup"
+    )
+    hash_type: str = None
+    url: str = None
+    choice: int = None
+    appimages: dict = field(default_factory=dict)
+    file_path: str = "json_files/"
 
-    def __init__(self):
-        self.owner: str = None
-        self.repo: str = None
-        self.api_url: str = None
-        self.sha_name: str = None
-        self.sha_url = None
-        self.appimage_name: str = None
-        self.version = None
-        self.appimage_folder: str = None
-        self.appimage_folder_backup: str = None
-        self.hash_type: str = None
-        self.url: str = None
-        self.choice: int = None
-        self.appimages: dict = {}
-
+    # FIX: is try except needed or decorator handle it?
     @handle_common_errors
     def ask_user(self):
         """New appimage installation options"""
-        print("Choose one of the following options:")
-        print("====================================")
-        print("1. Download new appimage, save old appimage")
-        print("2. Download new appimage, don't save old appimage")
-        print("====================================")
-        self.choice = int(input("Enter your choice: "))
+        while True:
+            print("Choose one of the following options:")
+            print("====================================")
+            print("1. Download new appimage, save old appimage")
+            print("2. Download new appimage, don't save old appimage")
+            print("====================================")
+            try:
+                self.choice = int(input("Enter your choice: "))
 
-        if self.choice not in [1, 2]:
-            print("Invalid choice. Try again.")
-            self.ask_user()
+                if self.choice not in [1, 2]:
+                    print("Invalid choice. Try again.")
+                    self.ask_user()
+            except ValueError:
+                print("Invalid input. Please enter a valid number.")
 
+    # FIX: Is while true realy needed ?
     @handle_common_errors
     def learn_owner_repo(self):
         while True:
@@ -62,8 +69,9 @@ class AppImageDownloader:
             logging.error(f"Error: {error}", exc_info=True)
             print(f"\033[41;30mError: {error}. Exiting...\033[0m")
             self.ask_inputs()
+
         if len(json_files) > 1:
-            print("\nThere are more than one .json file, please choose one of them:")
+            print("\nAvailable json files:")
             print("================================================================")
             for index, file in enumerate(json_files):
                 print(f"{index + 1}. {file}")
@@ -92,22 +100,20 @@ class AppImageDownloader:
         while True:
             print("=================================================")
             self.url = input("Enter the app github url: ").strip(" ")
-            self.appimage_folder = input(
-                "Which directory to save appimage \n"
-                "(Default: '~/Documents/appimages' if you leave it blank):"
-            ).strip(" ")
-            self.appimage_folder_backup = input(
-                "Which directory to save old appimage \n"
-                "(Default: '~/Documents/appimages/backup' if you leave it blank):"
-            ).strip(" ")
-
-            # setup default backup folder
-            if not self.appimage_folder_backup:
-                self.appimage_folder_backup = "~/Documents/appimages/backup"
-
-            # setup default appimage folder
-            if not self.appimage_folder:
-                self.appimage_folder = "~/Documents/appimages"
+            self.appimage_folder = (
+                input(
+                    "Which directory to save appimage \n"
+                    "(Default: '~/Documents/appimages/' if you leave it blank):"
+                ).strip(" ")
+                or self.appimage_folder
+            )
+            self.appimage_folder_backup = (
+                input(
+                    "Which directory to save old appimage \n"
+                    "(Default: '~/Documents/appimages/backup/' if you leave it blank):"
+                ).strip(" ")
+                or self.appimage_folder_backup
+            )
 
             self.hash_type = input(
                 "Enter the hash type for your sha(sha256, sha512) file: "
@@ -131,14 +137,12 @@ class AppImageDownloader:
         self.appimages["version"] = self.version
         self.appimages["sha"] = self.sha_name
         self.appimages["hash_type"] = self.hash_type
+        # Backup or not choice. 3 is backup(self.choice == 1), 4 is overwrite(self.choice == 2)
         self.appimages["choice"] = 3 if self.choice == 1 else 4
 
-        # Handle the trailing slash
-        if not self.appimage_folder_backup.endswith("/"):
-            self.appimage_folder_backup += "/"
-
-        if not self.appimage_folder.endswith("/"):
-            self.appimage_folder += "/"
+        # Handling trailing slashes
+        self.appimage_folder_backup = os.path.join(self.appimage_folder_backup, "")
+        self.appimage_folder = os.path.join(self.appimage_folder, "")
 
         self.appimages["appimage_folder_backup"] = self.appimage_folder_backup
         self.appimages["appimage_folder"] = self.appimage_folder
@@ -284,6 +288,7 @@ class AppImageDownloader:
         )
         # Request the appimage from the url
         response = requests.get(self.url, timeout=10, stream=True)
+
         total_size_in_bytes = int(response.headers.get("content-length", 0))
 
         if response.status_code == 200:
@@ -344,24 +349,12 @@ class AppImageDownloader:
             new_folder = input("Enter new appimage folder: ")
             if not new_folder.endswith("/"):
                 new_folder += "/"
-            if not new_folder.startswith("/"):
-                new_folder = "/" + new_folder
-            if new_folder.startswith("~"):
-                new_folder = os.path.expanduser(new_folder)
-            else:
-                new_folder = os.path.expanduser("~") + new_folder
 
             self.appimages["appimage_folder"] = new_folder
         elif choice == 5:
             new_folder = input("Enter new appimage folder backup: ")
             if not new_folder.endswith("/"):
                 new_folder += "/"
-            if not new_folder.startswith("/"):
-                new_folder = "/" + new_folder
-            if new_folder.startswith("~"):
-                new_folder = os.path.expanduser(new_folder)
-            else:
-                new_folder = os.path.expanduser("~") + new_folder
 
             self.appimages["appimage_folder_backup"] = new_folder
         elif choice == 6:

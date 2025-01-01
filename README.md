@@ -10,61 +10,63 @@
 
 ## ‎ 🦄 <samp>About my-unicorn<samp>
 
-- Script that downloads AppImage from Github’s latest version through API. It also verifies the file using: 
-  - 🛠️ Tested; 
+- Script that downloads AppImage from Github’s latest version through API. It also verifies the file using:
+  - 🛠️ Tested;
     - [x] sha256
     - [x] sha512
-- <samp>Which applications work with this script?<samp> 
-  - 🛠️ Tested; 
+- <samp>Which applications work with this script?<samp>
+  - 🛠️ Tested;
     - [x] super-productivity
     - [x] siyuan-note
     - [x] Joplin
 
 ## ‎ <samp>Dependencies<samp>
 
-- If you want, create virtual environment: 
+- [requests](https://pypi.org/project/requests/)
+- [yaml](https://pypi.org/project/PyYAML/)
+- [tqdm](https://pypi.org/project/tqdm/)
+
+- If you want, create virtual environment:
   1. Go to location where you cloned.
-  2. Create virtual env 
+  2. Create virtual env
      - `python3 -m venv .venv`
-  3. Activate virtual environment 
+  3. Activate virtual environment
      - `source .venv/bin/activate`
-  4. Install dependencies for pip. 
+  4. Install dependencies for pip.
      - `pip install -r requirements.txt`
-     - if this doesn't work, install manually: 
+     - if this doesn't work, install manually:
        - `pip3 install tqdm`
-       - Dependencies: 
-         - [requests](https://pypi.org/project/requests/)
-         - [yaml](https://pypi.org/project/PyYAML/)
-         - [tqdm](https://pypi.org/project/tqdm/)
 
 ## ‎ <samp> What you need to be aware of before utilizing<samp>
 
 1. Github url (https://github.com/johannesjo/super-productivity)
-2. If not work for your appimage:
+2. Hash type (e.g - sha512 for super-productivity)
+3. If hash verification not work, add manually to json file:
    - Github sha name e.g - latest-linux.yml here - (https://github.com/johannesjo/super-productivity/releases)
-3. Hash type (e.g - sha512 for super-productivity)
+   - See json_files folder for example. All of the json files is work as expected.
 
 ## ‎ <samp>How to use<samp>
 
-- Example: 
-  1. Open terminal and clone this repo (make sure you have git installed) 
+- Example:
+  1. Open terminal and clone this repo (make sure you have git installed)
      - `git clone https://github.com/Cyber-Syntax/my-unicorn.git`
-  2. Go that location (You can use `pwd` command to see your location. `cd` for change directory) 
+  2. Go that location (You can use `pwd` command to see your location. `cd` for change directory)
      - Example: `cd ~/Downloads/Cyber-Syntax/my-unicorn`
-  3. Activate virtual environment if you created: 
+  3. Activate virtual environment(Howto: dependencies section above):
      - `source .venv/bin/activate `
-  4. Start script 
+  4. Start script
      - `python3 main.py`
   5. Follow the instructions:
 
 ## ‎ <samp>How to install new appimage (This is need for json file create)<samp>
 
-- **You can skip this step:** 
+- **You can skip this step:**
+
   - if you have already installed the appimage with this script or if you created json file manually.
 
     ```
       ╰─❯ python3 main.py
-    
+
       Welcome to the my-unicorn 🦄!
       Choose one of the following options:
       ====================================
@@ -76,7 +78,7 @@
       Enter your choice: 2
       Downloading new appimage
       Choose one of the following options:
-    
+
       ====================================
       1. Backup old appimage and download new appimage
       2. Download new appimage and overwrite old appimage
@@ -121,3 +123,4 @@ Enter your choice: 3
 ## ‎ <samp>LICENSE<samp>
 
 - This script is licensed under the [GPL 3.0 License]. You can find a copy of the license in the [LICENSE](https://github.com/Cyber-Syntax/my-unicorn/blob/main/LICENSE) file or at [www.gnu.org](https://www.gnu.org/licenses/gpl-3.0.en.html)
+
