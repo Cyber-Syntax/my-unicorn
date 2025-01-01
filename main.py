@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import sys
 import logging
-from cls.FileHandler import FileHandler
+from src.file_handler import FileHandler
 
 
 def custom_excepthook(exc_type, exc_value, exc_traceback):
