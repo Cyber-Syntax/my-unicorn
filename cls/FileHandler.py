@@ -131,7 +131,7 @@ class FileHandler(AppImageDownloader):
         """Verify yml/yaml sha files"""
         # parse the sha file
         with open(self.sha_name, "r", encoding="utf-8") as file:
-            sha = yaml.load(file, Loader=yaml.FullLoader)
+            sha = yaml.safe_load(file)
 
         # get the sha from the sha file
         sha = sha[self.hash_type]
