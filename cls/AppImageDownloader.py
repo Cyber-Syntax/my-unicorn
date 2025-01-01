@@ -4,29 +4,30 @@ import sys
 import logging
 import requests
 from tqdm import tqdm
+from dataclasses import dataclass, field
 from cls.decorators import handle_api_errors, handle_common_errors
 
 
+@dataclass
 class AppImageDownloader:
     """This class downloads the appimage from the github release page"""
 
-    # The path to the json files
-    file_path = "json_files/"
-
-    def __init__(self):
-        self.owner: str = None
-        self.repo: str = None
-        self.api_url: str = None
-        self.sha_name: str = None
-        self.sha_url = None
-        self.appimage_name: str = None
-        self.version = None
-        self.appimage_folder: str = None
-        self.appimage_folder_backup: str = None
-        self.hash_type: str = None
-        self.url: str = None
-        self.choice: int = None
-        self.appimages: dict = {}
+    owner: str = None
+    repo: str = None
+    api_url: str = None
+    sha_name: str = None
+    sha_url: str = None
+    appimage_name: str = None
+    version: str = None
+    appimage_folder: str = field(default_factory=lambda: "~/Documents/appimages")
+    appimage_folder_backup: str = field(
+        default_factory=lambda: "~/Documents/appimages/backup"
+    )
+    hash_type: str = None
+    url: str = None
+    choice: int = None
+    appimages: dict = field(default_factory=dict)
+    file_path: str = "json_files/"
 
     # FIX: is try except needed or decorator handle it?
     @handle_common_errors
@@ -99,22 +100,20 @@ class AppImageDownloader:
         while True:
             print("=================================================")
             self.url = input("Enter the app github url: ").strip(" ")
-            self.appimage_folder = input(
-                "Which directory to save appimage \n"
-                "(Default: '~/Documents/appimages/' if you leave it blank):"
-            ).strip(" ")
-            self.appimage_folder_backup = input(
-                "Which directory to save old appimage \n"
-                "(Default: '~/Documents/appimages/backup/' if you leave it blank):"
-            ).strip(" ")
-
-            DEFAULT_APPIMAGE_FOLDER_BACKUP = "~/Documents/appimages/backup"
-            if not self.appimage_folder_backup:
-                self.appimage_folder_backup = DEFAULT_APPIMAGE_FOLDER_BACKUP
-
-            DEFAULT_APPIMAGE_FOLDER = "~/Documents/appimages"
-            if not self.appimage_folder:
-                self.appimage_folder = DEFAULT_APPIMAGE_FOLDER
+            self.appimage_folder = (
+                input(
+                    "Which directory to save appimage \n"
+                    "(Default: '~/Documents/appimages/' if you leave it blank):"
+                ).strip(" ")
+                or self.appimage_folder
+            )
+            self.appimage_folder_backup = (
+                input(
+                    "Which directory to save old appimage \n"
+                    "(Default: '~/Documents/appimages/backup/' if you leave it blank):"
+                ).strip(" ")
+                or self.appimage_folder_backup
+            )
 
             self.hash_type = input(
                 "Enter the hash type for your sha(sha256, sha512) file: "
