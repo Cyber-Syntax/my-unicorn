@@ -187,7 +187,7 @@ class FileHandler(AppImageDownloader):
         else:
             self.verify_other(response=self.get_sha())
 
-       @handle_common_errors
+    @handle_common_errors
     def handle_file_operations(self, batch_mode=False):
         """Handle the file operations with one user's approval"""
         # 1. backup old appimage
@@ -215,6 +215,7 @@ class FileHandler(AppImageDownloader):
         self.move_appimage()
         self.update_version()
         os.remove(self.sha_name)
+
     def make_executable(self):
         """Make the appimage executable"""
         # if already executable, return
