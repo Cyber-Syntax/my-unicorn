@@ -385,7 +385,12 @@ class FileHandler(AppImageDownloader):
     def update_selected_appimages(self, appimages_to_update):
         """Update all appimages"""
         if len(appimages_to_update) > 1:
-            if input("Do you want to enable batch mode? (y/n): ").lower() != "y":
+            if (
+                input(
+                    "Enable batch mode to continue without asking for approval? (y/n): "
+                ).lower()
+                != "y"
+            ):
                 batch_mode = False
             else:
                 batch_mode = True
