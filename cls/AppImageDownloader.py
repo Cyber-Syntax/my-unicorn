@@ -349,24 +349,12 @@ class AppImageDownloader:
             new_folder = input("Enter new appimage folder: ")
             if not new_folder.endswith("/"):
                 new_folder += "/"
-            if not new_folder.startswith("/"):
-                new_folder = "/" + new_folder
-            if new_folder.startswith("~"):
-                new_folder = os.path.expanduser(new_folder)
-            else:
-                new_folder = os.path.expanduser("~") + new_folder
 
             self.appimages["appimage_folder"] = new_folder
         elif choice == 5:
             new_folder = input("Enter new appimage folder backup: ")
             if not new_folder.endswith("/"):
                 new_folder += "/"
-            if not new_folder.startswith("/"):
-                new_folder = "/" + new_folder
-            if new_folder.startswith("~"):
-                new_folder = os.path.expanduser(new_folder)
-            else:
-                new_folder = os.path.expanduser("~") + new_folder
 
             self.appimages["appimage_folder_backup"] = new_folder
         elif choice == 6:
