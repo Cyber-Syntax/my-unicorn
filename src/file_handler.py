@@ -20,9 +20,6 @@ class FileHandler(AppImageDownloader):
     sha_name: str = None
     sha_url: str = None
 
-    def __post_init__(self):
-        super().__init__()
-
     @staticmethod
     def sha_response_error(func):
         """Handle response errors"""
