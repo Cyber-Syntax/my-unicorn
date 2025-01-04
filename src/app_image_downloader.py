@@ -27,7 +27,12 @@ class AppImageDownloader:
     url: str = None
     choice: int = None
     appimages: dict = field(default_factory=dict)
-    file_path: str = "config_files/"
+    file_path: str = field(init=False)
+
+    def __post_init__(self):
+        self.appimage_folder = os.path.expanduser(self.appimage_folder)
+        self.file_path = os.path.join(self.appimage_folder, "config_files/")
+        os.makedirs(self.file_path, exist_ok=True)
 
     # TODO: is try except needed or decorator handle it?
     @handle_common_errors
