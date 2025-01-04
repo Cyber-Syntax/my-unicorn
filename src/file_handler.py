@@ -320,6 +320,14 @@ class FileHandler(AppImageDownloader):
             file for file in os.listdir(self.file_path) if file.endswith(".json")
         ]
 
+        # Output the list of JSON files found
+        if json_files:
+            print("Found the following config files in the" f"\n[{self.file_path}]:")
+            for json_file in json_files:
+                print(f"- {json_file}")
+        else:
+            print("No JSON files found in the directory.")
+
         # Create a queue for not up-to-date appimages
         appimages_to_update = []
 
