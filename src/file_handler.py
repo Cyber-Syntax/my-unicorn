@@ -9,8 +9,8 @@ import shutil
 from dataclasses import dataclass
 import requests
 import yaml
-from cls.decorators import handle_api_errors, handle_common_errors
-from cls.AppImageDownloader import AppImageDownloader
+from src.decorators import handle_api_errors, handle_common_errors
+from src.app_image_downloader import AppImageDownloader
 
 
 @dataclass
@@ -19,9 +19,6 @@ class FileHandler(AppImageDownloader):
 
     sha_name: str = None
     sha_url: str = None
-
-    def __post_init__(self):
-        super().__init__()
 
     @staticmethod
     def sha_response_error(func):
@@ -188,35 +185,33 @@ class FileHandler(AppImageDownloader):
             self.verify_other(response=self.get_sha())
 
     @handle_common_errors
-    def handle_file_operations(self):
+    def handle_file_operations(self, batch_mode=False):
         """Handle the file operations with one user's approval"""
         # 1. backup old appimage
         print("--------------------- CHANGES  ----------------------")
         if self.choice == 1 or self.choice == 3:
             print(f"Moving old {self.repo}.AppImage to {self.appimage_folder_backup}")
 
-        # 2. Changing appimage name to {self.repo}.AppImage
         print(f"Changing {self.appimage_name} name to {self.repo}.AppImage")
-        # 3. moving appimage to appimage folder
         print(f"Moving updated appimage to {self.appimage_folder}")
-        # 4. update the version, appimage_name in the json file
         print(f"Updating credentials in {self.repo}.json")
-        # 5. Delete the downloaded sha file if verification is successful
         print(f"Deleting {self.sha_name}")
         print("-----------------------------------------------------")
 
-        # 6. Ask user for approval
-        if input("Do you want to continue? (y/n): ").lower() == "y":
-            if self.choice == 1 or self.choice == 3:
-                self.backup_old_appimage()
+        # 6. Ask user for approval if not in batch mode
+        if not batch_mode:
+            if input("Do you want to continue? (y/n): ").lower() != "y":
+                print("Appimage installed but not moved to the appimage folder")
+                print(f"{self.appimage_name} saved in {os.getcwd()}")
+                return
 
-            self.change_name()
-            self.move_appimage()
-            self.update_version()
-            os.remove(self.sha_name)
-        else:
-            print("Appimage installed but not moved to the appimage folder")
-            print(f"{self.appimage_name} saved in {os.getcwd()}")
+        if self.choice == 1 or self.choice == 3:
+            self.backup_old_appimage()
+
+        self.change_name()
+        self.move_appimage()
+        self.update_version()
+        os.remove(self.sha_name)
 
     def make_executable(self):
         """Make the appimage executable"""
@@ -320,23 +315,22 @@ class FileHandler(AppImageDownloader):
     # KeyError: 'tag_name' means that API RATE LIMIT EXCEEDED.
     @handle_common_errors
     def check_updates_json_all(self):
-        """Check for updates for all json files"""
+        """Check for updates for all JSON files"""
         json_files = [
             file for file in os.listdir(self.file_path) if file.endswith(".json")
         ]
 
-        # Create a queque for not up to date appimages
+        # Create a queue for not up-to-date appimages
         appimages_to_update = []
 
-        # Print appimages name and versions from json files
+        # Print appimages name and versions from JSON files
         for file in json_files:
             with open(f"{self.file_path}{file}", "r", encoding="utf-8") as file:
                 appimages = json.load(file)
 
-            # Check version via github api
+            # Check version via GitHub API
             response = requests.get(
-                f"https://api.github.com/repos/{appimages['owner']}/"
-                f"{appimages['repo']}/releases/latest"
+                f"https://api.github.com/repos/{appimages['owner']}/{appimages['repo']}/releases/latest"
             )
             latest_version = response.json()["tag_name"].replace("v", "")
 
@@ -349,41 +343,74 @@ class FileHandler(AppImageDownloader):
                 print(f"\033[42mLatest version: {latest_version}\033[0m")
                 print(f"Current version: {appimages['version']}")
                 print("-------------------------------------------------")
-                # append to queque appimages who is not up to date
+                # Append to queue appimages that are not up to date
                 appimages_to_update.append(appimages["repo"])
 
-        # if all appimages up to date
+        # If all appimages are up to date
         if not appimages_to_update:
             print("All appimages are up to date")
             sys.exit()
         else:
-            # Ask user to update all appimages
+            # Display the list of appimages to update
             print("=================================================")
-            print("All appimages who is not up to date:")
-            print("=================================================")
-            for appimage in appimages_to_update:
-                print(appimage)
+            print("Appimages that are not up to date:")
+            for idx, appimage in enumerate(appimages_to_update, start=1):
+                print(f"{idx}. {appimage}")
             print("=================================================")
 
-        # if there is update
-        if appimages_to_update:
-            # Ask user if there is updates to update all appimages
-            if (
-                input("Do you want to update to above appimages? (y/n): ").lower()
-                == "y"
-            ):
-                self.update_all_appimages(appimages_to_update)
-            else:
+            # Ask the user to select which appimages to update or skip
+            user_input = (
+                input(
+                    "Enter the numbers of the appimages you want to update (comma-separated) or type 'skip' to skip updates: "
+                )
+                .strip()
+                .lower()
+            )
+
+            if user_input == "skip":
+                print("No updates will be performed.")
                 sys.exit()
 
+            selected_indices = [int(idx.strip()) - 1 for idx in user_input.split(",")]
+
+            selected_appimages = [appimages_to_update[idx] for idx in selected_indices]
+
+            # Update the selected appimages
+            self.update_selected_appimages(selected_appimages)
+
     @handle_common_errors
-    def update_all_appimages(self, appimages_to_update):
+    def update_selected_appimages(self, appimages_to_update):
         """Update all appimages"""
+        if len(appimages_to_update) > 1:
+            if (
+                input(
+                    "Enable batch mode to continue without asking for approval? (y/n): "
+                ).lower()
+                != "y"
+            ):
+                batch_mode = False
+            else:
+                batch_mode = True
+        else:
+            batch_mode = False
+
+        if batch_mode:
+            print(
+                "Batch mode is enabled. All selected appimages will be updated without further prompts."
+            )
+        else:
+            print(
+                "Batch mode is disabled. You will be prompted for each appimage update."
+            )
+
         for appimage in appimages_to_update:
+            print(f"Updating {appimage}...")
             self.repo = appimage
             self.load_credentials()
             self.get_response()
             self.download()
             self.verify_sha()
             self.make_executable()
-            self.handle_file_operations()
+            self.handle_file_operations(batch_mode=batch_mode)
+
+        print("Update process completed for all selected appimages.")

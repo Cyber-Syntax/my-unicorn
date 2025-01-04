@@ -5,7 +5,7 @@ import logging
 import requests
 from tqdm import tqdm
 from dataclasses import dataclass, field
-from cls.decorators import handle_api_errors, handle_common_errors
+from src.decorators import handle_api_errors, handle_common_errors
 
 
 @dataclass
@@ -27,9 +27,9 @@ class AppImageDownloader:
     url: str = None
     choice: int = None
     appimages: dict = field(default_factory=dict)
-    file_path: str = "json_files/"
+    file_path: str = "config_files/"
 
-    # FIX: is try except needed or decorator handle it?
+    # TODO: is try except needed or decorator handle it?
     @handle_common_errors
     def ask_user(self):
         """New appimage installation options"""
@@ -48,7 +48,7 @@ class AppImageDownloader:
             except ValueError:
                 print("Invalid input. Please enter a valid number.")
 
-    # FIX: Is while true realy needed ?
+    # TODO: Is while true realy needed ?
     @handle_common_errors
     def learn_owner_repo(self):
         while True:
@@ -96,7 +96,6 @@ class AppImageDownloader:
 
     @handle_common_errors
     def ask_inputs(self):
-        """Ask the user for the inputs"""
         while True:
             print("=================================================")
             self.url = input("Enter the app github url: ").strip(" ")
@@ -130,7 +129,7 @@ class AppImageDownloader:
 
     @handle_common_errors
     def save_credentials(self):
-        """Save the credentials to a file in json format"""
+        """Save the credentials to a file in json format from response"""
         self.appimages["owner"] = self.owner
         self.appimages["repo"] = self.repo
         self.appimages["appimage"] = self.appimage_name
@@ -147,10 +146,10 @@ class AppImageDownloader:
         self.appimages["appimage_folder_backup"] = self.appimage_folder_backup
         self.appimages["appimage_folder"] = self.appimage_folder
 
-        # save the credentials to a json_files folder
+        # save the credentials to a config_files folder
         with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
             json.dump(self.appimages, file, indent=4)
-        print(f"Saved credentials to json_files/{self.repo}.json file")
+        print(f"Saved credentials to config_files/{self.repo}.json file")
         self.load_credentials()
 
     @handle_common_errors
@@ -325,7 +324,7 @@ class AppImageDownloader:
 
     @handle_common_errors
     def update_json(self):
-        """Update the json file with the new credentials"""
+        """Update the json file with the new credentials (e.g change json file)"""
         with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
             self.appimages = json.load(file)
 

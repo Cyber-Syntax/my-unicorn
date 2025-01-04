@@ -14,7 +14,6 @@ def handle_error(func_name, error, exit_message):
 
 
 def handle_common_errors(func):
-    """Handle common errors."""
 
     def wrapper(*args, **kwargs):
         try:
@@ -38,7 +37,6 @@ def handle_common_errors(func):
 
 
 def handle_api_errors(func):
-    """Handle the API-related errors."""
 
     def wrapper(*args, **kwargs):
         try:
