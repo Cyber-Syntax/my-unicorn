@@ -30,13 +30,8 @@ class AppImageDownloader:
     file_path: str = field(init=False)
 
     def __post_init__(self):
-        # Expand ~ to the user's home directory for appimage_folder
         self.appimage_folder = os.path.expanduser(self.appimage_folder)
-
-        # Assign file_path as appimage_folder + 'config_files/'
         self.file_path = os.path.join(self.appimage_folder, "config_files/")
-
-        # Ensure the config_files directory exists
         os.makedirs(self.file_path, exist_ok=True)
 
     # TODO: is try except needed or decorator handle it?
