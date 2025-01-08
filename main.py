@@ -22,13 +22,13 @@ def configure_logging():
     )
 
 
-def select_language(file_handler):
+def select_language(self):
     """Display language options and set the selected language"""
     global _
     languages = {1: "en", 2: "tr"}
-    current_locale = file_handler.get_locale_config()
+    current_locale = self.get_locale_config()
     if current_locale:
-        translations = Translations.load("locales", [current_locale])
+        translations = Translations.load(self.file_path, [current_locale])
         translations.install()
         _ = translations.gettext
         return
@@ -41,8 +41,8 @@ def select_language(file_handler):
         choice = int(input("Enter your choice: "))
         if choice in languages:
             language = languages[choice]
-            file_handler.save_locale_config(language)
-            translations = Translations.load("locales", [language])
+            self.save_locale_config(language)
+            translations = Translations.load(self.file_path, [language])
             translations.install()
             _ = translations.gettext
         else:
@@ -120,7 +120,6 @@ def main():
     """
     configure_logging()
     file_handler = FileHandler()
-    select_language(file_handler)
     choice = get_user_choice()
 
     functions = {
