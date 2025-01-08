@@ -1,6 +1,11 @@
 import sys
 import logging
 import requests
+from babel.support import Translations
+import gettext
+
+# Assuming that translations are already set up correctly in main.py
+_ = gettext.gettext
 
 # Set up logging
 logging.basicConfig(level=logging.ERROR)
@@ -20,18 +25,18 @@ def handle_common_errors(func):
             return func(*args, **kwargs)
         except ValueError as error:
             handle_error(
-                func.__name__, error, "Invalid input or value error. Try again."
+                func.__name__, error, _("Invalid input or value error. Try again.")
             )
         except KeyboardInterrupt as error:
-            handle_error(func.__name__, error, "Keyboard interrupt. Exiting...")
+            handle_error(func.__name__, error, _("Keyboard interrupt. Exiting..."))
         except EOFError as error:
-            handle_error(func.__name__, error, "EOF error. Input cannot be empty.")
+            handle_error(func.__name__, error, _("EOF error. Input cannot be empty."))
         except KeyError as error:
-            handle_error(func.__name__, error, "Key error. The key doesn't exist.")
+            handle_error(func.__name__, error, _("Key error. The key doesn't exist."))
         except FileNotFoundError as error:
-            handle_error(func.__name__, error, "File not found error.")
+            handle_error(func.__name__, error, _("File not found error."))
         except Exception as error:
-            handle_error(func.__name__, error, "An unknown error occurred.")
+            handle_error(func.__name__, error, _("An unknown error occurred."))
 
     return wrapper
 
@@ -43,27 +48,27 @@ def handle_api_errors(func):
             response = func(*args, **kwargs)
             return response
         except requests.exceptions.TooManyRedirects as error:
-            handle_error(func.__name__, error, "Too many redirects. Try again.")
+            handle_error(func.__name__, error, _("Too many redirects. Try again."))
         except requests.exceptions.InvalidURL as error:
-            handle_error(func.__name__, error, "Invalid URL. Try again.")
+            handle_error(func.__name__, error, _("Invalid URL. Try again."))
         except requests.exceptions.Timeout as error:
-            handle_error(func.__name__, error, "Timeout error. Try again.")
+            handle_error(func.__name__, error, _("Timeout error. Try again."))
         except requests.exceptions.ConnectionError as error:
-            handle_error(func.__name__, error, "Connection error. Try again.")
+            handle_error(func.__name__, error, _("Connection error. Try again."))
         except requests.exceptions.RequestException as error:
             handle_error(
                 func.__name__,
                 error,
-                "Request error. Check network connection and try again.",
+                _("Request error. Check network connection and try again."),
             )
         except requests.exceptions.HTTPError as error:
             handle_error(
                 func.__name__,
                 error,
-                "HTTP error.Check network connection and try again.",
+                _("HTTP error. Check network connection and try again."),
             )
 
         except Exception as error:
-            handle_error(func.__name__, error, "An unknown error occurred.")
+            handle_error(func.__name__, error, _("An unknown error occurred."))
 
     return wrapper

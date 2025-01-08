@@ -2,6 +2,8 @@
 import sys
 import logging
 from src.file_handler import FileHandler
+from babel.support import Translations
+import gettext
 
 
 def custom_excepthook(exc_type, exc_value, exc_traceback):
@@ -20,22 +22,54 @@ def configure_logging():
     )
 
 
-def get_user_choice():
-    """Display menu and get user choice"""
-    print("Welcome to the my-unicorn 🦄!")
-    print("Choose one of the following options:")
-    print("====================================")
-    print("1. Update AppImage by config file")
-    print("2. Download new AppImage (create config file)")
-    print("3. Customize AppImage config file")
-    print("4. Update all AppImages")
-    print("5. Exit")
-    print("====================================")
+def select_language(file_handler):
+    """Display language options and set the selected language"""
+    global _
+    languages = {1: "en", 2: "tr"}
+    current_locale = file_handler.get_locale_config()
+    if current_locale:
+        translations = Translations.load("locales", [current_locale])
+        translations.install()
+        _ = translations.gettext
+        return
+
+    print("Choose your language / Dilinizi seçin:")
+    print("1. English")
+    print("2. Türkçe")
+
     try:
-        return int(input("Enter your choice: "))
+        choice = int(input("Enter your choice: "))
+        if choice in languages:
+            language = languages[choice]
+            file_handler.save_locale_config(language)
+            translations = Translations.load("locales", [language])
+            translations.install()
+            _ = translations.gettext
+        else:
+            print("Invalid choice. Defaulting to English.")
+            _ = gettext.gettext
     except (ValueError, KeyboardInterrupt) as error:
         logging.error(f"Error: {error}", exc_info=True)
-        print(f"Error: {error}. Exiting...")
+        print("Invalid input. Defaulting to English.")
+        _ = gettext.gettext
+
+
+def get_user_choice():
+    """Display menu and get user choice"""
+    print(_("Welcome to the my-unicorn 🦄!"))
+    print(_("Choose one of the following options:"))
+    print("====================================")
+    print(_("1. Update AppImage by config file"))
+    print(_("2. Download new AppImage (create config file)"))
+    print(_("3. Customize AppImage config file"))
+    print(_("4. Update all AppImages"))
+    print(_("5. Exit"))
+    print("====================================")
+    try:
+        return int(input(_("Enter your choice: ")))
+    except (ValueError, KeyboardInterrupt) as error:
+        logging.error(f"Error: {error}", exc_info=True)
+        print(_("Error: {error}. Exiting...").format(error=error))
         sys.exit(1)
 
 
@@ -45,8 +79,11 @@ def run_functions(file_handler, function_list):
         if hasattr(file_handler, function):
             getattr(file_handler, function)()
         else:
-            print(f"Function {function} not found")
-            logging.error(f"Function {function} not found", exc_info=True)
+            print(_("Function {function} not found").format(function=function))
+            logging.error(
+                _("Function {function} not found").format(function=function),
+                exc_info=True,
+            )
             sys.exit()
 
 
@@ -59,29 +96,31 @@ def choice_update(file_handler, functions):
 
 def choice_download(file_handler, functions):
     """Handle choice 2: Download new AppImage"""
-    print("Downloading new appimage")
-    print("Choose one of the following options: \n")
+    print(_("Downloading new appimage"))
+    print(_("Choose one of the following options: \n"))
     print("====================================")
-    print("1. Backup old appimage and download new appimage")
-    print("2. Download new appimage and overwrite old appimage")
-    file_handler.choice = int(input("Enter your choice: "))
+    print(_("1. Backup old appimage and download new appimage"))
+    print(_("2. Download new appimage and overwrite old appimage"))
+    file_handler.choice = int(input(_("Enter your choice: ")))
     run_functions(file_handler, functions[file_handler.choice])
 
 
 def main():
     """
     Main function workflow:
-    1. List all JSON files using list_json_files().
-    2. Select a JSON file (e.g., joplin.json).
-    3. Load credentials from the selected JSON file via load_credentials().
-    4. Get a response from the GitHub API using get_response().
-    5. Download the AppImage using download().
-    6. Use save_credentials function to save owner, repo, hash_type, choice...
-    7. Verify file integrity with hash file and appimage
-    8. Make executable, delete version from appimage_name and move to directory
+    1. Select language.
+    2. List all JSON files using list_json_files().
+    3. Select a JSON file (e.g., joplin.json).
+    4. Load credentials from the selected JSON file via load_credentials().
+    5. Get a response from the GitHub API using get_response().
+    6. Download the AppImage using download().
+    7. Use save_credentials function to save owner, repo, hash_type, choice...
+    8. Verify file integrity with hash file and appimage
+    9. Make executable, delete version from appimage_name and move to directory
     """
     configure_logging()
     file_handler = FileHandler()
+    select_language(file_handler)
     choice = get_user_choice()
 
     functions = {
@@ -132,14 +171,14 @@ def main():
         elif choice == 4:
             file_handler.check_updates_json_all()
         elif choice == 5:
-            print("Exiting...")
+            print(_("Exiting..."))
             sys.exit()
         else:
-            print("Invalid choice")
+            print(_("Invalid choice"))
             sys.exit()
     except (ValueError, KeyboardInterrupt) as error:
         logging.error(f"Error: {error}", exc_info=True)
-        print(f"Error: {error}. Exiting...")
+        print(_("Error: {error}. Exiting...").format(error=error))
         sys.exit(1)
 
 
