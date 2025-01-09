@@ -1,11 +1,6 @@
 import sys
 import logging
 import requests
-from babel.support import Translations
-import gettext
-
-# Assuming that translations are already set up correctly in main.py
-_ = gettext.gettext
 
 # Set up logging
 logging.basicConfig(level=logging.ERROR)
