@@ -532,24 +532,3 @@ class FileHandler(AppImageDownloader):
             self.handle_file_operations(batch_mode=batch_mode)
 
         print(_("Update process completed for all selected appimages."))
-
-    def get_locale_config(self):
-        """Load the locale configuration from the config file."""
-        config_path = os.path.join(self.file_path, "locale.json")
-        print(f"Reading locale config from {config_path}")  # Debug statement
-        if os.path.exists(config_path):
-            with open(config_path, "r", encoding="utf-8") as file:
-                config = json.load(file)
-                return config.get(
-                    "locale", "en"
-                )  # Default to English if no locale is set
-        return "en"  # Default to English if no config file exists
-
-    def save_locale_config(self, locale):
-        """Save the selected locale to the config file."""
-        config_path = os.path.join(self.file_path, "locale.json")
-        print(f"Saving locale config to {config_path}")  # Debug statement
-        os.makedirs(os.path.dirname(config_path), exist_ok=True)
-        with open(config_path, "w", encoding="utf-8") as file:
-            json.dump({"locale": locale}, file, indent=4)
-        print(f"Locale saved as: {locale}")  # Debug statement

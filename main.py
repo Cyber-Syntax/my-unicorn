@@ -2,23 +2,51 @@
 import os
 import sys
 import logging
+import json
 from src.file_handler import FileHandler
 import gettext
 from babel.support import Translations
 
-# Assuming that translations are already set up correctly in main.py
 _ = gettext.gettext
 
 
-def select_language(self):
+def get_locale_config(file_path):
+    """Load the locale configuration from the config file."""
+    config_path = os.path.join(file_path, "locale.json")
+    print(f"Reading locale config from {config_path}")  # Debug statement
+    if os.path.exists(config_path):
+        with open(config_path, "r", encoding="utf-8") as file:
+            config = json.load(file)
+            return config.get("locale")  # Return None if no locale is set
+    return None  # Return None if no config file exists
+
+
+def save_locale_config(file_path, locale):
+    """Save the selected locale to the config file."""
+    config_path = os.path.join(file_path, "locale.json")
+    print(f"Saving locale config to {config_path}")  # Debug statement
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    with open(config_path, "w", encoding="utf-8") as file:
+        json.dump({"locale": locale}, file, indent=4)
+    print(f"Locale saved as: {locale}")  # Debug statement
+
+
+def load_translations(locale):
+    """Load translations for the specified locale."""
+    locales_dir = os.path.join(os.path.dirname(__file__), "locales")
+    translations = Translations.load(locales_dir, [locale])
+    translations.install()
+    global _
+    _ = translations.gettext
+
+
+def select_language(file_path):
     """Display language options and set the selected language"""
     global _
     languages = {1: "en", 2: "tr"}
-    current_locale = self.get_locale_config()
+    current_locale = get_locale_config(file_path)
     if current_locale:
-        translations = Translations.load(self.file_path, [current_locale])
-        translations.install()
-        _ = translations.gettext
+        load_translations(current_locale)
         return
 
     print("Choose your language / Dilinizi seçin:")
@@ -29,10 +57,8 @@ def select_language(self):
         choice = int(input("Enter your choice: "))
         if choice in languages:
             language = languages[choice]
-            self.save_locale_config(language)
-            translations = Translations.load(self.file_path, [language])
-            translations.install()
-            _ = translations.gettext
+            save_locale_config(file_path, language)
+            load_translations(language)
         else:
             print("Invalid choice. Defaulting to English.")
             _ = gettext.gettext
@@ -113,7 +139,7 @@ def choice_download(file_handler, functions):
 def main():
     """
     Main function workflow:
-    1. Select language.
+    1. Select language if not configured.
     2. List all JSON files using list_json_files().
     3. Select a JSON file (e.g., joplin.json).
     4. Load credentials from the selected JSON file via load_credentials().
@@ -127,8 +153,11 @@ def main():
     file_handler = FileHandler()
 
     if not os.path.isfile(os.path.join(file_handler.file_path, "locale.json")):
-        select_language(file_handler)
-
+        select_language(file_handler.file_path)
+    else:
+        current_locale = get_locale_config(file_handler.file_path)
+        if current_locale:
+            load_translations(current_locale)
     choice = get_user_choice()
 
     functions = {
@@ -179,7 +208,7 @@ def main():
         elif choice == 4:
             file_handler.check_updates_json_all()
         elif choice == 5:
-            select_language(file_handler)
+            select_language(file_handler.file_path)
             main()  # Restart the main function to apply the new language
         elif choice == 6:
             print(_("Exiting..."))

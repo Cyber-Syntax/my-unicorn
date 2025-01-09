@@ -1,14 +1,14 @@
-#Turkish translations for PROJECT.
+# Turkish translations for PROJECT.
 # Copyright (C) 2025 ORGANIZATION
 # This file is distributed under the same license as the PROJECT project.
-# FIRST AUTHOR Cyber-Syntax, 2025.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-01-08 13:50+0300\n"
-"PO-Revision-Date: 2025-01-08 13:50+0300\n"
+"POT-Creation-Date: 2025-01-09 11:39+0300\n"
+"PO-Revision-Date: 2025-01-09 11:41+0300\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: tr\n"
 "Language-Team: tr <LL@li.org>\n"
