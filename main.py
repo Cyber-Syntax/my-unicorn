@@ -13,7 +13,6 @@ _ = gettext.gettext
 def get_locale_config(file_path):
     """Load the locale configuration from the config file."""
     config_path = os.path.join(file_path, "locale.json")
-    print(f"Reading locale config from {config_path}")  # Debug statement
     if os.path.exists(config_path):
         with open(config_path, "r", encoding="utf-8") as file:
             config = json.load(file)
@@ -66,6 +65,30 @@ def select_language(file_path):
         logging.error(f"Error: {error}", exc_info=True)
         print("Invalid input. Defaulting to English.")
         _ = gettext.gettext
+
+
+def update_locale(file_handler):
+    """Update the locale.json file with the selected language."""
+    languages = {1: "en", 2: "tr"}
+    print("Choose your language / Dilinizi seçin:")
+    for key, value in languages.items():
+        print(f"{key}. {value}")
+
+    try:
+        choice = int(input("Enter your choice: "))
+        if choice in languages:
+            language = languages[choice]
+            config_path = os.path.join(file_handler.file_path, "locale.json")
+            print(f"Updating locale config to {config_path}")  # Debug statement
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            with open(config_path, "w", encoding="utf-8") as file:
+                json.dump({"locale": language}, file, indent=4)
+            print(f"Locale updated to: {language}")  # Debug statement
+        else:
+            print("Invalid choice.")
+    except (ValueError, KeyboardInterrupt) as error:
+        logging.error(f"Error: {error}", exc_info=True)
+        print("Invalid input.")
 
 
 def custom_excepthook(exc_type, exc_value, exc_traceback):
@@ -208,8 +231,7 @@ def main():
         elif choice == 4:
             file_handler.check_updates_json_all()
         elif choice == 5:
-            select_language(file_handler.file_path)
-            main()  # Restart the main function to apply the new language
+            update_locale(file_handler)
         elif choice == 6:
             print(_("Exiting..."))
             sys.exit()
