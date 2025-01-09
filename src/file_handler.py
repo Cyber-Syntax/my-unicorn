@@ -40,7 +40,7 @@ class FileHandler(AppImageDownloader):
     def get_sha(self):
         """Get the sha name and url"""
         print("************************************")
-        print(f"Downloading {self.sha_name}...")
+        print(_("Downloading {sha_name}...").format(sha_name=self.sha_name))
         response = requests.get(self.sha_url, timeout=10)
         return response
 
@@ -50,57 +50,75 @@ class FileHandler(AppImageDownloader):
         if not os.path.exists(self.sha_name):
             with open(self.sha_name, "w", encoding="utf-8") as file:
                 file.write(response.text)
-            print(f"\033[42mDownloaded {self.sha_name}\033[0m")
+            print(
+                _("\033[42mDownloaded {sha_name}\033[0m").format(sha_name=self.sha_name)
+            )
         else:
             # If the sha file already exists, check if it is the same as the downloaded one
             with open(self.sha_name, "r", encoding="utf-8") as file:
                 if response.text == file.read():
-                    print(f"{self.sha_name} already exists")
+                    print(_("{sha_name} already exists").format(sha_name=self.sha_name))
                 else:
                     print(
-                        f"{self.sha_name} already exists but it is different from the downloaded one"
+                        _(
+                            "{sha_name} already exists but it is different from the downloaded one"
+                        ).format(sha_name=self.sha_name)
                     )
-                    if input("Do you want to overwrite it? (y/n): ").lower() == "y":
+                    if input(_("Do you want to overwrite it? (y/n): ")).lower() == "y":
                         with open(self.sha_name, "w", encoding="utf-8") as file:
                             file.write(response.text)
-                        print(f"\033[42mDownloaded {self.sha_name}\033[0m")
+                        print(
+                            _("\033[42mDownloaded {sha_name}\033[0m").format(
+                                sha_name=self.sha_name
+                            )
+                        )
                     else:
-                        print("Exiting...")
+                        print(_("Exiting..."))
                         sys.exit()
 
     def handle_verification_error(self):
         """Handle verification errors"""
-        print(f"\033[41;30mError verifying {self.appimage_name}\033[0m")
+        print(
+            _("\033[41;30mError verifying {appimage_name}\033[0m").format(
+                appimage_name=self.appimage_name
+            )
+        )
         logging.error(f"Error verifying {self.appimage_name}")
         if (
-            input("Do you want to delete the downloaded appimage? (y/n): ").lower()
+            input(_("Do you want to delete the downloaded appimage? (y/n): ")).lower()
             == "y"
         ):
             os.remove(self.appimage_name)
-            print(f"Deleted {self.appimage_name}")
+            print(_("Deleted {appimage_name}").format(appimage_name=self.appimage_name))
             # Delete the downloaded sha file too
             if (
-                input("Do you want to delete the downloaded sha file? (y/n): ").lower()
+                input(
+                    _("Do you want to delete the downloaded sha file? (y/n): ")
+                ).lower()
                 == "y"
             ):
                 os.remove(self.sha_name)
-                print(f"Deleted {self.sha_name}")
+                print(_("Deleted {sha_name}").format(sha_name=self.sha_name))
                 sys.exit()
             else:
                 if (
                     input(
-                        "Do you want to continue without verification? (y/n): "
+                        _("Do you want to continue without verification? (y/n): ")
                     ).lower()
                     == "y"
                 ):
                     self.make_executable()
                 else:
-                    print("Exiting...")
+                    print(_("Exiting..."))
                     sys.exit()
 
     def handle_connection_error(self):
         """Handle connection errors"""
-        print(f"\033[41;30mError connecting to {self.sha_url}\033[0m")
+        print(
+            _("\033[41;30mError connecting to {sha_url}\033[0m").format(
+                sha_url=self.sha_url
+            )
+        )
         logging.error(f"Error connecting to {self.sha_url}")
         sys.exit()
 
@@ -109,19 +127,27 @@ class FileHandler(AppImageDownloader):
         new_name = f"{self.repo}.AppImage"
 
         if (
-            input("Do you want to delete the downloaded appimage? (y/n): ").lower()
+            input(_("Do you want to delete the downloaded appimage? (y/n): ")).lower()
             == "y"
         ):
             if self.appimage_name != new_name:
                 os.remove(self.appimage_name)
-                print(f"Deleted {self.appimage_name}")
+                print(
+                    _("Deleted {appimage_name}").format(
+                        appimage_name=self.appimage_name
+                    )
+                )
             else:
                 os.remove(new_name)
-                print(f"Deleted {new_name}")
+                print(_("Deleted {new_name}").format(new_name=new_name))
 
-            print(f"Deleted {self.appimage_name}")
+            print(_("Deleted {appimage_name}").format(appimage_name=self.appimage_name))
         else:
-            print(f"{self.appimage_name} saved in {os.getcwd()}")
+            print(
+                _("{appimage_name} saved in {cwd}").format(
+                    appimage_name=self.appimage_name, cwd=os.getcwd()
+                )
+            )
 
     @sha_response_error
     def verify_yml(self, response):
@@ -140,11 +166,15 @@ class FileHandler(AppImageDownloader):
 
         # compare the two hashes
         if appimage_sha == decoded_hash:
-            print(f"\033[42m{self.appimage_name} verified.\033[0m")
+            print(
+                _("\033[42m{appimage_name} verified.\033[0m").format(
+                    appimage_name=self.appimage_name
+                )
+            )
             print("************************************")
-            print("--------------------- HASHES ----------------------")
-            print(f"AppImage Hash: {appimage_sha}")
-            print(f"Parsed Hash: {decoded_hash}")
+            print(_("--------------------- HASHES ----------------------"))
+            print(_("AppImage Hash: {appimage_sha}").format(appimage_sha=appimage_sha))
+            print(_("Parsed Hash: {decoded_hash}").format(decoded_hash=decoded_hash))
             print("----------------------------------------------------")
         else:
             self.handle_verification_error()
@@ -168,11 +198,17 @@ class FileHandler(AppImageDownloader):
 
         # Compare the two hashes
         if appimage_hash == decoded_hash:
-            print(f"\033[42m{self.appimage_name} verified.\033[0m")
+            print(
+                _("\033[42m{appimage_name} verified.\033[0m").format(
+                    appimage_name=self.appimage_name
+                )
+            )
             print("************************************")
-            print("--------------------- HASHES ----------------------")
-            print(f"AppImage Hash: {appimage_hash}")
-            print(f"Parsed Hash: {decoded_hash}")
+            print(_("--------------------- HASHES ----------------------"))
+            print(
+                _("AppImage Hash: {appimage_hash}").format(appimage_hash=appimage_hash)
+            )
+            print(_("Parsed Hash: {decoded_hash}").format(decoded_hash=decoded_hash))
             print("----------------------------------------------------")
         else:
             self.handle_verification_error()
@@ -188,21 +224,35 @@ class FileHandler(AppImageDownloader):
     def handle_file_operations(self, batch_mode=False):
         """Handle the file operations with one user's approval"""
         # 1. backup old appimage
-        print("--------------------- CHANGES  ----------------------")
+        print(_("--------------------- CHANGES  ----------------------"))
         if self.choice == 1 or self.choice == 3:
-            print(f"Moving old {self.repo}.AppImage to {self.appimage_folder_backup}")
+            print(
+                _("Moving old {repo}.AppImage to {backup}").format(
+                    repo=self.repo, backup=self.appimage_folder_backup
+                )
+            )
 
-        print(f"Changing {self.appimage_name} name to {self.repo}.AppImage")
-        print(f"Moving updated appimage to {self.appimage_folder}")
-        print(f"Updating credentials in {self.repo}.json")
-        print(f"Deleting {self.sha_name}")
+        print(
+            _("Changing {appimage_name} name to {repo}.AppImage").format(
+                appimage_name=self.appimage_name, repo=self.repo
+            )
+        )
+        print(
+            _("Moving updated appimage to {folder}").format(folder=self.appimage_folder)
+        )
+        print(_("Updating credentials in {repo}.json").format(repo=self.repo))
+        print(_("Deleting {sha_name}").format(sha_name=self.sha_name))
         print("-----------------------------------------------------")
 
         # 6. Ask user for approval if not in batch mode
         if not batch_mode:
-            if input("Do you want to continue? (y/n): ").lower() != "y":
-                print("Appimage installed but not moved to the appimage folder")
-                print(f"{self.appimage_name} saved in {os.getcwd()}")
+            if input(_("Do you want to continue? (y/n): ")).lower() != "y":
+                print(_("Appimage installed but not moved to the appimage folder"))
+                print(
+                    _("{appimage_name} saved in {cwd}").format(
+                        appimage_name=self.appimage_name, cwd=os.getcwd()
+                    )
+                )
                 return
 
         if self.choice == 1 or self.choice == 3:
@@ -220,9 +270,9 @@ class FileHandler(AppImageDownloader):
             return
 
         print("************************************")
-        print("Making the appimage executable...")
+        print(_("Making the appimage executable..."))
         subprocess.run(["chmod", "+x", self.appimage_name], check=True)
-        print("\033[42mAppimage is now executable\033[0m")
+        print(_("\033[42mAppimage is now executable\033[0m"))
         print("************************************")
 
     @handle_common_errors
@@ -234,24 +284,37 @@ class FileHandler(AppImageDownloader):
 
         # Create a backup folder if it doesn't exist
         if os.path.exists(backup_folder):
-            print(f"Backup folder {backup_folder} found")
+            print(
+                _("Backup folder {backup_folder} found").format(
+                    backup_folder=backup_folder
+                )
+            )
         else:
             if (
                 input(
-                    f"Backup folder {backup_folder} not found,"
-                    "do you want to create it (y/n): "
-                )
+                    _(
+                        "Backup folder {backup_folder} not found, do you want to create it (y/n): "
+                    ).format(backup_folder=backup_folder)
+                ).lower()
                 == "y"
             ):
                 os.makedirs(os.path.dirname(backup_folder), exist_ok=True)
-                print(f"Created backup folder: {backup_folder}")
+                print(
+                    _("Created backup folder: {backup_folder}").format(
+                        backup_folder=backup_folder
+                    )
+                )
             else:
-                print("Backup folder not created.")
+                print(_("Backup folder not created."))
 
         # Check if old appimage exists
         if os.path.exists(f"{self.appimage_folder}/{self.repo}.AppImage"):
 
-            print(f"Found {self.repo}.AppImage in {self.appimage_folder}")
+            print(
+                _("Found {repo}.AppImage in {folder}").format(
+                    repo=self.repo, folder=self.appimage_folder
+                )
+            )
 
             # Move old appimage to backup folder
             try:
@@ -260,23 +323,37 @@ class FileHandler(AppImageDownloader):
             except shutil.Error as error:
                 logging.error(f"Error: {error}", exc_info=True)
                 print(
-                    f"\033[41;30mError moving {self.repo}.AppImage to {backup_folder}\033[0m"
+                    _(
+                        "\033[41;30mError moving {repo}.AppImage to {backup_folder}\033[0m"
+                    ).format(repo=self.repo, backup_folder=backup_folder)
                 )
             else:
-                print(f"Old {old_appimage} copied to {backup_folder}")
+                print(
+                    _("Old {old_appimage} copied to {backup_folder}").format(
+                        old_appimage=old_appimage, backup_folder=backup_folder
+                    )
+                )
                 print("-----------------------------------------------------")
         else:
-            print(f"{self.repo}.AppImage not found in {self.appimage_folder}")
+            print(
+                _("{repo}.AppImage not found in {folder}").format(
+                    repo=self.repo, folder=self.appimage_folder
+                )
+            )
 
     def change_name(self):
         """Change the appimage name to {self.repo}.AppImage"""
         new_name = f"{self.repo}.AppImage"
         if self.appimage_name != new_name:
-            print(f"Changing {self.appimage_name} name to {new_name}")
+            print(
+                _("Changing {appimage_name} name to {new_name}").format(
+                    appimage_name=self.appimage_name, new_name=new_name
+                )
+            )
             shutil.move(self.appimage_name, new_name)
             self.appimage_name = new_name
         else:
-            print("The appimage name is already the new name")
+            print(_("The appimage name is already the new name"))
 
     @handle_common_errors
     def move_appimage(self):
@@ -289,11 +366,16 @@ class FileHandler(AppImageDownloader):
         except shutil.Error as error:
             logging.error(f"Error: {error}", exc_info=True)
             print(
-                f"\033[41;30mError moving"
-                f" {self.repo}.AppImage to {self.appimage_folder}\033[0m"
+                _("\033[41;30mError moving {repo}.AppImage to {folder}\033[0m").format(
+                    repo=self.repo, folder=self.appimage_folder
+                )
             )
         else:
-            print(f"Moved {self.repo}.AppImage to {self.appimage_folder}")
+            print(
+                _("Moved {repo}.AppImage to {folder}").format(
+                    repo=self.repo, folder=self.appimage_folder
+                )
+            )
             # remove the appimage from the current directory because shutil uses copy2
             os.remove(f"{self.repo}.AppImage")
 
@@ -301,7 +383,7 @@ class FileHandler(AppImageDownloader):
     def update_version(self):
         """Update the version-appimage_name in the json file"""
 
-        print("\nUpdating credentials...")
+        print(_("Updating credentials..."))
         # update the version, appimage_name
         self.appimages["version"] = self.version
         self.appimages["appimage"] = self.repo + "-" + self.version + ".AppImage"
@@ -309,7 +391,11 @@ class FileHandler(AppImageDownloader):
         # write the updated version and appimage_name to the json file
         with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
             json.dump(self.appimages, file, indent=4)
-        print(f"\033[42mCredentials updated to {self.repo}.json\033[0m")
+        print(
+            _("\033[42mCredentials updated to {repo}.json\033[0m").format(
+                repo=self.repo
+            )
+        )
 
     # INFO: Cause API RATE LIMIT EXCEEDED if used more than 15 - 20 times
     # KeyError: 'tag_name' means that API RATE LIMIT EXCEEDED.
@@ -317,16 +403,22 @@ class FileHandler(AppImageDownloader):
     def check_updates_json_all(self):
         """Check for updates for all JSON files"""
         json_files = [
-            file for file in os.listdir(self.file_path) if file.endswith(".json")
+            file
+            for file in os.listdir(self.file_path)
+            if file.endswith(".json") and file != "locale.json"
         ]
 
         # Output the list of JSON files found
         if json_files:
-            print("Found the following config files in the" f"\n[{self.file_path}]:")
+            print(
+                _("Found the following config files in the\n[{file_path}]:").format(
+                    file_path=self.file_path
+                )
+            )
             for json_file in json_files:
-                print(f"- {json_file}")
+                print(_("- {json_file}").format(json_file=json_file))
         else:
-            print("No JSON files found in the directory.")
+            print(_("No JSON files found in the directory."))
 
         # Create a queue for not up-to-date appimages
         appimages_to_update = []
@@ -344,39 +436,53 @@ class FileHandler(AppImageDownloader):
 
             # Compare with above versions
             if latest_version == appimages["version"]:
-                print(f"{appimages['appimage']} is up to date")
+                print(
+                    _("{appimage} is up to date").format(appimage=appimages["appimage"])
+                )
             else:
                 print("-------------------------------------------------")
-                print(f"{appimages['appimage']} is not up to date")
-                print(f"\033[42mLatest version: {latest_version}\033[0m")
-                print(f"Current version: {appimages['version']}")
+                print(
+                    _("{appimage} is not up to date").format(
+                        appimage=appimages["appimage"]
+                    )
+                )
+                print(
+                    _("\033[42mLatest version: {version}\033[0m").format(
+                        version=latest_version
+                    )
+                )
+                print(
+                    _("Current version: {version}").format(version=appimages["version"])
+                )
                 print("-------------------------------------------------")
                 # Append to queue appimages that are not up to date
                 appimages_to_update.append(appimages["repo"])
 
         # If all appimages are up to date
         if not appimages_to_update:
-            print("All appimages are up to date")
+            print(_("All appimages are up to date"))
             sys.exit()
         else:
             # Display the list of appimages to update
             print("=================================================")
-            print("Appimages that are not up to date:")
+            print(_("Appimages that are not up to date:"))
             for idx, appimage in enumerate(appimages_to_update, start=1):
-                print(f"{idx}. {appimage}")
+                print(_("{idx}. {appimage}").format(idx=idx, appimage=appimage))
             print("=================================================")
 
             # Ask the user to select which appimages to update or skip
             user_input = (
                 input(
-                    "Enter the numbers of the appimages you want to update (comma-separated) or type 'skip' to skip updates: "
+                    _(
+                        "Enter the numbers of the appimages you want to update (comma-separated) or type 'skip' to skip updates: "
+                    )
                 )
                 .strip()
                 .lower()
             )
 
             if user_input == "skip":
-                print("No updates will be performed.")
+                print(_("No updates will be performed."))
                 sys.exit()
 
             selected_indices = [int(idx.strip()) - 1 for idx in user_input.split(",")]
@@ -392,7 +498,9 @@ class FileHandler(AppImageDownloader):
         if len(appimages_to_update) > 1:
             if (
                 input(
-                    "Enable batch mode to continue without asking for approval? (y/n): "
+                    _(
+                        "Enable batch mode to continue without asking for approval? (y/n): "
+                    )
                 ).lower()
                 != "y"
             ):
@@ -404,15 +512,19 @@ class FileHandler(AppImageDownloader):
 
         if batch_mode:
             print(
-                "Batch mode is enabled. All selected appimages will be updated without further prompts."
+                _(
+                    "Batch mode is enabled. All selected appimages will be updated without further prompts."
+                )
             )
         else:
             print(
-                "Batch mode is disabled. You will be prompted for each appimage update."
+                _(
+                    "Batch mode is disabled. You will be prompted for each appimage update."
+                )
             )
 
         for appimage in appimages_to_update:
-            print(f"Updating {appimage}...")
+            print(_("Updating {appimage}...").format(appimage=appimage))
             self.repo = appimage
             self.load_credentials()
             self.get_response()
@@ -421,4 +533,4 @@ class FileHandler(AppImageDownloader):
             self.make_executable()
             self.handle_file_operations(batch_mode=batch_mode)
 
-        print("Update process completed for all selected appimages.")
+        print(_("Update process completed for all selected appimages."))
