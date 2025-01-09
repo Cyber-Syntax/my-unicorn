@@ -297,7 +297,7 @@ msgstr "{sha_name} zaten mevcut ancak indirilen dosyadan farklı"
 
 #: src/file_handler.py:67
 msgid "Do you want to overwrite it? (y/n): "
-msgstr "Üzerine yazmak istiyor musunuz? (e/h):"
+msgstr "Üzerine yazmak istiyor musunuz? (y/n):"
 
 #: src/file_handler.py:82
 msgid "[41;30mError verifying {appimage_name}[0m"
@@ -305,7 +305,7 @@ msgstr "[41;30m{appimage_name} doğrulanırken hata oluştu[0m"
 
 #: src/file_handler.py:88 src/file_handler.py:130
 msgid "Do you want to delete the downloaded appimage? (y/n): "
-msgstr "İndirilen appimage'i silmek istiyor musunuz? (e/h):"
+msgstr "İndirilen appimage'i silmek istiyor musunuz? (y/n):"
 
 #: src/file_handler.py:92 src/file_handler.py:136 src/file_handler.py:144
 msgid "Deleted {appimage_name}"
@@ -313,7 +313,7 @@ msgstr "{appimage_name} silindi"
 
 #: src/file_handler.py:96
 msgid "Do you want to delete the downloaded sha file? (y/n): "
-msgstr "İndirilen sha dosyasını silmek istiyor musunuz? (e/h):"
+msgstr "İndirilen sha dosyasını silmek istiyor musunuz? (y/n):"
 
 #: src/file_handler.py:101
 msgid "Deleted {sha_name}"
@@ -321,7 +321,7 @@ msgstr "{sha_name} silindi"
 
 #: src/file_handler.py:106
 msgid "Do you want to continue without verification? (y/n): "
-msgstr "Doğrulama yapmadan devam etmek istiyor musunuz? (e/h):"
+msgstr "Doğrulama yapmadan devam etmek istiyor musunuz? (y/n):"
 
 #: src/file_handler.py:118
 msgid "[41;30mError connecting to {sha_url}[0m"
@@ -381,7 +381,7 @@ msgstr "{sha_name} siliniyor"
 
 #: src/file_handler.py:249
 msgid "Do you want to continue? (y/n): "
-msgstr "Devam etmek istiyor musunuz? (e/h):"
+msgstr "Devam etmek istiyor musunuz? (y/n):"
 
 #: src/file_handler.py:250
 msgid "Appimage installed but not moved to the appimage folder"
@@ -401,7 +401,7 @@ msgstr "Yedekleme klasörü {backup_folder} bulundu"
 
 #: src/file_handler.py:295
 msgid "Backup folder {backup_folder} not found, do you want to create it (y/n): "
-msgstr "Yedekleme klasörü {backup_folder} bulunamadı, oluşturmak istiyor musunuz? (e/h):"
+msgstr "Yedekleme klasörü {backup_folder} bulunamadı, oluşturmak istiyor musunuz? (y/n):"
 
 #: src/file_handler.py:303
 msgid "Created backup folder: {backup_folder}"
@@ -501,7 +501,7 @@ msgstr "Güncelleme yapılmayacak."
 
 #: src/file_handler.py:499
 msgid "Enable batch mode to continue without asking for approval? (y/n): "
-msgstr "Onay istemeden devam etmek için toplu modu etkinleştirilsin mi? (e/h):"
+msgstr "Onay istemeden devam etmek için toplu modu etkinleştirilsin mi? (y/n):"
 
 #: src/file_handler.py:513
 msgid ""
