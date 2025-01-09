@@ -403,7 +403,9 @@ class FileHandler(AppImageDownloader):
     def check_updates_json_all(self):
         """Check for updates for all JSON files"""
         json_files = [
-            file for file in os.listdir(self.file_path) if file.endswith(".json")
+            file
+            for file in os.listdir(self.file_path)
+            if file.endswith(".json") and file != "locale.json"
         ]
 
         # Output the list of JSON files found
