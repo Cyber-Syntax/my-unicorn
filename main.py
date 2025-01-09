@@ -1,25 +1,13 @@
 #!/usr/bin/python3
+import os
 import sys
 import logging
 from src.file_handler import FileHandler
-from babel.support import Translations
 import gettext
+from babel.support import Translations
 
-
-def custom_excepthook(exc_type, exc_value, exc_traceback):
-    """Custom excepthook to log uncaught exceptions"""
-    logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
-    sys.__excepthook__(exc_type, exc_value, exc_traceback)
-
-
-def configure_logging():
-    """Set up the logging configuration"""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%d-%b-%y %H:%M:%S",
-        filename="logs/my-unicorn.log",
-    )
+# Assuming that translations are already set up correctly in main.py
+_ = gettext.gettext
 
 
 def select_language(self):
@@ -54,6 +42,22 @@ def select_language(self):
         _ = gettext.gettext
 
 
+def custom_excepthook(exc_type, exc_value, exc_traceback):
+    """Custom excepthook to log uncaught exceptions"""
+    logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+    sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+
+def configure_logging():
+    """Set up the logging configuration"""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%d-%b-%y %H:%M:%S",
+        filename="logs/my-unicorn.log",
+    )
+
+
 def get_user_choice():
     """Display menu and get user choice"""
     print(_("Welcome to the my-unicorn 🦄!"))
@@ -63,7 +67,8 @@ def get_user_choice():
     print(_("2. Download new AppImage (create config file)"))
     print(_("3. Customize AppImage config file"))
     print(_("4. Update all AppImages"))
-    print(_("5. Exit"))
+    print(_("5. Change Language"))
+    print(_("6. Exit"))
     print("====================================")
     try:
         return int(input(_("Enter your choice: ")))
@@ -120,6 +125,10 @@ def main():
     """
     configure_logging()
     file_handler = FileHandler()
+
+    if not os.path.isfile(os.path.join(file_handler.file_path, "locale.json")):
+        select_language(file_handler)
+
     choice = get_user_choice()
 
     functions = {
@@ -170,6 +179,9 @@ def main():
         elif choice == 4:
             file_handler.check_updates_json_all()
         elif choice == 5:
+            select_language(file_handler)
+            main()  # Restart the main function to apply the new language
+        elif choice == 6:
             print(_("Exiting..."))
             sys.exit()
         else:

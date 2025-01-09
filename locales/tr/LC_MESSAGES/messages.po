@@ -1,7 +1,7 @@
 #Turkish translations for PROJECT.
 # Copyright (C) 2025 ORGANIZATION
 # This file is distributed under the same license as the PROJECT project.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+# FIRST AUTHOR Cyber-Syntax, 2025.
 #
 msgid ""
 msgstr ""

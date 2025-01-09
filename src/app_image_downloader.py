@@ -6,11 +6,6 @@ import requests
 from tqdm import tqdm
 from dataclasses import dataclass, field
 from src.decorators import handle_api_errors, handle_common_errors
-from babel.support import Translations
-import gettext
-
-# Assuming that translations are already set up correctly in main.py
-_ = gettext.gettext
 
 
 @dataclass
