@@ -1,3 +1,6 @@
+[![en](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.md)
+[![tr](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.tr.md)
+
 # <samp>Attention<samp>
 
 - **Do not utilize without making a backup of the previous version.** This script is in its **beta phase**. Hence, you may experience some glitches.
@@ -123,4 +126,3 @@ Enter your choice: 3
 ## ‎ <samp>LICENSE<samp>
 
 - This script is licensed under the [GPL 3.0 License]. You can find a copy of the license in the [LICENSE](https://github.com/Cyber-Syntax/my-unicorn/blob/main/LICENSE) file or at [www.gnu.org](https://www.gnu.org/licenses/gpl-3.0.en.html)
-
