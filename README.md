@@ -1,5 +1,5 @@
-[![en](https://img.shields.io/badge/lang-en-blue.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.md)
-[![tr](https://img.shields.io/badge/lang-tr-green.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.tr.md)
+[![en](https://img.shields.io/badge/lang-en-green.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.md)
+[![tr](https://img.shields.io/badge/lang-tr-blue.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.tr.md)
 
 ---
 
@@ -13,17 +13,19 @@
 
 ## **🦄 About my-unicorn**
 
-- Downloads the latest AppImage from GitHub via API. It also verifies the file using:
-
-  - 🛠️ **Tested:**
-    - [x] sha256
-    - [x] sha512
+- I created this project to solve my problem. This script installs an AppImage from the GitHub API, saves it to a user-selected directory, creates a config file (JSON) to save information about the AppImage and automate the update process. Also, this script is able to verify whether the AppImage has been installed correctly from GitHub by checking the SHA256 or SHA512 hash of the verification file from the GitHub repository against the actual AppImage.
 
 - **Applications tested with this script:**
+
   - 🛠️ **Tested:**
     - [x] super-productivity
     - [x] siyuan-note
     - [x] Joplin
+
+- 🛠️ **Tested:**
+
+  - [x] sha256
+  - [x] sha512
 
 ---
 

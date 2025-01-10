@@ -13,17 +13,19 @@
 
 ## **🦄 my-unicorn Hakkında**
 
-- GitHub üzerinden API kullanarak en son AppImage dosyasını indirir. Ayrıca dosyayı aşağıdaki hash türleriyle doğrular:
-
-  - 🛠️ **Test Edildi:**
-    - [x] sha256
-    - [x] sha512
+- Bu projeyi problemimi çözmek için oluşturdum. Bu betiği, GitHub API'sinden bir AppImage indirir, kullanıcının seçtiği bir dizine kaydeder, AppImage hakkında bilgi kaydetmek ve güncelleme sürecini otomatikleştirmek için bir config dosyası (JSON) oluşturur. Ayrıca bu betik, GitHub repository'sından doğrulama dosyasının SHA256 veya SHA512 hash'i ile gerçek AppImage'nin karşılaştırarak, doğru şekilde indirilip indirilmediğini kontrol edebilir.
 
 - **Bu script ile hangi uygulamalar test edilmiştir?**
+
   - 🛠️ **Test Edildi:**
     - [x] super-productivity
     - [x] siyuan-note
     - [x] Joplin
+
+- 🛠️ **Test Edildi:**
+
+  - [x] sha256
+  - [x] sha512
 
 ---
 
