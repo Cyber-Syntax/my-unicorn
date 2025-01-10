@@ -5,17 +5,9 @@
 
 # **⚠️ Dikkat**
 
-- **Bu proje kalıcı beta aşamasında** olup sınırlı testlerden geçmiştir. Başlangıçta öğrenme amaçlı geliştirilmiş olsa da, benim özel ihtiyaçlarımı etkin bir şekilde karşılamaktadır.
+- Bu proje sınırlı testlerden dolayı şu anlık **beta aşamasındadır** . Başlangıçta öğrenme amaçlı geliştirilmiş olsa da, benim özel ihtiyaçlarımı etkin bir şekilde karşılamaktadır.
 - **Önemli:** Script’i güncellerken **Releases** bölümündeki talimatları takip edin. Güncellemeler yeni özellikler veya değişiklikler içerebilir ve bu değişiklikler farklı adımlar gerektirebilir. Talimatları olabildiğince basit tutmaya çalışacağım.
 - **Şu anda desteklenen:** Sadece Linux. macOS'ta çalışabilir, ancak henüz test edilmemiştir.
-
----
-
-## **🙏 Bu Projeye Destek Olun**
-
-Bu script size yardımcı olduysa:
-
-- **GitHub üzerinde yıldız ⭐** vererek desteğinizi gösterebilirsiniz, böylece kodlama yolculuğumda motive olmamı sağlar!
 
 ---
 
@@ -35,43 +27,14 @@ Bu script size yardımcı olduysa:
 
 ---
 
-## **🛠️ Bağımlılıklar**
+# **💡 Nasıl Kullanılır**
 
-- [requests](https://pypi.org/project/requests/)
-- [yaml](https://pypi.org/project/PyYAML/)
-- [tqdm](https://pypi.org/project/tqdm/)
+## **⚙️ Kurulum**
 
-### İsteğe Bağlı: Sanal ortam oluşturma
-
-1. Repo’yu klonladığınız dizine gidin.
-2. Sanal ortam oluşturun:
-   - `python3 -m venv .venv`
-3. Sanal ortamı aktive edin:
-   - `source .venv/bin/activate`
-4. Bağımlılıkları pip ile yükleyin:
-   - `pip install -r requirements.txt`
-   - Eğer bu çalışmazsa, manuel olarak yükleyin:
-     - `pip3 install tqdm`
-
----
-
-## **⚠️ Kullanımdan Önce Bilmeniz Gerekenler**
-
-1. **GitHub URL’si:** Uygulamanın GitHub repo URL’si (örn. `https://github.com/johannesjo/super-productivity`).
-2. **Hash türü:** Hash türünü belirtin (örn. super-productivity için sha512).
-3. **Hash doğrulama sorunları:** Hash doğrulama başarısız olursa, JSON dosyasına manuel olarak hash ekleyebilirsiniz:
-   - GitHub release sayfasında (örn. [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)) en son hash’i bulun.
-   - `json_files` klasöründe örnek dosyaları kontrol edin. Tüm JSON dosyaları beklenildiği gibi çalışacaktır.
-
----
-
-## **💡 Kullanım**
-
-### Örnek adımlar:
-
-1. Terminali açın ve repo’yu klonlayın (git’in yüklü olduğundan emin olun):
+1. Bir terminal açın ve bu depoyu klonlayın (git'in yüklü olduğundan emin olun):
 
    ```bash
+   cd ~/Downloads/
    git clone https://github.com/Cyber-Syntax/my-unicorn.git
    ```
 
@@ -81,25 +44,37 @@ Bu script size yardımcı olduysa:
    cd ~/Downloads/Cyber-Syntax/my-unicorn
    ```
 
-3. Sanal ortamı aktif edin (eğer uygulandıysa):
+3. **Opsiyonel: Sanal bir ortam oluşturun (Tavsiye Edilir)**
+
+   - Sanal ortam oluşturun:
+     - `python3 -m venv .venv`
+   - Sanal ortamı etkinleştirin:
+     - `source .venv/bin/activate`
+   - `pip` kullanarak bağımlılıkları yükleyin:
+     - `pip install -r requirements.txt`
+   - Eğer bu yöntem çalışmazsa, bağımlılıkları manuel olarak yükleyin (bazıları zaten yüklü olabilir; hata alırsanız yüklenmeyenleri deneyin).
+     - `pip3 install babel certifi idna charset-normalizer PyYAML requests tqdm urllib3`
+
+4. Sanal ortamı etkinleştirin (eğer oluşturulduysa):
 
    ```bash
    source .venv/bin/activate
    ```
 
-4. Script’i başlatın:
-
-   ```bash
-   python3 main.py
-   ```
-
-5. Ekrandaki talimatları takip edin.
+5. Nasıl kulllanılacağını öğrenmek için alttakileri okumaya devam edin.
 
 ---
 
-## **📥 Yeni AppImage Nasıl Yüklenir (Konfigürasyon Dosyası Oluşturma)**
+## **🛠️ Uygulama Kullanımı**
 
-Bu adımı, eğer script ile daha önce AppImage yüklediyseniz veya konfigürasyon dosyasını (örn. `siyuan.json`) manuel olarak oluşturduysanız atlayabilirsiniz.
+1. `super-productivity.json` veya diğer örnek yapılandırma dosyalarını `config_files_examples/` klasöründen, uygulamanızın appimage dosyalarının bulunduğu dizine kopyalayabilirsiniz (varsayılan: `~/Documents/appimages/config_files/super-productivity.json`). Bu yapılandırma dosyası, super-productivity appimage için bir örnektir.
+
+2. Uygulama ile bir yapılandırma dosyası oluşturabilirsiniz. Ancak bunun için uygulama hakkında bazı bilgilere ihtiyacınız olacak:
+   - **GitHub URL:** Uygulamanın GitHub depo adresi (örn. `https://github.com/johannesjo/super-productivity`).
+   - **Hash türü:** Hash türünü belirtin (örn. super-productivity için sha512).
+   - **Hash doğrulama sorunları:** Eğer hash doğrulama başarısız olursa, hash'i manuel olarak JSON dosyasına ekleyebilirsiniz:
+     - En son hash bilgisini GitHub sürüm sayfasında bulabilirsiniz (örn. [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
+     - Örnekler için `json_files` klasörüne bakabilirsiniz. Tüm JSON dosyalarının beklendiği gibi çalışması gerekmektedir.
 
 ```bash
 ╰─❯ python3 main.py
@@ -157,10 +132,16 @@ Seçiminizi yapın: 3
 
 ---
 
-## **🤝 Katkı Sağlama**
+## **🙏 Bu Projeye Destek Olun**
 
-- Bu proje temelde öğrenme amaçlıdır, ancak geri bildirim veya öneriler için açığım! Katkılar ve fikirler değerlendirilecektir, ancak her katkı veya değişiklik garanti edilmez.
-- Detaylı açıklamalar için lütfen [CONTRIBUTING.md](.github/CONTRIBUTING.md) dosyasına başvurun.
+- **GitHub üzerinde yıldız ⭐** vererek desteğinizi gösterebilirsiniz, böylece kodlama yolculuğumda motive olmamı sağlar!
+- **💖 Projeyi Destekle:** Çalışmalarımı desteklemek ve projeler yapmaya devam etmemi sağlamak istersen, bana sponsor olmayı düşünebilirsin:
+  - [![Sponsor Ol](https://img.shields.io/badge/Sponsor-💖-brightgreen)](https://github.com/sponsors/Cyber-Syntax)
+
+### **🤝 Katkı Sağlama**
+
+- Bu proje benim için öncelikle bir öğrenme kaynağıdır, ancak geri bildirim veya önerilerden memnuniyet duyarım! Tüm katkıları entegre etmeyi veya sürekli olarak katılım sağlamayı vaat edemem, ancak proje hedeflerine uygun iyileştirmelere ve fikirlere açığım.
+- Yine de, daha ayrıntılı bir açıklama için lütfen [CONTRIBUTING.tr.md](.github/CONTRIBUTING.tr.md) dosyasına göz atın.
 
 ---
 

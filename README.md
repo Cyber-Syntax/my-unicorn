@@ -1,34 +1,19 @@
-[![en](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.md)
-[![tr](https://img.shields.io/badge/lang-tr-red.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.tr.md)
+[![en](https://img.shields.io/badge/lang-en-blue.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.md)
+[![tr](https://img.shields.io/badge/lang-tr-green.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.tr.md)
 
 ---
 
 # **⚠️ Attention**
 
-- **This project is in a permanent beta phase** due to limited testing. Although primarily developed for learning purposes, it effectively addresses my specific needs.
+- **This project is in a beta phase** due to limited testing at this time.. Although primarily developed for learning purposes, it effectively addresses my specific needs.
 - **Important:** Follow the instructions in the **Releases section** when updating the script. Updates may include new features or changes that could require different steps. I’ll strive to keep the instructions as simple as possible.
 - **Currently supported:** Linux only. While it might work on macOS, it has not been tested yet.
 
 ---
 
-## **🙏 Support This Project**
-
-If this script has been helpful:
-
-- **Consider giving it a star ⭐** on GitHub to show your support and keep me motivated on my coding journey!
-- **💖 Support This Project:** If you'd like to support my work and help me continue learning and building projects, consider sponsoring me:
-  - [![Sponsor Me](https://img.shields.io/badge/Sponsor-💖-brightgreen)](https://github.com/sponsors/Cyber-Syntax)
-
-### **🤝 Contributing**
-
-- This project is primarily a learning resource for me, but I appreciate any feedback or suggestions! While I can't promise to incorporate all contributions or maintain active involvement, I’m open to improvements and ideas that align with the project’s goals.
-- Anyway, please refer to the [CONTRIBUTING.md](.github/CONTRIBUTING.md) file for more detailed explanation.
-
----
-
 ## **🦄 About my-unicorn**
 
-- A script that downloads the latest AppImage from GitHub via API. It also verifies the file using:
+- Downloads the latest AppImage from GitHub via API. It also verifies the file using:
 
   - 🛠️ **Tested:**
     - [x] sha256
@@ -42,43 +27,14 @@ If this script has been helpful:
 
 ---
 
-## **🛠️ Dependencies**
-
-- [requests](https://pypi.org/project/requests/)
-- [yaml](https://pypi.org/project/PyYAML/)
-- [tqdm](https://pypi.org/project/tqdm/)
-
-### Optional: Create a virtual environment
-
-1. Navigate to the directory where you cloned the repository.
-2. Create a virtual environment:
-   - `python3 -m venv .venv`
-3. Activate the virtual environment:
-   - `source .venv/bin/activate`
-4. Install dependencies using `pip`:
-   - `pip install -r requirements.txt`
-   - If this doesn’t work, install manually:
-     - `pip3 install tqdm`
-
----
-
-## **⚠️ What You Need to Know Before Using**
-
-1. **GitHub URL:** The repository URL of the app (e.g., `https://github.com/johannesjo/super-productivity`).
-2. **Hash type:** Specify the hash type (e.g., sha512 for super-productivity).
-3. **Hash verification issues:** If the hash verification fails, you can manually add the hash to the JSON file:
-   - Look for the latest hash in the GitHub release page (e.g., [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
-   - Check the `json_files` folder for examples. All JSON files should work as expected.
-
----
-
 ## **💡 How to Use**
 
-### Example steps:
+### Install:
 
 1. Open a terminal and clone this repo (make sure you have git installed):
 
    ```bash
+   cd ~/Downloads &
    git clone https://github.com/Cyber-Syntax/my-unicorn.git
    ```
 
@@ -88,25 +44,39 @@ If this script has been helpful:
    cd ~/Downloads/Cyber-Syntax/my-unicorn
    ```
 
-3. Activate the virtual environment (if applicable):
+3. **Optional: Create a virtual environment (Recommended)**
+
+   - Create a virtual environment:
+     - `python3 -m venv .venv`
+   - Activate the virtual environment:
+     - `source .venv/bin/activate`
+   - Install dependencies using `pip`:
+     - `pip install -r requirements.txt`
+   - If this doesn't work, install manually (some of them may already be installed; exclude those if you encounter an error again).
+     - `pip3 install babel certifi idna charset-normalizer PyYAML requests tqdm urllib3`
+
+4. Activate the virtual environment (if applicable):
 
    ```bash
    source .venv/bin/activate
    ```
 
-4. Start the script:
-
-   ```bash
-   python3 main.py
-   ```
-
-5. Follow the on-screen instructions.
+5. Continue reading below to learn how to use.
 
 ---
 
-## **📥 How to Install a New AppImage (Create Config File)**
+### Using app:
 
-You can skip this step if you have already installed the AppImage with this script or if you manually created the config file (e.g., `siyuan.json`).
+1. You can copy `super-productivity.json` or other example config files from the `config_files_examples/` folder to your appimage folder path (default: `~/Documents/appimages/config_files/super-productivity.json`). This config file is an example for super-productivity appimage.
+
+2. Using the app to create one for you, but you'll need to know some information about the application:
+   - **GitHub URL:** The repository URL of the app (e.g., `https://github.com/johannesjo/super-productivity`).
+   - **Hash type:** Specify the hash type (e.g., sha512 for super-productivity).
+   - **Hash verification issues:** If the hash verification fails, you can manually add the hash to the JSON file:
+     - Look for the latest hash in the GitHub release page (e.g., [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
+     - Check the `json_files` folder for examples. All JSON files should work as expected.
+
+#### **📥 How to Install a New AppImage (Create Config File)**
 
 ```bash
 ╰─❯ python3 main.py
@@ -138,7 +108,7 @@ Joplin-2.13.12.AppImage: 100%|████████████████�
 
 ---
 
-## **🔄 How to Update AppImage**
+#### **🔄 1. How to Update AppImage**
 
 ```bash
 ╰─❯ python3 main.py
@@ -161,6 +131,19 @@ There are more than one .json file, please choose one of them:
 ============================================================
 Enter your choice: 3
 ```
+
+---
+
+## **🙏 Support This Project**
+
+- **Consider giving it a star ⭐** on GitHub to show your support and keep me motivated on my coding journey!
+- **💖 Sponsor me:** If you'd like to support my work and help me continue learning and building projects, consider sponsoring me:
+  - [![Sponsor Me](https://img.shields.io/badge/Sponsor-💖-brightgreen)](https://github.com/sponsors/Cyber-Syntax)
+
+### **🤝 Contributing**
+
+- This project is primarily a learning resource for me, but I appreciate any feedback or suggestions! While I can't promise to incorporate all contributions or maintain active involvement, I’m open to improvements and ideas that align with the project’s goals.
+- Anyway, please refer to the [CONTRIBUTING.md](.github/CONTRIBUTING.md) file for more detailed explanation.
 
 ---
 
