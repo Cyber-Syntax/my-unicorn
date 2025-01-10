@@ -16,6 +16,13 @@
 If this script has been helpful:
 
 - **Consider giving it a star ⭐** on GitHub to show your support and keep me motivated on my coding journey!
+- **💖 Support This Project:** If you'd like to support my work and help me continue learning and building projects, consider sponsoring me:
+  - [![Sponsor Me](https://img.shields.io/badge/Sponsor-💖-brightgreen)](https://github.com/sponsors/Cyber-Syntax)
+
+### **🤝 Contributing**
+
+- This project is primarily a learning resource for me, but I appreciate any feedback or suggestions! While I can't promise to incorporate all contributions or maintain active involvement, I’m open to improvements and ideas that align with the project’s goals.
+- Anyway, please refer to the [CONTRIBUTING.md](.github/CONTRIBUTING.md) file for more detailed explanation.
 
 ---
 
@@ -154,13 +161,6 @@ There are more than one .json file, please choose one of them:
 ============================================================
 Enter your choice: 3
 ```
-
----
-
-## **🤝 Contributing**
-
-- This project is primarily a learning resource for me, but I appreciate any feedback or suggestions! While I can't promise to incorporate all contributions or maintain active involvement, I’m open to improvements and ideas that align with the project’s goals.
-- Anyway, please refer to the [CONTRIBUTING.md](.github/CONTRIBUTING.md) file for more detailed explanation.
 
 ---
 

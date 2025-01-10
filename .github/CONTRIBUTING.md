@@ -9,7 +9,7 @@ I was started writing a script to learn Python, but this became my loved project
 - **Suggest improvements:** If you have ideas on how to improve the script, feel free to open an issue or submit a pull request.
 - **Report bugs:** If you encounter any issues or glitches, please let me know by opening an issue with details about the problem.
 - **Documentation:** Contributions to improving the documentation are always welcome.
-- **Trasnlations**
+- **Translations**
 
 ### **What You Can Expect:**
 
