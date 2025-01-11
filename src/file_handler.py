@@ -529,28 +529,12 @@ class FileHandler(AppImageDownloader):
             self.get_response()
             self.download()
 
-            # Verify SHA and handle errors
-            if not self.verify_sha():
-                print(
-                    _("Verification failed for {appimage}.").format(appimage=appimage)
-                )
+            # Verify SHA and handle errors (now handled by verify_yml)
+            if not self.verify_sha():  # Will return False if verification fails
                 if batch_mode:
                     print(_("Batch mode is being disabled due to an error."))
                     batch_mode = False
-
-                # Ask user for confirmation to proceed
-                if (
-                    input(
-                        _(
-                            "Do you want to retry or skip this appimage? (r=retry/s=skip): "
-                        )
-                    ).lower()
-                    == "r"
-                ):
-                    continue  # Retry the current appimage
-                else:
-                    print(_("Skipping {appimage}...").format(appimage=appimage))
-                    continue
+                continue  # Skip the current AppImage if verification fails
 
             self.make_executable()
             self.handle_file_operations(batch_mode=batch_mode)
