@@ -176,8 +176,10 @@ class FileHandler(AppImageDownloader):
             print(_("AppImage Hash: {appimage_sha}").format(appimage_sha=appimage_sha))
             print(_("Parsed Hash: {decoded_hash}").format(decoded_hash=decoded_hash))
             print("----------------------------------------------------")
+            return True
         else:
             self.handle_verification_error()
+            return False
 
         # close response
         response.close()
@@ -210,15 +212,17 @@ class FileHandler(AppImageDownloader):
             )
             print(_("Parsed Hash: {decoded_hash}").format(decoded_hash=decoded_hash))
             print("----------------------------------------------------")
+            return True
         else:
             self.handle_verification_error()
+            return False
 
     def verify_sha(self):
         """Verify the downloaded appimage"""
         if self.sha_name.endswith(".yml") or self.sha_name.endswith(".yaml"):
-            self.verify_yml(response=self.get_sha())
+            return self.verify_yml(response=self.get_sha())
         else:
-            self.verify_other(response=self.get_sha())
+            return self.verify_other(response=self.get_sha())
 
     @handle_common_errors
     def handle_file_operations(self, batch_mode=False):
@@ -495,20 +499,15 @@ class FileHandler(AppImageDownloader):
     @handle_common_errors
     def update_selected_appimages(self, appimages_to_update):
         """Update all appimages"""
-        if len(appimages_to_update) > 1:
-            if (
-                input(
-                    _(
-                        "Enable batch mode to continue without asking for approval? (y/n): "
-                    )
-                ).lower()
-                != "y"
-            ):
-                batch_mode = False
-            else:
-                batch_mode = True
-        else:
+        if (
+            input(
+                _("Enable batch mode to continue without asking for approval? (y/n): ")
+            ).lower()
+            != "y"
+        ):
             batch_mode = False
+        else:
+            batch_mode = True
 
         if batch_mode:
             print(
@@ -529,7 +528,14 @@ class FileHandler(AppImageDownloader):
             self.load_credentials()
             self.get_response()
             self.download()
-            self.verify_sha()
+
+            # Verify SHA and handle errors (now handled by verify_yml)
+            if not self.verify_sha():  # Will return False if verification fails
+                if batch_mode:
+                    print(_("Batch mode is being disabled due to an error."))
+                    batch_mode = False
+                continue  # Skip the current AppImage if verification fails
+
             self.make_executable()
             self.handle_file_operations(batch_mode=batch_mode)
 
