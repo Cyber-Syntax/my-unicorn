@@ -407,9 +407,7 @@ class FileHandler(AppImageDownloader):
     def check_updates_json_all(self):
         """Check for updates for all JSON files"""
         json_files = [
-            file
-            for file in os.listdir(self.file_path)
-            if file.endswith(".json") and file != "locale.json"
+            file for file in os.listdir(self.file_path) if file.endswith(".json")
         ]
 
         # Output the list of JSON files found
@@ -499,15 +497,22 @@ class FileHandler(AppImageDownloader):
     @handle_common_errors
     def update_selected_appimages(self, appimages_to_update):
         """Update all appimages"""
-        if (
-            input(
-                _("Enable batch mode to continue without asking for approval? (y/n): ")
-            ).lower()
-            != "y"
-        ):
-            batch_mode = False
-        else:
-            batch_mode = True
+        batch_mode = self.load_batch_mode()
+
+        if batch_mode is None:  # If no saved value is found, prompt for it
+            if (
+                input(
+                    _(
+                        "Enable batch mode to continue without asking for approval? (y/n): "
+                    )
+                ).lower()
+                != "y"
+            ):
+                batch_mode = False
+            else:
+                batch_mode = True
+            # Save the batch_mode value to a file
+            self.save_batch_mode(batch_mode)
 
         if batch_mode:
             print(
@@ -540,3 +545,19 @@ class FileHandler(AppImageDownloader):
             self.handle_file_operations(batch_mode=batch_mode)
 
         print(_("Update process completed for all selected appimages."))
+
+    def save_batch_mode(self, batch_mode):
+        """Save batch_mode to a JSON file"""
+
+        data = {"batch_mode": batch_mode}
+        with open(self.config_batch_path, "w") as json_file:
+            json.dump(data, json_file)
+
+    def load_batch_mode(self):
+        """Load batch_mode from a JSON file"""
+        try:
+            with open(self.config_batch_path, "r") as json_file:
+                data = json.load(json_file)
+                return data.get("batch_mode", None)  # Return None if not found
+        except FileNotFoundError:
+            return None  # Return None if the file doesn't exist

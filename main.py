@@ -8,13 +8,13 @@ import gettext
 from babel.support import Translations
 
 _ = gettext.gettext
+file_handler = FileHandler()
 
 
 def get_locale_config(file_path):
     """Load the locale configuration from the config file."""
-    config_path = os.path.join(file_path, "locale.json")
-    if os.path.exists(config_path):
-        with open(config_path, "r", encoding="utf-8") as file:
+    if os.path.exists(file_handler.config_path):
+        with open(file_handler.config_path, "r", encoding="utf-8") as file:
             config = json.load(file)
             return config.get("locale")  # Return None if no locale is set
     return None  # Return None if no config file exists
@@ -22,10 +22,9 @@ def get_locale_config(file_path):
 
 def save_locale_config(file_path, locale):
     """Save the selected locale to the config file."""
-    config_path = os.path.join(file_path, "locale.json")
-    print(f"Saving locale config to {config_path}")  # Debug statement
-    os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    with open(config_path, "w", encoding="utf-8") as file:
+    print(f"Saving locale config to {file_handler.config_path}")  # Debug statement
+    os.makedirs(os.path.dirname(file_handler.config_path), exist_ok=True)
+    with open(file_handler.config_path, "w", encoding="utf-8") as file:
         json.dump({"locale": locale}, file, indent=4)
     print(f"Locale saved as: {locale}")  # Debug statement
 
@@ -78,10 +77,11 @@ def update_locale(file_handler):
         choice = int(input("Enter your choice: "))
         if choice in languages:
             language = languages[choice]
-            config_path = os.path.join(file_handler.file_path, "locale.json")
-            print(f"Updating locale config to {config_path}")  # Debug statement
-            os.makedirs(os.path.dirname(config_path), exist_ok=True)
-            with open(config_path, "w", encoding="utf-8") as file:
+            print(
+                f"Updating locale config to {file_handler.config_path}"
+            )  # Debug statement
+            os.makedirs(os.path.dirname(file_handler.config_path), exist_ok=True)
+            with open(file_handler.config_path, "w", encoding="utf-8") as file:
                 json.dump({"locale": language}, file, indent=4)
             print(f"Locale updated to: {language}")  # Debug statement
         else:
@@ -173,7 +173,6 @@ def main():
     9. Make executable, delete version from appimage_name and move to directory
     """
     configure_logging()
-    file_handler = FileHandler()
 
     if not os.path.isfile(os.path.join(file_handler.file_path, "locale.json")):
         select_language(file_handler.file_path)

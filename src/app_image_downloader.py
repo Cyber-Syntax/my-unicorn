@@ -31,8 +31,15 @@ class AppImageDownloader:
 
     def __post_init__(self):
         self.appimage_folder = os.path.expanduser(self.appimage_folder)
+
         self.file_path = os.path.join(self.appimage_folder, "config_files/")
         os.makedirs(self.file_path, exist_ok=True)
+
+        other_settings_folder = os.path.join(self.file_path, "other_settings")
+        os.makedirs(other_settings_folder, exist_ok=True)
+
+        self.config_batch_path = os.path.join(other_settings_folder, "batch_mode.json")
+        self.config_path = os.path.join(other_settings_folder, "locale.json")
 
     @handle_common_errors
     def ask_user(self):
