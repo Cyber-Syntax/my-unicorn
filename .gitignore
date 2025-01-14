@@ -152,3 +152,4 @@ dmypy.json
 
 # logs
 *.log*
+logs/*
