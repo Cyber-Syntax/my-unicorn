@@ -72,9 +72,7 @@ class AppImageDownloader:
         """List the json files in the current directory, if json file exists."""
         try:
             json_files = [
-                file
-                for file in os.listdir(self.file_path)
-                if file.endswith(".json") and file != "locale.json"
+                file for file in os.listdir(self.file_path) if file.endswith(".json")
             ]
         except FileNotFoundError as error:
             logging.error(f"Error: {error}", exc_info=True)

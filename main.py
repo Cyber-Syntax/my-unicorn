@@ -6,6 +6,7 @@ import json
 from src.file_handler import FileHandler
 import gettext
 from babel.support import Translations
+from logging.handlers import RotatingFileHandler
 
 _ = gettext.gettext
 file_handler = FileHandler()
@@ -99,12 +100,20 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
 
 def configure_logging():
     """Set up the logging configuration"""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%d-%b-%y %H:%M:%S",
-        filename="logs/my-unicorn.log",
+    log_file_path = os.path.join(os.path.dirname(__file__), "logs/my-unicorn.log")
+    log_handler = RotatingFileHandler(
+        log_file_path,
+        maxBytes=1024 * 1024,
+        backupCount=3,  # 1MB per file, keep 3 backups
     )
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    log_handler.setFormatter(formatter)
+
+    logger = logging.getLogger()
+    logger.setLevel(
+        logging.INFO
+    )  # Logs INFO and above (INFO, WARNING, ERROR, CRITICAL)
+    logger.addHandler(log_handler)
 
 
 def get_user_choice():
@@ -174,7 +183,7 @@ def main():
     """
     configure_logging()
 
-    if not os.path.isfile(os.path.join(file_handler.file_path, "locale.json")):
+    if not os.path.isfile(file_handler.config_path):
         select_language(file_handler.file_path)
     else:
         current_locale = get_locale_config(file_handler.file_path)
