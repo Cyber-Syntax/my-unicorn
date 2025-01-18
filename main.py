@@ -7,89 +7,12 @@ from src.file_handler import FileHandler
 import gettext
 from babel.support import Translations
 from logging.handlers import RotatingFileHandler
+from src.locale import LocaleManager
+
 
 _ = gettext.gettext
 file_handler = FileHandler()
-
-
-def get_locale_config(file_path):
-    """Load the locale configuration from the config file."""
-    if os.path.exists(file_handler.config_path):
-        with open(file_handler.config_path, "r", encoding="utf-8") as file:
-            config = json.load(file)
-            return config.get("locale")  # Return None if no locale is set
-    return None  # Return None if no config file exists
-
-
-def save_locale_config(file_path, locale):
-    """Save the selected locale to the config file."""
-    print(f"Saving locale config to {file_handler.config_path}")  # Debug statement
-    os.makedirs(os.path.dirname(file_handler.config_path), exist_ok=True)
-    with open(file_handler.config_path, "w", encoding="utf-8") as file:
-        json.dump({"locale": locale}, file, indent=4)
-    print(f"Locale saved as: {locale}")  # Debug statement
-
-
-def load_translations(locale):
-    """Load translations for the specified locale."""
-    locales_dir = os.path.join(os.path.dirname(__file__), "locales")
-    translations = Translations.load(locales_dir, [locale])
-    translations.install()
-    global _
-    _ = translations.gettext
-
-
-def select_language(file_path):
-    """Display language options and set the selected language"""
-    global _
-    languages = {1: "en", 2: "tr"}
-    current_locale = get_locale_config(file_path)
-    if current_locale:
-        load_translations(current_locale)
-        return
-
-    print("Choose your language / Dilinizi seçin:")
-    print("1. English")
-    print("2. Türkçe")
-
-    try:
-        choice = int(input("Enter your choice: "))
-        if choice in languages:
-            language = languages[choice]
-            save_locale_config(file_path, language)
-            load_translations(language)
-        else:
-            print("Invalid choice. Defaulting to English.")
-            _ = gettext.gettext
-    except (ValueError, KeyboardInterrupt) as error:
-        logging.error(f"Error: {error}", exc_info=True)
-        print("Invalid input. Defaulting to English.")
-        _ = gettext.gettext
-
-
-def update_locale(file_handler):
-    """Update the locale.json file with the selected language."""
-    languages = {1: "en", 2: "tr"}
-    print("Choose your language / Dilinizi seçin:")
-    for key, value in languages.items():
-        print(f"{key}. {value}")
-
-    try:
-        choice = int(input("Enter your choice: "))
-        if choice in languages:
-            language = languages[choice]
-            print(
-                f"Updating locale config to {file_handler.config_path}"
-            )  # Debug statement
-            os.makedirs(os.path.dirname(file_handler.config_path), exist_ok=True)
-            with open(file_handler.config_path, "w", encoding="utf-8") as file:
-                json.dump({"locale": language}, file, indent=4)
-            print(f"Locale updated to: {language}")  # Debug statement
-        else:
-            print("Invalid choice.")
-    except (ValueError, KeyboardInterrupt) as error:
-        logging.error(f"Error: {error}", exc_info=True)
-        print("Invalid input.")
+locale_manager = LocaleManager
 
 
 def custom_excepthook(exc_type, exc_value, exc_traceback):
@@ -184,11 +107,11 @@ def main():
     configure_logging()
 
     if not os.path.isfile(file_handler.config_path):
-        select_language(file_handler.file_path)
+        locale_manager.select_language(file_handler.file_path)
     else:
-        current_locale = get_locale_config(file_handler.file_path)
+        current_locale = locale_manager.get_locale_config(file_handler.file_path)
         if current_locale:
-            load_translations(current_locale)
+            locale_manager.load_translations(current_locale)
     choice = get_user_choice()
 
     functions = {
@@ -239,7 +162,7 @@ def main():
         elif choice == 4:
             file_handler.check_updates_json_all()
         elif choice == 5:
-            update_locale(file_handler)
+            locale_manager.update_locale(file_handler)
         elif choice == 6:
             print(_("Exiting..."))
             sys.exit()
