@@ -3,7 +3,7 @@ from src.decorators import handle_common_errors
 
 
 @dataclass
-class InputHandler:
+class ParseURL:
     """Handles user inputs and repository information."""
 
     url: str = None
@@ -13,6 +13,11 @@ class InputHandler:
     def ask_url(self):
         """Ask user for input and update owner/repo."""
         self.url = input("Enter github url: ")
+
+    def __post_init__(self):
+        """Initialize owner and repo after URL is set."""
+        if self.url:
+            self.parse_owner_repo()
 
     @handle_common_errors
     def parse_owner_repo(self):

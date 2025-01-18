@@ -3,12 +3,12 @@ import json
 from babel.support import Translations
 import gettext
 from dataclasses import dataclass
-from src.app_image_downloader import AppImageDownloader
+from src.config import ConfigurationManager
 
 
 @dataclass
 class LocaleManager:
-    app_image_downloader: AppImageDownloader
+    config: ConfigurationManager
 
     def __post_init__(self, config_path):
         self.config_path = config_path

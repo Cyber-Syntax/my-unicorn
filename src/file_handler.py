@@ -13,8 +13,10 @@ from src.decorators import handle_api_errors, handle_common_errors
 
 
 @dataclass
-class FileHandler(AppImageDownloader):
+class FileHandler:
     """Handle the file operations"""
+
+    # TODO: load strings/keys from configs to not rely any other class
 
     def ask_delete_appimage(self):
         """Delete the downloaded appimage"""
@@ -213,7 +215,9 @@ class FileHandler(AppImageDownloader):
         self.appimages["appimage"] = self.repo + "-" + self.version + ".AppImage"
 
         # write the updated version and appimage_name to the json file
-        with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+        with open(
+            f"{self.config_folder_path}{self.repo}.json", "w", encoding="utf-8"
+        ) as file:
             json.dump(self.appimages, file, indent=4)
         print(
             _("\033[42mCredentials updated to {repo}.json\033[0m").format(

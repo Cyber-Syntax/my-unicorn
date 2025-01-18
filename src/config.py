@@ -5,7 +5,7 @@ from src.decorators import handle_common_errors
 
 
 @dataclass
-class ConfigurationManager:
+class ConfigurationManager(DownloadManager):
     """Handles reading and writing app image configuration files."""
 
     appimage_folder: str = field(default_factory=lambda: "~/Documents/appimages")
@@ -22,12 +22,13 @@ class ConfigurationManager:
         self.appimage_folder_backup = os.path.join(self.appimage_folder, "backup/")
         os.makedirs(self.appimage_folder_backup, exist_ok=True)
 
-        self.file_path = os.path.join(self.appimage_folder, "config_files/")
-        os.makedirs(self.file_path, exist_ok=True)
+        self.config_folder_path = os.path.join(self.appimage_folder, "config_files/")
+        os.makedirs(self.config_folder_path, exist_ok=True)
 
-        other_settings_folder = os.path.join(self.file_path, "other_settings")
+        other_settings_folder = os.path.join(self.config_folder_path, "other_settings")
         os.makedirs(other_settings_folder, exist_ok=True)
 
+        # TODO: make those one file.
         self.config_batch_path = os.path.join(other_settings_folder, "batch_mode.json")
         self.config_path = os.path.join(other_settings_folder, "locale.json")
 
@@ -48,12 +49,7 @@ class ConfigurationManager:
             ).strip(" ")
             print("=================================================")
 
-            if (
-                self.url
-                and self.appimage_folder
-                and self.hash_type
-                and self.appimage_folder_backup
-            ):
+            if self.appimage_folder and self.hash_type:
                 break
 
     # TODO: Make this to ask_keep_backup last version on the config creation
@@ -92,7 +88,9 @@ class ConfigurationManager:
         self.appimages["appimage_folder_backup"] = self.appimage_folder_backup
         self.appimages["appimage_folder"] = self.appimage_folder
 
-        with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+        with open(
+            f"{self.config_folder_path}{self.repo}.json", "w", encoding="utf-8"
+        ) as file:
             json.dump(self.appimages, file, indent=4)
         print(
             _("Saved credentials to config_files/{repo}.json file").format(
@@ -104,10 +102,10 @@ class ConfigurationManager:
     @handle_common_errors
     def load_credentials(self):
         """Load the credentials from a json file"""
-        json_path = f"{self.file_path}{self.repo}.json"
+        json_path = f"{self.config_folder_path}{self.repo}.json"
         if os.path.exists(json_path):
             with open(
-                f"{self.file_path}{self.repo}.json", "r", encoding="utf-8"
+                f"{self.config_folder_path}{self.repo}.json", "r", encoding="utf-8"
             ) as file:
                 self.appimages = json.load(file)
             self.owner = self.appimages["owner"]
@@ -135,14 +133,16 @@ class ConfigurationManager:
             print(
                 _(
                     "{path}{repo}.json File not found while trying to load credentials or unknown error."
-                ).format(path=self.file_path, repo=self.repo)
+                ).format(path=self.config_folder_path, repo=self.repo)
             )
             self.ask_user()
 
     @handle_common_errors
     def update_json(self):
         """Update the json file with the new credentials (e.g change json file)"""
-        with open(f"{self.file_path}{self.repo}.json", "r", encoding="utf-8") as file:
+        with open(
+            f"{self.config_folder_path}{self.repo}.json", "r", encoding="utf-8"
+        ) as file:
             self.appimages = json.load(file)
 
         print("=================================================")
@@ -178,7 +178,9 @@ class ConfigurationManager:
         else:
             print(_("Invalid choice"))
             sys.exit()
-        with open(f"{self.file_path}{self.repo}.json", "w", encoding="utf-8") as file:
+        with open(
+            f"{self.config_folder_path}{self.repo}.json", "w", encoding="utf-8"
+        ) as file:
             json.dump(self.appimages, file, indent=4)
 
         print("-------------------------------------------------")
@@ -189,7 +191,9 @@ class ConfigurationManager:
         """List the json files in the current directory, if json file exists."""
         try:
             json_files = [
-                file for file in os.listdir(self.file_path) if file.endswith(".json")
+                file
+                for file in os.listdir(self.config_folder_path)
+                if file.endswith(".json")
             ]
         except FileNotFoundError as error:
             logging.error(f"Error: {error}", exc_info=True)

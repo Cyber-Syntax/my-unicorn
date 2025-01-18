@@ -1,9 +1,8 @@
-class AppImageUpdater:
+class UpdateAppImage(ConfigurationManager, DownloadManager):
     """Handles the appimage update process, including checking for updates and user interaction."""
 
     def __init__(self, config_manager, github_api_handler):
         self.config_manager = config_manager
-        self.github_api_handler = github_api_handler
         self.appimages_to_update = []
 
     def check_updates_json_all(self):

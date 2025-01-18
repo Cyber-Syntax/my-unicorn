@@ -9,7 +9,7 @@ from src.decorators import handle_api_errors
 
 
 @dataclass
-class DownloadManager:
+class DownloadManager(ParseURL):
     """Manages the downloading of the app image."""
 
     api_url: str = None
