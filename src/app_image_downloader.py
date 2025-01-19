@@ -6,6 +6,9 @@ import requests
 from tqdm import tqdm
 from dataclasses import dataclass, field
 from .decorators import handle_api_errors, handle_common_errors
+import gettext
+
+_ = gettext.gettext
 
 
 @dataclass

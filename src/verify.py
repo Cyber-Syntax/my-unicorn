@@ -15,12 +15,8 @@ from .app_image_downloader import AppImageDownloader
 
 
 @dataclass
-class VerificationManager:
+class VerificationManager(FileHandler):
     sha_url: str = None
-    file_handler: FileHandler
-
-    def __post_init__(self):
-        self.file_handler.load_credentials()
 
     @staticmethod
     def sha_response_error(func):
@@ -221,6 +217,7 @@ class VerificationManager:
 
     def verify_sha(self):
         """Verify the downloaded appimage"""
+        self.file_handler.load_credentials()
         if self.sha_name.endswith(".yml") or self.sha_name.endswith(".yaml"):
             return self.verify_yml(response=self.get_sha())
         else:

@@ -6,7 +6,7 @@ import sys
 import logging
 import json
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import requests
 import yaml
 from .decorators import handle_api_errors, handle_common_errors
@@ -14,8 +14,12 @@ from .app_image_downloader import AppImageDownloader
 
 
 @dataclass
-class FileHandler(AppImageDownloader):
-    """Handle the file operations"""
+class FileHandler:
+    downloader: AppImageDownloader = field(default_factory=AppImageDownloader)
+
+    def __post_init__(self):
+        # FIX: it can't load because it didn't select anything to load? function don't now what to load
+        self.downloader.load_credentials()  # Directly call `FileHandler` methods
 
     @handle_common_errors
     def handle_file_operations(self, batch_mode=False):

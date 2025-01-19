@@ -1,9 +1,11 @@
 import sys
 import logging
 import requests
+import gettext
 
 # Set up logging
 logging.basicConfig(level=logging.ERROR)
+_ = gettext.gettext
 
 
 def handle_error(func_name, error, exit_message):

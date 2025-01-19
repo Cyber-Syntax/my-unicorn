@@ -4,12 +4,12 @@ import json
 import requests
 from .decorators import handle_common_errors
 from .app_image_downloader import AppImageDownloader
+from .file_handler import FileHandler
 from .verify import VerificationManager
 from dataclasses import dataclass, field
 
 
-@dataclass
-class UpdateManager(AppImageDownloader):
+class UpdateManager(FileHandler):
 
     # INFO: Cause API RATE LIMIT EXCEEDED if used more than 15 - 20 times
     # KeyError: 'tag_name' means that API RATE LIMIT EXCEEDED.
