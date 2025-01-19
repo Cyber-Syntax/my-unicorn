@@ -4,12 +4,16 @@ import sys
 import logging
 import json
 from src.file_handler import FileHandler
+from src.update import UpdateManager
+from src.verify import VerificationManager
 import gettext
 from babel.support import Translations
 from logging.handlers import RotatingFileHandler
 
 _ = gettext.gettext
 file_handler = FileHandler()
+update_manager = UpdateManager()
+verify_manager = VerificationManager()
 
 
 def get_locale_config(file_path):
@@ -198,7 +202,7 @@ def main():
             "get_response",
             "download",
             "save_credentials",
-            "verify_sha",
+            verify_manager.verify_sha,
             "make_executable",
             "handle_file_operations",
         ],
@@ -208,21 +212,21 @@ def main():
             "get_response",
             "download",
             "save_credentials",
-            "verify_sha",
+            verify_manager.verify_sha,
             "make_executable",
             "handle_file_operations",
         ],
         3: [
             "get_response",
             "download",
-            "verify_sha",
+            verify_manager.verify_sha,
             "make_executable",
             "handle_file_operations",
         ],
         4: [
             "get_response",
             "download",
-            "verify_sha",
+            verify_manager.verify_sha,
             "make_executable",
             "handle_file_operations",
         ],
@@ -237,7 +241,7 @@ def main():
             file_handler.list_json_files()
             file_handler.update_json()
         elif choice == 4:
-            file_handler.check_updates_json_all()
+            update_manager.check_updates_json_all()
         elif choice == 5:
             update_locale(file_handler)
         elif choice == 6:

@@ -5,7 +5,7 @@ import logging
 import requests
 from tqdm import tqdm
 from dataclasses import dataclass, field
-from src.decorators import handle_api_errors, handle_common_errors
+from .decorators import handle_api_errors, handle_common_errors
 
 
 @dataclass
