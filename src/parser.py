@@ -6,6 +6,9 @@ from src.decorators import handle_common_errors
 class ParseURL:
     """Handles user inputs and repository information."""
 
+    # TODO: setting up property for the owner and repo ?
+    # or just use parent child inheritance and after that just use configManager to load for other classes.
+    # need to decrease rely on the different classes or decide to use inharitance or property etc.
     url: str = None
     owner: str = None
     repo: str = None

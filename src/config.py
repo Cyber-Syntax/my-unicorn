@@ -8,12 +8,20 @@ from src.decorators import handle_common_errors
 class ConfigurationManager(DownloadManager):
     """Handles reading and writing app image configuration files."""
 
+    # TODO: first 2 not need to be rely for the specific json files, send them with locale, batch
+    # inside other_settings.json
     appimage_folder: str = field(default_factory=lambda: "~/Documents/appimages")
     appimage_folder_backup: str = field(init=False)
+    # Maybe create them for another config setup?
+    # hash_Type etc. maybe handle by parseURL which is already realated with something similar though
+    # parsing url, on the download can get things and than save it the path
+    # in this one, we can ask user initial this one like first function can be this one to create
+    # locale, paths, backups etc., afterward parse url can be asked and download can initialize
+    # and than specific config file can be created to path.
     config_folder_path: str = field(init=False)
     hash_type: str = None
     sha_name: str = None
-    choice: int = None
+    choice: int = None  # TODO: choice need to be different, keep backup or etc?
     appimages: dict = field(default_factory=dict)
 
     def __post_init__(self):
@@ -28,7 +36,9 @@ class ConfigurationManager(DownloadManager):
         other_settings_folder = os.path.join(self.config_folder_path, "other_settings")
         os.makedirs(other_settings_folder, exist_ok=True)
 
-        # TODO: make those one file.
+        # TODO: make those one file. Also lets add that config appimage_folder and backup too.
+        self.config_file = os.path.join(other_settings_folder, "settings.json")
+
         self.config_batch_path = os.path.join(other_settings_folder, "batch_mode.json")
         self.config_path = os.path.join(other_settings_folder, "locale.json")
 
