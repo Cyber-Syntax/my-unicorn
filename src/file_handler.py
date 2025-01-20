@@ -1,226 +1,110 @@
-import base64
-import hashlib
 import os
-import subprocess
-import sys
-import logging
-import json
 import shutil
+import subprocess
+import json
+import logging
 from dataclasses import dataclass
-import requests
-import yaml
-from src.decorators import handle_api_errors, handle_common_errors
+from typing import Optional
 
 
 @dataclass
 class FileHandler:
-    """Handle the file operations"""
+    """Handles file operations for managing AppImages."""
 
-    # TODO: load strings/keys from configs to not rely any other class
+    appimage_name: str
+    repo: str
+    version: str
+    appimage_folder: str
+    backup_folder: str
+    config_folder_path: str
+    appimages: dict
 
-    def ask_delete_appimage(self):
-        """Delete the downloaded appimage"""
-        new_name = f"{self.repo}.AppImage"
+    def ask_user_confirmation(self, message: str) -> bool:
+        """Ask the user for a yes/no confirmation."""
+        return input(f"{message} (y/n): ").strip().lower() == "y"
 
-        if (
-            input(_("Do you want to delete the downloaded appimage? (y/n): ")).lower()
-            == "y"
-        ):
-            if self.appimage_name != new_name:
-                os.remove(self.appimage_name)
-                print(
-                    _("Deleted {appimage_name}").format(
-                        appimage_name=self.appimage_name
-                    )
-                )
-            else:
-                os.remove(new_name)
-                print(_("Deleted {new_name}").format(new_name=new_name))
-
-            print(_("Deleted {appimage_name}").format(appimage_name=self.appimage_name))
+    def delete_file(self, file_path: str) -> None:
+        """Delete a file if it exists."""
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            print(f"Deleted {file_path}")
         else:
-            print(
-                _("{appimage_name} saved in {cwd}").format(
-                    appimage_name=self.appimage_name, cwd=os.getcwd()
-                )
-            )
+            print(f"File not found: {file_path}")
 
-    @handle_common_errors
-    def handle_file_operations(self, batch_mode=False):
-        """Handle the file operations with one user's approval"""
-        # 1. backup old appimage
-        print(_("--------------------- CHANGES  ----------------------"))
-        if self.choice == 1 or self.choice == 3:
-            print(
-                _("Moving old {repo}.AppImage to {backup}").format(
-                    repo=self.repo, backup=self.appimage_folder_backup
-                )
-            )
+    def make_executable(self, file_path: Optional[str] = None) -> None:
+        """Make a file executable."""
+        file_path = file_path or self.appimage_name
+        if os.access(file_path, os.X_OK):
+            print(f"{file_path} is already executable.")
+            return
+        subprocess.run(["chmod", "+x", file_path], check=True)
+        print(f"{file_path} is now executable.")
 
-        print(
-            _("Changing {appimage_name} name to {repo}.AppImage").format(
-                appimage_name=self.appimage_name, repo=self.repo
-            )
-        )
-        print(
-            _("Moving updated appimage to {folder}").format(folder=self.appimage_folder)
-        )
-        print(_("Updating credentials in {repo}.json").format(repo=self.repo))
-        print(_("Deleting {sha_name}").format(sha_name=self.sha_name))
-        print("-----------------------------------------------------")
+    def backup_old_appimage(self) -> None:
+        """Backup the old AppImage to a backup folder."""
+        old_appimage = os.path.join(self.appimage_folder, f"{self.repo}.AppImage")
+        backup_file = os.path.join(self.backup_folder, f"{self.repo}.AppImage")
 
-        # 6. Ask user for approval if not in batch mode
-        if not batch_mode:
-            if input(_("Do you want to continue? (y/n): ")).lower() != "y":
-                print(_("Appimage installed but not moved to the appimage folder"))
-                print(
-                    _("{appimage_name} saved in {cwd}").format(
-                        appimage_name=self.appimage_name, cwd=os.getcwd()
-                    )
-                )
+        if not os.path.exists(self.backup_folder):
+            if self.ask_user_confirmation(
+                f"Backup folder {self.backup_folder} not found. Create it?"
+            ):
+                os.makedirs(self.backup_folder, exist_ok=True)
+                print(f"Created backup folder: {self.backup_folder}")
+            else:
+                print("Backup operation canceled.")
                 return
 
-        if self.choice == 1 or self.choice == 3:
-            self.backup_old_appimage()
-
-        self.change_name()
-        self.move_appimage()
-        self.update_version()
-        os.remove(self.sha_name)
-
-    def make_executable(self):
-        """Make the appimage executable"""
-        # if already executable, return
-        if os.access(self.appimage_name, os.X_OK):
-            return
-
-        print("************************************")
-        print(_("Making the appimage executable..."))
-        subprocess.run(["chmod", "+x", self.appimage_name], check=True)
-        print(_("\033[42mAppimage is now executable\033[0m"))
-        print("************************************")
-
-    # TODO: check is it okay to use with new feature? Backup old appimage if the user accepted it
-    @handle_common_errors
-    def backup_old_appimage(self):
-        """Save old {self.repo}.AppImage to a backup folder"""
-        backup_folder = os.path.expanduser(f"{self.appimage_folder_backup}")
-        old_appimage = os.path.expanduser(f"{self.appimage_folder}{self.repo}.AppImage")
-        backup_file = os.path.expanduser(f"{backup_folder}{self.repo}.AppImage")
-
-        # Create a backup folder if it doesn't exist
-        if os.path.exists(backup_folder):
-            print(
-                _("Backup folder {backup_folder} found").format(
-                    backup_folder=backup_folder
-                )
-            )
+        if os.path.exists(old_appimage):
+            shutil.copy2(old_appimage, backup_file)
+            print(f"Backed up {old_appimage} to {backup_file}")
         else:
-            if (
-                input(
-                    _(
-                        "Backup folder {backup_folder} not found, do you want to create it (y/n): "
-                    ).format(backup_folder=backup_folder)
-                ).lower()
-                == "y"
-            ):
-                os.makedirs(os.path.dirname(backup_folder), exist_ok=True)
-                print(
-                    _("Created backup folder: {backup_folder}").format(
-                        backup_folder=backup_folder
-                    )
-                )
-            else:
-                print(_("Backup folder not created."))
+            print(f"Old AppImage not found: {old_appimage}")
 
-        # Check if old appimage exists
-        if os.path.exists(f"{self.appimage_folder}/{self.repo}.AppImage"):
-
-            print(
-                _("Found {repo}.AppImage in {folder}").format(
-                    repo=self.repo, folder=self.appimage_folder
-                )
-            )
-
-            # Move old appimage to backup folder
-            try:
-                # overwrite the old appimage to the backup folder if it already exists
-                shutil.copy2(old_appimage, backup_file)
-            except shutil.Error as error:
-                logging.error(f"Error: {error}", exc_info=True)
-                print(
-                    _(
-                        "\033[41;30mError moving {repo}.AppImage to {backup_folder}\033[0m"
-                    ).format(repo=self.repo, backup_folder=backup_folder)
-                )
-            else:
-                print(
-                    _("Old {old_appimage} copied to {backup_folder}").format(
-                        old_appimage=old_appimage, backup_folder=backup_folder
-                    )
-                )
-                print("-----------------------------------------------------")
-        else:
-            print(
-                _("{repo}.AppImage not found in {folder}").format(
-                    repo=self.repo, folder=self.appimage_folder
-                )
-            )
-
-    def change_name(self):
-        """Change the appimage name to {self.repo}.AppImage"""
+    def rename_appimage(self) -> None:
+        """Rename the AppImage to the repository's name."""
         new_name = f"{self.repo}.AppImage"
         if self.appimage_name != new_name:
-            print(
-                _("Changing {appimage_name} name to {new_name}").format(
-                    appimage_name=self.appimage_name, new_name=new_name
-                )
-            )
             shutil.move(self.appimage_name, new_name)
             self.appimage_name = new_name
+            print(f"Renamed AppImage to {new_name}")
         else:
-            print(_("The appimage name is already the new name"))
+            print(f"AppImage is already named {new_name}")
 
-    @handle_common_errors
-    def move_appimage(self):
-        """Move appimages to a appimage folder"""
-        # check if appimage folder exists
-        os.makedirs(os.path.dirname(self.appimage_folder), exist_ok=True)
-        # move appimage to appimage folder
-        try:
-            shutil.copy2(f"{self.repo}.AppImage", self.appimage_folder)
-        except shutil.Error as error:
-            logging.error(f"Error: {error}", exc_info=True)
-            print(
-                _("\033[41;30mError moving {repo}.AppImage to {folder}\033[0m").format(
-                    repo=self.repo, folder=self.appimage_folder
-                )
-            )
-        else:
-            print(
-                _("Moved {repo}.AppImage to {folder}").format(
-                    repo=self.repo, folder=self.appimage_folder
-                )
-            )
-            # remove the appimage from the current directory because shutil uses copy2
-            os.remove(f"{self.repo}.AppImage")
+    def move_appimage(self) -> None:
+        """Move the AppImage to the specified folder."""
+        os.makedirs(self.appimage_folder, exist_ok=True)
+        target_path = os.path.join(self.appimage_folder, f"{self.repo}.AppImage")
+        shutil.move(self.appimage_name, target_path)
+        print(f"Moved {self.appimage_name} to {self.appimage_folder}")
 
-    @handle_common_errors
-    def update_version(self):
-        """Update the version-appimage_name in the json file"""
-
-        print(_("Updating credentials..."))
-        # update the version, appimage_name
+    def update_version(self) -> None:
+        """Update the version and AppImage name in the configuration file."""
+        config_file = os.path.join(self.config_folder_path, f"{self.repo}.json")
         self.appimages["version"] = self.version
-        self.appimages["appimage"] = self.repo + "-" + self.version + ".AppImage"
+        self.appimages["appimage"] = f"{self.repo}-{self.version}.AppImage"
 
-        # write the updated version and appimage_name to the json file
-        with open(
-            f"{self.config_folder_path}{self.repo}.json", "w", encoding="utf-8"
-        ) as file:
+        with open(config_file, "w", encoding="utf-8") as file:
             json.dump(self.appimages, file, indent=4)
-        print(
-            _("\033[42mCredentials updated to {repo}.json\033[0m").format(
-                repo=self.repo
-            )
-        )
+        print(f"Updated configuration in {config_file}")
+
+    def handle_appimage_operations(self, batch_mode: bool = False) -> None:
+        """Handle file operations with optional user approval."""
+        print("--------- Summary of Operations ---------")
+        print(f"1. Backup old AppImage to {self.backup_folder}")
+        print(f"2. Rename AppImage to {self.repo}.AppImage")
+        print(f"3. Move AppImage to {self.appimage_folder}")
+        print(f"4. Update version information in {self.repo}.json")
+        print("-----------------------------------------")
+
+        if not batch_mode and not self.ask_user_confirmation(
+            "Proceed with the above operations?"
+        ):
+            print("Operation canceled by user.")
+            return
+
+        self.backup_old_appimage()
+        self.rename_appimage()
+        self.move_appimage()
+        self.update_version()
+        print("All operations completed successfully.")

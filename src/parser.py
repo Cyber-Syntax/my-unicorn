@@ -11,20 +11,28 @@ class ParseURL:
 
     def ask_url(self):
         """Ask user for input and update owner/repo."""
-        self.url = input("Enter github url: ")
+        self.url = input("Enter the GitHub URL: ").strip()
         self._validate_url()
         self._parse_owner_repo()
 
     def _validate_url(self):
         """Validate the GitHub URL format."""
         if not self.url.startswith("https://github.com/"):
-            raise ValueError("Invalid GitHub URL format.")
+            raise ValueError(
+                "Invalid GitHub URL format. Must start with 'https://github.com/'."
+            )
 
     def _parse_owner_repo(self):
-        """Parse owner repo from github url"""
+        """Parse owner and repository from GitHub URL."""
         if self.url:
-            self._owner = self.url.split("/")[3]
-            self._repo = self.url.split("/")[4]
+            parts = self.url.split("/")
+            if len(parts) >= 5:
+                self._owner = parts[3]
+                self._repo = parts[4]
+            else:
+                raise ValueError(
+                    "Invalid GitHub URL. Unable to parse owner and repository."
+                )
 
     @property
     def owner(self):
