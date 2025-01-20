@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from dataclasses import dataclass, field
 from .parser import ParseURL
 from .api import GitHubAPI
@@ -22,7 +23,7 @@ class AppConfigManager:
         self.config_folder = os.path.expanduser(self.config_folder)
         os.makedirs(self.config_folder, exist_ok=True)
         # Use the default name if no specific config file name is provided
-        self.config_file_name = f"{self.repo}.json"
+        self.config_file_name = self.config_file_name or f"{self.repo}.json"
 
     def get_config_file_path(self):
         """Get the full path for an app-specific configuration file."""
@@ -31,15 +32,22 @@ class AppConfigManager:
     def load_config(self):
         """Load app-specific configuration from a JSON file."""
         config_file = self.get_config_file_path()
-        if os.path.exists(config_file):
-            with open(config_file, "r", encoding="utf-8") as file:
-                config = json.load(file)
-                self.owner = config.get("owner", self.owner)
-                self.repo = config.get("repo", self.repo)
-                self.version = config.get("version", self.version)
-                self.sha_name = config.get("sha_name", self.sha_name)
-                self.hash_type = config.get("hash_type", self.hash_type)
-                self.appimage_name = config.get("appimage_name", self.appimage_name)
+        if os.path.isfile(config_file):  # Check if the file exists
+            try:
+                with open(config_file, "r", encoding="utf-8") as file:
+                    config = json.load(file)
+                    # Load values, falling back to current defaults if keys are missing
+                    self.owner = config.get("owner", self.owner)
+                    self.repo = config.get("repo", self.repo)
+                    self.version = config.get("version", self.version)
+                    self.sha_name = config.get("sha_name", self.sha_name)
+                    self.hash_type = config.get("hash_type", self.hash_type)
+                    self.appimage_name = config.get("appimage_name", self.appimage_name)
+            except json.JSONDecodeError as e:
+                logging.error(f"Invalid JSON in the configuration file: {e}")
+                raise ValueError("Failed to parse JSON from the configuration file.")
+        else:
+            logging.info(f"Configuration file {config_file} not found. Starting fresh.")
 
     def save_config(self):
         """Save app-specific configuration to a JSON file."""
@@ -61,7 +69,6 @@ class AppConfigManager:
     @staticmethod
     def from_github_api(owner, repo, sha_name=None, hash_type="sha256"):
         """Create an instance using data fetched from GitHub API."""
-
         github = GitHubAPI(owner, repo)
         github.get_response()
 
@@ -82,22 +89,16 @@ class AppConfigManager:
                 for file in os.listdir(self.config_folder)
                 if file.endswith(".json")
             ]
-            if json_files:
-                return json_files
-            else:
-                print(_("No JSON files found."))
-                return []
+            return json_files if json_files else []
         except FileNotFoundError as error:
-            logging.error(f"Error: {error}", exc_info=True)
-            print(_("Error: {error}. Exiting...").format(error=error))
-            sys.exit(1)
+            logging.error(f"Error accessing configuration folder: {error}")
+            raise FileNotFoundError("Configuration folder does not exist.")
 
-    @staticmethod
-    def create_app_config():
+    def create_app_config(self):
+        """Set up app-specific configuration interactively."""
         print("Setting up app-specific configuration...")
 
         # Parse the GitHub URL using ParseURL
-
         parser = ParseURL()
         parser.ask_url()
 
@@ -109,11 +110,12 @@ class AppConfigManager:
             input("Enter the hash type (default: 'sha256'): ").strip() or "sha256"
         )
 
-        # Create config using GitHubAPI
-        config = AppConfigManager.from_github_api(
+        # Update the current instance with values from GitHub API
+        app_config = AppConfigManager.from_github_api(
             owner=parser.owner, repo=parser.repo, sha_name=sha_name, hash_type=hash_type
         )
 
-        config.save_config()
-        print(f"Configuration for {config.appimage_name} saved successfully!")
-        return config
+        # Save the configuration
+        app_config.save_config()
+        print(f"Configuration for {app_config.appimage_name} saved successfully!")
+        return app_config

@@ -78,14 +78,10 @@ class SHAFileManager:
 class VerificationManager:
     """Coordinates the verification of downloaded AppImages."""
 
-    def __init__(
-        self, appimage_path: str, github_api: GitHubAPI, hash_type: str = "sha256"
-    ):
+    def __init__(self):
         self.appimage_path = appimage_path
-        self.github_api = github_api  # Dependency injection
-        self.sha_manager = SHAFileManager(
-            sha_name=github_api.sha_name, sha_url=github_api.sha_url
-        )
+        self.app_config = AppImageManager()
+        self.sha_manager = SHAFileManager(sha_name=str, sha_url=str)
         self.hash_manager = HashManager(hash_type)
 
     def handle_verification_error(

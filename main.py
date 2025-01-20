@@ -56,6 +56,7 @@ def main():
     configure_logging()
 
     # Setup Global Configuration if user doesn't have one
+    app_config = AppConfigManager()
     global_config = GlobalConfigManager()
     global_config.load_config()
 
@@ -68,7 +69,7 @@ def main():
 
     # Handle user choices
     if choice == 1:
-        AppConfigManager.create_app_config()
+        app_config.create_app_config()
 
     elif choice == 2:
         # Initialize updater with appropriate managers
@@ -77,11 +78,11 @@ def main():
 
     elif choice == 3:
         logging.info(_("Customizing global configuration..."))
-        GlobalConfigManager.customize_global_config(global_config)
+        global_config.customize_global_config(global_config)
 
     elif choice == 4:
         logging.info(_("Customizing AppImage configuration..."))
-        AppConfigManager.customize_app_config()
+        app_config.customize_app_config()
 
     elif choice == 5:
         print(_("Exiting..."))

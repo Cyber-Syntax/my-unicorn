@@ -6,9 +6,9 @@ import logging
 class GitHubAPI:
     """Handles interaction with the GitHub API to fetch release information."""
 
-    def __init__(self, owner: str, repo: str):
-        self.owner = owner
-        self.repo = repo
+    def __init__(self):
+        self.owner = None
+        self.repo = None
         self.api_url = (
             f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
         )
