@@ -102,6 +102,7 @@ class AppImageUpdater:
 
     def update_selected_appimages(self, appimages_to_update):
         """Update the selected appimages."""
+        # TODO: load batch_mode from global config and ensure defined
 
         for appimage in appimages_to_update:
             self._update_appimage(appimage, batch_mode)

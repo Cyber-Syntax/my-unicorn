@@ -12,8 +12,9 @@ class ParseURL:
     def ask_url(self):
         """Ask user for input and update owner/repo."""
         self.url = input("Enter the GitHub URL: ").strip()
-        self._validate_url()
-        self._parse_owner_repo()
+        if self.url:
+            self._validate_url()
+            self._parse_owner_repo()
 
     def _validate_url(self):
         """Validate the GitHub URL format."""

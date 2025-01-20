@@ -25,7 +25,12 @@ class DownloadManager:
             f"{self.api.appimage_name} downloading... Grab a cup of coffee :), it will take some time depending on your internet speed."
         )
 
-        response = requests.get(self.api.appimage_url, timeout=10, stream=True)
+        try:
+            response = requests.get(self.api.appimage_url, timeout=10)
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching data from GitHub API: {e}")
+            return None
+
         total_size_in_bytes = int(response.headers.get("content-length", 0))
 
         if response.status_code == 200:

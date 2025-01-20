@@ -43,7 +43,7 @@ class SHAFileManager:
     def download_sha_file(self):
         """Download the SHA file."""
         if not os.path.exists(self.sha_name):
-            response = requests.get(self.sha_url, timeout=10)
+            response = requests.get(self.sha_url, timeout=5)
             if response.status_code == 200:
                 with open(self.sha_name, "w", encoding="utf-8") as file:
                     file.write(response.text)
@@ -135,6 +135,8 @@ class VerificationManager:
             expected_hash = self._get_expected_hash()
 
             # Step 3: Calculate the AppImage hash
+            if not hasattr(self, "appimage_path") or not self.appimage_path:
+                raise AttributeError("appimage_path is not initialized.")
             appimage_hash = self.hash_manager.calculate_hash(self.appimage_path)
 
             # Step 4: Compare the hashes

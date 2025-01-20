@@ -37,7 +37,11 @@ class FileHandler:
         if os.access(file_path, os.X_OK):
             print(f"{file_path} is already executable.")
             return
-        subprocess.run(["chmod", "+x", file_path], check=True)
+
+        try:
+            subprocess.run(["chmod", "+x", file_path], check=True)
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Failed to make {file_path} executable: {e}")
         print(f"{file_path} is now executable.")
 
     def backup_old_appimage(self) -> None:

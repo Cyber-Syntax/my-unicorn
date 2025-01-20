@@ -6,7 +6,9 @@ from logging.handlers import RotatingFileHandler
 class LogManager:
     def __init__(self, log_file="my-unicorn.log", log_level=logging.INFO):
         """Initializes the logger with file path and log level"""
-        log_file_path = os.path.join(os.path.dirname(__file__), "logs", log_file)
+        log_dir = os.path.join(os.path.dirname(__file__), "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        log_file_path = os.path.join(log_dir, log_file)
         self.logger = logging.getLogger()
         self._setup_logger(log_file_path, log_level)
 
