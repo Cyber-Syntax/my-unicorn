@@ -10,6 +10,8 @@ import gettext
 _ = gettext.gettext
 
 
+# TODO: Not need to acces by github api, just load from config
+# Config already going to use githubapi class to save them, I don't need to make it two request
 class HashManager:
     """Handles hash generation and comparison."""
 
@@ -169,9 +171,3 @@ class VerificationManager:
             return sha_data
 
         raise ValueError(f"Hash not found in {self.github_api.sha_name}")
-
-    def _make_executable(self):
-        """Make the AppImage executable."""
-        if os.name == "posix":  # Linux/Unix-specific
-            os.chmod(self.appimage_path, 0o755)
-            print(f"{self.github_api.appimage_name} is now executable.")

@@ -1,5 +1,6 @@
 import requests
 import json
+import logging
 
 
 class GitHubAPI:
@@ -65,6 +66,18 @@ class GitHubAPI:
 
         else:
             print(f"Failed to get response from API: {self.api_url}")
+            return None
+
+    def check_latest_version(self, owner, repo):
+        """Fetch the latest release version from GitHub."""
+        try:
+            response = requests.get(
+                f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+            )
+            response.raise_for_status()
+            return response.json()["tag_name"].replace("v", "")
+        except requests.exceptions.RequestException as e:
+            logging.error(f"GitHub API request failed: {e}")
             return None
 
     @property
