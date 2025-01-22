@@ -1,14 +1,21 @@
 import requests
 import json
 import logging
+from .parser import ParseURL
+from dataclasses import dataclass, field
 
 
 class GitHubAPI:
     """Handles interaction with the GitHub API to fetch release information."""
 
-    def __init__(self):
-        self.owner = None
-        self.repo = None
+    def __init__(
+        self, owner: str, repo: str, sha_name: str = None, hash_type: str = "sha256"
+    ):
+        """Initialize the GitHubAPI object with owner, repo, and other optional params."""
+        self.owner = owner
+        self.repo = repo
+        self._sha_name = sha_name
+        self._hash_type = hash_type
         self.api_url = (
             f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
         )
@@ -16,7 +23,6 @@ class GitHubAPI:
         self._sha_url = None
         self._appimage_url = None
         self._appimage_name = None
-        self._sha_name = None
 
     def get_response(self):
         """Fetch the latest release data from GitHub API."""
@@ -94,6 +100,21 @@ class GitHubAPI:
     def sha_name(self):
         """Return the verification file name"""
         return self._sha_name
+
+    @sha_name.setter
+    def sha_name(self, value):
+        """Setter for _sha_name."""
+        self.__sha_name = value
+
+    @property
+    def hash_type(self):
+        """Return the hash type."""
+        return self.__hash_type
+
+    @hash_type.setter
+    def hash_type(self, value):
+        """Setter for _hash_type."""
+        self.__hash_type = value
 
     @property
     def appimage_url(self):

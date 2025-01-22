@@ -8,6 +8,12 @@ from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
 from src.locale import LocaleManager
 from src.update import AppImageUpdater
+from commands.invoker import CommandInvoker
+from commands.create_app_config import CreateAppConfigCommand
+from commands.update_all import UpdateAllAppImagesCommand
+from commands.customize_global_config import CustomizeGlobalConfigCommand
+from commands.customize_app_config import CustomizeAppConfigCommand
+from commands.download import DownloadCommand
 
 _ = gettext.gettext
 
@@ -23,7 +29,7 @@ def get_user_choice():
     print(_("Welcome to my-unicorn 🦄!"))
     print(_("Choose one of the following options:"))
     print("====================================")
-    print(_("1. Create AppImage Config File (Must be created to install/update)"))
+    print(_("1. Download AppImage (Must be installed to create config file)"))
     print(_("2. Update all AppImages"))
     print(_("3. Customize global config file"))
     print(_("4. Customize AppImage config file"))
@@ -39,7 +45,11 @@ def get_user_choice():
 
 def configure_logging():
     """Configure logging for the application."""
-    log_file_path = os.path.join(os.path.dirname(__file__), "logs/my-unicorn.log")
+    log_dir = os.path.join(os.path.dirname(__file__), "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = "my-unicorn.log"
+    log_file_path = os.path.join(log_dir, log_file)
+
     log_handler = RotatingFileHandler(
         log_file_path, maxBytes=1024 * 1024, backupCount=3
     )
@@ -64,32 +74,53 @@ def main():
     # locale_manager = LocaleManager()
     # locale_manager.load_translations(global_config.locale)
 
-    # Get user choice
-    choice = get_user_choice()
+    # # Get user choice
+    # choice = get_user_choice()
 
-    # Handle user choices
-    if choice == 1:
-        app_config.create_app_config()
+    # Initialize CommandInvoker and register commands
+    invoker = CommandInvoker()
 
-    elif choice == 2:
-        # Initialize updater with appropriate managers
-        updater = AppImageUpdater(global_config)
-        updater.update_all()
-
-    elif choice == 3:
-        logging.info(_("Customizing global configuration..."))
-        global_config.customize_global_config(global_config)
-
-    elif choice == 4:
-        logging.info(_("Customizing AppImage configuration..."))
-        app_config.customize_app_config()
-
-    elif choice == 5:
-        print(_("Exiting..."))
-        sys.exit()
-
-    else:
-        print(_("Invalid choice. Please try again."))
+    invoker.register_command(1, DownloadCommand())
+    invoker.register_command(2, UpdateAllAppImagesCommand())
+    invoker.register_command(3, CustomizeGlobalConfigCommand())
+    invoker.register_command(4, CustomizeAppConfigCommand())
+    # Main menu loop
+    while True:
+        choice = get_user_choice()
+        if choice == 5:  # Exit
+            print("Exiting...")
+            sys.exit(0)
+        invoker.execute_command(choice)
+    # # Main menu loop
+    # while True:
+    #     choice = get_user_choice()
+    #     if choice == 5:  # Exit
+    #         print("Exiting...")
+    #         sys.exit(0)
+    #     invoker.execute_command(choice)
+    # # Handle user choices
+    # if choice == 1:
+    #     app_config.create_app_config()
+    #
+    # elif choice == 2:
+    #     # Initialize updater with appropriate managers
+    #     updater = AppImageUpdater(global_config)
+    #     updater.update_all()
+    #
+    # elif choice == 3:
+    #     logging.info(_("Customizing global configuration..."))
+    #     global_config.customize_global_config(global_config)
+    #
+    # elif choice == 4:
+    #     logging.info(_("Customizing AppImage configuration..."))
+    #     app_config.customize_app_config()
+    #
+    # elif choice == 5:
+    #     print(_("Exiting..."))
+    #     sys.exit()
+    #
+    # else:
+    #     print(_("Invalid choice. Please try again."))
 
 
 if __name__ == "__main__":

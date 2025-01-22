@@ -67,19 +67,19 @@ class AppConfigManager:
         }
 
     @staticmethod
-    def from_github_api(owner, repo, sha_name=None, hash_type="sha256"):
-        """Create an instance using data fetched from GitHub API."""
-        github = GitHubAPI(owner, repo)
-        github.get_response()
-
-        return AppConfigManager(
-            appimage_name=github.appimage_name,
-            owner=owner,
-            repo=repo,
-            version=github.version,
-            sha_name=sha_name or github.sha_name,
-            hash_type=hash_type,
-        )
+    # def from_github_api(sha_name=None, hash_type="sha256"):
+    #     """Create an instance using data fetched from GitHub API."""
+    #     github = GitHubAPI()
+    #     github.get_response()
+    #
+    #     return AppConfigManager(
+    #         appimage_name=github.appimage_name,
+    #         # owner=owner,
+    #         # repo=repo,
+    #         version=github.version,
+    #         sha_name=sha_name or github.sha_name,
+    #         hash_type=hash_type,
+    #     )
 
     def list_json_files(self):
         """List JSON files in the configuration directory."""
@@ -94,28 +94,19 @@ class AppConfigManager:
             logging.error(f"Error accessing configuration folder: {error}")
             raise FileNotFoundError("Configuration folder does not exist.")
 
-    def create_app_config(self):
+    def ask_sha_hash(self):
         """Set up app-specific configuration interactively."""
         print("Setting up app-specific configuration...")
 
-        # Parse the GitHub URL using ParseURL
-        parser = ParseURL()
-        parser.ask_url()
-
-        sha_name = (
-            input("Enter the SHA file name (leave blank to auto-detect): ").strip()
-            or None
-        )
-        hash_type = (
+        # TODO: if detected, don't ask? Need to change command sorting
+        # We need to use api to detect first before asking those
+        self.sha_name = input("Enter the SHA file name : ").strip()
+        self.hash_type = (
             input("Enter the hash type (default: 'sha256'): ").strip() or "sha256"
         )
+        # # Update the current instance with values from GitHub API
+        # app_config = AppConfigManager.from_github_api(
+        #     sha_name=sha_name, hash_type=hash_type
+        # )
 
-        # Update the current instance with values from GitHub API
-        app_config = AppConfigManager.from_github_api(
-            owner=parser.owner, repo=parser.repo, sha_name=sha_name, hash_type=hash_type
-        )
-
-        # Save the configuration
-        app_config.save_config()
-        print(f"Configuration for {app_config.appimage_name} saved successfully!")
-        return app_config
+        return self.sha_name, self.hash_type
