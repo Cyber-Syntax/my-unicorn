@@ -8,12 +8,22 @@ from .verify import VerificationManager
 
 
 class AppImageUpdater:
-    """Handles the AppImage update process."""
+    """Handles the AppImage update process.
 
-    def __init__(self, app_config):
-        self.app_config = AppConfigManager()
-        self.github_api_handler = GitHubAPI()
-        self.verify = VerificationManager()
+    Dependencies:
+    - AppConfigManager: Manages app-specific configurations.
+    - GitHubAPI: Fetches release information from GitHub.
+    """
+
+    def __init__(
+        self,
+        app_config: AppConfigManager,
+        github_api_handler: GitHubAPI,
+        verify: VerificationManager,
+    ):
+        self.app_config = app_config
+        self.github_api_handler = github_api_handler
+        self.verify = verify
         self.appimages_to_update = []
 
     def update_all(self):

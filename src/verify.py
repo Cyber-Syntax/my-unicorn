@@ -78,11 +78,10 @@ class SHAFileManager:
 class VerificationManager:
     """Coordinates the verification of downloaded AppImages."""
 
-    def __init__(self):
+    def __init__(self, hash_manager: HashManager, sha_manager: SHAFileManager):
         self.appimage_path = appimage_path
-        self.app_config = AppImageManager()
-        self.sha_manager = SHAFileManager(sha_name=str, sha_url=str)
-        self.hash_manager = HashManager(hash_type)
+        self.sha_manager = sha_manager
+        self.hash_manager = hash_manager
 
     def handle_verification_error(
         self, appimage_hash: str = None, expected_hash: str = None
