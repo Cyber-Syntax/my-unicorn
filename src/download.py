@@ -13,12 +13,19 @@ class DownloadManager:
         self.api = api
         self.appimage_name = None
 
-    def download(self):
-        """Download the appimage from the github api."""
+    def is_app_exist(self):
+        """Check if the AppImage already exists in the current directory."""
         if os.path.exists(self.api.appimage_name) or os.path.exists(
             self.api.appimage_name + ".AppImage"
         ):
             print(f"{self.api.appimage_name} already exists in the current directory")
+            return True
+        return False
+
+    def download(self):
+        """Download the appimage from the github api."""
+        if self.is_app_exist():
+            # If the file exists, do not proceed with the download
             return
 
         print(

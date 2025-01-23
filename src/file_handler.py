@@ -11,13 +11,17 @@ from typing import Optional
 class FileHandler:
     """Handles file operations for managing AppImages."""
 
-    appimage_name: str
+    appimage_download_folder_path: str
+    appimage_download_backup_folder_path: str
+    config_file: str  # global
+    # app_config attributes
+    config_folder: str  # config folder path
+    config_file_name: str  # self.repo.json
     repo: str
     version: str
-    appimage_folder: str
-    backup_folder: str
-    config_folder_path: str
-    appimages: dict
+    appimage_name: str
+
+    # appimages: dict
 
     def ask_user_confirmation(self, message: str) -> bool:
         """Ask the user for a yes/no confirmation."""
@@ -46,15 +50,21 @@ class FileHandler:
 
     def backup_old_appimage(self) -> None:
         """Backup the old AppImage to a backup folder."""
-        old_appimage = os.path.join(self.appimage_folder, f"{self.repo}.AppImage")
-        backup_file = os.path.join(self.backup_folder, f"{self.repo}.AppImage")
+        old_appimage = os.path.join(
+            self.appimage_download_folder_path, f"{self.repo}.AppImage"
+        )
+        backup_file = os.path.join(
+            self.appimage_download_backup_folder_path, f"{self.repo}.AppImage"
+        )
 
-        if not os.path.exists(self.backup_folder):
+        if not os.path.exists(self.appimage_download_backup_folder_path):
             if self.ask_user_confirmation(
-                f"Backup folder {self.backup_folder} not found. Create it?"
+                f"Backup folder {self.appimage_download_backup_folder_path} not found. Create it?"
             ):
-                os.makedirs(self.backup_folder, exist_ok=True)
-                print(f"Created backup folder: {self.backup_folder}")
+                os.makedirs(self.appimage_download_backup_folder_path, exist_ok=True)
+                print(
+                    f"Created backup folder: {self.appimage_download_backup_folder_path}"
+                )
             else:
                 print("Backup operation canceled.")
                 return
@@ -77,27 +87,29 @@ class FileHandler:
 
     def move_appimage(self) -> None:
         """Move the AppImage to the specified folder."""
-        os.makedirs(self.appimage_folder, exist_ok=True)
-        target_path = os.path.join(self.appimage_folder, f"{self.repo}.AppImage")
+        os.makedirs(self.appimage_download_folder_path, exist_ok=True)
+        target_path = os.path.join(
+            self.appimage_download_folder_path, f"{self.repo}.AppImage"
+        )
         shutil.move(self.appimage_name, target_path)
-        print(f"Moved {self.appimage_name} to {self.appimage_folder}")
+        print(f"Moved {self.appimage_name} to {self.appimage_download_folder_path}")
 
     def update_version(self) -> None:
-        """Update the version and AppImage name in the configuration file."""
-        config_file = os.path.join(self.config_folder_path, f"{self.repo}.json")
-        self.appimages["version"] = self.version
-        self.appimages["appimage"] = f"{self.repo}-{self.version}.AppImage"
-
+        config_file = os.path.join(self.config_folder, f"{self.repo}.json")
+        config_data = {
+            "version": self.version,
+            "appimage": f"{self.repo}-{self.version}.AppImage",
+        }
         with open(config_file, "w", encoding="utf-8") as file:
-            json.dump(self.appimages, file, indent=4)
+            json.dump(config_data, file, indent=4)
         print(f"Updated configuration in {config_file}")
 
     def handle_appimage_operations(self, batch_mode: bool = False) -> None:
         """Handle file operations with optional user approval."""
         print("--------- Summary of Operations ---------")
-        print(f"1. Backup old AppImage to {self.backup_folder}")
+        print(f"1. Backup old AppImage to {self.appimage_download_backup_folder_path}")
         print(f"2. Rename AppImage to {self.repo}.AppImage")
-        print(f"3. Move AppImage to {self.appimage_folder}")
+        print(f"3. Move AppImage to {self.appimage_download_folder_path}")
         print(f"4. Update version information in {self.repo}.json")
         print("-----------------------------------------")
 

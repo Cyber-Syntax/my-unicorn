@@ -1,8 +1,6 @@
 import requests
 import json
 import logging
-from .parser import ParseURL
-from dataclasses import dataclass, field
 
 
 class GitHubAPI:
@@ -73,6 +71,7 @@ class GitHubAPI:
         else:
             print(f"Failed to get response from API: {self.api_url}")
             return None
+        return self._sha_url
 
     def check_latest_version(self, owner, repo):
         """Fetch the latest release version from GitHub."""
@@ -104,17 +103,17 @@ class GitHubAPI:
     @sha_name.setter
     def sha_name(self, value):
         """Setter for _sha_name."""
-        self.__sha_name = value
+        self._sha_name = value
 
     @property
     def hash_type(self):
         """Return the hash type."""
-        return self.__hash_type
+        return self._hash_type
 
     @hash_type.setter
     def hash_type(self, value):
         """Setter for _hash_type."""
-        self.__hash_type = value
+        self._hash_type = value
 
     @property
     def appimage_url(self):

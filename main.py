@@ -62,20 +62,14 @@ def configure_logging():
 
 
 def main():
-    # Configure logging
     configure_logging()
 
-    # Setup Global Configuration if user doesn't have one
-    app_config = AppConfigManager()
-    global_config = GlobalConfigManager()
-    global_config.load_config()
+    # global_config = GlobalConfigManager()
+    # global_config.load_config()
 
     # # Instantiate LocaleManager and set locale
     # locale_manager = LocaleManager()
     # locale_manager.load_translations(global_config.locale)
-
-    # # Get user choice
-    # choice = get_user_choice()
 
     # Initialize CommandInvoker and register commands
     invoker = CommandInvoker()
@@ -91,36 +85,6 @@ def main():
             print("Exiting...")
             sys.exit(0)
         invoker.execute_command(choice)
-    # # Main menu loop
-    # while True:
-    #     choice = get_user_choice()
-    #     if choice == 5:  # Exit
-    #         print("Exiting...")
-    #         sys.exit(0)
-    #     invoker.execute_command(choice)
-    # # Handle user choices
-    # if choice == 1:
-    #     app_config.create_app_config()
-    #
-    # elif choice == 2:
-    #     # Initialize updater with appropriate managers
-    #     updater = AppImageUpdater(global_config)
-    #     updater.update_all()
-    #
-    # elif choice == 3:
-    #     logging.info(_("Customizing global configuration..."))
-    #     global_config.customize_global_config(global_config)
-    #
-    # elif choice == 4:
-    #     logging.info(_("Customizing AppImage configuration..."))
-    #     app_config.customize_app_config()
-    #
-    # elif choice == 5:
-    #     print(_("Exiting..."))
-    #     sys.exit()
-    #
-    # else:
-    #     print(_("Invalid choice. Please try again."))
 
 
 if __name__ == "__main__":

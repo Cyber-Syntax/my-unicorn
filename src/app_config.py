@@ -12,29 +12,27 @@ class AppConfigManager:
 
     appimage_name: str = None
     config_folder: str = field(default="~/Documents/appimages/config_files/")
-    owner: str = None
-    repo: str = None
+    #FIX: repo came None or became None in this class
+    owner: str = field(default=None)
+    repo: str = field(default=None)
     version: str = None
     sha_name: str = None
     hash_type: str = field(default="sha256")
     config_file_name: str = field(default=None)
 
     def __post_init__(self):
+        self.repo = self.repo
         self.config_folder = os.path.expanduser(self.config_folder)
         os.makedirs(self.config_folder, exist_ok=True)
         # Use the default name if no specific config file name is provided
-        self.config_file_name = self.config_file_name or f"{self.repo}.json"
-
-    def get_config_file_path(self):
-        """Get the full path for an app-specific configuration file."""
-        return os.path.join(self.config_folder, self.config_file_name)
+        self.config_file_name = f"{self.repo}.json"
+        self.config_file = os.path.join(self.config_folder, self.config_file_name)
 
     def load_config(self):
         """Load app-specific configuration from a JSON file."""
-        config_file = self.get_config_file_path()
-        if os.path.isfile(config_file):  # Check if the file exists
+        if os.path.isfile(self.config_file):  # Check if the file exists
             try:
-                with open(config_file, "r", encoding="utf-8") as file:
+                with open(self.config_file, "r", encoding="utf-8") as file:
                     config = json.load(file)
                     # Load values, falling back to current defaults if keys are missing
                     self.owner = config.get("owner", self.owner)
@@ -50,10 +48,10 @@ class AppConfigManager:
             logging.info(f"Configuration file {config_file} not found. Starting fresh.")
 
     def save_config(self):
-        """Save app-specific configuration to a JSON file."""
-        config_file = self.get_config_file_path()
-        with open(config_file, "w", encoding="utf-8") as file:
-            json.dump(self.to_dict(), file, indent=4)
+        with open(self.config_file, "w", encoding="utf-8") as file:
+            config_data = self.to_dict()
+            logging.info(f"Saving configuration: {config_data}")
+            json.dump(config_data, file, indent=4)
 
     def to_dict(self):
         """Convert the dataclass to a dictionary."""
