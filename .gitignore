@@ -149,3 +149,7 @@ dmypy.json
 
 # syncthing conflict files
 *.sync-conflict-*
+
+# logs
+*.log*
+logs/*
