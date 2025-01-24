@@ -5,50 +5,12 @@ import hashlib
 import base64
 import logging
 import gettext
-from pathlib import Path
 
 _ = gettext.gettext
 
 
-# TODO: Not need to acces by github api, just load from config
-# Config already going to use githubapi class to save them, I don't need to make it two request
-# class HashManager:
-#     """Handles hash generation and comparison."""
-#
-#     def __init__(self, hash_type="sha256"):
-#         self.hash_type = hash_type
-#
-#     def calculate_hash(self, file_path):
-#         """Calculate the hash of a file."""
-#         with open(file_path, "rb") as file:
-#             return hashlib.new(self.hash_type, file.read()).hexdigest()
-#
-#     def compare_hashes(self, hash1, hash2):
-#         """Compare two hash values."""
-#         return hash1 == hash2
-#
-#     @staticmethod
-#     def decode_base64_hash(encoded_hash):
-#         """Decode a base64-encoded hash."""
-#         return base64.b64decode(encoded_hash).hex()
-#
-
-
-# class SHAFileManager:
-#     """Handles downloading and parsing SHA files."""
-#
-#     def __init__(self, sha_name, sha_url):
-#         self.sha_name = sha_name
-#         self.sha_url = sha_url
-#
-
-
 class VerificationManager:
     """Coordinates the verification of downloaded AppImages."""
-
-    # def __init__(self, hash_manager: HashManager, sha_manager: SHAFileManager):
-    #     self.sha_manager = sha_manager
-    #     self.hash_manager = hash_manager
 
     def __init__(
         self,
@@ -63,12 +25,11 @@ class VerificationManager:
         self.hash_type = hash_type
 
     def verify_appimage(self) -> bool:
-        """Verify the AppImage using the SHA file from GitHub."""
-
+        """Verify the AppImage using the SHA file."""
         try:
             self.download_sha_file()
-            self.parse_sha_file()
-            return True
+            is_valid = self.parse_sha_file()
+            return is_valid
         except requests.RequestException as e:
             logging.error(f"Network error: {e}")
             return False
@@ -93,56 +54,49 @@ class VerificationManager:
         """Parse the SHA file and extract hashes."""
         if self.sha_name.endswith((".yml", ".yaml")):
             return self._parse_yaml_sha()
+        elif self.sha_name.endswith((".sha512", ".sha256")):
+            return self._parse_simple_sha()
         else:
             return self._parse_text_sha()
 
-    # TODO: separate functions later
     def _parse_yaml_sha(self):
         """Parse SHA hash from a YAML file."""
-        # parse the sha file
         with open(self.sha_name, "r", encoding="utf-8") as file:
-            sha = yaml.safe_load(file)
+            sha_data = yaml.safe_load(file)
 
-        # get the sha from the sha file
-        sha = sha[self.hash_type]
-        decoded_hash = base64.b64decode(sha).hex()
+        sha_value = sha_data.get(self.hash_type)
+        if not sha_value:
+            raise ValueError(f"No {self.hash_type} hash found in the YAML file.")
 
-        # find appimage sha
-        with open(self.appimage_name, "rb") as file:
-            appimage_sha = hashlib.new(self.hash_type, file.read()).hexdigest()
+        decoded_hash = base64.b64decode(sha_value).hex()
 
-        # compare the two hashes
-        if appimage_sha == decoded_hash:
-            print(
-                _("\033[42m{appimage_name} verified.\033[0m").format(
-                    appimage_name=self.appimage_name
-                )
-            )
-            print("************************************")
-            print(_("--------------------- HASHES ----------------------"))
-            print(_("AppImage Hash: {appimage_sha}").format(appimage_sha=appimage_sha))
-            print(_("Parsed Hash: {decoded_hash}").format(decoded_hash=decoded_hash))
-            print("----------------------------------------------------")
-            return True
-        else:
-            return False
+        return self._compare_hashes(decoded_hash)
+
+    def _parse_simple_sha(self):
+        """Parse SHA hash from a simple .sha512 or .sha256 file."""
+        with open(self.sha_name, "r", encoding="utf-8") as file:
+            sha_line = file.readline().strip()
+
+        return self._compare_hashes(sha_line)
 
     def _parse_text_sha(self):
         """Parse SHA hash from a plain text file."""
-        print("parsing sha")
-        # Parse the sha file
         with open(self.sha_name, "r", encoding="utf-8") as file:
             for line in file:
                 if self.appimage_name in line:
-                    decoded_hash = line.split()[0]
-                    break
+                    sha_value = line.split()[0]
+                    return self._compare_hashes(sha_value)
 
-        # Find appimage sha
+        raise ValueError(
+            f"No matching hash found for {self.appimage_name} in the SHA file."
+        )
+
+    def _compare_hashes(self, expected_hash: str) -> bool:
+        """Compare the expected hash with the AppImage's hash."""
         with open(self.appimage_name, "rb") as file:
             appimage_hash = hashlib.new(self.hash_type, file.read()).hexdigest()
 
-        # Compare the two hashes
-        if appimage_hash == decoded_hash:
+        if appimage_hash == expected_hash:
             print(
                 _("\033[42m{appimage_name} verified.\033[0m").format(
                     appimage_name=self.appimage_name
@@ -150,11 +104,16 @@ class VerificationManager:
             )
             print("************************************")
             print(_("--------------------- HASHES ----------------------"))
-            print(
-                _("AppImage Hash: {appimage_hash}").format(appimage_hash=appimage_hash)
-            )
-            print(_("Parsed Hash: {decoded_hash}").format(decoded_hash=decoded_hash))
+            print(_("AppImage Hash: {appimage_hash}").format(appimage_hash=appimage_hash))
+            print(_("Expected Hash: {expected_hash}").format(expected_hash=expected_hash))
             print("----------------------------------------------------")
             return True
         else:
+            print(
+                _("\033[41m{appimage_name} verification failed.\033[0m").format(
+                    appimage_name=self.appimage_name
+                )
+            )
+            print(_("AppImage Hash: {appimage_hash}").format(appimage_hash=appimage_hash))
+            print(_("Expected Hash: {expected_hash}").format(expected_hash=expected_hash))
             return False

@@ -1,51 +1,59 @@
 import os
 import json
 import logging
-from dataclasses import dataclass, field
-from .parser import ParseURL
-from .api import GitHubAPI
 
 
-@dataclass
 class AppConfigManager:
     """Manages app-specific configuration settings."""
 
-    appimage_name: str = None
-    config_folder: str = field(default="~/Documents/appimages/config_files/")
-    #FIX: repo came None or became None in this class
-    owner: str = field(default=None)
-    repo: str = field(default=None)
-    version: str = None
-    sha_name: str = None
-    hash_type: str = field(default="sha256")
-    config_file_name: str = field(default=None)
-
-    def __post_init__(self):
-        self.repo = self.repo
-        self.config_folder = os.path.expanduser(self.config_folder)
-        os.makedirs(self.config_folder, exist_ok=True)
-        # Use the default name if no specific config file name is provided
+    def __init__(
+        self,
+        owner: str = None,
+        repo: str = None,
+        version: str = None,
+        sha_name: str = None,
+        hash_type: str = "sha256",
+        appimage_name: str = None,
+        config_folder: str = "~/Documents/appimages/config_files/",
+    ):
+        self.owner = owner
+        self.repo = repo
+        self.version = version
+        self.sha_name = sha_name
+        self.hash_type = hash_type
+        self.appimage_name = appimage_name
+        self.config_folder = os.path.expanduser(config_folder)
         self.config_file_name = f"{self.repo}.json"
-        self.config_file = os.path.join(self.config_folder, self.config_file_name)
+        self.config_file = (
+            os.path.join(self.config_folder, self.config_file_name)
+            if self.config_file_name
+            else None
+        )
 
-    def load_config(self):
-        """Load app-specific configuration from a JSON file."""
-        if os.path.isfile(self.config_file):  # Check if the file exists
+        # Ensure the configuration directory exists
+        os.makedirs(self.config_folder, exist_ok=True)
+
+    def load_appimage_config(self, config_file_name: str):
+        """Load a specific AppImage configuration file."""
+        config_file_path = os.path.join(self.config_folder, config_file_name)
+        if os.path.isfile(config_file_path):  # Check if the file exists
             try:
-                with open(self.config_file, "r", encoding="utf-8") as file:
+                with open(config_file_path, "r", encoding="utf-8") as file:
                     config = json.load(file)
-                    # Load values, falling back to current defaults if keys are missing
+                    # Update instance variables with the loaded config
                     self.owner = config.get("owner", self.owner)
                     self.repo = config.get("repo", self.repo)
                     self.version = config.get("version", self.version)
                     self.sha_name = config.get("sha_name", self.sha_name)
                     self.hash_type = config.get("hash_type", self.hash_type)
                     self.appimage_name = config.get("appimage_name", self.appimage_name)
+                    return config
             except json.JSONDecodeError as e:
                 logging.error(f"Invalid JSON in the configuration file: {e}")
                 raise ValueError("Failed to parse JSON from the configuration file.")
         else:
-            logging.info(f"Configuration file {config_file} not found. Starting fresh.")
+            logging.warning(f"Configuration file {config_file_name} not found.")
+            return None
 
     def save_config(self):
         with open(self.config_file, "w", encoding="utf-8") as file:
@@ -63,21 +71,6 @@ class AppConfigManager:
             "hash_type": self.hash_type,
             "appimage_name": self.appimage_name,
         }
-
-    @staticmethod
-    # def from_github_api(sha_name=None, hash_type="sha256"):
-    #     """Create an instance using data fetched from GitHub API."""
-    #     github = GitHubAPI()
-    #     github.get_response()
-    #
-    #     return AppConfigManager(
-    #         appimage_name=github.appimage_name,
-    #         # owner=owner,
-    #         # repo=repo,
-    #         version=github.version,
-    #         sha_name=sha_name or github.sha_name,
-    #         hash_type=hash_type,
-    #     )
 
     def list_json_files(self):
         """List JSON files in the configuration directory."""
@@ -97,14 +90,12 @@ class AppConfigManager:
         print("Setting up app-specific configuration...")
 
         # TODO: if detected, don't ask? Need to change command sorting
-        # We need to use api to detect first before asking those
-        self.sha_name = input("Enter the SHA file name : ").strip()
+
+        #TODO: Debug is WIP:
+        # joplin works, siyuan works
+        self.sha_name = input("Enter the SHA file name (Leave blank if you want auto detect): ").strip() or None
         self.hash_type = (
             input("Enter the hash type (default: 'sha256'): ").strip() or "sha256"
         )
-        # # Update the current instance with values from GitHub API
-        # app_config = AppConfigManager.from_github_api(
-        #     sha_name=sha_name, hash_type=hash_type
-        # )
 
         return self.sha_name, self.hash_type

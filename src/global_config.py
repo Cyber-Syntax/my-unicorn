@@ -1,7 +1,7 @@
 import os
 import json
-from dataclasses import dataclass, field
 import logging
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -22,8 +22,13 @@ class GlobalConfigManager:
     locale: str = field(default="en")
 
     def __post_init__(self):
+        # Expand only the config file path during initialization
         self.config_file = os.path.expanduser(self.config_file)
         self.load_config()
+
+    def expanded_path(self, path):
+        """Expand and return a user path."""
+        return os.path.expanduser(path)
 
     def load_config(self):
         """Load global settings from a JSON file or initialize defaults."""
@@ -103,3 +108,13 @@ class GlobalConfigManager:
         os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
         with open(self.config_file, "w", encoding="utf-8") as file:
             json.dump(self.to_dict(), file, indent=4)
+
+    # Properties to access expanded paths on demand
+    @property
+    def expanded_appimage_download_folder_path(self):
+        return os.path.expanduser(self.appimage_download_folder_path)
+
+    @property
+    def expanded_appimage_download_backup_folder_path(self):
+        return os.path.expanduser(self.appimage_download_backup_folder_path)
+

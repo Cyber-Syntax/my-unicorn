@@ -21,7 +21,7 @@ class DownloadCommand(Command):
 
         # Get hash_type and sha_name from user
         # TODO: able to learn without user input.
-        app_config = AppConfigManager()
+        app_config = AppConfigManager(owner=owner, repo=repo)
         sha_name, hash_type = (
             app_config.ask_sha_hash()
         )  # Returns sha_name and hash_type
@@ -31,8 +31,8 @@ class DownloadCommand(Command):
         api.get_response()  # Fetch release data from GitHub API
 
         # 4. Update the AppConfigManager with the fetched attributes
-        app_config.owner = parser.owner
-        app_config.repo = parser.repo
+        # app_config.owner = parser.owner
+        # app_config.repo = parser.repo
         app_config.version = api.version  # Assume version is fetched in GitHubAPI
         app_config.appimage_name = api.appimage_name
         app_config.sha_name = api.sha_name
@@ -42,18 +42,13 @@ class DownloadCommand(Command):
         download = DownloadManager(api)
         download.download()  # Pass the appimage URL to download method
 
-        # get sha_url
-        # sha_url = api.sha_url()  # return sha_url
-        # Initialize the hash manager and SHA file manager
-        # hash_manager = HashManager(hash_type=hash_type)
-        # sha_manager = SHAFileManager(sha_name=sha_name, sha_url=api.sha_url)
         # Pass data to VerificationManager
         verification_manager = VerificationManager(
             sha_name=api.sha_name,
             sha_url=api.sha_url,
             appimage_name=api.appimage_name,
             hash_type=api.hash_type,
-        )  # verification_manager.appimage_path = self.appimage_path
+        )
 
         global_config = GlobalConfigManager()
         global_config.load_config()
@@ -67,17 +62,9 @@ class DownloadCommand(Command):
                 repo=api.repo,
                 version=api.version,
                 config_file=global_config.config_file,
-                appimage_download_folder_path=global_config.appimage_download_folder_path,
-                appimage_download_backup_folder_path=global_config.appimage_download_backup_folder_path,
+                appimage_download_folder_path=global_config.expanded_appimage_download_folder_path,
+                appimage_download_backup_folder_path=global_config.expanded_appimage_download_backup_folder_path,
                 config_folder=app_config.config_folder,
                 config_file_name=app_config.config_file_name,
             )
             file_handler.handle_appimage_operations()
-
-
-# save attributes for future usage
-# FIX:: not able to save owner,repo,version,appimage_name but able to get sha_name and hash_type
-
-# FIX: when AppImage installed before, save_config save none.json
-# # because api not used because it is found on the dir.
-# app_config.save_config()

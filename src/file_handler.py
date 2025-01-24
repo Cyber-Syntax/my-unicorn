@@ -93,16 +93,28 @@ class FileHandler:
         )
         shutil.move(self.appimage_name, target_path)
         print(f"Moved {self.appimage_name} to {self.appimage_download_folder_path}")
-
+    
     def update_version(self) -> None:
         config_file = os.path.join(self.config_folder, f"{self.repo}.json")
-        config_data = {
-            "version": self.version,
-            "appimage": f"{self.repo}-{self.version}.AppImage",
-        }
-        with open(config_file, "w", encoding="utf-8") as file:
-            json.dump(config_data, file, indent=4)
-        print(f"Updated configuration in {config_file}")
+        
+        try:
+            # Check if config file exists
+            if os.path.exists(config_file):
+                with open(config_file, "r", encoding="utf-8") as file:
+                    config_data = json.load(file)
+            else:
+                config_data = {}
+            # Update version and appimage information
+            config_data["version"] = self.version
+            config_data["appimage_name"] = self.appimage_name
+
+            with open(config_file, "w", encoding="utf-8") as file:
+                json.dump(config_data, file, indent=4)
+            print(f"Updated configuration in {config_file}")
+        except json.JSONDecodeError as e:
+            print(f"Error decoding JSON: {e}")
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
     def handle_appimage_operations(self, batch_mode: bool = False) -> None:
         """Handle file operations with optional user approval."""
@@ -120,6 +132,7 @@ class FileHandler:
             return
 
         self.backup_old_appimage()
+        self.make_executable()
         self.rename_appimage()
         self.move_appimage()
         self.update_version()

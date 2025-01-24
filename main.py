@@ -10,7 +10,7 @@ from src.locale import LocaleManager
 from src.update import AppImageUpdater
 from commands.invoker import CommandInvoker
 from commands.create_app_config import CreateAppConfigCommand
-from commands.update_all import UpdateAllAppImagesCommand
+from commands.update_all import UpdateCommand
 from commands.customize_global_config import CustomizeGlobalConfigCommand
 from commands.customize_app_config import CustomizeAppConfigCommand
 from commands.download import DownloadCommand
@@ -75,7 +75,7 @@ def main():
     invoker = CommandInvoker()
 
     invoker.register_command(1, DownloadCommand())
-    invoker.register_command(2, UpdateAllAppImagesCommand())
+    invoker.register_command(2, UpdateCommand())
     invoker.register_command(3, CustomizeGlobalConfigCommand())
     invoker.register_command(4, CustomizeAppConfigCommand())
     # Main menu loop
