@@ -20,11 +20,16 @@ class FileHandler:
     repo: str
     version: str
     appimage_name: str
-
     # appimages: dict
+    # global config attributes
+    batch_mode: bool
+    keep_backup: bool
 
     def ask_user_confirmation(self, message: str) -> bool:
-        """Ask the user for a yes/no confirmation."""
+        """Handle confirmations based on batch mode"""
+        if self.batch_mode:
+            print(f"Batch mode: Auto-confirming '{message}'")
+            return True  # or False depending on safe default
         return input(f"{message} (y/n): ").strip().lower() == "y"
 
     def delete_file(self, file_path: str) -> None:
@@ -58,16 +63,16 @@ class FileHandler:
         )
 
         if not os.path.exists(self.appimage_download_backup_folder_path):
-            if self.ask_user_confirmation(
-                f"Backup folder {self.appimage_download_backup_folder_path} not found. Create it?"
-            ):
+            if self.batch_mode:
+                # Auto-create in batch mode
                 os.makedirs(self.appimage_download_backup_folder_path, exist_ok=True)
-                print(
-                    f"Created backup folder: {self.appimage_download_backup_folder_path}"
-                )
+                print(f"Auto-created backup folder: {self.appimage_download_backup_folder_path}")
             else:
-                print("Backup operation canceled.")
-                return
+                if not self.ask_user_confirmation(
+                    f"Backup folder {self.appimage_download_backup_folder_path} not found. Create it?"
+                ):
+                    print("Backup operation canceled.")
+                    return
 
         if os.path.exists(old_appimage):
             shutil.copy2(old_appimage, backup_file)
@@ -116,24 +121,38 @@ class FileHandler:
         except Exception as e:
             print(f"An error occurred: {e}")
 
-    def handle_appimage_operations(self, batch_mode: bool = False) -> None:
-        """Handle file operations with optional user approval."""
-        print("--------- Summary of Operations ---------")
-        print(f"1. Backup old AppImage to {self.appimage_download_backup_folder_path}")
-        print(f"2. Rename AppImage to {self.repo}.AppImage")
-        print(f"3. Move AppImage to {self.appimage_download_folder_path}")
-        print(f"4. Update version information in {self.repo}.json")
-        print("-----------------------------------------")
+    def handle_appimage_operations(self) -> None:
+        """Handle file operations with batch mode support."""
+        try:
+            print("--------- Summary of Operations ---------")
+            if self.keep_backup:
+                print(f"Backup old AppImage to {self.appimage_download_backup_folder_path}")
 
-        if not batch_mode and not self.ask_user_confirmation(
-            "Proceed with the above operations?"
-        ):
-            print("Operation canceled by user.")
-            return
+            print(f"Rename AppImage to {self.repo}.AppImage")
+            print(f"Move AppImage to {self.appimage_download_folder_path}")
+            print(f"Update version information in {self.repo}.json")
+            print("-----------------------------------------")
 
-        self.backup_old_appimage()
-        self.make_executable()
-        self.rename_appimage()
-        self.move_appimage()
-        self.update_version()
-        print("All operations completed successfully.")
+            if not self.batch_mode and not self.ask_user_confirmation("Proceed?"):
+                print("Operation canceled by user.")
+                return
+
+            # Critical operations that should stop on failure
+            if self.keep_backup:
+                self.backup_old_appimage()
+
+            self.make_executable()
+            self.rename_appimage()
+            self.move_appimage()
+            self.update_version()
+
+            print("All operations completed successfully.")
+            
+        except Exception as e:
+            logging.error(f"Critical error during file operations: {e}")
+            if self.batch_mode:
+                raise  # Halt entire process in batch mode
+            else:
+                print(f"Error: {e}. Continue with other operations?")
+                if not self.ask_user_confirmation("Continue?"):
+                    raise

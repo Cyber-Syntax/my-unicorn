@@ -33,7 +33,7 @@ class DownloadManager:
         )
 
         try:
-            response = requests.get(self.api.appimage_url, timeout=10)
+            response = requests.get(self.api.appimage_url, stream=True, timeout=10)
         except requests.exceptions.RequestException as e:
             logging.error(f"Error fetching data from GitHub API: {e}")
             return None
@@ -47,10 +47,13 @@ class DownloadManager:
                 unit="iB",
                 unit_scale=True,
                 unit_divisor=1024,
+                miniters=1,
             ) as progress_bar:
-                for data in response.iter_content(chunk_size=8192):
-                    size = file.write(data)
-                    progress_bar.update(size)
+                for chunk in response.iter_content(chunk_size=8192):
+                    file.write(chunk)
+                    file.flush()  # Force write to disk
+                    progress_bar.update(len(chunk))
+            print(f"Download completed! {self.api.appimage_name} installed.")
         else:
             print(f"Error downloading {self.api.appimage_name}")
             logging.error(f"Error downloading {self.api.appimage_url}")

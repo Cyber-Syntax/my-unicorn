@@ -66,5 +66,7 @@ class DownloadCommand(Command):
                 appimage_download_backup_folder_path=global_config.expanded_appimage_download_backup_folder_path,
                 config_folder=app_config.config_folder,
                 config_file_name=app_config.config_file_name,
+                batch_mode=self.global_config.batch_mode,
+                keep_backup=self.global_config.keep_backup,
             )
             file_handler.handle_appimage_operations()
