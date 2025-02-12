@@ -1,4 +1,3 @@
-
 import os
 import logging
 from .api import GitHubAPI
@@ -55,7 +54,8 @@ class AppImageUpdater:
             latest_version = github_api.check_latest_version(
                 self.app_config.owner, self.app_config.repo
             )
-
+            # FIX: something is wrong
+            # for versions and appimage_name
             if latest_version and latest_version != self.app_config.version:
                 print("-------------------------------------------------")
                 print(f"{self.app_config.appimage_name} is not up to date")
@@ -106,7 +106,9 @@ class AppImageUpdater:
             hash_type=github_api.hash_type,
         )
         if not verification_manager.verify_appimage():
-            print(f"Verification failed for {self.app_config.appimage_name}. Update aborted.")
+            print(
+                f"Verification failed for {self.app_config.appimage_name}. Update aborted."
+            )
             return
 
         # Update configuration and handle file operations
