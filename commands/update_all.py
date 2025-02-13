@@ -47,4 +47,3 @@ class UpdateCommand(Command):
         app_config = AppConfigManager()
         updater = AppImageUpdater(app_config, global_config)
         updater.update_selected_appimages(outdated_apps)
-        print("Update process completed successfully!")

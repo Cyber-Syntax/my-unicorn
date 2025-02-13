@@ -54,13 +54,12 @@ class AppImageUpdater:
             latest_version = github_api.check_latest_version(
                 self.app_config.owner, self.app_config.repo
             )
-            # FIX: something is wrong
-            # for versions and appimage_name
+
             if latest_version and latest_version != self.app_config.version:
                 print("-------------------------------------------------")
                 print(f"{self.app_config.appimage_name} is not up to date")
-                print(f"\033[42mLatest version: {self.app_config.version}\033[0m")
-                print(f"Current version: {latest_version}")
+                print(f"\033[42mLatest version: {latest_version}\033[0m")
+                print(f"Current version: {self.app_config.version}")
                 print("-------------------------------------------------")
                 appimages_to_update.append(
                     {
@@ -100,10 +99,10 @@ class AppImageUpdater:
 
         # Verify the AppImage
         verification_manager = VerificationManager(
-            sha_name=github_api.sha_name,
+            sha_name=self.app_config.sha_name,
             sha_url=github_api.sha_url,
             appimage_name=github_api.appimage_name,
-            hash_type=github_api.hash_type,
+            hash_type=self.app_config.hash_type,
         )
         if not verification_manager.verify_appimage():
             print(

@@ -52,7 +52,7 @@ class GitHubAPI:
                 ".sha",
             }
 
-            # Iterate over assets to find appimage and sha file based on the criteria
+            # Iterate over assets to find AppImage and SHA file based on the criteria.
             for asset in data["assets"]:
                 if asset["name"].endswith(".AppImage"):
                     self.appimage_name = asset["name"]
@@ -63,11 +63,27 @@ class GitHubAPI:
                     self.sha_name = asset["name"]
                     self.sha_url = asset["browser_download_url"]
 
-            # If sha_url is not found based on keywords, prompt user input (fallback)
-            if self.sha_name is None:
-                print("Couldn't find the sha file using keywords and extensions.")
-                self.sha_name = input("Enter the exact sha file name: ")
+            # If sha_url is not set, try matching the already provided sha_name
+            if not hasattr(self, "sha_url") or self.sha_url is None:
+                for asset in data["assets"]:
+                    if asset["name"] == self.sha_name:
+                        self.sha_url = asset["browser_download_url"]
+                        break
 
+                # If still not found, prompt the user.
+                if self.sha_url is None:
+                    print(
+                        "Couldn't automatically find the SHA file using keywords and extensions."
+                    )
+                    self.sha_name = input("Enter the exact SHA file name: ")
+                    for asset in data["assets"]:
+                        if asset["name"] == self.sha_name:
+                            self.sha_url = asset["browser_download_url"]
+                            break
+                    if self.sha_url is None:
+                        raise ValueError(
+                            "SHA file URL could not be determined based on the provided name."
+                        )
         else:
             print(f"Failed to get response from API: {self.api_url}")
             return None

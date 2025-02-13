@@ -38,8 +38,17 @@ class VerificationManager:
             return False
 
     def download_sha_file(self):
-        """Download the SHA file."""
-        if not os.path.exists(self.sha_name):
+        """Download the SHA file, overwriting any existing file."""
+        # If the file exists, remove it first.
+        if os.path.exists(self.sha_name):
+            try:
+                os.remove(self.sha_name)
+                print(f"Removed existing {self.sha_name}.")
+            except OSError as error:
+                raise OSError(f"Error removing {self.sha_name}: {error}")
+
+        try:
+            # Proceed to download the file.
             response = requests.get(self.sha_url, timeout=5)
             if response.status_code == 200:
                 with open(self.sha_name, "w", encoding="utf-8") as file:
@@ -47,8 +56,8 @@ class VerificationManager:
                 print(f"\033[42mDownloaded {self.sha_name}\033[0m")
             else:
                 raise ConnectionError(f"Failed to download {self.sha_url}.")
-        else:
-            print(f"{self.sha_name} already exists.")
+        except Exception as e:
+            print(f"Error while installing sha file: {e}")
 
     def parse_sha_file(self):
         """Parse the SHA file and extract hashes."""
@@ -61,6 +70,7 @@ class VerificationManager:
 
     def _parse_yaml_sha(self):
         """Parse SHA hash from a YAML file."""
+        print("parsing hash from yaml file")
         with open(self.sha_name, "r", encoding="utf-8") as file:
             sha_data = yaml.safe_load(file)
 
@@ -81,6 +91,7 @@ class VerificationManager:
 
     def _parse_text_sha(self):
         """Parse SHA hash from a plain text file."""
+        print("parsing hash from sha file")
         with open(self.sha_name, "r", encoding="utf-8") as file:
             for line in file:
                 if self.appimage_name in line:
@@ -104,8 +115,12 @@ class VerificationManager:
             )
             print("************************************")
             print(_("--------------------- HASHES ----------------------"))
-            print(_("AppImage Hash: {appimage_hash}").format(appimage_hash=appimage_hash))
-            print(_("Expected Hash: {expected_hash}").format(expected_hash=expected_hash))
+            print(
+                _("AppImage Hash: {appimage_hash}").format(appimage_hash=appimage_hash)
+            )
+            print(
+                _("Expected Hash: {expected_hash}").format(expected_hash=expected_hash)
+            )
             print("----------------------------------------------------")
             return True
         else:
@@ -114,6 +129,10 @@ class VerificationManager:
                     appimage_name=self.appimage_name
                 )
             )
-            print(_("AppImage Hash: {appimage_hash}").format(appimage_hash=appimage_hash))
-            print(_("Expected Hash: {expected_hash}").format(expected_hash=expected_hash))
+            print(
+                _("AppImage Hash: {appimage_hash}").format(appimage_hash=appimage_hash)
+            )
+            print(
+                _("Expected Hash: {expected_hash}").format(expected_hash=expected_hash)
+            )
             return False

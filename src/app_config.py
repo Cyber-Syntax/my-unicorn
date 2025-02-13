@@ -90,10 +90,14 @@ class AppConfigManager:
         print("Setting up app-specific configuration...")
 
         # TODO: if detected, don't ask? Need to change command sorting
-
-        #TODO: Debug is WIP:
+        # TODO: Debug is WIP:
         # joplin works, siyuan works
-        self.sha_name = input("Enter the SHA file name (Leave blank if you want auto detect): ").strip() or None
+        self.sha_name = (
+            input(
+                "Enter the SHA file name (Leave blank if you want auto detect): "
+            ).strip()
+            or None
+        )
         self.hash_type = (
             input("Enter the hash type (default: 'sha256'): ").strip() or "sha256"
         )
