@@ -31,8 +31,6 @@ class DownloadCommand(Command):
         api.get_response()  # Fetch release data from GitHub API
 
         # 4. Update the AppConfigManager with the fetched attributes
-        # app_config.owner = parser.owner
-        # app_config.repo = parser.repo
         app_config.version = api.version  # Assume version is fetched in GitHubAPI
         app_config.appimage_name = api.appimage_name
         app_config.sha_name = api.sha_name
@@ -52,21 +50,28 @@ class DownloadCommand(Command):
 
         global_config = GlobalConfigManager()
         global_config.load_config()
-        # Perform verification
-        if verification_manager.verify_appimage():
-            # if verification correct save current attiributes to app config file
-            app_config.save_config()
-            # if verification correct, make executable, change name, move appimage to user choosed dir
-            file_handler = FileHandler(
-                appimage_name=api.appimage_name,
-                repo=api.repo,
-                version=api.version,
-                config_file=global_config.config_file,
-                appimage_download_folder_path=global_config.expanded_appimage_download_folder_path,
-                appimage_download_backup_folder_path=global_config.expanded_appimage_download_backup_folder_path,
-                config_folder=app_config.config_folder,
-                config_file_name=app_config.config_file_name,
-                batch_mode=self.global_config.batch_mode,
-                keep_backup=self.global_config.keep_backup,
-            )
-            file_handler.handle_appimage_operations()
+
+        # Verify appimage; if it fails, exit early (or handle the error appropriately)
+        if not verification_manager.verify_appimage():
+            return  # or raise an exception
+
+        # Instantiate FileHandler only if verification passes
+        file_handler = FileHandler(
+            appimage_name=api.appimage_name,
+            repo=api.repo,
+            version=api.version,
+            config_file=global_config.config_file,
+            appimage_download_folder_path=global_config.expanded_appimage_download_folder_path,
+            appimage_download_backup_folder_path=global_config.expanded_appimage_download_backup_folder_path,
+            config_folder=app_config.config_folder,
+            config_file_name=app_config.config_file_name,
+            batch_mode=global_config.batch_mode,
+            keep_backup=global_config.keep_backup,
+        )
+
+        # Proceed with file operations; exit early if they fail
+        if not file_handler.handle_appimage_operations():
+            return  # or raise an exception
+
+        # Save the configuration only if all previous steps succeed
+        app_config.save_config()

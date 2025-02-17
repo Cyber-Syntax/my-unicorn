@@ -55,6 +55,8 @@ class FileHandler:
 
     def backup_old_appimage(self) -> None:
         """Backup the old AppImage to a backup folder."""
+        logging.info("Backup the old AppImage")
+
         old_appimage = os.path.join(
             self.appimage_download_folder_path, f"{self.repo}.AppImage"
         )
@@ -65,8 +67,17 @@ class FileHandler:
         if not os.path.exists(self.appimage_download_backup_folder_path):
             if self.batch_mode:
                 # Auto-create in batch mode
-                os.makedirs(self.appimage_download_backup_folder_path, exist_ok=True)
-                print(f"Auto-created backup folder: {self.appimage_download_backup_folder_path}")
+                try:
+                    os.makedirs(
+                        self.appimage_download_backup_folder_path, exist_ok=True
+                    )
+                    print(
+                        f"Auto-created backup folder: {self.appimage_download_backup_folder_path}"
+                    )
+                except OSError as e:
+                    logging.error(f"Failed to create backup folder: {e}")
+                    print(f"Error creating backup folder: {e}")
+                    return
             else:
                 if not self.ask_user_confirmation(
                     f"Backup folder {self.appimage_download_backup_folder_path} not found. Create it?"
@@ -98,10 +109,10 @@ class FileHandler:
         )
         shutil.move(self.appimage_name, target_path)
         print(f"Moved {self.appimage_name} to {self.appimage_download_folder_path}")
-    
+
     def update_version(self) -> None:
         config_file = os.path.join(self.config_folder, f"{self.repo}.json")
-        
+
         try:
             # Check if config file exists
             if os.path.exists(config_file):
@@ -126,7 +137,9 @@ class FileHandler:
         try:
             print("--------- Summary of Operations ---------")
             if self.keep_backup:
-                print(f"Backup old AppImage to {self.appimage_download_backup_folder_path}")
+                print(
+                    f"Backup old AppImage to {self.appimage_download_backup_folder_path}"
+                )
 
             print(f"Rename AppImage to {self.repo}.AppImage")
             print(f"Move AppImage to {self.appimage_download_folder_path}")
@@ -147,7 +160,7 @@ class FileHandler:
             self.update_version()
 
             print("All operations completed successfully.")
-            
+
         except Exception as e:
             logging.error(f"Critical error during file operations: {e}")
             if self.batch_mode:
