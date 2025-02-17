@@ -48,7 +48,7 @@ class FileHandler:
             return
 
         try:
-            subprocess.run(["chmod", "+x", file_path], check=True)
+            subprocess.run(["chmod", "+x", file_path], check=True, timeout=5)
         except subprocess.CalledProcessError as e:
             logging.error(f"Failed to make {file_path} executable: {e}")
         print(f"{file_path} is now executable.")

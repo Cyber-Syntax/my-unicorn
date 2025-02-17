@@ -13,10 +13,22 @@ class UpdateCommand(Command):
         global_config = GlobalConfigManager()
         global_config.load_config()
 
-        # Check versions first
-        check_cmd = CheckVersionsCommand(global_config)
-        outdated_apps = check_cmd.execute()
+        # Optionally, if you want to use CheckVersionsCommand, you can enable this:
+        # check_cmd = CheckVersionsCommand(global_config)
+        # outdated_apps = check_cmd.execute()
 
+        app_config = AppConfigManager()
+        updater = AppImageUpdater(app_config, global_config)
+
+        # Auto-select all files in batch mode
+        selected_files = updater.select_files()
+        if not selected_files:
+            return None
+
+        # Instead of returning immediately, store the result
+        outdated_apps = updater.check_versions(selected_files)
+
+        # Now, proceed with the update logic
         if not outdated_apps:
             print("All AppImages are already up to date!")
             return

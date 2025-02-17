@@ -25,16 +25,18 @@ class ParseURL:
 
     def _parse_owner_repo(self):
         """Parse owner and repository from GitHub URL."""
-        if self.url:
-            parts = self.url.split("/")
-            if len(parts) >= 5:
-                self._owner = parts[3]
-                self._repo = parts[4]
-                return self._owner, self._repo
-            else:
-                raise ValueError(
-                    "Invalid GitHub URL. Unable to parse owner and repository."
-                )
+        if not self.url:
+            raise ValueError("URL is not set. Please provide a valid GitHub URL.")
+
+        parts = self.url.split("/")
+        if len(parts) >= 5:
+            self._owner = parts[3]
+            self._repo = parts[4]
+            return self._owner, self._repo
+        else:
+            raise ValueError(
+                "Invalid GitHub URL. Unable to parse owner and repository."
+            )
 
     @property
     def owner(self):

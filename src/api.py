@@ -41,6 +41,7 @@ class GitHubAPI:
                 "checksums",
                 "CHECKSUM",
                 "CHECKSUMS",
+                "latest-linux",
             }
             valid_extensions = {
                 ".sha256",

@@ -110,9 +110,6 @@ class AppImageUpdater:
             )
             return
 
-        # Update configuration and handle file operations
-        # self.app_config.version = appimage_data["latest_version"]
-
         file_handler = FileHandler(
             appimage_name=github_api.appimage_name,
             repo=github_api.repo,

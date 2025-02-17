@@ -48,7 +48,9 @@ class VerificationManager:
                 raise OSError(f"Error removing {self.sha_name}: {error}")
 
         try:
-            # Proceed to download the file.
+            if not self.sha_url:
+                raise ValueError("SHA URL is not provided.")
+
             response = requests.get(self.sha_url, timeout=5)
             if response.status_code == 200:
                 with open(self.sha_name, "w", encoding="utf-8") as file:
