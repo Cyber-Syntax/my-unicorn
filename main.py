@@ -11,8 +11,6 @@ from src.update import AppImageUpdater
 from commands.invoker import CommandInvoker
 from commands.create_app_config import CreateAppConfigCommand
 from commands.update_all import UpdateCommand
-from commands.customize_global_config import CustomizeGlobalConfigCommand
-from commands.customize_app_config import CustomizeAppConfigCommand
 from commands.download import DownloadCommand
 
 _ = gettext.gettext
@@ -31,8 +29,8 @@ def get_user_choice():
     print("====================================")
     print(_("1. Download AppImage (Must be installed to create config file)"))
     print(_("2. Update all AppImages"))
-    print(_("3. Customize global config file"))
-    print(_("4. Customize AppImage config file"))
+    print(_("3. Customize AppImages config file"))
+    print(_("4. Customize Global config file"))
     print(_("5. Exit"))
     print("====================================")
     try:
@@ -64,8 +62,9 @@ def configure_logging():
 def main():
     configure_logging()
 
-    # global_config = GlobalConfigManager()
+    global_config = GlobalConfigManager()
     # global_config.load_config()
+    app_config = AppConfigManager()
 
     # # Instantiate LocaleManager and set locale
     # locale_manager = LocaleManager()
@@ -76,12 +75,18 @@ def main():
 
     invoker.register_command(1, DownloadCommand())
     invoker.register_command(2, UpdateCommand())
-    invoker.register_command(3, CustomizeGlobalConfigCommand())
-    invoker.register_command(4, CustomizeAppConfigCommand())
+    # TODO: register customize functions
+
+    # invoker.register_command(3, CustomizeGlobalConfigCommand())
+    # invoker.register_command(4, CustomizeAppConfigCommand())
     # Main menu loop
     while True:
         choice = get_user_choice()
-        if choice == 5:  # Exit
+        if choice == 3:
+            app_config.customize_appimage_config()
+        elif choice == 4:
+            global_config.customize_global_config()
+        elif choice == 5:  # Exit
             print("Exiting...")
             sys.exit(0)
         invoker.execute_command(choice)

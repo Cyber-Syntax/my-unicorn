@@ -60,6 +60,7 @@ class DownloadCommand(Command):
             appimage_name=api.appimage_name,
             repo=api.repo,
             version=api.version,
+            sha_name=api.sha_name,
             config_file=global_config.config_file,
             appimage_download_folder_path=global_config.expanded_appimage_download_folder_path,
             appimage_download_backup_folder_path=global_config.expanded_appimage_download_backup_folder_path,

@@ -114,6 +114,7 @@ class AppImageUpdater:
             appimage_name=github_api.appimage_name,
             repo=github_api.repo,
             version=github_api.version,
+            sha_name=github_api.sha_name,
             config_file=self.global_config.config_file,
             appimage_download_folder_path=self.global_config.expanded_appimage_download_folder_path,
             appimage_download_backup_folder_path=self.global_config.expanded_appimage_download_backup_folder_path,

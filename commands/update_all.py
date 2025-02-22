@@ -1,6 +1,4 @@
-# commands/update_all.py
 from commands.base import Command
-from commands.check_versions import CheckVersionsCommand
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
 from src.update import AppImageUpdater

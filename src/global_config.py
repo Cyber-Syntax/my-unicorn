@@ -118,3 +118,60 @@ class GlobalConfigManager:
     def expanded_appimage_download_backup_folder_path(self):
         return os.path.expanduser(self.appimage_download_backup_folder_path)
 
+    def customize_global_config(self):
+        """Customize the configuration settings for the Global Config."""
+        self.load_config()
+
+        print("Select which key to modify:")
+        print("=================================================")
+        print(f"1. AppImage Download Folder: {self.appimage_download_folder_path}")
+        print(f"2. Enable Backup: {'Yes' if self.keep_backup else 'No'}")
+        print(f"3. Batch Mode: {'Yes' if self.batch_mode else 'No'}")
+        print(f"4. Locale: {self.locale}")
+        print("5. Exit")
+        print("=================================================")
+
+        while True:
+            choice = input("Enter your choice: ")
+            if choice.isdigit() and 1 <= int(choice) <= 5:
+                break
+            else:
+                print("Invalid choice, please enter a number between 1 and 5.")
+
+        if choice == "5":
+            print("Exiting without changes.")
+            return
+
+        config_dict = {
+            "appimage_download_folder_path": self.appimage_download_folder_path,
+            "keep_backup": self.keep_backup,
+            "batch_mode": self.batch_mode,
+            "locale": self.locale,
+        }
+        key = list(config_dict.keys())[int(choice) - 1]
+
+        if key == "appimage_download_folder_path":
+            new_value = (
+                input("Enter the new folder path to save appimages: ").strip()
+                or "~/Documents/appimages"
+            )
+        elif key == "keep_backup":
+            new_value = (
+                input("Enable backup for old appimages? (yes/no): ").strip().lower()
+                or "no"
+            )
+            new_value = new_value == "yes"
+        elif key == "batch_mode":
+            new_value = input("Enable batch mode? (yes/no): ").strip().lower() or "no"
+            new_value = new_value == "yes"
+        elif key == "locale":
+            new_value = (
+                input("Select your locale (en/tr, default: en): ").strip() or "en"
+            )
+
+        setattr(self, key, new_value)
+        self.save_config()
+        print(
+            f"\033[42m{key.capitalize()} updated successfully in settings.json\033[0m"
+        )
+        print("=================================================")

@@ -19,6 +19,7 @@ class FileHandler:
     config_file_name: str  # self.repo.json
     repo: str
     version: str
+    sha_name: str
     appimage_name: str
     # appimages: dict
     # global config attributes
@@ -158,6 +159,8 @@ class FileHandler:
             self.rename_appimage()
             self.move_appimage()
             self.update_version()
+            # Delete old sha file if it is exist
+            self.delete_file(self.sha_name)
 
             print("All operations completed successfully.")
 
