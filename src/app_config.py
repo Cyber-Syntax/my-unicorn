@@ -14,6 +14,7 @@ class AppConfigManager:
         sha_name: str = None,
         hash_type: str = "sha256",
         appimage_name: str = None,
+        exact_appimage_name: str = None,
         config_folder: str = "~/Documents/appimages/config_files/",
     ):
         self.owner = owner
@@ -22,6 +23,7 @@ class AppConfigManager:
         self.sha_name = sha_name
         self.hash_type = hash_type
         self.appimage_name = appimage_name
+        self.exact_appimage_name = exact_appimage_name
         self.config_folder = os.path.expanduser(config_folder)
         self.config_file_name = f"{self.repo}.json" if self.repo else None
         self.config_file = (
@@ -46,6 +48,9 @@ class AppConfigManager:
                     self.sha_name = config.get("sha_name", self.sha_name)
                     self.hash_type = config.get("hash_type", self.hash_type)
                     self.appimage_name = config.get("appimage_name", self.appimage_name)
+                    self.exact_appimage_name = config.get(
+                        "exact_appimage_name", self.exact_appimage_name
+                    )
                     return config
             except json.JSONDecodeError as e:
                 logging.error(f"Invalid JSON in the configuration file: {e}")
@@ -116,6 +121,7 @@ class AppConfigManager:
             "sha_name": self.sha_name,
             "hash_type": self.hash_type,
             "appimage_name": self.appimage_name,
+            "exact_appimage_name": self.exact_appimage_name,
         }
         key = list(config_dict.keys())[int(choice) - 1]
         new_value = input(f"Enter the new value for {key}: ")
@@ -126,15 +132,59 @@ class AppConfigManager:
         )
         print("=================================================")
 
+    def temp_save_config(self):
+        """Atomically save configuration using temporary file"""
+        try:
+            temp_file = f"{self.config_file}.tmp"
+            os.makedirs(os.path.dirname(temp_file), exist_ok=True)
+
+            # Write complete current state to temp file
+            with open(temp_file, "w", encoding="utf-8") as file:
+                json.dump(self.to_dict(), file, indent=4)
+
+            print(f"Temporary config saved to {temp_file}")
+            return True
+        except Exception as e:
+            logging.error(f"Temp config save failed: {e}")
+            # Cleanup if possible
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+            return False
+
     def save_config(self):
-        """Save the current configuration to the config file."""
-        with open(self.config_file, "w", encoding="utf-8") as file:
-            config_data = self.to_dict()
-            logging.info(f"Saving configuration: {config_data}")
-            json.dump(config_data, file, indent=4)
+        """Commit temporary config by replacing original"""
+        try:
+            temp_file = f"{self.config_file}.tmp"
+
+            if not os.path.exists(temp_file):
+                raise FileNotFoundError("No temporary config to commit")
+
+            # Atomic replace operation
+            os.replace(temp_file, self.config_file)
+            print(f"Configuration committed to {self.config_file}")
+            return True
+
+        except Exception as e:
+            logging.error(f"Config commit failed: {e}")
+            # Cleanup temp file if it exists
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+            return False
+
+    # def save_config(self):
+    #     """Save the current configuration settings to a JSON file."""
+    #     try:
+    #         os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
+    #         config_data = self.to_dict()
+    #         with open(self.config_file, "w", encoding="utf-8") as file:
+    #             json.dump(config_data, file, indent=4)
+    #     except Exception as e:
+    #         logging.error(f"Error saving configuration to {self.config_file}: {e}")
+    #         raise ValueError("Failed to save configuration.")
 
     def to_dict(self):
         """Convert the instance variables to a dictionary."""
+
         return {
             "owner": self.owner,
             "repo": self.repo,
@@ -142,6 +192,7 @@ class AppConfigManager:
             "sha_name": self.sha_name,
             "hash_type": self.hash_type,
             "appimage_name": self.appimage_name,
+            "exact_appimage_name": self.exact_appimage_name,
         }
 
     def list_json_files(self):
@@ -156,3 +207,22 @@ class AppConfigManager:
         except FileNotFoundError as error:
             logging.error(f"Error accessing configuration folder: {error}")
             raise FileNotFoundError("Configuration folder does not exist.")
+
+    def ask_sha_hash(self):
+        """Set up app-specific configuration interactively."""
+        print("Setting up app-specific configuration...")
+
+        # TODO: if detected, don't ask? Need to change command sorting
+        # TODO: Debug is WIP:
+        # joplin works, siyuan works
+        self.sha_name = (
+            input(
+                "Enter the SHA file name (Leave blank if you want auto detect): "
+            ).strip()
+            or None
+        )
+        self.hash_type = (
+            input("Enter the hash type (default: 'sha256'): ").strip() or "sha256"
+        )
+
+        return self.sha_name, self.hash_type

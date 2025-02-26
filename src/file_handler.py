@@ -133,7 +133,7 @@ class FileHandler:
         except Exception as e:
             print(f"An error occurred: {e}")
 
-    def handle_appimage_operations(self) -> None:
+    def handle_appimage_operations(self) -> bool:
         """Handle file operations with batch mode support."""
         try:
             print("--------- Summary of Operations ---------")
@@ -149,7 +149,7 @@ class FileHandler:
 
             if not self.batch_mode and not self.ask_user_confirmation("Proceed?"):
                 print("Operation canceled by user.")
-                return
+                return False
 
             # Critical operations that should stop on failure
             if self.keep_backup:
@@ -159,10 +159,13 @@ class FileHandler:
             self.rename_appimage()
             self.move_appimage()
             self.update_version()
-            # Delete old sha file if it is exist
-            self.delete_file(self.sha_name)
 
-            print("All operations completed successfully.")
+            # Delete old sha file if it is exist
+            if self.sha_name != "no_sha_file":
+                self.delete_file(self.sha_name)
+
+            print("File operations completed successfully.")
+            return True
 
         except Exception as e:
             logging.error(f"Critical error during file operations: {e}")
@@ -171,4 +174,4 @@ class FileHandler:
             else:
                 print(f"Error: {e}. Continue with other operations?")
                 if not self.ask_user_confirmation("Continue?"):
-                    raise
+                    raise  # Halt entire process in interactive mode

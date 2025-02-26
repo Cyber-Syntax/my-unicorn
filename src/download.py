@@ -13,6 +13,8 @@ class DownloadManager:
         self.api = api
         self.appimage_name = None
 
+    # TODO: we need a logic to check is .json file exists or
+    # not for the appimage and even are the values are not empty -e.g owner, repo -
     def is_app_exist(self):
         """Check if the AppImage already exists in the current directory."""
         if os.path.exists(self.api.appimage_name) or os.path.exists(
@@ -53,7 +55,6 @@ class DownloadManager:
                     file.write(chunk)
                     file.flush()  # Force write to disk
                     progress_bar.update(len(chunk))
-            print(f"Download completed! {self.api.appimage_name} installed.")
         else:
             print(f"Error downloading {self.api.appimage_name}")
             logging.error(f"Error downloading {self.api.appimage_url}")

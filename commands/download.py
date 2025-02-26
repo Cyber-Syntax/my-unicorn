@@ -30,9 +30,12 @@ class DownloadCommand(Command):
         api = GitHubAPI(owner=owner, repo=repo, sha_name=sha_name, hash_type=hash_type)
         api.get_response()  # Fetch release data from GitHub API
 
-        # 4. Update the AppConfigManager with the fetched attributes
-        app_config.version = api.version  # Assume version is fetched in GitHubAPI
+        # Add these lines to sync ALL fields
+        app_config.owner = api.owner  # Explicitly set owner/repo
+        app_config.repo = api.repo  # (even if from parser)
+        app_config.version = api.version
         app_config.appimage_name = api.appimage_name
+        app_config.exact_appimage_name = api.exact_appimage_name
         app_config.sha_name = api.sha_name
         app_config.hash_type = api.hash_type
 
@@ -51,11 +54,18 @@ class DownloadCommand(Command):
         global_config = GlobalConfigManager()
         global_config.load_config()
 
-        # Verify appimage; if it fails, exit early (or handle the error appropriately)
-        if not verification_manager.verify_appimage():
-            return  # or raise an exception
+        # Modify verification check to handle "no_sha_file" and None cases
+        if api.sha_name != "no_sha_file":
+            is_valid = verification_manager.verify_appimage()
+            if not is_valid:
+                return
+        else:
+            print("Skipping verification for beta version")
 
-        # Instantiate FileHandler only if verification passes
+        # Save temporary configuration
+        app_config.temp_save_config()
+
+        # Handle file operations
         file_handler = FileHandler(
             appimage_name=api.appimage_name,
             repo=api.repo,
@@ -70,9 +80,11 @@ class DownloadCommand(Command):
             keep_backup=global_config.keep_backup,
         )
 
-        # Proceed with file operations; exit early if they fail
-        if not file_handler.handle_appimage_operations():
-            return  # or raise an exception
-
-        # Save the configuration only if all previous steps succeed
-        app_config.save_config()
+        # Check if the file operations were successful
+        success = file_handler.handle_appimage_operations()
+        if success:
+            # Save the configuration only if all previous steps succeed
+            app_config.save_config()
+            print("Configuration saved successfully.")
+        else:
+            print("An error occurred during file operations.")
