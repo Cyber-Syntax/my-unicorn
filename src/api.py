@@ -98,9 +98,6 @@ class GitHubAPI:
             logging.error(f"Missing expected key in release data: {e}")
             return None
 
-    # HACK: This is a hack to fix the issue with the appimage name selection logic
-    # FIXME: Trying to fix appimage name selection logic
-
     def _find_appimage_asset(self, assets: list):
         """Reliable AppImage selection with architecture keywords"""
         print("Current arch_keyword:", self.arch_keyword)
@@ -136,6 +133,11 @@ class GitHubAPI:
         elif candidates:
             print(f"Found {len(candidates)} architecture-matched AppImages:")
             self._select_from_list(candidates)
+            return
+
+        # Auto select if only one AppImage is left
+        if len(appimages) == 1:
+            self._select_appimage(appimages[0])
             return
 
         # 4. Fallback to asking user to choose from all AppImages
@@ -185,17 +187,14 @@ class GitHubAPI:
 
         sha_keywords = {
             "sha",
-            "SHA",
-            "SHA256",
-            "SHA512",
-            "SHA-256",
-            "SHA-512",
+            "sha256",
+            "sha512",
+            "sha-256",
+            "sha-512",
             "checksum",
             "checksums",
-            "CHECKSUM",
-            "CHECKSUMS",
             "latest-linux",
-            "SHA256SUMS",
+            "sha256sums",
         }
         valid_extensions = {
             ".sha256",
@@ -213,15 +212,35 @@ class GitHubAPI:
 
             # Match both keywords and valid extensions
             if any(kw in name_lower for kw in sha_keywords) and ext in valid_extensions:
-                self.sha_name = asset["name"]
-                self.sha_url = asset["browser_download_url"]
-                return
+                sha_asset = asset
+                break
 
-        # Manual fallback
+        # TESTING: hash detection
+        if sha_asset:
+            self.sha_name = sha_asset["name"]
+            self.sha_url = sha_asset["browser_download_url"]
+            # Automatically detect hash type from the filename
+            ext = os.path.splitext(sha_asset["name"])[1].lower()
+            if ext == ".sha256" or "sha256" in sha_asset["name"].lower():
+                self.hash_type = "sha256"
+            elif ext == ".sha512" or "sha512" in sha_asset["name"].lower():
+                self.hash_type = "sha512"
+            elif ext == ".yml" or ext == ".yaml" in sha_asset["name"].lower():
+                self.hash_type = "sha512"
+            else:
+                # Fall back to asking user for hash type if not found
+                default = "sha256"
+                print(f"Could not detect hash type from filename: {sha_asset['name']}")
+                user_input = input(f"Enter hash type (default: {default}): ")
+                self.hash_type = user_input if user_input else default
+
+            return
+
+        # Fallback to asking user for the SHA file if not found
         print("Could not find SHA file. Options:")
         print("1. Enter filename manually")
         print("2. Skip verification")
-        choice = input("Your choice (1/2): ")
+        choice = input("Your choice (1 or 2): ")
 
         if choice == "2":
             self.sha_name = "no_sha_file"
@@ -232,6 +251,10 @@ class GitHubAPI:
         for asset in assets:
             if asset["name"] == self.sha_name:
                 self.sha_url = asset["browser_download_url"]
+                # After manual selection, prompt for hash type as a fallback
+                default = "sha256"
+                user_input = input(f"Enter hash type (default: {default}): ")
+                self.hash_type = user_input if user_input else default
                 return
 
         raise ValueError("Specified SHA file not found in release assets")

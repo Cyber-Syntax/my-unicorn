@@ -34,6 +34,30 @@ class AppConfigManager:
         # Ensure the configuration directory exists
         os.makedirs(self.config_folder, exist_ok=True)
 
+    def select_files(self):
+        """List available JSON configuration files and allow the user to select multiple."""
+        json_files = self.list_json_files()
+        if not json_files:
+            print("No configuration files found. Please create one first.")
+            return None
+
+        print("Available configuration files:")
+        for idx, json_file in enumerate(json_files, start=1):
+            print(f"{idx}. {json_file}")
+
+        user_input = input(
+            "Enter the numbers of the configuration files you want to update (comma-separated): "
+        ).strip()
+
+        try:
+            selected_indices = [int(idx.strip()) - 1 for idx in user_input.split(",")]
+            if any(idx < 0 or idx >= len(json_files) for idx in selected_indices):
+                raise ValueError("Invalid selection.")
+            return [json_files[idx] for idx in selected_indices]
+        except (ValueError, IndexError):
+            print("Invalid selection. Please enter valid numbers.")
+            return None
+
     def load_appimage_config(self, config_file_name: str):
         """Load a specific AppImage configuration file."""
         config_file_path = os.path.join(self.config_folder, config_file_name)
@@ -169,17 +193,6 @@ class AppConfigManager:
                 os.remove(temp_file)
             return False
 
-    # def save_config(self):
-    #     """Save the current configuration settings to a JSON file."""
-    #     try:
-    #         os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
-    #         config_data = self.to_dict()
-    #         with open(self.config_file, "w", encoding="utf-8") as file:
-    #             json.dump(config_data, file, indent=4)
-    #     except Exception as e:
-    #         logging.error(f"Error saving configuration to {self.config_file}: {e}")
-    #         raise ValueError("Failed to save configuration.")
-
     def to_dict(self):
         """Convert the instance variables to a dictionary."""
 
@@ -214,13 +227,12 @@ class AppConfigManager:
         # TODO: Debug is WIP:
         # joplin works, siyuan works
         self.sha_name = (
-            input(
-                "Enter the SHA file name (Leave blank if you want auto detect): "
-            ).strip()
+            input("Enter the SHA file name (Leave blank for auto detect): ").strip()
             or None
         )
         self.hash_type = (
-            input("Enter the hash type (default: 'sha256'): ").strip() or "sha256"
+            input("Enter the hash type (Leave blank for auto detect): ").strip()
+            or "sha256"
         )
 
         return self.sha_name, self.hash_type

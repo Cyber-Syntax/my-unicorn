@@ -7,7 +7,6 @@ from logging.handlers import RotatingFileHandler
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
 from src.locale import LocaleManager
-from src.update import AppImageUpdater
 from commands.invoker import CommandInvoker
 from commands.create_app_config import CreateAppConfigCommand
 from commands.update_all import UpdateCommand
