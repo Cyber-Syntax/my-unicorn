@@ -1,3 +1,4 @@
+# commands/update.py
 from commands.base import Command
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
@@ -6,154 +7,154 @@ from src.download import DownloadManager
 from src.verify import VerificationManager
 from src.file_handler import FileHandler
 
-# TESTING: making this update class and follow command design pattern
-
 
 class UpdateCommand(Command):
-    """Command to update all outdated AppImages with batch mode support."""
+    """Orchestrates AppImage update process using command pattern components"""
 
     def __init__(self):
-        self.app_config = AppConfigManager()
         self.global_config = GlobalConfigManager()
+        self.app_config = AppConfigManager()
+        self.version_checker = VersionChecker()
+        self.updater = AppImageUpdater()
 
     def execute(self):
-        global_config = GlobalConfigManager()
-        global_config.load_config()
-        app_config = AppConfigManager()
+        """Main update execution flow"""
+        self.global_config.load_config()
 
-        # TODO: check version command
-
-        # Auto-select all files in batch mode
-        selected_files = app_config.select_files()
-        if not selected_files:
-            return None
-
-        # Instead of returning immediately, store the result
-        outdated_apps = self.check_versions(selected_files)
-
-        # Now, proceed with the update logic
-        if not outdated_apps:
-            print("All AppImages are already up to date!")
+        # 1. Find updatable apps
+        updatable = self.version_checker.find_updatable_apps(self.app_config)
+        if not updatable:
+            print("All AppImages are up to date!")
             return
 
-        # Handle confirmation based on batch mode
-        if global_config.batch_mode:
-            print("Batch mode: Automatically updating all outdated AppImages")
-            self._perform_update(global_config, outdated_apps)
-        else:
-            self._show_confirmation_prompt(outdated_apps, global_config)
+        # 2. Get user confirmation
+        if not self._confirm_updates(updatable):
+            print("Update cancelled")
+            return
 
-    def _show_confirmation_prompt(self, outdated_apps, global_config):
-        """Show interactive confirmation prompt."""
-        print("\nThe following AppImages will be updated:")
-        for idx, app in enumerate(outdated_apps, 1):
-            print(f"{idx}. {app['appimage_name']} (v{app['latest_version']})")
+        # 3. Perform updates
+        self.updater.execute_batch(updatable, self.global_config)
 
-        confirm = (
-            input("\nDo you want to proceed with updates? [y/N]: ").strip().lower()
-        )
-        if confirm == "y":
-            self._perform_update(global_config, outdated_apps)
-        else:
-            print("Update cancelled.")
+    def _confirm_updates(self, updatable):
+        """Handle user confirmation based on batch mode"""
+        if self.global_config.batch_mode:
+            print("Batch mode: Auto-confirming updates")
+            return True
 
-    def _perform_update(self, global_config, outdated_apps):
-        """Execute the actual update process."""
-        self.update_selected_appimages(outdated_apps)
+        print("\nApps to update:")
+        for idx, app in enumerate(updatable, 1):
+            print(f"{idx}. {app['name']} ({app['current']} → {app['latest']})")
 
-    def _update_appimage(self, appimage_data):
-        """Update a single AppImage."""
-        # Initialize GitHubAPI
+        return input("Proceed with updates? [y/N]: ").strip().lower() == "y"
+
+
+class VersionChecker:
+    """Encapsulates version checking logic"""
+
+    def find_updatable_apps(self, app_config):
+        """Return list of apps needing updates"""
+        updatable = []
+        for config_file in app_config.select_files():
+            app_data = self._check_single(app_config, config_file)
+            if app_data:
+                updatable.append(app_data)
+        return updatable
+
+    def _check_single(self, app_config, config_file):
+        """Check version for single AppImage"""
+        app_config.load_appimage_config(config_file)
+        current_version = app_config.version
+
+        # Get latest version from GitHub
         github_api = GitHubAPI(
-            owner=self.app_config.owner,
-            repo=self.app_config.repo,
-            sha_name=self.app_config.sha_name,
-            hash_type=self.app_config.hash_type,
-            arch_keyword=self.app_config.arch_keyword,
+            owner=app_config.owner,
+            repo=app_config.repo,
+            sha_name=app_config.sha_name,
+            hash_type=app_config.hash_type,
         )
+        latest_version = github_api.check_latest_version(
+            owner=app_config.owner, repo=app_config.repo
+        )
+
+        if latest_version and latest_version != current_version:
+            return {
+                "config_file": config_file,
+                "name": app_config.appimage_name,
+                "current": current_version,
+                "latest": latest_version,
+            }
+        return None
+
+
+class AppImageUpdater:
+    """Handles actual update operations"""
+
+    def execute_batch(self, updatable, global_config):
+        """Update multiple AppImages with queue logic"""
+        for app_data in updatable:
+            if not global_config.batch_mode:
+                # Confirm each update individually
+                print(
+                    f"\nReady to update {app_data['name']} ({app_data['current']} → {app_data['latest']})"
+                )
+                confirm = input("Proceed with this update? [y/N]: ").strip().lower()
+                if confirm != "y":
+                    print(f"Skipping {app_data['name']}")
+                    continue  # Skip this update and move to the next
+
+            self._update_single(app_data, global_config)
+
+    def _update_single(self, app_data, global_config):
+        """Update single AppImage"""
+        print(f"\nUpdating {app_data['name']}...")
+
+        # 1. Load config
+        app_config = AppConfigManager()
+        app_config.load_appimage_config(app_data["config_file"])
+
+        # 2. Fetch release data
+        github_api = GitHubAPI(
+            owner=app_config.owner,
+            repo=app_config.repo,
+            sha_name=app_config.sha_name,
+            hash_type=app_config.hash_type,
+            arch_keyword=app_config.arch_keyword,
+        )
+
         github_api.get_response()
 
-        # Download the new AppImage
-        print(f"Downloading {self.app_config.appimage_name}...")
-        download_manager = DownloadManager(github_api)
-        download_manager.download()
+        # 3. Download & verify
+        DownloadManager(github_api).download()
+        if not self._verify(app_config, github_api):
+            return
 
-        # Verify the AppImage
-        verification_manager = VerificationManager(
-            sha_name=self.app_config.sha_name,
-            sha_url=github_api.sha_url,
-            appimage_name=github_api.appimage_name,
-            hash_type=self.app_config.hash_type,
-        )
+        global_config = GlobalConfigManager()
 
-        # Save temporary configuration
-        self.app_config.temp_save_config()
-
-        # Beta versions don't have a SHA file
-        if github_api.sha_name != "no_sha_file":
-            is_valid = verification_manager.verify_appimage()
-            if not is_valid:
-                return
-        else:
-            print("Skipping verification for beta version")
-
+        # 4. Handle file operations
         file_handler = FileHandler(
             appimage_name=github_api.appimage_name,
             repo=github_api.repo,
             version=github_api.version,
             sha_name=github_api.sha_name,
-            config_file=self.global_config.config_file,
-            appimage_download_folder_path=self.global_config.expanded_appimage_download_folder_path,
-            appimage_download_backup_folder_path=self.global_config.expanded_appimage_download_backup_folder_path,
-            config_folder=self.app_config.config_folder,
-            config_file_name=self.app_config.config_file_name,
-            batch_mode=self.global_config.batch_mode,
-            keep_backup=self.global_config.keep_backup,
+            config_file=global_config.config_file,
+            appimage_download_folder_path=global_config.expanded_appimage_download_folder_path,
+            appimage_download_backup_folder_path=global_config.expanded_appimage_download_backup_folder_path,
+            config_folder=app_config.config_folder,
+            config_file_name=app_config.config_file_name,
+            batch_mode=global_config.batch_mode,
+            keep_backup=global_config.keep_backup,
         )
-
         file_handler.handle_appimage_operations()
 
-    def check_versions(self, selected_files):
-        """Check if the AppImages in the selected configuration files need updates."""
-        appimages_to_update = []
+    def _verify(self, app_config, github_api):
+        """Handle verification process"""
+        if github_api.sha_name == "no_sha_file":
+            print("Skipping verification for beta version")
+            return True
 
-        for config_file in selected_files:
-            self.app_config.load_appimage_config(config_file)
-
-            # Initialize GitHubAPI
-            github_api = GitHubAPI(
-                owner=self.app_config.owner,
-                repo=self.app_config.repo,
-                sha_name=self.app_config.sha_name,
-                hash_type=self.app_config.hash_type,
-                arch_keyword=self.app_config.arch_keyword,
-            )
-            latest_version = github_api.check_latest_version(
-                self.app_config.owner, self.app_config.repo
-            )
-
-            if latest_version and latest_version != self.app_config.version:
-                print("-------------------------------------------------")
-                print(f"{self.app_config.appimage_name} is not up to date")
-                print(f"\033[42mLatest version: {latest_version}\033[0m")
-                print(f"Current version: {self.app_config.version}")
-                print("-------------------------------------------------")
-                appimages_to_update.append(
-                    {
-                        "config_file": config_file,
-                        "latest_version": latest_version,
-                        "appimage_name": self.app_config.appimage_name,
-                    }
-                )
-            else:
-                print(
-                    f"{self.app_config.appimage_name} is already up to date (version {self.app_config.version})."
-                )
-
-        return appimages_to_update
-
-    def update_selected_appimages(self, appimages_to_update):
-        """Update the selected AppImages."""
-        for appimage_data in appimages_to_update:
-            self.app_config.load_appimage_config(appimage_data["config_file"])
-            self._update_appimage(appimage_data)
+        return VerificationManager(
+            sha_name=app_config.sha_name,
+            sha_url=github_api.sha_url,
+            appimage_name=github_api.appimage_name,
+            hash_type=app_config.hash_type,
+        ).verify_appimage()

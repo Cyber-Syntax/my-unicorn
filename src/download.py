@@ -4,6 +4,7 @@ import logging
 import requests
 from tqdm import tqdm
 from .api import GitHubAPI
+from .app_config import AppConfigManager
 
 
 class DownloadManager:
@@ -15,11 +16,19 @@ class DownloadManager:
 
     # TODO: we need a logic to check is .json file exists or
     # not for the appimage and even are the values are not empty -e.g owner, repo -
+
+    # HACK: This method is a workaround to check if the appimage exists in the current directory
+    # TODO: We need to refactor this method or use in different class to keep command design pattern
     def is_app_exist(self):
         """Check if the AppImage already exists in the current directory."""
-        if os.path.exists(self.api.appimage_name) or os.path.exists(
-            self.api.appimage_name + ".AppImage"
-        ):
+        # TESTING: api.appimage_name came none while updating need logic to load from json the appimage_name
+        # Get appimage name from config file first
+        # if not self.api.appimage_name:
+        #     app_config = AppConfigManager()
+        #     app_config.load_appimage_config(self.api.config_file)
+        #     self.api.appimage_name = app_config.appimage_name
+
+        if os.path.exists(self.api.appimage_name):
             print(f"{self.api.appimage_name} already exists in the current directory")
             return True
         return False
