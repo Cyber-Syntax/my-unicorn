@@ -33,6 +33,10 @@ class FileHandler:
             return True  # or False depending on safe default
         return input(f"{message} (y/n): ").strip().lower() == "y"
 
+    # HACK: This is a workaround to avoid wrong version sha file.
+    # TODO: Refactor this method to be able to handle version specific sha files.
+    # Maybe we can read the sha file and check if the version is same with latest version.
+
     def delete_file(self, file_path: str) -> None:
         """Delete a file if it exists."""
         if os.path.exists(file_path):

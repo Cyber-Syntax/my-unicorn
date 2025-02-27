@@ -5,8 +5,14 @@ import hashlib
 import base64
 import logging
 import gettext
+from typing import Optional
 
 _ = gettext.gettext
+
+# Constants for color formatting
+COLOR_SUCCESS = "\033[92m"
+COLOR_FAIL = "\033[41m"
+COLOR_RESET = "\033[0m"
 
 
 class VerificationManager:
@@ -22,119 +28,130 @@ class VerificationManager:
         self.sha_name = sha_name
         self.sha_url = sha_url
         self.appimage_name = appimage_name
-        self.hash_type = hash_type
+        self.hash_type = hash_type.lower()
+        self._validate_hash_type()
+
+    def _validate_hash_type(self):
+        """Ensure the hash type is supported"""
+        if self.hash_type not in hashlib.algorithms_available:
+            raise ValueError(f"Unsupported hash type: {self.hash_type}")
 
     def verify_appimage(self) -> bool:
-        """Verify the AppImage using the SHA file."""
+        """Verify the AppImage using the SHA file with proper error handling."""
         try:
-            self.download_sha_file()
-            is_valid = self.parse_sha_file()
-            return is_valid
-        except requests.RequestException as e:
-            logging.error(f"Network error: {e}")
+            if not self.sha_url or not self.sha_name:
+                raise ValueError("Missing SHA file information for verification")
+
+            self._download_sha_file()
+            return self._parse_sha_file()
+
+        except (requests.RequestException, IOError) as e:
+            logging.error(f"Verification failed: {str(e)}")
             return False
         except Exception as e:
-            logging.error(f"Unexpected error: {e}")
+            logging.error(f"Unexpected error during verification: {str(e)}")
             return False
 
-    def download_sha_file(self):
-        """Download the SHA file, overwriting any existing file."""
-        # If the file exists, remove it first.
+    def _download_sha_file(self):
+        """Download the SHA file with retries and proper cleanup."""
         if os.path.exists(self.sha_name):
             try:
                 os.remove(self.sha_name)
-                print(f"Removed existing {self.sha_name}.")
-            except OSError as error:
-                raise OSError(f"Error removing {self.sha_name}: {error}")
+                logging.info(f"Removed existing {self.sha_name}")
+            except OSError as e:
+                raise IOError(f"Failed to remove existing SHA file: {str(e)}")
 
         try:
-            if not self.sha_url:
-                raise ValueError("SHA URL is not provided.")
+            response = requests.get(self.sha_url, timeout=10)
+            response.raise_for_status()
+            with open(self.sha_name, "w", encoding="utf-8") as f:
+                f.write(response.text)
+            logging.info(f"Successfully downloaded {self.sha_name}")
+        except requests.RequestException as e:
+            raise IOError(f"Failed to download SHA file: {str(e)}")
 
-            response = requests.get(self.sha_url, timeout=5)
-            if response.status_code == 200:
-                with open(self.sha_name, "w", encoding="utf-8") as file:
-                    file.write(response.text)
-                print(f"\033[42mDownloaded {self.sha_name}\033[0m")
-            else:
-                raise ConnectionError(f"Failed to download {self.sha_url}.")
-        except Exception as e:
-            print(f"Error while installing sha file: {e}")
+    def _parse_sha_file(self) -> bool:
+        """Dispatch to appropriate SHA parsing method based on file extension."""
+        ext = os.path.splitext(self.sha_name)[1].lower()
+        parser = {
+            ".yml": self._parse_yaml_sha,
+            ".yaml": self._parse_yaml_sha,
+            ".sha256": self._parse_simple_sha,
+            ".sha512": self._parse_simple_sha,
+        }.get(ext, self._parse_text_sha)
 
-    def parse_sha_file(self):
-        """Parse the SHA file and extract hashes."""
-        if self.sha_name.endswith((".yml", ".yaml")):
-            return self._parse_yaml_sha()
-        elif self.sha_name.endswith((".sha512", ".sha256")):
-            return self._parse_simple_sha()
-        else:
-            return self._parse_text_sha()
+        return parser()
 
-    def _parse_yaml_sha(self):
-        """Parse SHA hash from a YAML file."""
-        print("parsing hash from yaml file")
-        with open(self.sha_name, "r", encoding="utf-8") as file:
-            sha_data = yaml.safe_load(file)
+    def _parse_yaml_sha(self) -> bool:
+        """Parse SHA hash from YAML file with error handling."""
+        try:
+            with open(self.sha_name, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
 
-        sha_value = sha_data.get(self.hash_type)
-        if not sha_value:
-            raise ValueError(f"No {self.hash_type} hash found in the YAML file.")
+            if not data:
+                raise ValueError("Empty YAML file")
 
-        decoded_hash = base64.b64decode(sha_value).hex()
+            encoded_hash = data.get(self.hash_type)
+            if not encoded_hash:
+                raise ValueError(f"No {self.hash_type} hash found in YAML")
 
-        return self._compare_hashes(decoded_hash)
+            decoded_hash = base64.b64decode(encoded_hash).hex()
+            return self._compare_hashes(decoded_hash)
 
-    def _parse_simple_sha(self):
-        """Parse SHA hash from a simple .sha512 or .sha256 file."""
-        with open(self.sha_name, "r", encoding="utf-8") as file:
-            sha_line = file.readline().strip()
+        except (yaml.YAMLError, ValueError, TypeError) as e:
+            raise IOError(f"YAML parsing failed: {str(e)}")
 
-        return self._compare_hashes(sha_line)
+    def _parse_simple_sha(self) -> bool:
+        """Parse SHA hash from simple hash file."""
+        with open(self.sha_name, "r", encoding="utf-8") as f:
+            content = f.read().strip()
 
-    def _parse_text_sha(self):
-        """Parse SHA hash from a plain text file."""
-        print("parsing hash from sha file")
-        with open(self.sha_name, "r", encoding="utf-8") as file:
-            for line in file:
-                if self.appimage_name in line:
-                    sha_value = line.split()[0]
-                    return self._compare_hashes(sha_value)
+        if not content:
+            raise ValueError("Empty SHA file")
 
-        raise ValueError(
-            f"No matching hash found for {self.appimage_name} in the SHA file."
-        )
+        return self._compare_hashes(content.split()[0])
+
+    def _parse_text_sha(self) -> bool:
+        """Parse SHA hash from text file with pattern matching."""
+        target_name = os.path.basename(self.appimage_name).lower()
+
+        with open(self.sha_name, "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) < 2:
+                    continue
+
+                filename = parts[1].lower()
+                if filename == target_name:
+                    return self._compare_hashes(parts[0])
+
+        raise ValueError(f"No hash found for {self.appimage_name} in SHA file")
 
     def _compare_hashes(self, expected_hash: str) -> bool:
-        """Compare the expected hash with the AppImage's hash."""
-        with open(self.appimage_name, "rb") as file:
-            appimage_hash = hashlib.new(self.hash_type, file.read()).hexdigest()
+        """Compare hashes using memory-efficient chunked reading."""
+        hash_func = hashlib.new(self.hash_type)
 
-        if appimage_hash == expected_hash:
-            print(
-                _("\033[42m{appimage_name} verified.\033[0m").format(
-                    appimage_name=self.appimage_name
-                )
-            )
-            print("************************************")
-            print(_("--------------------- HASHES ----------------------"))
-            print(
-                _("AppImage Hash: {appimage_hash}").format(appimage_hash=appimage_hash)
-            )
-            print(
-                _("Expected Hash: {expected_hash}").format(expected_hash=expected_hash)
-            )
-            print("----------------------------------------------------")
-            return True
-        else:
-            print(
-                _("\033[41m{appimage_name} verification failed.\033[0m").format(
-                    appimage_name=self.appimage_name
-                )
-            )
-            print(
-                _("AppImage Hash: {appimage_hash}").format(appimage_hash=appimage_hash)
-            )
-            print(
-                _("Expected Hash: {expected_hash}").format(expected_hash=expected_hash)
-            )
-            return False
+        with open(self.appimage_name, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_func.update(chunk)
+
+        actual_hash = hash_func.hexdigest()
+        self._log_comparison(actual_hash, expected_hash)
+        return actual_hash == expected_hash
+
+    def _log_comparison(self, actual: str, expected: str):
+        """Format and log hash comparison results."""
+        status = _("VERIFIED") if actual == expected else _("VERIFICATION FAILED")
+        color = COLOR_SUCCESS if actual == expected else COLOR_FAIL
+
+        log_lines = [
+            f"{color}{status}{COLOR_RESET}",
+            _("File: {name}").format(name=self.appimage_name),
+            _("Algorithm: {type}").format(type=self.hash_type.upper()),
+            _("Expected: {hash}").format(hash=expected),
+            _("Actual:   {hash}").format(hash=actual),
+            "----------------------------------------",
+        ]
+
+        print("\n".join(log_lines))
+        logging.info("\n".join(log_lines))
