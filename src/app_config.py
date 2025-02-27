@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+from typing import Optional
 
 
 class AppConfigManager:
@@ -33,6 +34,41 @@ class AppConfigManager:
         )
         # Ensure the configuration directory exists
         os.makedirs(self.config_folder, exist_ok=True)
+
+    # HACK: config_file as a workaround to use it in the function for now.
+    # config_file need to be used from the class but seems like it is coming None.
+    def update_version(
+        self, new_version: Optional[str] = None, new_appimage_name: Optional[str] = None
+    ) -> None:
+        """
+        Update the configuration file with the new version and AppImage name.
+        If new_version or new_appimage_name is provided, update the instance variables accordingly.
+        """
+        try:
+            if new_version is not None:
+                self.version = new_version
+            if new_appimage_name is not None:
+                self.appimage_name = new_appimage_name
+
+            config_file = os.path.join(self.config_folder, f"{self.repo}.json")
+
+            if os.path.exists(config_file):
+                with open(config_file, "r", encoding="utf-8") as file:
+                    config_data = json.load(file)
+            else:
+                config_data = {}
+
+            # Update version and AppImage information in the configuration data.
+            config_data["version"] = self.version
+            config_data["appimage_name"] = self.appimage_name
+
+            with open(config_file, "w", encoding="utf-8") as file:
+                json.dump(config_data, file, indent=4)
+            print(f"Updated configuration in {self.config_file}")
+        except json.JSONDecodeError as e:
+            print(f"Error decoding JSON: {e}")
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
     def select_files(self):
         """List available JSON configuration files and allow the user to select multiple."""

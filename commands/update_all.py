@@ -100,6 +100,7 @@ class AppImageUpdater:
 
         # 1. Load config
         app_config = AppConfigManager()
+        global_config = GlobalConfigManager()
         app_config.load_appimage_config(app_data["config_file"])
 
         # 2. Fetch release data
@@ -119,8 +120,6 @@ class AppImageUpdater:
         if not self._verify(app_config, github_api):
             return
 
-        global_config = GlobalConfigManager()
-
         # 4. Handle file operations
         file_handler = FileHandler(
             appimage_name=github_api.appimage_name,
@@ -135,7 +134,18 @@ class AppImageUpdater:
             batch_mode=global_config.batch_mode,
             keep_backup=global_config.keep_backup,
         )
-        file_handler.handle_appimage_operations()
+        success = file_handler.handle_appimage_operations()
+        if success:
+            try:
+                app_config.update_version(
+                    new_version=github_api.version,
+                    new_appimage_name=github_api.appimage_name,
+                )
+
+            except Exception as e:
+                print(f"Failed to update version in config file: {e}")
+        else:
+            print("Failed to update AppImage")
 
     def _verify(self, app_config, github_api):
         """Handle verification process"""
