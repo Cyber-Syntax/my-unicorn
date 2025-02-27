@@ -2,6 +2,8 @@ import requests
 import json
 import logging
 import os
+import platform
+import re
 
 
 class GitHubAPI:
@@ -13,6 +15,7 @@ class GitHubAPI:
         repo: str,
         sha_name: str = None,
         hash_type: str = "sha256",
+        arch_keyword: str = None,
     ):
         self.owner = owner
         self.repo = repo
@@ -22,7 +25,18 @@ class GitHubAPI:
         self.sha_url = None
         self.appimage_url = None
         self.appimage_name = None
-        self.exact_appimage_name = None
+        self.arch_keyword = arch_keyword
+        self.arch_keywords = self._get_arch_keywords()
+
+    def _get_arch_keywords(self):
+        """Static architecture keywords including linux variants"""
+        machine = platform.machine().lower()
+        return {
+            "x86_64": ["x86_64", "amd64", "linux", "linux64"],
+            "amd64": ["amd64", "x86_64", "linux"],
+            "armv7l": ["arm", "armv7l", "armhf"],
+            "aarch64": ["aarch64", "arm64"],
+        }.get(machine, [])
 
     def get_response(self):
         """Fetch release data with beta fallback handling"""
@@ -75,7 +89,7 @@ class GitHubAPI:
                 "sha_name": self.sha_name,
                 "hash_type": self.hash_type,
                 "appimage_name": self.appimage_name,
-                "exact_appimage_name": self.exact_appimage_name,
+                "arch_keyword": self.arch_keyword,
                 "appimage_url": self.appimage_url,
                 "sha_url": self.sha_url,
             }
@@ -84,44 +98,83 @@ class GitHubAPI:
             logging.error(f"Missing expected key in release data: {e}")
             return None
 
+    # HACK: This is a hack to fix the issue with the appimage name selection logic
+    # FIXME: Trying to fix appimage name selection logic
+
     def _find_appimage_asset(self, assets: list):
-        """Find AppImage asset with user selection when multiple exist"""
+        """Reliable AppImage selection with architecture keywords"""
+        print("Current arch_keyword:", self.arch_keyword)
+
         appimages = [a for a in assets if a["name"].lower().endswith(".appimage")]
 
         if not appimages:
             raise ValueError("No AppImage files found in release")
 
-        # Try to find exact match from previous config
-        if self.exact_appimage_name:
+        # 1. Try to match based on previously saved arch_keyword (exact ending)
+        if self.arch_keyword:
+            # Create a regex pattern that matches the arch_keyword at the end of the string.
+            pattern = re.compile(re.escape(self.arch_keyword.strip().lower()) + r"\Z")
+            print(f"Trying to find match with arch keyword: {self.arch_keyword}")
             for asset in appimages:
-                if asset["name"] == self.exact_appimage_name:
+                asset_name = asset["name"].strip().lower()
+                print(f"Checking asset: {asset_name}")
+                if pattern.search(asset_name):
                     self._select_appimage(asset)
                     return
 
-        # Auto-select if only one found
-        if len(appimages) == 1:
-            self._select_appimage(appimages[0])
-            self.exact_appimage_name = self.appimage_name  # Save for return
+        # 2. Filter by current architecture keywords list
+        candidates = []
+        for asset in appimages:
+            name = asset["name"].lower()
+            if any(kw in name for kw in self.arch_keywords):
+                candidates.append(asset)
+
+        # 3. Handle candidate selection
+        if len(candidates) == 1:
+            self._select_appimage(candidates[0])
+            return
+        elif candidates:
+            print(f"Found {len(candidates)} architecture-matched AppImages:")
+            self._select_from_list(candidates)
             return
 
-        # Multiple found - prompt user
-        print("Multiple AppImage versions found:")
+        # 4. Fallback to asking user to choose from all AppImages
+        print("No architecture-specific builds found, select from all AppImages:")
+        self._select_from_list(appimages)
+
+    def _select_from_list(self, appimages):
+        """User selection handler with persistence"""
         for idx, asset in enumerate(appimages, 1):
             print(f"{idx}. {asset['name']}")
 
         while True:
-            choice = input(f"Select version (1-{len(appimages)}): ")
+            choice = input(f"Select AppImage (1-{len(appimages)}): ")
             if choice.isdigit() and 1 <= int(choice) <= len(appimages):
                 selected = appimages[int(choice) - 1]
                 self._select_appimage(selected)
-                self.exact_appimage_name = self.appimage_name  # Save for return
                 return
-            print("Invalid input, please try again")
+            print("Invalid input, try again")
 
     def _select_appimage(self, asset):
         self.appimage_url = asset["browser_download_url"]
         self.appimage_name = asset["name"]
         print(f"Selected: {self.appimage_name}")
+        # Extract an arch keyword from the selected asset name.
+        # Prioritize more specific identifiers.
+        lower_name = self.appimage_name.lower()
+        for key in ["arm64", "aarch64", "amd64", "x86_64"]:
+            if key in lower_name:
+                self.arch_keyword = f"-{key}.appimage"
+                break
+        else:
+            # If no specific keyword is found, fallback to a default pattern.
+            # For instance, extract the substring starting with "-linux"
+            match = re.search(r"(-linux(?:64)?\.appimage)$", lower_name)
+            if match:
+                self.arch_keyword = match.group(1)
+            else:
+                # Last resort: use the file extension (this is less specific)
+                self.arch_keyword = ".appimage"
 
     def _find_sha_asset(self, assets: list):
         """Find SHA checksum asset with fallback logic"""

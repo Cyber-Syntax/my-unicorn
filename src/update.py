@@ -50,6 +50,7 @@ class AppImageUpdater:
                 repo=self.app_config.repo,
                 sha_name=self.app_config.sha_name,
                 hash_type=self.app_config.hash_type,
+                arch_keyword=self.app_config.arch_keyword,
             )
             latest_version = github_api.check_latest_version(
                 self.app_config.owner, self.app_config.repo
@@ -89,6 +90,7 @@ class AppImageUpdater:
             repo=self.app_config.repo,
             sha_name=self.app_config.sha_name,
             hash_type=self.app_config.hash_type,
+            arch_keyword=self.app_config.arch_keyword,
         )
         github_api.get_response()
 
@@ -104,11 +106,14 @@ class AppImageUpdater:
             appimage_name=github_api.appimage_name,
             hash_type=self.app_config.hash_type,
         )
-        if not verification_manager.verify_appimage():
-            print(
-                f"Verification failed for {self.app_config.appimage_name}. Update aborted."
-            )
-            return
+
+        # Beta versions don't have a SHA file
+        if github_api.sha_name != "no_sha_file":
+            is_valid = verification_manager.verify_appimage()
+            if not is_valid:
+                return
+        else:
+            print("Skipping verification for beta version")
 
         file_handler = FileHandler(
             appimage_name=github_api.appimage_name,
@@ -123,4 +128,5 @@ class AppImageUpdater:
             batch_mode=self.global_config.batch_mode,
             keep_backup=self.global_config.keep_backup,
         )
+
         file_handler.handle_appimage_operations()

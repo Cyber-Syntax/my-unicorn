@@ -14,7 +14,7 @@ class AppConfigManager:
         sha_name: str = None,
         hash_type: str = "sha256",
         appimage_name: str = None,
-        exact_appimage_name: str = None,
+        arch_keyword: str = None,
         config_folder: str = "~/Documents/appimages/config_files/",
     ):
         self.owner = owner
@@ -23,7 +23,7 @@ class AppConfigManager:
         self.sha_name = sha_name
         self.hash_type = hash_type
         self.appimage_name = appimage_name
-        self.exact_appimage_name = exact_appimage_name
+        self.arch_keyword = arch_keyword
         self.config_folder = os.path.expanduser(config_folder)
         self.config_file_name = f"{self.repo}.json" if self.repo else None
         self.config_file = (
@@ -48,9 +48,7 @@ class AppConfigManager:
                     self.sha_name = config.get("sha_name", self.sha_name)
                     self.hash_type = config.get("hash_type", self.hash_type)
                     self.appimage_name = config.get("appimage_name", self.appimage_name)
-                    self.exact_appimage_name = config.get(
-                        "exact_appimage_name", self.exact_appimage_name
-                    )
+                    self.arch_keyword = config.get("arch_keyword", self.arch_keyword)
                     return config
             except json.JSONDecodeError as e:
                 logging.error(f"Invalid JSON in the configuration file: {e}")
@@ -121,7 +119,7 @@ class AppConfigManager:
             "sha_name": self.sha_name,
             "hash_type": self.hash_type,
             "appimage_name": self.appimage_name,
-            "exact_appimage_name": self.exact_appimage_name,
+            "arch_keyword": self.arch_keyword,
         }
         key = list(config_dict.keys())[int(choice) - 1]
         new_value = input(f"Enter the new value for {key}: ")
@@ -192,7 +190,7 @@ class AppConfigManager:
             "sha_name": self.sha_name,
             "hash_type": self.hash_type,
             "appimage_name": self.appimage_name,
-            "exact_appimage_name": self.exact_appimage_name,
+            "arch_keyword": self.arch_keyword,
         }
 
     def list_json_files(self):

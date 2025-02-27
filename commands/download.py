@@ -27,7 +27,13 @@ class DownloadCommand(Command):
         )  # Returns sha_name and hash_type
 
         # 3. Initialize the GitHubAPI with the parsed owner and repo
-        api = GitHubAPI(owner=owner, repo=repo, sha_name=sha_name, hash_type=hash_type)
+        api = GitHubAPI(
+            owner=owner,
+            repo=repo,
+            sha_name=sha_name,
+            hash_type=hash_type,
+            arch_keyword=None,
+        )
         api.get_response()  # Fetch release data from GitHub API
 
         # Add these lines to sync ALL fields
@@ -35,7 +41,7 @@ class DownloadCommand(Command):
         app_config.repo = api.repo  # (even if from parser)
         app_config.version = api.version
         app_config.appimage_name = api.appimage_name
-        app_config.exact_appimage_name = api.exact_appimage_name
+        app_config.arch_keyword = api.arch_keyword
         app_config.sha_name = api.sha_name
         app_config.hash_type = api.hash_type
 
@@ -54,6 +60,7 @@ class DownloadCommand(Command):
         global_config = GlobalConfigManager()
         global_config.load_config()
 
+        # TODO: Those need to implement the update_all class too
         # Modify verification check to handle "no_sha_file" and None cases
         if api.sha_name != "no_sha_file":
             is_valid = verification_manager.verify_appimage()
