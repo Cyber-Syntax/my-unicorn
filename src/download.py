@@ -18,6 +18,10 @@ class DownloadManager:
 
     def is_app_exist(self):
         """Check if the AppImage already exists in the current directory."""
+        if not self.api.appimage_name:
+            print("AppImage name is not set.")
+            return False
+
         if os.path.exists(self.api.appimage_name):
             print(f"{self.api.appimage_name} already exists in the current directory")
             return True

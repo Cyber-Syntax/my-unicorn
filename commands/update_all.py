@@ -1,4 +1,3 @@
-# commands/update.py
 from commands.base import Command
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager

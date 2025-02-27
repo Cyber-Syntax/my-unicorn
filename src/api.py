@@ -68,18 +68,29 @@ class GitHubAPI:
             logging.error(f"Request failed: {e}")
             return None
 
+    # HACK: to make the code work for complex version parsing
+    # TODO: need to refactor this method
     def _process_release(self, release_data: dict, is_beta: bool):
-        """Process release data from either stable or beta releases"""
+        """Process release data with robust version parsing"""
         try:
-            if is_beta:
-                self.version = (
-                    release_data["tag_name"].replace("v", "").replace("-beta", "")
-                )
-            else:
-                self.version = release_data["tag_name"].replace("v", "")
-
+            raw_tag = release_data["tag_name"]
             assets = release_data.get("assets", [])
+
+            # First try to extract version from tag name
+            version = self._extract_version(raw_tag, is_beta)
+
+            # Find AppImage - THIS MUST SUCCEED
             self._find_appimage_asset(assets)
+            if not self.appimage_name:
+                raise ValueError("No AppImage found in release assets")
+
+            if not version:
+                version = self._extract_version_from_filename(self.appimage_name)
+
+            if not version:
+                raise ValueError(f"Could not determine version from tag: {raw_tag}")
+
+            self.version = version
             self._find_sha_asset(assets)
 
             return {
@@ -97,6 +108,36 @@ class GitHubAPI:
         except KeyError as e:
             logging.error(f"Missing expected key in release data: {e}")
             return None
+
+    def _extract_version(self, tag: str, is_beta: bool) -> str:
+        """Extract semantic version from tag string"""
+        # Clean common prefixes/suffixes
+        clean_tag = tag.lstrip("vV").replace("-beta", "").replace("-stable", "")
+
+        # Match semantic version pattern
+        version_match = re.search(r"\d+\.\d+\.\d+(?:\.\d+)*", clean_tag)
+        if version_match:
+            return version_match.group(0)
+
+        # Try alternative patterns if standard semantic version not found
+        alt_match = re.search(r"(\d+[\w\.]+)", clean_tag)
+        return alt_match.group(1) if alt_match else None
+
+    def _extract_version_from_filename(self, filename: str) -> str:
+        """Fallback version extraction from appimage filename"""
+        if not filename:
+            return None
+
+        # Try to find version in filename segments
+        for part in filename.split("-"):
+            version = self._extract_version(part, False)
+            if version:
+                return version
+
+        # Final fallback to regex search
+        version_match = re.search(r"\d+\.\d+\.\d+", filename)
+
+        return version_match.group(0) if version_match else None
 
     def _find_appimage_asset(self, assets: list):
         """Reliable AppImage selection with architecture keywords"""
@@ -179,88 +220,127 @@ class GitHubAPI:
                 self.arch_keyword = ".appimage"
 
     def _find_sha_asset(self, assets: list):
-        """Find SHA checksum asset with fallback logic"""
-
+        """Simplified SHA file detection with architecture awareness"""
         if self.sha_name == "no_sha_file":
             logging.info("Skipping SHA verification per configuration")
             return
 
-        sha_keywords = {
-            "sha",
-            "sha256",
-            "sha512",
-            "sha-256",
-            "sha-512",
-            "checksum",
-            "checksums",
-            "latest-linux",
-            "sha256sums",
-        }
-        valid_extensions = {
-            ".sha256",
-            ".sha512",
-            ".yml",
-            ".yaml",
-            ".txt",
-            ".sum",
-            ".sha",
-        }
-        # Initialize to None to handle fallback logic
-        sha_asset = None
+        # 1. Try exact match first
+        if self.sha_name:
+            for asset in assets:
+                if asset["name"] == self.sha_name:
+                    self._select_sha_asset(asset)
+                    return
 
-        # Check assets with reliable extension/keyword matching
+        # 2. Find architecture-specific SHA files
+        candidates = []
         for asset in assets:
-            name_lower = asset["name"].lower()
-            _, ext = os.path.splitext(name_lower)  # Gets extension with dot
+            name = asset["name"].lower()
+            if not self._is_sha_file(name):
+                continue
 
-            # Match both keywords and valid extensions
-            if any(kw in name_lower for kw in sha_keywords) and ext in valid_extensions:
-                sha_asset = asset
-                break
+            # Match architecture keywords or common patterns
+            if any(kw in name for kw in self.arch_keywords) or any(
+                p in name for p in ["checksums", "sha256sums", "latest"]
+            ):
+                candidates.append(asset)
 
-        # TESTING: hash detection
-        if sha_asset is not None:
-            self.sha_name = sha_asset["name"]
-            self.sha_url = sha_asset["browser_download_url"]
-            # Automatically detect hash type from the filename
-            ext = os.path.splitext(sha_asset["name"])[1].lower()
-            if ext == ".sha256" or "sha256" in sha_asset["name"].lower():
-                self.hash_type = "sha256"
-            elif ext == ".sha512" or "sha512" in sha_asset["name"].lower():
-                self.hash_type = "sha512"
-            elif ext == ".yml" or ext == ".yaml" in sha_asset["name"].lower():
-                self.hash_type = "sha512"
-            else:
-                # Fall back to asking user for hash type if not found
-                default = "sha256"
-                print(f"Could not detect hash type from filename: {sha_asset['name']}")
-                user_input = input(f"Enter hash type (default: {default}): ")
-                self.hash_type = user_input if user_input else default
-
+        # 3. Handle found candidates
+        if len(candidates) == 1:
+            self._select_sha_asset(candidates[0])
+            return
+        elif candidates:
+            print("Multiple SHA files found:")
+            self._select_sha_from_list(candidates)
             return
 
-        # Fallback to asking user for the SHA file if not found
-        print("Could not find SHA file. Options:")
+        # 4. Fallback to any SHA file
+        all_sha = [a for a in assets if self._is_sha_file(a["name"])]
+        if len(all_sha) == 1:
+            self._select_sha_asset(all_sha[0])
+            return
+        elif all_sha:
+            print("Found multiple SHA files:")
+            self._select_sha_from_list(all_sha)
+            return
+
+        # 5. Final fallback to manual input
+        self._handle_sha_fallback(assets)
+
+    def _is_sha_file(self, filename: str) -> bool:
+        """Check if file is a valid SHA file using simple rules"""
+        name = filename.lower()
+        return (
+            any(
+                name.endswith(ext)
+                for ext in (
+                    ".sha256",
+                    ".sha512",
+                    ".yml",
+                    ".yaml",
+                    ".txt",
+                    ".sum",
+                    ".sha",
+                )
+            )
+            or "checksum" in name
+            or "sha256" in name
+            or "sha512" in name
+        )
+
+    def _select_sha_asset(self, asset):
+        """Your original hash type detection with improvements"""
+        self.sha_name = asset["name"]
+        self.sha_url = asset["browser_download_url"]
+
+        # Original auto-detection logic
+        name_lower = self.sha_name.lower()
+        if "sha256" in name_lower:
+            self.hash_type = "sha256"
+        elif "sha512" in name_lower:
+            self.hash_type = "sha512"
+        elif name_lower.endswith((".yml", ".yaml")):
+            # Default for YAML files as in original code
+            self.hash_type = "sha512"
+        else:
+            # Fallback to user input
+            print(f"Could not detect hash type from {self.sha_name}")
+            default = "sha256"
+            user_input = input(f"Enter hash type (default: {default}): ").strip()
+            self.hash_type = user_input if user_input else default
+
+        print(f"Selected SHA file: {self.sha_name} (hash type: {self.hash_type})")
+
+    def _select_sha_from_list(self, sha_assets):
+        """Simple user selection prompt"""
+        for idx, asset in enumerate(sha_assets, 1):
+            print(f"{idx}. {asset['name']}")
+
+        while True:
+            choice = input(f"Select SHA file (1-{len(sha_assets)}): ")
+            if choice.isdigit() and 1 <= int(choice) <= len(sha_assets):
+                self._select_sha_asset(sha_assets[int(choice) - 1])
+                return
+            print("Invalid input, try again")
+
+    def _handle_sha_fallback(self, assets):
+        """Original fallback logic with improved prompts"""
+        print("Could not find SHA file automatically")
         print("1. Enter filename manually")
         print("2. Skip verification")
-        choice = input("Your choice (1 or 2): ")
+        choice = input("Your choice (1-2): ")
 
-        if choice == "2":
+        if choice == "1":
+            self.sha_name = input("Enter exact SHA filename: ")
+            for asset in assets:
+                if asset["name"] == self.sha_name:
+                    self.sha_url = asset["browser_download_url"]
+                    self._select_sha_asset(asset)  # Trigger hash type detection
+                    return
+            raise ValueError(f"SHA file {self.sha_name} not found")
+        else:
             self.sha_name = "no_sha_file"
             self.hash_type = "no_hash"
-            return
-
-        self.sha_name = input("Enter exact SHA filename: ")
-        for asset in assets:
-            if asset["name"] == self.sha_name:
-                self.sha_url = asset["browser_download_url"]
-                # After manual selection, prompt for hash type as a fallback
-                default = "sha256"
-                user_input = input(f"Enter hash type (default: {default}): ")
-                self.hash_type = user_input if user_input else default
-                return
-
-        raise ValueError("Specified SHA file not found in release assets")
 
     def check_latest_version(self, owner, repo):
         """Check if the latest version is already installed"""

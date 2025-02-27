@@ -1,7 +1,5 @@
 import os
 import shutil
-import subprocess
-import json
 import logging
 from dataclasses import dataclass
 from typing import Optional, Tuple
@@ -185,8 +183,6 @@ class FileHandler:
             (self.backup_old_appimage, "Backup old AppImage"),
             (self.make_executable, "Make AppImage executable"),
             (self.rename_and_move_appimage, "Rename and move AppImage"),
-            # NOTE: this line is commented out because the method is going to be used on app_config.py
-            # (self.update_config_version, "Update configuration"),
             (
                 lambda: self._safe_remove(self.sha_name)
                 if self.sha_name != "no_sha_file"
