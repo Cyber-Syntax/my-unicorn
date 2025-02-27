@@ -1,0 +1,10 @@
+{
+  "owner": "laurent22",
+  "repo": "joplin",
+  "version": "3.2.12",
+  "sha_name": "Joplin-3.2.12.AppImage.sha512",
+  "hash_type": "sha512",
+  "appimage_name": "Joplin-3.2.12.AppImage",
+  "arch_keyword": ".appimage"
+}
+

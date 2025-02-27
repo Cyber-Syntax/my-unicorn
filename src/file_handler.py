@@ -120,6 +120,8 @@ class FileHandler:
             if self.batch_mode:
                 raise
 
+    # TODO: Need to find better way to rename
+    # example standart-notes repo name is "app"...
     def rename_and_move_appimage(self) -> Tuple[bool, str]:
         """Rename the AppImage for Unix-based .desktop compatibility and move it to the download folder."""
         expected_name = f"{self.repo}.AppImage"
