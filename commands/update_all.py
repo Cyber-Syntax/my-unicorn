@@ -15,7 +15,7 @@ class UpdateCommand(Command):
         self.global_config = GlobalConfigManager()
         self.app_config = AppConfigManager()
         self.version_checker = VersionChecker()
-        self.updater = AppImageUpdater()
+        self.appimage_updater = AppImageUpdater()
 
     def execute(self):
         """Main update execution flow"""
@@ -33,7 +33,7 @@ class UpdateCommand(Command):
             return
 
         # 3. Perform updates
-        self.updater.execute_batch(updatable, self.global_config)
+        self.appimage_updater.execute_batch(updatable, self.global_config)
 
     def _confirm_updates(self, updatable):
         """Handle user confirmation based on batch mode"""
@@ -92,16 +92,6 @@ class AppImageUpdater:
     def execute_batch(self, updatable, global_config):
         """Update multiple AppImages with queue logic"""
         for app_data in updatable:
-            if not global_config.batch_mode:
-                # Confirm each update individually
-                print(
-                    f"\nReady to update {app_data['name']} ({app_data['current']} → {app_data['latest']})"
-                )
-                confirm = input("Proceed with this update? [y/N]: ").strip().lower()
-                if confirm != "y":
-                    print(f"Skipping {app_data['name']}")
-                    continue  # Skip this update and move to the next
-
             self._update_single(app_data, global_config)
 
     def _update_single(self, app_data, global_config):
@@ -121,6 +111,7 @@ class AppImageUpdater:
             arch_keyword=app_config.arch_keyword,
         )
 
+        # Get release data
         github_api.get_response()
 
         # 3. Download & verify

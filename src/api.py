@@ -205,6 +205,9 @@ class GitHubAPI:
             ".sum",
             ".sha",
         }
+        # Initialize to None to handle fallback logic
+        sha_asset = None
+
         # Check assets with reliable extension/keyword matching
         for asset in assets:
             name_lower = asset["name"].lower()
@@ -216,7 +219,7 @@ class GitHubAPI:
                 break
 
         # TESTING: hash detection
-        if sha_asset:
+        if sha_asset is not None:
             self.sha_name = sha_asset["name"]
             self.sha_url = sha_asset["browser_download_url"]
             # Automatically detect hash type from the filename

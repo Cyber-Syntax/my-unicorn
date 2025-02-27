@@ -2,8 +2,8 @@ from commands.base import Command
 from src.global_config import GlobalConfigManager
 
 
-class CreateAppConfigCommand(Command):
-    """Command to create an AppImage configuration file."""
+class CreateGlobalConfigCommand(Command):
+    """Command to create the global configuration file"""
 
     def execute(self):
         global_config = GlobalConfigManager()
