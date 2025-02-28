@@ -1,0 +1,8 @@
+{
+  "appimage_download_folder_path": "~/Documents/appimages",
+  "appimage_download_backup_folder_path": "~/Documents/appimages/backups",
+  "keep_backup": true,
+  "batch_mode": false,
+  "locale": "en"
+}
+

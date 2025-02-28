@@ -1,11 +1,10 @@
 {
-    "owner": "laurent22",
-    "repo": "joplin",
-    "appimage": "joplin-3.1.24.AppImage",
-    "version": "3.1.24",
-    "sha": "latest-linux.yml",
-    "hash_type": "sha512",
-    "choice": 4,
-    "appimage_folder_backup": "~/Documents/appimages/backup/",
-    "appimage_folder": "~/Documents/appimages/"
+  "owner": "laurent22",
+  "repo": "joplin",
+  "version": "3.2.12",
+  "sha_name": "Joplin-3.2.12.AppImage.sha512",
+  "hash_type": "sha512",
+  "appimage_name": "Joplin-3.2.12.AppImage",
+  "arch_keyword": ".appimage"
 }
+

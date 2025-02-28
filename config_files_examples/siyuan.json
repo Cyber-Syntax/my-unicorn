@@ -1,11 +1,9 @@
 {
     "owner": "siyuan-note",
     "repo": "siyuan",
-    "appimage": "siyuan-3.1.18.AppImage",
-    "version": "3.1.18",
-    "sha": "SHA256SUMS.txt",
+    "version": "3.1.23",
+    "sha_name": "SHA256SUMS.txt",
     "hash_type": "sha256",
-    "choice": 4,
-    "appimage_folder_backup": "~/Documents/appimages/backup/",
-    "appimage_folder": "~/Documents/appimages/"
+    "appimage_name": "siyuan-3.1.23-linux.AppImage",
+    "arch_keyword": "-linux.AppImage"
 }
