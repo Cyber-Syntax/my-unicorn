@@ -11,6 +11,9 @@ from commands.invoker import CommandInvoker
 from commands.create_app_config import CreateAppConfigCommand
 from commands.update_all import UpdateCommand
 from commands.download import DownloadCommand
+from commands.customize_app_config import CustomizeAppConfigCommand
+from commands.customize_global_config import CustomizeGlobalConfigCommand
+
 
 _ = gettext.gettext
 
@@ -74,18 +77,13 @@ def main():
 
     invoker.register_command(1, DownloadCommand())
     invoker.register_command(2, UpdateCommand())
-    # TODO: register customize functions
+    invoker.register_command(3, CustomizeGlobalConfigCommand())
+    invoker.register_command(4, CustomizeAppConfigCommand())
 
-    # invoker.register_command(3, CustomizeGlobalConfigCommand())
-    # invoker.register_command(4, CustomizeAppConfigCommand())
     # Main menu loop
     while True:
         choice = get_user_choice()
-        if choice == 3:
-            app_config.customize_appimage_config()
-        elif choice == 4:
-            global_config.customize_global_config()
-        elif choice == 5:  # Exit
+        if choice == 5:
             print("Exiting...")
             sys.exit(0)
         invoker.execute_command(choice)

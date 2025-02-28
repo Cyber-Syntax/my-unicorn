@@ -1,5 +1,6 @@
-import sys
 import logging
+import sys
+
 import requests
 
 # Set up logging
@@ -14,7 +15,6 @@ def handle_error(func_name, error, exit_message):
 
 
 def handle_common_errors(func):
-
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -37,7 +37,6 @@ def handle_common_errors(func):
 
 
 def handle_api_errors(func):
-
     def wrapper(*args, **kwargs):
         try:
             response = func(*args, **kwargs)

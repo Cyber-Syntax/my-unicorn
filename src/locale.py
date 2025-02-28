@@ -1,7 +1,8 @@
-import os
-import json
 import gettext
+import os
+
 from babel.support import Translations
+
 from .global_config import GlobalConfigManager
 
 
