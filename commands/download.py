@@ -1,11 +1,11 @@
 from commands.base import Command
-from src.download import DownloadManager
-from src.parser import ParseURL
 from src.api import GitHubAPI
 from src.app_config import AppConfigManager
-from src.verify import VerificationManager
+from src.download import DownloadManager
 from src.file_handler import FileHandler
 from src.global_config import GlobalConfigManager
+from src.parser import ParseURL
+from src.verify import VerificationManager
 
 
 class DownloadCommand(Command):
@@ -45,6 +45,9 @@ class DownloadCommand(Command):
         app_config.sha_name = api.sha_name
         app_config.hash_type = api.hash_type
 
+        # Save temporary configuration
+        app_config.temp_save_config()
+
         # 4. Use DownloadManager to download the AppImage
         download = DownloadManager(api)
         download.download()  # Pass the appimage URL to download method
@@ -68,9 +71,6 @@ class DownloadCommand(Command):
                 return
         else:
             print("Skipping verification for beta version")
-
-        # Save temporary configuration
-        app_config.temp_save_config()
 
         # Handle file operations
         file_handler = FileHandler(
