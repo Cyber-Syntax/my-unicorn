@@ -153,3 +153,6 @@ dmypy.json
 # logs
 *.log*
 logs/*
+
+# ruff
+.ruff_cache

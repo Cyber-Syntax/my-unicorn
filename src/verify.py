@@ -1,11 +1,12 @@
+import base64
+import gettext
+import hashlib
+import logging
 import os
+from typing import Optional
+
 import requests
 import yaml
-import hashlib
-import base64
-import logging
-import gettext
-from typing import Optional
 
 _ = gettext.gettext
 

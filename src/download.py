@@ -1,8 +1,10 @@
+import logging
 import os
 import sys
-import logging
+
 import requests
 from tqdm import tqdm
+
 from .api import GitHubAPI
 
 
