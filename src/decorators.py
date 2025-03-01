@@ -6,6 +6,8 @@ import requests
 # Set up logging
 logging.basicConfig(level=logging.ERROR)
 
+# NOTE: Not used anymore...
+
 
 def handle_error(func_name, error, exit_message):
     """Handle the error by logging it and printing an exit message."""
@@ -19,9 +21,7 @@ def handle_common_errors(func):
         try:
             return func(*args, **kwargs)
         except ValueError as error:
-            handle_error(
-                func.__name__, error, _("Invalid input or value error. Try again.")
-            )
+            handle_error(func.__name__, error, _("Invalid input or value error. Try again."))
         except KeyboardInterrupt as error:
             handle_error(func.__name__, error, _("Keyboard interrupt. Exiting..."))
         except EOFError as error:

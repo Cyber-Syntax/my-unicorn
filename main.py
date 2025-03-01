@@ -1,19 +1,19 @@
 #!/usr/bin/python3
+import gettext
+import logging
 import os
 import sys
-import logging
-import gettext
 from logging.handlers import RotatingFileHandler
+
+from commands.create_app_config import CreateAppConfigCommand
+from commands.customize_app_config import CustomizeAppConfigCommand
+from commands.customize_global_config import CustomizeGlobalConfigCommand
+from commands.download import DownloadCommand
+from commands.invoker import CommandInvoker
+from commands.update_all import UpdateCommand
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
 from src.locale import LocaleManager
-from commands.invoker import CommandInvoker
-from commands.create_app_config import CreateAppConfigCommand
-from commands.update_all import UpdateCommand
-from commands.download import DownloadCommand
-from commands.customize_app_config import CustomizeAppConfigCommand
-from commands.customize_global_config import CustomizeGlobalConfigCommand
-
 
 _ = gettext.gettext
 
@@ -50,9 +50,7 @@ def configure_logging():
     log_file = "my-unicorn.log"
     log_file_path = os.path.join(log_dir, log_file)
 
-    log_handler = RotatingFileHandler(
-        log_file_path, maxBytes=1024 * 1024, backupCount=3
-    )
+    log_handler = RotatingFileHandler(log_file_path, maxBytes=1024 * 1024, backupCount=3)
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     log_handler.setFormatter(formatter)
 

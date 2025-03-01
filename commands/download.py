@@ -22,9 +22,7 @@ class DownloadCommand(Command):
         # Get hash_type and sha_name from user
         # TODO: able to learn without user input.
         app_config = AppConfigManager(owner=owner, repo=repo)
-        sha_name, hash_type = (
-            app_config.ask_sha_hash()
-        )  # Returns sha_name and hash_type
+        sha_name, hash_type = app_config.ask_sha_hash()  # Returns sha_name and hash_type
 
         # 3. Initialize the GitHubAPI with the parsed owner and repo
         api = GitHubAPI(
@@ -52,20 +50,19 @@ class DownloadCommand(Command):
         download = DownloadManager(api)
         download.download()  # Pass the appimage URL to download method
 
-        # Pass data to VerificationManager
-        verification_manager = VerificationManager(
-            sha_name=api.sha_name,
-            sha_url=api.sha_url,
-            appimage_name=api.appimage_name,
-            hash_type=api.hash_type,
-        )
-
         global_config = GlobalConfigManager()
         global_config.load_config()
 
         # TODO: Those need to implement the update_all class too
         # Modify verification check to handle "no_sha_file" and None cases
         if api.sha_name != "no_sha_file":
+            # HACK: workaround when user skip verification for non-beta apps.
+            verification_manager = VerificationManager(
+                sha_name=api.sha_name,
+                sha_url=api.sha_url,
+                appimage_name=api.appimage_name,
+                hash_type=api.hash_type,
+            )
             is_valid = verification_manager.verify_appimage()
             if not is_valid:
                 return
