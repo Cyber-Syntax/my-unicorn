@@ -23,6 +23,7 @@
     - [x] Joplin
     - [x] FreeTube (Without verification because developer doesn't provide hash. Related issue: https://github.com/FreeTubeApp/FreeTube/issues/4720)
     - [x] Standard-notes
+    - [x] AppFlowy (Without verification because developer doesn't provide hash.)
 
 - 🛠️ **Tested:**
 
