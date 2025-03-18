@@ -9,9 +9,22 @@ from src.verify import VerificationManager
 
 
 class DownloadCommand(Command):
-    """Command to download the latest release's AppImage."""
+    """Command to download the latest release's AppImage.
+
+    This class is responsible for downloading the latest release's AppImage
+    from a specified GitHub repository. It extends the Command class and
+    implements the execute method to define the specific behavior of
+    downloading the AppImage.
+    """
 
     def execute(self):
+        """Execute the command to download the latest release's AppImage.
+
+        This method initializes the URL parser, gets the owner and repo from
+        the user, initializes the GitHubAPI, fetches release data, and
+        downloads the AppImage. It also handles verification and file
+        operations.
+        """
         # 1. Initialize the URL parser
         parser = ParseURL()
         parser.ask_url()  # Get owner and repo by asking the user for the URL

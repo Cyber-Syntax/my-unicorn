@@ -34,6 +34,7 @@ def get_user_choice():
     print(_("3. Customize AppImages config file"))
     print(_("4. Customize Global config file"))
     print(_("5. Exit"))
+    print(_("6. Help"))
     print("====================================")
     try:
         return int(input(_("Enter your choice: ")))
@@ -59,32 +60,51 @@ def configure_logging():
     logger.addHandler(log_handler)
 
 
+def display_help():
+    """Display help information for each command"""
+    help_text = """
+    Welcome to my-unicorn 🦄!
+    This script helps you manage AppImages using the command design pattern.
+
+    Available commands:
+    1. Download AppImage: Download a new AppImage and create a config file.
+    2. Update all AppImages: Update all existing AppImages based on their config files.
+    3. Customize AppImages config file: Customize the configuration file for a specific AppImage.
+    4. Customize Global config file: Customize the global configuration settings.
+    5. Exit: Exit the script.
+    6. Help: Display this help information.
+
+    For more information, refer to the documentation or contact support.
+    """
+    print(help_text)
+
+
 def main():
     configure_logging()
 
     global_config = GlobalConfigManager()
-    # global_config.load_config()
     app_config = AppConfigManager()
 
-    # # Instantiate LocaleManager and set locale
-    # locale_manager = LocaleManager()
-    # locale_manager.load_translations(global_config.locale)
-
-    # Initialize CommandInvoker and register commands
     invoker = CommandInvoker()
 
     invoker.register_command(1, DownloadCommand())
     invoker.register_command(2, UpdateCommand())
-    invoker.register_command(3, CustomizeGlobalConfigCommand())
-    invoker.register_command(4, CustomizeAppConfigCommand())
+    invoker.register_command(3, CustomizeAppConfigCommand())
+    invoker.register_command(4, CustomizeGlobalConfigCommand())
 
-    # Main menu loop
     while True:
         choice = get_user_choice()
         if choice == 5:
             print("Exiting...")
             sys.exit(0)
-        invoker.execute_command(choice)
+        elif choice == 6:
+            display_help()
+        else:
+            try:
+                invoker.execute_command(choice)
+            except Exception as e:
+                logging.error(f"Error executing command: {e}", exc_info=True)
+                print(_("An error occurred while executing the command. Please try again."))
 
 
 if __name__ == "__main__":
