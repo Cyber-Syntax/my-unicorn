@@ -142,7 +142,7 @@ dmypy.json
 *sha512*
 *SHA*
 # test
-*test*
+# *test*.py
 *None*
 
 .pylintrc
@@ -156,3 +156,4 @@ logs/*
 
 # ruff
 .ruff_cache
+*.vim

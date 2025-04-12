@@ -19,9 +19,7 @@ class ParseURL:
     def _validate_url(self):
         """Validate the GitHub URL format."""
         if not self.url.startswith("https://github.com/"):
-            raise ValueError(
-                "Invalid GitHub URL format. Must start with 'https://github.com/'."
-            )
+            raise ValueError("Invalid GitHub URL format. Must start with 'https://github.com/'.")
 
     def _parse_owner_repo(self):
         """Parse owner and repository from GitHub URL."""
@@ -34,10 +32,9 @@ class ParseURL:
             self._repo = parts[4]
             return self._owner, self._repo
         else:
-            raise ValueError(
-                "Invalid GitHub URL. Unable to parse owner and repository."
-            )
+            raise ValueError("Invalid GitHub URL. Unable to parse owner and repository.")
 
+    # TODO: are these properties necessary?
     @property
     def owner(self):
         """Return the owner from URL."""

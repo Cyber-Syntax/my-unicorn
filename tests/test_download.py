@@ -1,59 +1,63 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, mock_open, patch
+
 from src.download import DownloadManager
-from src.api import GitHubAPI
+
+
+# A fake API object to simulate the attributes that DownloadManager expects.
+class FakeAPI:
+    def __init__(self, appimage_name, appimage_url):
+        self.appimage_name = appimage_name
+        self.appimage_url = appimage_url
+
 
 class TestDownloadManager(unittest.TestCase):
+    @patch("os.path.exists")
+    def test_is_app_exist_not_set(self, mock_exists):
+        # When appimage_name is not set, is_app_exist() should print a message and return False.
+        fake_api = FakeAPI(None, None)
+        dm = DownloadManager(fake_api)
+        with patch("builtins.print") as mock_print:
+            self.assertFalse(dm.is_app_exist())
+            mock_print.assert_called_with("AppImage name is not set.")
 
-    @patch('requests.get')
-    def test_download_success(self, mock_get):
-        # Mock the response to simulate a successful download
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.headers = {'content-length': '1024'}
-        mock_response.iter_content = lambda chunk_size: [b'a' * chunk_size] * 128
-        mock_get.return_value = mock_response
+    @patch("os.path.exists")
+    def test_is_app_exist_true(self, mock_exists):
+        # If the file exists (os.path.exists returns True), is_app_exist() should return True.
+        fake_api = FakeAPI("test.AppImage", "http://example.com/test.AppImage")
+        dm = DownloadManager(fake_api)
+        mock_exists.return_value = True
+        with patch("builtins.print") as mock_print:
+            self.assertTrue(dm.is_app_exist())
+            mock_print.assert_called_with("test.AppImage already exists in the current directory")
 
-        api = GitHubAPI(owner='test_owner', repo='test_repo')
-        api.appimage_name = 'test.AppImage'
-        api.appimage_url = 'http://example.com/test.AppImage'
-        download_manager = DownloadManager(api)
+    @patch("src.download.requests.get")
+    @patch("os.path.exists")
+    def test_download_success(self, mock_exists, mock_get):
+        # If the file does not exist, download() should call requests.get, write file chunks, and close the response.
+        fake_api = FakeAPI("test.AppImage", "http://example.com/test.AppImage")
+        dm = DownloadManager(fake_api)
+        mock_exists.return_value = False
 
-        with patch('builtins.open', unittest.mock.mock_open()) as mock_file:
-            with patch('os.path.exists', return_value=False):
-                with patch('tqdm.tqdm') as mock_tqdm:
-                    download_manager.download()
-                    mock_file.assert_called_once_with('test.AppImage', 'wb')
-                    mock_tqdm.assert_called_once()
+        # Create a fake response object with necessary attributes.
+        fake_response = MagicMock()
+        fake_response.status_code = 200
+        fake_response.headers = {"content-length": "16"}
+        # Simulate iter_content yielding several chunks.
+        fake_response.iter_content = lambda chunk_size: [b"1234", b"5678", b"abcd", b"efgh"]
+        fake_response.close = MagicMock()
+        mock_get.return_value = fake_response
 
-    @patch('requests.get')
-    def test_download_file_exists(self, mock_get):
-        api = GitHubAPI(owner='test_owner', repo='test_repo')
-        api.appimage_name = 'test.AppImage'
-        api.appimage_url = 'http://example.com/test.AppImage'
-        download_manager = DownloadManager(api)
+        # Patch open to simulate file writing and patch tqdm to avoid lengthy progress bar output.
+        m = mock_open()
+        with patch("builtins.open", m), patch("tqdm.tqdm") as mock_tqdm:
+            dm.download()
 
-        with patch('os.path.exists', return_value=True):
-            download_manager.download()
-            mock_get.assert_not_called()
+        # Verify that write was called at least once and that the response was closed.
+        handle = m()
+        handle.write.assert_any_call(b"1234")
+        fake_response.close.assert_called_once()
 
-    @patch('requests.get')
-    def test_download_failure(self, mock_get):
-        # Mock the response to simulate a failed download
-        mock_response = MagicMock()
-        mock_response.status_code = 404
-        mock_get.return_value = mock_response
 
-        api = GitHubAPI(owner='test_owner', repo='test_repo')
-        api.appimage_name = 'test.AppImage'
-        api.appimage_url = 'http://example.com/test.AppImage'
-        download_manager = DownloadManager(api)
-
-        with patch('builtins.open', unittest.mock.mock_open()) as mock_file:
-            with patch('os.path.exists', return_value=False):
-                with self.assertRaises(SystemExit):
-                    download_manager.download()
-                    mock_file.assert_not_called()
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

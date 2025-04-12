@@ -59,9 +59,7 @@ class GitHubAPI:
             if response.status_code == 200 and response.json():
                 return self._process_release(response.json()[0], is_beta=True)
 
-            logging.error(
-                f"Failed to fetch releases. Status code: {response.status_code}"
-            )
+            logging.error(f"Failed to fetch releases. Status code: {response.status_code}")
             return None
 
         except requests.exceptions.RequestException as e:
@@ -360,15 +358,11 @@ class GitHubAPI:
                 return latest_version
             elif response_beta.status_code == 200:
                 latest_version = (
-                    response_beta.json()[0]["tag_name"]
-                    .replace("v", "")
-                    .replace("-beta", "")
+                    response_beta.json()[0]["tag_name"].replace("v", "").replace("-beta", "")
                 )
                 return latest_version
             else:
-                logging.error(
-                    f"Failed to fetch releases. Status code: {response.status_code}"
-                )
+                logging.error(f"Failed to fetch releases. Status code: {response.status_code}")
                 return None
 
         except requests.exceptions.RequestException as e:
