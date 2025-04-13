@@ -16,8 +16,21 @@ class AppConfigManager:
         hash_type: str = "sha256",
         appimage_name: str = None,
         arch_keyword: str = None,
-        config_folder: str = "~/Documents/appimages/config_files/",
+        config_folder: str = "~/.config/myunicorn/apps/",
     ):
+        """
+        Initialize the AppConfigManager with application-specific settings.
+        
+        Args:
+            owner (str, optional): GitHub repository owner
+            repo (str, optional): Repository name
+            version (str, optional): Application version
+            sha_name (str, optional): SHA verification file name
+            hash_type (str, optional): Hash type (sha256, sha512, etc.)
+            appimage_name (str, optional): Name of the AppImage file
+            arch_keyword (str, optional): Architecture keyword in filename
+            config_folder (str, optional): Path to configuration folder
+        """
         self.owner = owner
         self.repo = repo
         self.version = version
@@ -35,14 +48,16 @@ class AppConfigManager:
         # Ensure the configuration directory exists
         os.makedirs(self.config_folder, exist_ok=True)
 
-    # HACK: config_file as a workaround to use it in the function for now.
-    # config_file need to be used from the class but seems like it is coming None.
     def update_version(
         self, new_version: Optional[str] = None, new_appimage_name: Optional[str] = None
     ) -> None:
         """
         Update the configuration file with the new version and AppImage name.
         If new_version or new_appimage_name is provided, update the instance variables accordingly.
+        
+        Args:
+            new_version (Optional[str], optional): New version to update to
+            new_appimage_name (Optional[str], optional): New AppImage filename
         """
         try:
             if new_version is not None:
@@ -67,12 +82,19 @@ class AppConfigManager:
 
             print(f"Updated configuration in {self.config_file}")
         except json.JSONDecodeError as e:
+            logging.error(f"Error decoding JSON: {e}")
             print(f"Error decoding JSON: {e}")
         except Exception as e:
+            logging.error(f"An error occurred: {e}")
             print(f"An error occurred: {e}")
 
     def select_files(self):
-        """List available JSON configuration files and allow the user to select multiple."""
+        """
+        List available JSON configuration files and allow the user to select multiple.
+        
+        Returns:
+            list or None: List of selected JSON files or None if no selection made
+        """
         json_files = self.list_json_files()
         if not json_files:
             print("No configuration files found. Please create one first.")
@@ -96,7 +118,18 @@ class AppConfigManager:
             return None
 
     def load_appimage_config(self, config_file_name: str):
-        """Load a specific AppImage configuration file."""
+        """
+        Load a specific AppImage configuration file.
+        
+        Args:
+            config_file_name (str): Name of the configuration file
+            
+        Returns:
+            dict or None: Loaded configuration or None if file not found
+            
+        Raises:
+            ValueError: If JSON parsing fails
+        """
         config_file_path = os.path.join(self.config_folder, config_file_name)
         if os.path.isfile(config_file_path):
             try:
@@ -157,17 +190,18 @@ class AppConfigManager:
         print(f"4. SHA Name: {self.sha_name}")
         print(f"5. Hash Type: {self.hash_type}")
         print(f"6. AppImage Name: {self.appimage_name}")
-        print("7. Exit")
+        print(f"7. Architecture Keyword: {self.arch_keyword}")
+        print("8. Exit")
         print("=================================================")
 
         while True:
             choice = input("Enter your choice: ")
-            if choice.isdigit() and 1 <= int(choice) <= 7:
+            if choice.isdigit() and 1 <= int(choice) <= 8:
                 break
             else:
-                print("Invalid choice, please enter a number between 1 and 7.")
+                print("Invalid choice, please enter a number between 1 and 8.")
 
-        if choice == "7":
+        if choice == "8":
             print("Exiting without changes.")
             return
 
@@ -188,8 +222,17 @@ class AppConfigManager:
         print("=================================================")
 
     def temp_save_config(self):
-        """Atomically save configuration using temporary file"""
+        """
+        Atomically save configuration using temporary file
+        
+        Returns:
+            bool: True if save successful, False otherwise
+        """
         try:
+            if not self.config_file:
+                logging.error("Config file path is not set")
+                return False
+                
             temp_file = f"{self.config_file}.tmp"
             os.makedirs(os.path.dirname(temp_file), exist_ok=True)
 
@@ -197,38 +240,53 @@ class AppConfigManager:
             with open(temp_file, "w", encoding="utf-8") as file:
                 json.dump(self.to_dict(), file, indent=4)
 
-            print(f"Temporary config saved to {temp_file}")
+            logging.info(f"Temporary config saved to {temp_file}")
             return True
         except Exception as e:
             logging.error(f"Temp config save failed: {e}")
             # Cleanup if possible
-            if os.path.exists(temp_file):
+            if 'temp_file' in locals() and os.path.exists(temp_file):
                 os.remove(temp_file)
             return False
 
     def save_config(self):
-        """Commit temporary config by replacing original"""
+        """
+        Commit temporary config by replacing original
+        
+        Returns:
+            bool: True if commit successful, False otherwise
+        """
+        if not self.config_file:
+            logging.error("Config file path is not set")
+            return False
+            
         try:
+            # First save to temporary file
+            if not self.temp_save_config():
+                return False
+                
             temp_file = f"{self.config_file}.tmp"
-
-            if not os.path.exists(temp_file):
-                raise FileNotFoundError("No temporary config to commit")
 
             # Atomic replace operation
             os.replace(temp_file, self.config_file)
-            print(f"Configuration committed to {self.config_file}")
+            logging.info(f"Configuration committed to {self.config_file}")
             return True
 
         except Exception as e:
             logging.error(f"Config commit failed: {e}")
             # Cleanup temp file if it exists
+            temp_file = f"{self.config_file}.tmp"
             if os.path.exists(temp_file):
                 os.remove(temp_file)
             return False
 
     def to_dict(self):
-        """Convert the instance variables to a dictionary."""
-
+        """
+        Convert the instance variables to a dictionary.
+        
+        Returns:
+            dict: Dictionary representation of app configuration
+        """
         return {
             "owner": self.owner,
             "repo": self.repo,
@@ -240,16 +298,30 @@ class AppConfigManager:
         }
 
     def list_json_files(self):
-        """List JSON files in the configuration directory."""
+        """
+        List JSON files in the configuration directory.
+        
+        Returns:
+            list: List of JSON files in the configuration directory
+            
+        Raises:
+            FileNotFoundError: If the configuration folder doesn't exist
+        """
         try:
+            os.makedirs(self.config_folder, exist_ok=True)
             json_files = [file for file in os.listdir(self.config_folder) if file.endswith(".json")]
             return json_files if json_files else []
-        except FileNotFoundError as error:
+        except (FileNotFoundError, PermissionError) as error:
             logging.error(f"Error accessing configuration folder: {error}")
-            raise FileNotFoundError("Configuration folder does not exist.")
+            raise FileNotFoundError(f"Configuration folder access error: {error}")
 
     def ask_sha_hash(self):
-        """Set up app-specific configuration interactively."""
+        """
+        Set up app-specific configuration interactively.
+        
+        Returns:
+            tuple: (sha_name, hash_type) - The hash file name and hash type
+        """
         print("Setting up app-specific configuration...")
 
         # TODO: if detected, don't ask? Need to change command sorting

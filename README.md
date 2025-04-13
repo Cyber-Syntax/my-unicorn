@@ -1,7 +1,6 @@
 [![en](https://img.shields.io/badge/lang-en-green.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.md)
 [![tr](https://img.shields.io/badge/lang-tr-blue.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.tr.md)
 
----
 
 # **⚠️ Attention**
 
@@ -9,7 +8,6 @@
 - **Important:** Follow the instructions in the **Releases section** when updating the script. Updates may include new features or changes that could require different steps. I’ll strive to keep the instructions as simple as possible.
 - **Currently supported:** Linux only. While it might work on macOS, it has not been tested yet.
 
----
 
 ## **🦄 About my-unicorn**
 
@@ -30,7 +28,6 @@
   - [x] sha256
   - [x] sha512
 
----
 
 ## **💡 How to Use**
 
@@ -68,7 +65,6 @@
 
 5. Continue reading below to learn how to use.
 
----
 
 ### Using app:
 
@@ -76,68 +72,12 @@
 
 2. Using the app to create one for you, but you'll need to know some information about the application:
    - **GitHub URL:** The repository URL of the app (e.g., `https://github.com/johannesjo/super-productivity`).
-   - **Hash type:** Specify the hash type (e.g., sha512 for super-productivity).
-   - **Hash verification issues:** If the hash verification fails, you can manually add the hash to the JSON file:
-     - Look for the latest hash in the GitHub release page (e.g., [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
-     - Check the `json_files` folder for examples. All JSON files should work as expected.
+3. Hash type and Hash file name are automatically detected. You need to provide below informations, if the app compatibility is not available or error occurs:
+    - **Hash type:** Specify the hash type (e.g., sha512 for super-productivity).
+    - **Hash verification issues:** If the hash verification fails, you can manually add the hash to the JSON file:
+      - Look for the latest hash in the GitHub release page (e.g., [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
+      - Check the `apps/` folder for examples. All JSON files should work as expected.
 
-#### **📥 How to Install a New AppImage (Create Config File)**
-
-```bash
-╰─❯ python3 main.py
-Welcome to my-unicorn 🦄!
-Choose one of the following options:
-===================================
-1. Update existing AppImage
-2. Download new AppImage
-3. Update json file
-4. Exit
-===================================
-Enter your choice: 2
-Downloading new AppImage
-Choose one of the following options:
-===================================
-1. Backup old AppImage and download new AppImage
-2. Download new AppImage and overwrite old AppImage
-Enter your choice: 1
-===================================
-Enter the app GitHub URL: https://github.com/laurent22/joplin
-Which directory to save the AppImage (Default: '~/Documents/appimages'):
-Which directory to save the old AppImage (Default: '~/Documents/appimages/backup'):
-Enter the hash type for your sha (sha256, sha512): sha512
-===================================
-Parsing the owner and repo from the URL...
-Joplin downloading... Grab a cup of coffee :) This may take a while depending on your internet speed.
-Joplin-2.13.12.AppImage: 100%|██████████████████████████████████████████████████| 201M/201M [00:19<00:00, 11.0MiB/s]
-```
-
----
-
-#### **🔄 1. How to Update AppImage**
-
-```bash
-╰─❯ python3 main.py
-
-Welcome to my-unicorn 🦄!
-Choose one of the following options:
-====================================
-1. Update existing AppImage
-2. Download new AppImage
-3. Update json file
-4. Exit
-====================================
-Enter your choice: 1
-
-There are more than one .json file, please choose one of them:
-============================================================
-1. siyuan.json
-2. super-productivity.json
-3. joplin.json
-============================================================
-Enter your choice: 3
-```
-
----
 
 ## **🙏 Support This Project**
 
@@ -150,10 +90,7 @@ Enter your choice: 3
 - This project is primarily a learning resource for me, but I appreciate any feedback or suggestions! While I can't promise to incorporate all contributions or maintain active involvement, I’m open to improvements and ideas that align with the project’s goals.
 - Anyway, please refer to the [CONTRIBUTING.md](.github/CONTRIBUTING.md) file for more detailed explanation.
 
----
 
 ## **📝 License**
 
 This script is licensed under the [GPL 3.0 License]. You can find a copy of the license in the [LICENSE](https://github.com/Cyber-Syntax/my-unicorn/blob/main/LICENSE) file or at [www.gnu.org](https://www.gnu.org/licenses/gpl-3.0.en.html).
-
----

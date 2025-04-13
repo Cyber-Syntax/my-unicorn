@@ -1,7 +1,6 @@
 [![en](https://img.shields.io/badge/lang-en-green.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.md)
 [![tr](https://img.shields.io/badge/lang-tr-blue.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.tr.md)
 
----
 
 # **⚠️ Dikkat**
 
@@ -9,7 +8,6 @@
 - **Önemli:** Script’i güncellerken **Releases** bölümündeki talimatları takip edin. Güncellemeler yeni özellikler veya değişiklikler içerebilir ve bu değişiklikler farklı adımlar gerektirebilir. Talimatları olabildiğince basit tutmaya çalışacağım.
 - **Şu anda desteklenen:** Sadece Linux. macOS'ta çalışabilir, ancak henüz test edilmemiştir.
 
----
 
 ## **🦄 my-unicorn Hakkında**
 
@@ -27,7 +25,6 @@
   - [x] sha256
   - [x] sha512
 
----
 
 # **💡 Nasıl Kullanılır**
 
@@ -65,7 +62,6 @@
 
 5. Nasıl kulllanılacağını öğrenmek için alttakileri okumaya devam edin.
 
----
 
 ## **🛠️ Uygulama Kullanımı**
 
@@ -73,66 +69,11 @@
 
 2. Uygulama ile bir yapılandırma dosyası oluşturabilirsiniz. Ancak bunun için uygulama hakkında bazı bilgilere ihtiyacınız olacak:
    - **GitHub URL:** Uygulamanın GitHub depo adresi (örn. `https://github.com/johannesjo/super-productivity`).
+3. Hash türü ve Hash dosya adı otamatik olarak tespit edilir. Eğer uygulamanın uyumluluğu yoksa veya hata oluşursa aşağıdaki bilgileri sağlamanız gerekecek:
    - **Hash türü:** Hash türünü belirtin (örn. super-productivity için sha512).
    - **Hash doğrulama sorunları:** Eğer hash doğrulama başarısız olursa, hash'i manuel olarak JSON dosyasına ekleyebilirsiniz:
      - En son hash bilgisini GitHub sürüm sayfasında bulabilirsiniz (örn. [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
      - Örnekler için `json_files` klasörüne bakabilirsiniz. Tüm JSON dosyalarının beklendiği gibi çalışması gerekmektedir.
-
-```bash
-╰─❯ python3 main.py
-my-unicorn 🦄’a Hoş Geldiniz!
-Aşağıdaki seçeneklerden birini seçin:
-===================================
-1. Mevcut AppImage’ı güncelle
-2. Yeni AppImage indir
-3. Json dosyasını güncelle
-4. Çıkış
-===================================
-Seçiminizi yapın: 2
-Yeni AppImage indiriliyor
-Aşağıdaki seçeneklerden birini seçin:
-===================================
-1. Eski AppImage’ı yedekle ve yeni AppImage’ı indir
-2. Yeni AppImage’ı indir ve eski AppImage’ı üzerine yaz
-Seçiminizi yapın: 1
-===================================
-App GitHub URL’sini girin: https://github.com/laurent22/joplin
-AppImage’ı kaydedeceğiniz dizini girin (Varsayılan: '~/Documents/appimages'):
-Eski AppImage’ı kaydedeceğiniz dizini girin (Varsayılan: '~/Documents/appimages/backup'):
-Hash türünü girin (sha256, sha512): sha512
-===================================
-URL’den sahip ve repo ayrıştırılıyor...
-Joplin indiriliyor... Bir fincan kahve alabilirsiniz :) İnternet hızınıza bağlı olarak biraz zaman alabilir.
-Joplin-2.13.12.AppImage: 100%|██████████████████████████████████████████████████| 201M/201M [00:19<00:00, 11.0MiB/s]
-```
-
----
-
-## **🔄 AppImage Nasıl Güncellenir**
-
-```bash
-╰─❯ python3 main.py
-
-my-unicorn 🦄’a Hoş Geldiniz!
-Aşağıdaki seçeneklerden birini seçin:
-====================================
-1. Mevcut AppImage’ı güncelle
-2. Yeni AppImage indir
-3. Json dosyasını güncelle
-4. Çıkış
-====================================
-Seçiminizi yapın: 1
-
-Birden fazla .json dosyası bulundu, lütfen birini seçin:
-============================================================
-1. siyuan.json
-2. super-productivity.json
-3. joplin.json
-============================================================
-Seçiminizi yapın: 3
-```
-
----
 
 ## **🙏 Bu Projeye Destek Olun**
 
@@ -140,15 +81,14 @@ Seçiminizi yapın: 3
 - **💖 Projeyi Destekle:** Çalışmalarımı desteklemek ve projeler yapmaya devam etmemi sağlamak istersen, bana sponsor olmayı düşünebilirsin:
   - [![Sponsor Ol](https://img.shields.io/badge/Sponsor-💖-brightgreen)](https://github.com/sponsors/Cyber-Syntax)
 
+
 ### **🤝 Katkı Sağlama**
 
 - Bu proje benim için öncelikle bir öğrenme kaynağıdır, ancak geri bildirim veya önerilerden memnuniyet duyarım! Tüm katkıları entegre etmeyi veya sürekli olarak katılım sağlamayı vaat edemem, ancak proje hedeflerine uygun iyileştirmelere ve fikirlere açığım.
 - Yine de, daha ayrıntılı bir açıklama için lütfen [CONTRIBUTING.tr.md](.github/CONTRIBUTING.tr.md) dosyasına göz atın.
 
----
 
 ## **📝 Lisans**
 
 Bu script, [GPL 3.0 Lisansı](https://www.gnu.org/licenses/gpl-3.0.en.html) altında lisanslanmıştır. Lisansın bir kopyasını [LICENSE](https://github.com/Cyber-Syntax/my-unicorn/blob/main/LICENSE) dosyasından veya [www.gnu.org](https://www.gnu.org/licenses/gpl-3.0.en.html) adresinden bulabilirsiniz.
 
----
