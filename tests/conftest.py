@@ -1,7 +1,7 @@
 import pytest
 import requests_mock
 from httmock import HTTMock, all_requests
-
+    
 
 @pytest.fixture
 def mock_requests_get():

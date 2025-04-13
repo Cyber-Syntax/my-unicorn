@@ -1,16 +1,14 @@
-from ast import Param
 import os
 import sys
 import unittest
 from unittest.mock import patch
 
-from ..src.parser import ParseURL
-
 # Add the project root to sys.path so that the 'src' package can be imported.
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-
+    
+from src.parser import ParseURL
 
 class TestParseURL(unittest.TestCase):
     @patch("builtins.input", return_value="https://github.com/testowner/testrepo")

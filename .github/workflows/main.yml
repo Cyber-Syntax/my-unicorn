@@ -1,0 +1,74 @@
+name: Create Release from CHANGELOG
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'CHANGELOG.md'  # Only trigger when CHANGELOG.md is updated
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract latest version and notes
+        id: changelog
+        run: |
+          # Extract the first version number from CHANGELOG.md
+          VERSION=$(grep -m 1 '^## v' CHANGELOG.md | sed 's/^## \(v[0-9.]*[0-9]\(-[a-zA-Z0-9]*\)*\).*/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Extract notes for this version (everything between this version header and the next version header)
+          NOTES=$(awk -v ver="$VERSION" '
+            BEGIN { found=0; capture=0; notes=""; }
+            $0 ~ "^## " ver { found=1; capture=1; next; }
+            $0 ~ /^## v/ && capture==1 { capture=0; }
+            capture==1 { notes = notes $0 "\n"; }
+            END { print notes; }
+          ' CHANGELOG.md)
+          
+          # Save notes to output with correct GitHub multiline syntax
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "notes<<$EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+          
+          # For debugging
+          echo "Found version: $VERSION"
+          echo "Release notes excerpt: $(echo "$NOTES" | head -3)..."
+
+      - name: Check for existing release
+        id: check_release
+        run: |
+          VERSION=${{ steps.changelog.outputs.version }}
+          if gh release view $VERSION &>/dev/null; then
+            echo "Release already exists: $VERSION"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "No existing release found for: $VERSION"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create zip archive
+        if: steps.check_release.outputs.exists == 'false'
+        run: zip -r my-unicorn-${{ steps.changelog.outputs.version }}.zip ./ -x "*.git*" ".github/*"
+
+      - name: Create GitHub Release
+        if: steps.check_release.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.changelog.outputs.version }}
+          name: "Release ${{ steps.changelog.outputs.version }}"
+          body: ${{ steps.changelog.outputs.notes }}
+          draft: false
+          prerelease: ${{ contains(steps.changelog.outputs.version, '-') }}
+          files: my-unicorn-${{ steps.changelog.outputs.version }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
