@@ -50,20 +50,21 @@ class AppConfigManager:
             if new_appimage_name is not None:
                 self.appimage_name = new_appimage_name
 
-            config_file = os.path.join(self.config_folder, f"{self.repo}.json")
+            # Update the config_file attribute
+            self.config_file = os.path.join(self.config_folder, f"{self.repo}.json")
+            config_data = {}
 
-            if os.path.exists(config_file):
-                with open(config_file, "r", encoding="utf-8") as file:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, "r", encoding="utf-8") as file:
                     config_data = json.load(file)
-            else:
-                config_data = {}
 
             # Update version and AppImage information in the configuration data.
             config_data["version"] = self.version
             config_data["appimage_name"] = self.appimage_name
 
-            with open(config_file, "w", encoding="utf-8") as file:
+            with open(self.config_file, "w", encoding="utf-8") as file:
                 json.dump(config_data, file, indent=4)
+
             print(f"Updated configuration in {self.config_file}")
         except json.JSONDecodeError as e:
             print(f"Error decoding JSON: {e}")
@@ -146,9 +147,7 @@ class AppConfigManager:
 
         selected_file_path = os.path.join(self.config_folder, selected_file)
         self.load_appimage_config(selected_file)
-        self.config_file = (
-            selected_file_path  # Override to ensure saving to the selected file
-        )
+        self.config_file = selected_file_path  # Override to ensure saving to the selected file
 
         print("Select which key to modify:")
         print("=================================================")
@@ -185,9 +184,7 @@ class AppConfigManager:
         new_value = input(f"Enter the new value for {key}: ")
         setattr(self, key, new_value)
         self.save_config()
-        print(
-            f"\033[42m{key.capitalize()} updated successfully in {selected_file}\033[0m"
-        )
+        print(f"\033[42m{key.capitalize()} updated successfully in {selected_file}\033[0m")
         print("=================================================")
 
     def temp_save_config(self):
@@ -245,11 +242,7 @@ class AppConfigManager:
     def list_json_files(self):
         """List JSON files in the configuration directory."""
         try:
-            json_files = [
-                file
-                for file in os.listdir(self.config_folder)
-                if file.endswith(".json")
-            ]
+            json_files = [file for file in os.listdir(self.config_folder) if file.endswith(".json")]
             return json_files if json_files else []
         except FileNotFoundError as error:
             logging.error(f"Error accessing configuration folder: {error}")
@@ -263,12 +256,10 @@ class AppConfigManager:
         # TODO: Debug is WIP:
         # joplin works, siyuan works
         self.sha_name = (
-            input("Enter the SHA file name (Leave blank for auto detect): ").strip()
-            or None
+            input("Enter the SHA file name (Leave blank for auto detect): ").strip() or None
         )
         self.hash_type = (
-            input("Enter the hash type (Leave blank for auto detect): ").strip()
-            or "sha256"
+            input("Enter the hash type (Leave blank for auto detect): ").strip() or "sha256"
         )
 
         return self.sha_name, self.hash_type

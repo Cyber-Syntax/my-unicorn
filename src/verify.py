@@ -3,7 +3,6 @@ import gettext
 import hashlib
 import logging
 import os
-from typing import Optional
 
 import requests
 import yaml
@@ -14,6 +13,9 @@ _ = gettext.gettext
 COLOR_SUCCESS = "\033[92m"
 COLOR_FAIL = "\033[41m"
 COLOR_RESET = "\033[0m"
+
+# Supported hash types
+SUPPORTED_HASH_TYPES = ["sha256", "sha512"]
 
 
 class VerificationManager:
@@ -34,14 +36,25 @@ class VerificationManager:
 
     def _validate_hash_type(self):
         """Ensure the hash type is supported"""
+        if self.hash_type not in SUPPORTED_HASH_TYPES:
+            raise ValueError(
+                f"Unsupported hash type: {self.hash_type}. "
+                f"Supported types are: {', '.join(SUPPORTED_HASH_TYPES)}"
+            )
+
         if self.hash_type not in hashlib.algorithms_available:
-            raise ValueError(f"Unsupported hash type: {self.hash_type}")
+            raise ValueError(f"Hash type {self.hash_type} not available in this system")
 
     def verify_appimage(self) -> bool:
         """Verify the AppImage using the SHA file with proper error handling."""
         try:
             if not self.sha_url or not self.sha_name:
-                raise ValueError("Missing SHA file information for verification")
+                logging.error("Missing SHA file information for verification")
+                return False
+
+            if not self.appimage_name or not os.path.exists(self.appimage_name):
+                logging.error(f"AppImage file not found: {self.appimage_name}")
+                return False
 
             self._download_sha_file()
             return self._parse_sha_file()
@@ -70,9 +83,14 @@ class VerificationManager:
             logging.info(f"Successfully downloaded {self.sha_name}")
         except requests.RequestException as e:
             raise IOError(f"Failed to download SHA file: {str(e)}")
+        except Exception as e:
+            raise IOError(f"Failed to write SHA file: {str(e)}")
 
     def _parse_sha_file(self) -> bool:
         """Dispatch to appropriate SHA parsing method based on file extension."""
+        if not os.path.exists(self.sha_name):
+            raise IOError(f"SHA file not found: {self.sha_name}")
+
         ext = os.path.splitext(self.sha_name)[1].lower()
         parser = {
             ".yml": self._parse_yaml_sha,
@@ -96,49 +114,84 @@ class VerificationManager:
             if not encoded_hash:
                 raise ValueError(f"No {self.hash_type} hash found in YAML")
 
-            decoded_hash = base64.b64decode(encoded_hash).hex()
-            return self._compare_hashes(decoded_hash)
+            try:
+                decoded_hash = base64.b64decode(encoded_hash).hex()
+                return self._compare_hashes(decoded_hash)
+            except Exception as e:
+                raise ValueError(f"Failed to decode hash: {str(e)}")
 
         except (yaml.YAMLError, ValueError, TypeError) as e:
             raise IOError(f"YAML parsing failed: {str(e)}")
 
     def _parse_simple_sha(self) -> bool:
         """Parse SHA hash from simple hash file."""
-        with open(self.sha_name, "r", encoding="utf-8") as f:
-            content = f.read().strip()
+        try:
+            with open(self.sha_name, "r", encoding="utf-8") as f:
+                content = f.read().strip()
 
-        if not content:
-            raise ValueError("Empty SHA file")
+            if not content:
+                raise ValueError("Empty SHA file")
 
-        return self._compare_hashes(content.split()[0])
+            hash_value = content.split()[0]
+            # Validate hash format
+            expected_length = 64 if self.hash_type == "sha256" else 128
+            if len(hash_value) != expected_length or not all(
+                c in "0123456789abcdefABCDEF" for c in hash_value
+            ):
+                raise ValueError(f"Invalid {self.hash_type} hash format")
+
+            return self._compare_hashes(hash_value)
+
+        except IOError as e:
+            raise IOError(f"Failed to read SHA file: {str(e)}")
 
     def _parse_text_sha(self) -> bool:
         """Parse SHA hash from text file with pattern matching."""
         target_name = os.path.basename(self.appimage_name).lower()
 
-        with open(self.sha_name, "r", encoding="utf-8") as f:
-            for line in f:
-                parts = line.strip().split()
-                if len(parts) < 2:
-                    continue
+        try:
+            with open(self.sha_name, "r", encoding="utf-8") as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) < 2:
+                        continue
 
-                filename = parts[1].lower()
-                if filename == target_name:
-                    return self._compare_hashes(parts[0])
+                    filename = parts[1].lower()
+                    if filename == target_name:
+                        hash_value = parts[0]
+                        # Validate hash format
+                        expected_length = 64 if self.hash_type == "sha256" else 128
+                        if len(hash_value) != expected_length or not all(
+                            c in "0123456789abcdefABCDEF" for c in hash_value
+                        ):
+                            raise ValueError(f"Invalid {self.hash_type} hash format")
+                        return self._compare_hashes(hash_value)
 
-        raise ValueError(f"No hash found for {self.appimage_name} in SHA file")
+            raise ValueError(f"No hash found for {self.appimage_name} in SHA file")
+
+        except IOError as e:
+            raise IOError(f"Failed to read SHA file: {str(e)}")
 
     def _compare_hashes(self, expected_hash: str) -> bool:
         """Compare hashes using memory-efficient chunked reading."""
-        hash_func = hashlib.new(self.hash_type)
+        if not os.path.exists(self.appimage_name):
+            raise IOError(f"AppImage file not found: {self.appimage_name}")
 
-        with open(self.appimage_name, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                hash_func.update(chunk)
+        try:
+            hash_func = hashlib.new(self.hash_type)
 
-        actual_hash = hash_func.hexdigest()
-        self._log_comparison(actual_hash, expected_hash)
-        return actual_hash == expected_hash
+            with open(self.appimage_name, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_func.update(chunk)
+
+            actual_hash = hash_func.hexdigest()
+            self._log_comparison(actual_hash, expected_hash)
+            return actual_hash == expected_hash
+
+        except IOError as e:
+            raise IOError(f"Failed to read AppImage file: {str(e)}")
+        except Exception as e:
+            raise ValueError(f"Hash calculation failed: {str(e)}")
 
     def _log_comparison(self, actual: str, expected: str):
         """Format and log hash comparison results."""

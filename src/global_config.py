@@ -11,9 +11,7 @@ class GlobalConfigManager:
     config_file: str = field(
         default="~/Documents/appimages/config_files/other_settings/settings.json"
     )
-    appimage_download_folder_path: str = field(
-        default_factory=lambda: "~/Documents/appimages"
-    )
+    appimage_download_folder_path: str = field(default_factory=lambda: "~/Documents/appimages")
     appimage_download_backup_folder_path: str = field(
         default_factory=lambda: "~/Documents/appimages/backups"
     )
@@ -52,9 +50,7 @@ class GlobalConfigManager:
                 logging.error(f"Failed to parse the configuration file: {e}")
                 raise ValueError("Invalid JSON format in the configuration file.")
         else:
-            logging.info(
-                f"Configuration file not found at {self.config_file}. Creating one..."
-            )
+            logging.info(f"Configuration file not found at {self.config_file}. Creating one...")
             self.create_global_config()
             return False
 
@@ -82,14 +78,10 @@ class GlobalConfigManager:
             or "~/Documents/appimages"
         )
         keep_backup = (
-            input("Enable backup for old appimages? (yes/no, default: yes): ")
-            .strip()
-            .lower()
+            input("Enable backup for old appimages? (yes/no, default: yes): ").strip().lower()
             or "yes"
         )
-        batch_mode = (
-            input("Enable batch mode? (yes/no, default: no): ").strip().lower() or "no"
-        )
+        batch_mode = input("Enable batch mode? (yes/no, default: no): ").strip().lower() or "no"
         locale = input("Select your locale (en/tr, default: en): ").strip() or "en"
 
         # Update current instance values
@@ -156,22 +148,15 @@ class GlobalConfigManager:
                 or "~/Documents/appimages"
             )
         elif key == "keep_backup":
-            new_value = (
-                input("Enable backup for old appimages? (yes/no): ").strip().lower()
-                or "no"
-            )
+            new_value = input("Enable backup for old appimages? (yes/no): ").strip().lower() or "no"
             new_value = new_value == "yes"
         elif key == "batch_mode":
             new_value = input("Enable batch mode? (yes/no): ").strip().lower() or "no"
             new_value = new_value == "yes"
         elif key == "locale":
-            new_value = (
-                input("Select your locale (en/tr, default: en): ").strip() or "en"
-            )
+            new_value = input("Select your locale (en/tr, default: en): ").strip() or "en"
 
         setattr(self, key, new_value)
         self.save_config()
-        print(
-            f"\033[42m{key.capitalize()} updated successfully in settings.json\033[0m"
-        )
+        print(f"\033[42m{key.capitalize()} updated successfully in settings.json\033[0m")
         print("=================================================")

@@ -5,7 +5,6 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 
-from commands.create_app_config import CreateAppConfigCommand
 from commands.customize_app_config import CustomizeAppConfigCommand
 from commands.customize_global_config import CustomizeGlobalConfigCommand
 from commands.download import DownloadCommand
@@ -13,7 +12,6 @@ from commands.invoker import CommandInvoker
 from commands.update_all import UpdateCommand
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
-from src.locale import LocaleManager
 
 _ = gettext.gettext
 
@@ -62,8 +60,9 @@ def configure_logging():
 def main():
     configure_logging()
 
+    # Config Initialize, global config auto loads the config file
+    # Commands create the config file if it doesn't exist
     global_config = GlobalConfigManager()
-    # global_config.load_config()
     app_config = AppConfigManager()
 
     # # Instantiate LocaleManager and set locale
