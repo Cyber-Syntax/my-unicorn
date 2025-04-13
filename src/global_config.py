@@ -9,7 +9,7 @@ class GlobalConfigManager:
     """Manages global configuration settings."""
 
     config_file: str = field(
-        default="~/Documents/appimages/config_files/other_settings/settings.json"
+        default="~/.config/myunicorn/settings.json"
     )
     appimage_download_folder_path: str = field(default_factory=lambda: "~/Documents/appimages")
     appimage_download_backup_folder_path: str = field(
@@ -22,6 +22,8 @@ class GlobalConfigManager:
     def __post_init__(self):
         # Expand only the config file path during initialization
         self.config_file = os.path.expanduser(self.config_file)
+        # Ensure the XDG config directory exists
+        os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
         self.load_config()
 
     def expanded_path(self, path):
@@ -100,6 +102,7 @@ class GlobalConfigManager:
         os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
         with open(self.config_file, "w", encoding="utf-8") as file:
             json.dump(self.to_dict(), file, indent=4)
+        logging.info(f"Global configuration saved to {self.config_file}")
 
     # Properties to access expanded paths on demand
     @property
