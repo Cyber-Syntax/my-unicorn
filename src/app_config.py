@@ -1,7 +1,7 @@
 import os
 import json
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 
 
 class AppConfigManager:
@@ -20,7 +20,7 @@ class AppConfigManager:
     ):
         """
         Initialize the AppConfigManager with application-specific settings.
-        
+
         Args:
             owner (str, optional): GitHub repository owner
             repo (str, optional): Repository name
@@ -54,7 +54,7 @@ class AppConfigManager:
         """
         Update the configuration file with the new version and AppImage name.
         If new_version or new_appimage_name is provided, update the instance variables accordingly.
-        
+
         Args:
             new_version (Optional[str], optional): New version to update to
             new_appimage_name (Optional[str], optional): New AppImage filename
@@ -88,10 +88,80 @@ class AppConfigManager:
             logging.error(f"An error occurred: {e}")
             print(f"An error occurred: {e}")
 
+    def create_desktop_file(
+        self, appimage_path: str, icon_path: Optional[str] = None
+    ) -> Tuple[bool, str]:
+        """
+        Create a desktop entry file for the AppImage.
+
+        Args:
+            appimage_path (str): Full path to the AppImage file
+            icon_path (Optional[str]): Path to the icon file, if available
+
+        Returns:
+            Tuple[bool, str]: Success status and error message if any
+        """
+        try:
+            # Ensure repo name exists
+            if not self.repo:
+                return False, "Repository name not set"
+
+            # Create the desktop applications directory if it doesn't exist
+            desktop_dir = os.path.expanduser("~/.local/share/applications")
+            os.makedirs(desktop_dir, exist_ok=True)
+
+            # Determine display name (capitalize first letter of each word)
+            display_name = " ".join(
+                word.capitalize() for word in self.repo.replace("-", " ").split()
+            )
+
+            # Determine icon path
+            icon = icon_path or ""
+            if not icon_path:
+                # Create icons directory if it doesn't exist
+                icons_dir = os.path.join(os.path.dirname(appimage_path), "icons")
+                os.makedirs(icons_dir, exist_ok=True)
+
+                # Set default icon path - user can update this later
+                icon = os.path.join(icons_dir, f"{self.repo.lower()}.svg")
+
+            # Create the desktop file content
+            desktop_content = [
+                "[Desktop Entry]",
+                f"Name={display_name}",
+                f"Exec={appimage_path}",
+                f"Icon={icon}",
+                "Terminal=false",
+                "Type=Application",
+                f"Comment=AppImage for {display_name}",
+                "Categories=Utility;",
+            ]
+
+            # Write to desktop file
+            desktop_file_path = os.path.join(desktop_dir, f"{self.repo.lower()}.desktop")
+            desktop_file_temp = f"{desktop_file_path}.tmp"
+
+            with open(desktop_file_temp, "w", encoding="utf-8") as f:
+                f.write("\n".join(desktop_content))
+
+            # Atomic replace
+            os.replace(desktop_file_temp, desktop_file_path)
+
+            logging.info(f"Created desktop file at {desktop_file_path}")
+            return True, desktop_file_path
+
+        except Exception as e:
+            error_msg = f"Failed to create desktop file: {e}"
+            logging.error(error_msg)
+            # Cleanup if temp file exists
+            if "desktop_file_temp" in locals() and os.path.exists(desktop_file_temp):
+                os.remove(desktop_file_temp)
+            return False, error_msg
+
     def select_files(self):
         """
         List available JSON configuration files and allow the user to select multiple.
-        
+
         Returns:
             list or None: List of selected JSON files or None if no selection made
         """
@@ -120,13 +190,13 @@ class AppConfigManager:
     def load_appimage_config(self, config_file_name: str):
         """
         Load a specific AppImage configuration file.
-        
+
         Args:
             config_file_name (str): Name of the configuration file
-            
+
         Returns:
             dict or None: Loaded configuration or None if file not found
-            
+
         Raises:
             ValueError: If JSON parsing fails
         """
@@ -224,7 +294,7 @@ class AppConfigManager:
     def temp_save_config(self):
         """
         Atomically save configuration using temporary file
-        
+
         Returns:
             bool: True if save successful, False otherwise
         """
@@ -232,7 +302,7 @@ class AppConfigManager:
             if not self.config_file:
                 logging.error("Config file path is not set")
                 return False
-                
+
             temp_file = f"{self.config_file}.tmp"
             os.makedirs(os.path.dirname(temp_file), exist_ok=True)
 
@@ -245,26 +315,26 @@ class AppConfigManager:
         except Exception as e:
             logging.error(f"Temp config save failed: {e}")
             # Cleanup if possible
-            if 'temp_file' in locals() and os.path.exists(temp_file):
+            if "temp_file" in locals() and os.path.exists(temp_file):
                 os.remove(temp_file)
             return False
 
     def save_config(self):
         """
         Commit temporary config by replacing original
-        
+
         Returns:
             bool: True if commit successful, False otherwise
         """
         if not self.config_file:
             logging.error("Config file path is not set")
             return False
-            
+
         try:
             # First save to temporary file
             if not self.temp_save_config():
                 return False
-                
+
             temp_file = f"{self.config_file}.tmp"
 
             # Atomic replace operation
@@ -283,7 +353,7 @@ class AppConfigManager:
     def to_dict(self):
         """
         Convert the instance variables to a dictionary.
-        
+
         Returns:
             dict: Dictionary representation of app configuration
         """
@@ -300,10 +370,10 @@ class AppConfigManager:
     def list_json_files(self):
         """
         List JSON files in the configuration directory.
-        
+
         Returns:
             list: List of JSON files in the configuration directory
-            
+
         Raises:
             FileNotFoundError: If the configuration folder doesn't exist
         """
@@ -318,7 +388,7 @@ class AppConfigManager:
     def ask_sha_hash(self):
         """
         Set up app-specific configuration interactively.
-        
+
         Returns:
             tuple: (sha_name, hash_type) - The hash file name and hash type
         """
