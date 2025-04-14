@@ -25,7 +25,6 @@ class UpdateCommand(Command):
         updatable = self.version_checker.find_updatable_apps(self.app_config)
         if not updatable:
             logging.info("All AppImages are up to date!")
-            print("All AppImages are up to date!")
             return
 
         # 2. Get user confirmation

@@ -159,6 +159,7 @@ class AppConfigManager:
     def select_files(self):
         """
         List available JSON configuration files and allow the user to select multiple.
+        Shows application names without the .json extension for better readability.
 
         Returns:
             list or None: List of selected JSON files or None if no selection made
@@ -166,11 +167,16 @@ class AppConfigManager:
         json_files = self.list_json_files()
         if not json_files:
             logging.warning("No configuration files found. Please create one first.")
+            print("No configuration files found. Please create one first.")
             return None
 
+        # Display app names without the .json extension
         logging.info("Displaying available configuration files")
+        print("Available applications:")
         for idx, json_file in enumerate(json_files, start=1):
-            print(f"{idx}. {json_file}")
+            # Display just the app name without .json extension
+            app_name = os.path.splitext(json_file)[0]
+            print(f"{idx}. {app_name}")
 
         user_input = input(
             "Enter the numbers of the configuration files you want to update (comma-separated): "
@@ -184,6 +190,7 @@ class AppConfigManager:
             return [json_files[idx] for idx in selected_indices]
         except (ValueError, IndexError):
             logging.error("Invalid selection. Please enter valid numbers.")
+            print("Invalid selection. Please enter valid numbers.")
             return None
 
     def load_appimage_config(self, config_file_name: str):
@@ -226,15 +233,19 @@ class AppConfigManager:
         json_files = self.list_json_files()
         if not json_files:
             logging.warning("No JSON configuration files found.")
+            print("No JSON configuration files found.")
             return
 
         logging.info("Displaying available JSON files for customization")
+        print("Available applications:")
         for idx, file in enumerate(json_files, 1):
-            print(f"{idx}. {file}")
+            # Display just the app name without .json extension
+            app_name = os.path.splitext(file)[0]
+            print(f"{idx}. {app_name}")
         print(f"{len(json_files) + 1}. Cancel")
 
         while True:
-            file_choice = input("Select a file (number) or cancel: ")
+            file_choice = input("Select an application (number) or cancel: ")
             if file_choice.isdigit():
                 file_choice_num = int(file_choice)
                 if 1 <= file_choice_num <= len(json_files):
@@ -242,18 +253,23 @@ class AppConfigManager:
                     break
                 elif file_choice_num == len(json_files) + 1:
                     logging.info("Configuration customization cancelled by user")
+                    print("Operation cancelled.")
                     return
                 else:
                     logging.warning("Invalid choice. Please select a valid number.")
+                    print("Invalid choice. Please select a valid number.")
             else:
                 logging.warning("Invalid input. Please enter a number.")
+                print("Please enter a number.")
 
         selected_file_path = os.path.join(self.config_folder, selected_file)
         self.load_appimage_config(selected_file)
         self.config_file = selected_file_path  # Override to ensure saving to the selected file
 
-        logging.info("Displaying configuration options for customization")
-        print("Select which key to modify:")
+        # Show application name in title instead of filename
+        app_name = os.path.splitext(selected_file)[0]
+        logging.info(f"Displaying configuration options for {app_name}")
+        print(f"Configuration options for {app_name}:")
         print("=================================================")
         print(f"1. Owner: {self.owner}")
         print(f"2. Repo: {self.repo}")
@@ -271,9 +287,11 @@ class AppConfigManager:
                 break
             else:
                 logging.warning("Invalid choice, please enter a number between 1 and 8.")
+                print("Invalid choice, please enter a number between 1 and 8.")
 
         if choice == "8":
             logging.info("User exited configuration customization without changes")
+            print("Exiting without changes.")
             return
 
         config_dict = {
@@ -291,7 +309,7 @@ class AppConfigManager:
         setattr(self, key, new_value)
         self.save_config()
         logging.info(f"Updated {key} from '{old_value}' to '{new_value}' in {selected_file}")
-        print(f"\033[42m{key.capitalize()} updated successfully in {selected_file}\033[0m")
+        print(f"\033[42m{key.capitalize()} updated successfully in {app_name}\033[0m")
         print("=================================================")
 
     def temp_save_config(self):
