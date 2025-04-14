@@ -80,13 +80,11 @@ class AppConfigManager:
             with open(self.config_file, "w", encoding="utf-8") as file:
                 json.dump(config_data, file, indent=4)
 
-            print(f"Updated configuration in {self.config_file}")
+            logging.info(f"Updated configuration in {self.config_file}")
         except json.JSONDecodeError as e:
             logging.error(f"Error decoding JSON: {e}")
-            print(f"Error decoding JSON: {e}")
         except Exception as e:
             logging.error(f"An error occurred: {e}")
-            print(f"An error occurred: {e}")
 
     def create_desktop_file(
         self, appimage_path: str, icon_path: Optional[str] = None
@@ -167,10 +165,10 @@ class AppConfigManager:
         """
         json_files = self.list_json_files()
         if not json_files:
-            print("No configuration files found. Please create one first.")
+            logging.warning("No configuration files found. Please create one first.")
             return None
 
-        print("Available configuration files:")
+        logging.info("Displaying available configuration files")
         for idx, json_file in enumerate(json_files, start=1):
             print(f"{idx}. {json_file}")
 
@@ -182,9 +180,10 @@ class AppConfigManager:
             selected_indices = [int(idx.strip()) - 1 for idx in user_input.split(",")]
             if any(idx < 0 or idx >= len(json_files) for idx in selected_indices):
                 raise ValueError("Invalid selection.")
+            logging.info(f"User selected files: {[json_files[idx] for idx in selected_indices]}")
             return [json_files[idx] for idx in selected_indices]
         except (ValueError, IndexError):
-            print("Invalid selection. Please enter valid numbers.")
+            logging.error("Invalid selection. Please enter valid numbers.")
             return None
 
     def load_appimage_config(self, config_file_name: str):
@@ -213,6 +212,7 @@ class AppConfigManager:
                     self.hash_type = config.get("hash_type", self.hash_type)
                     self.appimage_name = config.get("appimage_name", self.appimage_name)
                     self.arch_keyword = config.get("arch_keyword", self.arch_keyword)
+                    logging.info(f"Successfully loaded configuration from {config_file_name}")
                     return config
             except json.JSONDecodeError as e:
                 logging.error(f"Invalid JSON in the configuration file: {e}")
@@ -225,10 +225,10 @@ class AppConfigManager:
         """Customize the configuration settings for an AppImage."""
         json_files = self.list_json_files()
         if not json_files:
-            print("No JSON configuration files found.")
+            logging.warning("No JSON configuration files found.")
             return
 
-        print("Available JSON files:")
+        logging.info("Displaying available JSON files for customization")
         for idx, file in enumerate(json_files, 1):
             print(f"{idx}. {file}")
         print(f"{len(json_files) + 1}. Cancel")
@@ -241,17 +241,18 @@ class AppConfigManager:
                     selected_file = json_files[file_choice_num - 1]
                     break
                 elif file_choice_num == len(json_files) + 1:
-                    print("Operation cancelled.")
+                    logging.info("Configuration customization cancelled by user")
                     return
                 else:
-                    print("Invalid choice. Please select a valid number.")
+                    logging.warning("Invalid choice. Please select a valid number.")
             else:
-                print("Please enter a number.")
+                logging.warning("Invalid input. Please enter a number.")
 
         selected_file_path = os.path.join(self.config_folder, selected_file)
         self.load_appimage_config(selected_file)
         self.config_file = selected_file_path  # Override to ensure saving to the selected file
 
+        logging.info("Displaying configuration options for customization")
         print("Select which key to modify:")
         print("=================================================")
         print(f"1. Owner: {self.owner}")
@@ -269,10 +270,10 @@ class AppConfigManager:
             if choice.isdigit() and 1 <= int(choice) <= 8:
                 break
             else:
-                print("Invalid choice, please enter a number between 1 and 8.")
+                logging.warning("Invalid choice, please enter a number between 1 and 8.")
 
         if choice == "8":
-            print("Exiting without changes.")
+            logging.info("User exited configuration customization without changes")
             return
 
         config_dict = {
@@ -286,8 +287,10 @@ class AppConfigManager:
         }
         key = list(config_dict.keys())[int(choice) - 1]
         new_value = input(f"Enter the new value for {key}: ")
+        old_value = getattr(self, key)
         setattr(self, key, new_value)
         self.save_config()
+        logging.info(f"Updated {key} from '{old_value}' to '{new_value}' in {selected_file}")
         print(f"\033[42m{key.capitalize()} updated successfully in {selected_file}\033[0m")
         print("=================================================")
 
@@ -392,11 +395,7 @@ class AppConfigManager:
         Returns:
             tuple: (sha_name, hash_type) - The hash file name and hash type
         """
-        print("Setting up app-specific configuration...")
-
-        # TODO: if detected, don't ask? Need to change command sorting
-        # TODO: Debug is WIP:
-        # joplin works, siyuan works
+        logging.info("Setting up app-specific configuration")
         self.sha_name = (
             input("Enter the SHA file name (Leave blank for auto detect): ").strip() or None
         )
@@ -404,4 +403,5 @@ class AppConfigManager:
             input("Enter the hash type (Leave blank for auto detect): ").strip() or "sha256"
         )
 
+        logging.info(f"SHA file name: {self.sha_name}, hash type: {self.hash_type}")
         return self.sha_name, self.hash_type

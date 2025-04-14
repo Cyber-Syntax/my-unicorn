@@ -24,11 +24,13 @@ class UpdateCommand(Command):
         # 1. Find updatable apps
         updatable = self.version_checker.find_updatable_apps(self.app_config)
         if not updatable:
+            logging.info("All AppImages are up to date!")
             print("All AppImages are up to date!")
             return
 
         # 2. Get user confirmation
         if not self._confirm_updates(updatable):
+            logging.info("Update cancelled by user")
             print("Update cancelled")
             return
 
@@ -38,12 +40,16 @@ class UpdateCommand(Command):
     def _confirm_updates(self, updatable):
         """Handle user confirmation based on batch mode"""
         if self.global_config.batch_mode:
+            logging.info("Batch mode: Auto-confirming updates")
             print("Batch mode: Auto-confirming updates")
             return True
 
+        logging.info(f"Found {len(updatable)} apps to update")
         print("\nApps to update:")
         for idx, app in enumerate(updatable, 1):
-            print(f"{idx}. {app['name']} ({app['current']} → {app['latest']})")
+            update_msg = f"{idx}. {app['name']} ({app['current']} → {app['latest']})"
+            logging.info(update_msg)
+            print(update_msg)
 
         return input("Proceed with updates? [y/N]: ").strip().lower() == "y"
 
@@ -77,6 +83,9 @@ class VersionChecker:
         )
 
         if latest_version and latest_version != current_version:
+            logging.info(
+                f"Update available for {app_config.repo}: {current_version} → {latest_version}"
+            )
             return {
                 "config_file": config_file,
                 "name": app_config.appimage_name,
@@ -91,6 +100,7 @@ class AppImageUpdater:
 
     def execute_batch(self, updatable, global_config):
         """Update multiple AppImages with queue logic"""
+        logging.info(f"Beginning batch update of {len(updatable)} AppImages")
         for app_data in updatable:
             self._update_single(app_data, global_config)
 
@@ -104,7 +114,9 @@ class AppImageUpdater:
             global_config (GlobalConfigManager): Global configuration settings
         """
         try:
-            print(f"\nUpdating {app_data['name']}...")
+            update_msg = f"\nUpdating {app_data['name']}..."
+            logging.info(update_msg)
+            print(update_msg)
 
             # 1. Load config
             app_config = AppConfigManager()
@@ -127,11 +139,15 @@ class AppImageUpdater:
                 # 3. Download & verify
                 DownloadManager(github_api).download()
                 if not self._verify(app_config, github_api):
-                    logging.warning(f"Verification failed for {app_data['name']}. Skipping update.")
-                    print(f"Verification failed for {app_data['name']}. Skipping update.")
+                    verification_failed_msg = (
+                        f"Verification failed for {app_data['name']}. Skipping update."
+                    )
+                    logging.warning(verification_failed_msg)
+                    print(verification_failed_msg)
                     return
             except Exception as e:
-                logging.error(f"Error fetching or downloading for {app_data['name']}: {str(e)}")
+                error_msg = f"Error fetching or downloading for {app_data['name']}: {str(e)}"
+                logging.error(error_msg)
                 print(f"Error updating {app_data['name']}: {str(e)}. Skipping to next app.")
                 return
 
@@ -156,26 +172,31 @@ class AppImageUpdater:
                         new_version=github_api.version,
                         new_appimage_name=github_api.appimage_name,
                     )
-                    print(
+                    success_msg = (
                         f"Successfully updated {app_data['name']} to version {github_api.version}"
                     )
+                    logging.info(success_msg)
+                    print(success_msg)
                 except Exception as e:
-                    logging.error(f"Failed to update version in config file: {str(e)}")
-                    print(f"Failed to update version in config file: {str(e)}")
+                    error_msg = f"Failed to update version in config file: {str(e)}"
+                    logging.error(error_msg)
+                    print(error_msg)
             else:
-                logging.error(f"Failed to update AppImage for {app_data['name']}")
-                print(f"Failed to update AppImage for {app_data['name']}")
+                error_msg = f"Failed to update AppImage for {app_data['name']}"
+                logging.error(error_msg)
+                print(error_msg)
 
         except Exception as e:
             # Catch any unexpected exceptions to ensure we continue to the next app
-            logging.error(f"Unexpected error updating {app_data['name']}: {str(e)}")
+            error_msg = f"Unexpected error updating {app_data['name']}: {str(e)}"
+            logging.error(error_msg)
             print(
                 f"Unexpected error updating {app_data['name']}: {str(e)}. Continuing to next app."
             )
 
-        print(
-            f"Finished processing {app_data['name']}"
-        )  # Always print this regardless of success/failure
+        finished_msg = f"Finished processing {app_data['name']}"
+        logging.info(finished_msg)
+        print(finished_msg)  # Always print this regardless of success/failure
 
     def _verify(self, app_config, github_api):
         """
@@ -189,6 +210,7 @@ class AppImageUpdater:
             bool: True if verification passed or skipped, False if failed
         """
         if github_api.sha_name == "no_sha_file":
+            logging.info("Skipping verification for beta version")
             print("Skipping verification for beta version")
             return True
 

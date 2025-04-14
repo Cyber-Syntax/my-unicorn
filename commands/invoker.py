@@ -1,3 +1,6 @@
+import logging
+
+
 class CommandInvoker:
     """Invoker to manage and execute commands."""
 
@@ -14,4 +17,4 @@ class CommandInvoker:
         if command:
             command.execute()
         else:
-            print("Invalid choice. Please try again.")
+            logging.error("Invalid choice. Please try again.")

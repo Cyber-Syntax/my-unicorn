@@ -37,6 +37,7 @@ def get_user_choice():
         return int(input(_("Enter your choice: ")))
     except (ValueError, KeyboardInterrupt) as error:
         logging.error(f"Error: {error}", exc_info=True)
+        logging.error("Error: {error}. Exiting...".format(error=error))
         print(_("Error: {error}. Exiting...").format(error=error))
         sys.exit(1)
 
@@ -55,6 +56,14 @@ def configure_logging():
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     logger.addHandler(log_handler)
+
+    # Add console handler for debugging
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    logging.info("Logging configured successfully")
 
 
 def main():
@@ -81,6 +90,7 @@ def main():
     while True:
         choice = get_user_choice()
         if choice == 5:
+            logging.info("User selected to exit application")
             print("Exiting...")
             sys.exit(0)
         invoker.execute_command(choice)

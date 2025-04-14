@@ -138,7 +138,7 @@ class GitHubAPI:
 
     def _find_appimage_asset(self, assets: list):
         """Reliable AppImage selection with architecture keywords"""
-        print("Current arch_keyword:", self.arch_keyword)
+        logging.info(f"Current arch_keyword: {self.arch_keyword}")
 
         appimages = [a for a in assets if a["name"].lower().endswith(".appimage")]
 
@@ -149,10 +149,10 @@ class GitHubAPI:
         if self.arch_keyword:
             # Create a regex pattern that matches the arch_keyword at the end of the string.
             pattern = re.compile(re.escape(self.arch_keyword.strip().lower()) + r"\Z")
-            print(f"Trying to find match with arch keyword: {self.arch_keyword}")
+            logging.info(f"Trying to find match with arch keyword: {self.arch_keyword}")
             for asset in appimages:
                 asset_name = asset["name"].strip().lower()
-                print(f"Checking asset: {asset_name}")
+                logging.info(f"Checking asset: {asset_name}")
                 if pattern.search(asset_name):
                     self._select_appimage(asset)
                     return
@@ -169,6 +169,7 @@ class GitHubAPI:
             self._select_appimage(candidates[0])
             return
         elif candidates:
+            logging.info(f"Found {len(candidates)} architecture-matched AppImages")
             print(f"Found {len(candidates)} architecture-matched AppImages:")
             self._select_from_list(candidates)
             return
@@ -179,6 +180,7 @@ class GitHubAPI:
             return
 
         # 4. Fallback to asking user to choose from all AppImages
+        logging.info("No architecture-specific builds found, select from all AppImages")
         print("No architecture-specific builds found, select from all AppImages:")
         self._select_from_list(appimages)
 
@@ -193,11 +195,13 @@ class GitHubAPI:
                 selected = appimages[int(choice) - 1]
                 self._select_appimage(selected)
                 return
+            logging.warning("Invalid input, try again")
             print("Invalid input, try again")
 
     def _select_appimage(self, asset):
         self.appimage_url = asset["browser_download_url"]
         self.appimage_name = asset["name"]
+        logging.info(f"Selected: {self.appimage_name}")
         print(f"Selected: {self.appimage_name}")
         # Extract an arch keyword from the selected asset name.
         # Prioritize more specific identifiers.
@@ -247,6 +251,7 @@ class GitHubAPI:
             self._select_sha_asset(candidates[0])
             return
         elif candidates:
+            logging.info("Multiple SHA files found")
             print("Multiple SHA files found:")
             self._select_sha_from_list(candidates)
             return
@@ -257,6 +262,7 @@ class GitHubAPI:
             self._select_sha_asset(all_sha[0])
             return
         elif all_sha:
+            logging.info("Found multiple SHA files")
             print("Found multiple SHA files:")
             self._select_sha_from_list(all_sha)
             return
@@ -301,11 +307,13 @@ class GitHubAPI:
             self.hash_type = "sha512"
         else:
             # Fallback to user input
+            logging.info(f"Could not detect hash type from {self.sha_name}")
             print(f"Could not detect hash type from {self.sha_name}")
             default = "sha256"
             user_input = input(f"Enter hash type (default: {default}): ").strip()
             self.hash_type = user_input if user_input else default
 
+        logging.info(f"Selected SHA file: {self.sha_name} (hash type: {self.hash_type})")
         print(f"Selected SHA file: {self.sha_name} (hash type: {self.hash_type})")
 
     def _select_sha_from_list(self, sha_assets):
@@ -318,10 +326,12 @@ class GitHubAPI:
             if choice.isdigit() and 1 <= int(choice) <= len(sha_assets):
                 self._select_sha_asset(sha_assets[int(choice) - 1])
                 return
+            logging.warning("Invalid input, try again")
             print("Invalid input, try again")
 
     def _handle_sha_fallback(self, assets):
         """Original fallback logic with improved prompts"""
+        logging.warning("Could not find SHA file automatically")
         print("Could not find SHA file automatically")
         print("1. Enter filename manually")
         print("2. Skip verification")
@@ -338,6 +348,7 @@ class GitHubAPI:
         else:
             self.sha_name = "no_sha_file"
             self.hash_type = "no_hash"
+            logging.info("User chose to skip SHA verification")
 
     def check_latest_version(self, owner, repo):
         """Check if the latest version is already installed"""
@@ -354,11 +365,13 @@ class GitHubAPI:
 
             if response.status_code == 200:
                 latest_version = response.json()["tag_name"].replace("v", "")
+                logging.info(f"Found latest version: {latest_version}")
                 return latest_version
             elif response_beta.status_code == 200:
                 latest_version = (
                     response_beta.json()[0]["tag_name"].replace("v", "").replace("-beta", "")
                 )
+                logging.info(f"Found latest beta version: {latest_version}")
                 return latest_version
             else:
                 logging.error(f"Failed to fetch releases. Status code: {response.status_code}")
