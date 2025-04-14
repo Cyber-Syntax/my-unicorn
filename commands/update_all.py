@@ -1,4 +1,5 @@
 from commands.base import Command
+import logging
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
 from src.api import GitHubAPI
@@ -94,60 +95,99 @@ class AppImageUpdater:
             self._update_single(app_data, global_config)
 
     def _update_single(self, app_data, global_config):
-        """Update single AppImage"""
-        print(f"\nUpdating {app_data['name']}...")
+        """
+        Update single AppImage with improved error handling to ensure
+        the update process continues to the next app on failure.
 
-        # 1. Load config
-        app_config = AppConfigManager()
-        global_config = GlobalConfigManager()
-        app_config.load_appimage_config(app_data["config_file"])
+        Args:
+            app_data (dict): Contains app information including config_file, name, etc.
+            global_config (GlobalConfigManager): Global configuration settings
+        """
+        try:
+            print(f"\nUpdating {app_data['name']}...")
 
-        # 2. Fetch release data
-        github_api = GitHubAPI(
-            owner=app_config.owner,
-            repo=app_config.repo,
-            sha_name=app_config.sha_name,
-            hash_type=app_config.hash_type,
-            arch_keyword=app_config.arch_keyword,
-        )
+            # 1. Load config
+            app_config = AppConfigManager()
+            global_config = GlobalConfigManager()
+            app_config.load_appimage_config(app_data["config_file"])
 
-        # Get release data
-        github_api.get_response()
+            # 2. Fetch release data
+            github_api = GitHubAPI(
+                owner=app_config.owner,
+                repo=app_config.repo,
+                sha_name=app_config.sha_name,
+                hash_type=app_config.hash_type,
+                arch_keyword=app_config.arch_keyword,
+            )
 
-        # 3. Download & verify
-        DownloadManager(github_api).download()
-        if not self._verify(app_config, github_api):
-            return
-
-        # 4. Handle file operations
-        file_handler = FileHandler(
-            appimage_name=github_api.appimage_name,
-            repo=github_api.repo,
-            version=github_api.version,
-            sha_name=github_api.sha_name,
-            config_file=global_config.config_file,
-            appimage_download_folder_path=global_config.expanded_appimage_download_folder_path,
-            appimage_download_backup_folder_path=global_config.expanded_appimage_download_backup_folder_path,
-            config_folder=app_config.config_folder,
-            config_file_name=app_config.config_file_name,
-            batch_mode=global_config.batch_mode,
-            keep_backup=global_config.keep_backup,
-        )
-        success = file_handler.handle_appimage_operations()
-        if success:
             try:
-                app_config.update_version(
-                    new_version=github_api.version,
-                    new_appimage_name=github_api.appimage_name,
-                )
+                # Get release data
+                github_api.get_response()
 
+                # 3. Download & verify
+                DownloadManager(github_api).download()
+                if not self._verify(app_config, github_api):
+                    logging.warning(f"Verification failed for {app_data['name']}. Skipping update.")
+                    print(f"Verification failed for {app_data['name']}. Skipping update.")
+                    return
             except Exception as e:
-                print(f"Failed to update version in config file: {e}")
-        else:
-            print("Failed to update AppImage")
+                logging.error(f"Error fetching or downloading for {app_data['name']}: {str(e)}")
+                print(f"Error updating {app_data['name']}: {str(e)}. Skipping to next app.")
+                return
+
+            # 4. Handle file operations
+            file_handler = FileHandler(
+                appimage_name=github_api.appimage_name,
+                repo=github_api.repo,
+                version=github_api.version,
+                sha_name=github_api.sha_name,
+                config_file=global_config.config_file,
+                appimage_download_folder_path=global_config.expanded_appimage_download_folder_path,
+                appimage_download_backup_folder_path=global_config.expanded_appimage_download_backup_folder_path,
+                config_folder=app_config.config_folder,
+                config_file_name=app_config.config_file_name,
+                batch_mode=global_config.batch_mode,
+                keep_backup=global_config.keep_backup,
+            )
+            success = file_handler.handle_appimage_operations()
+            if success:
+                try:
+                    app_config.update_version(
+                        new_version=github_api.version,
+                        new_appimage_name=github_api.appimage_name,
+                    )
+                    print(
+                        f"Successfully updated {app_data['name']} to version {github_api.version}"
+                    )
+                except Exception as e:
+                    logging.error(f"Failed to update version in config file: {str(e)}")
+                    print(f"Failed to update version in config file: {str(e)}")
+            else:
+                logging.error(f"Failed to update AppImage for {app_data['name']}")
+                print(f"Failed to update AppImage for {app_data['name']}")
+
+        except Exception as e:
+            # Catch any unexpected exceptions to ensure we continue to the next app
+            logging.error(f"Unexpected error updating {app_data['name']}: {str(e)}")
+            print(
+                f"Unexpected error updating {app_data['name']}: {str(e)}. Continuing to next app."
+            )
+
+        print(
+            f"Finished processing {app_data['name']}"
+        )  # Always print this regardless of success/failure
 
     def _verify(self, app_config, github_api):
-        """Handle verification process"""
+        """
+        Handle verification process for downloaded AppImage.
+
+        Args:
+            app_config (AppConfigManager): App configuration
+            github_api (GitHubAPI): GitHub API handler with release info
+
+        Returns:
+            bool: True if verification passed or skipped, False if failed
+        """
         if github_api.sha_name == "no_sha_file":
             print("Skipping verification for beta version")
             return True
