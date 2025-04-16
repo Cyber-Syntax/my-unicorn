@@ -8,9 +8,7 @@ from dataclasses import dataclass, field
 class GlobalConfigManager:
     """Manages global configuration settings."""
 
-    config_file: str = field(
-        default="~/.config/myunicorn/settings.json"
-    )
+    config_file: str = field(default="~/.config/myunicorn/settings.json")
     appimage_download_folder_path: str = field(default_factory=lambda: "~/Documents/appimages")
     appimage_download_backup_folder_path: str = field(
         default_factory=lambda: "~/Documents/appimages/backups"
@@ -48,6 +46,7 @@ class GlobalConfigManager:
                     self.keep_backup = config.get("keep_backup", self.keep_backup)
                     self.batch_mode = config.get("batch_mode", self.batch_mode)
                     self.locale = config.get("locale", self.locale)
+                    self.github_token = config.get("github_token", self.github_token)
             except json.JSONDecodeError as e:
                 logging.error(f"Failed to parse the configuration file: {e}")
                 raise ValueError("Invalid JSON format in the configuration file.")
@@ -66,6 +65,7 @@ class GlobalConfigManager:
             "keep_backup": self.keep_backup,
             "batch_mode": self.batch_mode,
             "locale": self.locale,
+            "github_token": self.github_token,
         }
 
     def create_global_config(self):
@@ -85,6 +85,9 @@ class GlobalConfigManager:
         )
         batch_mode = input("Enable batch mode? (yes/no, default: no): ").strip().lower() or "no"
         locale = input("Select your locale (en/tr, default: en): ").strip() or "en"
+        github_token = (
+            input("Enter your GitHub token (optional, press Enter to skip): ").strip() or ""
+        )
 
         # Update current instance values
         self.appimage_download_folder_path = appimage_download_folder_path
@@ -92,6 +95,7 @@ class GlobalConfigManager:
         self.keep_backup = keep_backup == "yes"
         self.batch_mode = batch_mode == "yes"
         self.locale = locale
+        self.github_token = github_token
 
         # Save the configuration
         self.save_config()
@@ -128,7 +132,7 @@ class GlobalConfigManager:
 
         while True:
             choice = input("Enter your choice: ")
-            if choice.isdigit() and 1 <= int(choice) <= 5:
+            if choice.isdigit() and 1 <= int(choice) <= 6:
                 break
             else:
                 print("Invalid choice, please enter a number between 1 and 5.")

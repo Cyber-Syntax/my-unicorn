@@ -90,7 +90,7 @@ class AppConfigManager:
         self, appimage_path: str, icon_path: Optional[str] = None
     ) -> Tuple[bool, str]:
         """
-        Create a desktop entry file for the AppImage.
+        Create or update a desktop entry file for the AppImage.
 
         Args:
             appimage_path (str): Full path to the AppImage file
@@ -100,58 +100,96 @@ class AppConfigManager:
             Tuple[bool, str]: Success status and error message if any
         """
         try:
-            # Ensure repo name exists
             if not self.repo:
                 return False, "Repository name not set"
 
-            # Create the desktop applications directory if it doesn't exist
             desktop_dir = os.path.expanduser("~/.local/share/applications")
             os.makedirs(desktop_dir, exist_ok=True)
+
+            desktop_file_path = os.path.join(desktop_dir, f"{self.repo.lower()}.desktop")
+            desktop_file_temp = f"{desktop_file_path}.tmp"
 
             # Determine display name (capitalize first letter of each word)
             display_name = " ".join(
                 word.capitalize() for word in self.repo.replace("-", " ").split()
             )
 
-            # Determine icon path
-            icon = icon_path or ""
-            if not icon_path:
-                # Create icons directory if it doesn't exist
-                icons_dir = os.path.join(os.path.dirname(appimage_path), "icons")
-                os.makedirs(icons_dir, exist_ok=True)
-
-                # Set default icon path - user can update this later
-                icon = os.path.join(icons_dir, f"{self.repo.lower()}.svg")
-
-            # Create the desktop file content
-            desktop_content = [
-                "[Desktop Entry]",
-                f"Name={display_name}",
-                f"Exec={appimage_path}",
-                f"Icon={icon}",
-                "Terminal=false",
-                "Type=Application",
-                f"Comment=AppImage for {display_name}",
-                "Categories=Utility;",
+            # Define standard XDG icon locations
+            icon_locations = [
+                os.path.expanduser(f"~/.local/share/icons/{self.repo.lower()}/"),
+                os.path.expanduser("~/.local/share/icons/hicolor/"),
+                "/usr/share/icons/hicolor/",
             ]
 
-            # Write to desktop file
-            desktop_file_path = os.path.join(desktop_dir, f"{self.repo.lower()}.desktop")
-            desktop_file_temp = f"{desktop_file_path}.tmp"
+            # Determine icon path
+            final_icon_path = icon_path
+            if not final_icon_path:
+                # Check standard locations for existing icons
+                for location in icon_locations:
+                    for size in ["scalable", "256x256", "128x128", "64x64"]:
+                        for ext in [".svg", ".png"]:
+                            check_path = os.path.join(
+                                location, size, "apps", f"{self.repo.lower()}{ext}"
+                            )
+                            if os.path.exists(check_path):
+                                final_icon_path = check_path
+                                break
+                        if final_icon_path:
+                            break
+                    if final_icon_path:
+                        break
 
+            # If still no icon found, use a fallback name
+            if not final_icon_path:
+                final_icon_path = self.repo.lower()
+
+            # Read existing desktop file if it exists
+            current_content = {}
+            if os.path.exists(desktop_file_path):
+                with open(desktop_file_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if "=" in line:
+                            key, value = line.strip().split("=", 1)
+                            current_content[key] = value
+
+            # Create new desktop file content
+            new_content = {
+                "Name": display_name,
+                "Exec": appimage_path,
+                "Icon": final_icon_path,
+                "Terminal": "false",
+                "Type": "Application",
+                "Comment": f"AppImage for {display_name}",
+                "Categories": "Utility;",
+            }
+
+            # Check if content would actually change
+            needs_update = False
+            for key, value in new_content.items():
+                if key not in current_content or current_content[key] != value:
+                    needs_update = True
+                    break
+
+            if not needs_update:
+                logging.info(f"Desktop file {desktop_file_path} already up to date")
+                return True, desktop_file_path
+
+            # Write to temporary file
             with open(desktop_file_temp, "w", encoding="utf-8") as f:
-                f.write("\n".join(desktop_content))
+                f.write("[Desktop Entry]\n")
+                for key, value in new_content.items():
+                    f.write(f"{key}={value}\n")
 
             # Atomic replace
             os.replace(desktop_file_temp, desktop_file_path)
+            os.chmod(desktop_file_path, 0o755)  # Make executable
 
-            logging.info(f"Created desktop file at {desktop_file_path}")
+            logging.info(f"Updated desktop file at {desktop_file_path}")
             return True, desktop_file_path
 
         except Exception as e:
-            error_msg = f"Failed to create desktop file: {e}"
+            error_msg = f"Failed to create/update desktop file: {e}"
             logging.error(error_msg)
-            # Cleanup if temp file exists
             if "desktop_file_temp" in locals() and os.path.exists(desktop_file_temp):
                 os.remove(desktop_file_temp)
             return False, error_msg
@@ -164,33 +202,40 @@ class AppConfigManager:
         Returns:
             list or None: List of selected JSON files or None if no selection made
         """
-        json_files = self.list_json_files()
-        if not json_files:
-            logging.warning("No configuration files found. Please create one first.")
-            print("No configuration files found. Please create one first.")
-            return None
-
-        # Display app names without the .json extension
-        logging.info("Displaying available configuration files")
-        print("Available applications:")
-        for idx, json_file in enumerate(json_files, start=1):
-            # Display just the app name without .json extension
-            app_name = os.path.splitext(json_file)[0]
-            print(f"{idx}. {app_name}")
-
-        user_input = input(
-            "Enter the numbers of the configuration files you want to update (comma-separated): "
-        ).strip()
-
         try:
-            selected_indices = [int(idx.strip()) - 1 for idx in user_input.split(",")]
-            if any(idx < 0 or idx >= len(json_files) for idx in selected_indices):
-                raise ValueError("Invalid selection.")
-            logging.info(f"User selected files: {[json_files[idx] for idx in selected_indices]}")
-            return [json_files[idx] for idx in selected_indices]
-        except (ValueError, IndexError):
-            logging.error("Invalid selection. Please enter valid numbers.")
-            print("Invalid selection. Please enter valid numbers.")
+            json_files = self.list_json_files()
+            if not json_files:
+                logging.warning("No configuration files found. Please create one first.")
+                print("No configuration files found. Please create one first.")
+                return None
+
+            # Display app names without the .json extension
+            logging.info("Displaying available configuration files")
+            print("Available applications:")
+            for idx, json_file in enumerate(json_files, start=1):
+                # Display just the app name without .json extension
+                app_name = os.path.splitext(json_file)[0]
+                print(f"{idx}. {app_name}")
+
+            user_input = input(
+                "Enter the numbers of the configuration files you want to update (comma-separated): "
+            ).strip()
+
+            try:
+                selected_indices = [int(idx.strip()) - 1 for idx in user_input.split(",")]
+                if any(idx < 0 or idx >= len(json_files) for idx in selected_indices):
+                    raise ValueError("Invalid selection.")
+                logging.info(
+                    f"User selected files: {[json_files[idx] for idx in selected_indices]}"
+                )
+                return [json_files[idx] for idx in selected_indices]
+            except (ValueError, IndexError):
+                logging.error("Invalid selection. Please enter valid numbers.")
+                print("Invalid selection. Please enter valid numbers.")
+                return None
+        except KeyboardInterrupt:
+            logging.info("User cancelled the selection.")
+            print("\nSelection cancelled.")
             return None
 
     def load_appimage_config(self, config_file_name: str):

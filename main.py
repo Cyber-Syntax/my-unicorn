@@ -9,6 +9,7 @@ from commands.customize_app_config import CustomizeAppConfigCommand
 from commands.customize_global_config import CustomizeGlobalConfigCommand
 from commands.download import DownloadCommand
 from commands.invoker import CommandInvoker
+from commands.manage_token import ManageTokenCommand
 from commands.update_all import UpdateCommand
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
@@ -31,7 +32,8 @@ def get_user_choice():
     print(_("2. Update all AppImages"))
     print(_("3. Customize AppImages config file"))
     print(_("4. Customize Global config file"))
-    print(_("5. Exit"))
+    print(_("5. Manage GitHub Token (for API rate limits)"))
+    print(_("6. Exit"))
     print("====================================")
     try:
         return int(input(_("Enter your choice: ")))
@@ -83,13 +85,14 @@ def main():
 
     invoker.register_command(1, DownloadCommand())
     invoker.register_command(2, UpdateCommand())
-    invoker.register_command(3, CustomizeGlobalConfigCommand())
-    invoker.register_command(4, CustomizeAppConfigCommand())
+    invoker.register_command(3, CustomizeAppConfigCommand())
+    invoker.register_command(4, CustomizeGlobalConfigCommand())
+    invoker.register_command(5, ManageTokenCommand())
 
     # Main menu loop
     while True:
         choice = get_user_choice()
-        if choice == 5:
+        if choice == 6:
             logging.info("User selected to exit application")
             print("Exiting...")
             sys.exit(0)

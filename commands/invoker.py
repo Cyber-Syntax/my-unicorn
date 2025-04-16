@@ -15,6 +15,14 @@ class CommandInvoker:
         """Execute a registered command."""
         command = self.commands.get(key)
         if command:
-            command.execute()
+            try:
+                command.execute()
+            except TypeError as e:
+                logging.error(f"Type error occurred: {e}")
+                print(f"Error: {e}. Please check your configuration files.")
+            except Exception as e:
+                logging.error(f"Error executing command: {e}")
+                print(f"An error occurred: {e}")
         else:
             logging.error("Invalid choice. Please try again.")
+            print("Invalid choice. Please try again.")

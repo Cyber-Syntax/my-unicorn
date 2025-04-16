@@ -57,13 +57,28 @@ class VersionChecker:
     """Encapsulates version checking logic"""
 
     def find_updatable_apps(self, app_config):
-        """Return list of apps needing updates"""
-        updatable = []
-        for config_file in app_config.select_files():
+        """
+        Find applications that can be updated.
+        
+        Args:
+            app_config (AppConfig): The application configuration object.
+            
+        Returns:
+            list: A list of updatable applications.
+        """
+        updatable_apps = []
+        
+        # Check if app_config is None or if select_files() returns None
+        selected_files = app_config.select_files() if app_config else None
+        if not selected_files:
+            print("No configuration files selected or available.")
+            return updatable_apps
+        
+        for config_file in selected_files:
             app_data = self._check_single(app_config, config_file)
             if app_data:
-                updatable.append(app_data)
-        return updatable
+                updatable_apps.append(app_data)
+        return updatable_apps
 
     def _check_single(self, app_config, config_file):
         """Check version for single AppImage"""
@@ -164,6 +179,15 @@ class AppImageUpdater:
                 batch_mode=global_config.batch_mode,
                 keep_backup=global_config.keep_backup,
             )
+            # Install icon for the appimage
+            icon_success, icon_msg = file_handler.download_app_icon(
+                github_api.owner, github_api.repo
+            )
+            if icon_success:
+                print(f"Icon installed: {icon_msg}")
+            else:
+                print(f"No icon installed: {icon_msg}")
+
             success = file_handler.handle_appimage_operations()
             if success:
                 try:

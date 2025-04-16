@@ -205,12 +205,66 @@ class FileHandler:
             logger.error(error_msg)
             return False, error_msg
 
-    def handle_appimage_operations(self) -> bool:
+    def download_app_icon(self, owner: str, repo: str) -> Tuple[bool, str]:
+        """
+        Download application icon from the GitHub repository.
+
+        Uses the IconManager class for efficient icon discovery and download,
+        with a focus on avoiding GitHub API rate limits. Will gracefully skip
+        if an icon cannot be found to avoid hanging.
+
+        Args:
+            owner (str): Repository owner/organization name
+            repo (str): Repository name
+
+        Returns:
+            Tuple[bool, str]: Success status and icon path or error message
+        """
+        try:
+            from src.icon_manager import IconManager
+
+            logger.info(f"Searching for icon for {owner}/{repo}")
+
+            # Create instance of the IconManager with limited API calls
+            icon_manager = IconManager()
+
+            # Set API limit to 3 to avoid excessive API calls and rate limiting
+            # This will ensure the operation doesn't hang if no icon is found
+            icon_info = icon_manager.find_icon(owner, repo, api_limit=3)
+            if not icon_info:
+                logger.info(f"No suitable icon found for {repo} (skipping to avoid rate limit)")
+                print(
+                    f"No icon was installed for {repo}. You can add an icon manually later if desired."
+                )
+                return False, f"No suitable icon found for {repo}"
+
+            # Download the icon using the IconManager
+            success, result = icon_manager.download_icon(icon_info, repo)
+
+            if success:
+                logger.info(f"Successfully downloaded icon to {result}")
+                print(f"Icon installed for {repo}: {result}")
+            else:
+                logger.warning(f"Failed to download icon: {result}")
+                print(f"Failed to install icon for {repo}: {result}")
+
+            return success, result
+
+        except Exception as e:
+            error_msg = f"Failed to download icon: {e}"
+            logger.error(error_msg)
+            print(error_msg)
+            return False, error_msg
+
+    def handle_appimage_operations(self, github_api=None) -> bool:
         """
         Orchestrate complete file operations with a single global confirmation prompt.
 
         A summary of the changes is displayed first. In interactive mode,
         the user is prompted once to confirm all operations before proceeding.
+
+        Args:
+            github_api: Optional GitHubAPI instance for icon downloading
 
         Returns:
             bool: True if operations completed successfully, False otherwise
@@ -222,6 +276,11 @@ class FileHandler:
                 f"Backup old AppImage from {self.old_appimage_path} to {self.backup_path}"
             )
         summary_lines.append(f"Make AppImage executable: {self.appimage_name}")
+
+        # Add icon download to operations if GitHub API is provided
+        if github_api:
+            summary_lines.append(f"Download application icon for {self.repo}")
+
         summary_lines.append(f"Rename and move AppImage to: {self.target_path}")
         summary_lines.append(f"Update configuration file at: {self.config_path}")
 
@@ -245,22 +304,37 @@ class FileHandler:
             print("Operation cancelled by user.")
             return False
 
+        # Track downloaded icon path to use in desktop file
+        icon_path = None
+
         # List of operations to perform.
         operations = [
             (self.backup_old_appimage, "Backup old AppImage"),
             (self.make_executable, "Make AppImage executable"),
-            (self.rename_and_move_appimage, "Rename and move AppImage"),
-            (
-                self.update_desktop_entry,
-                f"{desktop_operation} desktop entry file",
-            ),  # Use update method that handles both create/update
-            (
-                lambda: self._safe_remove(self.sha_name)
-                if self.sha_name != "no_sha_file"
-                else None,
-                "Cleanup SHA file",
-            ),
         ]
+
+        # Add icon download operation if GitHub API is provided
+        if github_api:
+            operations.append(
+                (lambda: self._handle_icon_download(github_api), "Download application icon")
+            )
+
+        # Add remaining operations
+        operations.extend(
+            [
+                (self.rename_and_move_appimage, "Rename and move AppImage"),
+                (
+                    lambda: self._handle_desktop_entry(icon_path),
+                    f"{desktop_operation} desktop entry file",
+                ),
+                (
+                    lambda: self._safe_remove(self.sha_name)
+                    if self.sha_name != "no_sha_file"
+                    else None,
+                    "Cleanup SHA file",
+                ),
+            ]
+        )
 
         # Execute each operation with error handling.
         for operation, description in operations:
@@ -268,6 +342,13 @@ class FileHandler:
                 logger.info("Starting: %s", description)
                 if callable(operation):
                     result = operation()
+
+                    # Special handling for icon download operation
+                    if description == "Download application icon" and isinstance(result, tuple):
+                        success, data = result
+                        if success:
+                            icon_path = data
+
                     # If an operation returns a tuple, check the success flag.
                     if isinstance(result, tuple) and len(result) > 0 and not result[0]:
                         logger.error("Operation failed: %s -> %s", description, result[1])
@@ -277,6 +358,7 @@ class FileHandler:
                         ):
                             print("Remaining operations cancelled.")
                             return False
+
                 logger.info("Completed: %s", description)
             except Exception as e:
                 logger.error("Operation failed: %s -> %s", description, str(e))
@@ -289,3 +371,52 @@ class FileHandler:
 
         print("All operations completed successfully!")
         return True
+
+    def _handle_icon_download(self, github_api):
+        """
+        Handle the icon download operation and return results.
+
+        Args:
+            github_api: GitHubAPI instance for repository access
+
+        Returns:
+            Tuple[bool, str]: Success status and icon path or error message
+        """
+        # Extract owner and repo from the GitHub API instance
+        owner = github_api.owner
+        repo = self.repo  # Use the repo from FileHandler
+
+        # Call the download_app_icon method with the correct parameters
+        return self.download_app_icon(owner, repo)
+
+    def _handle_desktop_entry(self, icon_path=None):
+        """
+        Create or update desktop entry with proper icon handling.
+
+        Args:
+            icon_path: Optional path to the downloaded icon file
+
+        Returns:
+            Tuple[bool, str]: Success status and message
+        """
+        try:
+            # Create AppConfigManager instance
+            app_config = AppConfigManager(repo=self.repo)
+
+            # Check if we have a new icon to use
+            if icon_path and os.path.exists(icon_path):
+                success, message = app_config.create_desktop_file(self.target_path, icon_path)
+            else:
+                # Let create_desktop_file handle icon path resolution
+                success, message = app_config.create_desktop_file(self.target_path)
+
+            if success:
+                logger.info("Desktop entry operation successful")
+            else:
+                logger.warning(f"Desktop entry operation warning: {message}")
+
+            return success, message
+        except Exception as e:
+            error_msg = f"Error managing desktop entry: {e}"
+            logger.error(error_msg)
+            return False, error_msg

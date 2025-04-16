@@ -15,3 +15,9 @@
 - Write descriptive error messages that help diagnose the problem.
 - Keep functions focused on a single responsibility.
 - Use proper scoping for variables (avoid globals).
+- Do not save secrets in source code.
+- Use HTTPS for all API communications.
+- Exclude sensitive information from log files and error messages to prevent accidental exposure.
+- Validate and sanitize all external inputs.
+- Load sensitive configuration values only at runtime from environment variables or secure vault services.
+- For storing user passwords, generate a unique random salt for each password and combine it with a secure hash (for example, using PBKDF2 or bcrypt).

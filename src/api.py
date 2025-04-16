@@ -1,8 +1,12 @@
 import logging
 import platform
 import re
-
+import os
 import requests
+from datetime import datetime
+from src.icon_manager import IconManager
+from src.global_config import GlobalConfigManager
+from src.secure_token import SecureTokenManager
 
 
 class GitHubAPI:
@@ -26,6 +30,27 @@ class GitHubAPI:
         self.appimage_name = None
         self.arch_keyword = arch_keyword
         self.arch_keywords = self._get_arch_keywords()
+        self._headers = self._get_request_headers()
+
+    def _get_request_headers(self) -> dict:
+        """Get headers for GitHub API requests including authentication if available."""
+        headers = {"Accept": "application/vnd.github.v3+json"}
+
+        # Try to get token from secure storage first
+        token = SecureTokenManager.get_token()
+
+        # Fall back to legacy config if needed
+        if not token:
+            global_config = GlobalConfigManager()
+            token = getattr(global_config, "github_token", None)
+
+        if token:
+            headers["Authorization"] = f"token {token}"
+            logging.info("Using GitHub token for authentication")
+        else:
+            logging.info("No GitHub token found, using unauthenticated requests")
+
+        return headers
 
     def _get_arch_keywords(self):
         """Static architecture keywords including linux variants"""
@@ -40,9 +65,10 @@ class GitHubAPI:
     def get_response(self):
         """Fetch release data with beta fallback handling"""
         try:
-            # Try stable release first
+            # Try stable release first with auth headers
             response = requests.get(
                 f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest",
+                headers=self._headers,
                 timeout=10,
             )
 
@@ -52,11 +78,25 @@ class GitHubAPI:
             # Fallback to beta releases
             response = requests.get(
                 f"https://api.github.com/repos/{self.owner}/{self.repo}/releases",
+                headers=self._headers,
                 timeout=10,
             )
 
             if response.status_code == 200 and response.json():
                 return self._process_release(response.json()[0], is_beta=True)
+
+            # Handle rate limit explicitly
+            if response.status_code == 403 and "X-RateLimit-Remaining" in response.headers:
+                remaining = response.headers["X-RateLimit-Remaining"]
+                if remaining == "0":
+                    reset_time = int(response.headers["X-RateLimit-Reset"])
+                    reset_datetime = datetime.fromtimestamp(reset_time)
+                    error_msg = f"GitHub API rate limit exceeded. Resets at {reset_datetime}"
+                    logging.error(error_msg)
+                    print(f"Error: {error_msg}")
+                    if not global_config.github_token:
+                        print("Tip: Set a GitHub token in global settings to increase rate limits.")
+                    return None
 
             logging.error(f"Failed to fetch releases. Status code: {response.status_code}")
             return None
@@ -380,3 +420,35 @@ class GitHubAPI:
         except requests.exceptions.RequestException as e:
             logging.error(f"GitHub API request failed: {e}")
             return None
+
+    def find_app_icon(self) -> dict:
+        """
+        Find the best icon for the app using IconManager.
+
+        Returns:
+            dict or None: Icon asset information or None if no suitable icon found.
+        """
+        # Use IconManager for icon discovery
+        icon_manager = IconManager()
+        icon_info = icon_manager.find_icon(self.owner, self.repo)
+        if icon_info:
+            return icon_info
+        # If not found, skip to avoid rate limit
+        return None
+
+    def download_icon(self, icon_info: dict, repo_name: str) -> str | None:
+        """
+        Download an icon using IconManager and save it to the XDG icons directory.
+
+        Args:
+            icon_info (dict): Icon information from IconManager
+            repo_name (str): Repository name for the app
+
+        Returns:
+            str or None: Path to the saved icon or None if download failed
+        """
+        icon_manager = IconManager()
+        success, icon_path = icon_manager.download_icon(icon_info, repo_name)
+        if success:
+            return icon_path
+        return None
