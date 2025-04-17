@@ -1,4 +1,4 @@
-#FIX: not work
+# FIX: not work
 import unittest
 from unittest.mock import patch
 import sys
@@ -8,24 +8,33 @@ import os
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-    
-from commands.download import DownloadCommand
+
+from src.commands.download import DownloadCommand
 from src.api import GitHubAPI
 
 
 class TestIntegrationDownloadFlow(unittest.TestCase):
-    @patch('builtins.input')
-    @patch('src.download.DownloadManager.download')
-    @patch('src.verify.VerificationManager.verify_appimage', return_value=True)
-    @patch('src.file_handler.FileHandler.handle_appimage_operations', return_value=True)
-    @patch('src.app_config.AppConfigManager.ask_sha_hash', return_value=("test.sha256", "sha256"))
-    @patch('src.api.GitHubAPI.get_response')
-    @patch('src.app_config.AppConfigManager.temp_save_config')
-    @patch('src.app_config.AppConfigManager.save_config')
-    @patch('src.global_config.GlobalConfigManager.load_config')
-    def test_full_flow(self, mock_gc_load, mock_app_save, mock_temp_save,
-                       mock_api_get, mock_ask_sha, mock_file_handle,
-                       mock_verify, mock_download, mock_input):
+    @patch("builtins.input")
+    @patch("src.download.DownloadManager.download")
+    @patch("src.verify.VerificationManager.verify_appimage", return_value=True)
+    @patch("src.file_handler.FileHandler.handle_appimage_operations", return_value=True)
+    @patch("src.app_config.AppConfigManager.ask_sha_hash", return_value=("test.sha256", "sha256"))
+    @patch("src.api.GitHubAPI.get_response")
+    @patch("src.app_config.AppConfigManager.temp_save_config")
+    @patch("src.app_config.AppConfigManager.save_config")
+    @patch("src.global_config.GlobalConfigManager.load_config")
+    def test_full_flow(
+        self,
+        mock_gc_load,
+        mock_app_save,
+        mock_temp_save,
+        mock_api_get,
+        mock_ask_sha,
+        mock_file_handle,
+        mock_verify,
+        mock_download,
+        mock_input,
+    ):
         """Integration test for the complete download command flow:
         1. Parse the URL and extract owner/repo.
         2. Ask for SHA file info.
@@ -68,6 +77,7 @@ class TestIntegrationDownloadFlow(unittest.TestCase):
                 "appimage_url": api.appimage_url,
                 "sha_url": api.sha_url,
             }
+
         mock_api_get.side_effect = fake_get_response
 
         # Now run the full download command execution.
@@ -77,14 +87,15 @@ class TestIntegrationDownloadFlow(unittest.TestCase):
         cmd.execute()
 
         # Assert that each key step in the flow was called.
-        mock_api_get.assert_called_once()             # GitHubAPI.get_response() was called.
-        mock_ask_sha.assert_called_once()             # AppConfigManager.ask_sha_hash() was called.
-        mock_temp_save.assert_called_once()           # Temporary configuration was saved.
-        mock_download.assert_called_once()            # DownloadManager.download() was invoked.
-        mock_verify.assert_called_once()              # VerificationManager.verify_appimage() was run.
-        mock_file_handle.assert_called_once()         # FileHandler.handle_appimage_operations() was executed.
-        mock_app_save.assert_called_once()            # Final configuration saving took place.
-        mock_gc_load.assert_called_once()             # Global configuration was loaded.
+        mock_api_get.assert_called_once()  # GitHubAPI.get_response() was called.
+        mock_ask_sha.assert_called_once()  # AppConfigManager.ask_sha_hash() was called.
+        mock_temp_save.assert_called_once()  # Temporary configuration was saved.
+        mock_download.assert_called_once()  # DownloadManager.download() was invoked.
+        mock_verify.assert_called_once()  # VerificationManager.verify_appimage() was run.
+        mock_file_handle.assert_called_once()  # FileHandler.handle_appimage_operations() was executed.
+        mock_app_save.assert_called_once()  # Final configuration saving took place.
+        mock_gc_load.assert_called_once()  # Global configuration was loaded.
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

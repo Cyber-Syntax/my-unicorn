@@ -11,7 +11,7 @@ import logging
 import os
 from typing import List, Dict, Any, Optional, Tuple
 
-from commands.base import Command
+from src.commands.base import Command
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
 from src.api import GitHubAPI

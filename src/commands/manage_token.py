@@ -13,7 +13,7 @@ from typing import Dict, Any
 
 import requests
 
-from commands.command import Command
+from src.commands.base import Command
 from src.secure_token import SecureTokenManager
 
 

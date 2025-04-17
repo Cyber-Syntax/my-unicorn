@@ -1,4 +1,4 @@
-from commands.update_base import BaseUpdateCommand
+from src.commands.update_base import BaseUpdateCommand
 import logging
 from typing import List, Dict, Any, Optional
 from src.app_config import AppConfigManager
@@ -21,6 +21,7 @@ class UpdateCommand(BaseUpdateCommand):
         updatable = self._find_updatable_apps()
         if not updatable:
             logging.info("No AppImages selected for update or all are up to date")
+            print("No AppImages selected for update or all are up to date!")
             return
 
         # 2. Get user confirmation

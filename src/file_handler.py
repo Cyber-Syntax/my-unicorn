@@ -56,6 +56,7 @@ class FileHandler:
         config_file_name: str = None,
         batch_mode: bool = False,
         keep_backup: bool = True,
+        max_backups: int = 3,
     ):
         """
         Initialize file handler with paths and configuration.
@@ -73,6 +74,7 @@ class FileHandler:
             config_file_name: Name of configuration file
             batch_mode: Whether to run in batch mode (no user prompts)
             keep_backup: Whether to keep backup files
+            max_backups: Maximum number of backup files to keep per app
         """
         self.appimage_name = appimage_name
         self.repo = repo
@@ -86,6 +88,7 @@ class FileHandler:
         self.config_file_name = config_file_name
         self.batch_mode = batch_mode
         self.keep_backup = keep_backup
+        self.max_backups = max_backups
 
         # Use repo directly for consistent naming
         self.app_id = self.repo.lower() if self.repo else ""
@@ -146,7 +149,10 @@ class FileHandler:
 
     def _backup_appimage(self) -> bool:
         """
-        Backup existing AppImage file.
+        Backup existing AppImage file and maintain backup rotation.
+
+        Keeps only the specified number of backup files per app, removing older backups
+        when the limit is reached.
 
         Returns:
             bool: True if backup succeeded or was skipped, False otherwise
@@ -155,24 +161,31 @@ class FileHandler:
             # Check if the backup folder exists or create it
             os.makedirs(self.appimage_download_backup_folder_path, exist_ok=True)
 
-            # Check if a current backup exists
-            if os.path.exists(self.backup_path):
-                if self.keep_backup:
-                    # Create a unique backup name with timestamp
-                    import time
+            # If we don't want to keep backups, just return
+            if not self.keep_backup:
+                logging.info("Backups disabled, skipping backup creation")
+                return True
 
-                    timestamp = time.strftime("%Y%m%d-%H%M%S")
-                    backup_name = f"{os.path.splitext(self.appimage_name)[0]}_{timestamp}.AppImage"
-                    new_backup_path = os.path.join(
-                        self.appimage_download_backup_folder_path, backup_name
-                    )
-                    # Copy existing backup to timestamped backup
-                    shutil.move(self.backup_path, new_backup_path)
-                    logging.info(f"Created historical backup: {backup_name}")
-                else:
-                    # Remove old backup
-                    os.remove(self.backup_path)
-                    logging.info(f"Removed old backup: {self.backup_path}")
+            # Get app name for grouping backups by app
+            app_base_name = os.path.splitext(self.app_id)[0].lower()
+
+            # Check if a current backup exists for this app
+            if os.path.exists(self.backup_path):
+                # Create a unique backup name with timestamp
+                import time
+
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                backup_name = f"{os.path.splitext(self.appimage_name)[0]}_{timestamp}.AppImage"
+                new_backup_path = os.path.join(
+                    self.appimage_download_backup_folder_path, backup_name
+                )
+
+                # Move existing backup to timestamped backup
+                shutil.move(self.backup_path, new_backup_path)
+                logging.info(f"Created historical backup: {backup_name}")
+
+                # Clean up old backups if we have too many
+                self._cleanup_old_backups(app_base_name)
 
             # Move current AppImage to backup
             logging.info(f"Backing up {self.appimage_path} to {self.backup_path}")
@@ -182,6 +195,60 @@ class FileHandler:
         except Exception as e:
             logging.error(f"Failed to backup AppImage: {str(e)}")
             return False
+
+    def _cleanup_old_backups(self, app_base_name: str) -> None:
+        """
+        Remove old backup files when there are too many backups.
+
+        Args:
+            app_base_name: Base name of the app to clean up backups for
+        """
+        try:
+            # If max_backups is set to a very high number, skip cleanup
+            if self.max_backups > 100:
+                return
+
+            # Find all backup files for this app
+            backup_pattern = f"{app_base_name}_*.AppImage"
+            all_backups = []
+
+            for filename in os.listdir(self.appimage_download_backup_folder_path):
+                filepath = os.path.join(self.appimage_download_backup_folder_path, filename)
+                # Check if it matches our pattern and is a file
+                if (
+                    filename.lower().startswith(f"{app_base_name}_")
+                    and filename.lower().endswith(".appimage")
+                    and os.path.isfile(filepath)
+                ):
+                    # Get file modification time for sorting
+                    mod_time = os.path.getmtime(filepath)
+                    all_backups.append((filepath, mod_time))
+
+            # Sort backups by modification time (newest first)
+            all_backups.sort(key=lambda x: x[1], reverse=True)
+
+            # Keep only the newest max_backups files
+            files_to_remove = all_backups[self.max_backups :]
+
+            if files_to_remove:
+                removed_count = 0
+                for filepath, _ in files_to_remove:
+                    try:
+                        os.remove(filepath)
+                        removed_count += 1
+                        logging.info(f"Removed old backup: {os.path.basename(filepath)}")
+                    except OSError as e:
+                        logging.warning(f"Failed to remove old backup {filepath}: {e}")
+
+                if removed_count > 0:
+                    print(
+                        f"✓ Cleaned up {removed_count} old backup{'s' if removed_count > 1 else ''}"
+                    )
+                    logging.info(f"Cleaned up {removed_count} old backups for {app_base_name}")
+
+        except Exception as e:
+            # Log but don't fail the whole operation if cleanup fails
+            logging.warning(f"Error during backup cleanup: {str(e)}")
 
     def _move_appimage(self) -> bool:
         """

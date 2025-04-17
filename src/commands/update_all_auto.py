@@ -11,7 +11,7 @@ import logging
 import os
 from typing import List, Dict, Any
 
-from commands.update_base import BaseUpdateCommand
+from src.commands.update_base import BaseUpdateCommand
 
 
 class UpdateAllAutoCommand(BaseUpdateCommand):

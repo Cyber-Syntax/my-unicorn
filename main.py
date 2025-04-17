@@ -5,13 +5,13 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 
-from commands.customize_app_config import CustomizeAppConfigCommand
-from commands.customize_global_config import CustomizeGlobalConfigCommand
-from commands.download import DownloadCommand
-from commands.invoker import CommandInvoker
-from commands.manage_token import ManageTokenCommand
-from commands.update_all import UpdateCommand
-from commands.update_all_auto import UpdateAllAutoCommand
+from src.commands.customize_app_config import CustomizeAppConfigCommand
+from src.commands.customize_global_config import CustomizeGlobalConfigCommand
+from src.commands.download import DownloadCommand
+from src.commands.invoker import CommandInvoker
+from src.commands.manage_token import ManageTokenCommand
+from src.commands.update_all import UpdateCommand
+from src.commands.update_all_auto import UpdateAllAutoCommand
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
 

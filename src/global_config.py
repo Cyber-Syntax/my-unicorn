@@ -14,6 +14,7 @@ class GlobalConfigManager:
         default_factory=lambda: "~/Documents/appimages/backups"
     )
     keep_backup: bool = field(default=True)
+    max_backups: int = field(default=3)  # Number of backups to keep per app
     batch_mode: bool = field(default=False)
     locale: str = field(default="en")
 
@@ -44,6 +45,7 @@ class GlobalConfigManager:
                         self.appimage_download_backup_folder_path,
                     )
                     self.keep_backup = config.get("keep_backup", self.keep_backup)
+                    self.max_backups = config.get("max_backups", self.max_backups)
                     self.batch_mode = config.get("batch_mode", self.batch_mode)
                     self.locale = config.get("locale", self.locale)
             except json.JSONDecodeError as e:
@@ -62,6 +64,7 @@ class GlobalConfigManager:
             "appimage_download_folder_path": self.appimage_download_folder_path,
             "appimage_download_backup_folder_path": self.appimage_download_backup_folder_path,
             "keep_backup": self.keep_backup,
+            "max_backups": self.max_backups,
             "batch_mode": self.batch_mode,
             "locale": self.locale,
         }
@@ -81,6 +84,7 @@ class GlobalConfigManager:
             input("Enable backup for old appimages? (yes/no, default: yes): ").strip().lower()
             or "yes"
         )
+        max_backups = input("Max number of backups to keep per app (default: 3): ").strip() or "3"
         batch_mode = input("Enable batch mode? (yes/no, default: no): ").strip().lower() or "no"
         locale = input("Select your locale (en/tr, default: en): ").strip() or "en"
 
@@ -88,6 +92,7 @@ class GlobalConfigManager:
         self.appimage_download_folder_path = appimage_download_folder_path
         self.appimage_download_backup_folder_path = "~/Documents/appimages/backups"
         self.keep_backup = keep_backup == "yes"
+        self.max_backups = int(max_backups)
         self.batch_mode = batch_mode == "yes"
         self.locale = locale
 
@@ -119,9 +124,10 @@ class GlobalConfigManager:
         print("=================================================")
         print(f"1. AppImage Download Folder: {self.appimage_download_folder_path}")
         print(f"2. Enable Backup: {'Yes' if self.keep_backup else 'No'}")
-        print(f"3. Batch Mode: {'Yes' if self.batch_mode else 'No'}")
-        print(f"4. Locale: {self.locale}")
-        print("5. Exit")
+        print(f"3. Max Backups Per App: {self.max_backups}")
+        print(f"4. Batch Mode: {'Yes' if self.batch_mode else 'No'}")
+        print(f"5. Locale: {self.locale}")
+        print("6. Exit")
         print("=================================================")
 
         while True:
@@ -129,15 +135,16 @@ class GlobalConfigManager:
             if choice.isdigit() and 1 <= int(choice) <= 6:
                 break
             else:
-                print("Invalid choice, please enter a number between 1 and 5.")
+                print("Invalid choice, please enter a number between 1 and 6.")
 
-        if choice == "5":
+        if choice == "6":
             print("Exiting without changes.")
             return
 
         config_dict = {
             "appimage_download_folder_path": self.appimage_download_folder_path,
             "keep_backup": self.keep_backup,
+            "max_backups": self.max_backups,
             "batch_mode": self.batch_mode,
             "locale": self.locale,
         }
@@ -151,6 +158,16 @@ class GlobalConfigManager:
         elif key == "keep_backup":
             new_value = input("Enable backup for old appimages? (yes/no): ").strip().lower() or "no"
             new_value = new_value == "yes"
+        elif key == "max_backups":
+            new_value_str = input("Enter max number of backups to keep per app: ").strip() or "3"
+            try:
+                new_value = int(new_value_str)
+                if new_value < 1:
+                    print("Value must be at least 1. Setting to 1.")
+                    new_value = 1
+            except ValueError:
+                print("Invalid number. Setting to default (3).")
+                new_value = 3
         elif key == "batch_mode":
             new_value = input("Enable batch mode? (yes/no): ").strip().lower() or "no"
             new_value = new_value == "yes"

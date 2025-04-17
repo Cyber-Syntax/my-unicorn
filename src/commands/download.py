@@ -1,4 +1,4 @@
-from commands.base import Command
+from src.commands.base import Command
 import logging
 from src.api import GitHubAPI
 from src.app_config import AppConfigManager

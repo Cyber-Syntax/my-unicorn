@@ -1,4 +1,4 @@
-from commands.base import Command
+from src.commands.base import Command
 from src.global_config import GlobalConfigManager
 
 
