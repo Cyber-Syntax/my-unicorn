@@ -8,6 +8,7 @@ This module provides customizations for Standard Notes AppImage handling.
 
 import logging
 import os
+import re
 from typing import Tuple, Optional
 
 from src.app_config import AppConfigManager
@@ -161,3 +162,31 @@ class StandardNotesHandler:
                 except Exception as cleanup_error:
                     logger.warning(f"Failed to clean up temporary file: {cleanup_error}")
             return False, error_msg
+    
+    #TODO: Need better way to handle this in api.py
+    @staticmethod
+    def extract_version(appimage_name: str) -> str:
+        """
+        Extract the version from the AppImage file name or repository tag.
+
+        Handles both Standard Notes version formats:
+        - Standard format: app-3.195.13-x86_64.AppImage
+        - Package format: @standardnotes/desktop@3.195.13
+
+        Args:
+            appimage_name: The name of the AppImage file or tag string
+
+        Returns:
+            The extracted version string or "unknown" if not found
+        """
+        # Handle the @standardnotes/desktop@3.195.13 format
+        std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", appimage_name)
+        if std_notes_match:
+            return std_notes_match.group(1)
+
+        # Handle standard format: app-3.195.13-x86_64.AppImage
+        match = re.search(r"-(\d+\.\d+\.\d+)", appimage_name)
+        if match:
+            return match.group(1)
+
+        return "unknown"

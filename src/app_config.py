@@ -50,8 +50,7 @@ class AppConfigManager:
         self.config_folder = os.path.expanduser(config_folder)
 
         # Use repo directly for app identifier
-        self.app_id = self.repo.lower() if self.repo else None
-        self.config_file_name = f"{self.app_id}.json" if self.app_id else None
+        self.config_file_name = f"{self.repo}.json" if self.repo else None
         self.config_file = (
             os.path.join(self.config_folder, self.config_file_name)
             if self.config_file_name
@@ -79,7 +78,7 @@ class AppConfigManager:
                 self.appimage_name = new_appimage_name
 
             # Update the config_file attribute using app_id instead of repo
-            self.config_file = os.path.join(self.config_folder, f"{self.app_id}.json")
+            self.config_file = os.path.join(self.config_folder, f"{self.repo}.json")
             config_data = {}
 
             if os.path.exists(self.config_file):
@@ -117,7 +116,7 @@ class AppConfigManager:
             Tuple[bool, str]: Success status and error message or filepath if successful
         """
         try:
-            if not self.app_id:
+            if not self.repo:
                 return False, "Application identifier not available"
 
             # Ensure desktop file directory exists
@@ -125,7 +124,7 @@ class AppConfigManager:
             os.makedirs(desktop_dir, exist_ok=True)
 
             # Define paths for desktop file - use the app_id for filename
-            desktop_file_path = os.path.join(desktop_dir, f"{self.app_id.lower()}.desktop")
+            desktop_file_path = os.path.join(desktop_dir, f"{self.repo.lower()}.desktop")
             desktop_file_temp = f"{desktop_file_path}.tmp"
 
             # Determine display name (preserve original case of repo name for better desktop integration)
@@ -139,7 +138,7 @@ class AppConfigManager:
                 # Define icon locations using both app_id and repository-based structure
                 icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
                 app_icon_dir = os.path.join(
-                    icon_base_dir, self.app_id
+                    icon_base_dir, self.repo
                 )  # Primary location using app_id
                 repo_icon_dir = os.path.join(
                     icon_base_dir, self.repo
@@ -148,8 +147,8 @@ class AppConfigManager:
                 # Check standard icon file names in both directories
                 icon_locations = []
 
-                # First check app_id directory (primary for generic repos)
-                if self.app_id != self.repo.lower():
+                # First check app directory (primary for generic repos)
+                if self.repo != self.repo.lower():
                     icon_locations.extend(
                         [
                             os.path.join(app_icon_dir, "icon.svg"),
@@ -174,9 +173,9 @@ class AppConfigManager:
                         os.path.join(icon_base_dir, "256x256/apps", f"{self.repo}.png"),
                         os.path.join(icon_base_dir, "128x128/apps", f"{self.repo}.png"),
                         # Also check app_id in legacy locations
-                        os.path.join(icon_base_dir, "scalable/apps", f"{self.app_id}.svg"),
-                        os.path.join(icon_base_dir, "256x256/apps", f"{self.app_id}.png"),
-                        os.path.join(icon_base_dir, "128x128/apps", f"{self.app_id}.png"),
+                        os.path.join(icon_base_dir, "scalable/apps", f"{self.repo}.svg"),
+                        os.path.join(icon_base_dir, "256x256/apps", f"{self.repo}.png"),
+                        os.path.join(icon_base_dir, "128x128/apps", f"{self.repo}.png"),
                     ]
                 )
 

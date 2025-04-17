@@ -90,12 +90,9 @@ class FileHandler:
         self.keep_backup = keep_backup
         self.max_backups = max_backups
 
-        # Use repo directly for consistent naming
-        self.app_id = self.repo.lower() if self.repo else ""
-
         # Derived paths
         # Construct the AppImage file path with proper .AppImage extension if missing
-        file_name = self.app_id  # Use app_id for consistent naming
+        file_name = self.repo
         if not file_name.lower().endswith(".appimage"):
             file_name += ".AppImage"
         self.appimage_path = os.path.join(self.appimage_download_folder_path, file_name)
@@ -167,71 +164,77 @@ class FileHandler:
                 return True
 
             # Get app name for grouping backups by app
-            app_base_name = os.path.splitext(self.app_id)[0].lower()
+            app_base_name = os.path.splitext(self.repo)[0].lower()
 
-            # Always clean up old backups based on max_backups setting
+            # Create a unique backup name with timestamp
+            import time
+
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            backup_name = f"{app_base_name}_{timestamp}.AppImage"
+            new_backup_path = os.path.join(self.appimage_download_backup_folder_path, backup_name)
+
+            # Move current AppImage to timestamped backup
+            logging.info(f"Backing up {self.appimage_path} to {new_backup_path}")
+            shutil.copy2(self.appimage_path, new_backup_path)
+
+            # Always clean up old backups based on max_backups setting after adding a new backup
             self._cleanup_old_backups(app_base_name)
 
-            # Check if a current backup exists for this app
-            if os.path.exists(self.backup_path):
-                # Create a unique backup name with timestamp
-                import time
-
-                timestamp = time.strftime("%Y%m%d-%H%M%S")
-                backup_name = f"{os.path.splitext(self.appimage_name)[0]}_{timestamp}.AppImage"
-                new_backup_path = os.path.join(
-                    self.appimage_download_backup_folder_path, backup_name
-                )
-
-                # Move existing backup to timestamped backup
-                shutil.move(self.backup_path, new_backup_path)
-                logging.info(f"Created historical backup: {backup_name}")
-
-            # Move current AppImage to backup
-            logging.info(f"Backing up {self.appimage_path} to {self.backup_path}")
-            shutil.move(self.appimage_path, self.backup_path)
             return True
 
-        except Exception as e:
+        except OSError as e:
             logging.error(f"Failed to backup AppImage: {str(e)}")
             return False
 
     def _cleanup_old_backups(self, app_base_name: str) -> None:
         """
-        Remove old backup files when there are too many backups.
+        Remove old backup files based on max_backups setting.
 
         Args:
             app_base_name: Base name of the app to clean up backups for
         """
         try:
-            # If max_backups is set to a very high number, skip cleanup
+            # Skip cleanup if max_backups is set to a very high number
             if self.max_backups > 100:
                 return
 
             # Find all backup files for this app
-            backup_pattern = f"{app_base_name}_*.AppImage"
             all_backups = []
+
+            # Ensure backup directory exists
+            if not os.path.exists(self.appimage_download_backup_folder_path):
+                logging.info(
+                    f"Backup directory does not exist: {self.appimage_download_backup_folder_path}"
+                )
+                return
 
             for filename in os.listdir(self.appimage_download_backup_folder_path):
                 filepath = os.path.join(self.appimage_download_backup_folder_path, filename)
-                # Check if it matches our pattern and is a file
+                # Use case-insensitive comparison for both app name and file extension
                 if (
-                    filename.lower().startswith(f"{app_base_name}_")
+                    filename.lower().startswith(f"{app_base_name.lower()}_")
                     and filename.lower().endswith(".appimage")
                     and os.path.isfile(filepath)
                 ):
                     # Get file modification time for sorting
                     mod_time = os.path.getmtime(filepath)
                     all_backups.append((filepath, mod_time))
+                    logging.debug(f"Found backup file: {filename}")
 
             # Sort backups by modification time (newest first)
             all_backups.sort(key=lambda x: x[1], reverse=True)
 
-            # Keep only the newest max_backups files
-            files_to_remove = all_backups[self.max_backups :]
+            # Log the number of backups found
+            backups_count = len(all_backups)
+            logging.info(
+                f"Found {backups_count} backups for {app_base_name}, max_backups={self.max_backups}"
+            )
 
-            if files_to_remove:
+            # Keep only the newest max_backups files
+            if backups_count > self.max_backups:
+                files_to_remove = all_backups[self.max_backups :]
                 removed_count = 0
+
                 for filepath, _ in files_to_remove:
                     try:
                         os.remove(filepath)
@@ -245,10 +248,17 @@ class FileHandler:
                         f"✓ Cleaned up {removed_count} old backup{'s' if removed_count > 1 else ''}"
                     )
                     logging.info(f"Cleaned up {removed_count} old backups for {app_base_name}")
+            else:
+                logging.info(
+                    f"No backups to remove for {app_base_name}, current count ({backups_count}) ≤ max_backups ({self.max_backups})"
+                )
 
-        except Exception as e:
+        except OSError as e:
             # Log but don't fail the whole operation if cleanup fails
             logging.warning(f"Error during backup cleanup: {str(e)}")
+        except Exception as e:
+            # Catch any other unexpected errors
+            logging.warning(f"Unexpected error during backup cleanup: {str(e)}")
 
     def _move_appimage(self) -> bool:
         """
@@ -359,7 +369,7 @@ class FileHandler:
             # Define paths using app_id instead of repo
             app_name = self.repo  # Preserve original case for display name
             desktop_dir = os.path.expanduser("~/.local/share/applications")
-            desktop_file = f"{self.app_id.lower()}.desktop"  # Use app_id for filename
+            desktop_file = f"{self.repo.lower()}.desktop"  # Use app_id for filename
             desktop_path = os.path.join(desktop_dir, desktop_file)
 
             logging.info(f"Processing desktop entry at {desktop_path}")
@@ -469,14 +479,14 @@ class FileHandler:
         icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
 
         # Check both app_id and repo-specific directories
-        app_id_icon_dir = os.path.join(icon_base_dir, self.app_id)
+        app_id_icon_dir = os.path.join(icon_base_dir, self.repo)
         repo_icon_dir = os.path.join(icon_base_dir, app_name)
 
         # List of directories to search in priority order
         icon_dirs = []
 
         # If app_id is different from repo name (for generic repos), check it first
-        if self.app_id != app_name:
+        if self.repo != app_name:
             icon_dirs.append(app_id_icon_dir)
 
         # Always check the repo directory
@@ -513,13 +523,13 @@ class FileHandler:
             [
                 os.path.join(icon_base_dir, "scalable/apps", f"{app_name}.svg"),
                 os.path.join(icon_base_dir, "256x256/apps", f"{app_name}.png"),
-                os.path.join(icon_base_dir, "scalable/apps", f"{self.app_id}.svg"),
-                os.path.join(icon_base_dir, "256x256/apps", f"{self.app_id}.png"),
+                os.path.join(icon_base_dir, "scalable/apps", f"{self.repo}.svg"),
+                os.path.join(icon_base_dir, "256x256/apps", f"{self.repo}.png"),
                 # Fall back to generic icon locations
                 os.path.expanduser(f"~/.local/share/icons/{app_name}.png"),
                 os.path.expanduser(f"~/.local/share/icons/{app_name}.svg"),
-                os.path.expanduser(f"~/.local/share/icons/{self.app_id}.png"),
-                os.path.expanduser(f"~/.local/share/icons/{self.app_id}.svg"),
+                os.path.expanduser(f"~/.local/share/icons/{self.repo}.png"),
+                os.path.expanduser(f"~/.local/share/icons/{self.repo}.svg"),
             ]
         )
 
@@ -533,7 +543,7 @@ class FileHandler:
                 # Skip any paths that cause errors (e.g., permission issues)
                 continue
 
-        logging.debug(f"No icon found for {app_name} or {self.app_id}")
+        logging.debug(f"No icon found for {app_name} or {self.repo}")
         return None
 
     def download_app_icon(self, owner: str, repo: str) -> Tuple[bool, str]:

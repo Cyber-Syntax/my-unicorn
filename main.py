@@ -13,6 +13,7 @@ from src.commands.manage_token import ManageTokenCommand
 from src.commands.migrate_config import MigrateConfigCommand
 from src.commands.update_all import UpdateCommand
 from src.commands.update_all_auto import UpdateAllAutoCommand
+from src.commands.delete_backups import DeleteBackupsCommand
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
 
@@ -37,7 +38,8 @@ def get_user_choice():
     print(_("5. Customize Global config file"))
     print(_("6. Manage GitHub Token (for API rate limits)"))
     print(_("7. Check and Migrate Configuration Files"))
-    print(_("8. Exit"))
+    print(_("8. Delete Old Backups"))
+    print(_("9. Exit"))
     print("====================================")
     try:
         return int(input(_("Enter your choice: ")))
@@ -104,11 +106,12 @@ def main():
     invoker.register_command(5, CustomizeGlobalConfigCommand())
     invoker.register_command(6, ManageTokenCommand())
     invoker.register_command(7, MigrateConfigCommand())
+    invoker.register_command(8, DeleteBackupsCommand())
 
     # Main menu loop
     while True:
         choice = get_user_choice()
-        if choice == 8:
+        if choice == 9:
             logging.info("User selected to exit application")
             print("Exiting...")
             sys.exit(0)
