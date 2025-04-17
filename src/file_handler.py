@@ -16,10 +16,14 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
+from importlib import import_module
 
 import requests
 
 from src.api import GitHubAPI
+
+# Configure module logger
+logger = logging.getLogger(__name__)
 
 
 class FileHandler:
@@ -32,6 +36,11 @@ class FileHandler:
     - Managing backup files
     - Setting proper file permissions
     """
+
+    # Dictionary mapping repo names to app-specific handler modules
+    APP_HANDLERS = {
+        "app": "standard_notes",  # Standard Notes repo is called "app"
+    }
 
     def __init__(
         self,
@@ -232,6 +241,54 @@ class FileHandler:
                  False otherwise
         """
         try:
+            # Check if there's a specialized handler for this application
+            if self.repo.lower() in self.APP_HANDLERS:
+                try:
+                    # Import the appropriate app handler module
+                    handler_module_name = self.APP_HANDLERS[self.repo.lower()]
+                    module_path = f"src.apps.{handler_module_name}"
+
+                    # Import the module dynamically
+                    handler_module = import_module(module_path)
+
+                    # Get the handler class (assuming it follows the pattern: RepoNameHandler)
+                    handler_class_name = (
+                        "".join(word.capitalize() for word in handler_module_name.split("_"))
+                        + "Handler"
+                    )
+                    handler_class = getattr(handler_module, handler_class_name)
+
+                    # Get the app_config instance
+                    from src.app_config import AppConfigManager
+
+                    app_config = AppConfigManager(
+                        owner=self.owner,
+                        repo=self.repo,
+                        version=self.version,
+                        sha_name=self.sha_name,
+                        appimage_name=self.appimage_name,
+                    )
+
+                    # Get icon path if available
+                    icon_path = self._get_icon_path(self.repo)
+
+                    # Use the specialized handler to create the desktop file
+                    success, result = handler_class.create_desktop_file(
+                        app_config=app_config, appimage_path=self.appimage_path, icon_path=icon_path
+                    )
+
+                    if success:
+                        logging.info(f"Created desktop entry using {handler_class_name}: {result}")
+                        return True
+                    else:
+                        logging.warning(
+                            f"App-specific handler failed: {result}, falling back to default"
+                        )
+                        # Continue with default implementation if specialized handler failed
+                except (ImportError, AttributeError, Exception) as e:
+                    logging.warning(f"Failed to use app-specific handler: {str(e)}, using default")
+
+            # Default desktop entry creation implementation
             # Define paths using app_id instead of repo
             app_name = self.repo  # Preserve original case for display name
             desktop_dir = os.path.expanduser("~/.local/share/applications")
