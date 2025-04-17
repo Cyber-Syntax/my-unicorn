@@ -1,25 +1,29 @@
-from commands.base import Command
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Auto update command module.
+
+This module provides a command to automatically check and update all AppImages
+without requiring manual selection of each app.
+"""
+
 import logging
 import os
 from typing import List, Dict, Any
-from src.app_config import AppConfigManager
-from src.global_config import GlobalConfigManager
-from src.api import GitHubAPI
-from src.download import DownloadManager
-from src.verify import VerificationManager
-from src.file_handler import FileHandler
+
+from commands.update_base import BaseUpdateCommand
 
 
-class UpdateAllAutoCommand(Command):
+class UpdateAllAutoCommand(BaseUpdateCommand):
     """Command to automatically check and update all AppImages without manual selection."""
 
-    def __init__(self):
-        """Initialize with necessary configuration managers."""
-        self.global_config = GlobalConfigManager()
-        self.app_config = AppConfigManager()
-
     def execute(self):
-        """Check all AppImage configurations and update those with new versions available."""
+        """
+        Check all AppImage configurations and update those with new versions available.
+
+        This method automatically scans all available AppImage configurations and
+        updates any that have newer versions available.
+        """
         logging.info("Starting automatic check of all AppImages")
         print("Checking all AppImages for updates...")
 
@@ -30,16 +34,18 @@ class UpdateAllAutoCommand(Command):
         updatable_apps = self._find_all_updatable_apps()
 
         if not updatable_apps:
+            logging.info("All AppImages are up to date")
             print("All AppImages are up to date!")
             return
 
         # Display updatable apps to user
-        print(f"\nFound {len(updatable_apps)} AppImages with updates available:")
-        for idx, app in enumerate(updatable_apps, 1):
-            print(f"{idx}. {app['name']} ({app['current']} → {app['latest']})")
+        self._display_update_list(updatable_apps)
 
         # Determine what to do based on batch mode
         if self.global_config.batch_mode:
+            logging.info(
+                f"Batch mode enabled - updating all {len(updatable_apps)} AppImages automatically"
+            )
             print(
                 f"Batch mode enabled - updating all {len(updatable_apps)} AppImages automatically"
             )
@@ -61,6 +67,7 @@ class UpdateAllAutoCommand(Command):
             # Get all config files
             json_files = self._list_all_config_files()
             if not json_files:
+                logging.warning("No AppImage configuration files found")
                 print("No AppImage configuration files found. Use the Download option first.")
                 return []
 
@@ -69,49 +76,36 @@ class UpdateAllAutoCommand(Command):
             # Check each app for updates
             for config_file in json_files:
                 try:
-                    # Load the app configuration
-                    self.app_config.load_appimage_config(config_file)
+                    # Create a temporary app config for checking this app
                     app_name = os.path.splitext(config_file)[0]  # Remove .json extension
-
                     print(f"Checking {app_name}...", end="", flush=True)
 
-                    # Check if update is available
-                    github_api = GitHubAPI(
-                        owner=self.app_config.owner,
-                        repo=self.app_config.repo,
-                        sha_name=self.app_config.sha_name,
-                        hash_type=self.app_config.hash_type,
-                    )
-
-                    latest_version = github_api.check_latest_version(
-                        owner=self.app_config.owner, repo=self.app_config.repo
-                    )
-
-                    if latest_version and latest_version != self.app_config.version:
-                        print(f" update available: {self.app_config.version} → {latest_version}")
-
-                        # Add to updatable list
-                        updatable_apps.append(
-                            {
-                                "config_file": config_file,
-                                "name": app_name,
-                                "current": self.app_config.version,
-                                "latest": latest_version,
-                            }
-                        )
+                    app_data = self._check_single_app_version(self.app_config, config_file)
+                    if app_data:
+                        print(f" update available: {app_data['current']} → {app_data['latest']}")
+                        updatable_apps.append(app_data)
                     else:
                         print(" already up to date")
 
                 except Exception as e:
+                    error_msg = f"Error checking {config_file}: {str(e)}"
+                    logging.error(error_msg)
                     print(f" error: {str(e)}")
 
         except Exception as e:
-            print(f"Error during update check: {str(e)}")
+            error_msg = f"Error during update check: {str(e)}"
+            logging.error(error_msg)
+            print(error_msg)
 
         return updatable_apps
 
     def _list_all_config_files(self) -> List[str]:
-        """Get a list of all AppImage configuration files."""
+        """
+        Get a list of all AppImage configuration files.
+
+        Returns:
+            List[str]: List of configuration filenames
+        """
         return self.app_config.list_json_files()
 
     def _handle_interactive_update(self, updatable_apps: List[Dict[str, Any]]) -> None:
@@ -128,10 +122,12 @@ class UpdateAllAutoCommand(Command):
         user_input = input("> ").strip().lower()
 
         if user_input == "cancel":
+            logging.info("Update cancelled by user")
             print("Update cancelled.")
             return
 
         if user_input == "all":
+            logging.info("User selected to update all apps")
             self._update_apps(updatable_apps)
             return
 
@@ -141,6 +137,7 @@ class UpdateAllAutoCommand(Command):
 
             # Validate indices
             if any(idx < 0 or idx >= len(updatable_apps) for idx in selected_indices):
+                logging.warning("Invalid app selection indices")
                 print("Invalid selection. Please enter valid numbers.")
                 return
 
@@ -148,12 +145,15 @@ class UpdateAllAutoCommand(Command):
             selected_apps = [updatable_apps[idx] for idx in selected_indices]
 
             if selected_apps:
+                logging.info(f"User selected {len(selected_apps)} apps to update")
                 print(f"Updating {len(selected_apps)} selected AppImages...")
                 self._update_apps(selected_apps)
             else:
+                logging.info("No apps selected for update")
                 print("No apps selected for update.")
 
         except ValueError:
+            logging.warning("Invalid input format for app selection")
             print("Invalid input. Please enter numbers separated by commas.")
 
     def _update_apps(self, apps_to_update: List[Dict[str, Any]]) -> None:
@@ -163,82 +163,25 @@ class UpdateAllAutoCommand(Command):
         Args:
             apps_to_update: List of app information dictionaries to update
         """
-        for app_data in apps_to_update:
-            try:
-                print(f"\nUpdating {app_data['name']}...")
+        total_apps = len(apps_to_update)
+        is_batch = total_apps > 1
 
-                # 1. Load app config
-                self.app_config.load_appimage_config(app_data["config_file"])
+        success_count = 0
+        failure_count = 0
 
-                # 2. Initialize GitHub API and get release info
-                github_api = GitHubAPI(
-                    owner=self.app_config.owner,
-                    repo=self.app_config.repo,
-                    sha_name=self.app_config.sha_name,
-                    hash_type=self.app_config.hash_type,
-                    arch_keyword=self.app_config.arch_keyword,
-                )
+        for index, app_data in enumerate(apps_to_update, 1):
+            print(f"\n[{index}/{total_apps}] Processing {app_data['name']}...")
+            success = self._update_single_app(app_data, is_batch=is_batch)
 
-                # Get release data
-                github_api.get_response()
+            if success:
+                success_count += 1
+            else:
+                failure_count += 1
 
-                # 3. Download AppImage
-                print(f"Downloading {github_api.appimage_name}...")
-                DownloadManager(github_api).download()
-
-                # 4. Verify the download if SHA file is available
-                if github_api.sha_name != "no_sha_file":
-                    print("Verifying download...")
-                    if not VerificationManager(
-                        sha_name=github_api.sha_name,
-                        sha_url=github_api.sha_url,
-                        appimage_name=github_api.appimage_name,
-                        hash_type=github_api.hash_type,
-                    ).verify_appimage():
-                        print(f"Verification failed for {app_data['name']}. Skipping.")
-                        continue
-                else:
-                    print("Skipping verification (no SHA file available)")
-
-                # 5. Handle file operations
-                file_handler = FileHandler(
-                    appimage_name=github_api.appimage_name,
-                    repo=github_api.repo,
-                    version=github_api.version,
-                    sha_name=github_api.sha_name,
-                    config_file=self.global_config.config_file,
-                    appimage_download_folder_path=self.global_config.expanded_appimage_download_folder_path,
-                    appimage_download_backup_folder_path=self.global_config.expanded_appimage_download_backup_folder_path,
-                    config_folder=self.app_config.config_folder,
-                    config_file_name=self.app_config.config_file_name,
-                    batch_mode=self.global_config.batch_mode,
-                    keep_backup=self.global_config.keep_backup,
-                )
-
-                # Try to download icon
-                icon_success, icon_msg = file_handler.download_app_icon(
-                    github_api.owner, github_api.repo
-                )
-                if icon_success:
-                    print(f"Icon installed: {icon_msg}")
-
-                # Perform file operations
-                if file_handler.handle_appimage_operations():
-                    # Update config file with new version
-                    self.app_config.update_version(
-                        new_version=github_api.version,
-                        new_appimage_name=github_api.appimage_name,
-                    )
-                    print(
-                        f"Successfully updated {app_data['name']} to version {github_api.version}"
-                    )
-                else:
-                    print(f"Failed to update {app_data['name']}")
-
-            except Exception as e:
-                print(f"Error updating {app_data['name']}: {str(e)}")
-                print("Continuing with next app...")
-
-            print(f"Finished processing {app_data['name']}")
-
-        print("\nUpdate process completed!")
+        # Print summary
+        print("\n=== Update Summary ===")
+        print(f"Total apps processed: {total_apps}")
+        print(f"Successfully updated: {success_count}")
+        if failure_count > 0:
+            print(f"Failed updates: {failure_count}")
+        print("Update process completed!")

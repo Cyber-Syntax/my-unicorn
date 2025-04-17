@@ -192,7 +192,7 @@ class ManageTokenCommand(Command):
         headers = {"Accept": "application/vnd.github.v3+json"}
         if token:
             # Add token to headers but don't log the actual token value
-            headers["Authorization"] = f"token {token}"
+            headers["Authorization"] = f"Bearer {token}"
             self._logger.info("Using token from secure storage for rate limit check")
         else:
             self._logger.info("No token available, checking unauthenticated rate limits")
@@ -273,7 +273,7 @@ class ManageTokenCommand(Command):
             response = requests.get(
                 "https://api.github.com/rate_limit",
                 headers={
-                    "Authorization": f"token {token}",
+                    "Authorization": f"Bearer {token}",
                     "Accept": "application/vnd.github.v3+json",
                 },
                 timeout=10,

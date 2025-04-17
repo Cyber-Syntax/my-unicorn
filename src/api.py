@@ -4,9 +4,10 @@ import re
 import os
 import requests
 from datetime import datetime
+from typing import Dict, Optional, List
+
 from src.icon_manager import IconManager
-from src.global_config import GlobalConfigManager
-from src.secure_token import SecureTokenManager
+from src.auth_manager import GitHubAuthManager
 
 
 class GitHubAPI:
@@ -20,6 +21,16 @@ class GitHubAPI:
         hash_type: str = "sha256",
         arch_keyword: str = None,
     ):
+        """
+        Initialize the GitHub API client with repository information.
+
+        Args:
+            owner: GitHub repository owner/organization
+            repo: GitHub repository name
+            sha_name: Name of SHA hash file (if known)
+            hash_type: Type of hash for verification (sha256, sha512)
+            arch_keyword: Architecture-specific keyword for file matching
+        """
         self.owner = owner
         self.repo = repo
         self.sha_name = sha_name
@@ -30,40 +41,35 @@ class GitHubAPI:
         self.appimage_name = None
         self.arch_keyword = arch_keyword
         self.arch_keywords = self._get_arch_keywords()
-        self._headers = self._get_request_headers()
+        # Initialize headers with authentication if available
+        self._headers = GitHubAuthManager.get_auth_headers()
 
-    def _get_request_headers(self) -> dict:
-        """Get headers for GitHub API requests including authentication if available."""
-        headers = {"Accept": "application/vnd.github.v3+json"}
+    def _get_arch_keywords(self) -> List[str]:
+        """
+        Get architecture-specific keywords for the current system.
 
-        # Try to get token from secure storage first
-        token = SecureTokenManager.get_token()
-
-        # Fall back to legacy config if needed
-        if not token:
-            global_config = GlobalConfigManager()
-            token = getattr(global_config, "github_token", None)
-
-        if token:
-            headers["Authorization"] = f"token {token}"
-            logging.info("Using GitHub token for authentication")
-        else:
-            logging.info("No GitHub token found, using unauthenticated requests")
-
-        return headers
-
-    def _get_arch_keywords(self):
-        """Static architecture keywords including linux variants"""
+        Returns:
+            list: Architecture keywords for the current platform
+        """
         machine = platform.machine().lower()
+        # Store the current system architecture for better matching
+        self.current_arch = machine
+
+        # Update keyword mapping with more specific keywords first (for better matching)
         return {
-            "x86_64": ["x86_64", "amd64", "linux", "linux64"],
-            "amd64": ["amd64", "x86_64", "linux"],
-            "armv7l": ["arm", "armv7l", "armhf"],
+            "x86_64": ["x86_64", "x86-64", "amd64", "x64", "linux64"],
+            "amd64": ["amd64", "x86_64", "x86-64", "x64", "linux64"],
+            "armv7l": ["armv7l", "arm", "armhf"],
             "aarch64": ["aarch64", "arm64"],
         }.get(machine, [])
 
     def get_response(self):
-        """Fetch release data with beta fallback handling"""
+        """
+        Fetch release data with beta fallback handling.
+
+        Returns:
+            dict or None: Processed release data or None if request failed
+        """
         try:
             # Try stable release first with auth headers
             response = requests.get(
@@ -94,8 +100,9 @@ class GitHubAPI:
                     error_msg = f"GitHub API rate limit exceeded. Resets at {reset_datetime}"
                     logging.error(error_msg)
                     print(f"Error: {error_msg}")
-                    if not global_config.github_token:
-                        print("Tip: Set a GitHub token in global settings to increase rate limits.")
+                    print(
+                        "Tip: Add or update your GitHub token using option 6 in the main menu to increase rate limits."
+                    )
                     return None
 
             logging.error(f"Failed to fetch releases. Status code: {response.status_code}")
@@ -177,9 +184,18 @@ class GitHubAPI:
         return version_match.group(0) if version_match else None
 
     def _find_appimage_asset(self, assets: list):
-        """Reliable AppImage selection with architecture keywords"""
-        logging.info(f"Current arch_keyword: {self.arch_keyword}")
+        """
+        Reliable AppImage selection with architecture keywords.
 
+        Args:
+            assets: List of release assets from GitHub API
+        """
+        logging.info(f"Current arch_keyword: {self.arch_keyword}")
+        logging.info(
+            f"Current system architecture: {getattr(self, 'current_arch', platform.machine().lower())}"
+        )
+
+        # Filter all AppImage files
         appimages = [a for a in assets if a["name"].lower().endswith(".appimage")]
 
         if not appimages:
@@ -197,12 +213,30 @@ class GitHubAPI:
                     self._select_appimage(asset)
                     return
 
-        # 2. Filter by current architecture keywords list
+        # 2. Filter by current architecture keywords with stronger matching
         candidates = []
+        exact_arch_match = None
+
+        # Current architecture to find a perfect match
+        current_arch = getattr(self, "current_arch", platform.machine().lower())
+
         for asset in appimages:
             name = asset["name"].lower()
+
+            # Look for exact architecture match first (highest priority)
+            if current_arch in name:
+                exact_arch_match = asset
+                break
+
+            # Otherwise collect candidates based on architecture keywords
             if any(kw in name for kw in self.arch_keywords):
                 candidates.append(asset)
+
+        # If we found an exact architecture match, use it immediately
+        if exact_arch_match:
+            logging.info(f"Found exact architecture match: {exact_arch_match['name']}")
+            self._select_appimage(exact_arch_match)
+            return
 
         # 3. Handle candidate selection
         if len(candidates) == 1:
@@ -239,6 +273,12 @@ class GitHubAPI:
             print("Invalid input, try again")
 
     def _select_appimage(self, asset):
+        """
+        Select an AppImage asset and set instance attributes.
+
+        Args:
+            asset: GitHub API asset information dictionary
+        """
         self.appimage_url = asset["browser_download_url"]
         self.appimage_name = asset["name"]
         logging.info(f"Selected: {self.appimage_name}")
@@ -390,16 +430,36 @@ class GitHubAPI:
             self.hash_type = "no_hash"
             logging.info("User chose to skip SHA verification")
 
-    def check_latest_version(self, owner, repo):
-        """Check if the latest version is already installed"""
+    def check_latest_version(
+        self, owner: Optional[str] = None, repo: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Check the latest version available for a repository.
+
+        Args:
+            owner: Repository owner/organization (defaults to self.owner)
+            repo: Repository name (defaults to self.repo)
+
+        Returns:
+            str or None: Latest version string or None if request failed
+        """
+        # Use instance values if parameters not provided
+        owner = owner or self.owner
+        repo = repo or self.repo
+
         try:
-            # Fetch latest or beta latest release data
+            # Ensure we have the latest authentication headers
+            headers = GitHubAuthManager.get_auth_headers()
+
+            # Fetch latest or beta latest release data with authentication
             response = requests.get(
                 f"https://api.github.com/repos/{owner}/{repo}/releases/latest",
+                headers=headers,
                 timeout=10,
             )
             response_beta = requests.get(
                 f"https://api.github.com/repos/{owner}/{repo}/releases",
+                headers=headers,
                 timeout=10,
             )
 
@@ -407,13 +467,26 @@ class GitHubAPI:
                 latest_version = response.json()["tag_name"].replace("v", "")
                 logging.info(f"Found latest version: {latest_version}")
                 return latest_version
-            elif response_beta.status_code == 200:
+            elif response_beta.status_code == 200 and response_beta.json():
                 latest_version = (
                     response_beta.json()[0]["tag_name"].replace("v", "").replace("-beta", "")
                 )
                 logging.info(f"Found latest beta version: {latest_version}")
                 return latest_version
             else:
+                # Check for rate limit issues
+                if response.status_code == 403 and "X-RateLimit-Remaining" in response.headers:
+                    remaining = response.headers["X-RateLimit-Remaining"]
+                    if remaining == "0":
+                        reset_time = int(response.headers["X-RateLimit-Reset"])
+                        reset_datetime = datetime.fromtimestamp(reset_time)
+                        logging.error(f"GitHub API rate limit exceeded. Resets at {reset_datetime}")
+                        print(f"Error: GitHub API rate limit exceeded. Resets at {reset_datetime}")
+                        print(
+                            "Tip: Add or update your GitHub token using option 6 in the main menu to increase rate limits."
+                        )
+                        return None
+
                 logging.error(f"Failed to fetch releases. Status code: {response.status_code}")
                 return None
 
@@ -421,34 +494,23 @@ class GitHubAPI:
             logging.error(f"GitHub API request failed: {e}")
             return None
 
-    def find_app_icon(self) -> dict:
+    def find_app_icon(self) -> Optional[Dict[str, any]]:
         """
         Find the best icon for the app using IconManager.
 
         Returns:
             dict or None: Icon asset information or None if no suitable icon found.
         """
-        # Use IconManager for icon discovery
+        # Use IconManager for icon discovery with proper authentication
         icon_manager = IconManager()
-        icon_info = icon_manager.find_icon(self.owner, self.repo)
-        if icon_info:
-            return icon_info
-        # If not found, skip to avoid rate limit
-        return None
+        # Use the auth headers we already have
+        icon_info = icon_manager.find_icon(self.owner, self.repo, headers=self._headers)
+        return icon_info  # May be None if not found
 
-    def download_icon(self, icon_info: dict, repo_name: str) -> str | None:
+    def refresh_auth(self) -> None:
         """
-        Download an icon using IconManager and save it to the XDG icons directory.
+        Refresh the authentication headers to ensure token is current.
 
-        Args:
-            icon_info (dict): Icon information from IconManager
-            repo_name (str): Repository name for the app
-
-        Returns:
-            str or None: Path to the saved icon or None if download failed
+        Call this method before making API requests if the token might have changed.
         """
-        icon_manager = IconManager()
-        success, icon_path = icon_manager.download_icon(icon_info, repo_name)
-        if success:
-            return icon_path
-        return None
+        self._headers = GitHubAuthManager.get_auth_headers()

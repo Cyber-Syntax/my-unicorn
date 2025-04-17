@@ -13,7 +13,6 @@
 - Store configuration in separate files (e.g., YAML, JSON, or .env) rather than hardcoding in scripts.
 - Always check return values from functions that may fail.
 - Write descriptive error messages that help diagnose the problem.
-- Keep functions focused on a single responsibility.
 - Use proper scoping for variables (avoid globals).
 - Do not save secrets in source code.
 - Use HTTPS for all API communications.
@@ -21,3 +20,6 @@
 - Validate and sanitize all external inputs.
 - Load sensitive configuration values only at runtime from environment variables or secure vault services.
 - For storing user passwords, generate a unique random salt for each password and combine it with a secure hash (for example, using PBKDF2 or bcrypt).
+- Use the single responsibility principle as a guide: every module (and function) should have one clear purpose.
+- By separating concerns, you make your code more modular, easier to test, and easier to maintain.
+- Reusability: If certain functions are useful in multiple parts of your application, consider placing them in their own file (or a separate module within a utilities package) to promote reuse.
