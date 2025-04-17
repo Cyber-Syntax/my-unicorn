@@ -301,42 +301,100 @@ class GitHubAPI:
                 self.arch_keyword = ".appimage"
 
     def _find_sha_asset(self, assets: list):
-        """Simplified SHA file detection with architecture awareness"""
+        """
+        Find and select appropriate SHA file for verification.
+
+        This method intelligently filters SHA files based on the selected AppImage architecture
+        and prioritizes architecture-specific SHA files that match the selected AppImage.
+
+        Args:
+            assets: List of release assets from GitHub API
+        """
+        # Skip if SHA verification is disabled
         if self.sha_name == "no_sha_file":
             logging.info("Skipping SHA verification per configuration")
             return
 
-        # 1. Try exact match first
+        # Extract architecture from selected AppImage name for better SHA matching
+        appimage_arch = self._extract_arch_from_filename(self.appimage_name)
+        logging.info(f"Extracted architecture from AppImage: {appimage_arch}")
+
+        # 1. Try exact match first if SHA name is provided
         if self.sha_name:
             for asset in assets:
                 if asset["name"] == self.sha_name:
                     self._select_sha_asset(asset)
                     return
 
-        # 2. Find architecture-specific SHA files
-        candidates = []
+        # 2. Find architecture-specific SHA files that match the AppImage architecture
+        sha_candidates = []
+        generic_sha_candidates = []
+        sha256sums = None
+        linux_yml = None
+
         for asset in assets:
             name = asset["name"].lower()
             if not self._is_sha_file(name):
                 continue
 
-            # Match architecture keywords or common patterns
-            if any(kw in name for kw in self.arch_keywords) or any(
-                p in name for p in ["checksums", "sha256sums", "latest"]
-            ):
-                candidates.append(asset)
+            # Special handling for common SHA files
+            if name == "sha256sums":
+                sha256sums = asset
 
-        # 3. Handle found candidates
-        if len(candidates) == 1:
-            self._select_sha_asset(candidates[0])
+            if name == "latest-linux.yml":
+                linux_yml = asset
+
+            # Match architecture-specific SHA files with the AppImage architecture
+            asset_arch = self._extract_arch_from_filename(name)
+
+            if asset_arch:
+                # Only include architecture-specific files if they match the AppImage architecture
+                if asset_arch == appimage_arch:
+                    sha_candidates.append(asset)
+                # Skip SHA files that are for other architectures
+                continue
+
+            # Include generic SHA files (no specific architecture in name)
+            # Only include files that appear to be for Linux/generic platforms
+            if "mac" not in name and "windows" not in name and "win" not in name:
+                generic_sha_candidates.append(asset)
+
+        # 3. Select SHA file based on intelligent prioritization
+
+        # Use architecture-specific SHA files if available
+        if len(sha_candidates) == 1:
+            logging.info(f"Found architecture-specific SHA file: {sha_candidates[0]['name']}")
+            self._select_sha_asset(sha_candidates[0])
             return
-        elif candidates:
-            logging.info("Multiple SHA files found")
-            print("Multiple SHA files found:")
-            self._select_sha_from_list(candidates)
+        elif len(sha_candidates) > 1:
+            logging.info("Multiple architecture-specific SHA files found")
+            print("Multiple architecture-specific SHA files found:")
+            self._select_sha_from_list(sha_candidates)
             return
 
-        # 4. Fallback to any SHA file
+        # Set default SHA files based on common naming patterns
+        if sha256sums:
+            logging.info("Using SHA256SUMS file as default SHA256 checksums file")
+            self._select_sha_asset(sha256sums)
+            return
+
+        if linux_yml and "linux" in self.appimage_name.lower():
+            logging.info("Using latest-linux.yml file as default SHA for Linux")
+            self._select_sha_asset(linux_yml)
+            return
+
+        # Use generic SHA candidates if available
+        if len(generic_sha_candidates) == 1:
+            logging.info(f"Using generic SHA file: {generic_sha_candidates[0]['name']}")
+            self._select_sha_asset(generic_sha_candidates[0])
+            return
+        elif generic_sha_candidates:
+            logging.info("Multiple generic SHA files found")
+            print("SHA files compatible with your architecture:")
+            self._select_sha_from_list(generic_sha_candidates)
+            return
+
+        # 4. Fallback to any SHA file if no architecture-specific or generic files found
         all_sha = [a for a in assets if self._is_sha_file(a["name"])]
         if len(all_sha) == 1:
             self._select_sha_asset(all_sha[0])
@@ -349,6 +407,42 @@ class GitHubAPI:
 
         # 5. Final fallback to manual input
         self._handle_sha_fallback(assets)
+
+    def _extract_arch_from_filename(self, filename: str) -> str:
+        """
+        Extract architecture information from a filename.
+
+        This helper method identifies the architecture pattern in filenames
+        to allow better matching between AppImages and SHA files.
+
+        Args:
+            filename: The filename to analyze
+
+        Returns:
+            str: Architecture identifier or empty string if not found
+        """
+        if not filename:
+            return ""
+
+        filename_lower = filename.lower()
+
+        # Check for common architecture patterns in the filename
+        arch_patterns = {
+            "x86_64": ["x86_64", "x86-64", "amd64", "x64"],
+            "arm64": ["arm64", "aarch64"],
+            "armv7": ["armv7", "armhf", "arm32"],
+            "arm": ["arm"],
+            "i386": ["i386", "i686", "x86"],
+            "mac": ["mac", "darwin"],
+            "win": ["win", "windows"],
+        }
+
+        # Find which architecture pattern matches the filename
+        for arch, patterns in arch_patterns.items():
+            if any(pattern in filename_lower for pattern in patterns):
+                return arch
+
+        return ""
 
     def _is_sha_file(self, filename: str) -> bool:
         """Check if file is a valid SHA file using simple rules"""
