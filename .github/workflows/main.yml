@@ -2,9 +2,9 @@ name: Create Release from CHANGELOG
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'CHANGELOG.md'  # Only trigger when CHANGELOG.md is updated
+      - "CHANGELOG.md" # Only trigger when CHANGELOG.md is updated
 
 jobs:
   release:
@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history to get commit messages
 
       - name: Extract latest version and notes
         id: changelog
@@ -22,7 +24,7 @@ jobs:
           # Extract the first version number from CHANGELOG.md
           VERSION=$(grep -m 1 '^## v' CHANGELOG.md | sed 's/^## \(v[0-9.]*[0-9]\(-[a-zA-Z0-9]*\)*\).*/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          
+
           # Extract notes for this version (everything between this version header and the next version header)
           NOTES=$(awk -v ver="$VERSION" '
             BEGIN { found=0; capture=0; notes=""; }
@@ -31,16 +33,30 @@ jobs:
             capture==1 { notes = notes $0 "\n"; }
             END { print notes; }
           ' CHANGELOG.md)
-          
+
+          # Get recent commits since last tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || echo "")
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # If no previous tag exists, get all commits
+            COMMITS=$(git log --pretty=format:"  - %s" | grep -E "^  - (feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)" || echo "")
+          else
+            # Get commits between previous tag and HEAD
+            COMMITS=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"  - %s" | grep -E "^  - (feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)" || echo "")
+          fi
+
+          # Combine CHANGELOG notes with commit messages
+          FULL_NOTES="${NOTES}\n\n### Commits\n${COMMITS}"
+
           # Save notes to output with correct GitHub multiline syntax
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "notes<<$EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo -e "$FULL_NOTES" >> $GITHUB_OUTPUT
           echo "$EOF" >> $GITHUB_OUTPUT
-          
+
           # For debugging
           echo "Found version: $VERSION"
           echo "Release notes excerpt: $(echo "$NOTES" | head -3)..."
+          echo "Commit messages excerpt: $(echo "$COMMITS" | head -3)..."
 
       - name: Check for existing release
         id: check_release

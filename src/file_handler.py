@@ -161,13 +161,16 @@ class FileHandler:
             # Check if the backup folder exists or create it
             os.makedirs(self.appimage_download_backup_folder_path, exist_ok=True)
 
-            # If we don't want to keep backups, just return
+            # If keep_backup is False, skip backup creation
             if not self.keep_backup:
                 logging.info("Backups disabled, skipping backup creation")
                 return True
 
             # Get app name for grouping backups by app
             app_base_name = os.path.splitext(self.app_id)[0].lower()
+
+            # Always clean up old backups based on max_backups setting
+            self._cleanup_old_backups(app_base_name)
 
             # Check if a current backup exists for this app
             if os.path.exists(self.backup_path):
@@ -183,9 +186,6 @@ class FileHandler:
                 # Move existing backup to timestamped backup
                 shutil.move(self.backup_path, new_backup_path)
                 logging.info(f"Created historical backup: {backup_name}")
-
-                # Clean up old backups if we have too many
-                self._cleanup_old_backups(app_base_name)
 
             # Move current AppImage to backup
             logging.info(f"Backing up {self.appimage_path} to {self.backup_path}")

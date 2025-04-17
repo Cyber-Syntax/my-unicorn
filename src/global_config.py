@@ -35,7 +35,12 @@ class GlobalConfigManager:
             try:
                 with open(self.config_file, "r", encoding="utf-8") as file:
                     config = json.load(file)
-                    # Safely load each configuration item
+
+                    # Get all expected config keys from to_dict method
+                    expected_keys = set(self.to_dict().keys())
+                    found_keys = set(config.keys())
+
+                    # Load each configuration item safely
                     self.appimage_download_folder_path = config.get(
                         "appimage_download_folder_path",
                         self.appimage_download_folder_path,
@@ -48,6 +53,11 @@ class GlobalConfigManager:
                     self.max_backups = config.get("max_backups", self.max_backups)
                     self.batch_mode = config.get("batch_mode", self.batch_mode)
                     self.locale = config.get("locale", self.locale)
+
+                    # If any expected keys are missing, log it
+                    missing_keys = expected_keys - found_keys
+                    if missing_keys:
+                        logging.info(f"Config file is missing keys: {missing_keys}")
             except json.JSONDecodeError as e:
                 logging.error(f"Failed to parse the configuration file: {e}")
                 raise ValueError("Invalid JSON format in the configuration file.")

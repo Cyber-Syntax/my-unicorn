@@ -10,6 +10,7 @@ from src.commands.customize_global_config import CustomizeGlobalConfigCommand
 from src.commands.download import DownloadCommand
 from src.commands.invoker import CommandInvoker
 from src.commands.manage_token import ManageTokenCommand
+from src.commands.migrate_config import MigrateConfigCommand
 from src.commands.update_all import UpdateCommand
 from src.commands.update_all_auto import UpdateAllAutoCommand
 from src.app_config import AppConfigManager
@@ -35,7 +36,8 @@ def get_user_choice():
     print(_("4. Customize AppImages config file"))
     print(_("5. Customize Global config file"))
     print(_("6. Manage GitHub Token (for API rate limits)"))
-    print(_("7. Exit"))
+    print(_("7. Check and Migrate Configuration Files"))
+    print(_("8. Exit"))
     print("====================================")
     try:
         return int(input(_("Enter your choice: ")))
@@ -55,9 +57,9 @@ def configure_logging():
 
     # Configure file handler for all log levels
     file_handler = RotatingFileHandler(log_file_path, maxBytes=1024 * 1024, backupCount=3)
-    file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s")
     file_handler.setFormatter(file_formatter)
-    file_handler.setLevel(logging.INFO)
+    file_handler.setLevel(logging.DEBUG)  # Changed to DEBUG level
 
     # Configure console handler for ERROR and above only
     console_handler = logging.StreamHandler()
@@ -67,7 +69,7 @@ def configure_logging():
 
     # Get root logger and configure it
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)  # Base level for the logger
+    logger.setLevel(logging.DEBUG)  # Changed to DEBUG level
 
     # Remove any existing handlers (in case this function is called multiple times)
     for handler in logger.handlers[:]:
@@ -77,7 +79,7 @@ def configure_logging():
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
-    logging.info("Logging configured successfully")
+    logging.info("Logging configured with DEBUG level")
 
 
 def main():
@@ -101,11 +103,12 @@ def main():
     invoker.register_command(4, CustomizeAppConfigCommand())
     invoker.register_command(5, CustomizeGlobalConfigCommand())
     invoker.register_command(6, ManageTokenCommand())
+    invoker.register_command(7, MigrateConfigCommand())
 
     # Main menu loop
     while True:
         choice = get_user_choice()
-        if choice == 7:
+        if choice == 8:
             logging.info("User selected to exit application")
             print("Exiting...")
             sys.exit(0)
