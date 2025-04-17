@@ -48,44 +48,18 @@ class AppConfigManager:
         self.appimage_name = appimage_name
         self.arch_keyword = arch_keyword
         self.config_folder = os.path.expanduser(config_folder)
-        
-        # Get a unique app identifier for file naming
-        self.app_id = self._get_app_identifier()
+
+        # Use repo directly for app identifier
+        self.app_id = self.repo.lower() if self.repo else None
         self.config_file_name = f"{self.app_id}.json" if self.app_id else None
         self.config_file = (
             os.path.join(self.config_folder, self.config_file_name)
             if self.config_file_name
             else None
         )
-        
+
         # Ensure the configuration directory exists
         os.makedirs(self.config_folder, exist_ok=True)
-        
-    def _get_app_identifier(self) -> str:
-        """
-        Generate a unique, user-friendly identifier for the application.
-        
-        For repositories with generic names like 'app', 'core', etc.,
-        this will use owner_repo format. Otherwise, it uses just the repo name.
-        
-        Returns:
-            str: Application identifier for file naming, or None if repo is not set
-        """
-        if not self.repo:
-            return None
-            
-        # List of generic repository names that should use combined format
-        generic_names = {"app", "core", "client", "desktop", "main", "electron"}
-        
-        # Check if we have a generic repo name
-        if self.repo.lower() in generic_names and self.owner:
-            # For generic repo names, combine owner and repo
-            # Replace slashes and spaces with underscores for safe filenames
-            safe_owner = re.sub(r'[/\s]', '_', self.owner)
-            return f"{safe_owner}_{self.repo}".lower()
-        
-        # For normal case, just return the repo name
-        return self.repo
 
     def update_version(
         self, new_version: Optional[str] = None, new_appimage_name: Optional[str] = None
@@ -160,25 +134,51 @@ class AppConfigManager:
             # Determine icon path - start with the provided icon path if available
             final_icon_path = icon_path
 
-            # If no specific icon path provided, search in the repo-specific directory
+            # If no specific icon path provided, search in both app_id and repo-specific directories
             if not final_icon_path:
-                # Define icon locations using the repository-based structure
+                # Define icon locations using both app_id and repository-based structure
                 icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
-                repo_icon_dir = os.path.join(icon_base_dir, self.repo)
+                app_icon_dir = os.path.join(
+                    icon_base_dir, self.app_id
+                )  # Primary location using app_id
+                repo_icon_dir = os.path.join(
+                    icon_base_dir, self.repo
+                )  # Fallback for backward compatibility
 
-                # Check standard icon file names in repo directory
-                icon_locations = [
-                    # Repository-specific directory with standard names
-                    os.path.join(repo_icon_dir, "icon.svg"),
-                    os.path.join(repo_icon_dir, "icon.png"),
-                    os.path.join(repo_icon_dir, "icon.jpg"),
-                    os.path.join(repo_icon_dir, "logo.svg"),
-                    os.path.join(repo_icon_dir, "logo.png"),
-                    # Legacy locations for backward compatibility
-                    os.path.join(icon_base_dir, "scalable/apps", f"{self.repo}.svg"),
-                    os.path.join(icon_base_dir, "256x256/apps", f"{self.repo}.png"),
-                    os.path.join(icon_base_dir, "128x128/apps", f"{self.repo}.png"),
-                ]
+                # Check standard icon file names in both directories
+                icon_locations = []
+
+                # First check app_id directory (primary for generic repos)
+                if self.app_id != self.repo.lower():
+                    icon_locations.extend(
+                        [
+                            os.path.join(app_icon_dir, "icon.svg"),
+                            os.path.join(app_icon_dir, "icon.png"),
+                            os.path.join(app_icon_dir, "icon.jpg"),
+                            os.path.join(app_icon_dir, "logo.svg"),
+                            os.path.join(app_icon_dir, "logo.png"),
+                        ]
+                    )
+
+                # Also check repo directory (for backward compatibility)
+                icon_locations.extend(
+                    [
+                        # Repository-specific directory with standard names
+                        os.path.join(repo_icon_dir, "icon.svg"),
+                        os.path.join(repo_icon_dir, "icon.png"),
+                        os.path.join(repo_icon_dir, "icon.jpg"),
+                        os.path.join(repo_icon_dir, "logo.svg"),
+                        os.path.join(repo_icon_dir, "logo.png"),
+                        # Legacy locations for backward compatibility
+                        os.path.join(icon_base_dir, "scalable/apps", f"{self.repo}.svg"),
+                        os.path.join(icon_base_dir, "256x256/apps", f"{self.repo}.png"),
+                        os.path.join(icon_base_dir, "128x128/apps", f"{self.repo}.png"),
+                        # Also check app_id in legacy locations
+                        os.path.join(icon_base_dir, "scalable/apps", f"{self.app_id}.svg"),
+                        os.path.join(icon_base_dir, "256x256/apps", f"{self.app_id}.png"),
+                        os.path.join(icon_base_dir, "128x128/apps", f"{self.app_id}.png"),
+                    ]
+                )
 
                 # Check each location for an existing icon
                 for location in icon_locations:
@@ -187,20 +187,24 @@ class AppConfigManager:
                         logger.info(f"Using existing icon at: {final_icon_path}")
                         break
 
-                # If repo directory exists but no standard files found, use first image file if any
-                if (
-                    os.path.exists(repo_icon_dir)
-                    and os.path.isdir(repo_icon_dir)
-                    and not final_icon_path
-                ):
-                    for filename in os.listdir(repo_icon_dir):
-                        file_path = os.path.join(repo_icon_dir, filename)
-                        if os.path.isfile(file_path) and any(
-                            file_path.lower().endswith(ext)
-                            for ext in [".svg", ".png", ".jpg", ".jpeg"]
-                        ):
-                            final_icon_path = file_path
-                            logger.info(f"Using first image file found: {final_icon_path}")
+                # If app_id directory exists but no standard files found, use first image file if any
+                for check_dir in [app_icon_dir, repo_icon_dir]:
+                    if (
+                        os.path.exists(check_dir)
+                        and os.path.isdir(check_dir)
+                        and not final_icon_path
+                    ):
+                        for filename in os.listdir(check_dir):
+                            file_path = os.path.join(check_dir, filename)
+                            if os.path.isfile(file_path) and any(
+                                file_path.lower().endswith(ext)
+                                for ext in [".svg", ".png", ".jpg", ".jpeg"]
+                            ):
+                                final_icon_path = file_path
+                                logger.info(f"Using first image file found: {final_icon_path}")
+                                break
+                        # Break the outer loop if we found an icon
+                        if final_icon_path:
                             break
 
             # If still no icon found, use the repo name as fallback

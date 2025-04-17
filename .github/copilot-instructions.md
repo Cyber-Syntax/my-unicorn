@@ -1,25 +1,34 @@
 # Python Coding Rules
 
-- Always add comments.
-- Follow PEP 8 style guidelines for code formatting.
-- Use meaningful variable and function names in snake_case.
-- Use UPPER_CASE for constants.
-- Use CamelCase for class names.
-- Add docstrings to all functions, classes, and modules following the Google style guide.
-- Use type hints to indicate parameter and return types.
-- Use f-strings for string formatting instead of older methods.
-- Implement proper exception handling with specific exception types.
-- Use logging instead of print statements for recording key actions and errors.
-- Store configuration in separate files (e.g., YAML, JSON, or .env) rather than hardcoding in scripts.
-- Always check return values from functions that may fail.
-- Write descriptive error messages that help diagnose the problem.
-- Use proper scoping for variables (avoid globals).
-- Do not save secrets in source code.
+- Comment only to explain why code exists or complex reasoning.
+- Avoid redundant comments that repeat what the code already shows.
+- Write docstrings for public functions, classes, and modules only.
+- Keep docstrings concise and focused on usage information.
+- Name variables and functions descriptively to reduce need for comments.
+- Create functions that perform a single task with a clear name.
+- Organize large codebases into focused, well-named modules.
+- Prioritize code clarity over cleverness.
+- Create functions that perform a single task well.
+- Place reusable functions in their own modules.
+- Design modules and functions with a single, clear purpose.
+- Name variables and functions in lowercase_with_underscores.
+- Avoid global variables when possible.
+- Name constants in ALL_UPPERCASE.
+- Name classes in CapitalizedWords.
+- Add docstrings to all functions, classes, and modules.
+- Include type hints for parameters and return values.
+- Use f-strings for string formatting.
+- Catch specific exceptions, not broad exception types.
+- Use logging for recording actions and errors.
+- Write helpful, descriptive error messages.
+- Avoid print statements for application output.
+- Store configuration settings separately from code.
+- Check return values from functions that might fail.
+- Limit variable scope appropriately.
+- Make code modular to improve testing and maintenance.
 - Use HTTPS for all API communications.
-- Exclude sensitive information from log files and error messages to prevent accidental exposure.
-- Validate and sanitize all external inputs.
-- Load sensitive configuration values only at runtime from environment variables or secure vault services.
-- For storing user passwords, generate a unique random salt for each password and combine it with a secure hash (for example, using PBKDF2 or bcrypt).
-- Use the single responsibility principle as a guide: every module (and function) should have one clear purpose.
-- By separating concerns, you make your code more modular, easier to test, and easier to maintain.
-- Reusability: If certain functions are useful in multiple parts of your application, consider placing them in their own file (or a separate module within a utilities package) to promote reuse.
+- Load sensitive configuration values only at runtime.
+- Keep sensitive information out of logs and error messages.
+- Never include secrets or passwords in source code.
+- Validate and sanitize all user inputs.
+- Use secure hashing with unique salts for passwords.
