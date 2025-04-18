@@ -48,7 +48,6 @@ class StandardNotesHandler:
             desktop_dir = os.path.expanduser("~/.local/share/applications")
             os.makedirs(desktop_dir, exist_ok=True)
 
-            # Use standardnotes for the desktop filename instead of app_id (which is 'app')
             desktop_file_path = os.path.join(desktop_dir, "standardnotes.desktop")
             desktop_file_temp = f"{desktop_file_path}.tmp"
 
@@ -62,13 +61,12 @@ class StandardNotesHandler:
                 icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
                 # Try standardnotes directory first
                 std_notes_icon_dir = os.path.join(icon_base_dir, "standardnotes")
-                app_icon_dir = os.path.join(icon_base_dir, app_config.app_id)
+                app_icon_dir = os.path.join(icon_base_dir, app_config.repo)
 
                 # Check for icons in standardnotes directory first
                 icon_locations = [
                     os.path.join(std_notes_icon_dir, "icon.svg"),
                     os.path.join(std_notes_icon_dir, "icon.png"),
-                    # Then check app_id directory
                     os.path.join(app_icon_dir, "icon.svg"),
                     os.path.join(app_icon_dir, "icon.png"),
                 ]

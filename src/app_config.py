@@ -77,7 +77,6 @@ class AppConfigManager:
             if new_appimage_name is not None:
                 self.appimage_name = new_appimage_name
 
-            # Update the config_file attribute using app_id instead of repo
             self.config_file = os.path.join(self.config_folder, f"{self.repo}.json")
             config_data = {}
 
@@ -123,7 +122,6 @@ class AppConfigManager:
             desktop_dir = os.path.expanduser("~/.local/share/applications")
             os.makedirs(desktop_dir, exist_ok=True)
 
-            # Define paths for desktop file - use the app_id for filename
             desktop_file_path = os.path.join(desktop_dir, f"{self.repo.lower()}.desktop")
             desktop_file_temp = f"{desktop_file_path}.tmp"
 
@@ -133,13 +131,11 @@ class AppConfigManager:
             # Determine icon path - start with the provided icon path if available
             final_icon_path = icon_path
 
-            # If no specific icon path provided, search in both app_id and repo-specific directories
             if not final_icon_path:
-                # Define icon locations using both app_id and repository-based structure
                 icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
                 app_icon_dir = os.path.join(
                     icon_base_dir, self.repo
-                )  # Primary location using app_id
+                )
                 repo_icon_dir = os.path.join(
                     icon_base_dir, self.repo
                 )  # Fallback for backward compatibility
@@ -172,7 +168,6 @@ class AppConfigManager:
                         os.path.join(icon_base_dir, "scalable/apps", f"{self.repo}.svg"),
                         os.path.join(icon_base_dir, "256x256/apps", f"{self.repo}.png"),
                         os.path.join(icon_base_dir, "128x128/apps", f"{self.repo}.png"),
-                        # Also check app_id in legacy locations
                         os.path.join(icon_base_dir, "scalable/apps", f"{self.repo}.svg"),
                         os.path.join(icon_base_dir, "256x256/apps", f"{self.repo}.png"),
                         os.path.join(icon_base_dir, "128x128/apps", f"{self.repo}.png"),
@@ -186,7 +181,6 @@ class AppConfigManager:
                         logger.info(f"Using existing icon at: {final_icon_path}")
                         break
 
-                # If app_id directory exists but no standard files found, use first image file if any
                 for check_dir in [app_icon_dir, repo_icon_dir]:
                     if (
                         os.path.exists(check_dir)

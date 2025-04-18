@@ -129,6 +129,7 @@ class DownloadCommand(Command):
             config_file_name=app_config.config_file_name,
             batch_mode=global_config.batch_mode,
             keep_backup=global_config.keep_backup,
+            max_backups=global_config.max_backups,
         )
 
         # Install icon for the appimage

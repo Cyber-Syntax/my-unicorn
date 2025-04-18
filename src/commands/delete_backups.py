@@ -109,13 +109,21 @@ class DeleteBackupsCommand(Command):
 
             file_count = 0
             for filename in os.listdir(backup_dir):
-                if filename.lower().startswith(
-                    f"{selected_app.lower()}_"
-                ) and filename.lower().endswith(".appimage"):
-                    filepath = os.path.join(backup_dir, filename)
-                    if os.path.isfile(filepath):
-                        os.remove(filepath)
-                        file_count += 1
+                filepath = os.path.join(backup_dir, filename)
+                if not filename.lower().endswith(".appimage") or not os.path.isfile(filepath):
+                    continue
+
+                # Simple matching - check if filename starts with app name
+                app_lower = selected_app.lower()
+                filename_lower = filename.lower()
+
+                if (
+                    filename_lower.startswith(f"{app_lower}-")
+                    or filename_lower.startswith(f"{app_lower}_")
+                    or filename_lower == f"{app_lower}.appimage"
+                ):
+                    os.remove(filepath)
+                    file_count += 1
 
             if file_count > 0:
                 print(f"✓ Successfully deleted {file_count} backup files for {selected_app}.")
@@ -234,29 +242,42 @@ class DeleteBackupsCommand(Command):
 
         for app in apps:
             app_backups = []
+
+            # Find all backups for this app
             for filename in os.listdir(backup_dir):
-                if filename.lower().startswith(f"{app.lower()}_") and filename.lower().endswith(
-                    ".appimage"
+                filepath = os.path.join(backup_dir, filename)
+                if not filename.lower().endswith(".appimage") or not os.path.isfile(filepath):
+                    continue
+
+                # Simple matching - check if filename starts with app name
+                app_lower = app.lower()
+                filename_lower = filename.lower()
+
+                if (
+                    filename_lower.startswith(f"{app_lower}-")
+                    or filename_lower.startswith(f"{app_lower}_")
+                    or filename_lower == f"{app_lower}.appimage"
                 ):
-                    filepath = os.path.join(backup_dir, filename)
-                    if os.path.isfile(filepath):
-                        mod_time = os.path.getmtime(filepath)
-                        app_backups.append((filepath, mod_time))
+                    mod_time = os.path.getmtime(filepath)
+                    app_backups.append((filepath, mod_time, filename))
 
             # Sort backups by modification time (newest first)
             app_backups.sort(key=lambda x: x[1], reverse=True)
 
+            # Log what we found
+            logging.info(f"Found {len(app_backups)} backups for {app}, max_backups={max_backups}")
+
             # Keep only the newest max_backups files
-            files_to_remove = app_backups[max_backups:]
-            if files_to_remove:
+            if len(app_backups) > max_backups:
+                files_to_remove = app_backups[max_backups:]
                 removed_count = 0
-                for filepath, _ in files_to_remove:
+                for filepath, _, filename in files_to_remove:
                     try:
                         os.remove(filepath)
                         removed_count += 1
-                        logging.info(f"Removed old backup: {os.path.basename(filepath)}")
+                        logging.info(f"Removed old backup: {filename}")
                     except OSError as e:
-                        logging.warning(f"Failed to remove old backup {filepath}: {e}")
+                        logging.warning(f"Failed to remove old backup {filename}: {e}")
 
                 total_removed += removed_count
                 if removed_count > 0:
@@ -286,9 +307,20 @@ class DeleteBackupsCommand(Command):
 
         try:
             for filename in os.listdir(backup_dir):
-                if filename.lower().endswith(".appimage") and "_" in filename:
-                    # Extract app name before the underscore
-                    app_name = filename.split("_")[0]
+                if filename.lower().endswith(".appimage"):
+                    # Extract app name using simplified logic - get first part before "-" or "_"
+                    filename_base = filename.split(".")[0]  # Remove extension
+
+                    # Case 1: AppName-version-etc format
+                    if "-" in filename_base:
+                        app_name = filename_base.split("-")[0]
+                    # Case 2: AppName_timestamp format
+                    elif "_" in filename_base:
+                        app_name = filename_base.split("_")[0]
+                    # Case 3: Simple AppName format
+                    else:
+                        app_name = filename_base
+
                     apps.add(app_name)
         except OSError as e:
             logging.error(f"Error getting available apps: {str(e)}")

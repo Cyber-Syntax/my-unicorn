@@ -194,31 +194,37 @@ class FileHandler:
             app_base_name: Base name of the app to clean up backups for
         """
         try:
-            # Skip cleanup if max_backups is set to a very high number
-            if self.max_backups > 100:
+            # Skip cleanup if backup is disabled
+            if self.keep_backup == False:
                 return
+
+            # Ensure backup directory exists
+            backup_dir = self.appimage_download_backup_folder_path
+            if not os.path.exists(backup_dir):
+                logging.info(f"Backup directory does not exist: {backup_dir}")
+                return
+
+            # Normalize app_base_name for consistent comparison
+            app_base_name = app_base_name.lower()
 
             # Find all backup files for this app
             all_backups = []
 
-            # Ensure backup directory exists
-            if not os.path.exists(self.appimage_download_backup_folder_path):
-                logging.info(
-                    f"Backup directory does not exist: {self.appimage_download_backup_folder_path}"
-                )
-                return
+            for filename in os.listdir(backup_dir):
+                filepath = os.path.join(backup_dir, filename)
+                if not filename.lower().endswith(".appimage") or not os.path.isfile(filepath):
+                    continue
 
-            for filename in os.listdir(self.appimage_download_backup_folder_path):
-                filepath = os.path.join(self.appimage_download_backup_folder_path, filename)
-                # Use case-insensitive comparison for both app name and file extension
+                # Simplified matching - just check if the normalized filename starts with the app name
+                filename_lower = filename.lower()
                 if (
-                    filename.lower().startswith(f"{app_base_name.lower()}_")
-                    and filename.lower().endswith(".appimage")
-                    and os.path.isfile(filepath)
+                    filename_lower.startswith(f"{app_base_name}-")
+                    or filename_lower.startswith(f"{app_base_name}_")
+                    or filename_lower == f"{app_base_name}.appimage"
                 ):
                     # Get file modification time for sorting
                     mod_time = os.path.getmtime(filepath)
-                    all_backups.append((filepath, mod_time))
+                    all_backups.append((filepath, mod_time, filename))
                     logging.debug(f"Found backup file: {filename}")
 
             # Sort backups by modification time (newest first)
@@ -235,13 +241,13 @@ class FileHandler:
                 files_to_remove = all_backups[self.max_backups :]
                 removed_count = 0
 
-                for filepath, _ in files_to_remove:
+                for filepath, _, filename in files_to_remove:
                     try:
                         os.remove(filepath)
                         removed_count += 1
-                        logging.info(f"Removed old backup: {os.path.basename(filepath)}")
+                        logging.info(f"Removed old backup: {filename}")
                     except OSError as e:
-                        logging.warning(f"Failed to remove old backup {filepath}: {e}")
+                        logging.warning(f"Failed to remove old backup {filename}: {e}")
 
                 if removed_count > 0:
                     print(
@@ -366,10 +372,9 @@ class FileHandler:
                     logging.warning(f"Failed to use app-specific handler: {str(e)}, using default")
 
             # Default desktop entry creation implementation
-            # Define paths using app_id instead of repo
             app_name = self.repo  # Preserve original case for display name
             desktop_dir = os.path.expanduser("~/.local/share/applications")
-            desktop_file = f"{self.repo.lower()}.desktop"  # Use app_id for filename
+            desktop_file = f"{self.repo.lower()}.desktop"
             desktop_path = os.path.join(desktop_dir, desktop_file)
 
             logging.info(f"Processing desktop entry at {desktop_path}")
@@ -465,7 +470,6 @@ class FileHandler:
         Get path to application icon if it exists.
 
         Searches for icons in the repository-specific directory structure:
-        - First in the app_id directory (for generic repos)
         - Then in the repository name directory (for backward compatibility)
         - Finally in legacy icon locations
 
@@ -478,14 +482,12 @@ class FileHandler:
         # Base icon directory for myunicorn
         icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
 
-        # Check both app_id and repo-specific directories
         app_id_icon_dir = os.path.join(icon_base_dir, self.repo)
         repo_icon_dir = os.path.join(icon_base_dir, app_name)
 
         # List of directories to search in priority order
         icon_dirs = []
 
-        # If app_id is different from repo name (for generic repos), check it first
         if self.repo != app_name:
             icon_dirs.append(app_id_icon_dir)
 
@@ -552,7 +554,6 @@ class FileHandler:
 
         Uses the IconManager to find and download the best icon for the repository.
         Icons are stored in ~/.local/share/icons/myunicorn/<repo>/ directory.
-        For repositories with generic names, the app_id will be used for consistent naming.
 
         Args:
             owner: Repository owner
@@ -567,13 +568,11 @@ class FileHandler:
             from src.app_config import AppConfigManager
 
             app_config = AppConfigManager(owner=owner, repo=repo)
-            app_id = app_config.app_id
+            app_id = app_config.repo
 
-            # Set up proper icon directory structure using the app_id instead of repo
             # This ensures consistency with other file naming throughout the application
             icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
 
-            # First check for icons in the app_id directory (for generic repos)
             app_id_icon_dir = os.path.join(icon_base_dir, app_id)
 
             # Also check the repo directory (for backward compatibility)
@@ -582,7 +581,6 @@ class FileHandler:
             # Ensure primary icon directory exists
             os.makedirs(app_id_icon_dir, exist_ok=True)
 
-            # Use the app_id directory as the target for new downloads
             target_icon_dir = app_id_icon_dir
 
             # Check if icon already exists in either directory
