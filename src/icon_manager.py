@@ -14,6 +14,7 @@ from typing import Dict, Optional, List, Any, Tuple, Union
 
 # Import the icon paths configuration module instead of using YAML
 from src.data.icon_paths import get_icon_paths
+from src.auth_manager import GitHubAuthManager
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -41,10 +42,8 @@ class IconManager:
         """
         Find the best icon for a given repository.
 
-        Implements a multi-stage search strategy:
-        1. First check for exact_path specification in the config
-        2. Then try repository-specific path list
-        3. Finally fall back to default paths
+        Only checks paths from icon_paths.py configuration without falling back to
+        searching other directories in the repository. This reduces API calls.
 
         Args:
             owner: Repository owner/organization
@@ -61,11 +60,10 @@ class IconManager:
         # Get repository-specific configuration
         repo_config = self._get_repo_config(owner, repo)
 
-        # Set up proper headers for GitHub API
+        # Use GitHubAuthManager for authentication if no headers provided
         if headers is None:
-            headers = {
-                "Accept": "application/vnd.github.v3+json",
-            }
+            headers = GitHubAuthManager.get_auth_headers()
+            logger.debug("Using GitHubAuthManager for icon search authentication")
 
         # Step 1: Try exact path if specified (highest priority)
         if isinstance(repo_config, dict) and "exact_path" in repo_config:
@@ -95,14 +93,7 @@ class IconManager:
                     icon_info["preferred_filename"] = repo_config["filename"]
                 return icon_info
 
-        # Step 3: Fall back to default paths if no repository-specific icon found
-        default_paths = get_icon_paths("default")
-        for path in default_paths:
-            logger.debug(f"Checking default icon path: {path}")
-            icon_info = self._check_icon_path(owner, repo, path, headers)
-            if icon_info:
-                return icon_info
-
+        # Skip default fallback paths to reduce API calls
         logger.info(f"No suitable icon found for {owner}/{repo}")
         return None
 
@@ -148,7 +139,10 @@ class IconManager:
             content_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
             logger.debug(f"Checking for icon at: {content_url}")
 
-            response = requests.get(content_url, headers=headers, timeout=10)
+            # Use GitHubAuthManager for authenticated requests with rate limit handling
+            response = GitHubAuthManager.make_authenticated_request(
+                "GET", content_url, headers=headers, timeout=10, audit_action="icon_path_check"
+            )
 
             # Handle directory responses by checking for icon files inside
             if response.status_code == 200:
@@ -173,6 +167,13 @@ class IconManager:
                     if any(name.endswith(ext) for ext in [".png", ".svg", ".jpg", ".jpeg"]):
                         logger.info(f"Found icon at {path}")
                         return self._format_icon_info(content)
+
+            # Handle rate limit exceeded
+            elif response.status_code == 403 and "rate limit exceeded" in response.text.lower():
+                logger.warning("GitHub API rate limit exceeded during icon search")
+                # Try to refresh auth headers
+                GitHubAuthManager.clear_cached_headers()
+                # We don't retry here to avoid recursion, but the next request will use refreshed token
 
             return None
 
@@ -248,8 +249,11 @@ class IconManager:
             # Use atomic download pattern with temporary file
             temp_icon_path = f"{icon_path}.tmp"
 
-            # Download the icon
-            response = requests.get(icon_info["download_url"], stream=True, timeout=10)
+            # Use GitHubAuthManager for authenticated download
+            download_url = icon_info["download_url"]
+            response = GitHubAuthManager.make_authenticated_request(
+                "GET", download_url, stream=True, timeout=10, audit_action="icon_download"
+            )
             response.raise_for_status()
 
             with open(temp_icon_path, "wb") as f:

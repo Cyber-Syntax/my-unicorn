@@ -17,6 +17,9 @@ class CommandInvoker:
         if command:
             try:
                 command.execute()
+            except KeyboardInterrupt:
+                logging.info("Command execution interrupted by user (Ctrl+C)")
+                print("\nCommand interrupted. Returning to main menu...")
             except TypeError as e:
                 logging.error(f"Type error occurred: {e}")
                 print(f"Error: {e}. Please check your configuration files.")

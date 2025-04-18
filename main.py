@@ -16,6 +16,7 @@ from src.commands.update_all_auto import UpdateAllAutoCommand
 from src.commands.delete_backups import DeleteBackupsCommand
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
+from src.auth_manager import GitHubAuthManager
 
 _ = gettext.gettext
 
@@ -29,6 +30,27 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
 def get_user_choice():
     """Display menu and get user choice"""
     print(_("Welcome to my-unicorn 🦄!"))
+
+    # Display GitHub API rate limit info if available
+    try:
+        remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+        if is_authenticated:
+            print(_("GitHub API: {} of {} requests remaining (estimate)").format(remaining, limit))
+            if remaining < 100:
+                print(_("⚠️ Running low on API requests! Resets at {}").format(reset_time))
+        else:
+            # For unauthenticated users, only show if it's low
+            if remaining < 20:
+                print(
+                    _("⚠️ GitHub API: {} of 60 requests remaining (unauthenticated)").format(
+                        remaining
+                    )
+                )
+                print(_("Add a token using option 6 to get 5000 requests/hour"))
+    except Exception as e:
+        # Silently handle any errors to avoid breaking the main menu
+        logging.debug(f"Error checking rate limits: {e}")
+
     print(_("Choose one of the following options:"))
     print("====================================")
     print(_("1. Download AppImage (Must be installed to create config file)"))
@@ -43,11 +65,15 @@ def get_user_choice():
     print("====================================")
     try:
         return int(input(_("Enter your choice: ")))
-    except (ValueError, KeyboardInterrupt) as error:
+    except ValueError as error:
         logging.error(f"Error: {error}", exc_info=True)
         logging.error("Error: {error}. Exiting...".format(error=error))
         print(_("Error: {error}. Exiting...").format(error=error))
         sys.exit(1)
+    except KeyboardInterrupt:
+        logging.info("User interrupted the program with Ctrl+C")
+        print("\n" + _("Program interrupted. Exiting gracefully..."))
+        sys.exit(0)
 
 
 def configure_logging():

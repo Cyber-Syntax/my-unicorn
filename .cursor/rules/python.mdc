@@ -58,23 +58,7 @@ You are an AI assistant specialized in Python development with the following foc
 
 ## 4. Performance Optimization
 
-- **Asynchronous Programming:** Leverage `async` and `await` for I/O-bound operations to maximize concurrency
-- **Caching:** Apply `functools.lru_cache`, `@cache` (Python 3.9+), or `fastapi.Depends` caching where appropriate
-- **Resource Monitoring:** Use `psutil` or similar to monitor resource usage and identify bottlenecks
 - **Memory Efficiency:** Ensure proper release of unused resources to prevent memory leaks
-- **Concurrency:** Employ `concurrent.futures` or `asyncio` to manage concurrent tasks effectively
-- **Database Best Practices:** Design database schemas efficiently, optimize queries, and use indexes wisely
-
-## 5. API Development with FastAPI
-
-- **Data Validation:** Use Pydantic models for rigorous request and response data validation
-- **Dependency Injection:** Effectively use FastAPI's dependency injection for managing dependencies
-- **Routing:** Define clear and RESTful API routes using FastAPI's `APIRouter`
-- **Background Tasks:** Utilize FastAPI's `BackgroundTasks` or integrate with Celery for background processing
-- **Security:** Implement robust authentication and authorization (e.g., OAuth 2.0, JWT)
-- **Documentation:** Auto-generate API documentation using FastAPI's OpenAPI support
-- **Versioning:** Plan for API versioning from the start (e.g., using URL prefixes or headers)
-- **CORS:** Configure Cross-Origin Resource Sharing (CORS) settings correctly
 
 # Code Example Requirements
 
@@ -85,6 +69,8 @@ You are an AI assistant specialized in Python development with the following foc
 - Include error handling
 - Use `ruff` for code formatting
 - Preserve existing comments in any file being modified
+- API requests, use the appropriate header like `Authorization: Bearer <token>`
+- Always use HTTPS endpoints when transmitting API tokens to ensure data is encrypted over the wire. 
 
 # Testing Guidelines
 

@@ -14,24 +14,29 @@ class UpdateCommand(BaseUpdateCommand):
 
     def execute(self):
         """Main update execution flow with user selection."""
-        # Load global configuration
-        self.global_config.load_config()
+        try:
+            # Load global configuration
+            self.global_config.load_config()
 
-        # 1. Find updatable apps via user selection
-        updatable = self._find_updatable_apps()
-        if not updatable:
-            logging.info("No AppImages selected for update or all are up to date")
-            print("No AppImages selected for update or all are up to date!")
+            # 1. Find updatable apps via user selection
+            updatable = self._find_updatable_apps()
+            if not updatable:
+                logging.info("No AppImages selected for update or all are up to date")
+                print("No AppImages selected for update or all are up to date!")
+                return
+
+            # 2. Get user confirmation
+            if not self._confirm_updates(updatable):
+                logging.info("Update cancelled by user")
+                print("Update cancelled")
+                return
+
+            # 3. Perform updates
+            self._update_apps(updatable)
+        except KeyboardInterrupt:
+            logging.info("Operation cancelled by user (Ctrl+C)")
+            print("\nOperation cancelled by user (Ctrl+C)")
             return
-
-        # 2. Get user confirmation
-        if not self._confirm_updates(updatable):
-            logging.info("Update cancelled by user")
-            print("Update cancelled")
-            return
-
-        # 3. Perform updates
-        self._update_apps(updatable)
 
     def _find_updatable_apps(self) -> List[Dict[str, Any]]:
         """
@@ -73,7 +78,12 @@ class UpdateCommand(BaseUpdateCommand):
 
         # Display list of apps to update
         self._display_update_list(updatable)
-        return input("\nProceed with updates? [y/N]: ").strip().lower() == "y"
+        try:
+            return input("\nProceed with updates? [y/N]: ").strip().lower() == "y"
+        except KeyboardInterrupt:
+            logging.info("Confirmation cancelled by user (Ctrl+C)")
+            print("\nConfirmation cancelled by user (Ctrl+C)")
+            return False
 
     def _update_apps(self, apps_to_update: List[Dict[str, Any]]) -> None:
         """
@@ -82,10 +92,5 @@ class UpdateCommand(BaseUpdateCommand):
         Args:
             apps_to_update: List of app information dictionaries to update
         """
-        logging.info(f"Beginning update of {len(apps_to_update)} AppImages")
-
-        # Process each app one by one
-        for app_data in apps_to_update:
-            self._update_single_app(app_data, is_batch=(len(apps_to_update) > 1))
-
-        print("\nUpdate process completed!")
+        # Call the base class implementation which now includes rate limit display
+        super()._update_apps(apps_to_update)

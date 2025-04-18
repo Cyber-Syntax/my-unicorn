@@ -1,35 +1,46 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+GitHub API handler module.
+
+This module provides functionality for interacting with the GitHub API.
+"""
+
 import logging
 import platform
 import re
 import os
 import requests
 from datetime import datetime
-from typing import Dict, Optional, List
+from typing import Dict, Any, Optional, List, Tuple, Union
 
 from src.icon_manager import IconManager
 from src.auth_manager import GitHubAuthManager
 
+# Configure module logger
+logger = logging.getLogger(__name__)
+
 
 class GitHubAPI:
-    """Handles interaction with the GitHub API to fetch release information."""
+    """Handler for GitHub API requests."""
 
     def __init__(
         self,
         owner: str,
         repo: str,
-        sha_name: str = None,
+        sha_name: str = "sha256",
         hash_type: str = "sha256",
-        arch_keyword: str = None,
+        arch_keyword: Optional[str] = None,
     ):
         """
-        Initialize the GitHub API client with repository information.
+        Initialize the GitHub API handler.
 
         Args:
-            owner: GitHub repository owner/organization
-            repo: GitHub repository name
-            sha_name: Name of SHA hash file (if known)
-            hash_type: Type of hash for verification (sha256, sha512)
-            arch_keyword: Architecture-specific keyword for file matching
+            owner: Repository owner/organization
+            repo: Repository name
+            sha_name: Name of the sha algorithm used in the release assets
+            hash_type: Type of hash to use for file verification
+            arch_keyword: Architecture keyword to filter releases
         """
         self.owner = owner
         self.repo = repo
@@ -39,81 +50,372 @@ class GitHubAPI:
         self.sha_url = None
         self.appimage_url = None
         self.appimage_name = None
-        self.arch_keyword = arch_keyword
+        self._arch_keyword = arch_keyword
         self.arch_keywords = self._get_arch_keywords()
-        # Initialize headers with authentication if available
+        # Get authentication headers from GitHubAuthManager
         self._headers = GitHubAuthManager.get_auth_headers()
+        self._icon_manager = IconManager()
+        logger.debug(f"API initialized for {owner}/{repo} with auth headers")
 
     def _get_arch_keywords(self) -> List[str]:
         """
-        Get architecture-specific keywords for the current system.
+        Get architecture-specific keywords based on the current platform.
 
         Returns:
-            list: Architecture keywords for the current platform
+            list: List of architecture keywords
         """
+        if self._arch_keyword:
+            return [self._arch_keyword]
+
+        system = platform.system().lower()
         machine = platform.machine().lower()
-        # Store the current system architecture for better matching
-        self.current_arch = machine
 
-        # Update keyword mapping with more specific keywords first (for better matching)
-        return {
-            "x86_64": ["x86_64", "x86-64", "amd64", "x64", "linux64"],
-            "amd64": ["amd64", "x86_64", "x86-64", "x64", "linux64"],
-            "armv7l": ["armv7l", "arm", "armhf"],
-            "aarch64": ["aarch64", "arm64"],
-        }.get(machine, [])
+        # Simplified architecture mapping based on system and machine
+        arch_map = {
+            "linux": {
+                "x86_64": ["x86_64", "amd64", "x64", "linux64"],
+                "aarch64": ["aarch64", "arm64", "aarch", "arm"],
+                "armv7l": ["armv7", "arm32", "armhf"],
+                "armv6l": ["armv6", "arm"],
+                "i686": ["i686", "x86", "i386", "linux32"],
+            },
+            "darwin": {
+                "x86_64": ["x86_64", "amd64", "x64", "darwin64", "macos"],
+                "arm64": ["arm64", "aarch64", "arm", "macos"],
+            },
+            "windows": {
+                "AMD64": ["x86_64", "amd64", "x64", "win64"],
+                "x86": ["x86", "i686", "i386", "win32"],
+                "ARM64": ["arm64", "aarch64", "arm"],
+            },
+        }
 
-    def get_response(self):
+        # Return default keywords for the current platform or empty list
+        default_keywords = arch_map.get(system, {}).get(machine, [])
+        if not default_keywords:
+            logger.warning(
+                f"No architecture keywords found for {system}/{machine}. "
+                "Using system name as fallback."
+            )
+            return [system]
+        return default_keywords
+
+    def get_response(self, per_page: int = 100) -> Tuple[bool, Union[Dict[str, str], str]]:
         """
-        Fetch release data with beta fallback handling.
+        Get the response from the GitHub API for releases.
+
+        Args:
+            per_page: Number of releases to fetch per page
 
         Returns:
-            dict or None: Processed release data or None if request failed
+            tuple: (Success flag, Response data or error message)
         """
+        api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases"
+        params = {"per_page": per_page}
+
         try:
-            # Try stable release first with auth headers
-            response = requests.get(
-                f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest",
+            # Use GitHubAuthManager for authenticated requests with rate limit handling
+            logger.debug(f"Fetching releases from {api_url}")
+            response = GitHubAuthManager.make_authenticated_request(
+                "GET",
+                api_url,
+                params=params,
                 headers=self._headers,
-                timeout=10,
+                timeout=30,
+                audit_action="fetch_releases",
             )
 
             if response.status_code == 200:
-                return self._process_release(response.json(), is_beta=False)
+                releases = response.json()
+                if not releases:
+                    logger.warning(f"No releases found for {self.owner}/{self.repo}")
+                    # Try beta/pre-releases if no stable releases found
+                    return self._check_for_beta_releases()
 
-            # Fallback to beta releases
-            response = requests.get(
-                f"https://api.github.com/repos/{self.owner}/{self.repo}/releases",
-                headers=self._headers,
-                timeout=10,
-            )
+                # Process the release data for update operations
+                # This ensures appimage_name, version, etc. are properly set
+                self._process_latest_release(releases)
 
-            if response.status_code == 200 and response.json():
-                return self._process_release(response.json()[0], is_beta=True)
-
-            # Handle rate limit explicitly
-            if response.status_code == 403 and "X-RateLimit-Remaining" in response.headers:
-                remaining = response.headers["X-RateLimit-Remaining"]
-                if remaining == "0":
-                    reset_time = int(response.headers["X-RateLimit-Reset"])
-                    reset_datetime = datetime.fromtimestamp(reset_time)
-                    error_msg = f"GitHub API rate limit exceeded. Resets at {reset_datetime}"
-                    logging.error(error_msg)
-                    print(f"Error: {error_msg}")
-                    print(
-                        "Tip: Add or update your GitHub token using option 6 in the main menu to increase rate limits."
-                    )
-                    return None
-
-            logging.error(f"Failed to fetch releases. Status code: {response.status_code}")
-            return None
+                return True, releases
+            elif response.status_code == 403 and "rate limit exceeded" in response.text.lower():
+                logger.warning("GitHub API rate limit exceeded, refreshing authentication")
+                self.refresh_auth()
+                # Return informative message to user
+                return False, "GitHub API rate limit exceeded. Please try again in a few minutes."
+            else:
+                error_msg = f"Failed to fetch releases: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                return False, error_msg
 
         except requests.exceptions.RequestException as e:
-            logging.error(f"Request failed: {e}")
+            logger.error(f"Request error fetching releases: {str(e)}")
+            return False, f"Network error: {str(e)}"
+        except Exception as e:
+            logger.error(f"Unexpected error fetching releases: {str(e)}")
+            return False, f"Error: {str(e)}"
+
+    def _process_latest_release(self, releases):
+        """
+        Process the latest release to set appimage_name, version, and other attributes.
+
+        Args:
+            releases: List of release data from GitHub API
+        """
+        try:
+            # Filter out draft releases
+            valid_releases = [r for r in releases if not r.get("draft", False)]
+
+            if not valid_releases:
+                logger.warning("No valid releases found after filtering drafts")
+                return
+
+            # Get the latest release (first in the list)
+            latest_release = valid_releases[0]
+
+            # Process with our existing method
+            logger.info(f"Processing latest release: {latest_release.get('tag_name')}")
+            result = self._process_release(latest_release, latest_release.get("prerelease", False))
+
+            if not result:
+                logger.warning("Failed to process release data")
+
+            # Ensure we have the required data
+            if not self.appimage_name or not self.appimage_url:
+                logger.warning("Missing appimage_name or appimage_url after processing release")
+
+        except Exception as e:
+            logger.error(f"Error processing latest release: {e}")
+
+    def _check_for_beta_releases(self) -> Tuple[bool, Union[Dict[str, str], str]]:
+        """
+        Check for beta/pre-releases if no stable releases found.
+
+        Returns:
+            tuple: (Success flag, Response data or error message)
+        """
+        api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases"
+        params = {"per_page": 100}
+
+        try:
+            # Explicitly request pre-releases by including all releases and filtering
+            response = GitHubAuthManager.make_authenticated_request(
+                "GET",
+                api_url,
+                params=params,
+                headers=self._headers,
+                timeout=30,
+                audit_action="fetch_beta_releases",
+            )
+
+            if response.status_code == 200:
+                releases = response.json()
+                if releases:
+                    logger.info(
+                        f"Found {len(releases)} beta/pre-releases for {self.owner}/{self.repo}"
+                    )
+                    # Process the beta release data
+                    self._process_latest_release(releases)
+                    return True, releases
+                return False, "No releases found (including pre-releases)"
+            else:
+                error_msg = (
+                    f"Failed to fetch beta releases: {response.status_code} - {response.text}"
+                )
+                logger.error(error_msg)
+                return False, error_msg
+
+        except Exception as e:
+            logger.error(f"Error checking beta releases: {str(e)}")
+            return False, f"Error checking beta releases: {str(e)}"
+
+    def check_latest_version(
+        self, current_version: Optional[str] = None
+    ) -> Tuple[bool, Dict[str, str]]:
+        """
+        Check if there's a newer version available.
+
+        Args:
+            current_version: Current version to compare against
+
+        Returns:
+            tuple: (Update available flag, Version information)
+        """
+        # First try to get stable (non-beta) releases
+        success, response = self.get_response(per_page=10)
+
+        if not success:
+            return False, {"error": str(response)}
+
+        try:
+            # Filter releases that aren't drafts, exclude pre-releases by default
+            stable_releases = [
+                r for r in response if not r.get("draft", False) and not r.get("prerelease", False)
+            ]
+
+            # If no stable releases found, check if this repo typically uses beta releases
+            # This could be based on repo name or other criteria
+            uses_beta = self._repo_uses_beta()
+
+            # If we couldn't find stable releases or this repo uses beta versions,
+            # include pre-releases as well
+            if not stable_releases or uses_beta:
+                logger.info(
+                    f"No stable releases found or repo {self.repo} uses beta. Including pre-releases."
+                )
+                releases = [r for r in response if not r.get("draft", False)]
+            else:
+                releases = stable_releases
+
+            if not releases:
+                return False, {"error": "No suitable releases found"}
+
+            latest_release = releases[0]
+            latest_version = latest_release.get("tag_name", "")
+
+            # Normalize version strings for proper comparison
+            current_version_clean = self._normalize_version_for_comparison(current_version)
+            latest_version_clean = self._normalize_version_for_comparison(latest_version)
+
+            logger.debug(
+                f"Comparing versions: Current '{current_version_clean}' vs Latest '{latest_version_clean}'"
+            )
+
+            # Check if update is available
+            update_available = False
+            if current_version_clean and latest_version_clean != current_version_clean:
+                # For repos that use beta versions, handle special comparison
+                if uses_beta:
+                    # For FreeTube: if current is X.Y.Z and latest is vX.Y.Z-beta, consider it the same version
+                    # Only consider it an update if the version numbers differ
+                    current_base = self._extract_base_version(current_version_clean)
+                    latest_base = self._extract_base_version(latest_version_clean)
+
+                    if current_base != latest_base:
+                        update_available = True
+                        logger.info(
+                            f"Update available for beta app: {current_version} → {latest_version}"
+                        )
+                else:
+                    # Standard comparison for non-beta apps
+                    update_available = True
+                    logger.info(f"Update available: {current_version} → {latest_version}")
+
+            # Get architecture keywords
+            arch_keywords = self._get_arch_keywords()
+
+            # Filter assets by architecture
+            compatible_assets = []
+            for asset in latest_release.get("assets", []):
+                asset_name = asset.get("name", "").lower()
+                if any(keyword.lower() in asset_name for keyword in arch_keywords):
+                    compatible_assets.append(asset)
+
+            return update_available, {
+                "current_version": current_version,
+                "latest_version": latest_version,
+                "release_notes": latest_release.get("body", ""),
+                "release_url": latest_release.get("html_url", ""),
+                "compatible_assets": compatible_assets,
+                "is_prerelease": latest_release.get("prerelease", False),
+                "published_at": latest_release.get("published_at", ""),
+            }
+
+        except Exception as e:
+            logger.error(f"Error parsing release information: {str(e)}")
+            return False, {"error": f"Error parsing release information: {str(e)}"}
+
+    def _normalize_version_for_comparison(self, version: Optional[str]) -> str:
+        """
+        Normalize version string for consistent comparison.
+
+        Args:
+            version: Version string to normalize
+
+        Returns:
+            str: Normalized version string
+        """
+        if not version:
+            return ""
+
+        # Convert to lowercase for case-insensitive comparison
+        normalized = version.lower()
+
+        # Remove 'v' prefix if present
+        if normalized.startswith("v"):
+            normalized = normalized[1:]
+
+        return normalized
+
+    def _extract_base_version(self, version: str) -> str:
+        """
+        Extract the base version number without beta/alpha suffixes.
+
+        Args:
+            version: Version string to extract from
+
+        Returns:
+            str: Base version number (e.g., "0.23.3" from "0.23.3-beta")
+        """
+        # Split on common version separators
+        for separator in ["-", "+", "_"]:
+            if separator in version:
+                return version.split(separator)[0]
+
+        return version
+
+    def _repo_uses_beta(self) -> bool:
+        """
+        Determine if this repository typically uses beta/pre-releases.
+
+        Returns:
+            bool: True if the repository typically uses beta releases
+        """
+        # List of repos that are known to use beta releases
+        beta_repos = ["FreeTube"]
+
+        # Check if the current repo is in the list
+        if self.repo in beta_repos:
+            logger.info(f"Repository {self.repo} is configured to use beta releases")
+            return True
+
+        return False
+
+    def find_app_icon(self) -> Optional[Dict[str, Any]]:
+        """
+        Find application icon for the repository.
+
+        Uses IconManager with the current authentication headers.
+
+        Returns:
+            dict or None: Icon information dictionary or None if not found
+        """
+        try:
+            # Use the IconManager with current authentication headers
+            icon_info = self._icon_manager.find_icon(self.owner, self.repo, headers=self._headers)
+
+            if icon_info:
+                logger.info(f"Found app icon: {icon_info.get('name')}")
+                return icon_info
+
+            return None
+        except Exception as e:
+            logger.error(f"Error finding app icon: {str(e)}")
             return None
 
-    # HACK: to make the code work for complex version parsing
-    # TODO: need to refactor this method
+    def refresh_auth(self) -> None:
+        """
+        Refresh authentication headers.
+
+        This method should be called when encountering rate limits
+        or authentication issues.
+        """
+        logger.debug("Refreshing authentication headers")
+        # Clear cached headers in GitHubAuthManager
+        GitHubAuthManager.clear_cached_headers()
+        # Get fresh headers
+        self._headers = GitHubAuthManager.get_auth_headers()
+        logger.info("Authentication headers refreshed")
+
     def _process_release(self, release_data: dict, is_beta: bool):
         """Process release data with robust version parsing"""
         try:
@@ -144,7 +446,7 @@ class GitHubAPI:
                 "sha_name": self.sha_name,
                 "hash_type": self.hash_type,
                 "appimage_name": self.appimage_name,
-                "arch_keyword": self.arch_keyword,
+                "arch_keyword": self._arch_keyword,
                 "appimage_url": self.appimage_url,
                 "sha_url": self.sha_url,
             }
@@ -190,23 +492,42 @@ class GitHubAPI:
         Args:
             assets: List of release assets from GitHub API
         """
-        logging.info(f"Current arch_keyword: {self.arch_keyword}")
-        logging.info(
-            f"Current system architecture: {getattr(self, 'current_arch', platform.machine().lower())}"
-        )
+        # Current system architecture for logging
+        current_arch = platform.machine().lower()
+        logging.info(f"Current arch_keyword: {self._arch_keyword}")
+        logging.info(f"Current system architecture: {current_arch}")
+
+        # Get incompatible architectures to explicitly filter out
+        incompatible_archs = self._get_incompatible_archs(current_arch)
+        logging.info(f"Filtering out incompatible architectures: {incompatible_archs}")
 
         # Filter all AppImage files
         appimages = [a for a in assets if a["name"].lower().endswith(".appimage")]
 
-        if not appimages:
+        # First filter out incompatible architectures
+        compatible_appimages = []
+        for appimage in appimages:
+            asset_name = appimage["name"].lower()
+            # Skip assets with incompatible architecture markers
+            if any(arch in asset_name for arch in incompatible_archs):
+                logging.info(f"Skipping incompatible architecture: {asset_name}")
+                continue
+            compatible_appimages.append(appimage)
+
+        # Use compatible AppImages for further processing, or fall back to all if none are compatible
+        filtered_appimages = compatible_appimages if compatible_appimages else appimages
+
+        if not filtered_appimages:
             raise ValueError("No AppImage files found in release")
 
+        logging.info(f"Found {len(filtered_appimages)} potentially compatible AppImages")
+
         # 1. Try to match based on previously saved arch_keyword (exact ending)
-        if self.arch_keyword:
+        if self._arch_keyword:
             # Create a regex pattern that matches the arch_keyword at the end of the string.
-            pattern = re.compile(re.escape(self.arch_keyword.strip().lower()) + r"\Z")
-            logging.info(f"Trying to find match with arch keyword: {self.arch_keyword}")
-            for asset in appimages:
+            pattern = re.compile(re.escape(self._arch_keyword.strip().lower()) + r"\Z")
+            logging.info(f"Trying to find match with arch keyword: {self._arch_keyword}")
+            for asset in filtered_appimages:
                 asset_name = asset["name"].strip().lower()
                 logging.info(f"Checking asset: {asset_name}")
                 if pattern.search(asset_name):
@@ -216,11 +537,9 @@ class GitHubAPI:
         # 2. Filter by current architecture keywords with stronger matching
         candidates = []
         exact_arch_match = None
+        current_arch_keywords = self.arch_keywords
 
-        # Current architecture to find a perfect match
-        current_arch = getattr(self, "current_arch", platform.machine().lower())
-
-        for asset in appimages:
+        for asset in filtered_appimages:
             name = asset["name"].lower()
 
             # Look for exact architecture match first (highest priority)
@@ -229,7 +548,7 @@ class GitHubAPI:
                 break
 
             # Otherwise collect candidates based on architecture keywords
-            if any(kw in name for kw in self.arch_keywords):
+            if any(kw in name for kw in current_arch_keywords):
                 candidates.append(asset)
 
         # If we found an exact architecture match, use it immediately
@@ -248,15 +567,117 @@ class GitHubAPI:
             self._select_from_list(candidates)
             return
 
-        # Auto select if only one AppImage is left
-        if len(appimages) == 1:
-            self._select_appimage(appimages[0])
+        # 4. For generic Linux builds without architecture in name, prefer those
+        generic_linux_builds = [
+            asset
+            for asset in filtered_appimages
+            if "linux" in asset["name"].lower()
+            and not any(
+                arch in asset["name"].lower()
+                for arch in [
+                    "arm",
+                    "arm64",
+                    "aarch64",
+                    "armhf",
+                    "arm32",
+                    "x86_64",
+                    "amd64",
+                    "i686",
+                    "i386",
+                ]
+            )
+        ]
+
+        if len(generic_linux_builds) == 1:
+            logging.info(f"Found generic Linux build: {generic_linux_builds[0]['name']}")
+            self._select_appimage(generic_linux_builds[0])
+            return
+        elif generic_linux_builds:
+            logging.info(f"Found {len(generic_linux_builds)} generic Linux builds")
+            print(f"Found {len(generic_linux_builds)} generic Linux builds:")
+            self._select_from_list(generic_linux_builds)
             return
 
-        # 4. Fallback to asking user to choose from all AppImages
-        logging.info("No architecture-specific builds found, select from all AppImages")
-        print("No architecture-specific builds found, select from all AppImages:")
-        self._select_from_list(appimages)
+        # 5. Auto select if only one AppImage is left
+        if len(filtered_appimages) == 1:
+            self._select_appimage(filtered_appimages[0])
+            return
+
+        # 6. Fallback to asking user to choose from all compatible AppImages
+        logging.info("No architecture-specific builds found, select from compatible AppImages")
+        print("Please select the AppImage appropriate for your system:")
+        self._select_from_list(filtered_appimages)
+
+    def _get_incompatible_archs(self, current_arch: str) -> List[str]:
+        """
+        Get a list of architecture keywords that are incompatible with the current architecture.
+
+        Args:
+            current_arch: Current system architecture
+
+        Returns:
+            list: List of incompatible architecture keywords to filter out
+        """
+        # Define incompatible architectures based on current architecture
+        incompatible_map = {
+            # On x86_64, filter out ARM and 32-bit architectures
+            "x86_64": [
+                "arm64",
+                "aarch64",
+                "armhf",
+                "arm32",
+                "armv7",
+                "armv6",
+                "i686",
+                "i386",
+                "arm-",
+                "-arm",
+                "win",
+                "windows",
+                "darwin",
+                "mac",
+                "osx",
+            ],
+            # On ARM, filter out x86_64 and other incompatible architectures
+            "aarch64": [
+                "x86_64",
+                "amd64",
+                "i686",
+                "i386",
+                "win",
+                "windows",
+                "darwin",
+                "mac",
+                "osx",
+            ],
+            "arm64": ["x86_64", "amd64", "i686", "i386", "win", "windows", "darwin", "mac", "osx"],
+            # On 32-bit x86, filter out 64-bit and ARM
+            "i686": [
+                "x86_64",
+                "amd64",
+                "arm64",
+                "aarch64",
+                "win",
+                "windows",
+                "darwin",
+                "mac",
+                "osx",
+            ],
+            "i386": [
+                "x86_64",
+                "amd64",
+                "arm64",
+                "aarch64",
+                "win",
+                "windows",
+                "darwin",
+                "mac",
+                "osx",
+            ],
+        }
+
+        # Return incompatible architectures or empty list if not defined
+        return incompatible_map.get(current_arch, [])
 
     def _select_from_list(self, appimages):
         """User selection handler with persistence"""
@@ -282,23 +703,22 @@ class GitHubAPI:
         self.appimage_url = asset["browser_download_url"]
         self.appimage_name = asset["name"]
         logging.info(f"Selected: {self.appimage_name}")
-        print(f"Selected: {self.appimage_name}")
         # Extract an arch keyword from the selected asset name.
         # Prioritize more specific identifiers.
         lower_name = self.appimage_name.lower()
         for key in ["arm64", "aarch64", "amd64", "x86_64"]:
             if key in lower_name:
-                self.arch_keyword = f"-{key}.appimage"
+                self._arch_keyword = f"-{key}.appimage"
                 break
         else:
             # If no specific keyword is found, fallback to a default pattern.
             # For instance, extract the substring starting with "-linux"
             match = re.search(r"(-linux(?:64)?\.appimage)$", lower_name)
             if match:
-                self.arch_keyword = match.group(1)
+                self._arch_keyword = match.group(1)
             else:
                 # Last resort: use the file extension (this is less specific)
-                self.arch_keyword = ".appimage"
+                self._arch_keyword = ".appimage"
 
     def _find_sha_asset(self, assets: list):
         """
@@ -488,7 +908,6 @@ class GitHubAPI:
             self.hash_type = user_input if user_input else default
 
         logging.info(f"Selected SHA file: {self.sha_name} (hash type: {self.hash_type})")
-        print(f"Selected SHA file: {self.sha_name} (hash type: {self.hash_type})")
 
     def _select_sha_from_list(self, sha_assets):
         """Simple user selection prompt"""
@@ -523,89 +942,3 @@ class GitHubAPI:
             self.sha_name = "no_sha_file"
             self.hash_type = "no_hash"
             logging.info("User chose to skip SHA verification")
-
-    def check_latest_version(
-        self, owner: Optional[str] = None, repo: Optional[str] = None
-    ) -> Optional[str]:
-        """
-        Check the latest version available for a repository.
-
-        Args:
-            owner: Repository owner/organization (defaults to self.owner)
-            repo: Repository name (defaults to self.repo)
-
-        Returns:
-            str or None: Latest version string or None if request failed
-        """
-        # Use instance values if parameters not provided
-        owner = owner or self.owner
-        repo = repo or self.repo
-
-        try:
-            # Ensure we have the latest authentication headers
-            headers = GitHubAuthManager.get_auth_headers()
-
-            # Fetch latest or beta latest release data with authentication
-            response = requests.get(
-                f"https://api.github.com/repos/{owner}/{repo}/releases/latest",
-                headers=headers,
-                timeout=10,
-            )
-            response_beta = requests.get(
-                f"https://api.github.com/repos/{owner}/{repo}/releases",
-                headers=headers,
-                timeout=10,
-            )
-
-            if response.status_code == 200:
-                latest_version = response.json()["tag_name"].replace("v", "")
-                logging.info(f"Found latest version: {latest_version}")
-                return latest_version
-            elif response_beta.status_code == 200 and response_beta.json():
-                latest_version = (
-                    response_beta.json()[0]["tag_name"].replace("v", "").replace("-beta", "")
-                )
-                logging.info(f"Found latest beta version: {latest_version}")
-                return latest_version
-            else:
-                # Check for rate limit issues
-                if response.status_code == 403 and "X-RateLimit-Remaining" in response.headers:
-                    remaining = response.headers["X-RateLimit-Remaining"]
-                    if remaining == "0":
-                        reset_time = int(response.headers["X-RateLimit-Reset"])
-                        reset_datetime = datetime.fromtimestamp(reset_time)
-                        logging.error(f"GitHub API rate limit exceeded. Resets at {reset_datetime}")
-                        print(f"Error: GitHub API rate limit exceeded. Resets at {reset_datetime}")
-                        print(
-                            "Tip: Add or update your GitHub token using option 6 in the main menu to increase rate limits."
-                        )
-                        return None
-
-                logging.error(f"Failed to fetch releases. Status code: {response.status_code}")
-                return None
-
-        except requests.exceptions.RequestException as e:
-            logging.error(f"GitHub API request failed: {e}")
-            return None
-
-    def find_app_icon(self) -> Optional[Dict[str, any]]:
-        """
-        Find the best icon for the app using IconManager.
-
-        Returns:
-            dict or None: Icon asset information or None if no suitable icon found.
-        """
-        # Use IconManager for icon discovery with proper authentication
-        icon_manager = IconManager()
-        # Use the auth headers we already have
-        icon_info = icon_manager.find_icon(self.owner, self.repo, headers=self._headers)
-        return icon_info  # May be None if not found
-
-    def refresh_auth(self) -> None:
-        """
-        Refresh the authentication headers to ensure token is current.
-
-        Call this method before making API requests if the token might have changed.
-        """
-        self._headers = GitHubAuthManager.get_auth_headers()
-

@@ -18,46 +18,43 @@ comments, and easier maintenance.
 #    - 'size': Preferred icon size to download (optional)
 #
 # Repository names should be lowercase for case-insensitive matching
-
 ICON_PATHS = {
-    # Default paths for all repositories (fallback)
-    "default": [
-        "assets/logo.png",
-        "assets/icon.png",
-        "assets/app-icon.png",
-        "assets/icons/icon.png",
-        "assets/icons/512x512.png",
-        "assets/icons/256x256.png",
-        "assets/icons/128x128.png",
-        "icons/512x512.png",
-        "icons/256x256.png",
-        "icons/icon.svg",
-        "resources/icons/512x512.png",
-        "build/icons/512x512.png",
-        "build/icons/256x256.png",
-        "build/icon.png",
-        "public/icon.png",
-        "src/assets/icons/icon.png",
-        "src/assets/icon.png",
-    ],
-    # Repository-specific configurations
-    "super-productivity": ["src/assets/icons/favicon-192x192.png"],
-    "joplin": ["Assets/LinuxIcons/256x256.png"],
-    "freetube": ["_icons/icon.svg"],
-    "appflowy": ["frontend/resources/flowy_icons/40x/app_logo.svg"],
-    # Standard Notes with direct path to icon file
+    "super-productivity": {
+        "exact_path": "src/assets/icons/favicon-192x192.png",
+        "paths": ["src/assets/icons/favicon-192x192.png"],
+        "filename": "superproductivity_icon.png",
+    },
+    "joplin": {
+        "exact_path": "Assets/LinuxIcons/256x256.png",
+        "paths": ["Assets/LinuxIcons/256x256.png"],
+        "filename": "joplin_icon.png",
+    },
+    "freetube": {
+        "exact_path": "_icons/icon.svg",
+        "paths": ["_icons/icon.svg"],
+        "filename": "freetube_icon.svg",
+    },
+    "appflowy": {
+        "exact_path": "frontend/resources/flowy_icons/40x/app_logo.svg",
+        "paths": ["frontend/resources/flowy_icons/40x/app_logo.svg"],
+        "filename": "appflowy_icon.svg",
+    },
+    "siyuan-note/siyuan": {
+        "exact_path": "app/src/assets/icon.png",
+        "paths": ["app/src/assets/icon.png"],
+        "filename": "siyuan_icon.png",
+    },
     "app": {
         "exact_path": "packages/clipper/images/icon128.png",
-        "filename": "icon.png",  # Save as icon.png
+        "filename": "standardnotes_icon.png",
         "paths": [
             "packages/clipper/images/icon128.png",
             "packages/desktop/app/icon/Icon-256x256.png",
         ],
     },
-    # Example with alternative owner/repo format
     "standardnotes/app": {
         "exact_path": "packages/clipper/images/icon128.png",
-        "filename": "icon.png",
+        "filename": "standardnotes_icon.png",
     },
     # Add more repository configurations as needed...
 }
