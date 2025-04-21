@@ -399,7 +399,7 @@ class SecureTokenManager:
         # Save updated metadata
         if KEYRING_AVAILABLE:
             try:
-                keyring_module.set_password(f"{SERVICE_NAME}_metadata", USERNAME, str(metadata))
+                keyring_module.set_password(f"{SERVICE_NAME}_metadata", USERNAME, json.dumps(metadata))
             except Exception as e:
                 logger.debug(f"Could not update token metadata in keyring: {e}")
         elif CRYPTO_AVAILABLE and TOKEN_METADATA_FILE.exists():
