@@ -925,7 +925,7 @@ class GitHubAPI:
     def _handle_sha_fallback(self, assets):
         """Original fallback logic with improved prompts"""
         logging.warning("Could not find SHA file automatically")
-        print("Could not find SHA file automatically")
+        print(f"Could not find SHA file automatically for {self.appimage_name}")
         print("1. Enter filename manually")
         print("2. Skip verification")
         choice = input("Your choice (1-2): ")

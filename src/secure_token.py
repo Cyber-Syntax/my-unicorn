@@ -9,6 +9,7 @@ keyring when available, with a fallback to encrypted file storage.
 
 import base64
 import getpass
+import json
 import logging
 import os
 import time
@@ -314,9 +315,10 @@ class SecureTokenManager:
                             f"{SERVICE_NAME}_metadata", USERNAME
                         )
                         if metadata_str:
-                            metadata = eval(metadata_str)  # Simple conversion from string to dict
-                    except Exception:
-                        logger.debug("Could not retrieve token metadata from keyring")
+                            metadata = json.loads(metadata_str)
+                    except json.JSONDecodeError:
+                        logger.debug("Could not parse token metadata")
+                        metadata = {}
 
                     if GNOME_KEYRING_AVAILABLE:
                         logger.info("Retrieved GitHub token from Seahorse/GNOME keyring")
@@ -343,8 +345,6 @@ class SecureTokenManager:
                 if TOKEN_METADATA_FILE.exists():
                     try:
                         with open(TOKEN_METADATA_FILE, "r") as f:
-                            import json
-
                             metadata = json.load(f)
                     except Exception as e:
                         logger.debug(f"Could not retrieve token metadata from file: {e}")
@@ -406,8 +406,6 @@ class SecureTokenManager:
             try:
                 temp_metadata_file = TOKEN_METADATA_FILE.with_suffix(".tmp")
                 with open(temp_metadata_file, "w") as f:
-                    import json
-
                     json.dump(metadata, f)
                 os.chmod(temp_metadata_file, 0o600)
                 os.replace(temp_metadata_file, TOKEN_METADATA_FILE)
@@ -429,16 +427,15 @@ class SecureTokenManager:
             try:
                 metadata_str = keyring_module.get_password(f"{SERVICE_NAME}_metadata", USERNAME)
                 if metadata_str:
-                    metadata = eval(metadata_str)  # Simple conversion from string to dict
-            except Exception as e:
-                logger.debug(f"Could not retrieve token metadata from keyring: {e}")
+                    metadata = json.loads(metadata_str)
+            except json.JSONDecodeError:
+                logger.debug(f"Could not decode token metadata from keyring")
+                metadata = {}
 
         # Try encrypted file as fallback
         if not metadata and CRYPTO_AVAILABLE and TOKEN_METADATA_FILE.exists():
             try:
                 with open(TOKEN_METADATA_FILE, "r") as f:
-                    import json
-
                     metadata = json.load(f)
             except Exception as e:
                 logger.debug(f"Could not retrieve token metadata from file: {e}")
@@ -895,7 +892,6 @@ class SecureTokenManager:
 
             # Write to audit log file
             audit_log_path = CONFIG_DIR / "token_audit.log"
-            import json
 
             with open(audit_log_path, "a") as f:
                 f.write(json.dumps(audit_entry) + "\n")
@@ -924,8 +920,6 @@ class SecureTokenManager:
             return audit_logs
 
         try:
-            import json
-
             with open(audit_log_path, "r") as f:
                 for line in f:
                     try:
@@ -1023,7 +1017,7 @@ class SecureTokenManager:
                 metadata["storage_status"] = "Active"
     
             # Store metadata separately
-            keyring_module.set_password(f"{SERVICE_NAME}_metadata", USERNAME, str(metadata))
+            keyring_module.set_password(f"{SERVICE_NAME}_metadata", USERNAME, json.dumps(metadata))
     
             if GNOME_KEYRING_AVAILABLE:
                 logger.info("GitHub token saved to Seahorse/GNOME keyring")
@@ -1089,7 +1083,6 @@ class SecureTokenManager:
             # Save metadata to separate file
             temp_metadata_file = TOKEN_METADATA_FILE.with_suffix(".tmp")
             with open(temp_metadata_file, "w") as f:
-                import json
                 json.dump(metadata, f)
     
             # Set secure file permissions before final move
@@ -1155,7 +1148,7 @@ class SecureTokenManager:
                 {"service": f"{SERVICE_NAME}_metadata"},
                 Secret.COLLECTION_DEFAULT,
                 "GitHub API Token Metadata",
-                str(metadata),
+                json.dumps(metadata),
                 None,
             )
     
