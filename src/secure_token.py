@@ -285,147 +285,6 @@ class SecureTokenManager:
     """
 
     @staticmethod
-    def save_token(token: str, expires_in_days: int = DEFAULT_TOKEN_EXPIRATION_DAYS) -> bool:
-        """
-        Save a GitHub token securely with expiration metadata.
-
-        Tries multiple storage methods in order of security preference:
-        1. Seahorse/GNOME keyring (if available)
-        2. KDE Wallet (if available)
-        3. Encrypted file (if cryptography module available)
-
-        Args:
-            token: The GitHub token to store
-            expires_in_days: Number of days until token expiration (default: 90)
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        if not token:
-            logger.warning("Attempted to save an empty token")
-            return False
-
-        # Generate token metadata
-        token_id = str(uuid.uuid4())
-        creation_time = int(time.time())
-        expiration_time = creation_time + (expires_in_days * 86400)  # Convert days to seconds
-
-        # Prepare metadata
-        metadata = {
-            "token_id": token_id,
-            "created_at": creation_time,
-            "expires_at": expiration_time,
-            "last_used_at": creation_time,
-            "scopes": "unknown",  # Will be updated when actually used with GitHub API
-            "storage_method": "Auto-detect",  # Will be updated based on actual storage
-            "storage_location": "Not yet determined",
-            "storage_status": "Pending",
-        }
-
-        # Try system keyring first (most secure)
-        if KEYRING_AVAILABLE:
-            try:
-                # Store token
-                keyring_module.set_password(SERVICE_NAME, USERNAME, token)
-
-                # Update metadata with storage information
-                if GNOME_KEYRING_AVAILABLE:
-                    metadata["storage_method"] = "GNOME keyring"
-                    metadata["storage_location"] = "Seahorse/GNOME keyring"
-                    metadata["storage_status"] = "Active"
-                    metadata["gnome_keyring_name"] = "login"
-                elif KDE_WALLET_AVAILABLE:
-                    metadata["storage_method"] = "KDE Wallet"
-                    metadata["storage_location"] = "KDE Wallet"
-                    metadata["storage_status"] = "Active"
-                else:
-                    metadata["storage_method"] = "System keyring"
-                    metadata["storage_location"] = "Default system keyring"
-                    metadata["storage_status"] = "Active"
-
-                # Store metadata separately
-                keyring_module.set_password(f"{SERVICE_NAME}_metadata", USERNAME, str(metadata))
-
-                if GNOME_KEYRING_AVAILABLE:
-                    logger.info("GitHub token saved to Seahorse/GNOME keyring")
-                elif KDE_WALLET_AVAILABLE:
-                    logger.info("GitHub token saved to KDE Wallet")
-                else:
-                    logger.info("GitHub token saved to system keyring")
-
-                return True
-            except Exception as e:
-                logger.warning(f"Could not save to system keyring: {e}")
-
-        # Try encrypted file storage as fallback
-        if CRYPTO_AVAILABLE:
-            try:
-                # Ensure config directory exists with proper permissions
-                os.makedirs(CONFIG_DIR, exist_ok=True)
-
-                # Set secure directory permissions (only user can access)
-                try:
-                    os.chmod(CONFIG_DIR, 0o700)
-                except OSError as e:
-                    logger.warning(f"Could not set secure permissions on config directory: {e}")
-
-                # Update metadata with storage information
-                metadata["storage_method"] = "Encrypted file"
-                metadata["storage_location"] = str(TOKEN_FILE)
-                metadata["storage_status"] = "Active"
-                metadata["encryption_type"] = "Fernet symmetric encryption"
-
-                # Generate or retrieve encryption key
-                key = SecureTokenManager._get_encryption_key()
-
-                # Encrypt and save token
-                fernet = Fernet(key)
-                encrypted_token = fernet.encrypt(token.encode("utf-8"))
-
-                # Use atomic write pattern with a temporary file
-                temp_token_file = TOKEN_FILE.with_suffix(".tmp")
-                with open(temp_token_file, "wb") as f:
-                    f.write(encrypted_token)
-
-                # Set secure file permissions before final move
-                os.chmod(temp_token_file, 0o600)
-
-                # Atomically replace the token file
-                os.replace(temp_token_file, TOKEN_FILE)
-
-                # Save metadata to separate file
-                temp_metadata_file = TOKEN_METADATA_FILE.with_suffix(".tmp")
-                with open(temp_metadata_file, "w") as f:
-                    import json
-
-                    json.dump(metadata, f)
-
-                # Set secure file permissions before final move
-                os.chmod(temp_metadata_file, 0o600)
-
-                # Atomically replace the metadata file
-                os.replace(temp_metadata_file, TOKEN_METADATA_FILE)
-
-                logger.info("GitHub token saved to encrypted file with expiration metadata")
-                return True
-            except Exception as e:
-                # Clean up temp files if they exist
-                for temp_file in [
-                    TOKEN_FILE.with_suffix(".tmp"),
-                    TOKEN_METADATA_FILE.with_suffix(".tmp"),
-                ]:
-                    if os.path.exists(temp_file):
-                        try:
-                            os.remove(temp_file)
-                        except:
-                            pass
-                logger.error(f"Failed to save token to encrypted file: {e}")
-
-        # If all else fails, indicate failure
-        logger.error("No secure storage method available for token")
-        return False
-
-    @staticmethod
     def get_token(validate_expiration: bool = True) -> str:
         """
         Retrieve the GitHub token from secure storage.
@@ -496,17 +355,27 @@ class SecureTokenManager:
         if token and validate_expiration and metadata:
             try:
                 now = int(time.time())
-                if "expires_at" in metadata and metadata["expires_at"] < now:
-                    logger.warning("Token has expired and is no longer valid")
-                    # Update usage stats but return empty token to indicate expiration
-                    SecureTokenManager._update_token_usage_stats(metadata)
-                    return ""
-
+                if "expires_at" in metadata:
+                    # Handle both string and integer timestamp formats
+                    expires_at = metadata["expires_at"]
+                    if isinstance(expires_at, str):
+                        try:
+                            # Try parsing as ISO format date first
+                            expires_at = int(datetime.datetime.fromisoformat(expires_at).timestamp())
+                        except ValueError:
+                            # Try parsing as a float/int string directly
+                            expires_at = int(float(expires_at))
+                        
+                    if expires_at < now:
+                        logger.warning("Token has expired and is no longer valid")
+                        # Update usage stats but return empty token to indicate expiration
+                        SecureTokenManager._update_token_usage_stats(metadata)
+                        return ""
                 # Update last used time
                 SecureTokenManager._update_token_usage_stats(metadata)
             except Exception as e:
                 logger.warning(f"Error validating token expiration: {e}")
-
+        
         # If no token was found
         if not token:
             logger.warning("No GitHub token found in secure storage")
@@ -580,7 +449,7 @@ class SecureTokenManager:
     def is_token_expired() -> bool:
         """
         Check if the current token has expired.
-
+    
         Returns:
             bool: True if token has expired or doesn't exist, False if valid
         """
@@ -588,33 +457,64 @@ class SecureTokenManager:
         if not metadata or "expires_at" not in metadata:
             # If we can't determine expiration, assume expired
             return True
-
-        now = int(time.time())
-        return metadata["expires_at"] < now
+    
+        try:
+            now = int(time.time())
+            # Handle both string and integer timestamp formats
+            expires_at = metadata["expires_at"]
+            if isinstance(expires_at, str):
+                try:
+                    # Try parsing as ISO format date first
+                    expires_at = int(datetime.datetime.fromisoformat(expires_at).timestamp())
+                except ValueError:
+                    # Try parsing as a float/int string directly
+                    expires_at = int(float(expires_at))
+            
+            return expires_at < now
+        except Exception as e:
+            logger.warning(f"Error checking token expiration: {e}")
+            return True  # Assume expired if there's an error
 
     @staticmethod
     def get_token_expiration_info() -> Tuple[bool, Optional[str]]:
         """
         Get token expiration information.
-
+    
         Returns:
             Tuple[bool, Optional[str]]: (is_expired, expiration_date_string)
         """
         metadata = SecureTokenManager.get_token_metadata()
         if not metadata or "expires_at" not in metadata:
             return True, None
-
-        now = int(time.time())
-        is_expired = metadata["expires_at"] < now
-
-        # Convert expiration timestamp to human-readable date
+    
         try:
-            expiration_date = datetime.datetime.fromtimestamp(metadata["expires_at"])
-            expiration_str = expiration_date.strftime("%Y-%m-%d %H:%M:%S")
-        except Exception:
-            expiration_str = None
-
-        return is_expired, expiration_str
+            now = int(time.time())
+            # Handle both string and integer timestamp formats
+            expires_at = metadata["expires_at"]
+            if isinstance(expires_at, str):
+                try:
+                    # Try parsing as ISO format date first
+                    from datetime import datetime
+                    expires_at_ts = int(datetime.fromisoformat(expires_at).timestamp())
+                except ValueError:
+                    # Try parsing as a float/int string directly
+                    expires_at_ts = int(float(expires_at))
+            else:
+                expires_at_ts = expires_at
+                
+            is_expired = expires_at_ts < now
+    
+            # Convert expiration timestamp to human-readable date
+            try:
+                expiration_date = datetime.fromtimestamp(expires_at_ts)
+                expiration_str = expiration_date.strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                expiration_str = None
+    
+            return is_expired, expiration_str
+        except Exception as e:
+            logger.warning(f"Error getting token expiration info: {e}")
+            return True, None  # Assume expired if there's an error
 
     @staticmethod
     def remove_token() -> bool:
@@ -797,12 +697,9 @@ class SecureTokenManager:
         return machine_id.encode("utf-8")
 
     @staticmethod
-    def prompt_for_token(hide_input: bool = True) -> str:
+    def prompt_for_token() -> str:
         """
         Securely prompt the user for a GitHub token.
-
-        Args:
-            hide_input: Whether to hide user input during entry
 
         Returns:
             str: The entered token or empty string if cancelled
@@ -812,10 +709,7 @@ class SecureTokenManager:
         print("Tip: For rate limits only, you can create a token with NO permissions/scopes")
 
         try:
-            if hide_input:
-                token = getpass.getpass("Token: ")
-            else:
-                token = input("Token: ")
+            token = getpass.getpass("Token: ")
             return token.strip()
         except (KeyboardInterrupt, EOFError):
             print("\nToken entry cancelled.")
@@ -1055,31 +949,27 @@ class SecureTokenManager:
         return audit_logs
 
     @staticmethod
-    def save_token_to_gnome_keyring(
-        token: str, expires_in_days: int = DEFAULT_TOKEN_EXPIRATION_DAYS
-    ) -> bool:
+    def _create_token_metadata(token: str, expires_in_days: int, storage_info: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """
-        Save a GitHub token explicitly to GNOME keyring with fallback.
-
-        This method tries to save the token specifically to GNOME keyring first.
-        If that fails, it falls back to the default save mechanism.
-
+        Create basic token metadata.
+        
         Args:
             token: The GitHub token to store
-            expires_in_days: Number of days until token expiration (default: 90)
-
+            expires_in_days: Number of days until token expiration
+            storage_info: Optional initial storage information
+            
         Returns:
-            bool: True if successful, False otherwise
+            Dict[str, Any]: Token metadata
         """
         if not token:
-            logger.warning("Attempted to save an empty token")
-            return False
-
+            logger.warning("Attempted to create metadata for an empty token")
+            return {}
+            
         # Generate token metadata
         token_id = str(uuid.uuid4())
         creation_time = int(time.time())
         expiration_time = creation_time + (expires_in_days * 86400)  # Convert days to seconds
-
+    
         # Prepare metadata
         metadata = {
             "token_id": token_id,
@@ -1087,133 +977,36 @@ class SecureTokenManager:
             "expires_at": expiration_time,
             "last_used_at": creation_time,
             "scopes": "unknown",  # Will be updated when actually used with GitHub API
-            "storage_method": "GNOME keyring (explicit)",
-            "storage_location": "Seahorse/GNOME keyring",
+            "storage_method": "Auto-detect",
+            "storage_location": "Not yet determined",
             "storage_status": "Pending",
-            "storage_preference": "GNOME keyring explicitly requested",
         }
-
-        # Check if GNOME keyring is available
-        if GNOME_KEYRING_AVAILABLE:
-            try:
-                # First try with the Python keyring interface
-                logger.info("Attempting to save token to GNOME keyring via python-keyring")
-                keyring_module.set_password(SERVICE_NAME, USERNAME, token)
-
-                # Update metadata with more specific storage details
-                metadata["storage_status"] = "Active"
-                metadata["storage_method_detail"] = "Python keyring with SecretService backend"
-
-                keyring_module.set_password(f"{SERVICE_NAME}_metadata", USERNAME, str(metadata))
-                logger.info("GitHub token saved to Seahorse/GNOME keyring")
-                return True
-            except Exception as e:
-                logger.warning(f"Failed to save to GNOME keyring via python-keyring: {e}")
-
-                # Try direct libsecret approach as backup
-                try:
-                    logger.info("Attempting to save token using direct libsecret bindings")
-                    import gi
-
-                    gi.require_version("Secret", "1.0")
-                    from gi.repository import Secret
-
-                    # Update metadata for direct libsecret approach
-                    metadata["storage_method_detail"] = "Direct libsecret via GObject Introspection"
-
-                    # Create a schema for our application
-                    schema = Secret.Schema.new(
-                        "org.myunicorn.auth",
-                        Secret.SchemaFlags.NONE,
-                        {"service": Secret.SchemaAttributeType.STRING},
-                    )
-
-                    # Store the token
-                    stored = Secret.password_store_sync(
-                        schema,
-                        {"service": SERVICE_NAME},
-                        Secret.COLLECTION_DEFAULT,
-                        "GitHub API Token",
-                        token,
-                        None,
-                    )
-
-                    # Store metadata
-                    metadata_stored = Secret.password_store_sync(
-                        schema,
-                        {"service": f"{SERVICE_NAME}_metadata"},
-                        Secret.COLLECTION_DEFAULT,
-                        "GitHub API Token Metadata",
-                        str(metadata),
-                        None,
-                    )
-
-                    if stored and metadata_stored:
-                        logger.info("GitHub token saved to GNOME keyring via libsecret")
-                        return True
-                    else:
-                        logger.warning("Failed to save to GNOME keyring via libsecret")
-                except Exception as e:
-                    logger.warning(f"Failed to save to GNOME keyring via libsecret: {e}")
-
-        # If we get here, GNOME keyring isn't available or all direct attempts failed
-        # Fall back to the default save mechanism, but update metadata to indicate fallback
-        logger.info("Falling back to default token save mechanism")
-
-        # Update metadata to indicate fallback
-        metadata["storage_method"] = "Fallback storage"
-        metadata["storage_status"] = "Fallback used"
-        metadata["fallback_reason"] = "GNOME keyring unavailable or access failed"
-
-        # Use the default save method with our updated metadata
-        return SecureTokenManager.save_token(token, expires_in_days)
-
+        
+        # Update with provided storage info if any
+        if storage_info:
+            metadata.update(storage_info)
+            
+        return metadata
+    
     @staticmethod
-    def save_token_directly_to_keyring(
-        token: str, expires_in_days: int = DEFAULT_TOKEN_EXPIRATION_DAYS
-    ) -> bool:
+    def _save_to_keyring(token: str, metadata: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
         """
-        Save a GitHub token directly to the system keyring without fallbacks.
-
-        This method attempts to save the token only to the system keyring and does
-        not fall back to other storage methods if that fails.
-
+        Save token to system keyring.
+        
         Args:
             token: The GitHub token to store
-            expires_in_days: Number of days until token expiration (default: 90)
-
+            metadata: Token metadata
+            
         Returns:
-            bool: True if successful, False otherwise
+            Tuple[bool, Dict[str, Any]]: (success, updated_metadata)
         """
-        if not token:
-            logger.warning("Attempted to save an empty token")
-            return False
-
         if not KEYRING_AVAILABLE:
-            logger.error("No keyring module available for token storage")
-            return False
-
-        # Generate token metadata
-        token_id = str(uuid.uuid4())
-        creation_time = int(time.time())
-        expiration_time = creation_time + (expires_in_days * 86400)  # Convert days to seconds
-
-        # Prepare metadata
-        metadata = {
-            "token_id": token_id,
-            "created_at": creation_time,
-            "expires_at": expiration_time,
-            "last_used_at": creation_time,
-            "scopes": "unknown",  # Will be updated when actually used with GitHub API
-            "storage_method": "Direct keyring",
-            "storage_location": "System keyring",
-            "storage_status": "Pending",
-        }
-
+            return False, metadata
+            
         try:
             # Store token
             keyring_module.set_password(SERVICE_NAME, USERNAME, token)
-
+    
             # Update metadata with storage information
             if GNOME_KEYRING_AVAILABLE:
                 metadata["storage_method"] = "GNOME keyring"
@@ -1228,18 +1021,258 @@ class SecureTokenManager:
                 metadata["storage_method"] = "System keyring"
                 metadata["storage_location"] = "Default system keyring"
                 metadata["storage_status"] = "Active"
-
+    
             # Store metadata separately
             keyring_module.set_password(f"{SERVICE_NAME}_metadata", USERNAME, str(metadata))
-
+    
             if GNOME_KEYRING_AVAILABLE:
-                logger.info("GitHub token saved directly to Seahorse/GNOME keyring")
+                logger.info("GitHub token saved to Seahorse/GNOME keyring")
             elif KDE_WALLET_AVAILABLE:
-                logger.info("GitHub token saved directly to KDE Wallet")
+                logger.info("GitHub token saved to KDE Wallet")
             else:
-                logger.info("GitHub token saved directly to system keyring")
-
-            return True
+                logger.info("GitHub token saved to system keyring")
+    
+            return True, metadata
         except Exception as e:
-            logger.error(f"Failed to save token directly to keyring: {e}")
+            logger.warning(f"Could not save to system keyring: {e}")
+            return False, metadata
+    
+    @staticmethod
+    def _save_to_encrypted_file(token: str, metadata: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Save token to encrypted file.
+        
+        Args:
+            token: The GitHub token to store
+            metadata: Token metadata
+            
+        Returns:
+            Tuple[bool, Dict[str, Any]]: (success, updated_metadata)
+        """
+        if not CRYPTO_AVAILABLE:
+            return False, metadata
+            
+        try:
+            # Ensure config directory exists with proper permissions
+            os.makedirs(CONFIG_DIR, exist_ok=True)
+    
+            # Set secure directory permissions (only user can access)
+            try:
+                os.chmod(CONFIG_DIR, 0o700)
+            except OSError as e:
+                logger.warning(f"Could not set secure permissions on config directory: {e}")
+    
+            # Update metadata with storage information
+            metadata["storage_method"] = "Encrypted file"
+            metadata["storage_location"] = str(TOKEN_FILE)
+            metadata["storage_status"] = "Active"
+            metadata["encryption_type"] = "Fernet symmetric encryption"
+    
+            # Generate or retrieve encryption key
+            key = SecureTokenManager._get_encryption_key()
+    
+            # Encrypt and save token
+            fernet = Fernet(key)
+            encrypted_token = fernet.encrypt(token.encode("utf-8"))
+    
+            # Use atomic write pattern with a temporary file
+            temp_token_file = TOKEN_FILE.with_suffix(".tmp")
+            with open(temp_token_file, "wb") as f:
+                f.write(encrypted_token)
+    
+            # Set secure file permissions before final move
+            os.chmod(temp_token_file, 0o600)
+    
+            # Atomically replace the token file
+            os.replace(temp_token_file, TOKEN_FILE)
+    
+            # Save metadata to separate file
+            temp_metadata_file = TOKEN_METADATA_FILE.with_suffix(".tmp")
+            with open(temp_metadata_file, "w") as f:
+                import json
+                json.dump(metadata, f)
+    
+            # Set secure file permissions before final move
+            os.chmod(temp_metadata_file, 0o600)
+    
+            # Atomically replace the metadata file
+            os.replace(temp_metadata_file, TOKEN_METADATA_FILE)
+    
+            logger.info("GitHub token saved to encrypted file with expiration metadata")
+            return True, metadata
+        except Exception as e:
+            # Clean up temp files if they exist
+            for temp_file in [TOKEN_FILE.with_suffix(".tmp"), TOKEN_METADATA_FILE.with_suffix(".tmp")]:
+                if os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                    except:
+                        pass
+            logger.error(f"Failed to save token to encrypted file: {e}")
+            return False, metadata
+    
+    @staticmethod
+    def _save_to_gnome_keyring_direct(token: str, metadata: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Save token directly to GNOME keyring using libsecret.
+        
+        Args:
+            token: The GitHub token to store
+            metadata: Token metadata
+            
+        Returns:
+            Tuple[bool, Dict[str, Any]]: (success, updated_metadata)
+        """
+        try:
+            logger.info("Attempting to save token using direct libsecret bindings")
+            import gi
+            gi.require_version("Secret", "1.0")
+            from gi.repository import Secret
+    
+            # Update metadata for direct libsecret approach
+            metadata["storage_method_detail"] = "Direct libsecret via GObject Introspection"
+    
+            # Create a schema for our application
+            schema = Secret.Schema.new(
+                "org.myunicorn.auth",
+                Secret.SchemaFlags.NONE,
+                {"service": Secret.SchemaAttributeType.STRING},
+            )
+    
+            # Store the token
+            stored = Secret.password_store_sync(
+                schema,
+                {"service": SERVICE_NAME},
+                Secret.COLLECTION_DEFAULT,
+                "GitHub API Token",
+                token,
+                None,
+            )
+    
+            # Store metadata
+            metadata_stored = Secret.password_store_sync(
+                schema,
+                {"service": f"{SERVICE_NAME}_metadata"},
+                Secret.COLLECTION_DEFAULT,
+                "GitHub API Token Metadata",
+                str(metadata),
+                None,
+            )
+    
+            if stored and metadata_stored:
+                logger.info("GitHub token saved to GNOME keyring via libsecret")
+                metadata["storage_status"] = "Active"
+                return True, metadata
+            else:
+                logger.warning("Failed to save to GNOME keyring via libsecret")
+                return False, metadata
+        except Exception as e:
+            logger.warning(f"Failed to save to GNOME keyring via libsecret: {e}")
+            return False, metadata
+    
+    @staticmethod
+    def save_token(token: str, expires_in_days: int = DEFAULT_TOKEN_EXPIRATION_DAYS, 
+                storage_preference: str = "auto") -> bool:
+        """
+        Save a GitHub token securely with expiration metadata.
+    
+        Tries multiple storage methods in order of security preference:
+        1. Seahorse/GNOME keyring (if available)
+        2. KDE Wallet (if available)
+        3. Encrypted file (if cryptography module available)
+    
+        Args:
+            token: The GitHub token to store
+            expires_in_days: Number of days until token expiration (default: 90)
+            storage_preference: Preferred storage method ("auto", "keyring", "gnome", "file")
+    
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not token:
+            logger.warning("Attempted to save an empty token")
             return False
+    
+        # Create metadata
+        metadata = SecureTokenManager._create_token_metadata(
+            token, expires_in_days, 
+            {"storage_preference": storage_preference}
+        )
+        
+        # Try system keyring first (most secure) if not explicitly requesting file storage
+        if storage_preference in ("auto", "keyring", "gnome") and KEYRING_AVAILABLE:
+            success, metadata = SecureTokenManager._save_to_keyring(token, metadata)
+            if success:
+                return True
+        
+        # Try GNOME keyring with direct libsecret if specifically requested
+        if storage_preference == "gnome" and not success and GNOME_KEYRING_AVAILABLE:
+            success, metadata = SecureTokenManager._save_to_gnome_keyring_direct(token, metadata)
+            if success:
+                return True
+                
+        # Try encrypted file storage as fallback if not explicitly requesting keyring-only
+        if storage_preference in ("auto", "file") and CRYPTO_AVAILABLE:
+            success, metadata = SecureTokenManager._save_to_encrypted_file(token, metadata)
+            if success:
+                return True
+    
+        # If all else fails, indicate failure
+        logger.error("No secure storage method available for token")
+        return False
+    
+    @staticmethod
+    def save_token_to_gnome_keyring(token: str, expires_in_days: int = DEFAULT_TOKEN_EXPIRATION_DAYS) -> bool:
+        """
+        Save a GitHub token explicitly to GNOME keyring with fallback.
+    
+        This method tries to save the token specifically to GNOME keyring first.
+        If that fails, it falls back to the default save mechanism.
+    
+        Args:
+            token: The GitHub token to store
+            expires_in_days: Number of days until token expiration (default: 90)
+    
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        return SecureTokenManager.save_token(token, expires_in_days, storage_preference="gnome")
+    
+    @staticmethod
+    def save_token_directly_to_keyring(token: str, expires_in_days: int = DEFAULT_TOKEN_EXPIRATION_DAYS, metadata: Dict[str, Any] = None) -> bool:
+        """
+        Save a GitHub token directly to the system keyring without fallbacks.
+    
+        This method attempts to save the token only to the system keyring and does
+        not fall back to other storage methods if that fails.
+    
+        Args:
+            token: The GitHub token to store
+            expires_in_days: Number of days until token expiration (default: 90)
+            metadata: Optional additional metadata to include
+    
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not token:
+            logger.warning("Attempted to save an empty token")
+            return False
+    
+        if not KEYRING_AVAILABLE:
+            logger.error("No keyring module available for token storage")
+            return False
+        
+        # Create base metadata with keyring preference
+        base_metadata = SecureTokenManager._create_token_metadata(
+            token, expires_in_days, 
+            {"storage_preference": "keyring_only"}
+        )
+        
+        # Update with any provided metadata
+        if metadata:
+            base_metadata.update(metadata)
+        
+        # Try to save to keyring
+        success, _ = SecureTokenManager._save_to_keyring(token, base_metadata)
+        return success
+        

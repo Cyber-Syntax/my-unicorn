@@ -466,7 +466,23 @@ class ManageTokenCommand(Command):
                         print(f"Type: {token_info.get('token_type', 'Unknown')}")
                     if token_info.get("scopes"):
                         print(f"Scopes: {', '.join(token_info.get('scopes', []))}")
-
+            
+                    # Check if days_until_rotation is a string and convert if needed
+                    if "days_until_rotation" in token_info and token_info["days_until_rotation"] is not None:
+                        days_until_rotation = token_info["days_until_rotation"]
+                        # Convert to int if it's a string
+                        if isinstance(days_until_rotation, str):
+                            try:
+                                days_until_rotation = int(days_until_rotation)
+                            except ValueError:
+                                days_until_rotation = None
+                                
+                        # Now it's safe to compare
+                        if days_until_rotation is not None and days_until_rotation <= 0:
+                            print("⚠️ Token scheduled for rotation on next use")
+                        elif days_until_rotation is not None:
+                            print(f"ℹ️ Token scheduled for rotation in {days_until_rotation} days")
+            
                     if token_info.get("is_fine_grained", False):
                         print("✅ Using fine-grained personal access token (recommended)")
                     elif token_info.get("is_classic", False):
@@ -475,7 +491,7 @@ class ManageTokenCommand(Command):
             except Exception as token_info_error:
                 self._logger.error(f"Error retrieving token information: {token_info_error}")
                 # Continue execution - token info is not critical
-
+    
         except Exception as e:
             # Log both the error type and the message for better debugging
             self._logger.error(f"Error checking rate limits: {type(e).__name__}: {str(e)}")
@@ -646,7 +662,7 @@ class ManageTokenCommand(Command):
             except Exception as e:
                 self._logger.error(f"Error processing last used date: {e}")
                 print("Last used: Unknown")
-
+            
     def _view_audit_logs(self) -> None:
         """
         Display token usage audit logs.
