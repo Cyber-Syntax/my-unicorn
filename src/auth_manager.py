@@ -564,7 +564,7 @@ class GitHubAuthManager:
                 if response.status_code == 200 and url.startswith("https://api.github.com"):
                     # Decrement the rate limit only for successful requests
                     cls._update_cached_rate_limit(1)
-
+                    
                 # Check if auth failed
                 if response.status_code in (401, 403) and retries < max_retries:
                     # Clear cached headers to force token refresh

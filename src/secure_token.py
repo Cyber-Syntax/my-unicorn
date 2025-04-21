@@ -1017,7 +1017,8 @@ class SecureTokenManager:
                 metadata["storage_status"] = "Active"
     
             # Store metadata separately
-            keyring_module.set_password(f"{SERVICE_NAME}_metadata", USERNAME, json.dumps(metadata))
+            metadata_json = json.dumps(metadata)
+            keyring_module.set_password(f"{SERVICE_NAME}_metadata", USERNAME, metadata_json)
     
             if GNOME_KEYRING_AVAILABLE:
                 logger.info("GitHub token saved to Seahorse/GNOME keyring")
@@ -1182,9 +1183,16 @@ class SecureTokenManager:
         Returns:
             bool: True if successful, False otherwise
         """
-        if not token:
-            logger.warning("Attempted to save an empty token")
+        import re
+        # Validate GitHub token format (ghp_, github_pat_, etc.)
+        if not re.match(r'^(ghp_|github_pat_|gho_|ghu_|ghs_|ghr_)?[a-zA-Z0-9_\-]+$', token):
+            logger.warning("Token appears to have an invalid format")
             return False
+            
+        # Validate token length (GitHub tokens are typically at least 40 chars)
+        if len(token) < 40:
+            logger.warning("Token appears to be too short to be valid")
+            return False       
     
         # Create metadata
         metadata = SecureTokenManager._create_token_metadata(
