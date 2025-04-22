@@ -13,6 +13,7 @@ import sys
 from typing import List, Dict, Any
 
 from src.commands.update_base import BaseUpdateCommand
+from src.auth_manager import GitHubAuthManager
 
 
 class UpdateAllAutoCommand(BaseUpdateCommand):
@@ -31,6 +32,44 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         try:
             # Load global configuration
             self.global_config.load_config()
+
+            # Check rate limits before proceeding with any API operations
+            # Get current rate limit information
+            remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+
+            # Calculate minimum requests needed (at least one per app config)
+            json_files = self._list_all_config_files()
+            if not json_files:
+                logging.warning("No AppImage configuration files found")
+                print("No AppImage configuration files found. Use the Download option first.")
+                return
+
+            # Each app will need at least one request
+            min_requests_needed = len(json_files)
+
+            # Check if we have enough requests to at least check all apps
+            if remaining < min_requests_needed:
+                logging.error(
+                    f"Insufficient API requests to check all apps: {remaining}/{min_requests_needed} available"
+                )
+                print("\n--- GitHub API Rate Limit Warning ---")
+                print(f"⚠️  Not enough API requests available to check all apps!")
+                print(
+                    f"Rate limit status: {remaining}/{limit} requests remaining{' (authenticated)' if is_authenticated else ' (unauthenticated)'}"
+                )
+
+                if reset_time:
+                    print(f"Limits reset at: {reset_time}")
+
+                print(f"Minimum requests required: {min_requests_needed} (one per app config)")
+
+                if not is_authenticated:
+                    print(
+                        "\n🔑 Please add a GitHub token using option 6 in the main menu to increase rate limits (5000/hour)."
+                    )
+
+                print("\nPlease try again later when more API requests are available.")
+                return
 
             # Find all updatable apps
             updatable_apps = self._find_all_updatable_apps()
@@ -175,23 +214,62 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
     def _update_apps(self, apps_to_update: List[Dict[str, Any]]) -> None:
         """
-        Update the specified apps.
+        Update the specified apps with rate limit awareness.
 
         Args:
             apps_to_update: List of app information dictionaries to update
         """
-        total_apps = len(apps_to_update)
-        is_batch = total_apps > 1
+        logging.info(f"Checking rate limits before updating {len(apps_to_update)} AppImages")
 
+        # Check if we have enough API requests available
+        can_proceed, filtered_apps, status_message = self._check_rate_limits(apps_to_update)
+
+        # Display rate limit status
+        print("\n--- GitHub API Rate Limit Check ---")
+        print(status_message)
+
+        if not can_proceed:
+            if not filtered_apps:
+                logging.warning("Update aborted: Insufficient API rate limits")
+                print("Update process aborted due to rate limit constraints.")
+                return
+
+            # Ask user if they want to proceed with partial updates
+            if not self.global_config.batch_mode:
+                try:
+                    continue_partial = (
+                        input(
+                            f"\nProceed with partial update ({len(filtered_apps)}/{len(apps_to_update)} apps)? [y/N]: "
+                        )
+                        .strip()
+                        .lower()
+                        == "y"
+                    )
+
+                    if not continue_partial:
+                        logging.info("User declined partial update")
+                        print("Update cancelled.")
+                        return
+                except KeyboardInterrupt:
+                    logging.info("Rate limit confirmation cancelled by user (Ctrl+C)")
+                    print("\nUpdate cancelled by user (Ctrl+C)")
+                    return
+
+            # Batch mode or user confirmed - proceed with partial update
+            apps_to_update = filtered_apps
+            print(f"\nProceeding with update of {len(apps_to_update)} apps within rate limits.")
+
+        # Continue with the regular update process
+        logging.info(f"Beginning update of {len(apps_to_update)} AppImages")
+        total_apps = len(apps_to_update)
         success_count = 0
         failure_count = 0
 
         try:
+            # Process each app one by one
             for index, app_data in enumerate(apps_to_update, 1):
-                print(f"\n[{index}/{total_apps}] Processing {app_data['name']}...")
                 try:
-                    success = self._update_single_app(app_data, is_batch=is_batch)
-
+                    success = self._update_single_app(app_data, is_batch=(len(apps_to_update) > 1))
                     if success:
                         success_count += 1
                     else:
@@ -201,7 +279,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                     print(f"\nUpdate of {app_data['name']} cancelled by user (Ctrl+C)")
                     failure_count += 1
                     # Ask if user wants to continue with remaining apps
-                    if index < total_apps and not is_batch:
+                    if index < total_apps and total_apps > 1:
                         try:
                             continue_update = (
                                 input("\nContinue with remaining updates? (y/N): ").strip().lower()
@@ -216,15 +294,15 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                             print("\nAll updates cancelled by user (Ctrl+C)")
                             break
 
-            # Print summary
+            # Show completion message
             print("\n=== Update Summary ===")
-            print(f"Total apps processed: {index if 'index' in locals() else 0}/{total_apps}")
+            print(f"Total apps processed: {success_count + failure_count}/{total_apps}")
             print(f"Successfully updated: {success_count}")
             if failure_count > 0:
                 print(f"Failed/cancelled updates: {failure_count}")
             print("Update process completed!")
 
-            # Display rate limit information after updates
+            # Display updated rate limit information after updates
             self._display_rate_limit_info()
         except KeyboardInterrupt:
             logging.info("Update process cancelled by user (Ctrl+C)")

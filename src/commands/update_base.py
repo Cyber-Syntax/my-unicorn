@@ -394,10 +394,17 @@ class BaseUpdateCommand(Command):
         failure_count = 0
 
         try:
+            # Check rate limits before proceeding
+            can_proceed, filtered_apps, rate_limit_message = self._check_rate_limits(apps_to_update)
+            print(rate_limit_message)
+            if not can_proceed:
+                print("Update process aborted due to rate limit constraints.")
+                return
+
             # Process each app one by one
-            for index, app_data in enumerate(apps_to_update, 1):
+            for index, app_data in enumerate(filtered_apps, 1):
                 try:
-                    success = self._update_single_app(app_data, is_batch=(len(apps_to_update) > 1))
+                    success = self._update_single_app(app_data, is_batch=(len(filtered_apps) > 1))
                     if success:
                         success_count += 1
                     else:
@@ -471,3 +478,99 @@ class BaseUpdateCommand(Command):
         except Exception as e:
             # Silently handle any errors to avoid breaking update completion
             logging.debug(f"Error displaying rate limit info: {e}")
+
+    def _check_rate_limits(
+        self, apps_to_update: List[Dict[str, Any]]
+    ) -> Tuple[bool, List[Dict[str, Any]], str]:
+        """
+        Check if updating the specified apps would exceed GitHub API rate limits.
+
+        Calculates required API requests and compares against remaining limits.
+        Each app update requires at least 1 API request, plus potentially 1 more for icon download.
+
+        Args:
+            apps_to_update: List of app information dictionaries to update
+
+        Returns:
+            Tuple containing:
+                - bool: True if update can proceed, False if rate limits would be exceeded
+                - List[Dict[str, Any]]: Filtered list of apps that can be updated within limits
+                - str: Message explaining rate limit status
+        """
+        # Get current rate limit information
+        remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+
+        # Calculate required API requests (1 for update check + potentially 1 for icon)
+        required_requests = 0
+        apps_with_icons = []
+
+        # First pass: determine which apps need icon downloads
+        for app_data in apps_to_update:
+            required_requests += 1  # Base request for update
+
+            # Check if app already has an icon
+            config_file = app_data["config_file"]
+            app_config = AppConfigManager()
+            app_config.load_appimage_config(config_file)
+
+            # Extract owner and repo for icon check
+            owner = app_config.owner
+            repo = app_config.repo
+
+            # Check if icon already exists
+            icon_path = os.path.join(
+                self.global_config.expanded_appimage_desktop_folder_path, f"{repo.lower()}.png"
+            )
+
+            if not os.path.exists(icon_path):
+                required_requests += 1  # Add request for icon download
+                apps_with_icons.append(app_data["name"])
+
+        # Determine if we have enough requests available
+        can_proceed = remaining >= required_requests
+
+        # Create status message
+        status_message = (
+            f"Rate limit status: {remaining}/{limit} requests remaining"
+            f"{' (authenticated)' if is_authenticated else ' (unauthenticated)'}\n"
+        )
+
+        if reset_time:
+            status_message += f"Resets at: {reset_time}\n"
+
+        status_message += f"Required API requests: {required_requests}\n"
+
+        if apps_with_icons:
+            status_message += f"Apps needing icon downloads ({len(apps_with_icons)}): {', '.join(apps_with_icons)}\n"
+
+        # If we can't proceed with all apps, determine how many we can update
+        if not can_proceed:
+            # Prioritize apps without icon downloads first (they use fewer requests)
+            prioritized_apps = []
+            remaining_requests = remaining
+
+            for app_data in apps_to_update:
+                app_name = app_data["name"]
+                requests_needed = 2 if app_name in apps_with_icons else 1
+
+                if remaining_requests >= requests_needed:
+                    prioritized_apps.append(app_data)
+                    remaining_requests -= requests_needed
+                else:
+                    break
+
+            if prioritized_apps:
+                status_message += (
+                    f"⚠️ WARNING: Not enough API requests for all updates.\n"
+                    f"Can update {len(prioritized_apps)}/{len(apps_to_update)} apps within current limits.\n"
+                    f"Consider adding a GitHub token to increase rate limits (5000/hour)."
+                )
+                return False, prioritized_apps, status_message
+            else:
+                status_message += (
+                    f"❌ ERROR: Not enough API requests to perform any updates.\n"
+                    f"Please wait until rate limits reset or add a GitHub token."
+                )
+                return False, [], status_message
+
+        return True, apps_to_update, status_message
