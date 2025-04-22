@@ -18,6 +18,8 @@ import datetime
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any, List
 
+from src.utils.datetime_utils import parse_timestamp, format_timestamp
+
 # Configure module logger
 logger = logging.getLogger(__name__)
 
@@ -356,26 +358,20 @@ class SecureTokenManager:
             try:
                 now = int(time.time())
                 if "expires_at" in metadata:
-                    # Handle both string and integer timestamp formats
-                    expires_at = metadata["expires_at"]
-                    if isinstance(expires_at, str):
-                        try:
-                            # Try parsing as ISO format date first
-                            expires_at = int(datetime.datetime.fromisoformat(expires_at).timestamp())
-                        except ValueError:
-                            # Try parsing as a float/int string directly
-                            expires_at = int(float(expires_at))
-                        
-                    if expires_at < now:
-                        logger.warning("Token has expired and is no longer valid")
-                        # Update usage stats but return empty token to indicate expiration
-                        SecureTokenManager._update_token_usage_stats(metadata)
-                        return ""
+                    # Use the utility function to parse timestamp
+                    expires_dt = parse_timestamp(metadata["expires_at"])
+                    if expires_dt:
+                        expires_at = int(expires_dt.timestamp())
+                        if expires_at < now:
+                            logger.warning("Token has expired and is no longer valid")
+                            # Update usage stats but return empty token to indicate expiration
+                            SecureTokenManager._update_token_usage_stats(metadata)
+                            return ""
                 # Update last used time
                 SecureTokenManager._update_token_usage_stats(metadata)
             except Exception as e:
                 logger.warning(f"Error validating token expiration: {e}")
-        
+
         # If no token was found
         if not token:
             logger.warning("No GitHub token found in secure storage")
@@ -399,7 +395,9 @@ class SecureTokenManager:
         # Save updated metadata
         if KEYRING_AVAILABLE:
             try:
-                keyring_module.set_password(f"{SERVICE_NAME}_metadata", USERNAME, json.dumps(metadata))
+                keyring_module.set_password(
+                    f"{SERVICE_NAME}_metadata", USERNAME, json.dumps(metadata)
+                )
             except Exception as e:
                 logger.debug(f"Could not update token metadata in keyring: {e}")
         elif CRYPTO_AVAILABLE and TOKEN_METADATA_FILE.exists():
@@ -446,7 +444,7 @@ class SecureTokenManager:
     def is_token_expired() -> bool:
         """
         Check if the current token has expired.
-    
+
         Returns:
             bool: True if token has expired or doesn't exist, False if valid
         """
@@ -454,20 +452,14 @@ class SecureTokenManager:
         if not metadata or "expires_at" not in metadata:
             # If we can't determine expiration, assume expired
             return True
-    
+
         try:
             now = int(time.time())
-            # Handle both string and integer timestamp formats
-            expires_at = metadata["expires_at"]
-            if isinstance(expires_at, str):
-                try:
-                    # Try parsing as ISO format date first
-                    expires_at = int(datetime.datetime.fromisoformat(expires_at).timestamp())
-                except ValueError:
-                    # Try parsing as a float/int string directly
-                    expires_at = int(float(expires_at))
-            
-            return expires_at < now
+            # Use the utility function to parse timestamp
+            expires_dt = parse_timestamp(metadata["expires_at"])
+            if expires_dt:
+                return expires_dt.timestamp() < now
+            return True  # Assume expired if parsing fails
         except Exception as e:
             logger.warning(f"Error checking token expiration: {e}")
             return True  # Assume expired if there's an error
@@ -476,38 +468,26 @@ class SecureTokenManager:
     def get_token_expiration_info() -> Tuple[bool, Optional[str]]:
         """
         Get token expiration information.
-    
+
         Returns:
             Tuple[bool, Optional[str]]: (is_expired, expiration_date_string)
         """
         metadata = SecureTokenManager.get_token_metadata()
         if not metadata or "expires_at" not in metadata:
             return True, None
-    
+
         try:
             now = int(time.time())
-            # Handle both string and integer timestamp formats
-            expires_at = metadata["expires_at"]
-            if isinstance(expires_at, str):
-                try:
-                    # Try parsing as ISO format date first
-                    from datetime import datetime
-                    expires_at_ts = int(datetime.fromisoformat(expires_at).timestamp())
-                except ValueError:
-                    # Try parsing as a float/int string directly
-                    expires_at_ts = int(float(expires_at))
-            else:
-                expires_at_ts = expires_at
-                
-            is_expired = expires_at_ts < now
-    
-            # Convert expiration timestamp to human-readable date
-            try:
-                expiration_date = datetime.fromtimestamp(expires_at_ts)
-                expiration_str = expiration_date.strftime("%Y-%m-%d %H:%M:%S")
-            except Exception:
-                expiration_str = None
-    
+            # Use the utility function to parse timestamp
+            expires_dt = parse_timestamp(metadata["expires_at"])
+            if not expires_dt:
+                return True, None
+
+            is_expired = expires_dt.timestamp() < now
+
+            # Format expiration date as string
+            expiration_str = format_timestamp(expires_dt)
+
             return is_expired, expiration_str
         except Exception as e:
             logger.warning(f"Error getting token expiration info: {e}")
@@ -943,27 +923,29 @@ class SecureTokenManager:
         return audit_logs
 
     @staticmethod
-    def _create_token_metadata(token: str, expires_in_days: int, storage_info: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    def _create_token_metadata(
+        token: str, expires_in_days: int, storage_info: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
         """
         Create basic token metadata.
-        
+
         Args:
             token: The GitHub token to store
             expires_in_days: Number of days until token expiration
             storage_info: Optional initial storage information
-            
+
         Returns:
             Dict[str, Any]: Token metadata
         """
         if not token:
             logger.warning("Attempted to create metadata for an empty token")
             return {}
-            
+
         # Generate token metadata
         token_id = str(uuid.uuid4())
         creation_time = int(time.time())
         expiration_time = creation_time + (expires_in_days * 86400)  # Convert days to seconds
-    
+
         # Prepare metadata
         metadata = {
             "token_id": token_id,
@@ -975,32 +957,32 @@ class SecureTokenManager:
             "storage_location": "Not yet determined",
             "storage_status": "Pending",
         }
-        
+
         # Update with provided storage info if any
         if storage_info:
             metadata.update(storage_info)
-            
+
         return metadata
-    
+
     @staticmethod
     def _save_to_keyring(token: str, metadata: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
         """
         Save token to system keyring.
-        
+
         Args:
             token: The GitHub token to store
             metadata: Token metadata
-            
+
         Returns:
             Tuple[bool, Dict[str, Any]]: (success, updated_metadata)
         """
         if not KEYRING_AVAILABLE:
             return False, metadata
-            
+
         try:
             # Store token
             keyring_module.set_password(SERVICE_NAME, USERNAME, token)
-    
+
             # Update metadata with storage information
             if GNOME_KEYRING_AVAILABLE:
                 metadata["storage_method"] = "GNOME keyring"
@@ -1015,88 +997,93 @@ class SecureTokenManager:
                 metadata["storage_method"] = "System keyring"
                 metadata["storage_location"] = "Default system keyring"
                 metadata["storage_status"] = "Active"
-    
+
             # Store metadata separately
             metadata_json = json.dumps(metadata)
             keyring_module.set_password(f"{SERVICE_NAME}_metadata", USERNAME, metadata_json)
-    
+
             if GNOME_KEYRING_AVAILABLE:
                 logger.info("GitHub token saved to Seahorse/GNOME keyring")
             elif KDE_WALLET_AVAILABLE:
                 logger.info("GitHub token saved to KDE Wallet")
             else:
                 logger.info("GitHub token saved to system keyring")
-    
+
             return True, metadata
         except Exception as e:
             logger.warning(f"Could not save to system keyring: {e}")
             return False, metadata
-    
+
     @staticmethod
-    def _save_to_encrypted_file(token: str, metadata: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
+    def _save_to_encrypted_file(
+        token: str, metadata: Dict[str, Any]
+    ) -> Tuple[bool, Dict[str, Any]]:
         """
         Save token to encrypted file.
-        
+
         Args:
             token: The GitHub token to store
             metadata: Token metadata
-            
+
         Returns:
             Tuple[bool, Dict[str, Any]]: (success, updated_metadata)
         """
         if not CRYPTO_AVAILABLE:
             return False, metadata
-            
+
         try:
             # Ensure config directory exists with proper permissions
             os.makedirs(CONFIG_DIR, exist_ok=True)
-    
+
             # Set secure directory permissions (only user can access)
             try:
                 os.chmod(CONFIG_DIR, 0o700)
             except OSError as e:
                 logger.warning(f"Could not set secure permissions on config directory: {e}")
-    
+
             # Update metadata with storage information
             metadata["storage_method"] = "Encrypted file"
             metadata["storage_location"] = str(TOKEN_FILE)
             metadata["storage_status"] = "Active"
             metadata["encryption_type"] = "Fernet symmetric encryption"
-    
+
             # Generate or retrieve encryption key
             key = SecureTokenManager._get_encryption_key()
-    
+
             # Encrypt and save token
             fernet = Fernet(key)
             encrypted_token = fernet.encrypt(token.encode("utf-8"))
-    
+
             # Use atomic write pattern with a temporary file
             temp_token_file = TOKEN_FILE.with_suffix(".tmp")
             with open(temp_token_file, "wb") as f:
                 f.write(encrypted_token)
-    
+
             # Set secure file permissions before final move
             os.chmod(temp_token_file, 0o600)
-    
+
             # Atomically replace the token file
             os.replace(temp_token_file, TOKEN_FILE)
-    
+
             # Save metadata to separate file
             temp_metadata_file = TOKEN_METADATA_FILE.with_suffix(".tmp")
             with open(temp_metadata_file, "w") as f:
                 json.dump(metadata, f)
-    
+
             # Set secure file permissions before final move
             os.chmod(temp_metadata_file, 0o600)
-    
+
             # Atomically replace the metadata file
             os.replace(temp_metadata_file, TOKEN_METADATA_FILE)
-    
+
             logger.info("GitHub token saved to encrypted file with expiration metadata")
             return True, metadata
         except Exception as e:
             # Clean up temp files if they exist
-            for temp_file in [TOKEN_FILE.with_suffix(".tmp"), TOKEN_METADATA_FILE.with_suffix(".tmp")]:
+            for temp_file in [
+                TOKEN_FILE.with_suffix(".tmp"),
+                TOKEN_METADATA_FILE.with_suffix(".tmp"),
+            ]:
                 if os.path.exists(temp_file):
                     try:
                         os.remove(temp_file)
@@ -1104,59 +1091,63 @@ class SecureTokenManager:
                         pass
             logger.error(f"Failed to save token to encrypted file: {e}")
             return False, metadata
-    
+
     @staticmethod
-    def save_token(token: str, expires_in_days: int = DEFAULT_TOKEN_EXPIRATION_DAYS, 
-                storage_preference: str = "auto", metadata: Optional[Dict[str, Any]] = None) -> bool:
+    def save_token(
+        token: str,
+        expires_in_days: int = DEFAULT_TOKEN_EXPIRATION_DAYS,
+        storage_preference: str = "auto",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> bool:
         """
         Save a GitHub token securely with expiration metadata.
-    
+
         Tries multiple storage methods in order of security preference:
         1. Seahorse/GNOME keyring (if available)
         2. KDE Wallet (if available)
         3. Encrypted file (if cryptography module available)
-    
+
         Args:
             token: The GitHub token to store
             expires_in_days: Number of days until token expiration (default: 90)
             storage_preference: Preferred storage method ("auto", "keyring", "gnome", "file")
             metadata: Optional additional metadata to include
-    
+
         Returns:
             bool: True if successful, False otherwise
         """
         import re
+
         # Validate GitHub token format (ghp_, github_pat_, etc.)
-        if not re.match(r'^(ghp_|github_pat_|gho_|ghu_|ghs_|ghr_)?[a-zA-Z0-9_\-]+$', token):
+        if not re.match(r"^(ghp_|github_pat_|gho_|ghu_|ghs_|ghr_)?[a-zA-Z0-9_\-]+$", token):
             logger.warning("Token appears to have an invalid format")
             return False
-            
+
         # Validate token length (GitHub tokens are typically at least 40 chars)
         if len(token) < 40:
             logger.warning("Token appears to be too short to be valid")
-            return False       
-    
+            return False
+
         # Create metadata
         metadata_dict = SecureTokenManager._create_token_metadata(
-            token, expires_in_days, 
-            {"storage_preference": storage_preference}
+            token, expires_in_days, {"storage_preference": storage_preference}
         )
-        
+
         # Update with any provided custom metadata
         if metadata:
             metadata_dict.update(metadata)
-        
+
         # Try system keyring first (most secure) if not explicitly requesting file storage
         if storage_preference in ("auto", "keyring", "keyring_only") and KEYRING_AVAILABLE:
             success, metadata_dict = SecureTokenManager._save_to_keyring(token, metadata_dict)
             if success:
                 return True
-                
+
         # If we've specified keyring_only but it failed, return failure
         if storage_preference == "keyring_only":
             logger.error("Failed to save to keyring and keyring_only mode was specified")
-            return False              
-                
+            return False
+
         # Try encrypted file storage as fallback if not explicitly requesting keyring-only
         if storage_preference in ("auto", "file") and CRYPTO_AVAILABLE:
             # Ask for user approval before using encrypted file storage
@@ -1164,17 +1155,19 @@ class SecureTokenManager:
                 print("\nKeyring storage failed or not available.")
                 print("The token can be stored in an encrypted file instead.")
                 print("This is less secure than a system keyring but still provides protection.")
-                
+
                 response = input("Would you like to save your token in an encrypted file? (y/n): ")
-                if response.lower() != 'y':
+                if response.lower() != "y":
                     logger.info("User declined fallback to encrypted file storage")
                     return False
-                    
+
             logger.info("Proceeding with encrypted file storage")
-            success, metadata_dict = SecureTokenManager._save_to_encrypted_file(token, metadata_dict)
+            success, metadata_dict = SecureTokenManager._save_to_encrypted_file(
+                token, metadata_dict
+            )
             if success:
                 return True
-    
+
         # If all else fails, indicate failure
         logger.error("No secure storage method available for token")
         return False

@@ -17,6 +17,8 @@ from datetime import datetime
 import requests
 
 from src.secure_token import SecureTokenManager
+from src.utils.datetime_utils import parse_timestamp, format_timestamp, get_next_hour_timestamp
+from src.utils.cache_utils import ensure_directory_exists, load_json_cache, save_json_cache
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -115,14 +117,16 @@ class GitHubAuthManager:
         is_expired, expiration_str = SecureTokenManager.get_token_expiration_info()
         if expiration_str:
             try:
-                expiration_dt = datetime.strptime(expiration_str, "%Y-%m-%d %H:%M:%S")
-                remaining = (expiration_dt - datetime.now()).total_seconds()
-                cache_validity = (
-                    min(cls._token_check_interval, remaining / 2)
-                    if remaining > 0
-                    else cls._token_check_interval
-                )
-                cls._cached_headers_expiration = time.time() + cache_validity
+                # Use our datetime utility to parse the expiration string
+                expiration_dt = parse_timestamp(expiration_str)
+                if expiration_dt:
+                    remaining = (expiration_dt - datetime.now()).total_seconds()
+                    cache_validity = (
+                        min(cls._token_check_interval, remaining / 2)
+                        if remaining > 0
+                        else cls._token_check_interval
+                    )
+                    cls._cached_headers_expiration = time.time() + cache_validity
             except Exception as e:
                 logger.warning(f"Error parsing token expiration info: {e}")
                 cls._cached_headers_expiration = time.time() + cls._token_check_interval
@@ -147,28 +151,28 @@ class GitHubAuthManager:
         cls._last_token = None
         cls._last_token_check = 0
         logger.debug("Cleared cached GitHub API authentication headers")
-    
+
     @classmethod
     def clear_rate_limit_cache(cls) -> None:
         """
         Clear the cached rate limit information.
-        
+
         This should be called when the authentication status changes,
-        especially when a token is removed to ensure the rate limits 
+        especially when a token is removed to ensure the rate limits
         properly reflect the unauthenticated state (60 requests/hour).
         """
         cls._rate_limit_cache = {}
         cls._rate_limit_cache_time = 0
         cls._request_count_since_cache = 0
-        
+
         # Calculate next hour boundary for unauthenticated limits
-        next_hour_timestamp = (int(time.time() / 3600) + 1) * 3600
+        next_hour_timestamp = get_next_hour_timestamp()
         next_hour = datetime.fromtimestamp(next_hour_timestamp)
-        
+
         # Set default unauthenticated rate limits
         cache_data = {
-            "remaining": 50,       # Start a bit below max to be conservative
-            "limit": 60,           # Unauthenticated limit is 60 per hour
+            "remaining": 50,  # Start a bit below max to be conservative
+            "limit": 60,  # Unauthenticated limit is 60 per hour
             "reset_formatted": next_hour.strftime("%Y-%m-%d %H:%M:%S"),
             "is_authenticated": False,
             "request_count": 0,
@@ -182,11 +186,10 @@ class GitHubAuthManager:
                 }
             },
         }
-        
+
         # Save to cache file
         cls._save_rate_limit_cache(cache_data)
         logger.info("Rate limit cache cleared and reset to unauthenticated limits (60/hour)")
-    
 
     @staticmethod
     def has_valid_token() -> bool:
@@ -220,7 +223,11 @@ class GitHubAuthManager:
 
         # Check if token is approaching expiration
         try:
-            expiration_date = datetime.strptime(expiration_str, "%Y-%m-%d %H:%M:%S")
+            # Use datetime utility to parse expiration
+            expiration_date = parse_timestamp(expiration_str)
+            if not expiration_date:
+                return False
+
             current_date = datetime.now()
 
             # Calculate days until expiration
@@ -233,17 +240,6 @@ class GitHubAuthManager:
             return False
 
     @classmethod
-    def _ensure_cache_dir(cls) -> str:
-        """
-        Ensure the cache directory exists.
-
-        Returns:
-            str: Path to the cache directory
-        """
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        return CACHE_DIR
-
-    @classmethod
     def _get_cache_file_path(cls) -> str:
         """
         Get the path to the rate limit cache file.
@@ -251,7 +247,7 @@ class GitHubAuthManager:
         Returns:
             str: Path to the cache file
         """
-        return os.path.join(cls._ensure_cache_dir(), "rate_limit_cache.json")
+        return os.path.join(ensure_directory_exists(CACHE_DIR), "rate_limit_cache.json")
 
     @classmethod
     def _load_rate_limit_cache(cls) -> Dict[str, Any]:
@@ -261,31 +257,11 @@ class GitHubAuthManager:
         Returns:
             dict: Rate limit cache or empty dict if no cache
         """
-        try:
-            cache_file = cls._get_cache_file_path()
-            if os.path.exists(cache_file):
-                with open(cache_file, "r") as f:
-                    data = json.load(f)
-                    # Check if cache is still valid
-                    current_time = time.time()
-                    cache_age = current_time - data.get("timestamp", 0)
-
-                    # If cache is still valid and not forced to refresh
-                    if cache_age < RATE_LIMIT_CACHE_TTL:
-                        # Reset request counter if loading from file
-                        if "request_count" in data:
-                            cls._request_count_since_cache = data.get("request_count", 0)
-                        return data
-                    # If cache is old but within the hard refresh limit, we can still use it
-                    # but reset the request counter to be safe
-                    elif cache_age < RATE_LIMIT_HARD_REFRESH:
-                        cls._request_count_since_cache = 0
-                        data["request_count"] = 0
-                        return data
-            return {}
-        except Exception as e:
-            logger.debug(f"Error loading rate limit cache: {e}")
-            return {}
+        return load_json_cache(
+            cls._get_cache_file_path(),
+            ttl_seconds=RATE_LIMIT_CACHE_TTL,
+            hard_refresh_seconds=RATE_LIMIT_HARD_REFRESH,
+        )
 
     @classmethod
     def _save_rate_limit_cache(cls, data: Dict[str, Any]) -> bool:
@@ -298,24 +274,12 @@ class GitHubAuthManager:
         Returns:
             bool: True if saved successfully, False otherwise
         """
-        try:
-            # Add timestamp and request count to cache
-            data["timestamp"] = time.time()
-            data["request_count"] = cls._request_count_since_cache
-            data["cache_ttl"] = RATE_LIMIT_CACHE_TTL
+        # Add request count to cache
+        data["request_count"] = cls._request_count_since_cache
+        data["cache_ttl"] = RATE_LIMIT_CACHE_TTL
 
-            # Save to file
-            cache_file = cls._get_cache_file_path()
-            # Write to temp file first for atomic update
-            temp_file = f"{cache_file}.tmp"
-            with open(temp_file, "w") as f:
-                json.dump(data, f)
-            # Atomic replace
-            os.replace(temp_file, cache_file)
-            return True
-        except Exception as e:
-            logger.debug(f"Error saving rate limit cache: {e}")
-            return False
+        # Save to file using our cache utility
+        return save_json_cache(cls._get_cache_file_path(), data)
 
     @classmethod
     def _update_cached_rate_limit(cls, decrement: int = 1) -> None:
@@ -345,6 +309,230 @@ class GitHubAuthManager:
             logger.debug(f"Updated cached rate limit: {new_remaining} (-{decrement}) remaining")
 
     @classmethod
+    def _core_rate_limit_data(
+        cls,
+        use_cache: bool = True,
+        custom_headers: Optional[Dict[str, str]] = None,
+        return_dict: bool = False,
+    ) -> Union[Tuple[int, int, str, bool], Dict[str, Any]]:
+        """
+        Core implementation for rate limit data retrieval.
+
+        This method handles both cached and live rate limit information.
+
+        Args:
+            use_cache: Whether to use cached data when available
+            custom_headers: Optional custom headers for API request
+            return_dict: If True, returns complete data dictionary
+
+        Returns:
+            Tuple or Dict: Rate limit information
+        """
+        # Check memory cache if using cache
+        current_time = time.time()
+        if use_cache:
+            cache_age = current_time - cls._rate_limit_cache_time
+
+            # Force refresh if cache is too old
+            if (cache_age > RATE_LIMIT_HARD_REFRESH) and cls._rate_limit_cache:
+                logger.debug("Cache too old, forcing refresh of rate limit information")
+                cls._rate_limit_cache = {}
+            # Use memory cache if it's still valid
+            elif (cache_age < RATE_LIMIT_CACHE_TTL) and cls._rate_limit_cache:
+                logger.debug("Using cached rate limit information")
+                # Include request count in debug info
+                logger.debug(f"API requests since cache refresh: {cls._request_count_since_cache}")
+
+                # Return the appropriate format
+                if return_dict and "resources" in cls._rate_limit_cache:
+                    return cls._rate_limit_cache
+                else:
+                    return (
+                        cls._rate_limit_cache.get("remaining", 0),
+                        cls._rate_limit_cache.get("limit", 0),
+                        cls._rate_limit_cache.get("reset_formatted", ""),
+                        cls._rate_limit_cache.get("is_authenticated", False),
+                    )
+
+        # Try to load from file cache if memory cache is invalid and we're using cache
+        if not cls._rate_limit_cache and use_cache:
+            file_cache = cls._load_rate_limit_cache()
+            if file_cache:
+                logger.debug("Using file cached rate limit information")
+                cls._rate_limit_cache = file_cache
+                cls._rate_limit_cache_time = current_time
+
+                # Return the appropriate format
+                if return_dict and "resources" in file_cache:
+                    return file_cache
+                else:
+                    return (
+                        file_cache.get("remaining", 0),
+                        file_cache.get("limit", 0),
+                        file_cache.get("reset_formatted", ""),
+                        file_cache.get("is_authenticated", False),
+                    )
+
+        # No valid cache or cache disabled, make API call
+        token = SecureTokenManager.get_token(validate_expiration=True)
+        is_authenticated = bool(token)
+
+        # Prepare headers - use custom headers if provided
+        headers = custom_headers if custom_headers else cls.get_auth_headers()
+
+        try:
+            # Make rate limit API request
+            response = requests.get(
+                "https://api.github.com/rate_limit",
+                headers=headers,
+                timeout=10 if not use_cache else 5,  # Longer timeout for explicit checks
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                rate = data.get("rate", {})
+                remaining = rate.get("remaining", 0)
+                limit = rate.get("limit", 0)
+                reset_time = rate.get("reset", 0)
+
+                # Format reset time
+                reset_datetime = datetime.fromtimestamp(reset_time)
+                reset_formatted = reset_datetime.strftime("%Y-%m-%d %H:%M:%S")
+
+                # Add a full hour timestamp for the next reset
+                next_full_hour_reset = get_next_hour_timestamp()
+                full_hour_reset_formatted = datetime.fromtimestamp(next_full_hour_reset).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+
+                # Log usage for audit
+                if cls._audit_enabled and is_authenticated:
+                    SecureTokenManager.audit_log_token_usage("check_rate_limit")
+
+                # Create the result dictionary
+                cache_data = {
+                    "remaining": remaining,
+                    "limit": limit,
+                    "reset": reset_time,
+                    "reset_formatted": reset_formatted,
+                    "is_authenticated": is_authenticated,
+                    "request_count": 0,  # Reset counter when we get fresh data
+                    "resources": data.get("resources", {}),  # Store complete resources data
+                    "full_hour_reset": next_full_hour_reset,
+                    "full_hour_reset_formatted": full_hour_reset_formatted,
+                }
+
+                # Cache the result if caching is enabled
+                if use_cache:
+                    cls._rate_limit_cache = cache_data
+                    cls._rate_limit_cache_time = current_time
+                    cls._request_count_since_cache = 0  # Reset counter
+                    cls._save_rate_limit_cache(cache_data)
+
+                # Return the appropriate format
+                if return_dict:
+                    return cache_data
+                else:
+                    return remaining, limit, reset_formatted, is_authenticated
+
+            # Handle error response
+            logger.debug(f"Rate limit check failed, status code: {response.status_code}")
+            if response.status_code == 401:
+                # Authentication failed - token may be invalid
+                logger.warning("Rate limit check failed due to authentication error")
+                # If token was invalid but exists, clear it from cache
+                if token and cls._last_token:
+                    cls.clear_cached_headers()
+
+            # Create default values based on authentication status
+            if is_authenticated:
+                defaults = (4000, 5000, "", True)  # Default authenticated rate limit
+            else:
+                defaults = (50, 60, "", False)  # Default for unauthenticated users
+
+            # Calculate next hour boundary for reset
+            next_hour_timestamp = get_next_hour_timestamp()
+            next_hour_formatted = datetime.fromtimestamp(next_hour_timestamp).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+
+            # Create cache data dictionary
+            cache_data = {
+                "remaining": defaults[0],
+                "limit": defaults[1],
+                "reset_formatted": defaults[2],
+                "is_authenticated": defaults[3],
+                "request_count": 0,
+                "full_hour_reset": next_hour_timestamp,
+                "full_hour_reset_formatted": next_hour_formatted,
+                "resources": {
+                    "core": {
+                        "limit": defaults[1],
+                        "remaining": defaults[0],
+                        "reset": next_hour_timestamp,  # Use hourly reset
+                    }
+                },
+            }
+
+            # Cache the result if caching is enabled
+            if use_cache:
+                cls._rate_limit_cache = cache_data
+                cls._rate_limit_cache_time = current_time
+                cls._request_count_since_cache = 0  # Reset counter
+                cls._save_rate_limit_cache(cache_data)
+
+            # Return the appropriate format
+            if return_dict:
+                return cache_data
+            else:
+                return defaults
+
+        except Exception as e:
+            logger.debug(f"Failed to check rate limits: {e}")
+
+            # Create default values based on authentication status
+            if is_authenticated:
+                defaults = (4500, 5000, "", True)  # Default authenticated limit
+            else:
+                defaults = (50, 60, "", False)  # Default unauthenticated limit
+
+            # Calculate next hour boundary for reset
+            next_hour_timestamp = get_next_hour_timestamp()
+            next_hour_formatted = datetime.fromtimestamp(next_hour_timestamp).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+
+            # Create cache data dictionary
+            cache_data = {
+                "remaining": defaults[0],
+                "limit": defaults[1],
+                "reset_formatted": defaults[2],
+                "is_authenticated": defaults[3],
+                "request_count": 0,
+                "full_hour_reset": next_hour_timestamp,
+                "full_hour_reset_formatted": next_hour_formatted,
+                "resources": {
+                    "core": {
+                        "limit": defaults[1],
+                        "remaining": defaults[0],
+                        "reset": next_hour_timestamp,  # Use hourly reset
+                    }
+                },
+            }
+
+            # Cache the result if caching is enabled
+            if use_cache:
+                cls._rate_limit_cache = cache_data
+                cls._rate_limit_cache_time = current_time
+                cls._request_count_since_cache = 0  # Reset counter
+
+            # Return the appropriate format
+            if return_dict:
+                return cache_data
+            else:
+                return defaults
+
+    @classmethod
     def get_rate_limit_info(
         cls, custom_headers: Optional[Dict[str, str]] = None, return_dict: bool = False
     ) -> Union[Tuple[int, int, str, bool], Dict[str, Any]]:
@@ -361,196 +549,9 @@ class GitHubAuthManager:
             tuple or dict: By default returns (remaining, limit, reset time, is_authenticated)
                           If return_dict=True, returns the complete rate limit information
         """
-        # Check if we have a recent cache first
-        current_time = time.time()
-        cache_age = current_time - cls._rate_limit_cache_time
-
-        # Force refresh if cache is too old
-        if (cache_age > RATE_LIMIT_HARD_REFRESH) and cls._rate_limit_cache:
-            logger.debug("Cache too old, forcing refresh of rate limit information")
-            cls._rate_limit_cache = {}
-        # Use memory cache if it's still valid
-        elif (cache_age < RATE_LIMIT_CACHE_TTL) and cls._rate_limit_cache:
-            logger.debug("Using cached rate limit information")
-            # Include request count in debug info
-            logger.debug(f"API requests since cache refresh: {cls._request_count_since_cache}")
-
-            # If a dictionary return is requested, return the full cache
-            if return_dict and "resources" in cls._rate_limit_cache:
-                return cls._rate_limit_cache
-
-            return (
-                cls._rate_limit_cache.get("remaining", 0),
-                cls._rate_limit_cache.get("limit", 0),
-                cls._rate_limit_cache.get("reset_formatted", ""),
-                cls._rate_limit_cache.get("is_authenticated", False),
-            )
-
-        # Try to load from file cache if memory cache is invalid
-        if not cls._rate_limit_cache:
-            file_cache = cls._load_rate_limit_cache()
-            if file_cache:
-                logger.debug("Using file cached rate limit information")
-                cls._rate_limit_cache = file_cache
-                cls._rate_limit_cache_time = current_time
-
-                # If a dictionary return is requested, return the full cache
-                if return_dict and "resources" in file_cache:
-                    return file_cache
-
-                return (
-                    file_cache.get("remaining", 0),
-                    file_cache.get("limit", 0),
-                    file_cache.get("reset_formatted", ""),
-                    file_cache.get("is_authenticated", False),
-                )
-
-        # No valid cache, need to make API call
-        token = SecureTokenManager.get_token(validate_expiration=True)
-        is_authenticated = bool(token)
-
-        # Prepare headers - use custom headers if provided
-        headers = custom_headers if custom_headers else cls.get_auth_headers()
-
-        try:
-            # Make rate limit API request
-            response = requests.get(
-                "https://api.github.com/rate_limit",
-                headers=headers,
-                timeout=5,  # Short timeout to avoid blocking the main menu
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                rate = data.get("rate", {})
-                remaining = rate.get("remaining", 0)
-                limit = rate.get("limit", 0)
-                reset_time = rate.get("reset", 0)
-
-                # Format reset time
-                reset_datetime = datetime.fromtimestamp(reset_time)
-                reset_formatted = reset_datetime.strftime("%Y-%m-%d %H:%M:%S")
-
-                # Add a full hour timestamp to make it clear when the next reset will be (for display purposes)
-                next_full_hour_reset = datetime.fromtimestamp(
-                    (int(time.time() / 3600) + 1) * 3600  # Next hour boundary
-                )
-                full_hour_reset_formatted = next_full_hour_reset.strftime("%Y-%m-%d %H:%M:%S")
-
-                # Log usage for audit
-                if cls._audit_enabled and is_authenticated:
-                    SecureTokenManager.audit_log_token_usage("check_rate_limit")
-
-                # Cache the result - store the full API response
-                cache_data = {
-                    "remaining": remaining,
-                    "limit": limit,
-                    "reset": reset_time,
-                    "reset_formatted": reset_formatted,
-                    "is_authenticated": is_authenticated,
-                    "request_count": 0,  # Reset counter when we get fresh data
-                    "resources": data.get("resources", {}),  # Store complete resources data
-                    "full_hour_reset": next_full_hour_reset.timestamp(),
-                    "full_hour_reset_formatted": full_hour_reset_formatted,
-                }
-                cls._rate_limit_cache = cache_data
-                cls._rate_limit_cache_time = current_time
-                cls._request_count_since_cache = 0  # Reset counter
-                cls._save_rate_limit_cache(cache_data)
-
-                # Return the full dict if requested
-                if return_dict:
-                    return cache_data
-
-                return remaining, limit, reset_formatted, is_authenticated
-
-            # Return defaults if request failed
-            logger.debug(f"Rate limit check failed, status code: {response.status_code}")
-            if response.status_code == 401:
-                # Authentication failed - token may be invalid
-                logger.warning("Rate limit check failed due to authentication error")
-                # If token was invalid but exists, clear it from cache
-                if token and cls._last_token:
-                    cls.clear_cached_headers()
-
-            # For unauthenticated users, GitHub allows 60 requests per hour
-            if is_authenticated:
-                defaults = (4000, 5000, "", True)  # Default authenticated rate limit
-            else:
-                defaults = (50, 60, "", False)  # Default for unauthenticated users
-
-            # Calculate next hour boundary for reset
-            next_hour_timestamp = (int(time.time() / 3600) + 1) * 3600
-            next_hour = datetime.fromtimestamp(next_hour_timestamp)
-            next_hour_formatted = next_hour.strftime("%Y-%m-%d %H:%M:%S")
-
-            # Cache these defaults too
-            cache_data = {
-                "remaining": defaults[0],
-                "limit": defaults[1],
-                "reset_formatted": defaults[2],
-                "is_authenticated": defaults[3],
-                "request_count": 0,
-                "full_hour_reset": next_hour_timestamp,
-                "full_hour_reset_formatted": next_hour_formatted,
-                "resources": {
-                    "core": {
-                        "limit": defaults[1],
-                        "remaining": defaults[0],
-                        "reset": next_hour_timestamp,  # Use hourly reset
-                    }
-                },
-            }
-            cls._rate_limit_cache = cache_data
-            cls._rate_limit_cache_time = current_time
-            cls._request_count_since_cache = 0  # Reset counter
-            cls._save_rate_limit_cache(cache_data)
-
-            # Return the full dict if requested
-            if return_dict:
-                return cache_data
-
-            return defaults
-
-        except Exception as e:
-            logger.debug(f"Failed to check rate limits: {e}")
-            # Return sensible defaults that won't cause alarm
-            if is_authenticated:
-                defaults = (4500, 5000, "", True)  # Default authenticated limit
-            else:
-                defaults = (50, 60, "", False)  # Default unauthenticated limit
-
-            # Calculate next hour boundary for reset
-            next_hour_timestamp = (int(time.time() / 3600) + 1) * 3600
-            next_hour = datetime.fromtimestamp(next_hour_timestamp)
-            next_hour_formatted = next_hour.strftime("%Y-%m-%d %H:%M:%S")
-
-            # Cache these defaults too
-            cache_data = {
-                "remaining": defaults[0],
-                "limit": defaults[1],
-                "reset_formatted": defaults[2],
-                "is_authenticated": defaults[3],
-                "request_count": 0,
-                "full_hour_reset": next_hour_timestamp,
-                "full_hour_reset_formatted": next_hour_formatted,
-                "resources": {
-                    "core": {
-                        "limit": defaults[1],
-                        "remaining": defaults[0],
-                        "reset": next_hour_timestamp,  # Use hourly reset
-                    }
-                },
-            }
-            cls._rate_limit_cache = cache_data
-            cls._rate_limit_cache_time = current_time
-            cls._request_count_since_cache = 0  # Reset counter
-
-            # Return the full dict if requested
-            if return_dict:
-                return cache_data
-
-            return defaults
+        return cls._core_rate_limit_data(
+            use_cache=True, custom_headers=custom_headers, return_dict=return_dict
+        )
 
     @classmethod
     def make_authenticated_request(
@@ -604,7 +605,7 @@ class GitHubAuthManager:
                 if response.status_code == 200 and url.startswith("https://api.github.com"):
                     # Decrement the rate limit only for successful requests
                     cls._update_cached_rate_limit(1)
-                    
+
                 # Check if auth failed
                 if response.status_code in (401, 403) and retries < max_retries:
                     # Clear cached headers to force token refresh
@@ -644,83 +645,57 @@ class GitHubAuthManager:
     def get_token_info(cls) -> Dict[str, Any]:
         """
         Get information about the current token.
-    
+
         Returns:
             Dict with token information including expiration status
         """
         logger.debug("Getting token information and status")
         token_metadata = SecureTokenManager.get_token_metadata()
         is_expired, expiration_date = SecureTokenManager.get_token_expiration_info()
-    
+
         # Calculate when the token will be rotated
         days_until_rotation = None
         if expiration_date and not is_expired:
             try:
-                expiration = datetime.strptime(expiration_date, "%Y-%m-%d %H:%M:%S")
-                current_date = datetime.now()
-                days_until_expiration = (expiration - current_date).days
-    
-                if days_until_expiration <= TOKEN_REFRESH_THRESHOLD_DAYS:
-                    days_until_rotation = 0  # Will be rotated on next use
-                else:
-                    days_until_rotation = days_until_expiration - TOKEN_REFRESH_THRESHOLD_DAYS
+                # Use datetime utility to parse the expiration date
+                expiration = parse_timestamp(expiration_date)
+                if expiration:
+                    current_date = datetime.now()
+                    days_until_expiration = (expiration - current_date).days
+
+                    if days_until_expiration <= TOKEN_REFRESH_THRESHOLD_DAYS:
+                        days_until_rotation = 0  # Will be rotated on next use
+                    else:
+                        days_until_rotation = days_until_expiration - TOKEN_REFRESH_THRESHOLD_DAYS
             except Exception as e:
                 logger.warning(f"Error calculating token rotation time: {e}")
                 pass
-    
-        # Use our own has_valid_token method instead of trying to call it on SecureTokenManager
+
+        # Use our own has_valid_token method
         result = {
             "token_exists": SecureTokenManager.token_exists(),
-            "token_valid": cls.has_valid_token(),  # Fixed: using GitHubAuthManager's method
+            "token_valid": cls.has_valid_token(),
             "is_expired": is_expired,
             "expiration_date": expiration_date,
             "days_until_rotation": days_until_rotation,
             "created_at": None,
             "last_used_at": None,
         }
-    
+
         # Add metadata if available
         if token_metadata:
             if "created_at" in token_metadata:
-                try:
-                    created_ts = token_metadata["created_at"]
-                    # Handle both string and integer timestamp formats
-                    if isinstance(created_ts, str):
-                        try:
-                            # Try parsing as ISO format date first
-                            created_at_dt = datetime.fromisoformat(created_ts)
-                        except ValueError:
-                            # Try parsing as a float/int string directly
-                            created_at_dt = datetime.fromtimestamp(float(created_ts))
-                    else:
-                        # Assume it's an integer timestamp
-                        created_at_dt = datetime.fromtimestamp(created_ts)
-                        
-                    result["created_at"] = created_at_dt.strftime("%Y-%m-%d %H:%M:%S")
-                except Exception as e:
-                    logger.warning(f"Error processing token creation date: {e}")
-                    pass
-    
+                # Use our datetime utility to format the creation date
+                created_at_str = format_timestamp(token_metadata["created_at"])
+                if created_at_str:
+                    result["created_at"] = created_at_str
+
             if "last_used_at" in token_metadata:
-                try:
-                    used_ts = token_metadata["last_used_at"]
-                    # Handle both string and integer timestamp formats
-                    if isinstance(used_ts, str):
-                        try:
-                            # Try parsing as ISO format date first
-                            used_at_dt = datetime.fromisoformat(used_ts)
-                        except ValueError:
-                            # Try parsing as a float/int string directly
-                            used_at_dt = datetime.fromtimestamp(float(used_ts))
-                    else:
-                        # Assume it's an integer timestamp
-                        used_at_dt = datetime.fromtimestamp(used_ts)
-                        
-                    result["last_used_at"] = used_at_dt.strftime("%Y-%m-%d %H:%M:%S")
-                except Exception as e:
-                    logger.warning(f"Error processing token last used date: {e}")
-                    pass
-    
+                # Use our datetime utility to format the last used date
+                last_used_str = format_timestamp(token_metadata["last_used_at"])
+                if last_used_str:
+                    result["last_used_at"] = last_used_str
+
         logger.debug(
             f"Token info result: valid={result['token_valid']}, expired={result['is_expired']}"
         )
@@ -753,100 +728,33 @@ class GitHubAuthManager:
                 f"Current cached remaining: {cls._rate_limit_cache.get('remaining', 'N/A')}/{cls._rate_limit_cache.get('limit', 'N/A')}"
             )
 
-        # Get authentication token
-        token = SecureTokenManager.get_token(validate_expiration=True)
-        is_authenticated = bool(token)
+        # Use our core implementation with cache disabled
+        result = cls._core_rate_limit_data(
+            use_cache=False, custom_headers=custom_headers, return_dict=True
+        )
 
-        # Prepare headers - use custom headers if provided
-        headers = custom_headers if custom_headers else cls.get_auth_headers()
-
-        try:
-            # Make rate limit API request
-            logger.debug("Making direct API call to get rate limits")
-            response = requests.get(
-                "https://api.github.com/rate_limit",
-                headers=headers,
-                timeout=10,  # Longer timeout for explicit checks
+        # Log the live check results if it was successful
+        if "error" not in result:
+            logger.info(
+                f"Live rate limit check results: {result.get('remaining', 'N/A')}/{result.get('limit', 'N/A')} "
+                f"(reset at {result.get('reset_formatted', 'N/A')})"
             )
 
-            if response.status_code == 200:
-                data = response.json()
-                rate = data.get("rate", {})
-                remaining = rate.get("remaining", 0)
-                limit = rate.get("limit", 0)
-                reset_time = rate.get("reset", 0)
+            # Also update the cache with the fresh data
+            logger.debug("Updating rate limit cache with fresh data from API")
+            cls._rate_limit_cache = result.copy()
+            cls._rate_limit_cache["request_count"] = 0  # Reset counter
+            cls._rate_limit_cache_time = time.time()
+            cls._request_count_since_cache = 0
+            cls._save_rate_limit_cache(cls._rate_limit_cache)
 
-                # Format reset time
-                reset_datetime = datetime.fromtimestamp(reset_time)
-                reset_formatted = reset_datetime.strftime("%Y-%m-%d %H:%M:%S")
+            # Log cache status after update
+            logger.debug(
+                f"Cache updated with fresh data. New timestamp: "
+                f"{datetime.fromtimestamp(cls._rate_limit_cache_time).strftime('%Y-%m-%d %H:%M:%S')}"
+            )
 
-                # Add a full hour timestamp to make it clear when the next reset will be (for display purposes)
-                next_full_hour_reset = datetime.fromtimestamp(
-                    (int(time.time() / 3600) + 1) * 3600  # Next hour boundary
-                )
-                full_hour_reset_formatted = next_full_hour_reset.strftime("%Y-%m-%d %H:%M:%S")
-
-                # Log usage for audit
-                if cls._audit_enabled and is_authenticated:
-                    SecureTokenManager.audit_log_token_usage("check_rate_limit")
-
-                # Create result dictionary
-                result = {
-                    "remaining": remaining,
-                    "limit": limit,
-                    "reset": reset_time,
-                    "reset_formatted": reset_formatted,
-                    "is_authenticated": is_authenticated,
-                    "resources": data.get("resources", {}),
-                    "full_hour_reset": next_full_hour_reset.timestamp(),
-                    "full_hour_reset_formatted": full_hour_reset_formatted,
-                }
-
-                # Log the live check results
-                logger.info(
-                    f"Live rate limit check results: {remaining}/{limit} (reset at {reset_formatted})"
-                )
-
-                # Also update the cache with the fresh data
-                logger.debug("Updating rate limit cache with fresh data from API")
-                cls._rate_limit_cache = result.copy()
-                cls._rate_limit_cache["request_count"] = 0  # Reset counter
-                cls._rate_limit_cache_time = time.time()
-                cls._request_count_since_cache = 0
-                cls._save_rate_limit_cache(cls._rate_limit_cache)
-
-                # Log cache status after update
-                logger.debug(
-                    f"Cache updated with fresh data. New timestamp: {datetime.fromtimestamp(cls._rate_limit_cache_time).strftime('%Y-%m-%d %H:%M:%S')}"
-                )
-
-                return result
-
-            # Handle error cases
-            logger.error(f"Rate limit check failed, status code: {response.status_code}")
-            if response.status_code == 401:
-                logger.warning("Rate limit check failed due to authentication error")
-                if token and cls._last_token:
-                    cls.clear_cached_headers()
-
-            # Create error result dictionary
-            error_result = {
-                "error": f"API request failed with status code: {response.status_code}",
-                "is_authenticated": is_authenticated,
-                "resources": {"core": {"limit": 0, "remaining": 0, "reset": 0}},
-            }
-            return error_result
-
-        except Exception as e:
-            logger.error(f"Error checking rate limits: {str(e)}")
-
-            # Create error result dictionary
-            error_result = {
-                "error": f"Request error: {str(e)}",
-                "is_authenticated": is_authenticated,
-                "resources": {"core": {"limit": 0, "remaining": 0, "reset": 0}},
-            }
-            return error_result
+        return result
 
     @classmethod
     def validate_token(

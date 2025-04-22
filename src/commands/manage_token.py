@@ -17,6 +17,7 @@ import requests
 from src.commands.base import Command
 from src.secure_token import SecureTokenManager, TOKEN_FILE, TOKEN_METADATA_FILE, CONFIG_DIR
 from src.auth_manager import GitHubAuthManager
+from src.utils.datetime_utils import parse_timestamp, format_timestamp
 
 
 class ManageTokenCommand(Command):
@@ -111,31 +112,21 @@ class ManageTokenCommand(Command):
                 if SecureTokenManager.is_token_expired():
                     print("⚠️ Token is EXPIRED - please rotate your token")
                 else:
-                    # Get expiration date - handle both string and integer timestamp formats safely
+                    # Get expiration date - use our datetime utility for safe parsing
                     if "expires_at" in metadata:
                         try:
-                            expires_at = metadata.get("expires_at")
-                            if isinstance(expires_at, int):
-                                # If it's a timestamp (seconds since epoch)
-                                expiration_date = datetime.fromtimestamp(expires_at)
-                            elif isinstance(expires_at, str):
-                                # If it's an ISO format string (from newer versions)
-                                try:
-                                    expiration_date = datetime.fromisoformat(expires_at)
-                                except ValueError:
-                                    # In case it's a different string format, try timestamp
-                                    expiration_date = datetime.fromtimestamp(float(expires_at))
-                            else:
-                                raise ValueError(
-                                    f"Unknown expiration date format: {type(expires_at)}"
-                                )
+                            expires_dt = parse_timestamp(metadata.get("expires_at"))
+                            if expires_dt:
+                                days_remaining = (expires_dt - datetime.now()).days
 
-                            days_remaining = (expiration_date - datetime.now()).days
-
-                            if days_remaining <= 7:
-                                print(f"⚠️ Token expiring soon - {days_remaining} days remaining")
-                            else:
-                                print(f"✅ Token valid - {days_remaining} days until expiration")
+                                if days_remaining <= 7:
+                                    print(
+                                        f"⚠️ Token expiring soon - {days_remaining} days remaining"
+                                    )
+                                else:
+                                    print(
+                                        f"✅ Token valid - {days_remaining} days until expiration"
+                                    )
                         except Exception as e:
                             self._logger.error(f"Error processing expiration date: {e}")
                             print("⚠️ Token expiration date could not be determined")
@@ -143,21 +134,9 @@ class ManageTokenCommand(Command):
                 # Show when the token was last used
                 if "last_used_at" in metadata:
                     try:
-                        last_used = metadata.get("last_used_at")
-                        if isinstance(last_used, int):
-                            # If it's a timestamp (seconds since epoch)
-                            last_used_date = datetime.fromtimestamp(last_used)
-                        elif isinstance(last_used, str):
-                            # If it's an ISO format string
-                            try:
-                                last_used_date = datetime.fromisoformat(last_used)
-                            except ValueError:
-                                # Try parsing as timestamp
-                                last_used_date = datetime.fromtimestamp(float(last_used))
-                        else:
-                            raise ValueError(f"Unknown last_used format: {type(last_used)}")
-
-                        print(f"📊 Last used: {last_used_date.strftime('%Y-%m-%d %H:%M:%S')}")
+                        last_used_dt = parse_timestamp(metadata.get("last_used_at"))
+                        if last_used_dt:
+                            print(f"📊 Last used: {last_used_dt.strftime('%Y-%m-%d %H:%M:%S')}")
                     except Exception as e:
                         self._logger.error(f"Error processing last used date: {e}")
         else:
@@ -406,7 +385,10 @@ class ManageTokenCommand(Command):
                         print(f"Scopes: {', '.join(token_info.get('scopes', []))}")
 
                     # Check if days_until_rotation is a string and convert if needed
-                    if "days_until_rotation" in token_info and token_info["days_until_rotation"] is not None:
+                    if (
+                        "days_until_rotation" in token_info
+                        and token_info["days_until_rotation"] is not None
+                    ):
                         days_until_rotation = token_info["days_until_rotation"]
                         # Convert to int if it's a string
                         if isinstance(days_until_rotation, str):
@@ -509,24 +491,14 @@ class ManageTokenCommand(Command):
 
         print("\n--- Token Expiration Information ---")
 
-        # Display creation date
+        # Display creation date - use our datetime utility for safe parsing
         if "created_at" in metadata:
             try:
-                created_at = metadata.get("created_at")
-                if isinstance(created_at, int):
-                    # If it's a timestamp (seconds since epoch)
-                    created_date = datetime.fromtimestamp(created_at)
-                elif isinstance(created_at, str):
-                    # If it's an ISO format string
-                    try:
-                        created_date = datetime.fromisoformat(created_at)
-                    except ValueError:
-                        # Try parsing as timestamp
-                        created_date = datetime.fromtimestamp(float(created_at))
+                created_dt = parse_timestamp(metadata.get("created_at"))
+                if created_dt:
+                    print(f"Created: {created_dt.strftime('%Y-%m-%d %H:%M:%S')}")
                 else:
-                    raise ValueError(f"Unknown created_at format: {type(created_at)}")
-
-                print(f"Created: {created_date.strftime('%Y-%m-%d %H:%M:%S')}")
+                    print("Creation date: Unknown")
             except Exception as e:
                 self._logger.error(f"Error processing creation date: {e}")
                 print("Creation date: Unknown")
@@ -534,38 +506,28 @@ class ManageTokenCommand(Command):
         # Display expiration date and status
         if "expires_at" in metadata:
             try:
-                expires_at = metadata.get("expires_at")
-                if isinstance(expires_at, int):
-                    # If it's a timestamp (seconds since epoch)
-                    expiration_date = datetime.fromtimestamp(expires_at)
-                elif isinstance(expires_at, str):
-                    # If it's an ISO format string
-                    try:
-                        expiration_date = datetime.fromisoformat(expires_at)
-                    except ValueError:
-                        # Try parsing as timestamp
-                        expiration_date = datetime.fromtimestamp(float(expires_at))
-                else:
-                    raise ValueError(f"Unknown expires_at format: {type(expires_at)}")
+                expires_dt = parse_timestamp(metadata.get("expires_at"))
+                if expires_dt:
+                    print(f"Expires: {expires_dt.strftime('%Y-%m-%d %H:%M:%S')}")
 
-                print(f"Expires: {expiration_date.strftime('%Y-%m-%d %H:%M:%S')}")
-
-                # Check if expired
-                if SecureTokenManager.is_token_expired():
-                    print("Status: 🔴 EXPIRED - Please rotate your token")
-                else:
-                    # Calculate days remaining
-                    days_remaining = (expiration_date - datetime.now()).days
-                    hours_remaining = (expiration_date - datetime.now()).seconds // 3600
-
-                    if days_remaining < 1:
-                        print(f"Status: 🟠 Expiring in {hours_remaining} hours")
-                    elif days_remaining < 7:
-                        print(f"Status: 🟠 Expiring soon - {days_remaining} days remaining")
-                    elif days_remaining < 30:
-                        print(f"Status: 🟡 Valid - {days_remaining} days remaining")
+                    # Check if expired
+                    if SecureTokenManager.is_token_expired():
+                        print("Status: 🔴 EXPIRED - Please rotate your token")
                     else:
-                        print(f"Status: 🟢 Valid - {days_remaining} days remaining")
+                        # Calculate days remaining
+                        days_remaining = (expires_dt - datetime.now()).days
+                        hours_remaining = (expires_dt - datetime.now()).seconds // 3600
+
+                        if days_remaining < 1:
+                            print(f"Status: 🟠 Expiring in {hours_remaining} hours")
+                        elif days_remaining < 7:
+                            print(f"Status: 🟠 Expiring soon - {days_remaining} days remaining")
+                        elif days_remaining < 30:
+                            print(f"Status: 🟡 Valid - {days_remaining} days remaining")
+                        else:
+                            print(f"Status: 🟢 Valid - {days_remaining} days remaining")
+                else:
+                    print("Expiration date: Unknown")
             except Exception as e:
                 self._logger.error(f"Error processing expiration date: {e}")
                 print("Expiration date: Unknown")
@@ -573,30 +535,20 @@ class ManageTokenCommand(Command):
         # Token usage information
         if "last_used_at" in metadata:
             try:
-                last_used = metadata.get("last_used_at")
-                if isinstance(last_used, int):
-                    # If it's a timestamp (seconds since epoch)
-                    last_used_date = datetime.fromtimestamp(last_used)
-                elif isinstance(last_used, str):
-                    # If it's an ISO format string
-                    try:
-                        last_used_date = datetime.fromisoformat(last_used)
-                    except ValueError:
-                        # Try parsing as timestamp
-                        last_used_date = datetime.fromtimestamp(float(last_used))
-                else:
-                    raise ValueError(f"Unknown last_used_at format: {type(last_used)}")
+                last_used_dt = parse_timestamp(metadata.get("last_used_at"))
+                if last_used_dt:
+                    print(f"Last used: {last_used_dt.strftime('%Y-%m-%d %H:%M:%S')}")
 
-                print(f"Last used: {last_used_date.strftime('%Y-%m-%d %H:%M:%S')}")
-
-                # Calculate days since last use
-                days_since_use = (datetime.now() - last_used_date).days
-                if days_since_use == 0:
-                    print("Usage: Used today")
-                elif days_since_use == 1:
-                    print("Usage: Used yesterday")
+                    # Calculate days since last use
+                    days_since_use = (datetime.now() - last_used_dt).days
+                    if days_since_use == 0:
+                        print("Usage: Used today")
+                    elif days_since_use == 1:
+                        print("Usage: Used yesterday")
+                    else:
+                        print(f"Usage: Used {days_since_use} days ago")
                 else:
-                    print(f"Usage: Used {days_since_use} days ago")
+                    print("Last used: Unknown")
             except Exception as e:
                 self._logger.error(f"Error processing last used date: {e}")
                 print("Last used: Unknown")
@@ -619,25 +571,17 @@ class ManageTokenCommand(Command):
         # Display the 10 most recent logs
         for log in sorted(audit_logs, key=lambda x: x.get("timestamp", ""), reverse=True)[:10]:
             try:
-                # Parse timestamp safely, handling different formats
+                # Parse timestamp safely using our utility
                 timestamp_str = log.get("timestamp", "")
-                if timestamp_str:
-                    try:
-                        # Try ISO format first (most common in JSON logs)
-                        timestamp_date = datetime.fromisoformat(timestamp_str)
-                    except ValueError:
-                        try:
-                            # Try parsing as Unix timestamp
-                            timestamp_date = datetime.fromtimestamp(float(timestamp_str))
-                        except (ValueError, TypeError):
-                            # If all else fails, just show the raw string
-                            formatted_timestamp = str(timestamp_str)[:19]  # Truncate if needed
-                else:
-                    formatted_timestamp = "Unknown"
+                formatted_timestamp = "Unknown"
 
-                # Format timestamp if we successfully parsed it
-                if "timestamp_date" in locals():
-                    formatted_timestamp = timestamp_date.strftime("%Y-%m-%d %H:%M:%S")
+                if timestamp_str:
+                    timestamp_date = parse_timestamp(timestamp_str)
+                    if timestamp_date:
+                        formatted_timestamp = timestamp_date.strftime("%Y-%m-%d %H:%M:%S")
+                    else:
+                        # If parsing fails, use the raw string (truncated if needed)
+                        formatted_timestamp = str(timestamp_str)[:19]
 
                 action = log.get("action", "unknown")
                 source_ip = log.get("source_ip", "unknown")
@@ -659,22 +603,17 @@ class ManageTokenCommand(Command):
 
                 for log in sorted(audit_logs, key=lambda x: x.get("timestamp", ""), reverse=True):
                     try:
-                        # Parse timestamp safely
+                        # Parse timestamp safely using our utility
                         timestamp_str = log.get("timestamp", "")
-                        if timestamp_str:
-                            try:
-                                timestamp_date = datetime.fromisoformat(timestamp_str)
-                            except ValueError:
-                                try:
-                                    timestamp_date = datetime.fromtimestamp(float(timestamp_str))
-                                except (ValueError, TypeError):
-                                    formatted_timestamp = str(timestamp_str)[:19]
-                        else:
-                            formatted_timestamp = "Unknown"
+                        formatted_timestamp = "Unknown"
 
-                        # Format timestamp if we successfully parsed it
-                        if "timestamp_date" in locals():
-                            formatted_timestamp = timestamp_date.strftime("%Y-%m-%d %H:%M:%S")
+                        if timestamp_str:
+                            timestamp_date = parse_timestamp(timestamp_str)
+                            if timestamp_date:
+                                formatted_timestamp = timestamp_date.strftime("%Y-%m-%d %H:%M:%S")
+                            else:
+                                # If parsing fails, use the raw string (truncated if needed)
+                                formatted_timestamp = str(timestamp_str)[:19]
 
                         action = log.get("action", "unknown")
                         source_ip = log.get("source_ip", "unknown")
@@ -796,21 +735,11 @@ class ManageTokenCommand(Command):
             # Display when the token was stored based on creation time
             if "created_at" in metadata:
                 try:
-                    created_at = metadata.get("created_at")
-                    if isinstance(created_at, int):
-                        # If it's a timestamp (seconds since epoch)
-                        created_date = datetime.fromtimestamp(created_at)
-                    elif isinstance(created_at, str):
-                        # If it's an ISO format string
-                        try:
-                            created_date = datetime.fromisoformat(created_at)
-                        except ValueError:
-                            # Try parsing as timestamp
-                            created_date = datetime.fromtimestamp(float(created_at))
+                    created_dt = parse_timestamp(metadata.get("created_at"))
+                    if created_dt:
+                        print(f"Storage Date: {created_dt.strftime('%Y-%m-%d %H:%M:%S')}")
                     else:
-                        raise ValueError(f"Unknown created_at format: {type(created_at)}")
-
-                    print(f"Storage Date: {created_date.strftime('%Y-%m-%d %H:%M:%S')}")
+                        print("Storage Date: Unknown")
                 except Exception as e:
                     self._logger.error(f"Error processing creation date: {e}")
                     print("Storage Date: Unknown")
@@ -937,10 +866,13 @@ class ManageTokenCommand(Command):
             "source": "manage_token_command",
             "security_level": "high",
         }
-        
+
         # Save token to keyring using our enhanced method with improved metadata
         result = SecureTokenManager.save_token(
-            token,expires_in_days=expiration_days,storage_preference="keyring_only",metadata=metadata
+            token,
+            expires_in_days=expiration_days,
+            storage_preference="keyring_only",
+            metadata=metadata,
         )
 
         if result:
