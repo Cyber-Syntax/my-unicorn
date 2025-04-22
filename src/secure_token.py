@@ -316,8 +316,8 @@ class SecureTokenManager:
                         )
                         if metadata_str:
                             metadata = json.loads(metadata_str)
-                    except json.JSONDecodeError:
-                        logger.debug("Could not parse token metadata")
+                    except json.JSONDecodeError as e:
+                        logger.debug(f"Could not parse token metadata {e}")
                         metadata = {}
 
                     if GNOME_KEYRING_AVAILABLE:

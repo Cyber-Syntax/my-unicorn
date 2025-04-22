@@ -37,16 +37,14 @@ def get_user_choice():
         if is_authenticated:
             print(_("GitHub API: {} of {} requests remaining (estimate)").format(remaining, limit))
             if remaining < 100:
-                print(_("⚠️ Running low on API requests! Resets at {}").format(reset_time))
+                print(_("ℹ️ Running low on API requests! Resets at {}").format(reset_time))
         else:
-            # For unauthenticated users, only show if it's low
-            if remaining < 20:
-                print(
-                    _("⚠️ GitHub API: {} of 60 requests remaining (unauthenticated)").format(
-                        remaining
-                    )
+            print(
+                _("ℹ️ GitHub API: {} of 60 requests remaining (unauthenticated)").format(
+                    remaining
                 )
-                print(_("Add a token using option 6 to get 5000 requests/hour"))
+            )
+            print(_("🔑 Add your github token using option 6 to get 5000 requests/hour"))
     except Exception as e:
         # Silently handle any errors to avoid breaking the main menu
         logging.debug(f"Error checking rate limits: {e}")

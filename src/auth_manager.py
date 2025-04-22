@@ -147,6 +147,46 @@ class GitHubAuthManager:
         cls._last_token = None
         cls._last_token_check = 0
         logger.debug("Cleared cached GitHub API authentication headers")
+    
+    @classmethod
+    def clear_rate_limit_cache(cls) -> None:
+        """
+        Clear the cached rate limit information.
+        
+        This should be called when the authentication status changes,
+        especially when a token is removed to ensure the rate limits 
+        properly reflect the unauthenticated state (60 requests/hour).
+        """
+        cls._rate_limit_cache = {}
+        cls._rate_limit_cache_time = 0
+        cls._request_count_since_cache = 0
+        
+        # Calculate next hour boundary for unauthenticated limits
+        next_hour_timestamp = (int(time.time() / 3600) + 1) * 3600
+        next_hour = datetime.fromtimestamp(next_hour_timestamp)
+        
+        # Set default unauthenticated rate limits
+        cache_data = {
+            "remaining": 50,       # Start a bit below max to be conservative
+            "limit": 60,           # Unauthenticated limit is 60 per hour
+            "reset_formatted": next_hour.strftime("%Y-%m-%d %H:%M:%S"),
+            "is_authenticated": False,
+            "request_count": 0,
+            "full_hour_reset": next_hour_timestamp,
+            "full_hour_reset_formatted": next_hour.strftime("%Y-%m-%d %H:%M:%S"),
+            "resources": {
+                "core": {
+                    "limit": 60,
+                    "remaining": 50,
+                    "reset": next_hour_timestamp,
+                }
+            },
+        }
+        
+        # Save to cache file
+        cls._save_rate_limit_cache(cache_data)
+        logger.info("Rate limit cache cleared and reset to unauthenticated limits (60/hour)")
+    
 
     @staticmethod
     def has_valid_token() -> bool:
@@ -685,73 +725,6 @@ class GitHubAuthManager:
             f"Token info result: valid={result['token_valid']}, expired={result['is_expired']}"
         )
         return result
- 
-     
-    # @classmethod
-    # def get_token_info(cls) -> Dict[str, Any]:
-    #     """
-    #     Get information about the current token.
-
-    #     Returns:
-    #         Dict with token information including expiration status
-    #     """
-    #     logger.debug("Getting token information and status")
-    #     token_metadata = SecureTokenManager.get_token_metadata()
-    #     is_expired, expiration_date = SecureTokenManager.get_token_expiration_info()
-
-    #     # Calculate when the token will be rotated
-    #     days_until_rotation = None
-    #     if expiration_date and not is_expired:
-    #         try:
-    #             expiration = datetime.strptime(expiration_date, "%Y-%m-%d %H:%M:%S")
-    #             current_date = datetime.now()
-    #             days_until_expiration = (expiration - current_date).days
-
-    #             if days_until_expiration <= TOKEN_REFRESH_THRESHOLD_DAYS:
-    #                 days_until_rotation = 0  # Will be rotated on next use
-    #             else:
-    #                 days_until_rotation = days_until_expiration - TOKEN_REFRESH_THRESHOLD_DAYS
-    #         except Exception as e:
-    #             logger.warning(f"Error calculating token rotation time: {e}")
-    #             pass
-
-    #     # Use our own has_valid_token method instead of trying to call it on SecureTokenManager
-    #     result = {
-    #         "token_exists": SecureTokenManager.token_exists(),
-    #         "token_valid": cls.has_valid_token(),  # Fixed: using GitHubAuthManager's method
-    #         "is_expired": is_expired,
-    #         "expiration_date": expiration_date,
-    #         "days_until_rotation": days_until_rotation,
-    #         "created_at": None,
-    #         "last_used_at": None,
-    #     }
-
-    #     # Add metadata if available
-    #     if token_metadata:
-    #         if "created_at" in token_metadata:
-    #             try:
-    #                 created_ts = token_metadata["created_at"]
-    #                 result["created_at"] = datetime.fromtimestamp(created_ts).strftime(
-    #                     "%Y-%m-%d %H:%M:%S"
-    #                 )
-    #             except Exception as e:
-    #                 logger.warning(f"Error processing token creation date: {e}")
-    #                 pass
-
-    #         if "last_used_at" in token_metadata:
-    #             try:
-    #                 used_ts = token_metadata["last_used_at"]
-    #                 result["last_used_at"] = datetime.fromtimestamp(used_ts).strftime(
-    #                     "%Y-%m-%d %H:%M:%S"
-    #                 )
-    #             except Exception as e:
-    #                 logger.warning(f"Error processing token last used date: {e}")
-    #                 pass
-
-    #     logger.debug(
-    #         f"Token info result: valid={result['token_valid']}, expired={result['is_expired']}"
-    #     )
-    #     return result
 
     @classmethod
     def get_live_rate_limit_info(

@@ -283,6 +283,7 @@ class ManageTokenCommand(Command):
         Remove the GitHub token from secure storage.
 
         This removes the token from all potential storage locations.
+        After removal, it clears any cached authentication headers and rate limit information.
         """
         self._logger.info("Removing GitHub token")
 
@@ -302,6 +303,8 @@ class ManageTokenCommand(Command):
             print("\n✅ GitHub token removed successfully")
             # Clear any cached authentication headers
             GitHubAuthManager.clear_cached_headers()
+            # Clear any cached rate limit information
+            GitHubAuthManager.clear_rate_limit_cache()
         else:
             print("\n❓ No tokens were found to remove or removal failed")
 
