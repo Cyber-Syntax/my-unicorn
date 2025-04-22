@@ -52,36 +52,33 @@ class ManageTokenCommand(Command):
             # Display menu
             print("\nGitHub Token Management:")
             print("------------------------")
-            print("1. Add or Update Token with cryptography")
-            print("2. Save Token to Keyring (e.g GNOME keyring)")
-            print("3. Remove Token")
-            print("4. Check API Rate Limits")
-            print("5. View Token Expiration")
-            print("6. View Token Audit Logs")
-            print("7. Rotate Token")
-            print("8. View Storage Details")
-            print("9. Back to Main Menu")
+            print("1. Save Token to Secure Keyring (e.g GNOME keyring)")
+            print("2. Remove Token")
+            print("3. Check API Rate Limits")
+            print("4. View Token Expiration")
+            print("5. View Token Audit Logs")
+            print("6. Rotate Token")
+            print("7. View Storage Details")
+            print("8. Back to Main Menu")
 
             try:
                 choice = int(input("\nEnter your choice (1-9): "))
 
                 if choice == 1:
-                    self._add_update_token()
-                elif choice == 2:
                     self._save_to_keyring()
-                elif choice == 3:
+                elif choice == 2:
                     self._remove_token()
-                elif choice == 4:
+                elif choice == 3:
                     self._check_rate_limits()
-                elif choice == 5:
+                elif choice == 4:
                     self._view_token_expiration()
-                elif choice == 6:
+                elif choice == 5:
                     self._view_audit_logs()
-                elif choice == 7:
+                elif choice == 6:
                     self._rotate_token()
-                elif choice == 8:
+                elif choice == 7:
                     self._view_storage_details()
-                elif choice == 9:
+                elif choice == 8:
                     self._logger.info("Exiting token management")
                     return
                 else:
@@ -169,68 +166,6 @@ class ManageTokenCommand(Command):
         # Simple secure storage status without complex details
         print("\nSecure Storage: ✅ Enabled")
         print("Token Security: ✅ Protected")
-
-    def _add_update_token(self) -> None:
-        """
-        Add or update a GitHub token in the secure storage.
-
-        This prompts the user for a token and validates it before saving.
-        """
-        self._logger.info("Adding/updating GitHub token")
-
-        # Get the token from the user (input is hidden)
-        token = SecureTokenManager.prompt_for_token()
-
-        if not token:
-            print("Operation cancelled.")
-            return
-
-        # Ask for token expiration
-        expiration_days = self._get_token_expiration_days()
-        if expiration_days is None:
-            print("Operation cancelled.")
-            return
-
-        # Validate the token
-        if self._validate_token(token):
-            # Check if GNOME keyring is available
-            keyring_status = SecureTokenManager.get_keyring_status()
-            use_gnome_keyring = False
-
-            if keyring_status["gnome_keyring_available"]:
-                print("\nGNOME keyring (Seahorse) detected on your system.")
-                choice = input("Do you want to explicitly save to GNOME keyring? (y/n): ")
-                use_gnome_keyring = choice.lower() == "y"
-
-            # Save the token based on user choice
-            if use_gnome_keyring:
-                # Use the explicit GNOME keyring method
-                success = SecureTokenManager.save_token_to_gnome_keyring(
-                    token, expires_in_days=expiration_days
-                )
-                if success:
-                    print("\n✅ GitHub token saved successfully to GNOME keyring!")
-                    print(f"📅 Token will expire in {expiration_days} days")
-                else:
-                    print("\n❌ Failed to save token to GNOME keyring!")
-                    print("   Fallback storage method was used instead.")
-            else:
-                # Use the default save method with auto-detection
-                if SecureTokenManager.save_token(token, expires_in_days=expiration_days):
-                    print("\n✅ GitHub token saved successfully!")
-                    print(f"📅 Token will expire in {expiration_days} days")
-                else:
-                    print("\n❌ Failed to save token securely!")
-                    print("   Make sure you have keyring or cryptography modules installed.")
-
-            # Clear any cached authentication headers regardless of save method
-            GitHubAuthManager.clear_cached_headers()
-
-            # Show current rate limits with new token
-            self._check_rate_limits(token)
-        else:
-            print("\n❌ Invalid GitHub token! Token was not saved.")
-            print("   Please make sure you've entered the token correctly.")
 
     def _get_token_expiration_days(self) -> Optional[int]:
         """
@@ -469,7 +404,7 @@ class ManageTokenCommand(Command):
                         print(f"Type: {token_info.get('token_type', 'Unknown')}")
                     if token_info.get("scopes"):
                         print(f"Scopes: {', '.join(token_info.get('scopes', []))}")
-            
+
                     # Check if days_until_rotation is a string and convert if needed
                     if "days_until_rotation" in token_info and token_info["days_until_rotation"] is not None:
                         days_until_rotation = token_info["days_until_rotation"]
@@ -479,13 +414,13 @@ class ManageTokenCommand(Command):
                                 days_until_rotation = int(days_until_rotation)
                             except ValueError:
                                 days_until_rotation = None
-                                
+
                         # Now it's safe to compare
                         if days_until_rotation is not None and days_until_rotation <= 0:
                             print("⚠️ Token scheduled for rotation on next use")
                         elif days_until_rotation is not None:
                             print(f"ℹ️ Token scheduled for rotation in {days_until_rotation} days")
-            
+
                     if token_info.get("is_fine_grained", False):
                         print("✅ Using fine-grained personal access token (recommended)")
                     elif token_info.get("is_classic", False):
@@ -494,7 +429,7 @@ class ManageTokenCommand(Command):
             except Exception as token_info_error:
                 self._logger.error(f"Error retrieving token information: {token_info_error}")
                 # Continue execution - token info is not critical
-    
+
         except Exception as e:
             # Log both the error type and the message for better debugging
             self._logger.error(f"Error checking rate limits: {type(e).__name__}: {str(e)}")
@@ -665,7 +600,7 @@ class ManageTokenCommand(Command):
             except Exception as e:
                 self._logger.error(f"Error processing last used date: {e}")
                 print("Last used: Unknown")
-            
+
     def _view_audit_logs(self) -> None:
         """
         Display token usage audit logs.
@@ -1002,9 +937,10 @@ class ManageTokenCommand(Command):
             "source": "manage_token_command",
             "security_level": "high",
         }
-
-        result = SecureTokenManager.save_token_directly_to_keyring(
-            token, expires_in_days=expiration_days, metadata=metadata
+        
+        # Save token to keyring using our enhanced method with improved metadata
+        result = SecureTokenManager.save_token(
+            token,expires_in_days=expiration_days,storage_preference="keyring_only",metadata=metadata
         )
 
         if result:
