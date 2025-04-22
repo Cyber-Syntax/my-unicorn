@@ -3,7 +3,7 @@ import gettext
 import hashlib
 import logging
 import os
-
+import re
 import requests
 import yaml
 
@@ -15,7 +15,7 @@ COLOR_FAIL = "\033[41m"
 COLOR_RESET = "\033[0m"
 
 # Supported hash types
-SUPPORTED_HASH_TYPES = ["sha256", "sha512"]
+SUPPORTED_HASH_TYPES = ["sha256", "sha512", "no_hash"]
 
 
 class VerificationManager:
@@ -42,22 +42,45 @@ class VerificationManager:
                 f"Supported types are: {', '.join(SUPPORTED_HASH_TYPES)}"
             )
 
-        if self.hash_type not in hashlib.algorithms_available:
+        if self.hash_type != "no_hash" and self.hash_type not in hashlib.algorithms_available:
             raise ValueError(f"Hash type {self.hash_type} not available in this system")
 
-    def verify_appimage(self) -> bool:
-        """Verify the AppImage using the SHA file with proper error handling."""
+    def verify_appimage(self, cleanup_on_failure: bool = False) -> bool:
+        """
+        Verify the AppImage using the SHA file with proper error handling and fallbacks.
+
+        Args:
+            cleanup_on_failure: Whether to remove the AppImage if verification fails
+
+        Returns:
+            bool: True if verification passed or skipped due to fallback, False otherwise
+        """
         try:
-            if not self.sha_url or not self.sha_name:
-                logging.error("Missing SHA file information for verification")
-                return False
+            # Skip verification if hash_type is set to no_hash or no SHA info available
+            if self.hash_type == "no_hash" or not self.sha_name or not self.sha_url:
+                logging.info("Verification skipped - no hash file information available")
+                print("Note: Verification skipped - no hash file provided")
+                return True
 
             if not self.appimage_name or not os.path.exists(self.appimage_name):
                 logging.error(f"AppImage file not found: {self.appimage_name}")
                 return False
 
+            # FALLBACK CASE: If sha_name matches appimage_name, this indicates
+            # our API fallback was triggered where no SHA file was found
+            if self.sha_name == self.appimage_name:
+                logging.info("Verification fallback: No SHA file available for this release")
+                print("Note: Verification skipped - no hash file provided by the developer")
+                logging.info(f"Proceeding with unverified AppImage: {self.appimage_name}")
+                return True
+
             self._download_sha_file()
-            return self._parse_sha_file()
+            is_valid = self._parse_sha_file()
+
+            if not is_valid and cleanup_on_failure:
+                self._cleanup_failed_file(self.appimage_name)
+
+            return is_valid
 
         except (requests.RequestException, IOError) as e:
             logging.error(f"Verification failed: {str(e)}")
@@ -88,6 +111,10 @@ class VerificationManager:
 
     def _parse_sha_file(self) -> bool:
         """Dispatch to appropriate SHA parsing method based on file extension."""
+        if self.hash_type == "no_hash":
+            logging.info("Skipping hash verification as requested")
+            return True
+
         if not os.path.exists(self.sha_name):
             raise IOError(f"SHA file not found: {self.sha_name}")
 
@@ -186,12 +213,34 @@ class VerificationManager:
 
             actual_hash = hash_func.hexdigest()
             self._log_comparison(actual_hash, expected_hash)
+
+            # Delete the SHA file after verification
+            self._cleanup_verification_file()
+
             return actual_hash == expected_hash
 
         except IOError as e:
             raise IOError(f"Failed to read AppImage file: {str(e)}")
         except Exception as e:
             raise ValueError(f"Hash calculation failed: {str(e)}")
+
+    def _cleanup_verification_file(self) -> bool:
+        """Remove SHA file after verification to keep the system clean.
+
+        Returns:
+            bool: True if cleanup succeeded or file didn't exist, False otherwise
+        """
+        if not self.sha_name or not os.path.exists(self.sha_name):
+            logging.debug(f"No SHA file to clean up: {self.sha_name}")
+            return True
+
+        try:
+            os.remove(self.sha_name)
+            logging.info(f"Removed verification file: {self.sha_name}")
+            return True
+        except OSError as e:
+            logging.warning(f"Failed to remove verification file: {str(e)}")
+            return False
 
     def _log_comparison(self, actual: str, expected: str):
         """Format and log hash comparison results."""
@@ -209,3 +258,20 @@ class VerificationManager:
 
         print("\n".join(log_lines))
         logging.info("\n".join(log_lines))
+
+    def _cleanup_failed_file(self, filepath: str) -> bool:
+        """Remove a file that failed verification to prevent future update issues."""
+        try:
+            if not os.path.exists(filepath):
+                logging.info(f"File not found, nothing to clean up: {filepath}")
+                return True
+
+            os.remove(filepath)
+            logging.info(f"Cleaned up failed verification file: {filepath}")
+            print(f"Removed failed file: {filepath}")
+            return True
+
+        except Exception as e:
+            logging.error(f"Failed to remove file after verification failure: {str(e)}")
+            print(f"Warning: Could not remove failed file: {filepath}")
+            return False

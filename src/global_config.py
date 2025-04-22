@@ -8,14 +8,13 @@ from dataclasses import dataclass, field
 class GlobalConfigManager:
     """Manages global configuration settings."""
 
-    config_file: str = field(
-        default="~/.config/myunicorn/settings.json"
-    )
+    config_file: str = field(default="~/.config/myunicorn/settings.json")
     appimage_download_folder_path: str = field(default_factory=lambda: "~/Documents/appimages")
     appimage_download_backup_folder_path: str = field(
         default_factory=lambda: "~/Documents/appimages/backups"
     )
     keep_backup: bool = field(default=True)
+    max_backups: int = field(default=3)  # Number of backups to keep per app
     batch_mode: bool = field(default=False)
     locale: str = field(default="en")
 
@@ -36,7 +35,12 @@ class GlobalConfigManager:
             try:
                 with open(self.config_file, "r", encoding="utf-8") as file:
                     config = json.load(file)
-                    # Safely load each configuration item
+
+                    # Get all expected config keys from to_dict method
+                    expected_keys = set(self.to_dict().keys())
+                    found_keys = set(config.keys())
+
+                    # Load each configuration item safely
                     self.appimage_download_folder_path = config.get(
                         "appimage_download_folder_path",
                         self.appimage_download_folder_path,
@@ -46,8 +50,14 @@ class GlobalConfigManager:
                         self.appimage_download_backup_folder_path,
                     )
                     self.keep_backup = config.get("keep_backup", self.keep_backup)
+                    self.max_backups = config.get("max_backups", self.max_backups)
                     self.batch_mode = config.get("batch_mode", self.batch_mode)
                     self.locale = config.get("locale", self.locale)
+
+                    # If any expected keys are missing, log it
+                    missing_keys = expected_keys - found_keys
+                    if missing_keys:
+                        logging.info(f"Config file is missing keys: {missing_keys}")
             except json.JSONDecodeError as e:
                 logging.error(f"Failed to parse the configuration file: {e}")
                 raise ValueError("Invalid JSON format in the configuration file.")
@@ -64,6 +74,7 @@ class GlobalConfigManager:
             "appimage_download_folder_path": self.appimage_download_folder_path,
             "appimage_download_backup_folder_path": self.appimage_download_backup_folder_path,
             "keep_backup": self.keep_backup,
+            "max_backups": self.max_backups,
             "batch_mode": self.batch_mode,
             "locale": self.locale,
         }
@@ -72,30 +83,50 @@ class GlobalConfigManager:
         """Sets up global configuration interactively."""
         print("Setting up global configuration...")
 
-        # Use default values if input is blank
-        appimage_download_folder_path = (
-            input(
-                "Enter the folder path to save appimages (default: '~/Documents/appimages'): "
-            ).strip()
-            or "~/Documents/appimages"
-        )
-        keep_backup = (
-            input("Enable backup for old appimages? (yes/no, default: yes): ").strip().lower()
-            or "yes"
-        )
-        batch_mode = input("Enable batch mode? (yes/no, default: no): ").strip().lower() or "no"
-        locale = input("Select your locale (en/tr, default: en): ").strip() or "en"
+        try:
+            # Use default values if input is blank
+            appimage_download_folder_path = (
+                input(
+                    "Enter the folder path to save appimages (default: '~/Documents/appimages'): "
+                ).strip()
+                or "~/Documents/appimages"
+            )
+            keep_backup = (
+                input("Enable backup for old appimages? (yes/no, default: yes): ").strip().lower()
+                or "yes"
+            )
+            max_backups = (
+                input("Max number of backups to keep per app (default: 3): ").strip() or "3"
+            )
+            batch_mode = input("Enable batch mode? (yes/no, default: no): ").strip().lower() or "no"
+            locale = input("Select your locale (en/tr, default: en): ").strip() or "en"
 
-        # Update current instance values
-        self.appimage_download_folder_path = appimage_download_folder_path
-        self.appimage_download_backup_folder_path = "~/Documents/appimages/backups"
-        self.keep_backup = keep_backup == "yes"
-        self.batch_mode = batch_mode == "yes"
-        self.locale = locale
+            # Update current instance values
+            self.appimage_download_folder_path = appimage_download_folder_path
+            self.appimage_download_backup_folder_path = "~/Documents/appimages/backups"
+            self.keep_backup = keep_backup == "yes"
+            self.max_backups = int(max_backups)
+            self.batch_mode = batch_mode == "yes"
+            self.locale = locale
 
-        # Save the configuration
-        self.save_config()
-        print("Global configuration saved successfully!")
+            # Save the configuration
+            self.save_config()
+            print("Global configuration saved successfully!")
+        except KeyboardInterrupt:
+            logging.info("Global configuration setup interrupted by user")
+            print("\nConfiguration setup interrupted. Using default values.")
+
+            # Set default values
+            self.appimage_download_folder_path = "~/Documents/appimages"
+            self.appimage_download_backup_folder_path = "~/Documents/appimages/backups"
+            self.keep_backup = True
+            self.max_backups = 3
+            self.batch_mode = False
+            self.locale = "en"
+
+            # Save the default configuration
+            self.save_config()
+            print("Default global configuration saved.")
 
     def save_config(self):
         """Save global settings to a JSON file."""
@@ -121,45 +152,71 @@ class GlobalConfigManager:
         print("=================================================")
         print(f"1. AppImage Download Folder: {self.appimage_download_folder_path}")
         print(f"2. Enable Backup: {'Yes' if self.keep_backup else 'No'}")
-        print(f"3. Batch Mode: {'Yes' if self.batch_mode else 'No'}")
-        print(f"4. Locale: {self.locale}")
-        print("5. Exit")
+        print(f"3. Max Backups Per App: {self.max_backups}")
+        print(f"4. Batch Mode: {'Yes' if self.batch_mode else 'No'}")
+        print(f"5. Locale: {self.locale}")
+        print("6. Exit")
         print("=================================================")
 
-        while True:
-            choice = input("Enter your choice: ")
-            if choice.isdigit() and 1 <= int(choice) <= 5:
-                break
-            else:
-                print("Invalid choice, please enter a number between 1 and 5.")
+        try:
+            while True:
+                choice = input("Enter your choice: ")
+                if choice.isdigit() and 1 <= int(choice) <= 6:
+                    break
+                else:
+                    print("Invalid choice, please enter a number between 1 and 6.")
 
-        if choice == "5":
-            print("Exiting without changes.")
+            if choice == "6":
+                print("Exiting without changes.")
+                return
+
+            config_dict = {
+                "appimage_download_folder_path": self.appimage_download_folder_path,
+                "keep_backup": self.keep_backup,
+                "max_backups": self.max_backups,
+                "batch_mode": self.batch_mode,
+                "locale": self.locale,
+            }
+            key = list(config_dict.keys())[int(choice) - 1]
+
+            try:
+                if key == "appimage_download_folder_path":
+                    new_value = (
+                        input("Enter the new folder path to save appimages: ").strip()
+                        or "~/Documents/appimages"
+                    )
+                elif key == "keep_backup":
+                    new_value = (
+                        input("Enable backup for old appimages? (yes/no): ").strip().lower() or "no"
+                    )
+                    new_value = new_value == "yes"
+                elif key == "max_backups":
+                    new_value_str = (
+                        input("Enter max number of backups to keep per app: ").strip() or "3"
+                    )
+                    try:
+                        new_value = int(new_value_str)
+                        if new_value < 1:
+                            print("Value must be at least 1. Setting to 1.")
+                            new_value = 1
+                    except ValueError:
+                        print("Invalid number. Setting to default (3).")
+                        new_value = 3
+                elif key == "batch_mode":
+                    new_value = input("Enable batch mode? (yes/no): ").strip().lower() or "no"
+                    new_value = new_value == "yes"
+                elif key == "locale":
+                    new_value = input("Select your locale (en/tr, default: en): ").strip() or "en"
+
+                setattr(self, key, new_value)
+                self.save_config()
+                print(f"\033[42m{key.capitalize()} updated successfully in settings.json\033[0m")
+                print("=================================================")
+            except KeyboardInterrupt:
+                logging.info("User interrupted configuration update")
+                print("\nConfiguration update cancelled. No changes were made.")
+                return
+        except KeyboardInterrupt:
+            logging.info("User interrupted configuration customization")
+            print("\nConfiguration customization cancelled. No changes were made.")
             return
-
-        config_dict = {
-            "appimage_download_folder_path": self.appimage_download_folder_path,
-            "keep_backup": self.keep_backup,
-            "batch_mode": self.batch_mode,
-            "locale": self.locale,
-        }
-        key = list(config_dict.keys())[int(choice) - 1]
-
-        if key == "appimage_download_folder_path":
-            new_value = (
-                input("Enter the new folder path to save appimages: ").strip()
-                or "~/Documents/appimages"
-            )
-        elif key == "keep_backup":
-            new_value = input("Enable backup for old appimages? (yes/no): ").strip().lower() or "no"
-            new_value = new_value == "yes"
-        elif key == "batch_mode":
-            new_value = input("Enable batch mode? (yes/no): ").strip().lower() or "no"
-            new_value = new_value == "yes"
-        elif key == "locale":
-            new_value = input("Select your locale (en/tr, default: en): ").strip() or "en"
-
-        setattr(self, key, new_value)
-        self.save_config()
-        print(f"\033[42m{key.capitalize()} updated successfully in settings.json\033[0m")
-        print("=================================================")

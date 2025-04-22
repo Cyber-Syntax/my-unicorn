@@ -49,5 +49,11 @@ class LocaleManager:
             language = languages.get(choice, "en")
             self.save_locale_config(language)
             self.load_translations(language)
-        except (ValueError, KeyboardInterrupt):
+        except ValueError:
             print("Invalid input. Defaulting to English.")
+            self.save_locale_config("en")
+            self.load_translations("en")
+        except KeyboardInterrupt:
+            print("\nSelection interrupted. Defaulting to English.")
+            self.save_locale_config("en")
+            self.load_translations("en")

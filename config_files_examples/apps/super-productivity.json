@@ -1,10 +1,9 @@
 {
-  "owner": "johannesjo",
-  "repo": "super-productivity",
-  "version": "11.1.2",
-  "sha_name": "latest-linux.yml",
-  "hash_type": "sha512",
-  "appimage_name": "super-productivity.AppImage",
-  "arch_keyword": "-x86_64.appimage"
+    "owner": "johannesjo",
+    "repo": "super-productivity",
+    "version": "12.0.2",
+    "sha_name": "latest-linux.yml",
+    "hash_type": "sha512",
+    "appimage_name": "superProductivity-x86_64.AppImage",
+    "arch_keyword": "-x86_64.appimage"
 }
-

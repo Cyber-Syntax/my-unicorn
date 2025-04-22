@@ -21,10 +21,11 @@ class DownloadManager:
     def is_app_exist(self):
         """Check if the AppImage already exists in the current directory."""
         if not self.api.appimage_name:
-            print("AppImage name is not set.")
+            logging.error("AppImage name is not set.")
             return False
 
         if os.path.exists(self.api.appimage_name):
+            logging.info(f"{self.api.appimage_name} already exists in the current directory")
             print(f"{self.api.appimage_name} already exists in the current directory")
             return True
         return False
@@ -35,6 +36,7 @@ class DownloadManager:
             # If the file exists, do not proceed with the download
             return
 
+        logging.info(f"Starting download of {self.api.appimage_name}")
         print(
             f"{self.api.appimage_name} downloading... Grab a cup of coffee :), it will take some time depending on your internet speed."
         )
@@ -61,12 +63,14 @@ class DownloadManager:
                     file.flush()  # Force write to disk
                     progress_bar.update(len(chunk))
         else:
+            logging.error(f"Error downloading {self.api.appimage_name}: {response.status_code}")
             print(f"Error downloading {self.api.appimage_name}")
-            logging.error(f"Error downloading {self.api.appimage_url}")
             sys.exit()
 
         if response is not None:
             response.close()
+            logging.info(f"Download completed: {self.api.appimage_name} installed")
             print(f"Download completed! {self.api.appimage_name} installed.")
         else:
+            logging.error(f"Error downloading {self.api.appimage_name}")
             print(f"Error downloading {self.api.appimage_name}")
