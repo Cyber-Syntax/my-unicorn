@@ -133,11 +133,7 @@ class DownloadCommand(Command):
         )
 
         # Install icon for the appimage
-        icon_success, icon_msg = file_handler.download_app_icon(api.owner, api.repo)
-        if icon_success:
-            print(f"Icon installed: {icon_msg}")
-        else:
-            print(f"No icon installed: {icon_msg}")
+        file_handler.download_app_icon(api.owner, api.repo)
 
         # Check if the file operations were successful
         success = file_handler.handle_appimage_operations()

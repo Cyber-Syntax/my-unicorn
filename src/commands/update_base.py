@@ -219,11 +219,7 @@ class BaseUpdateCommand(Command):
         file_handler = self._create_file_handler(github_api, app_config, global_config)
 
         # Try to download icon
-        icon_success, icon_msg = file_handler.download_app_icon(github_api.owner, github_api.repo)
-        if icon_success:
-            print(f"Icon installed: {icon_msg}")
-        else:
-            print(f"No icon installed: {icon_msg}")
+        file_handler.download_app_icon(github_api.owner, github_api.repo)
 
         # Perform file operations and update config
         if file_handler.handle_appimage_operations(github_api=github_api):

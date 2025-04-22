@@ -45,40 +45,6 @@ class VerificationManager:
         if self.hash_type != "no_hash" and self.hash_type not in hashlib.algorithms_available:
             raise ValueError(f"Hash type {self.hash_type} not available in this system")
 
-    def _handle_sha_fallback(self, assets=None):
-        """
-        Original fallback logic with improved prompts.
-
-        Args:
-            assets: List of release assets from GitHub API
-        """
-        logging.warning("Could not find SHA file automatically")
-        print("Could not find SHA file automatically")
-        print("1. Enter filename manually")
-        print("2. Skip verification")
-        choice = input("Your choice (1-2): ")
-
-        if choice == "1":
-            self.sha_name = input("Enter exact SHA filename: ")
-            if assets:
-                for asset in assets:
-                    if asset["name"] == self.sha_name:
-                        self.sha_url = asset["browser_download_url"]
-                        # Set hash type based on filename
-                        if "sha256" in self.sha_name.lower():
-                            self.hash_type = "sha256"
-                        elif "sha512" in self.sha_name.lower():
-                            self.hash_type = "sha512"
-                        return
-                raise ValueError(f"SHA file {self.sha_name} not found")
-            else:
-                logging.warning("No assets provided, can't verify SHA file existence")
-                self.sha_url = None
-        else:
-            self.sha_name = "no_sha_file"
-            self.hash_type = "no_hash"
-            logging.info("User chose to skip SHA verification")
-
     def verify_appimage(self, cleanup_on_failure: bool = False) -> bool:
         """
         Verify the AppImage using the SHA file with proper error handling and fallbacks.
