@@ -147,6 +147,9 @@ class DynamicProgressManager(Generic[T]):
         self._live: Optional[Live] = None
         self._layout: Optional[Layout] = None
 
+        # Track if a task has a download in progress
+        self._download_in_progress: Dict[T, bool] = {}
+
     @contextmanager
     def start_progress(self, total_items: int, title: str = "Processing") -> None:
         """
@@ -213,6 +216,7 @@ class DynamicProgressManager(Generic[T]):
 
             # Reset progress displays
             self.task_map.clear()
+            self._download_in_progress.clear()
             if self.download_progress:
                 self.download_progress = None
 
@@ -242,6 +246,9 @@ class DynamicProgressManager(Generic[T]):
             "completed_steps": set(),
             "success": None,
         }
+
+        # Initialize download tracking
+        self._download_in_progress[item_id] = False
 
     def start_item_step(self, item_id: T, step: str) -> None:
         """
@@ -302,6 +309,10 @@ class DynamicProgressManager(Generic[T]):
             else:
                 self.task_stats["failed"] += 1
 
+            # Clean up download tracking
+            if item_id in self._download_in_progress:
+                self._download_in_progress[item_id] = False
+
     def start_download(self, item_id: T, filename: str, total_size: int) -> TaskID:
         """
         Start tracking a file download.
@@ -314,35 +325,22 @@ class DynamicProgressManager(Generic[T]):
         Returns:
             TaskID: Task ID for the download
         """
-        # Initialize download progress if needed
-        if not self.download_progress:
-            # Create a nested progress bar specifically for downloads
-            self.download_progress = Progress(
-                TextColumn("[bold cyan]{task.description}[/]"),
-                BarColumn(bar_width=30),
-                DownloadColumn(),
-                TransferSpeedColumn(),
-                TimeRemainingColumn(),
-            )
+        # Mark this item as having a download in progress
+        if item_id in self._download_in_progress:
+            self._download_in_progress[item_id] = True
 
-            # Add the download progress to the main task
-            if item_id in self.task_map:
-                main_task_id = self.task_map[item_id]["task_id"]
-                self.progress.update(main_task_id, status=f"[blue]Downloading {filename}[/]")
-
-        # Create a download task
-        download_task_id = self.progress.add_task(
-            f"Downloading {filename}",
-            total=total_size,
-            completed=0,
-            progress_type="download",  # Set progress type for this specific task
-        )
-
-        # Store the download task information
+        # Update the main task status
         if item_id in self.task_map:
-            self.task_map[item_id]["download_task_id"] = download_task_id
+            main_task_id = self.task_map[item_id]["task_id"]
+            self.progress.update(main_task_id, status=f"[blue]Downloading {filename}[/]")
 
-        return download_task_id
+            # Since we're now using the external download progress manager,
+            # we'll return a placeholder task ID
+            # The actual progress tracking will happen in the DownloadManager
+            return main_task_id
+
+        # Return a default task ID if item not found
+        return 0
 
     def update_download(
         self, item_id: T, filename: str, advance: int = 0, finished: bool = False
@@ -356,22 +354,17 @@ class DynamicProgressManager(Generic[T]):
             advance: Number of bytes to advance the progress
             finished: Whether the download is finished
         """
-        if item_id in self.task_map and "download_task_id" in self.task_map[item_id]:
-            download_task_id = self.task_map[item_id]["download_task_id"]
-
-            if advance > 0:
-                self.progress.update(download_task_id, advance=advance)
+        if item_id in self.task_map:
+            # Update the main task status based on download state
+            main_task_id = self.task_map[item_id]["task_id"]
 
             if finished:
-                self.progress.update(
-                    download_task_id,
-                    description=f"[green]Downloaded {filename}[/]",
-                    status="[bold green]✓ Complete[/]",
-                )
-
-                # Update the main task status
-                main_task_id = self.task_map[item_id]["task_id"]
+                # Mark download as complete
+                self._download_in_progress[item_id] = False
                 self.progress.update(main_task_id, status=f"[green]Download completed[/]")
+            elif advance > 0 and self._download_in_progress.get(item_id, False):
+                # Only show downloading status if still in progress
+                self.progress.update(main_task_id, status=f"[blue]Downloading {filename}...[/]")
 
     def get_summary(self) -> Table:
         """

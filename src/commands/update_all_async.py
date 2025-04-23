@@ -397,6 +397,85 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             self.console.print("\n[yellow]Confirmation cancelled by user (Ctrl+C)[/]")
             return False
 
+    def _check_rate_limits(
+        self, apps: List[Dict[str, Any]]
+    ) -> Tuple[bool, List[Dict[str, Any]], str]:
+        """
+        Check if we have enough API rate limits for the selected apps.
+
+        This method:
+        1. Gets current GitHub API rate limits
+        2. Estimates required requests per app (2-3 typically)
+        3. Determines if there are enough rate limits for all selected apps
+        4. If not, filters to apps that can be processed within limits
+
+        Args:
+            apps: List of app information dictionaries
+
+        Returns:
+            Tuple containing:
+            - bool: True if we can proceed with all apps, False if partial/no update needed
+            - List[Dict[str, Any]]: Filtered list of apps that can be processed
+            - str: Status message explaining the rate limit situation
+        """
+        # Get current rate limit info
+        remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+
+        # For each app, we need approximately:
+        # - 1 API call to fetch releases
+        # - 1 API call to get version info
+        # - Potentially 1 more if we need additional info (uncommon)
+        # Using 3 as a conservative estimate to be safe
+        requests_per_app = 3
+
+        # Calculate total required requests
+        required_requests = len(apps) * requests_per_app
+
+        # Check if we have enough remaining
+        if remaining >= required_requests:
+            # We have enough rate limits for all apps
+            return (
+                True,
+                apps,
+                f"Sufficient API rate limits: {remaining} remaining, {required_requests} required",
+            )
+
+        # Not enough for all apps - calculate how many we can process
+        processable_apps_count = remaining // requests_per_app
+        filtered_apps = []
+
+        if processable_apps_count > 0:
+            # Take only as many apps as we can process with available rate limits
+            filtered_apps = apps[:processable_apps_count]
+            status = (
+                f"[yellow]⚠️  Insufficient API rate limits for all apps.[/]\n"
+                f"Rate limits: {remaining}/{limit} remaining\n"
+                f"Total required: {required_requests} ({requests_per_app} per app × {len(apps)} apps)\n"
+                f"Can process: {processable_apps_count}/{len(apps)} apps with current rate limits"
+            )
+
+            if reset_time:
+                status += f"\nLimits reset at: {reset_time}"
+
+            if not is_authenticated:
+                status += "\n\n[blue]🔑[/] Adding a GitHub token would increase your rate limit to 5000/hour."
+        else:
+            # Can't process any apps with current rate limits
+            status = (
+                f"[bold red]❌ Insufficient API rate limits.[/]\n"
+                f"Rate limits: {remaining}/{limit} remaining\n"
+                f"Required: {required_requests} ({requests_per_app} per app × {len(apps)} apps)\n"
+                f"Cannot process any apps with current rate limits."
+            )
+
+            if reset_time:
+                status += f"\nLimits reset at: {reset_time}"
+
+            if not is_authenticated:
+                status += "\n\n[blue]🔑[/] Adding a GitHub token would increase your rate limit to 5000/hour."
+
+        return False, filtered_apps, status
+
     def _update_apps_async(self, apps_to_update: List[Dict[str, Any]]) -> None:
         """
         Update multiple apps concurrently using asyncio.

@@ -3,7 +3,7 @@ import os
 import sys
 import asyncio
 import time
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any, Union, Set
 
 import requests
 from rich.console import Console
@@ -27,26 +27,45 @@ class MultiAppProgress(Progress):
     All progress bars are rendered together in a single display.
     """
 
-    def get_renderables(self):
-        """Override to customize the progress bar display for each task."""
-        for task_id in self.task_ids:
-            task = self.tasks[task_id]
-            # Get the custom prefix if provided
-            prefix = task.fields.get("prefix", "")
-            # Create app-specific columns based on task fields
-            self.columns = (
-                TextColumn(f"{prefix}[bold cyan]{{task.description}}[/]"),
-                BarColumn(),
-                "[progress.percentage]{task.percentage:>3.0f}%",
-                "•",
-                DownloadColumn(),
-                "•",
-                TransferSpeedColumn(),
-                "•",
-                TimeRemainingColumn(),
-            )
-            # Yield a single-row table for this task
-            yield self.make_tasks_table([task])
+    def get_renderables(self) -> List[Any]:
+        """
+        Override to customize the progress bar display for each task.
+
+        Returns:
+            List[Any]: A list of renderables for displaying download progress
+        """
+        renderables = []
+
+        # Safely iterate through tasks that actually exist
+        for task in self.tasks:
+            if task.visible:
+                # Get the custom prefix if provided
+                prefix = task.fields.get("prefix", "")
+
+                # Create app-specific columns for this task
+                temp_columns = [
+                    TextColumn(f"{prefix}[bold cyan]{{task.description}}[/]"),
+                    BarColumn(),
+                    "[progress.percentage]{task.percentage:>3.0f}%",
+                    "•",
+                    DownloadColumn(),
+                    "•",
+                    TransferSpeedColumn(),
+                    "•",
+                    TimeRemainingColumn(),
+                ]
+
+                # Create a table with just this task
+                # Note: make_tasks_table in Rich only takes the columns parameter
+                # and gets tasks from self.tasks. We need to create a new Progress
+                # instance with just this task.
+                single_task_progress = Progress(*temp_columns)
+                single_task_progress.add_task(
+                    task.description, total=task.total, completed=task.completed, **task.fields
+                )
+                renderables.append(single_task_progress)
+
+        return renderables
 
 
 class DownloadManager:
@@ -60,6 +79,13 @@ class DownloadManager:
         app_index: Index of the app in a multi-app update (1-based)
         total_apps: Total number of apps being updated
     """
+
+    # Class variables for shared progress tracking
+    _global_progress: Optional[MultiAppProgress] = None
+    _active_tasks: Set[int] = set()
+    _lock = (
+        asyncio.Lock() if hasattr(asyncio, "Lock") else None
+    )  # For thread safety in async contexts
 
     def __init__(self, github_api: "GitHubAPI", app_index: int = 0, total_apps: int = 0) -> None:
         """
@@ -82,8 +108,7 @@ class DownloadManager:
         except RuntimeError:
             self.is_async_mode = False
 
-        # Shared progress instance for all downloads (class variable)
-        self._shared_progress: Optional[MultiAppProgress] = None
+        # Store task ID for this download instance
         self._progress_task_id: Optional[int] = None
 
     def _format_size(self, size_bytes: int) -> str:
@@ -122,20 +147,27 @@ class DownloadManager:
             MultiAppProgress: The shared progress instance
         """
         # Use the first instance's progress or create a new one
-        if not hasattr(cls, "_global_progress") or cls._global_progress is None:
+        if cls._global_progress is None:
             cls._global_progress = MultiAppProgress(
                 expand=True,
                 transient=False,  # Keep all progress bars visible
             )
             cls._global_progress.start()
+            cls._active_tasks = set()
+
         return cls._global_progress
 
     @classmethod
     def stop_progress(cls) -> None:
         """Stop and clear the shared progress instance."""
-        if hasattr(cls, "_global_progress") and cls._global_progress is not None:
-            cls._global_progress.stop()
-            cls._global_progress = None
+        if cls._global_progress is not None:
+            try:
+                cls._global_progress.stop()
+            except Exception as e:
+                logging.error(f"Error stopping progress display: {str(e)}")
+            finally:
+                cls._global_progress = None
+                cls._active_tasks = set()
 
     def download(self) -> None:
         """
@@ -213,15 +245,26 @@ class DownloadManager:
             # Prepare the output file path
             file_path = os.path.join("downloads", appimage_name)
 
-            # Get the shared progress instance
+            # Get the shared progress instance with thread safety
             progress = self.get_or_create_progress()
 
             # Add a task for this download with the app's prefix
-            download_task = progress.add_task(
-                f"Downloading {appimage_name}",
-                total=total_size,
-                prefix=prefix,  # Store prefix as a custom field
-            )
+            try:
+                download_task = progress.add_task(
+                    f"Downloading {appimage_name}",
+                    total=total_size,
+                    prefix=prefix,  # Store prefix as a custom field
+                )
+
+                # Track this task
+                self._progress_task_id = download_task
+                DownloadManager._active_tasks.add(download_task)
+
+            except Exception as e:
+                self._logger.error(f"Error creating progress task: {str(e)}")
+                # Fallback to console output without progress bar
+                console.print(f"{prefix}[cyan]Downloading {appimage_name}...[/]")
+                download_task = None
 
             # Start the actual download
             start_time = time.time()
@@ -237,20 +280,34 @@ class DownloadManager:
                     if chunk:
                         f.write(chunk)
                         downloaded_size += len(chunk)
-                        progress.update(download_task, completed=downloaded_size)
-
-            # Mark task as completed
-            progress.update(download_task, completed=total_size)
-
-            # Calculate download statistics
-            download_time = time.time() - start_time
-            speed_mbps = (total_size / (1024 * 1024)) / download_time if download_time > 0 else 0
+                        if download_task is not None and progress is not None:
+                            try:
+                                progress.update(download_task, completed=downloaded_size)
+                            except Exception as e:
+                                # If updating progress fails, log it but continue the download
+                                self._logger.debug(f"Error updating progress: {str(e)}")
 
             # Make the AppImage executable
             os.chmod(file_path, os.stat(file_path).st_mode | 0o111)
 
-            # Remove this task from the progress display
-            progress.remove_task(download_task)
+            # Clean up progress tracking
+            if download_task is not None and progress is not None:
+                try:
+                    # Mark task as completed
+                    progress.update(download_task, completed=total_size)
+
+                    # Remove this task from tracking and the progress display
+                    if download_task in DownloadManager._active_tasks:
+                        DownloadManager._active_tasks.remove(download_task)
+
+                    progress.remove_task(download_task)
+                    self._progress_task_id = None
+                except Exception as e:
+                    self._logger.debug(f"Error cleaning up progress task: {str(e)}")
+
+            # Calculate download statistics
+            download_time = time.time() - start_time
+            speed_mbps = (total_size / (1024 * 1024)) / download_time if download_time > 0 else 0
 
             # Display completion message
             console.print(
@@ -261,10 +318,41 @@ class DownloadManager:
 
             # If this is the last download and we're in async mode, clean up the progress display
             if self.is_async_mode and self.app_index == self.total_apps:
-                self.stop_progress()
+                # Only stop if no active tasks remain
+                if not DownloadManager._active_tasks:
+                    self.stop_progress()
 
         except requests.exceptions.RequestException as e:
             error_msg = f"Network error while downloading {appimage_name}: {str(e)}"
             self._logger.error(error_msg)
             console.print(f"{prefix}[bold red]✗ Download failed:[/] {error_msg}")
+
+            # Clean up the progress task if it exists
+            if hasattr(self, "_progress_task_id") and self._progress_task_id is not None:
+                try:
+                    if self._progress_task_id in DownloadManager._active_tasks:
+                        DownloadManager._active_tasks.remove(self._progress_task_id)
+
+                    if DownloadManager._global_progress is not None:
+                        DownloadManager._global_progress.remove_task(self._progress_task_id)
+                except Exception:
+                    pass  # Ignore errors during cleanup
+
+                self._progress_task_id = None
+
             raise RuntimeError(error_msg)
+        except Exception as e:
+            # Ensure we clean up the task in case of any other error
+            if hasattr(self, "_progress_task_id") and self._progress_task_id is not None:
+                try:
+                    if self._progress_task_id in DownloadManager._active_tasks:
+                        DownloadManager._active_tasks.remove(self._progress_task_id)
+
+                    if DownloadManager._global_progress is not None:
+                        DownloadManager._global_progress.remove_task(self._progress_task_id)
+                except Exception:
+                    pass  # Ignore errors during cleanup
+
+                self._progress_task_id = None
+
+            raise  # Re-raise the original exception
