@@ -251,10 +251,10 @@ class FileHandler:
                         logging.warning(f"Failed to remove old backup {filename}: {e}")
 
                 if removed_count > 0:
-                    print(
-                        f"✓ Cleaned up {removed_count} old backup{'s' if removed_count > 1 else ''}"
+                    logging.info(
+                        f"✓ Cleaned up {removed_count} old backup{'s' if removed_count > 1 else ''} for {app_base_name}"
+                        f" (kept {self.max_backups} newest)"
                     )
-                    logging.info(f"Cleaned up {removed_count} old backups for {app_base_name}")
             else:
                 logging.info(
                     f"No backups to remove for {app_base_name}, current count ({backups_count}) ≤ max_backups ({self.max_backups})"

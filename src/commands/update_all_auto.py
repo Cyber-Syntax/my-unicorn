@@ -4,13 +4,18 @@
 Auto update command module.
 
 This module provides a command to automatically check and update all AppImages
-without requiring manual selection of each app.
+without requiring manual selection of each app. Supports both synchronous and
+asynchronous updates for improved performance.
 """
 
 import logging
 import os
 import sys
-from typing import List, Dict, Any
+import asyncio
+from typing import List, Dict, Any, Optional, Tuple
+
+from rich.console import Console
+from rich.table import Table
 
 from src.commands.update_base import BaseUpdateCommand
 from src.auth_manager import GitHubAuthManager
@@ -19,19 +24,29 @@ from src.auth_manager import GitHubAuthManager
 class UpdateAllAutoCommand(BaseUpdateCommand):
     """Command to automatically check and update all AppImages without manual selection."""
 
+    def __init__(self):
+        """Initialize with base configuration and async-specific settings."""
+        super().__init__()
+        self.console = Console()
+
+        # Note: max_concurrent_updates is already initialized in the BaseUpdateCommand constructor
+        # and the global_config is already loaded in __post_init__
+
     def execute(self):
         """
         Check all AppImage configurations and update those with new versions available.
 
         This method automatically scans all available AppImage configurations and
-        updates any that have newer versions available.
+        updates any that have newer versions available. By default, it uses the
+        synchronous update method, but if async_mode is enabled, it will use
+        the more efficient concurrent update approach.
         """
         logging.info("Starting automatic check of all AppImages")
         print("Checking all AppImages for updates...")
 
         try:
-            # Load global configuration
-            self.global_config.load_config()
+            # Determine if we should use async mode (from global config)
+            use_async = getattr(self.global_config, "use_async_updates", False)
 
             # Check rate limits before proceeding with any API operations
             # Get current rate limit information
@@ -90,10 +105,14 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                 print(
                     f"Batch mode enabled - updating all {len(updatable_apps)} AppImages automatically"
                 )
-                self._update_apps(updatable_apps)
+                if use_async:
+                    self._update_apps_async_wrapper(updatable_apps)
+                else:
+                    self._update_apps(updatable_apps)
             else:
                 # In interactive mode, ask which apps to update
-                self._handle_interactive_update(updatable_apps)
+                self._handle_interactive_update(updatable_apps, use_async)
+
         except KeyboardInterrupt:
             logging.info("Operation cancelled by user (Ctrl+C)")
             print("\nOperation cancelled by user (Ctrl+C)")
@@ -160,12 +179,15 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         """
         return self.app_config.list_json_files()
 
-    def _handle_interactive_update(self, updatable_apps: List[Dict[str, Any]]) -> None:
+    def _handle_interactive_update(
+        self, updatable_apps: List[Dict[str, Any]], use_async: bool = False
+    ) -> None:
         """
         Handle interactive mode where user selects which apps to update.
 
         Args:
             updatable_apps: List of updatable app information dictionaries
+            use_async: Whether to use async update mode
         """
         # Ask user which apps to update
         print("\nEnter the numbers of the AppImages you want to update (comma-separated):")
@@ -181,7 +203,10 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
             if user_input == "all":
                 logging.info("User selected to update all apps")
-                self._update_apps(updatable_apps)
+                if use_async:
+                    self._update_apps_async_wrapper(updatable_apps)
+                else:
+                    self._update_apps(updatable_apps)
                 return
 
             try:
@@ -199,7 +224,10 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
                 if selected_apps:
                     logging.info(f"User selected {len(selected_apps)} apps to update")
-                    self._update_apps(selected_apps)
+                    if use_async:
+                        self._update_apps_async_wrapper(selected_apps)
+                    else:
+                        self._update_apps(selected_apps)
                 else:
                     logging.info("No apps selected for update")
                     print("No apps selected for update.")
@@ -212,105 +240,80 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             print("\nSelection cancelled by user (Ctrl+C)")
             return
 
-    def _update_apps(self, apps_to_update: List[Dict[str, Any]]) -> None:
+    def _update_apps_async_wrapper(self, apps_to_update: List[Dict[str, Any]]) -> None:
         """
-        Update the specified apps with rate limit awareness.
+        Wrapper to call the async update method from a synchronous context.
 
         Args:
             apps_to_update: List of app information dictionaries to update
         """
-        logging.info(f"Checking rate limits before updating {len(apps_to_update)} AppImages")
-
-        # Check if we have enough API requests available
-        can_proceed, filtered_apps, status_message = self._check_rate_limits(apps_to_update)
-
-        # Display rate limit status
-        print("\n--- GitHub API Rate Limit Check ---")
-        print(status_message)
-
-        if not can_proceed:
-            if not filtered_apps:
-                logging.warning("Update aborted: Insufficient API rate limits")
-                print("Update process aborted due to rate limit constraints.")
-                return
-
-            # Ask user if they want to proceed with partial updates
-            if not self.global_config.batch_mode:
-                try:
-                    continue_partial = (
-                        input(
-                            f"\nProceed with partial update ({len(filtered_apps)}/{len(apps_to_update)} apps)? [y/N]: "
-                        )
-                        .strip()
-                        .lower()
-                        == "y"
-                    )
-
-                    if not continue_partial:
-                        logging.info("User declined partial update")
-                        print("Update cancelled.")
-                        return
-                except KeyboardInterrupt:
-                    logging.info("Rate limit confirmation cancelled by user (Ctrl+C)")
-                    print("\nUpdate cancelled by user (Ctrl+C)")
-                    return
-
-            # Batch mode or user confirmed - proceed with partial update
-            apps_to_update = filtered_apps
-            print(f"\nProceeding with update of {len(apps_to_update)} apps within rate limits.")
-
-        # Continue with the regular update process
-        logging.info(f"Beginning update of {len(apps_to_update)} AppImages")
-        total_apps = len(apps_to_update)
-        success_count = 0
-        failure_count = 0
-
         try:
-            # Process each app one by one
-            for index, app_data in enumerate(apps_to_update, 1):
-                try:
-                    success = self._update_single_app(app_data, is_batch=(len(apps_to_update) > 1))
-                    if success:
-                        success_count += 1
-                    else:
-                        failure_count += 1
-                except KeyboardInterrupt:
-                    logging.info(f"Update of {app_data['name']} cancelled by user (Ctrl+C)")
-                    print(f"\nUpdate of {app_data['name']} cancelled by user (Ctrl+C)")
-                    failure_count += 1
-                    # Ask if user wants to continue with remaining apps
-                    if index < total_apps and total_apps > 1:
-                        try:
-                            continue_update = (
-                                input("\nContinue with remaining updates? (y/N): ").strip().lower()
-                                == "y"
-                            )
-                            if not continue_update:
-                                logging.info("Remaining updates cancelled by user")
-                                print("Remaining updates cancelled.")
-                                break
-                        except KeyboardInterrupt:
-                            logging.info("All updates cancelled by user (Ctrl+C)")
-                            print("\nAll updates cancelled by user (Ctrl+C)")
-                            break
+            # Create a new event loop if needed
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
 
-            # Show completion message
-            print("\n=== Update Summary ===")
-            print(f"Total apps processed: {success_count + failure_count}/{total_apps}")
-            print(f"Successfully updated: {success_count}")
+            # Create a semaphore to limit concurrency - use max_concurrent_updates from base class
+            self.semaphore = asyncio.Semaphore(self.max_concurrent_updates)
+
+            print(
+                f"\nStarting asynchronous update of {len(apps_to_update)} AppImages (max {self.max_concurrent_updates} concurrent)..."
+            )
+
+            # Run the async update method
+            success_count, failure_count, results = loop.run_until_complete(
+                self._update_apps_async(apps_to_update)
+            )
+
+            # Show completion message with Rich
+            table = Table(title="Update Results")
+            table.add_column("App", style="cyan")
+            table.add_column("Result", style="bold")
+            table.add_column("Details", style="dim")
+            table.add_column("Time", style="blue")
+
+            for result in results:
+                app_name = result["app"]["name"]
+                result_data = result["result"]
+                status = result_data["status"]
+
+                if status == "success":
+                    result_style = "green"
+                    result_text = "✓ Success"
+                elif status == "failed":
+                    result_style = "red"
+                    result_text = "✗ Failed"
+                else:
+                    result_style = "yellow"
+                    result_text = "! Error"
+
+                table.add_row(
+                    app_name,
+                    f"[{result_style}]{result_text}[/{result_style}]",
+                    result_data.get("message", ""),
+                    f"{result_data.get('elapsed', 0):.1f}s",
+                )
+
+            self.console.print(table)
+
+            # Show summary
+            self.console.print("\n=== Update Summary ===")
+            self.console.print(
+                f"Total apps processed: {success_count + failure_count}/{len(apps_to_update)}"
+            )
+            self.console.print(f"[green]Successfully updated: {success_count}[/]")
             if failure_count > 0:
-                print(f"Failed/cancelled updates: {failure_count}")
-            print("Update process completed!")
+                self.console.print(f"[red]Failed updates: {failure_count}[/]")
+            self.console.print("[bold green]Update process completed![/]")
 
             # Display updated rate limit information after updates
             self._display_rate_limit_info()
+
         except KeyboardInterrupt:
             logging.info("Update process cancelled by user (Ctrl+C)")
-            print("\nUpdate process cancelled by user (Ctrl+C)")
-            if success_count > 0 or failure_count > 0:
-                print("\n=== Partial Update Summary ===")
-                print(f"Total apps processed: {success_count + failure_count}/{total_apps}")
-                print(f"Successfully updated: {success_count}")
-                if failure_count > 0:
-                    print(f"Failed/cancelled updates: {failure_count}")
-            print("Update process interrupted!")
+            self.console.print("\n[bold yellow]Update process cancelled by user (Ctrl+C)[/]")
+        except Exception as e:
+            logging.error(f"Error in async update process: {str(e)}", exc_info=True)
+            self.console.print(f"\n[bold red]Error in update process:[/] {str(e)}")

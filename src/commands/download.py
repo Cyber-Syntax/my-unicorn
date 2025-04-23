@@ -66,7 +66,7 @@ class DownloadCommand(Command):
 
                 # Handle verification based on SHA file availability
                 if api.sha_name == "no_sha_file":
-                    print("Skipping verification for beta version")
+                    logging.info("Skipping verification due to no_sha_file.")
                     verification_success = True
                     break
                 else:

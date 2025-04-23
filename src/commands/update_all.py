@@ -8,13 +8,36 @@ from src.download import DownloadManager
 from src.verify import VerificationManager
 from src.file_handler import FileHandler
 from src.auth_manager import GitHubAuthManager
+import warnings
 
 
 class UpdateCommand(BaseUpdateCommand):
-    """Command to update selected AppImages using interactive selection."""
+    """
+    DEPRECATED: Command to update selected AppImages using interactive selection.
+
+    This command is now deprecated. Please use UpdateAsyncCommand instead, which provides
+    more efficient concurrent updates with the same functionality.
+    """
+
+    def __init__(self):
+        """Initialize with warning about deprecation."""
+        super().__init__()
+        warnings.warn(
+            "UpdateCommand is deprecated. Use UpdateAsyncCommand for more efficient updates.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self._logger.warning("UpdateCommand is deprecated. Use UpdateAsyncCommand instead.")
 
     def execute(self):
         """Main update execution flow with user selection."""
+        print(
+            "\n⚠️ DEPRECATED: This update method is deprecated and will be removed in a future version."
+        )
+        print(
+            "Please use the Async Update option from the main menu instead for more efficient updates.\n"
+        )
+
         try:
             # Load global configuration
             self.global_config.load_config()
@@ -262,52 +285,3 @@ class UpdateCommand(BaseUpdateCommand):
             logging.info("Confirmation cancelled by user (Ctrl+C)")
             print("\nConfirmation cancelled by user (Ctrl+C)")
             return False
-
-    def _update_apps(self, apps_to_update: List[Dict[str, Any]]) -> None:
-        """
-        Update the specified apps with rate limit awareness.
-
-        Args:
-            apps_to_update: List of app information dictionaries to update
-        """
-        logging.info(f"Checking rate limits before updating {len(apps_to_update)} AppImages")
-
-        # Check if we have enough API requests available
-        can_proceed, filtered_apps, status_message = self._check_rate_limits(apps_to_update)
-
-        # Display rate limit status
-        print("\n--- GitHub API Rate Limit Check ---")
-        print(status_message)
-
-        if not can_proceed:
-            if not filtered_apps:
-                logging.warning("Update aborted: Insufficient API rate limits")
-                print("Update process aborted due to rate limit constraints.")
-                return
-
-            # Ask user if they want to proceed with partial updates
-            try:
-                continue_partial = (
-                    input(
-                        f"\nProceed with partial update ({len(filtered_apps)}/{len(apps_to_update)} apps)? [y/N]: "
-                    )
-                    .strip()
-                    .lower()
-                    == "y"
-                )
-
-                if not continue_partial:
-                    logging.info("User declined partial update")
-                    print("Update cancelled.")
-                    return
-            except KeyboardInterrupt:
-                logging.info("Rate limit confirmation cancelled by user (Ctrl+C)")
-                print("\nUpdate cancelled by user (Ctrl+C)")
-                return
-
-            # User confirmed - proceed with partial update
-            apps_to_update = filtered_apps
-            print(f"\nProceeding with update of {len(apps_to_update)} apps within rate limits.")
-
-        # Continue with the regular update process using the base implementation
-        super()._update_apps(apps_to_update)

@@ -55,8 +55,6 @@ class UpdateAsyncCommand(BaseUpdateCommand):
     improved performance.
 
     Attributes:
-        max_concurrent_updates (int): Maximum number of updates to run concurrently
-        semaphore (Optional[asyncio.Semaphore]): Semaphore to control concurrency
         _logger (logging.Logger): Logger instance for this class
         console (Console): Rich console for output
     """
@@ -64,14 +62,13 @@ class UpdateAsyncCommand(BaseUpdateCommand):
     def __init__(self) -> None:
         """Initialize with base configuration and async-specific settings."""
         super().__init__()
-        # Control the maximum number of concurrent updates (configurable in settings)
-        self.max_concurrent_updates: int = 3
-        # Semaphore will be initialized in execute() method
-        self.semaphore: Optional[asyncio.Semaphore] = None
         # Logger for this class
         self._logger = logging.getLogger(__name__)
         # Rich console for output
         self.console = Console()
+
+        # The max_concurrent_updates value is initialized from the global config
+        # that was already loaded in BaseUpdateCommand.__post_init__()
 
     def execute(self) -> None:
         """
@@ -85,16 +82,6 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         5. Displays progress and results
         """
         try:
-            # Load global configuration
-            self.global_config.load_config()
-
-            # Override max concurrent updates if specified in config
-            if (
-                hasattr(self.global_config, "max_concurrent_updates")
-                and self.global_config.max_concurrent_updates
-            ):
-                self.max_concurrent_updates = self.global_config.max_concurrent_updates
-
             # Get available configuration files
             available_files = self.app_config.list_json_files()
 
@@ -705,7 +692,6 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         app_name = app_data["name"]
         app_config = AppConfigManager()
         global_config = GlobalConfigManager()
-        global_config.load_config()
 
         logging.info(f"Starting async update for {app_name}")
 

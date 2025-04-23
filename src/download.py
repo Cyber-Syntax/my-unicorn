@@ -17,6 +17,7 @@ from rich.progress import (
 )
 
 from .api import GitHubAPI
+from .global_config import GlobalConfigManager
 
 
 class MultiAppProgress(Progress):
@@ -87,6 +88,9 @@ class DownloadManager:
         asyncio.Lock() if hasattr(asyncio, "Lock") else None
     )  # For thread safety in async contexts
 
+    # Use GlobalConfigManager for configuration
+    _global_config: Optional[GlobalConfigManager] = None
+
     def __init__(self, github_api: "GitHubAPI", app_index: int = 0, total_apps: int = 0) -> None:
         """
         Initialize the download manager with GitHub API instance.
@@ -100,6 +104,11 @@ class DownloadManager:
         self._logger = logging.getLogger(__name__)
         self.app_index = app_index
         self.total_apps = total_apps
+
+        # Initialize global config if not already set
+        if DownloadManager._global_config is None:
+            DownloadManager._global_config = GlobalConfigManager()
+            DownloadManager._global_config.load_config()
 
         # Detect if we're in an async context
         try:

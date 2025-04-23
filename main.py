@@ -1,4 +1,7 @@
 #!/usr/bin/python3
+"""Main module for my-unicorn CLI application.
+This module configures logging, loads configuration files, and executes commands."""
+
 import gettext
 import logging
 import os
@@ -11,7 +14,6 @@ from src.commands.download import DownloadCommand
 from src.commands.invoker import CommandInvoker
 from src.commands.manage_token import ManageTokenCommand
 from src.commands.migrate_config import MigrateConfigCommand
-from src.commands.update_all import UpdateCommand
 from src.commands.update_all_auto import UpdateAllAutoCommand
 from src.commands.update_all_async import UpdateAsyncCommand  # Import the new async update command
 from src.commands.delete_backups import DeleteBackupsCommand
@@ -51,15 +53,14 @@ def get_user_choice():
     print(_("Choose one of the following options:"))
     print("====================================")
     print(_("1. Download AppImage (Must be installed to create config file)"))
-    print(_("2. Update selected AppImages"))
-    print(_("3. Update all AppImages automatically"))
-    print(_("4. Update Asynchronously (Parallel Updates)"))  # New async update option
-    print(_("5. Customize AppImages config file"))
-    print(_("6. Customize Global config file"))
-    print(_("7. Manage GitHub Token (for API rate limits)"))
-    print(_("8. Check and Migrate Configuration Files"))
-    print(_("9. Delete Old Backups"))
-    print(_("10. Exit"))  # Updated exit option number
+    print(_("2. Update all AppImages automatically"))
+    print(_("3. Update Asynchronously (Parallel Updates)"))  # New async update option
+    print(_("4. Customize AppImages config file"))
+    print(_("5. Customize Global config file"))
+    print(_("6. Manage GitHub Token (for API rate limits)"))
+    print(_("7. Check and Migrate Configuration Files"))
+    print(_("8. Delete Old Backups"))
+    print(_("9. Exit"))  # Updated exit option number
     print("====================================")
     try:
         return int(input(_("Enter your choice: ")))
@@ -124,19 +125,18 @@ def main():
     invoker = CommandInvoker()
 
     invoker.register_command(1, DownloadCommand())
-    invoker.register_command(2, UpdateCommand())
-    invoker.register_command(3, UpdateAllAutoCommand())
-    invoker.register_command(4, UpdateAsyncCommand())  # Register the new async update command
-    invoker.register_command(5, CustomizeAppConfigCommand())
-    invoker.register_command(6, CustomizeGlobalConfigCommand())
-    invoker.register_command(7, ManageTokenCommand())
-    invoker.register_command(8, MigrateConfigCommand())
-    invoker.register_command(9, DeleteBackupsCommand())
+    invoker.register_command(2, UpdateAllAutoCommand())
+    invoker.register_command(3, UpdateAsyncCommand())  # Register the new async update command
+    invoker.register_command(4, CustomizeAppConfigCommand())
+    invoker.register_command(5, CustomizeGlobalConfigCommand())
+    invoker.register_command(6, ManageTokenCommand())
+    invoker.register_command(7, MigrateConfigCommand())
+    invoker.register_command(8, DeleteBackupsCommand())
 
     # Main menu loop
     while True:
         choice = get_user_choice()
-        if choice == 10:  # Updated exit option number
+        if choice == 9:  # Updated exit option number
             logging.info("User selected to exit application")
             print("Exiting...")
             sys.exit(0)
