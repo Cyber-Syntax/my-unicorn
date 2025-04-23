@@ -196,7 +196,7 @@ class FileHandler:
         """
         try:
             # Skip cleanup if backup is disabled
-            if self.keep_backup == False:
+            if not self.keep_backup:
                 return
 
             # Ensure backup directory exists
