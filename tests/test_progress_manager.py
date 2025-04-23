@@ -277,3 +277,299 @@ def test_thread_safety(monkeypatch: "MonkeyPatch") -> None:
     # Check that the progress manager state is consistent
     assert len(manager._completed_items) == thread_count * items_per_thread
     assert len(manager._active_items) == 0
+
+
+class TestDynamicProgressManager:
+    """Tests for the DynamicProgressManager class."""
+
+    @pytest.fixture
+    def progress_manager(self) -> DynamicProgressManager[str]:
+        """Create a DynamicProgressManager instance for testing.
+
+        Returns:
+            DynamicProgressManager: A new progress manager instance
+        """
+        return DynamicProgressManager()
+
+    def test_init(self, progress_manager: DynamicProgressManager[str]) -> None:
+        """Test that the progress manager initializes correctly."""
+        # Check initial state
+        assert hasattr(progress_manager, "console")
+        assert hasattr(progress_manager, "progress")
+        assert hasattr(progress_manager, "task_map")
+        assert progress_manager.task_map == {}
+        assert progress_manager.task_stats == {
+            "start_time": None,
+            "items": 0,
+            "completed": 0,
+            "failed": 0,
+        }
+        assert progress_manager._live is None
+        assert progress_manager._layout is None
+        assert progress_manager._download_in_progress == {}
+
+    def test_start_progress(self, progress_manager: DynamicProgressManager[str]) -> None:
+        """Test starting progress display."""
+        with patch.object(Live, "__init__", return_value=None) as mock_live_init, patch.object(
+            Live, "start"
+        ) as mock_live_start, patch.object(Live, "stop") as mock_live_stop, patch.object(
+            Live, "refresh"
+        ) as mock_live_refresh:
+            # Start progress
+            with progress_manager.start_progress(total_items=3, title="Test Progress"):
+                # Verify that Live was initialized and started
+                mock_live_init.assert_called_once()
+                mock_live_start.assert_called_once()
+
+                # Check task stats were initialized
+                assert progress_manager.task_stats["items"] == 3
+                assert progress_manager.task_stats["start_time"] is not None
+
+                # Check layout was created
+                assert progress_manager._layout is not None
+                assert "header" in progress_manager._layout.layouts
+                assert "progress" in progress_manager._layout.layouts
+                assert "footer" in progress_manager._layout.layouts
+
+            # Verify that Live was stopped after the context manager
+            mock_live_stop.assert_called_once()
+            # Verify the footer was updated with completion info
+            mock_live_refresh.assert_called_once()
+
+            # Check task map was reset
+            assert progress_manager.task_map == {}
+            assert progress_manager._download_in_progress == {}
+
+    def test_add_item(self, progress_manager: DynamicProgressManager[str]) -> None:
+        """Test adding an item to track."""
+        with patch.object(Progress, "add_task", return_value=123) as mock_add_task:
+            # Add an item
+            progress_manager.add_item(
+                item_id="test_item", name="Test Item", steps=["step1", "step2", "step3"]
+            )
+
+            # Verify task was added to progress
+            mock_add_task.assert_called_once()
+            assert "Test Item" in mock_add_task.call_args[0][0]
+
+            # Verify item was tracked properly
+            assert "test_item" in progress_manager.task_map
+            assert progress_manager.task_map["test_item"]["name"] == "Test Item"
+            assert progress_manager.task_map["test_item"]["task_id"] == 123
+            assert progress_manager.task_map["test_item"]["steps"] == ["step1", "step2", "step3"]
+            assert progress_manager.task_map["test_item"]["completed_steps"] == set()
+            assert progress_manager.task_map["test_item"]["success"] is None
+
+            # Verify download tracking was initialized
+            assert "test_item" in progress_manager._download_in_progress
+            assert progress_manager._download_in_progress["test_item"] is False
+
+    def test_start_item_step(self, progress_manager: DynamicProgressManager[str]) -> None:
+        """Test starting a step for an item."""
+        with patch.object(Progress, "add_task", return_value=123) as mock_add_task, patch.object(
+            Progress, "update"
+        ) as mock_update:
+            # Add an item
+            progress_manager.add_item(
+                item_id="test_item", name="Test Item", steps=["step1", "step2", "step3"]
+            )
+
+            # Start a step
+            progress_manager.start_item_step(item_id="test_item", step="step1")
+
+            # Verify progress was updated
+            mock_update.assert_called_once_with(123, status="[yellow]Working on step1...[/]")
+
+            # Verify internal state update
+            assert progress_manager.task_map["test_item"]["current_step"] == "step1"
+
+    def test_update_item_step(self, progress_manager: DynamicProgressManager[str]) -> None:
+        """Test updating a step for an item."""
+        with patch.object(Progress, "add_task", return_value=123) as mock_add_task, patch.object(
+            Progress, "update"
+        ) as mock_update:
+            # Add an item
+            progress_manager.add_item(
+                item_id="test_item", name="Test Item", steps=["step1", "step2", "step3"]
+            )
+
+            # Update a step (not completed)
+            progress_manager.update_item_step(item_id="test_item", step="step1", completed=False)
+
+            # Should not update progress for non-completion
+            mock_update.assert_not_called()
+            assert "step1" not in progress_manager.task_map["test_item"]["completed_steps"]
+
+            # Update a step (completed)
+            progress_manager.update_item_step(item_id="test_item", step="step1", completed=True)
+
+            # Verify progress was updated
+            mock_update.assert_called_once()
+            assert mock_update.call_args[0][0] == 123  # task_id
+            assert mock_update.call_args[1]["completed"] == 1  # 1 step completed
+            assert "[green]Completed step1" in mock_update.call_args[1]["status"]
+
+            # Verify internal state update
+            assert "step1" in progress_manager.task_map["test_item"]["completed_steps"]
+
+    def test_complete_item(self, progress_manager: DynamicProgressManager[str]) -> None:
+        """Test marking an item as completed."""
+        with patch.object(Progress, "add_task", return_value=123) as mock_add_task, patch.object(
+            Progress, "update"
+        ) as mock_update:
+            # Add an item
+            progress_manager.add_item(
+                item_id="test_item", name="Test Item", steps=["step1", "step2", "step3"]
+            )
+
+            # Initial stats
+            assert progress_manager.task_stats["completed"] == 0
+            assert progress_manager.task_stats["failed"] == 0
+
+            # Complete item successfully
+            progress_manager.complete_item(item_id="test_item", success=True)
+
+            # Verify progress was updated
+            mock_update.assert_called_once()
+            assert mock_update.call_args[0][0] == 123  # task_id
+            assert mock_update.call_args[1]["completed"] == 3  # All 3 steps marked complete
+            assert "[bold green]✓ Success" in mock_update.call_args[1]["status"]
+
+            # Verify internal state update
+            assert progress_manager.task_map["test_item"]["success"] is True
+            assert progress_manager.task_stats["completed"] == 1
+            assert progress_manager.task_stats["failed"] == 0
+            assert progress_manager._download_in_progress["test_item"] is False
+
+            # Reset mock
+            mock_update.reset_mock()
+
+            # Add another item
+            progress_manager.add_item(
+                item_id="test_item2", name="Test Item 2", steps=["step1", "step2"]
+            )
+            mock_add_task.return_value = 456
+
+            # Complete item with failure
+            progress_manager.complete_item(item_id="test_item2", success=False)
+
+            # Verify progress was updated
+            assert mock_update.call_args[0][0] == 456  # task_id
+            assert mock_update.call_args[1]["completed"] == 2  # All steps marked complete
+            assert "[bold red]✗ Failed" in mock_update.call_args[1]["status"]
+
+            # Verify internal state update
+            assert progress_manager.task_map["test_item2"]["success"] is False
+            assert progress_manager.task_stats["completed"] == 1
+            assert progress_manager.task_stats["failed"] == 1
+            assert progress_manager._download_in_progress["test_item2"] is False
+
+    def test_start_download(self, progress_manager: DynamicProgressManager[str]) -> None:
+        """Test starting a download for an item."""
+        with patch.object(Progress, "add_task", return_value=123) as mock_add_task, patch.object(
+            Progress, "update"
+        ) as mock_update:
+            # Add an item
+            progress_manager.add_item(
+                item_id="test_item", name="Test Item", steps=["download", "verify"]
+            )
+
+            # Start a download
+            task_id = progress_manager.start_download(
+                item_id="test_item", filename="test.AppImage", total_size=1024000
+            )
+
+            # Verify task was returned
+            assert task_id == 123
+
+            # Verify main task was updated
+            mock_update.assert_called_once()
+            assert mock_update.call_args[0][0] == 123  # main task_id
+            assert "[blue]Downloading test.AppImage" in mock_update.call_args[1]["status"]
+
+            # Verify download tracking was updated
+            assert progress_manager._download_in_progress["test_item"] is True
+
+    def test_update_download(self, progress_manager: DynamicProgressManager[str]) -> None:
+        """Test updating a download for an item."""
+        with patch.object(Progress, "add_task", return_value=123) as mock_add_task, patch.object(
+            Progress, "update"
+        ) as mock_update:
+            # Add an item
+            progress_manager.add_item(
+                item_id="test_item", name="Test Item", steps=["download", "verify"]
+            )
+
+            # Start a download
+            progress_manager.start_download(
+                item_id="test_item", filename="test.AppImage", total_size=1024000
+            )
+
+            mock_update.reset_mock()
+
+            # Update download progress
+            progress_manager.update_download(
+                item_id="test_item",
+                filename="test.AppImage",
+                advance=102400,  # 100KB
+                finished=False,
+            )
+
+            # Verify main task was updated
+            mock_update.assert_called_once()
+            assert mock_update.call_args[0][0] == 123  # main task_id
+            assert "[blue]Downloading test.AppImage" in mock_update.call_args[1]["status"]
+
+            mock_update.reset_mock()
+
+            # Complete download
+            progress_manager.update_download(
+                item_id="test_item", filename="test.AppImage", advance=0, finished=True
+            )
+
+            # Verify main task was updated
+            mock_update.assert_called_once()
+            assert mock_update.call_args[0][0] == 123  # main task_id
+            assert "[green]Download completed" in mock_update.call_args[1]["status"]
+
+            # Verify download tracking was updated
+            assert progress_manager._download_in_progress["test_item"] is False
+
+    def test_get_summary(self, progress_manager: DynamicProgressManager[str]) -> None:
+        """Test generating a summary table."""
+        # Add some items with different states
+        with patch.object(Progress, "add_task") as mock_add_task:
+            mock_add_task.side_effect = [123, 456, 789]
+
+            # Add items
+            progress_manager.add_item("item1", "Success Item", ["step1", "step2"])
+            progress_manager.add_item("item2", "Failed Item", ["step1", "step2"])
+            progress_manager.add_item("item3", "In Progress Item", ["step1", "step2"])
+
+            # Set completion states
+            progress_manager.task_map["item1"]["success"] = True
+            progress_manager.task_map["item1"]["completed_steps"] = {"step1", "step2"}
+
+            progress_manager.task_map["item2"]["success"] = False
+            progress_manager.task_map["item2"]["completed_steps"] = {"step1"}
+
+            # Item 3 stays in progress
+            progress_manager.task_map["item3"]["completed_steps"] = {"step1"}
+
+            # Get summary table
+            table = progress_manager.get_summary()
+
+            # Check table structure
+            assert table.title == "Operation Summary"
+            assert len(table.columns) == 3
+
+            # Table contents are harder to verify directly without rendering
+            # but we can check the internal task states that would be used
+            assert progress_manager.task_map["item1"]["success"] is True
+            assert len(progress_manager.task_map["item1"]["completed_steps"]) == 2
+
+            assert progress_manager.task_map["item2"]["success"] is False
+            assert len(progress_manager.task_map["item2"]["completed_steps"]) == 1
+
+            assert progress_manager.task_map["item3"]["success"] is None
+            assert len(progress_manager.task_map["item3"]["completed_steps"]) == 1

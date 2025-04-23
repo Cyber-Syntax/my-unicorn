@@ -183,18 +183,33 @@ class VerificationManager:
                     if len(parts) < 2:
                         continue
 
-                    filename = parts[1].lower()
-                    if filename == target_name:
+                    # Check for both standard patterns:
+                    # 1. HASH FILENAME format (common for sha256sum output)
+                    # 2. FILENAME HASH format (used by some projects)
+                    hash_value = None
+                    if parts[1].lower() == target_name:
                         hash_value = parts[0]
-                        # Validate hash format
-                        expected_length = 64 if self.hash_type == "sha256" else 128
-                        if len(hash_value) != expected_length or not all(
-                            c in "0123456789abcdefABCDEF" for c in hash_value
-                        ):
-                            raise ValueError(f"Invalid {self.hash_type} hash format")
-                        return self._compare_hashes(hash_value)
+                    elif len(parts) > 2 and parts[0].lower() == target_name:
+                        hash_value = parts[1]
 
-            raise ValueError(f"No hash found for {self.appimage_name} in SHA file")
+                    if hash_value:
+                        # Validate hash format with proper hex check
+                        expected_length = 64 if self.hash_type == "sha256" else 128
+                        if len(hash_value) != expected_length:
+                            logging.warning(
+                                f"Hash for {target_name} has wrong length: {len(hash_value)}, "
+                                f"expected {expected_length}"
+                            )
+                            continue
+
+                        if not re.match(r"^[0-9a-f]+$", hash_value.lower()):
+                            logging.warning(f"Invalid hex characters in hash: {hash_value}")
+                            continue
+
+                        logging.info(f"Found valid hash for {target_name} in SHA file")
+                        return self._compare_hashes(hash_value.lower())
+
+            raise ValueError(f"No valid hash found for {self.appimage_name} in SHA file")
 
         except IOError as e:
             raise IOError(f"Failed to read SHA file: {str(e)}")
@@ -207,11 +222,14 @@ class VerificationManager:
         try:
             hash_func = hashlib.new(self.hash_type)
 
+            # Use larger chunk size for better performance with large files
+            chunk_size = 65536  # 64KB chunks
+
             with open(self.appimage_name, "rb") as f:
-                for chunk in iter(lambda: f.read(4096), b""):
+                for chunk in iter(lambda: f.read(chunk_size), b""):
                     hash_func.update(chunk)
 
-            actual_hash = hash_func.hexdigest()
+            actual_hash = hash_func.hexdigest().lower()  # Always use lowercase for comparison
             self._log_comparison(actual_hash, expected_hash)
 
             # Delete the SHA file after verification
@@ -243,9 +261,14 @@ class VerificationManager:
             return False
 
     def _log_comparison(self, actual: str, expected: str):
-        """Format and log hash comparison results."""
-        status = _("VERIFIED") if actual == expected else _("VERIFICATION FAILED")
-        color = COLOR_SUCCESS if actual == expected else COLOR_FAIL
+        """Format and log hash comparison results.
+
+        Successful verifications are only logged, not printed to console.
+        Failed verifications are both logged and printed to console.
+        """
+        is_verified = actual == expected
+        status = _("VERIFIED") if is_verified else _("VERIFICATION FAILED")
+        color = COLOR_SUCCESS if is_verified else COLOR_FAIL
 
         log_lines = [
             f"{color}{status}{COLOR_RESET}",
@@ -256,8 +279,12 @@ class VerificationManager:
             "----------------------------------------",
         ]
 
-        print("\n".join(log_lines))
+        # Always log the verification results
         logging.info("\n".join(log_lines))
+
+        # Only print to console if verification failed
+        if not is_verified:
+            print("\n".join(log_lines))
 
     def _cleanup_failed_file(self, filepath: str) -> bool:
         """Remove a file that failed verification to prevent future update issues."""
