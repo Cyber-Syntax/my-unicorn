@@ -768,7 +768,10 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                 file_handler = self._create_file_handler(github_api, app_config, global_config)
 
                 # Try to download icon
-                file_handler.download_app_icon(github_api.owner, github_api.repo)
+                from src.icon_manager import IconManager
+
+                icon_manager = IconManager()
+                icon_manager.ensure_app_icon(github_api.owner, github_api.repo)
 
                 # Perform file operations and update config
                 if file_handler.handle_appimage_operations(github_api=github_api):

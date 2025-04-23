@@ -232,8 +232,11 @@ class BaseUpdateCommand(Command):
         # Handle file operations
         file_handler = self._create_file_handler(github_api, app_config, global_config)
 
-        # Try to download icon
-        file_handler.download_app_icon(github_api.owner, github_api.repo)
+        # Download app icon if possible
+        from src.icon_manager import IconManager
+
+        icon_manager = IconManager()
+        icon_manager.ensure_app_icon(github_api.owner, github_api.repo)
 
         # Perform file operations and update config
         if file_handler.handle_appimage_operations(github_api=github_api):
@@ -537,7 +540,6 @@ class BaseUpdateCommand(Command):
                 # Primary location
                 os.path.expanduser(f"~/.local/share/icons/myunicorn/{repo}/{repo}_icon.svg"),
                 os.path.expanduser(f"~/.local/share/icons/myunicorn/{repo}/{repo}_icon.png"),
-
                 # System theme locations that might be used
                 os.path.expanduser(
                     f"~/.local/share/icons/hicolor/scalable/apps/{repo.lower()}.svg"
@@ -712,8 +714,11 @@ class BaseUpdateCommand(Command):
                 # Handle file operations
                 file_handler = self._create_file_handler(github_api, app_config, global_config)
 
-                # Try to download icon
-                file_handler.download_app_icon(github_api.owner, github_api.repo)
+                # Download app icon if possible
+                from src.icon_manager import IconManager
+
+                icon_manager = IconManager()
+                icon_manager.ensure_app_icon(github_api.owner, github_api.repo)
 
                 # Perform file operations and update config
                 if file_handler.handle_appimage_operations(github_api=github_api):

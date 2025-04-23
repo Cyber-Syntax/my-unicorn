@@ -313,3 +313,165 @@ class IconManager:
                 except Exception:
                     pass
             return False, f"Error: {str(e)}"
+
+    def get_icon_path(self, repo: str, app_name: Optional[str] = None) -> Optional[str]:
+        """
+        Find the path to an existing icon for an application.
+
+        Searches for icons in various locations in the following order:
+        1. Repository-specific directory with preferred filename
+        2. Standard icon filenames in repository directory
+        3. Legacy system locations
+
+        Args:
+            repo: Repository name (used for directory names)
+            app_name: Optional alternative name (original case preserved)
+
+        Returns:
+            str or None: Path to icon file if found, None otherwise
+        """
+        if not app_name:
+            app_name = repo
+
+        # Base icon directory for myunicorn
+        icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
+
+        # Primary and fallback directories
+        app_icon_dir = os.path.join(icon_base_dir, repo)
+        repo_icon_dir = os.path.join(icon_base_dir, app_name)
+
+        # Build list of search directories in priority order
+        icon_dirs = []
+        if repo != app_name:
+            icon_dirs.append(app_icon_dir)
+        icon_dirs.append(repo_icon_dir)
+
+        # Check standard icon filenames in each directory
+        search_paths = []
+        for icon_dir in icon_dirs:
+            if os.path.exists(icon_dir) and os.path.isdir(icon_dir):
+                # Add standard filenames
+                search_paths.extend(
+                    [
+                        os.path.join(icon_dir, f"{name}{ext}")
+                        for name in ["icon", "logo", repo.lower()]
+                        for ext in [".svg", ".png", ".jpg", ".jpeg"]
+                    ]
+                )
+
+                # Add any other image files in the directory
+                search_paths.extend(
+                    [
+                        os.path.join(icon_dir, f)
+                        for f in os.listdir(icon_dir)
+                        if os.path.isfile(os.path.join(icon_dir, f))
+                        and any(
+                            f.lower().endswith(ext) for ext in [".svg", ".png", ".jpg", ".jpeg"]
+                        )
+                    ]
+                )
+
+        # Also check legacy locations
+        search_paths.extend(
+            [
+                os.path.join(icon_base_dir, "scalable/apps", f"{name}.svg")
+                for name in [app_name, repo]
+            ]
+        )
+        search_paths.extend(
+            [
+                os.path.join(icon_base_dir, "256x256/apps", f"{name}.png")
+                for name in [app_name, repo]
+            ]
+        )
+        search_paths.extend(
+            [
+                os.path.expanduser(f"~/.local/share/icons/{name}{ext}")
+                for name in [app_name, repo]
+                for ext in [".svg", ".png"]
+            ]
+        )
+
+        # Check each location for a valid icon file
+        for icon_path in search_paths:
+            try:
+                if os.path.exists(icon_path) and os.path.isfile(icon_path):
+                    logger.debug(f"Found icon at: {icon_path}")
+                    return icon_path
+            except Exception as e:
+                # Skip paths with access errors
+                logger.debug(f"Error checking icon path {icon_path}: {e}")
+                continue
+
+        logger.debug(f"No icon found for {app_name} or {repo}")
+        return None
+
+    def ensure_app_icon(
+        self, owner: str, repo: str, headers: Optional[Dict[str, str]] = None
+    ) -> Tuple[bool, str]:
+        """
+        Ensure an icon exists for the specified app, downloading if necessary.
+
+        First checks if an icon already exists in expected locations.
+        If not, downloads the icon from the GitHub repository.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name (original case preserved)
+            headers: Optional authentication headers
+
+        Returns:
+            Tuple[bool, str]: (Success status, Path to icon or status message)
+        """
+        try:
+            from src.app_config import AppConfigManager
+
+            # Get app ID for consistent directory naming
+            app_config = AppConfigManager(owner=owner, repo=repo)
+            app_id = app_config.repo
+
+            # Check if icon already exists
+            existing_icon = self.get_icon_path(app_id, repo)
+            if existing_icon:
+                logger.info(f"Using existing icon: {existing_icon}")
+                return True, existing_icon
+
+            # No existing icon found, proceed with download
+            logger.info(f"No existing icon found for {repo}, will download")
+
+            # Prepare icon directory
+            icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
+            target_icon_dir = os.path.join(icon_base_dir, app_id)
+            os.makedirs(target_icon_dir, exist_ok=True)
+
+            # Get authentication headers if not provided
+            if not headers:
+                from src.auth_manager import GitHubAuthManager
+
+                headers = GitHubAuthManager.get_auth_headers()
+
+            # Find icon in the repository
+            icon_info = self.find_icon(owner, repo, headers)
+
+            if not icon_info:
+                message = (
+                    f"No icon configuration found for {owner}/{repo}. "
+                    f"Desktop entry will use the app name ('{repo}') which may work with "
+                    f"system icon themes like Papirus or Adwaita."
+                )
+                logger.info(message)
+                return True, message
+
+            # Download the icon
+            success, result_path = self.download_icon(icon_info, target_icon_dir)
+
+            if success:
+                logger.info(f"Successfully downloaded icon to {result_path}")
+                return True, result_path
+            else:
+                logger.error(f"Failed to download icon: {result_path}")
+                return False, result_path
+
+        except Exception as e:
+            logger.error(f"Failed to ensure app icon: {str(e)}")
+            return False, f"Error: {str(e)}"

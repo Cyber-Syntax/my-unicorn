@@ -44,7 +44,7 @@ ICON_PATHS = {
         "paths": ["app/src/assets/icon.png"],
         "filename": "siyuan_icon.png",
     },
-    "Zettlr/Zettlr": {
+    "zettlr": {
         "exact_path": "resources/icons/png/512x512.png",
         "paths": ["resources/icons/png/512x512.png"],
         "filename": "zettlr_icon.png",

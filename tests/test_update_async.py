@@ -259,34 +259,45 @@ class TestUpdateAsyncCommand:
             update_command, "_verify_appimage", return_value=True
         ) as mock_verify, patch.object(
             update_command, "_create_file_handler"
-        ) as mock_create_handler:
-            # Mock file handler
-            mock_file_handler = MagicMock()
-            mock_file_handler.download_app_icon.return_value = True
-            mock_file_handler.handle_appimage_operations.return_value = True
-            mock_create_handler.return_value = mock_file_handler
+        ) as mock_create_handler, patch(
+            "src.icon_manager.IconManager", return_value=MagicMock()
+        ) as mock_icon_manager_class:
+            # Mock IconManager
+            mock_icon_manager = MagicMock()
+            mock_icon_manager.ensure_app_icon.return_value = (True, "/path/to/icon.png")
 
-            # Mock app config updates
-            mock_app_config = MagicMock()
-            mock_load_config.return_value = mock_app_config
+            with patch(
+                "src.icon_manager.IconManager", return_value=mock_icon_manager
+            ) as mock_icon_manager_class:
+                # Mock file handler
+                mock_file_handler = MagicMock()
+                mock_file_handler.download_app_icon.return_value = True
+                mock_file_handler.handle_appimage_operations.return_value = True
+                mock_create_handler.return_value = mock_file_handler
 
-            # Call the method
-            result = update_command._update_single_app_async(
-                app_data, is_batch=True, app_index=1, total_apps=4
-            )
+                # Mock app config updates
+                mock_app_config = MagicMock()
+                mock_load_config.return_value = mock_app_config
 
-            # Verify successful update
-            assert result is True
+                # Call the method
+                result = update_command._update_single_app_async(
+                    app_data, is_batch=True, app_index=1, total_apps=4
+                )
 
-            # Verify the correct sequence of operations
-            mock_load_config.assert_called_once_with(app_data["config_file"])
-            mock_get_response.assert_called_once()
-            mock_download_init.assert_called_once()
-            mock_download.assert_called_once()
-            mock_verify.assert_called_once()
-            mock_file_handler.download_app_icon.assert_called_once()
-            mock_file_handler.handle_appimage_operations.assert_called_once()
-            mock_app_config.update_version.assert_called_once()
+                # Verify successful update
+                assert result is True
+
+                # Verify the correct sequence of operations
+                mock_load_config.assert_called_once_with(app_data["config_file"])
+                mock_get_response.assert_called_once()
+                mock_download_init.assert_called_once()
+                mock_download.assert_called_once()
+                mock_verify.assert_called_once()
+                mock_icon_manager.ensure_app_icon.assert_called_once_with(
+                    mock_app_config.owner, mock_app_config.repo
+                )
+                mock_file_handler.handle_appimage_operations.assert_called_once()
+                mock_app_config.update_version.assert_called_once()
 
     def test_update_single_app_async_errors(self, update_command: UpdateAsyncCommand) -> None:
         """Test error handling in _update_single_app_async method."""

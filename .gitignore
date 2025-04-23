@@ -158,3 +158,6 @@ logs/*
 # ruff
 .ruff_cache
 *.vim
+
+# other
+examples

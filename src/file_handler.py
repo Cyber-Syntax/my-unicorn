@@ -354,7 +354,10 @@ class FileHandler:
                     )
 
                     # Get icon path if available
-                    icon_path = self._get_icon_path(self.repo)
+                    from src.icon_manager import IconManager
+
+                    icon_manager = IconManager()
+                    icon_path = icon_manager.get_icon_path(self.repo)
 
                     # Use the specialized handler to create the desktop file
                     success, result = handler_class.create_desktop_file(
@@ -384,7 +387,10 @@ class FileHandler:
             os.makedirs(desktop_dir, exist_ok=True)
 
             # Get icon path if available
-            icon_path = self._get_icon_path(self.repo)
+            from src.icon_manager import IconManager
+
+            icon_manager = IconManager()
+            icon_path = icon_manager.get_icon_path(self.repo)
 
             # Read existing desktop file content if it exists
             existing_entries = {}
@@ -465,219 +471,3 @@ class FileHandler:
         except Exception as e:
             logging.error(f"Unexpected error creating desktop entry: {str(e)}")
             return False
-
-    def _get_icon_path(self, app_name: str) -> Optional[str]:
-        """
-        Get path to application icon if it exists.
-
-        Searches for icons in the repository-specific directory structure:
-        - Then in the repository name directory (for backward compatibility)
-        - Finally in legacy icon locations
-
-        Args:
-            app_name: Name of the application (original case preserved)
-
-        Returns:
-            str or None: Path to icon file or None if not found
-        """
-        # Base icon directory for myunicorn
-        icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
-
-        app_id_icon_dir = os.path.join(icon_base_dir, self.repo)
-        repo_icon_dir = os.path.join(icon_base_dir, app_name)
-
-        # List of directories to search in priority order
-        icon_dirs = []
-
-        if self.repo != app_name:
-            icon_dirs.append(app_id_icon_dir)
-
-        # Always check the repo directory
-        icon_dirs.append(repo_icon_dir)
-
-        # Build list of potential icon paths
-        search_paths = []
-
-        # Check standard icon filenames in each directory
-        for icon_dir in icon_dirs:
-            if os.path.exists(icon_dir) and os.path.isdir(icon_dir):
-                # Add standard filenames
-                search_paths.extend(
-                    [
-                        os.path.join(icon_dir, "icon.svg"),
-                        os.path.join(icon_dir, "icon.png"),
-                        os.path.join(icon_dir, "icon.jpg"),
-                        os.path.join(icon_dir, "logo.svg"),
-                        os.path.join(icon_dir, "logo.png"),
-                        # Also add any image files in the directory
-                        *[
-                            os.path.join(icon_dir, f)
-                            for f in os.listdir(icon_dir)
-                            if os.path.isfile(os.path.join(icon_dir, f))
-                            and any(
-                                f.lower().endswith(ext) for ext in [".svg", ".png", ".jpg", ".jpeg"]
-                            )
-                        ],
-                    ]
-                )
-
-        # Also check the fallback legacy locations (for backward compatibility)
-        search_paths.extend(
-            [
-                os.path.join(icon_base_dir, "scalable/apps", f"{app_name}.svg"),
-                os.path.join(icon_base_dir, "256x256/apps", f"{app_name}.png"),
-                os.path.join(icon_base_dir, "scalable/apps", f"{self.repo}.svg"),
-                os.path.join(icon_base_dir, "256x256/apps", f"{self.repo}.png"),
-                # Fall back to generic icon locations
-                os.path.expanduser(f"~/.local/share/icons/{app_name}.png"),
-                os.path.expanduser(f"~/.local/share/icons/{app_name}.svg"),
-                os.path.expanduser(f"~/.local/share/icons/{self.repo}.png"),
-                os.path.expanduser(f"~/.local/share/icons/{self.repo}.svg"),
-            ]
-        )
-
-        # Check each location for a valid icon file
-        for icon_path in search_paths:
-            try:
-                if os.path.exists(icon_path) and os.path.isfile(icon_path):
-                    logging.debug(f"Found icon at: {icon_path}")
-                    return icon_path
-            except Exception:
-                # Skip any paths that cause errors (e.g., permission issues)
-                continue
-
-        logging.debug(f"No icon found for {app_name} or {self.repo}")
-        return None
-
-    def download_app_icon(self, owner: str, repo: str) -> Tuple[bool, str]:
-        """
-        Download application icon from GitHub repository if it doesn't exist locally.
-
-        Uses the IconManager to find and download the best icon for the repository.
-        Icons are stored in ~/.local/share/icons/myunicorn/<repo>/ directory.
-
-        Args:
-            owner: Repository owner
-            repo: Repository name (original case preserved)
-
-        Returns:
-            tuple: (success, message) where success is a boolean and message is
-                  a descriptive string
-        """
-        try:
-            # Generate app identifier for icon directory naming
-            from src.app_config import AppConfigManager
-            from src.data.icon_paths import get_icon_paths
-
-            app_config = AppConfigManager(owner=owner, repo=repo)
-            app_id = app_config.repo
-
-            # This ensures consistency with other file naming throughout the application
-            icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
-
-            app_id_icon_dir = os.path.join(icon_base_dir, app_id)
-            repo_icon_dir = os.path.join(icon_base_dir, repo)
-
-            # Get repo-specific filename from icon path configuration
-            repo_config = get_icon_paths(repo)
-            preferred_filename = None
-            if isinstance(repo_config, dict) and "filename" in repo_config:
-                preferred_filename = repo_config["filename"]
-                logging.debug(f"Found preferred filename for {repo}: {preferred_filename}")
-
-            # Ensure primary icon directory exists
-            os.makedirs(app_id_icon_dir, exist_ok=True)
-            target_icon_dir = app_id_icon_dir
-
-            # Check if icon already exists in either directory with any known pattern
-            # 1. Check for exact preferred filename from config first
-            if preferred_filename:
-                for check_dir in [app_id_icon_dir, repo_icon_dir]:
-                    icon_path = os.path.join(check_dir, preferred_filename)
-                    if os.path.exists(icon_path) and os.path.isfile(icon_path):
-                        logging.info(f"Icon already exists at {icon_path} (preferred filename)")
-                        return True, icon_path
-
-            # 2. Check for standard icon filenames
-            for check_dir in [app_id_icon_dir, repo_icon_dir]:
-                if os.path.exists(check_dir):
-                    # Check generic icon names
-                    for name in ["icon", "logo", repo.lower(), app_id.lower()]:
-                        for ext in [".svg", ".png", ".jpg", ".jpeg"]:
-                            icon_path = os.path.join(check_dir, f"{name}{ext}")
-                            if os.path.exists(icon_path) and os.path.isfile(icon_path):
-                                logging.info(f"Icon already exists at {icon_path} (standard name)")
-                                return True, icon_path
-
-                    # 3. Check for any image file in the directory
-                    for filename in os.listdir(check_dir):
-                        if os.path.isfile(os.path.join(check_dir, filename)) and any(
-                            filename.lower().endswith(ext)
-                            for ext in [".svg", ".png", ".jpg", ".jpeg"]
-                        ):
-                            icon_path = os.path.join(check_dir, filename)
-                            logging.info(f"Icon already exists at {icon_path} (found in directory)")
-                            return True, icon_path
-
-            # 4. Check legacy system locations
-            legacy_locations = [
-                os.path.join(icon_base_dir, "scalable/apps", f"{app_id}.svg"),
-                os.path.join(icon_base_dir, "256x256/apps", f"{app_id}.png"),
-                os.path.join(icon_base_dir, "scalable/apps", f"{repo}.svg"),
-                os.path.join(icon_base_dir, "256x256/apps", f"{repo}.png"),
-                os.path.expanduser(f"~/.local/share/icons/{app_id}.svg"),
-                os.path.expanduser(f"~/.local/share/icons/{app_id}.png"),
-                os.path.expanduser(f"~/.local/share/icons/{repo}.svg"),
-                os.path.expanduser(f"~/.local/share/icons/{repo}.png"),
-            ]
-
-            for icon_path in legacy_locations:
-                if os.path.exists(icon_path) and os.path.isfile(icon_path):
-                    logging.info(f"Icon already exists at {icon_path} (legacy location)")
-                    return True, icon_path
-
-            # No existing icon found, proceed with download
-            logging.info(f"No existing icon found for {repo}, will download")
-
-            # Initialize GitHub API for authentication headers
-            from src.api import GitHubAPI
-
-            github_api = GitHubAPI(owner=owner, repo=repo)
-
-            # Import and use IconManager with our enhanced search logic
-            from src.icon_manager import IconManager
-
-            icon_manager = IconManager()
-
-            # Find icon using the improved manager
-            icon_info = icon_manager.find_icon(owner, repo, headers=github_api._headers)
-
-            if not icon_info:
-                # This is a valid use case - some apps work with system theme icons
-                message = (
-                    f"No icon configuration found for {owner}/{repo}. "
-                    f"Desktop entry will use the app name ('{repo}') which may work with "
-                    f"system icon themes like Papirus or Adwaita."
-                )
-                logging.info(message)
-                return True, message
-
-            # Download the icon to the target directory
-            success, result_path = icon_manager.download_icon(icon_info, target_icon_dir)
-
-            if success:
-                logging.info(f"Successfully downloaded icon to {result_path}")
-                return True, result_path
-            else:
-                logging.error(f"Failed to download icon: {result_path}")
-                return False, result_path
-
-        except Exception as e:
-            logging.error(f"Failed to download icon: {str(e)}")
-            # Provide a more descriptive message when the fallback is "default"
-            if str(e) == "'default'":
-                return False, (
-                    f"Icon path not defined for {repo}. Desktop entry will use the app name, "
-                    f"which may work with system icon themes like Papirus or Adwaita."
-                )
-            return False, f"Error: {str(e)}"

@@ -7,6 +7,7 @@ from src.file_handler import FileHandler
 from src.global_config import GlobalConfigManager
 from src.parser import ParseURL
 from src.verify import VerificationManager
+from src.icon_manager import IconManager
 
 
 class DownloadCommand(Command):
@@ -132,8 +133,9 @@ class DownloadCommand(Command):
             max_backups=global_config.max_backups,
         )
 
-        # Install icon for the appimage
-        file_handler.download_app_icon(api.owner, api.repo)
+        # Download app icon if possible
+        icon_manager = IconManager()
+        icon_manager.ensure_app_icon(api.owner, api.repo)
 
         # Check if the file operations were successful
         success = file_handler.handle_appimage_operations()
