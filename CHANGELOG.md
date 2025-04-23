@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.7.1-alpha
+# BREAKING CHANGES
+Added download more than 1 app at a time feature. `max_concurrent_updates` is added to the settings.json file and default value is 3. Migrate with choice migrate to add this default value to your settings.json file to be able to use this feature. 
+
+You can change this value to any number you want but be careful with API rate limits which is 60 requests per hour without a token and 5000 requests per hour with a token. Also, you can't update more than 100 apps because of secondary rate limits on Github.
+
 ## v0.7.0-alpha
 # BREAKING CHANGES
 New max_backup parameter in the settings.json file. This will be used to limit the number of backups created for each app. The default value is 3. Use choice migrate to update settings.json with default value. 

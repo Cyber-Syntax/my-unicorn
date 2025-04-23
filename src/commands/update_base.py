@@ -517,10 +517,10 @@ class BaseUpdateCommand(Command):
             owner = app_config.owner
             repo = app_config.repo
 
-            # Check if icon already exists
-            icon_path = os.path.join(
-                self.global_config.expanded_appimage_desktop_folder_path, f"{repo.lower()}.png"
-            )
+            # Check if icon already exists in the applications directory
+            # Look for the icon in the applications directory (where desktop files are placed)
+            applications_dir = os.path.expanduser("~/.local/share/applications")
+            icon_path = os.path.join(applications_dir, f"{repo.lower()}.png")
 
             if not os.path.exists(icon_path):
                 required_requests += 1  # Add request for icon download

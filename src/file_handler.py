@@ -19,6 +19,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from importlib import import_module
 
 import requests
+from tqdm import tqdm
 
 from src.api import GitHubAPI
 

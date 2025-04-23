@@ -1,17 +1,214 @@
-import unittest
-from unittest.mock import MagicMock, mock_open, patch
-import sys
+"""Test module for download manager functionality.
+
+This module tests the download manager and progress display functionality,
+with a focus on concurrent download handling.
+"""
+
 import os
+import threading
+import time
+from typing import List, TYPE_CHECKING
+from unittest.mock import MagicMock, patch, mock_open
+import sys
+import pytest
+import requests
+import unittest
 
-# Add the project root to sys.path so that the 'src' package can be imported.
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-    
-from src.download import DownloadManager
+from src.download import DownloadManager 
+from src.progress_manager import DynamicProgressManager
+from src.api import GitHubAPI
+
+if TYPE_CHECKING:
+    from _pytest.capture import CaptureFixture
+    from _pytest.fixtures import FixtureRequest
+    from _pytest.logging import LogCaptureFixture
+    from _pytest.monkeypatch import MonkeyPatch
+    from pytest_mock.plugin import MockerFixture
 
 
-# A fake API object to simulate the attributes that DownloadManager expects.
+@pytest.fixture
+def mock_github_api() -> MagicMock:
+    """Create a mock GitHub API for testing.
+
+    Returns:
+        MagicMock: A mocked GitHubAPI instance
+    """
+    mock_api = MagicMock(spec=GitHubAPI)
+    mock_api.appimage_url = "https://example.com/test.AppImage"
+    mock_api.appimage_name = "test.AppImage"
+    mock_api.version = "1.0.0"
+    return mock_api
+
+
+@pytest.fixture
+def mock_requests_responses(monkeypatch: "MonkeyPatch") -> None:
+    """Mock requests responses for testing downloads.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture
+    """
+    # Mock head response
+    mock_head = MagicMock()
+    mock_head.raise_for_status = MagicMock()
+    mock_head.headers = {"content-length": "1024000"}  # 1MB file
+
+    # Mock get response
+    mock_get = MagicMock()
+    mock_get.raise_for_status = MagicMock()
+    # Generate some fake content chunks for the download
+    chunks = [b"x" * 102400] * 10  # 10 chunks of 100KB each
+    mock_get.iter_content = MagicMock(return_value=chunks)
+
+    # Patch the requests methods
+    monkeypatch.setattr(requests, "head", lambda *args, **kwargs: mock_head)
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: mock_get)
+
+
+@pytest.fixture(autouse=True)
+def cleanup_progress_manager() -> None:
+    """Reset the ProgressManager singleton between tests."""
+    # Reset before test
+    ProgressManager._instance = None
+
+    # Run the test
+    yield
+
+    # Reset after test
+    ProgressManager._instance = None
+
+
+@pytest.fixture
+def setup_download_dir() -> None:
+    """Set up and clean up the downloads directory."""
+    # Create directory if it doesn't exist
+    os.makedirs("downloads", exist_ok=True)
+
+    # Run the test
+    yield
+
+    # Clean up test files
+    if os.path.exists("downloads/test.AppImage"):
+        os.remove("downloads/test.AppImage")
+    if os.path.exists("downloads/test2.AppImage"):
+        os.remove("downloads/test2.AppImage")
+
+
+def test_progress_manager_singleton() -> None:
+    """Test that ProgressManager maintains a single instance."""
+    # Create two instances
+    manager1 = ProgressManager()
+    manager2 = ProgressManager()
+
+    # Verify they're the same object
+    assert manager1 is manager2
+    assert id(manager1) == id(manager2)
+
+
+def test_progress_manager_reference_counting() -> None:
+    """Test that ProgressManager tracks references correctly."""
+    manager = ProgressManager()
+
+    # Initially no progress display
+    assert manager._progress is None
+    assert manager._user_count == 0
+
+    # First use creates progress
+    with manager.get_progress() as progress1:
+        assert manager._progress is not None
+        assert manager._user_count == 1
+
+        # Second use increments counter
+        with manager.get_progress() as progress2:
+            assert manager._user_count == 2
+            # Both references point to the same progress
+            assert progress1 is progress2
+
+        # Back to one user
+        assert manager._user_count == 1
+        assert manager._progress is not None
+
+    # No more users, progress cleaned up
+    assert manager._user_count == 0
+    assert manager._progress is None
+
+
+def test_download_manager_basic(
+    mock_github_api: MagicMock, mock_requests_responses: None, setup_download_dir: None
+) -> None:
+    """Test basic download functionality with progress display.
+
+    Args:
+        mock_github_api: Mock GitHub API fixture
+        mock_requests_responses: Mock requests responses fixture
+        setup_download_dir: Fixture to set up and clean download directory
+    """
+    # Create download manager
+    download_manager = DownloadManager(mock_github_api)
+
+    # Perform download
+    download_manager.download()
+
+    # Verify file was created
+    assert os.path.exists("downloads/test.AppImage")
+
+
+def test_concurrent_downloads(
+    mock_github_api: MagicMock, mock_requests_responses: None, setup_download_dir: None
+) -> None:
+    """Test that concurrent downloads share the same progress display.
+
+    Args:
+        mock_github_api: Mock GitHub API fixture
+        mock_requests_responses: Mock requests responses fixture
+        setup_download_dir: Fixture to set up and clean download directory
+    """
+    # Create two API objects with different filenames
+    api1 = MagicMock(spec=GitHubAPI)
+    api1.appimage_url = "https://example.com/test.AppImage"
+    api1.appimage_name = "test.AppImage"
+
+    api2 = MagicMock(spec=GitHubAPI)
+    api2.appimage_url = "https://example.com/test2.AppImage"
+    api2.appimage_name = "test2.AppImage"
+
+    # Create download managers
+    dm1 = DownloadManager(api1)
+    dm2 = DownloadManager(api2)
+
+    # Create a function to run in a thread
+    def download_thread(download_manager: DownloadManager) -> None:
+        download_manager.download()
+
+    # Launch two download threads
+    threads: List[threading.Thread] = []
+
+    # Start first thread
+    t1 = threading.Thread(target=download_thread, args=(dm1,))
+    t1.start()
+    threads.append(t1)
+
+    # Small delay to ensure first thread has started
+    time.sleep(0.1)
+
+    # Start second thread
+    t2 = threading.Thread(target=download_thread, args=(dm2,))
+    t2.start()
+    threads.append(t2)
+
+    # Wait for both threads to complete
+    for thread in threads:
+        thread.join()
+
+    # Verify both files were created
+    assert os.path.exists("downloads/test.AppImage")
+    assert os.path.exists("downloads/test2.AppImage")
+
+    # Verify progress manager was properly cleaned up
+    progress_manager = ProgressManager()
+    assert progress_manager._progress is None
+    assert progress_manager._user_count == 0
+
+
 class FakeAPI:
     def __init__(self, appimage_name, appimage_url):
         self.appimage_name = appimage_name

@@ -60,6 +60,11 @@ class IconManager:
         # Get repository-specific configuration
         repo_config = self._get_repo_config(owner, repo)
 
+        # Check if repo_config is None or empty
+        if not repo_config:
+            logger.info(f"No icon configuration found for {owner}/{repo}")
+            return None
+
         # Use GitHubAuthManager for authentication if no headers provided
         if headers is None:
             headers = GitHubAuthManager.get_auth_headers()
@@ -68,13 +73,16 @@ class IconManager:
         # Step 1: Try exact path if specified (highest priority)
         if isinstance(repo_config, dict) and "exact_path" in repo_config:
             exact_path = repo_config["exact_path"]
-            logger.info(f"Trying exact icon path: {exact_path}")
-            icon_info = self._check_icon_path(owner, repo, exact_path, headers)
-            if icon_info:
-                # Add filename preference if specified
-                if "filename" in repo_config:
-                    icon_info["preferred_filename"] = repo_config["filename"]
-                return icon_info
+            if not exact_path or exact_path == "default":
+                logger.warning(f"Invalid exact_path '{exact_path}' for {owner}/{repo}")
+            else:
+                logger.info(f"Trying exact icon path: {exact_path}")
+                icon_info = self._check_icon_path(owner, repo, exact_path, headers)
+                if icon_info:
+                    # Add filename preference if specified
+                    if "filename" in repo_config:
+                        icon_info["preferred_filename"] = repo_config["filename"]
+                    return icon_info
 
         # Step 2: Try paths from configuration
         paths_to_check = []
@@ -83,8 +91,16 @@ class IconManager:
         elif isinstance(repo_config, list):
             paths_to_check = repo_config
 
+        # Filter out any invalid paths
+        valid_paths = [p for p in paths_to_check if p and p != "default"]
+
+        if len(valid_paths) < len(paths_to_check):
+            logger.warning(
+                f"Filtered out {len(paths_to_check) - len(valid_paths)} invalid paths for {owner}/{repo}"
+            )
+
         # Check each repository-specific path
-        for path in paths_to_check:
+        for path in valid_paths:
             logger.debug(f"Checking repository-specific icon path: {path}")
             icon_info = self._check_icon_path(owner, repo, path, headers)
             if icon_info:
@@ -97,7 +113,7 @@ class IconManager:
         logger.info(f"No suitable icon found for {owner}/{repo}")
         return None
 
-    def _get_repo_config(self, owner: str, repo: str) -> Union[Dict[str, Any], List[str]]:
+    def _get_repo_config(self, owner: str, repo: str) -> Union[Dict[str, Any], List[str], None]:
         """
         Get repository configuration for icon paths.
 
@@ -110,13 +126,17 @@ class IconManager:
             repo: Repository name
 
         Returns:
-            Union[Dict[str, Any], List[str]]: Repository configuration
+            Union[Dict[str, Any], List[str], None]: Repository configuration or None if not found
         """
         # Try different formats to find a match
         full_name = f"{owner}/{repo}"
         config = get_icon_paths(full_name) or get_icon_paths(repo)
 
-        logger.debug(f"Using icon configuration for {repo}: {type(config)}")
+        if config:
+            logger.debug(f"Using icon configuration for {repo}: {type(config)}")
+        else:
+            logger.debug(f"No icon configuration found for {repo}")
+
         return config
 
     def _check_icon_path(
@@ -134,6 +154,11 @@ class IconManager:
         Returns:
             dict or None: Icon information dictionary or None if not found
         """
+        # Validate path before attempting to check
+        if not path or path == "default":
+            logger.warning(f"Invalid icon path: '{path}'")
+            return None
+
         try:
             # Format the GitHub content API URL
             content_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
@@ -174,6 +199,10 @@ class IconManager:
                 # Try to refresh auth headers
                 GitHubAuthManager.clear_cached_headers()
                 # We don't retry here to avoid recursion, but the next request will use refreshed token
+            elif response.status_code == 404:
+                logger.debug(f"Icon path not found: {path}")
+            else:
+                logger.debug(f"Unexpected response ({response.status_code}) for icon path: {path}")
 
             return None
 
@@ -228,6 +257,12 @@ class IconManager:
             # Determine filename (use preferred_filename if specified)
             if "preferred_filename" in icon_info:
                 base_name = icon_info["preferred_filename"]
+                if not base_name or base_name == "default":
+                    # Fall back to original name if preferred_filename is invalid
+                    base_name = icon_info["name"]
+                    logger.warning(
+                        f"Invalid preferred_filename '{icon_info['preferred_filename']}', using {base_name} instead"
+                    )
             else:
                 base_name = icon_info["name"]
 

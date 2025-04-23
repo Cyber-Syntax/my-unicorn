@@ -17,6 +17,7 @@ class GlobalConfigManager:
     max_backups: int = field(default=3)  # Number of backups to keep per app
     batch_mode: bool = field(default=False)
     locale: str = field(default="en")
+    max_concurrent_updates: int = field(default=3)  # Default value for maximum concurrent updates
 
     def __post_init__(self):
         # Expand only the config file path during initialization
@@ -53,6 +54,9 @@ class GlobalConfigManager:
                     self.max_backups = config.get("max_backups", self.max_backups)
                     self.batch_mode = config.get("batch_mode", self.batch_mode)
                     self.locale = config.get("locale", self.locale)
+                    self.max_concurrent_updates = config.get(
+                        "max_concurrent_updates", self.max_concurrent_updates
+                    )
 
                     # If any expected keys are missing, log it
                     missing_keys = expected_keys - found_keys
@@ -77,6 +81,7 @@ class GlobalConfigManager:
             "max_backups": self.max_backups,
             "batch_mode": self.batch_mode,
             "locale": self.locale,
+            "max_concurrent_updates": self.max_concurrent_updates,
         }
 
     def create_global_config(self):
@@ -100,6 +105,9 @@ class GlobalConfigManager:
             )
             batch_mode = input("Enable batch mode? (yes/no, default: no): ").strip().lower() or "no"
             locale = input("Select your locale (en/tr, default: en): ").strip() or "en"
+            max_concurrent_updates = (
+                input("Max number of concurrent updates (default: 3): ").strip() or "3"
+            )
 
             # Update current instance values
             self.appimage_download_folder_path = appimage_download_folder_path
@@ -108,6 +116,7 @@ class GlobalConfigManager:
             self.max_backups = int(max_backups)
             self.batch_mode = batch_mode == "yes"
             self.locale = locale
+            self.max_concurrent_updates = int(max_concurrent_updates)
 
             # Save the configuration
             self.save_config()
@@ -123,6 +132,7 @@ class GlobalConfigManager:
             self.max_backups = 3
             self.batch_mode = False
             self.locale = "en"
+            self.max_concurrent_updates = 3
 
             # Save the default configuration
             self.save_config()
@@ -155,18 +165,19 @@ class GlobalConfigManager:
         print(f"3. Max Backups Per App: {self.max_backups}")
         print(f"4. Batch Mode: {'Yes' if self.batch_mode else 'No'}")
         print(f"5. Locale: {self.locale}")
-        print("6. Exit")
+        print(f"6. Max Concurrent Updates: {self.max_concurrent_updates}")
+        print("7. Exit")
         print("=================================================")
 
         try:
             while True:
                 choice = input("Enter your choice: ")
-                if choice.isdigit() and 1 <= int(choice) <= 6:
+                if choice.isdigit() and 1 <= int(choice) <= 7:
                     break
                 else:
-                    print("Invalid choice, please enter a number between 1 and 6.")
+                    print("Invalid choice, please enter a number between 1 and 7.")
 
-            if choice == "6":
+            if choice == "7":
                 print("Exiting without changes.")
                 return
 
@@ -176,6 +187,7 @@ class GlobalConfigManager:
                 "max_backups": self.max_backups,
                 "batch_mode": self.batch_mode,
                 "locale": self.locale,
+                "max_concurrent_updates": self.max_concurrent_updates,
             }
             key = list(config_dict.keys())[int(choice) - 1]
 
@@ -207,6 +219,16 @@ class GlobalConfigManager:
                     new_value = new_value == "yes"
                 elif key == "locale":
                     new_value = input("Select your locale (en/tr, default: en): ").strip() or "en"
+                elif key == "max_concurrent_updates":
+                    new_value_str = input("Enter max number of concurrent updates: ").strip() or "3"
+                    try:
+                        new_value = int(new_value_str)
+                        if new_value < 1:
+                            print("Value must be at least 1. Setting to 1.")
+                            new_value = 1
+                    except ValueError:
+                        print("Invalid number. Setting to default (3).")
+                        new_value = 3
 
                 setattr(self, key, new_value)
                 self.save_config()
