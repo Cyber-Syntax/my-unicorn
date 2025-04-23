@@ -607,7 +607,14 @@ class FileHandler:
             icon_info = icon_manager.find_icon(owner, repo, headers=github_api._headers)
 
             if not icon_info:
-                return False, "No suitable icon found in repository"
+                # This is a valid use case - some apps work with system theme icons
+                message = (
+                    f"No icon configuration found for {owner}/{repo}. "
+                    f"Desktop entry will use the app name ('{repo}') which may work with "
+                    f"system icon themes like Papirus or Adwaita."
+                )
+                logging.info(message)
+                return True, message
 
             # Download the icon to the target directory
             success, result_path = icon_manager.download_icon(icon_info, target_icon_dir)
@@ -621,4 +628,10 @@ class FileHandler:
 
         except Exception as e:
             logging.error(f"Failed to download icon: {str(e)}")
+            # Provide a more descriptive message when the fallback is "default"
+            if str(e) == "'default'":
+                return False, (
+                    f"Icon path not defined for {repo}. Desktop entry will use the app name, "
+                    f"which may work with system icon themes like Papirus or Adwaita."
+                )
             return False, f"Error: {str(e)}"

@@ -62,7 +62,10 @@ class IconManager:
 
         # Check if repo_config is None or empty
         if not repo_config:
-            logger.info(f"No icon configuration found for {owner}/{repo}")
+            logger.info(
+                f"No icon configuration found for {owner}/{repo}. "
+                f"Will use app name in desktop file; this may work with system icon themes like Papirus."
+            )
             return None
 
         # Use GitHubAuthManager for authentication if no headers provided

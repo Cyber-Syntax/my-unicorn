@@ -65,7 +65,7 @@ ICON_PATHS = {
 }
 
 
-def get_icon_paths(repo_name: str):
+def get_icon_paths(repo_name: str) -> dict:
     """
     Get icon paths configuration for a repository.
 
@@ -73,9 +73,12 @@ def get_icon_paths(repo_name: str):
         repo_name: Repository name (case-insensitive)
 
     Returns:
-        dict or list: Icon paths configuration for the repository,
-                     or default paths if not found
+        dict: Icon paths configuration for the repository
+              or None if no configuration exists
     """
+    if not repo_name:
+        return None
+
     # Try with original case, then lowercase
     repo_config = ICON_PATHS.get(repo_name) or ICON_PATHS.get(repo_name.lower())
 
@@ -84,5 +87,6 @@ def get_icon_paths(repo_name: str):
         _, name = repo_name.split("/", 1)
         repo_config = ICON_PATHS.get(name) or ICON_PATHS.get(name.lower())
 
-    # Fall back to default paths if no specific configuration found
-    return repo_config or ICON_PATHS["default"]
+    # Return the found configuration or None
+    # We no longer return ICON_PATHS["default"] as fallback since it doesn't exist
+    return repo_config
