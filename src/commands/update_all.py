@@ -84,7 +84,6 @@ class UpdateCommand(BaseUpdateCommand):
             updatable = self._find_updatable_apps()
             if not updatable:
                 logging.info("No AppImages selected for update or all are up to date")
-                print("No AppImages selected for update or all are up to date!")
                 return
 
             # 2. Get user confirmation

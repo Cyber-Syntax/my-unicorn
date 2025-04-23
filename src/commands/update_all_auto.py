@@ -45,8 +45,8 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         print("Checking all AppImages for updates...")
 
         try:
-            # Determine if we should use async mode (from global config)
-            use_async = getattr(self.global_config, "use_async_updates", False)
+            # Use async mode by default - it's more efficient
+            use_async = True
 
             # Check rate limits before proceeding with any API operations
             # Get current rate limit information

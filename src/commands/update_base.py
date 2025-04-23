@@ -519,7 +519,7 @@ class BaseUpdateCommand(Command):
         required_requests = 0
         apps_with_icons = []
 
-        # First pass: determine which apps need icon downloads
+        # First pass: determine which apps need icon downloads by checking if they already exist
         for app_data in apps_to_update:
             required_requests += 1  # Base request for update
 
@@ -532,14 +532,30 @@ class BaseUpdateCommand(Command):
             owner = app_config.owner
             repo = app_config.repo
 
-            # Check if icon already exists in the applications directory
-            # Look for the icon in the applications directory (where desktop files are placed)
-            applications_dir = os.path.expanduser("~/.local/share/applications")
-            icon_path = os.path.join(applications_dir, f"{repo.lower()}.png")
+            icon_exists = False
+            icon_locations = [
+                # Primary location
+                os.path.expanduser(f"~/.local/share/icons/myunicorn/{repo}/{repo}_icon.svg"),
+                os.path.expanduser(f"~/.local/share/icons/myunicorn/{repo}/{repo}_icon.png"),
 
-            if not os.path.exists(icon_path):
+                # System theme locations that might be used
+                os.path.expanduser(
+                    f"~/.local/share/icons/hicolor/scalable/apps/{repo.lower()}.svg"
+                ),
+                os.path.expanduser(f"~/.local/share/icons/hicolor/256x256/apps/{repo.lower()}.png"),
+            ]
+
+            # Check if any icon exists
+            for icon_path in icon_locations:
+                if os.path.exists(icon_path):
+                    icon_exists = True
+                    self._logger.debug(f"Icon found at: {icon_path}")
+                    break
+
+            if not icon_exists:
                 required_requests += 1  # Add request for icon download
                 apps_with_icons.append(app_data["name"])
+                self._logger.debug(f"Icon not found for {repo}, will need to download")
 
         # Determine if we have enough requests available
         can_proceed = remaining >= required_requests

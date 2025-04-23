@@ -315,7 +315,7 @@ class AppConfigManager:
                 print(f"{idx}. {app_name}")
 
             user_input = input(
-                "Enter the numbers of the configuration files you want to update (comma-separated): "
+                "Select application(s) (comma-separated numbers) or cancel: "
             ).strip()
 
             try:
@@ -326,7 +326,6 @@ class AppConfigManager:
                 return [json_files[idx] for idx in selected_indices]
             except (ValueError, IndexError):
                 logger.error("Invalid selection. Please enter valid numbers.")
-                print("Invalid selection. Please enter valid numbers.")
                 return None
         except KeyboardInterrupt:
             logger.info("User cancelled the selection.")
