@@ -319,7 +319,7 @@ class DownloadManager:
             speed_mbps = (total_size / (1024 * 1024)) / download_time if download_time > 0 else 0
 
             # Display completion message
-            console.print(
+            logging.info(
                 f"{prefix}[green]✓ Downloaded {appimage_name}[/] "
                 f"({self._format_size(total_size)}, {speed_mbps:.1f} MB/s)"
             )

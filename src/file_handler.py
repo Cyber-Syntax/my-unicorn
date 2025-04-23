@@ -567,6 +567,7 @@ class FileHandler:
         try:
             # Generate app identifier for icon directory naming
             from src.app_config import AppConfigManager
+            from src.data.icon_paths import get_icon_paths
 
             app_config = AppConfigManager(owner=owner, repo=repo)
             app_id = app_config.repo
@@ -575,23 +576,68 @@ class FileHandler:
             icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
 
             app_id_icon_dir = os.path.join(icon_base_dir, app_id)
-
-            # Also check the repo directory (for backward compatibility)
             repo_icon_dir = os.path.join(icon_base_dir, repo)
+
+            # Get repo-specific filename from icon path configuration
+            repo_config = get_icon_paths(repo)
+            preferred_filename = None
+            if isinstance(repo_config, dict) and "filename" in repo_config:
+                preferred_filename = repo_config["filename"]
+                logging.debug(f"Found preferred filename for {repo}: {preferred_filename}")
 
             # Ensure primary icon directory exists
             os.makedirs(app_id_icon_dir, exist_ok=True)
-
             target_icon_dir = app_id_icon_dir
 
-            # Check if icon already exists in either directory
+            # Check if icon already exists in either directory with any known pattern
+            # 1. Check for exact preferred filename from config first
+            if preferred_filename:
+                for check_dir in [app_id_icon_dir, repo_icon_dir]:
+                    icon_path = os.path.join(check_dir, preferred_filename)
+                    if os.path.exists(icon_path) and os.path.isfile(icon_path):
+                        logging.info(f"Icon already exists at {icon_path} (preferred filename)")
+                        return True, icon_path
+
+            # 2. Check for standard icon filenames
             for check_dir in [app_id_icon_dir, repo_icon_dir]:
                 if os.path.exists(check_dir):
-                    for ext in [".svg", ".png", ".jpg", ".jpeg"]:
-                        icon_path = os.path.join(check_dir, f"icon{ext}")
-                        if os.path.exists(icon_path):
-                            logging.info(f"Icon already exists at {icon_path}")
+                    # Check generic icon names
+                    for name in ["icon", "logo", repo.lower(), app_id.lower()]:
+                        for ext in [".svg", ".png", ".jpg", ".jpeg"]:
+                            icon_path = os.path.join(check_dir, f"{name}{ext}")
+                            if os.path.exists(icon_path) and os.path.isfile(icon_path):
+                                logging.info(f"Icon already exists at {icon_path} (standard name)")
+                                return True, icon_path
+
+                    # 3. Check for any image file in the directory
+                    for filename in os.listdir(check_dir):
+                        if os.path.isfile(os.path.join(check_dir, filename)) and any(
+                            filename.lower().endswith(ext)
+                            for ext in [".svg", ".png", ".jpg", ".jpeg"]
+                        ):
+                            icon_path = os.path.join(check_dir, filename)
+                            logging.info(f"Icon already exists at {icon_path} (found in directory)")
                             return True, icon_path
+
+            # 4. Check legacy system locations
+            legacy_locations = [
+                os.path.join(icon_base_dir, "scalable/apps", f"{app_id}.svg"),
+                os.path.join(icon_base_dir, "256x256/apps", f"{app_id}.png"),
+                os.path.join(icon_base_dir, "scalable/apps", f"{repo}.svg"),
+                os.path.join(icon_base_dir, "256x256/apps", f"{repo}.png"),
+                os.path.expanduser(f"~/.local/share/icons/{app_id}.svg"),
+                os.path.expanduser(f"~/.local/share/icons/{app_id}.png"),
+                os.path.expanduser(f"~/.local/share/icons/{repo}.svg"),
+                os.path.expanduser(f"~/.local/share/icons/{repo}.png"),
+            ]
+
+            for icon_path in legacy_locations:
+                if os.path.exists(icon_path) and os.path.isfile(icon_path):
+                    logging.info(f"Icon already exists at {icon_path} (legacy location)")
+                    return True, icon_path
+
+            # No existing icon found, proceed with download
+            logging.info(f"No existing icon found for {repo}, will download")
 
             # Initialize GitHub API for authentication headers
             from src.api import GitHubAPI
