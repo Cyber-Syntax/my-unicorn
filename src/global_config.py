@@ -158,6 +158,200 @@ class GlobalConfigManager:
         """Customize the configuration settings for the Global Config."""
         self.load_config()
 
+        # Initialize Rich console if not already imported
+        try:
+            from rich.console import Console
+            from rich.panel import Panel
+            from rich.table import Table
+            from rich import box
+
+            console = Console()
+        except ImportError:
+            logging.error("Rich library not available for enhanced display")
+            self._fallback_customize_config()
+            return
+
+        console.print(
+            Panel.fit(
+                "[bold cyan]Global Configuration Settings[/bold cyan]",
+                border_style="cyan",
+                title="⚙️",
+            )
+        )
+
+        # Create configuration status table with centered alignment
+        status_table = Table(box=box.ROUNDED, border_style="cyan", show_header=False)
+        status_table.add_column("Setting", style="dim blue", justify="left")
+        status_table.add_column("Value", style="green", justify="left")
+
+        # Add current configuration values to status table
+        status_table.add_row("AppImage Download Folder", f"📁 {self.appimage_download_folder_path}")
+        status_table.add_row("Backup Folder", f"📁 {self.appimage_download_backup_folder_path}")
+        status_table.add_row("Keep Backups", "✅ Yes" if self.keep_backup else "❌ No")
+        status_table.add_row("Max Backups Per App", f"📊 {self.max_backups}")
+        status_table.add_row("Batch Mode", "✅ Enabled" if self.batch_mode else "❌ Disabled")
+        status_table.add_row("Locale", f"🌐 {self.locale}")
+        status_table.add_row("Max Concurrent Updates", f"⚡ {self.max_concurrent_updates}")
+
+        # Show configuration status
+        console.print(status_table, justify="left")
+
+        # Create layout grid with two equally sized columns
+        layout = Table.grid(expand=True)
+        layout.add_column(ratio=1)
+        layout.add_column(ratio=1)
+
+        # Core Settings panel
+        core_table = Table(
+            box=box.ROUNDED,
+            show_header=False,
+            border_style="blue",
+            title="[bold blue]Core Settings[/bold blue]",
+        )
+        core_table.add_column("Option", style="cyan", justify="right", width=2)
+        core_table.add_column("Description")
+        core_table.add_row("1", "AppImage Download Folder")
+        core_table.add_row("2", "Enable Backup")
+        core_table.add_row("3", "Max Backups Per App")
+        core_table.add_row("4", "Batch Mode")
+
+        # Advanced Settings panel
+        advanced_table = Table(
+            box=box.ROUNDED,
+            show_header=False,
+            border_style="green",
+            title="[bold green]Advanced Settings[/bold green]",
+        )
+        advanced_table.add_column("Option", style="cyan", justify="right", width=2)
+        advanced_table.add_column("Description")
+        advanced_table.add_row("5", "Locale")
+        advanced_table.add_row("6", "Max Concurrent Updates")
+        advanced_table.add_row("7", "Exit")
+
+        # Add tables to layout grid
+        layout.add_row(core_table, advanced_table)
+
+        # Print the layout
+        console.print(layout)
+
+        try:
+            while True:
+                choice = console.input("[bold cyan]Enter your choice (1-7):[/bold cyan] ")
+                if choice.isdigit() and 1 <= int(choice) <= 7:
+                    break
+                else:
+                    console.print(
+                        "[bold red]Invalid choice, please enter a number between 1 and 7.[/bold red]"
+                    )
+
+            if choice == "7":
+                console.print("[yellow]Exiting without changes.[/yellow]")
+                return
+
+            config_dict = {
+                "appimage_download_folder_path": self.appimage_download_folder_path,
+                "keep_backup": self.keep_backup,
+                "max_backups": self.max_backups,
+                "batch_mode": self.batch_mode,
+                "locale": self.locale,
+                "max_concurrent_updates": self.max_concurrent_updates,
+            }
+            key = list(config_dict.keys())[int(choice) - 1]
+
+            try:
+                if key == "appimage_download_folder_path":
+                    new_value = (
+                        console.input(
+                            "[cyan]Enter the new folder path to save appimages:[/cyan] "
+                        ).strip()
+                        or "~/Documents/appimages"
+                    )
+                elif key == "keep_backup":
+                    new_value = (
+                        console.input("[cyan]Enable backup for old appimages? (yes/no):[/cyan] ")
+                        .strip()
+                        .lower()
+                        or "no"
+                    )
+                    new_value = new_value == "yes"
+                elif key == "max_backups":
+                    new_value_str = (
+                        console.input(
+                            "[cyan]Enter max number of backups to keep per app:[/cyan] "
+                        ).strip()
+                        or "3"
+                    )
+                    try:
+                        new_value = int(new_value_str)
+                        if new_value < 1:
+                            console.print(
+                                "[yellow]Value must be at least 1. Setting to 1.[/yellow]"
+                            )
+                            new_value = 1
+                    except ValueError:
+                        console.print("[yellow]Invalid number. Setting to default (3).[/yellow]")
+                        new_value = 3
+                elif key == "batch_mode":
+                    new_value = (
+                        console.input("[cyan]Enable batch mode? (yes/no):[/cyan] ").strip().lower()
+                        or "no"
+                    )
+                    new_value = new_value == "yes"
+                elif key == "locale":
+                    new_value = (
+                        console.input(
+                            "[cyan]Select your locale (en/tr, default: en):[/cyan] "
+                        ).strip()
+                        or "en"
+                    )
+                elif key == "max_concurrent_updates":
+                    new_value_str = (
+                        console.input(
+                            "[cyan]Enter max number of concurrent updates:[/cyan] "
+                        ).strip()
+                        or "3"
+                    )
+                    try:
+                        new_value = int(new_value_str)
+                        if new_value < 1:
+                            console.print(
+                                "[yellow]Value must be at least 1. Setting to 1.[/yellow]"
+                            )
+                            new_value = 1
+                    except ValueError:
+                        console.print("[yellow]Invalid number. Setting to default (3).[/yellow]")
+                        new_value = 3
+
+                setattr(self, key, new_value)
+                self.save_config()
+                console.print(
+                    f"[bold green]✅ {key.replace('_', ' ').title()} updated successfully in settings.json[/bold green]"
+                )
+                console.print("=================================================")
+
+                # Show updated configuration setting
+                console.print(
+                    Panel(
+                        f"[bold]Updated [cyan]{key.replace('_', ' ').title()}[/cyan] to: [green]{getattr(self, key)}[/green][/bold]",
+                        border_style="green",
+                    )
+                )
+
+            except KeyboardInterrupt:
+                logging.info("User interrupted configuration update")
+                console.print(
+                    "\n[yellow]Configuration update cancelled. No changes were made.[/yellow]"
+                )
+                return
+        except KeyboardInterrupt:
+            logging.info("User interrupted configuration customization")
+            console.print(
+                "\n[yellow]Configuration customization cancelled. No changes were made.[/yellow]"
+            )
+            return
+
+    def _fallback_customize_config(self):
+        """Fallback method for customizing config without Rich library."""
         print("Select which key to modify:")
         print("=================================================")
         print(f"1. AppImage Download Folder: {self.appimage_download_folder_path}")

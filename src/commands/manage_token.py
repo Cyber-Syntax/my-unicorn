@@ -46,49 +46,144 @@ class ManageTokenCommand(Command):
         """
         self._logger.info("Executing GitHub token management command")
 
+        # Initialize Rich console if not already imported
+        try:
+            from rich.console import Console
+            from rich.panel import Panel
+            from rich.table import Table
+            from rich import box
+
+            console = Console()
+            rich_available = True
+        except ImportError:
+            self._logger.warning("Rich library not available for enhanced display")
+            rich_available = False
+
         while True:
             # Show current token status
             self._show_token_status()
 
-            # Display menu
-            print("\nGitHub Token Management:")
-            print("------------------------")
-            print("1. Save Token to Secure Keyring (e.g GNOME keyring)")
-            print("2. Remove Token")
-            print("3. Check API Rate Limits")
-            print("4. View Token Expiration")
-            print("5. View Token Audit Logs")
-            print("6. Rotate Token")
-            print("7. View Storage Details")
-            print("8. Back to Main Menu")
+            if rich_available:
+                # Display menu with Rich
+                console.print(
+                    Panel.fit(
+                        "[bold cyan]GitHub Token Management[/bold cyan]",
+                        border_style="cyan",
+                        title="🔑",
+                    )
+                )
 
-            try:
-                choice = int(input("\nEnter your choice (1-9): "))
+                # Create layout grid with two equally sized columns
+                layout = Table.grid(expand=True)
+                layout.add_column(ratio=1)
+                layout.add_column(ratio=1)
 
-                if choice == 1:
-                    self._save_to_keyring()
-                elif choice == 2:
-                    self._remove_token()
-                elif choice == 3:
-                    self._check_rate_limits()
-                elif choice == 4:
-                    self._view_token_expiration()
-                elif choice == 5:
-                    self._view_audit_logs()
-                elif choice == 6:
-                    self._rotate_token()
-                elif choice == 7:
-                    self._view_storage_details()
-                elif choice == 8:
-                    self._logger.info("Exiting token management")
+                # Security Settings panel
+                security_table = Table(
+                    box=box.ROUNDED,
+                    show_header=False,
+                    border_style="blue",
+                    title="[bold blue]Security Settings[/bold blue]",
+                )
+                security_table.add_column("Option", style="cyan", justify="right", width=2)
+                security_table.add_column("Description")
+                security_table.add_row("1", "Save Token to Secure Keyring (e.g GNOME keyring)")
+                security_table.add_row("2", "Remove Token")
+                security_table.add_row("3", "Check API Rate Limits")
+                security_table.add_row("4", "View Token Expiration")
+
+                # Management panel
+                mgmt_table = Table(
+                    box=box.ROUNDED,
+                    show_header=False,
+                    border_style="green",
+                    title="[bold green]Advanced Options[/bold green]",
+                )
+                mgmt_table.add_column("Option", style="cyan", justify="right", width=2)
+                mgmt_table.add_column("Description")
+                mgmt_table.add_row("5", "View Token Audit Logs")
+                mgmt_table.add_row("6", "Rotate Token")
+                mgmt_table.add_row("7", "View Storage Details")
+                mgmt_table.add_row("8", "Back to Main Menu")
+
+                # Add tables to layout grid
+                layout.add_row(security_table, mgmt_table)
+
+                # Print the layout
+                console.print(layout)
+
+                try:
+                    choice = console.input("\n[bold cyan]Enter your choice (1-8):[/bold cyan] ")
+                    try:
+                        choice_num = int(choice)
+                        if 1 <= choice_num <= 8:
+                            if choice_num == 1:
+                                self._save_to_keyring()
+                            elif choice_num == 2:
+                                self._remove_token()
+                            elif choice_num == 3:
+                                self._check_rate_limits()
+                            elif choice_num == 4:
+                                self._view_token_expiration()
+                            elif choice_num == 5:
+                                self._view_audit_logs()
+                            elif choice_num == 6:
+                                self._rotate_token()
+                            elif choice_num == 7:
+                                self._view_storage_details()
+                            elif choice_num == 8:
+                                self._logger.info("Exiting token management")
+                                return
+                        else:
+                            console.print(
+                                "[bold red]Invalid choice. Please enter a number between 1 and 8.[/bold red]"
+                            )
+                    except ValueError:
+                        console.print("[bold red]Invalid input. Please enter a number.[/bold red]")
+                except KeyboardInterrupt:
+                    console.print("\n[yellow]Operation cancelled. Returning to main menu.[/yellow]")
                     return
-                else:
-                    print("Invalid choice. Please enter a number between 1 and 9.")
-            except ValueError:
-                print("Invalid input. Please enter a number.")
-            except KeyboardInterrupt:
-                print("\nOperation cancelled. Returning to main menu.")
-                return
+            else:
+                # Fallback to standard text interface
+                # Display menu
+                print("\nGitHub Token Management:")
+                print("------------------------")
+                print("1. Save Token to Secure Keyring (e.g GNOME keyring)")
+                print("2. Remove Token")
+                print("3. Check API Rate Limits")
+                print("4. View Token Expiration")
+                print("5. View Token Audit Logs")
+                print("6. Rotate Token")
+                print("7. View Storage Details")
+                print("8. Back to Main Menu")
+
+                try:
+                    choice = int(input("\nEnter your choice (1-8): "))
+
+                    if choice == 1:
+                        self._save_to_keyring()
+                    elif choice == 2:
+                        self._remove_token()
+                    elif choice == 3:
+                        self._check_rate_limits()
+                    elif choice == 4:
+                        self._view_token_expiration()
+                    elif choice == 5:
+                        self._view_audit_logs()
+                    elif choice == 6:
+                        self._rotate_token()
+                    elif choice == 7:
+                        self._view_storage_details()
+                    elif choice == 8:
+                        self._logger.info("Exiting token management")
+                        return
+                    else:
+                        print("Invalid choice. Please enter a number between 1 and 8.")
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+                except KeyboardInterrupt:
+                    print("\nOperation cancelled. Returning to main menu.")
+                    return
 
     def _show_token_status(self) -> None:
         """
@@ -99,52 +194,138 @@ class ManageTokenCommand(Command):
         # Check if token exists
         token_exists = SecureTokenManager.token_exists()
 
-        print("\n--- GitHub Token Status ---")
+        try:
+            # Try to use Rich library for enhanced display
+            from rich.console import Console
+            from rich.panel import Panel
+            from rich.table import Table
+            from rich import box
 
-        # Show token existence status
-        if token_exists:
-            print("✅ GitHub token is set")
+            console = Console()
 
-            # Get token metadata
-            metadata = SecureTokenManager.get_token_metadata()
-            if metadata:
-                # Check expiration
-                if SecureTokenManager.is_token_expired():
-                    print("⚠️ Token is EXPIRED - please rotate your token")
-                else:
-                    # Get expiration date - use our datetime utility for safe parsing
-                    if "expires_at" in metadata:
+            # Create status panel
+            console.print(
+                Panel.fit(
+                    "[bold cyan]GitHub Token Status[/bold cyan]",
+                    border_style="cyan",
+                    title="🔑",
+                )
+            )
+
+            # Create token status table
+            status_table = Table(box=box.ROUNDED, border_style="cyan", show_header=False)
+            status_table.add_column("Status", style="dim blue", justify="right", width=20)
+            status_table.add_column("Value", style="green", justify="left")
+
+            # Show token existence status
+            if token_exists:
+                status_table.add_row("Token Status", "[green]✅ GitHub token is set[/green]")
+
+                # Get token metadata
+                metadata = SecureTokenManager.get_token_metadata()
+                if metadata:
+                    # Check expiration
+                    if SecureTokenManager.is_token_expired():
+                        status_table.add_row(
+                            "Expiration",
+                            "[bold red]⚠️ Token is EXPIRED - please rotate your token[/bold red]",
+                        )
+                    else:
+                        # Get expiration date - use our datetime utility for safe parsing
+                        if "expires_at" in metadata:
+                            try:
+                                expires_dt = parse_timestamp(metadata.get("expires_at"))
+                                if expires_dt:
+                                    days_remaining = (expires_dt - datetime.now()).days
+
+                                    if days_remaining <= 7:
+                                        status_table.add_row(
+                                            "Expiration",
+                                            f"[yellow]⚠️ Token expiring soon - {days_remaining} days remaining[/yellow]",
+                                        )
+                                    else:
+                                        status_table.add_row(
+                                            "Expiration",
+                                            f"[green]✅ Token valid - {days_remaining} days until expiration[/green]",
+                                        )
+                            except Exception as e:
+                                self._logger.error(f"Error processing expiration date: {e}")
+                                status_table.add_row(
+                                    "Expiration",
+                                    "[yellow]⚠️ Token expiration date could not be determined[/yellow]",
+                                )
+
+                    # Show when the token was last used
+                    if "last_used_at" in metadata:
                         try:
-                            expires_dt = parse_timestamp(metadata.get("expires_at"))
-                            if expires_dt:
-                                days_remaining = (expires_dt - datetime.now()).days
-
-                                if days_remaining <= 7:
-                                    print(
-                                        f"⚠️ Token expiring soon - {days_remaining} days remaining"
-                                    )
-                                else:
-                                    print(
-                                        f"✅ Token valid - {days_remaining} days until expiration"
-                                    )
+                            last_used_dt = parse_timestamp(metadata.get("last_used_at"))
+                            if last_used_dt:
+                                status_table.add_row(
+                                    "Last Used",
+                                    f"[blue]📊 {last_used_dt.strftime('%Y-%m-%d %H:%M:%S')}[/blue]",
+                                )
                         except Exception as e:
-                            self._logger.error(f"Error processing expiration date: {e}")
-                            print("⚠️ Token expiration date could not be determined")
+                            self._logger.error(f"Error processing last used date: {e}")
+            else:
+                status_table.add_row("Token Status", "[red]❌ No GitHub token configured[/red]")
 
-                # Show when the token was last used
-                if "last_used_at" in metadata:
-                    try:
-                        last_used_dt = parse_timestamp(metadata.get("last_used_at"))
-                        if last_used_dt:
-                            print(f"📊 Last used: {last_used_dt.strftime('%Y-%m-%d %H:%M:%S')}")
-                    except Exception as e:
-                        self._logger.error(f"Error processing last used date: {e}")
-        else:
-            print("❌ No GitHub token configured")
+            # Add security information
+            status_table.add_row("Secure Storage", "[green]✅ Enabled[/green]")
+            status_table.add_row("Token Security", "[green]✅ Protected[/green]")
 
-        # Simple secure storage status without complex details
-        print("\nSecure Storage: ✅ Enabled")
-        print("Token Security: ✅ Protected")
+            # Print the status table
+            console.print(status_table)
+
+        except ImportError:
+            # Fallback to standard display if Rich is not available
+            self._logger.warning("Rich library not available for token status display")
+
+            print("\n--- GitHub Token Status ---")
+
+            # Show token existence status
+            if token_exists:
+                print("✅ GitHub token is set")
+
+                # Get token metadata
+                metadata = SecureTokenManager.get_token_metadata()
+                if metadata:
+                    # Check expiration
+                    if SecureTokenManager.is_token_expired():
+                        print("⚠️ Token is EXPIRED - please rotate your token")
+                    else:
+                        # Get expiration date - use our datetime utility for safe parsing
+                        if "expires_at" in metadata:
+                            try:
+                                expires_dt = parse_timestamp(metadata.get("expires_at"))
+                                if expires_dt:
+                                    days_remaining = (expires_dt - datetime.now()).days
+
+                                    if days_remaining <= 7:
+                                        print(
+                                            f"⚠️ Token expiring soon - {days_remaining} days remaining"
+                                        )
+                                    else:
+                                        print(
+                                            f"✅ Token valid - {days_remaining} days until expiration"
+                                        )
+                            except Exception as e:
+                                self._logger.error(f"Error processing expiration date: {e}")
+                                print("⚠️ Token expiration date could not be determined")
+
+                    # Show when the token was last used
+                    if "last_used_at" in metadata:
+                        try:
+                            last_used_dt = parse_timestamp(metadata.get("last_used_at"))
+                            if last_used_dt:
+                                print(f"📊 Last used: {last_used_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+                        except Exception as e:
+                            self._logger.error(f"Error processing last used date: {e}")
+            else:
+                print("❌ No GitHub token configured")
+
+            # Simple secure storage status without complex details
+            print("\nSecure Storage: ✅ Enabled")
+            print("Token Security: ✅ Protected")
 
     def _get_token_expiration_days(self) -> Optional[int]:
         """
@@ -235,7 +416,19 @@ class ManageTokenCommand(Command):
         """
         self._logger.info("Checking GitHub API rate limits directly from API")
 
-        print("\n--- GitHub API Rate Limits ---")
+        try:
+            # Try to use Rich library for enhanced display
+            from rich.console import Console
+            from rich.panel import Panel
+            from rich.table import Table
+            from rich import box
+
+            console = Console()
+            rich_available = True
+        except ImportError:
+            self._logger.warning("Rich library not available for rate limits display")
+            rich_available = False
+            print("\n--- GitHub API Rate Limits ---")
 
         try:
             # If token is provided, temporarily use it without saving
@@ -257,169 +450,421 @@ class ManageTokenCommand(Command):
                     f"❌ Error retrieving rate limit information: {rate_limit_info['error']}"
                 )
                 self._logger.error(error_msg)
-                print(error_msg)
-                print("   Please check your token validity and network connection.")
+
+                if rich_available:
+                    console.print(f"[bold red]{error_msg}[/bold red]")
+                    console.print(
+                        "[yellow]   Please check your token validity and network connection.[/yellow]"
+                    )
+                else:
+                    print(error_msg)
+                    print("   Please check your token validity and network connection.")
                 return
 
-            # Display core rate limits
-            core_limits = rate_limit_info.get("resources", {}).get("core", {})
-            if core_limits:
-                remaining = core_limits.get("remaining", 0)
-                limit = core_limits.get("limit", 0)
-                reset_timestamp = core_limits.get("reset", 0)
+            if rich_available:
+                # Create status panel
+                console.print(
+                    Panel.fit(
+                        "[bold cyan]GitHub API Rate Limits[/bold cyan]",
+                        border_style="cyan",
+                        title="📊",
+                    )
+                )
 
-                # Calculate time until reset
-                if reset_timestamp:
-                    reset_time = datetime.fromtimestamp(reset_timestamp)
-                    time_until_reset = reset_time - datetime.now()
-                    minutes_until_reset = max(0, int(time_until_reset.total_seconds() / 60))
+                # Create rate limits table
+                limits_table = Table(box=box.ROUNDED, border_style="blue", show_header=True)
+                limits_table.add_column("API Resource", style="cyan", justify="left")
+                limits_table.add_column("Status", style="green", justify="left")
+                limits_table.add_column("Usage", style="magenta", justify="center")
+                limits_table.add_column("Reset Time", style="yellow", justify="left")
 
-                    # Get the full hour reset time if available
-                    full_hour_reset_formatted = None
-                    if "full_hour_reset" in rate_limit_info:
-                        full_hour_reset = datetime.fromtimestamp(rate_limit_info["full_hour_reset"])
-                        full_hour_reset_formatted = full_hour_reset.strftime("%H:%M:%S")
+                # Display core rate limits
+                core_limits = rate_limit_info.get("resources", {}).get("core", {})
+                if core_limits:
+                    remaining = core_limits.get("remaining", 0)
+                    limit = core_limits.get("limit", 0)
+                    reset_timestamp = core_limits.get("reset", 0)
 
-                    print(f"Core API Rate Limit: {remaining}/{limit}")
+                    # Calculate time until reset
+                    if reset_timestamp:
+                        reset_time = datetime.fromtimestamp(reset_timestamp)
+                        time_until_reset = reset_time - datetime.now()
+                        minutes_until_reset = max(0, int(time_until_reset.total_seconds() / 60))
 
-                    # Display both the GitHub-provided reset time and the hourly reset explanation
-                    if full_hour_reset_formatted:
-                        print(
-                            f"Reset in: {minutes_until_reset} minutes ({reset_time.strftime('%H:%M:%S')}) - hourly at {full_hour_reset_formatted}"
-                        )
-                    else:
-                        print(
-                            f"Reset in: {minutes_until_reset} minutes ({reset_time.strftime('%H:%M:%S')})"
-                        )
+                        # Get the full hour reset time if available
+                        full_hour_reset_formatted = None
+                        if "full_hour_reset" in rate_limit_info:
+                            full_hour_reset = datetime.fromtimestamp(
+                                rate_limit_info["full_hour_reset"]
+                            )
+                            full_hour_reset_formatted = full_hour_reset.strftime("%H:%M:%S")
 
-                    print("Note: GitHub API rate limits reset on an hourly basis")
-
-                    # Show rate limit status with emoji indicators
-                    if remaining == 0:
-                        print("⛔ Rate limit exceeded! Requests will be rejected until reset time.")
-                    elif remaining < 10:
-                        print("⚠️ Rate limit almost exhausted! Use requests sparingly.")
-                    else:
-                        percentage = (remaining / limit) * 100
-                        if percentage < 25:
-                            print("🔸 Rate limit below 25% - consider spacing out requests.")
+                        # Determine status color based on remaining requests
+                        status_text = ""
+                        if remaining == 0:
+                            status_text = "[bold red]⛔ Rate limit exceeded![/bold red]"
+                        elif remaining < 10:
+                            status_text = "[bold yellow]⚠️ Almost exhausted[/bold yellow]"
                         else:
-                            print("✅ Rate limit healthy.")
-                else:
-                    self._logger.warning("Missing reset timestamp in rate limit data")
-                    print(f"Core API Rate Limit: {remaining}/{limit}")
-                    print("Reset time: Not available")
-            else:
-                self._logger.warning("No core rate limit information available")
-                print("No core rate limit information available")
+                            percentage = (remaining / limit) * 100
+                            if percentage < 25:
+                                status_text = "[yellow]🔸 Below 25%[/yellow]"
+                            else:
+                                status_text = "[green]✅ Healthy[/green]"
 
-            # Display search rate limits
-            search_limits = rate_limit_info.get("resources", {}).get("search", {})
-            if search_limits:
-                search_remaining = search_limits.get("remaining", 0)
-                search_limit = search_limits.get("limit", 0)
-                search_reset = search_limits.get("reset", 0)
+                        # Format reset information
+                        reset_info = (
+                            f"{reset_time.strftime('%H:%M:%S')} ({minutes_until_reset} min)"
+                        )
+                        if full_hour_reset_formatted:
+                            reset_info += f"\nHourly at {full_hour_reset_formatted}"
 
-                if search_reset:
-                    search_reset_time = datetime.fromtimestamp(search_reset)
-                    search_time_until_reset = search_reset_time - datetime.now()
-                    search_minutes = max(0, int(search_time_until_reset.total_seconds() / 60))
-
-                    # Get the full hour reset if available
-                    full_hour_reset_formatted = None
-                    if "full_hour_reset" in rate_limit_info:
-                        full_hour_reset = datetime.fromtimestamp(rate_limit_info["full_hour_reset"])
-                        full_hour_reset_formatted = full_hour_reset.strftime("%H:%M:%S")
-
-                    print(f"\nSearch API Rate Limit: {search_remaining}/{search_limit}")
-
-                    # Display both the GitHub-provided reset time and the hourly reset explanation
-                    if full_hour_reset_formatted:
-                        print(
-                            f"Reset in: {search_minutes} minutes ({search_reset_time.strftime('%H:%M:%S')}) - hourly at {full_hour_reset_formatted}"
+                        # Add to table
+                        limits_table.add_row(
+                            "[bold]Core API[/bold]", status_text, f"{remaining}/{limit}", reset_info
                         )
                     else:
-                        print(
-                            f"Reset in: {search_minutes} minutes ({search_reset_time.strftime('%H:%M:%S')})"
+                        limits_table.add_row(
+                            "[bold]Core API[/bold]",
+                            "[yellow]⚠️ Unknown status[/yellow]",
+                            f"{remaining}/{limit}",
+                            "Not available",
                         )
-
-            # Show graphql rate limits if available
-            graphql_limits = rate_limit_info.get("resources", {}).get("graphql", {})
-            if graphql_limits:
-                graphql_remaining = graphql_limits.get("remaining", 0)
-                graphql_limit = graphql_limits.get("limit", 0)
-                graphql_reset = graphql_limits.get("reset", 0)
-
-                print(f"\nGraphQL API Rate Limit: {graphql_remaining}/{graphql_limit}")
-
-                # Show reset info for GraphQL if available
-                if graphql_reset:
-                    graphql_reset_time = datetime.fromtimestamp(graphql_reset)
-                    graphql_minutes = max(
-                        0, int((graphql_reset_time - datetime.now()).total_seconds() / 60)
+                else:
+                    limits_table.add_row(
+                        "[bold]Core API[/bold]", "[red]❌ Not available[/red]", "N/A", "N/A"
                     )
 
-                    if "full_hour_reset" in rate_limit_info:
-                        full_hour_reset = datetime.fromtimestamp(rate_limit_info["full_hour_reset"])
-                        print(
-                            f"Reset in: {graphql_minutes} minutes (hourly at {full_hour_reset.strftime('%H:%M:%S')})"
+                # Display search rate limits
+                search_limits = rate_limit_info.get("resources", {}).get("search", {})
+                if search_limits:
+                    search_remaining = search_limits.get("remaining", 0)
+                    search_limit = search_limits.get("limit", 0)
+                    search_reset = search_limits.get("reset", 0)
+
+                    if search_reset:
+                        search_reset_time = datetime.fromtimestamp(search_reset)
+                        search_time_until_reset = search_reset_time - datetime.now()
+                        search_minutes = max(0, int(search_time_until_reset.total_seconds() / 60))
+
+                        # Determine status color based on remaining requests
+                        search_status_text = ""
+                        if search_remaining == 0:
+                            search_status_text = "[bold red]⛔ Rate limit exceeded![/bold red]"
+                        elif search_remaining < 5:
+                            search_status_text = "[bold yellow]⚠️ Almost exhausted[/bold yellow]"
+                        else:
+                            search_percentage = (search_remaining / search_limit) * 100
+                            if search_percentage < 25:
+                                search_status_text = "[yellow]🔸 Below 25%[/yellow]"
+                            else:
+                                search_status_text = "[green]✅ Healthy[/green]"
+
+                        # Format reset information
+                        search_reset_info = (
+                            f"{search_reset_time.strftime('%H:%M:%S')} ({search_minutes} min)"
+                        )
+
+                        # Add to table
+                        limits_table.add_row(
+                            "[bold]Search API[/bold]",
+                            search_status_text,
+                            f"{search_remaining}/{search_limit}",
+                            search_reset_info,
                         )
                     else:
-                        print(
-                            f"Reset in: {graphql_minutes} minutes ({graphql_reset_time.strftime('%H:%M:%S')})"
+                        limits_table.add_row(
+                            "[bold]Search API[/bold]",
+                            "[yellow]⚠️ Unknown status[/yellow]",
+                            f"{search_remaining}/{search_limit}",
+                            "Not available",
                         )
 
-            # Display information about the check
-            print("\nLive Check: ✅ Rate limit information from GitHub API (not cached)")
-            check_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"Check time: {check_time}")
+                # Show graphql rate limits if available
+                graphql_limits = rate_limit_info.get("resources", {}).get("graphql", {})
+                if graphql_limits:
+                    graphql_remaining = graphql_limits.get("remaining", 0)
+                    graphql_limit = graphql_limits.get("limit", 0)
+                    graphql_reset = graphql_limits.get("reset", 0)
 
-            # Display authentication type information
-            try:
-                token_info = GitHubAuthManager.get_token_info()
-                if token_info:
-                    print("\nToken Information:")
-                    if token_info.get("token_type"):
-                        print(f"Type: {token_info.get('token_type', 'Unknown')}")
-                    if token_info.get("scopes"):
-                        print(f"Scopes: {', '.join(token_info.get('scopes', []))}")
+                    if graphql_reset:
+                        graphql_reset_time = datetime.fromtimestamp(graphql_reset)
+                        graphql_minutes = max(
+                            0, int((graphql_reset_time - datetime.now()).total_seconds() / 60)
+                        )
 
-                    # Check if days_until_rotation is a string and convert if needed
-                    if (
-                        "days_until_rotation" in token_info
-                        and token_info["days_until_rotation"] is not None
-                    ):
-                        days_until_rotation = token_info["days_until_rotation"]
-                        # Convert to int if it's a string
-                        if isinstance(days_until_rotation, str):
-                            try:
-                                days_until_rotation = int(days_until_rotation)
-                            except ValueError:
-                                days_until_rotation = None
+                        # Determine status color based on remaining requests
+                        graphql_status_text = ""
+                        if graphql_remaining == 0:
+                            graphql_status_text = "[bold red]⛔ Rate limit exceeded![/bold red]"
+                        elif graphql_remaining < 100:
+                            graphql_status_text = "[bold yellow]⚠️ Almost exhausted[/bold yellow]"
+                        else:
+                            graphql_percentage = (graphql_remaining / graphql_limit) * 100
+                            if graphql_percentage < 25:
+                                graphql_status_text = "[yellow]🔸 Below 25%[/yellow]"
+                            else:
+                                graphql_status_text = "[green]✅ Healthy[/green]"
 
-                        # Now it's safe to compare
-                        if days_until_rotation is not None and days_until_rotation <= 0:
-                            print("⚠️ Token scheduled for rotation on next use")
-                        elif days_until_rotation is not None:
-                            print(f"ℹ️ Token scheduled for rotation in {days_until_rotation} days")
+                        # Format reset information
+                        graphql_reset_info = (
+                            f"{graphql_reset_time.strftime('%H:%M:%S')} ({graphql_minutes} min)"
+                        )
 
-                    if token_info.get("is_fine_grained", False):
-                        print("✅ Using fine-grained personal access token (recommended)")
-                    elif token_info.get("is_classic", False):
-                        print("ℹ️ Using classic personal access token")
-                        print("   Consider upgrading to a fine-grained token for better security")
-            except Exception as token_info_error:
-                self._logger.error(f"Error retrieving token information: {token_info_error}")
-                # Continue execution - token info is not critical
+                        # Add to table
+                        limits_table.add_row(
+                            "[bold]GraphQL API[/bold]",
+                            graphql_status_text,
+                            f"{graphql_remaining}/{graphql_limit}",
+                            graphql_reset_info,
+                        )
+
+                # Print the limits table
+                console.print(limits_table)
+
+                # Create info table for additional information
+                info_table = Table(box=box.ROUNDED, border_style="cyan", show_header=False)
+                info_table.add_column("Info", style="dim blue", justify="right", width=15)
+                info_table.add_column("Value", style="green", justify="left")
+
+                # Add check information
+                check_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                info_table.add_row(
+                    "Check Type", "[green]✅ Live from GitHub API (not cached)[/green]"
+                )
+                info_table.add_row("Check Time", check_time)
+
+                # Add token information if available
+                try:
+                    token_info = GitHubAuthManager.get_token_info()
+                    if token_info:
+                        if token_info.get("token_type"):
+                            info_table.add_row(
+                                "Token Type", token_info.get("token_type", "Unknown")
+                            )
+
+                        if token_info.get("scopes"):
+                            info_table.add_row(
+                                "Token Scopes", ", ".join(token_info.get("scopes", []))
+                            )
+
+                        # Check if days_until_rotation is a string and convert if needed
+                        if (
+                            "days_until_rotation" in token_info
+                            and token_info["days_until_rotation"] is not None
+                        ):
+                            days_until_rotation = token_info["days_until_rotation"]
+                            # Convert to int if it's a string
+                            if isinstance(days_until_rotation, str):
+                                try:
+                                    days_until_rotation = int(days_until_rotation)
+                                except ValueError:
+                                    days_until_rotation = None
+
+                            # Now it's safe to compare
+                            if days_until_rotation is not None and days_until_rotation <= 0:
+                                info_table.add_row(
+                                    "Rotation", "[yellow]⚠️ Scheduled for next use[/yellow]"
+                                )
+                            elif days_until_rotation is not None:
+                                info_table.add_row("Rotation", f"In {days_until_rotation} days")
+
+                        if token_info.get("is_fine_grained", False):
+                            info_table.add_row(
+                                "Token Security", "[green]✅ Fine-grained (recommended)[/green]"
+                            )
+                        elif token_info.get("is_classic", False):
+                            info_table.add_row(
+                                "Token Security", "[yellow]ℹ️ Classic (consider upgrading)[/yellow]"
+                            )
+                except Exception as token_info_error:
+                    self._logger.error(f"Error retrieving token information: {token_info_error}")
+
+                # Print the info table
+                console.print(info_table)
+
+            else:
+                # Standard text output for non-Rich environments
+                # Display core rate limits
+                core_limits = rate_limit_info.get("resources", {}).get("core", {})
+                if core_limits:
+                    remaining = core_limits.get("remaining", 0)
+                    limit = core_limits.get("limit", 0)
+                    reset_timestamp = core_limits.get("reset", 0)
+
+                    # Calculate time until reset
+                    if reset_timestamp:
+                        reset_time = datetime.fromtimestamp(reset_timestamp)
+                        time_until_reset = reset_time - datetime.now()
+                        minutes_until_reset = max(0, int(time_until_reset.total_seconds() / 60))
+
+                        # Get the full hour reset time if available
+                        full_hour_reset_formatted = None
+                        if "full_hour_reset" in rate_limit_info:
+                            full_hour_reset = datetime.fromtimestamp(
+                                rate_limit_info["full_hour_reset"]
+                            )
+                            full_hour_reset_formatted = full_hour_reset.strftime("%H:%M:%S")
+
+                        print(f"Core API Rate Limit: {remaining}/{limit}")
+
+                        # Display both the GitHub-provided reset time and the hourly reset explanation
+                        if full_hour_reset_formatted:
+                            print(
+                                f"Reset in: {minutes_until_reset} minutes ({reset_time.strftime('%H:%M:%S')}) - hourly at {full_hour_reset_formatted}"
+                            )
+                        else:
+                            print(
+                                f"Reset in: {minutes_until_reset} minutes ({reset_time.strftime('%H:%M:%S')})"
+                            )
+
+                        print("Note: GitHub API rate limits reset on an hourly basis")
+
+                        # Show rate limit status with emoji indicators
+                        if remaining == 0:
+                            print(
+                                "⛔ Rate limit exceeded! Requests will be rejected until reset time."
+                            )
+                        elif remaining < 10:
+                            print("⚠️ Rate limit almost exhausted! Use requests sparingly.")
+                        else:
+                            percentage = (remaining / limit) * 100
+                            if percentage < 25:
+                                print("🔸 Rate limit below 25% - consider spacing out requests.")
+                            else:
+                                print("✅ Rate limit healthy.")
+                    else:
+                        self._logger.warning("Missing reset timestamp in rate limit data")
+                        print(f"Core API Rate Limit: {remaining}/{limit}")
+                        print("Reset time: Not available")
+                else:
+                    self._logger.warning("No core rate limit information available")
+                    print("No core rate limit information available")
+
+                # Display search rate limits
+                search_limits = rate_limit_info.get("resources", {}).get("search", {})
+                if search_limits:
+                    search_remaining = search_limits.get("remaining", 0)
+                    search_limit = search_limits.get("limit", 0)
+                    search_reset = search_limits.get("reset", 0)
+
+                    if search_reset:
+                        search_reset_time = datetime.fromtimestamp(search_reset)
+                        search_time_until_reset = search_reset_time - datetime.now()
+                        search_minutes = max(0, int(search_time_until_reset.total_seconds() / 60))
+
+                        # Get the full hour reset if available
+                        full_hour_reset_formatted = None
+                        if "full_hour_reset" in rate_limit_info:
+                            full_hour_reset = datetime.fromtimestamp(
+                                rate_limit_info["full_hour_reset"]
+                            )
+                            full_hour_reset_formatted = full_hour_reset.strftime("%H:%M:%S")
+
+                        print(f"\nSearch API Rate Limit: {search_remaining}/{search_limit}")
+
+                        # Display both the GitHub-provided reset time and the hourly reset explanation
+                        if full_hour_reset_formatted:
+                            print(
+                                f"Reset in: {search_minutes} minutes ({search_reset_time.strftime('%H:%M:%S')}) - hourly at {full_hour_reset_formatted}"
+                            )
+                        else:
+                            print(
+                                f"Reset in: {search_minutes} minutes ({search_reset_time.strftime('%H:%M:%S')})"
+                            )
+
+                # Show graphql rate limits if available
+                graphql_limits = rate_limit_info.get("resources", {}).get("graphql", {})
+                if graphql_limits:
+                    graphql_remaining = graphql_limits.get("remaining", 0)
+                    graphql_limit = graphql_limits.get("limit", 0)
+                    graphql_reset = graphql_limits.get("reset", 0)
+
+                    print(f"\nGraphQL API Rate Limit: {graphql_remaining}/{graphql_limit}")
+
+                    # Show reset info for GraphQL if available
+                    if graphql_reset:
+                        graphql_reset_time = datetime.fromtimestamp(graphql_reset)
+                        graphql_minutes = max(
+                            0, int((graphql_reset_time - datetime.now()).total_seconds() / 60)
+                        )
+
+                        if "full_hour_reset" in rate_limit_info:
+                            full_hour_reset = datetime.fromtimestamp(
+                                rate_limit_info["full_hour_reset"]
+                            )
+                            print(
+                                f"Reset in: {graphql_minutes} minutes (hourly at {full_hour_reset.strftime('%H:%M:%S')})"
+                            )
+                        else:
+                            print(
+                                f"Reset in: {graphql_minutes} minutes ({graphql_reset_time.strftime('%H:%M:%S')})"
+                            )
+
+                # Display information about the check
+                print("\nLive Check: ✅ Rate limit information from GitHub API (not cached)")
+                check_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                print(f"Check time: {check_time}")
+
+                # Display authentication type information
+                try:
+                    token_info = GitHubAuthManager.get_token_info()
+                    if token_info:
+                        print("\nToken Information:")
+                        if token_info.get("token_type"):
+                            print(f"Type: {token_info.get('token_type', 'Unknown')}")
+                        if token_info.get("scopes"):
+                            print(f"Scopes: {', '.join(token_info.get('scopes', []))}")
+
+                        # Check if days_until_rotation is a string and convert if needed
+                        if (
+                            "days_until_rotation" in token_info
+                            and token_info["days_until_rotation"] is not None
+                        ):
+                            days_until_rotation = token_info["days_until_rotation"]
+                            # Convert to int if it's a string
+                            if isinstance(days_until_rotation, str):
+                                try:
+                                    days_until_rotation = int(days_until_rotation)
+                                except ValueError:
+                                    days_until_rotation = None
+
+                            # Now it's safe to compare
+                            if days_until_rotation is not None and days_until_rotation <= 0:
+                                print("⚠️ Token scheduled for rotation on next use")
+                            elif days_until_rotation is not None:
+                                print(
+                                    f"ℹ️ Token scheduled for rotation in {days_until_rotation} days"
+                                )
+
+                        if token_info.get("is_fine_grained", False):
+                            print("✅ Using fine-grained personal access token (recommended)")
+                        elif token_info.get("is_classic", False):
+                            print("ℹ️ Using classic personal access token")
+                            print(
+                                "   Consider upgrading to a fine-grained token for better security"
+                            )
+                except Exception as token_info_error:
+                    self._logger.error(f"Error retrieving token information: {token_info_error}")
+                    # Continue execution - token info is not critical
 
         except Exception as e:
             # Log both the error type and the message for better debugging
             self._logger.error(f"Error checking rate limits: {type(e).__name__}: {str(e)}")
             self._logger.exception("Detailed exception info:")
 
-            print(f"❌ Error checking rate limits: {type(e).__name__}: {str(e)}")
-            print("   Please check your network connection and token validity.")
-            print("   Check application logs for more details.")
+            if rich_available:
+                console.print(
+                    f"[bold red]❌ Error checking rate limits: {type(e).__name__}: {str(e)}[/bold red]"
+                )
+                console.print(
+                    "[yellow]   Please check your network connection and token validity.[/yellow]"
+                )
+                console.print("[yellow]   Check application logs for more details.[/yellow]")
+            else:
+                print(f"❌ Error checking rate limits: {type(e).__name__}: {str(e)}")
+                print("   Please check your network connection and token validity.")
+                print("   Check application logs for more details.")
 
     def _validate_token(self, token: str) -> bool:
         """
@@ -804,6 +1249,7 @@ class ManageTokenCommand(Command):
         current_token = SecureTokenManager.get_token(validate_expiration=False)
 
         # If a token already exists, confirm update
+        #TODO: if it is already exist, not need to write again? this is non-sense?
         if current_token:
             print("\nA token already exists.")
             choice = input("Do you want to update the token in the keyring? (y/n): ")
@@ -824,6 +1270,7 @@ class ManageTokenCommand(Command):
 
             # Validate the token using GitHubAuthManager for improved validation
             if not self._validate_token(token):
+                logging.error("Invalid GitHub token! _validate_token returned False")
                 print("\n❌ Invalid GitHub token! Token was not saved.")
                 print("   Please make sure you've entered the token correctly.")
                 return
@@ -831,6 +1278,7 @@ class ManageTokenCommand(Command):
         # Ask for token expiration
         expiration_days = self._get_token_expiration_days()
         if expiration_days is None:
+            logging.error("Token expiration days not provided. _get_token_expiration_days returned None")
             print("Operation cancelled.")
             return
 

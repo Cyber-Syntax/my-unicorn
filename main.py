@@ -15,11 +15,19 @@ from src.commands.invoker import CommandInvoker
 from src.commands.manage_token import ManageTokenCommand
 from src.commands.migrate_config import MigrateConfigCommand
 from src.commands.update_all_auto import UpdateAllAutoCommand
-from src.commands.update_all_async import UpdateAsyncCommand  # Import the new async update command
+from src.commands.update_all_async import UpdateAsyncCommand
 from src.commands.delete_backups import DeleteBackupsCommand
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
 from src.auth_manager import GitHubAuthManager
+
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
+from rich import box
+
+console = Console()
 
 _ = gettext.gettext
 
@@ -30,48 +38,116 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 
-def get_user_choice():
-    """Display menu and get user choice"""
-    print(_("Welcome to my-unicorn 🦄!"))
+def get_user_choice() -> int:
+    """Display menu and get user choice using Rich library with side-by-side layout.
+
+    Returns:
+        int: The user's menu choice as an integer
+
+    Raises:
+        ValueError: If user input cannot be converted to an integer
+        KeyboardInterrupt: If user cancels with Ctrl+C
+    """
+    console.print(
+        Panel.fit(
+            "[bold cyan]Welcome to my-unicorn[/bold cyan] :unicorn:",
+            border_style="cyan",
+            title="🦄",
+        )
+    )
 
     # Display GitHub API rate limit info if available
     try:
         remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+
+        # Create a status table for API rate limit information
+        status_table = Table(box=box.ROUNDED, border_style="blue", show_header=False, expand=False)
+        status_table.add_column("Status", style="dim blue", justify="right")
+        status_table.add_column("Value", style="green")
+
         if is_authenticated:
-            print(_("GitHub API: {} of {} requests remaining (estimate)").format(remaining, limit))
-            if remaining < 100:
-                print(_("ℹ️ Running low on API requests! Resets at {}").format(reset_time))
-        else:
-            print(
-                _("ℹ️ GitHub API: {} of 60 requests remaining (unauthenticated)").format(remaining)
+            status_table.add_row(
+                "GitHub API Status", f"[green]{remaining}[/green] of {limit} requests remaining"
             )
-            print(_("🔑 Add your github token using option 6 to get 5000 requests/hour"))
+            status_table.add_row("Authentication", "✅ Authenticated")
+            status_table.add_row("Reset Time", f"{reset_time}")
+
+            if remaining < 100:
+                status_table.add_row("Warning", f"[yellow]⚠️ Low API requests remaining![/yellow]")
+        else:
+            status_table.add_row(
+                "GitHub API Status", f"[yellow]{remaining} of 60 requests remaining[/yellow]"
+            )
+            status_table.add_row("Authentication", "❌ Unauthenticated")
+            status_table.add_row(
+                "Note", "[blue]🔑 Add token (option 6) for 5000 requests/hour[/blue]"
+            )
+
+        console.print(status_table)
     except Exception as e:
-        # Silently handle any errors to avoid breaking the main menu
         logging.debug(f"Error checking rate limits: {e}")
 
-    print(_("Choose one of the following options:"))
-    print("====================================")
-    print(_("1. Download AppImage (Must be installed to create config file)"))
-    print(_("2. Update all AppImages automatically"))
-    print(_("3. Update Asynchronously (Parallel Updates)"))  # New async update option
-    print(_("4. Customize AppImages config file"))
-    print(_("5. Customize Global config file"))
-    print(_("6. Manage GitHub Token (for API rate limits)"))
-    print(_("7. Check and Migrate Configuration Files"))
-    print(_("8. Delete Old Backups"))
-    print(_("9. Exit"))  # Updated exit option number
-    print("====================================")
+    # Create layout grid with three equally sized columns
+    layout = Table.grid(expand=True)
+    layout.add_column(ratio=1)
+    layout.add_column(ratio=1)
+    layout.add_column(ratio=1)
+
+    # Download & Update panel
+    download_table = Table(
+        box=box.ROUNDED,
+        show_header=False,
+        border_style="magenta",
+        title="[bold magenta]Download & Update[/bold magenta]",
+    )
+    download_table.add_column("Option", style="cyan", justify="right", width=2)
+    download_table.add_column("Description")
+    download_table.add_row("1", "Download new AppImage")
+    download_table.add_row("2", "Update all AppImages")
+    download_table.add_row("3", "Select AppImages to update")
+
+    # Configuration panel
+    config_table = Table(
+        box=box.ROUNDED,
+        show_header=False,
+        border_style="blue",
+        title="[bold blue]Configuration[/bold blue]",
+    )
+    config_table.add_column("Option", style="cyan", justify="right", width=2)
+    config_table.add_column("Description")
+    config_table.add_row("4", "Manage AppImage settings")
+    config_table.add_row("5", "Manage global settings")
+    config_table.add_row("6", "Manage GitHub token")
+
+    # Maintenance panel
+    maint_table = Table(
+        box=box.ROUNDED,
+        show_header=False,
+        border_style="green",
+        title="[bold green]Maintenance[/bold green]",
+    )
+    maint_table.add_column("Option", style="cyan", justify="right", width=2)
+    maint_table.add_column("Description")
+    maint_table.add_row("7", "Update configuration files")
+    maint_table.add_row("8", "Clean old backups")
+    maint_table.add_row("9", "Exit")
+
+    # Add tables to layout grid
+    layout.add_row(download_table, config_table, maint_table)
+
+    # Print the layout
+    console.print(layout)
+
     try:
-        return int(input(_("Enter your choice: ")))
+        choice = console.input("[bold cyan]Enter your choice:[/bold cyan] ")
+        return int(choice)
     except ValueError as error:
-        logging.error(f"Error: {error}", exc_info=True)
-        logging.error("Error: {error}. Exiting...".format(error=error))
-        print(_("Error: {error}. Exiting...").format(error=error))
+        console.print(f"[bold red]Invalid input: {error}[/bold red]")
+        logging.error(f"Invalid menu choice: {error}", exc_info=True)
         sys.exit(1)
     except KeyboardInterrupt:
         logging.info("User interrupted the program with Ctrl+C")
-        print("\n" + _("Program interrupted. Exiting gracefully..."))
+        console.print("\n[yellow]Program interrupted. Exiting gracefully...[/yellow]")
         sys.exit(0)
 
 

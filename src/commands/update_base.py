@@ -38,16 +38,14 @@ class BaseUpdateCommand(Command):
         self.global_config = GlobalConfigManager()
         self.app_config = AppConfigManager()
         self._logger = logging.getLogger(__name__)
-
-        # For async operations - will be properly set after global_config is loaded
+        
+        self.max_concurrent_updates = self.global_config.max_concurrent_updates
+        self._logger.debug(
+            f"Set max_concurrent_updates to {self.max_concurrent_updates} from global config"
+        )
+        
+        self._logger.debug("Initializing semaphore")
         self.semaphore: Optional[asyncio.Semaphore] = None
-
-        # Set max_concurrent_updates from global config after it's loaded in post_init
-        if hasattr(self.global_config, "max_concurrent_updates"):
-            self.max_concurrent_updates = self.global_config.max_concurrent_updates
-            self._logger.debug(
-                f"Set max_concurrent_updates to {self.max_concurrent_updates} from global config"
-            )
 
     def execute(self):
         """
