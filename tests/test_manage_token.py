@@ -35,7 +35,7 @@ logging.getLogger("src.secure_token").setLevel(logging.CRITICAL)
 logging.getLogger("src.auth_manager").setLevel(logging.CRITICAL)
 
 # Safe mock token value used throughout tests
-SAFE_MOCK_TOKEN =ghp_mocktokenfortesting123456789abcdefghijklmnopq"
+SAFE_MOCK_TOKEN = "ghp_mocktokenfortesting123456789abcdefghijklmnopq"
 
 
 class TestManageTokenCommand:
@@ -464,11 +464,18 @@ class TestManageTokenCommand:
         # Should print invalid choice message
         mock_print.assert_any_call("Invalid input. Please enter a number.")
 
-    def test_not_exposing_real_tokens_in_exceptions(self, command, mock_secure_token_manager):
+    @patch("builtins.print")
+    @patch("builtins.input", side_effect=["y"])  # Mock the confirmation input
+    def test_not_exposing_real_tokens_in_exceptions(
+        self, mock_input, mock_print, command, mock_secure_token_manager
+    ):
         """Ensure that if a real token is used, it's not exposed in exceptions."""
         # Setup - create a token that looks like a real GitHub token
         real_looking_token = "ghp_1234567890abcdefghijklmnopqrstuvwxyz"
         mock_secure_token_manager.save_token.side_effect = Exception("Failed to save token")
+
+        # Make sure we use a token-like value for testing
+        mock_secure_token_manager.get_token.return_value = real_looking_token
 
         # Make sure the exception doesn't contain the token
         with pytest.raises(Exception) as exc_info:

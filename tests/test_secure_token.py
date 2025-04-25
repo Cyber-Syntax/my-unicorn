@@ -8,7 +8,7 @@ secure token storage and retrieval.
 """
 
 import os
-importempfile
+import tempfile
 import time
 import builtins
 import pytest
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from pytest_mock.plugin import MockerFixture
 
 # Import the module to test
-from src.secure_token import SecureTokenManager, DEFAULT_TOKEN_EXPIRATION_DAYS
+from src.secure_token import DEFAULT_TOKEN_EXPIRATION_DAYS, SecureTokenManager
 
 # Disable logging during tests to prevent token exposure in logs
 logging.getLogger("src.secure_token").setLevel(logging.CRITICAL)
