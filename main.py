@@ -21,14 +21,6 @@ from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
 from src.auth_manager import GitHubAuthManager
 
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
-from rich import box
-
-console = Console()
-
 _ = gettext.gettext
 
 
@@ -39,7 +31,7 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
 
 
 def get_user_choice() -> int:
-    """Display menu and get user choice using Rich library with side-by-side layout.
+    """Display menu and get user choice using standard terminal output.
 
     Returns:
         int: The user's menu choice as an integer
@@ -48,106 +40,62 @@ def get_user_choice() -> int:
         ValueError: If user input cannot be converted to an integer
         KeyboardInterrupt: If user cancels with Ctrl+C
     """
-    console.print(
-        Panel.fit(
-            "[bold cyan]Welcome to my-unicorn[/bold cyan] :unicorn:",
-            border_style="cyan",
-            title="🦄",
-        )
-    )
+    print("\n" + "=" * 60)
+    print("                 Welcome to my-unicorn 🦄")
+    print("=" * 60)
 
     # Display GitHub API rate limit info if available
     try:
         remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
 
-        # Create a status table for API rate limit information
-        status_table = Table(box=box.ROUNDED, border_style="blue", show_header=False, expand=False)
-        status_table.add_column("Status", style="dim blue", justify="right")
-        status_table.add_column("Value", style="green")
+        # Create a status display for API rate limit information
+        print("\n--- GitHub API Status ---")
 
         if is_authenticated:
-            status_table.add_row(
-                "GitHub API Status", f"[green]{remaining}[/green] of {limit} requests remaining"
-            )
-            status_table.add_row("Authentication", "✅ Authenticated")
-            status_table.add_row("Reset Time", f"{reset_time}")
+            print(f"GitHub API Status: {remaining} of {limit} requests remaining")
+            print(f"Authentication: ✅ Authenticated")
+            print(f"Reset Time: {reset_time}")
 
             if remaining < 100:
-                status_table.add_row("Warning", f"[yellow]⚠️ Low API requests remaining![/yellow]")
+                print(f"Warning: ⚠️ Low API requests remaining!")
         else:
-            status_table.add_row(
-                "GitHub API Status", f"[yellow]{remaining} of 60 requests remaining[/yellow]"
-            )
-            status_table.add_row("Authentication", "❌ Unauthenticated")
-            status_table.add_row(
-                "Note", "[blue]🔑 Add token (option 6) for 5000 requests/hour[/blue]"
-            )
+            print(f"GitHub API Status: {remaining} of 60 requests remaining")
+            print(f"Authentication: ❌ Unauthenticated")
+            print(f"Note: 🔑 Add token (option 6) for 5000 requests/hour")
 
-        console.print(status_table)
+        print("-" * 40)
     except Exception as e:
         logging.debug(f"Error checking rate limits: {e}")
 
-    # Create layout grid with three equally sized columns
-    layout = Table.grid(expand=True)
-    layout.add_column(ratio=1)
-    layout.add_column(ratio=1)
-    layout.add_column(ratio=1)
+    # Download & Update section
+    print("\n--- Download & Update ---")
+    print("1. Download new AppImage")
+    print("2. Update all AppImages")
+    print("3. Select AppImages to update")
 
-    # Download & Update panel
-    download_table = Table(
-        box=box.ROUNDED,
-        show_header=False,
-        border_style="magenta",
-        title="[bold magenta]Download & Update[/bold magenta]",
-    )
-    download_table.add_column("Option", style="cyan", justify="right", width=2)
-    download_table.add_column("Description")
-    download_table.add_row("1", "Download new AppImage")
-    download_table.add_row("2", "Update all AppImages")
-    download_table.add_row("3", "Select AppImages to update")
+    # Configuration section
+    print("\n--- Configuration ---")
+    print("4. Manage AppImage settings")
+    print("5. Manage global settings")
+    print("6. Manage GitHub token")
 
-    # Configuration panel
-    config_table = Table(
-        box=box.ROUNDED,
-        show_header=False,
-        border_style="blue",
-        title="[bold blue]Configuration[/bold blue]",
-    )
-    config_table.add_column("Option", style="cyan", justify="right", width=2)
-    config_table.add_column("Description")
-    config_table.add_row("4", "Manage AppImage settings")
-    config_table.add_row("5", "Manage global settings")
-    config_table.add_row("6", "Manage GitHub token")
-
-    # Maintenance panel
-    maint_table = Table(
-        box=box.ROUNDED,
-        show_header=False,
-        border_style="green",
-        title="[bold green]Maintenance[/bold green]",
-    )
-    maint_table.add_column("Option", style="cyan", justify="right", width=2)
-    maint_table.add_column("Description")
-    maint_table.add_row("7", "Update configuration files")
-    maint_table.add_row("8", "Clean old backups")
-    maint_table.add_row("9", "Exit")
-
-    # Add tables to layout grid
-    layout.add_row(download_table, config_table, maint_table)
-
-    # Print the layout
-    console.print(layout)
+    # Maintenance section
+    print("\n--- Maintenance ---")
+    print("7. Update configuration files")
+    print("8. Clean old backups")
+    print("9. Exit")
+    print("-" * 40)
 
     try:
-        choice = console.input("[bold cyan]Enter your choice:[/bold cyan] ")
+        choice = input("\nEnter your choice: ")
         return int(choice)
     except ValueError as error:
-        console.print(f"[bold red]Invalid input: {error}[/bold red]")
+        print(f"Invalid input: {error}")
         logging.error(f"Invalid menu choice: {error}", exc_info=True)
         sys.exit(1)
     except KeyboardInterrupt:
         logging.info("User interrupted the program with Ctrl+C")
-        console.print("\n[yellow]Program interrupted. Exiting gracefully...[/yellow]")
+        print("\nProgram interrupted. Exiting gracefully...")
         sys.exit(0)
 
 

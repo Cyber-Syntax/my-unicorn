@@ -30,8 +30,8 @@ TOKEN_KEY = "github_token"
 CONFIG_DIR = Path(os.path.expanduser("~/.config/myunicorn"))
 SALT_FILE = CONFIG_DIR / ".token.salt"
 KEY_FILE = CONFIG_DIR / ".token.key"
-TOKEN_FILE = CONFIG_DIR / ".token.enc"
-TOKEN_METADATA_FILE = CONFIG_DIR / ".token.meta"
+TOKEN_FILE = CONFIG_DIR / "token.dat"
+TOKEN_METADATA_FILE = CONFIG_DIR / "token_metadata.json"
 # Default token expiration in days (90 days is a common security standard)
 DEFAULT_TOKEN_EXPIRATION_DAYS = 90
 
@@ -1098,6 +1098,7 @@ class SecureTokenManager:
         expires_in_days: int = DEFAULT_TOKEN_EXPIRATION_DAYS,
         storage_preference: str = "auto",
         metadata: Optional[Dict[str, Any]] = None,
+        ask_for_fallback: bool = True,
     ) -> bool:
         """
         Save a GitHub token securely with expiration metadata.
@@ -1112,6 +1113,7 @@ class SecureTokenManager:
             expires_in_days: Number of days until token expiration (default: 90)
             storage_preference: Preferred storage method ("auto", "keyring", "gnome", "file")
             metadata: Optional additional metadata to include
+            ask_for_fallback: Whether to ask for user confirmation for fallback storage
 
         Returns:
             bool: True if successful, False otherwise

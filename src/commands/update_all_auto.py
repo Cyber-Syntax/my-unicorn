@@ -14,9 +14,6 @@ import sys
 import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 
-from rich.console import Console
-from rich.table import Table
-
 from src.commands.update_base import BaseUpdateCommand
 from src.auth_manager import GitHubAuthManager
 
@@ -27,7 +24,6 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
     def __init__(self):
         """Initialize with base configuration and async-specific settings."""
         super().__init__()
-        self.console = Console()
 
         # Note: max_concurrent_updates is already initialized in the BaseUpdateCommand constructor
         # and the global_config is already loaded in __post_init__
@@ -267,12 +263,10 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                 self._update_apps_async(apps_to_update)
             )
 
-            # Show completion message with Rich
-            table = Table(title="Update Results")
-            table.add_column("App", style="cyan")
-            table.add_column("Result", style="bold")
-            table.add_column("Details", style="dim")
-            table.add_column("Time", style="blue")
+            # Show completion message with standard output
+            print("\n=== Update Results ===")
+            print("App                  | Result       | Details                 | Time")
+            print("-" * 80)
 
             for result in results:
                 app_name = result["app"]["name"]
@@ -280,40 +274,86 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                 status = result_data["status"]
 
                 if status == "success":
-                    result_style = "green"
                     result_text = "✓ Success"
                 elif status == "failed":
-                    result_style = "red"
                     result_text = "✗ Failed"
                 else:
-                    result_style = "yellow"
                     result_text = "! Error"
 
-                table.add_row(
-                    app_name,
-                    f"[{result_style}]{result_text}[/{result_style}]",
-                    result_data.get("message", ""),
-                    f"{result_data.get('elapsed', 0):.1f}s",
-                )
+                message = result_data.get("message", "")
+                if len(message) > 25:
+                    message = message[:22] + "..."
 
-            self.console.print(table)
+                elapsed = f"{result_data.get('elapsed', 0):.1f}s"
+
+                print(f"{app_name:<20} | {result_text:<12} | {message:<25} | {elapsed}")
 
             # Show summary
-            self.console.print("\n=== Update Summary ===")
-            self.console.print(
-                f"Total apps processed: {success_count + failure_count}/{len(apps_to_update)}"
-            )
-            self.console.print(f"[green]Successfully updated: {success_count}[/]")
+            print("\n=== Update Summary ===")
+            print(f"Total apps processed: {success_count + failure_count}/{len(apps_to_update)}")
+            print(f"Successfully updated: {success_count}")
             if failure_count > 0:
-                self.console.print(f"[red]Failed updates: {failure_count}[/]")
-            self.console.print("[bold green]Update process completed![/]")
+                print(f"Failed updates: {failure_count}")
+
+                # List failed updates
+                for app_name, result in results.items():
+                    if result.get("status") != "success":
+                        print(f"  - {app_name}: {result.get('message', 'Unknown error')}")
+
+            print("Update process completed!")
 
             # Display updated rate limit information after updates
             self._display_rate_limit_info()
 
         except KeyboardInterrupt:
             logging.info("Update process cancelled by user (Ctrl+C)")
-            self.console.print("\n[bold yellow]Update process cancelled by user (Ctrl+C)[/]")
+            print("\nUpdate process cancelled by user (Ctrl+C)")
         except Exception as e:
             logging.error(f"Error in async update process: {str(e)}", exc_info=True)
-            self.console.print(f"\n[bold red]Error in update process:[/] {str(e)}")
+            print(f"\nError in update process: {str(e)}")
+
+    def _display_update_list(self, updatable_apps: List[Dict[str, Any]]) -> None:
+        """
+        Display a list of updatable apps with standard print statements.
+
+        Args:
+            updatable_apps: List of updatable app information dictionaries
+        """
+        print(f"\nFound {len(updatable_apps)} apps to update:")
+        print("-" * 60)
+        print("# | App                  | Current      | Latest")
+        print("-" * 60)
+
+        for idx, app in enumerate(updatable_apps, 1):
+            print(f"{idx:<2}| {app['name']:<20} | {app['current']:<12} | {app['latest']}")
+
+        print("-" * 60)
+
+    def _display_rate_limit_info(self) -> None:
+        """
+        Display GitHub API rate limit information after updates using standard print statements.
+        """
+        try:
+            # Use the cached rate limit info to avoid unnecessary API calls
+            remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+
+            print("\n--- GitHub API Rate Limits ---")
+            print(
+                f"Remaining requests: {remaining}/{limit} ({'authenticated' if is_authenticated else 'unauthenticated'})"
+            )
+
+            if reset_time:
+                print(f"Resets at: {reset_time}")
+
+            if remaining < (100 if is_authenticated else 20):
+                if remaining < 100 and is_authenticated:
+                    print("⚠️ Running low on API requests!")
+                elif remaining < 20 and not is_authenticated:
+                    print("⚠️ Low on unauthenticated requests!")
+                    print("Tip: Add a GitHub token to increase rate limits (5000/hour).")
+
+            print("Note: Rate limit information is an estimate based on usage since last refresh.")
+
+        except Exception as e:
+            # Silently handle any errors to avoid breaking update completion
+            logging.debug(f"Error displaying rate limit info: {e}")

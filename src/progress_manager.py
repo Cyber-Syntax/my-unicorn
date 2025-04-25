@@ -1,141 +1,526 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Dynamic progress management for concurrent operations with Rich library integration.
+Dynamic progress management for concurrent operations with standard terminal output.
 
 This module provides customizable progress tracking for both synchronous and asynchronous
-operations with support for nested progress bars and dynamic styling based on context.
+operations with support for nested progress bars using standard terminal output.
 """
 
 from typing import Dict, Any, Generic, TypeVar, Optional, List, Tuple, Set, Union
 from contextlib import contextmanager
 import time
+import sys
+import threading
 from datetime import datetime
-
-from rich.progress import (
-    Progress,
-    BarColumn,
-    TextColumn,
-    DownloadColumn,
-    TransferSpeedColumn,
-    TimeRemainingColumn,
-    TaskID,
-    SpinnerColumn,
-    TimeElapsedColumn,
-)
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich.table import Table
-from rich.layout import Layout
-from rich.live import Live
-from rich.console import Group
 
 # Type variable for item IDs
 T = TypeVar("T")
 
 
-class CustomProgressColumn(BarColumn):
-    """Custom progress column that can adapt its appearance based on context."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.bar_width = kwargs.get("bar_width", 40)
-
-
-class NestedProgress(Progress):
+class BasicMultiAppProgress:
     """
-    A progress class that supports nested progress bars with dynamic styling.
+    Basic progress display for multiple app downloads using terminal output.
 
-    This class extends Rich's Progress to allow tasks to have different column layouts
-    and styling based on their context or task type.
+    Each app gets its own progress bar with its own styling and prefix.
+    All progress bars are rendered together in a single display
     """
 
-    def get_renderables(self) -> List[Any]:
+    def __init__(self, expand: bool = True, transient: bool = False) -> None:
         """
-        Generate renderables for each task based on its progress_type.
+        Initialize a new progress instance.
 
-        Different tasks can have different column layouts and styles.
+        Args:
+            expand: Whether to expand the progress bar
+            transient: Whether to hide completed tasks
+        """
+        self.tasks: Dict[int, Dict[str, Any]] = {}  # Dictionary to store tasks
+        self.task_counter: int = 0  # Counter for task IDs
+        self.active: bool = False  # Whether the progress display is active
+        # Options similar to the original class
+        self.expand = expand
+        self.transient = transient
+        # Store start times for speed calculation
+        self.start_times: Dict[int, float] = {}
+        # Track the number of lines used in last render
+        self.last_render_lines: int = 0
+
+    def add_task(
+        self,
+        description: str,
+        total: int = 100,
+        completed: int = 0,
+        prefix: str = "",
+        visible: bool = True,
+        **kwargs,
+    ) -> int:
+        """
+        Add a new task to track.
+
+        Args:
+            description: Description of the task
+            total: Total size or steps
+            completed: Already completed size or steps
+            prefix: Prefix to show before the description
+            visible: Whether this task is visible
+            **kwargs: Additional fields
 
         Returns:
-            List of renderables for each task
+            int: Task ID for the new task
         """
-        renderables = []
+        task_id = self.task_counter
+        self.task_counter += 1
 
-        for task in self.tasks:
-            # Get the progress type from task fields
-            progress_type = task.fields.get("progress_type", "default")
+        self.tasks[task_id] = {
+            "description": description,
+            "total": total,
+            "completed": completed,
+            "prefix": prefix,
+            "visible": visible,
+            "fields": kwargs,  # Store any additional fields
+        }
 
-            # Create a temporary columns configuration based on progress_type
-            if progress_type == "download":
-                temp_columns = [
-                    TextColumn("[bold blue]{task.description}[/]"),
-                    BarColumn(bar_width=None),
-                    DownloadColumn(),
-                    TransferSpeedColumn(),
-                    TimeRemainingColumn(),
-                ]
-            elif progress_type == "process":
-                temp_columns = [
-                    SpinnerColumn(),
-                    TextColumn("[bold green]{task.description}[/]"),
-                    BarColumn(bar_width=50),
-                    TextColumn("[bold]{task.fields[status]}[/]"),
-                    TimeElapsedColumn(),
-                ]
-            elif progress_type == "verify":
-                temp_columns = [
-                    TextColumn("[bold yellow]{task.description}[/]"),
-                    BarColumn(bar_width=30, style="yellow"),
-                    TextColumn("[bold]{task.percentage:>3.0f}%[/]"),
-                ]
+        # Save start time for speed calculation
+        self.start_times[task_id] = time.time()
+
+        # Render if active
+        if self.active:
+            self._render()
+
+        return task_id
+
+    def update(self, task_id: int, **kwargs) -> None:
+        """
+        Update a task's progress.
+
+        Args:
+            task_id: ID of the task to update
+            **kwargs: Attributes to update
+        """
+        if task_id not in self.tasks:
+            return
+
+        # Update task attributes
+        for key, value in kwargs.items():
+            if key == "advance":
+                self.tasks[task_id]["completed"] += value
+            elif key == "completed":
+                self.tasks[task_id]["completed"] = value
             else:
-                # Default columns
-                temp_columns = self.columns
+                self.tasks[task_id][key] = value
 
-            # Create a table with just this task
-            table = self.make_tasks_table(temp_columns, [task])
-            renderables.append(table)
+        # Ensure completed doesn't exceed total
+        if self.tasks[task_id]["completed"] > self.tasks[task_id]["total"]:
+            self.tasks[task_id]["completed"] = self.tasks[task_id]["total"]
 
-        return renderables
+        # If display is active, refresh it
+        if self.active:
+            self._render()
+
+    def remove_task(self, task_id: int) -> None:
+        """
+        Remove a task from progress tracking.
+
+        Args:
+            task_id: ID of the task to remove
+        """
+        if task_id in self.tasks:
+            del self.tasks[task_id]
+
+        if task_id in self.start_times:
+            del self.start_times[task_id]
+
+        # Re-render if active
+        if self.active:
+            self._render()
+
+    def start(self) -> None:
+        """Start displaying progress."""
+        self.active = True
+        self._render()
+
+    def stop(self) -> None:
+        """Stop displaying progress."""
+        self.active = False
+        # Clear the progress display by moving up and clearing lines
+        if self.last_render_lines > 0:
+            for _ in range(self.last_render_lines):
+                sys.stdout.write("\033[K\033[1A")  # Clear line and move up
+            sys.stdout.write("\033[K")  # Clear the current line
+            sys.stdout.flush()
+            self.last_render_lines = 0
+
+    def _format_size(self, size_bytes: int) -> str:
+        """
+        Format size in human-readable format.
+
+        Args:
+            size_bytes: Size in bytes
+
+        Returns:
+            str: Formatted size string (e.g., '10.5 MB')
+        """
+        if size_bytes <= 0:
+            return "0 B"
+
+        units = ["B", "KB", "MB", "GB", "TB"]
+        unit_index = 0
+        size = float(size_bytes)
+
+        while size >= 1024 and unit_index < len(units) - 1:
+            size /= 1024
+            unit_index += 1
+
+        return (
+            f"{size:.1f} {units[unit_index]}"
+            if unit_index > 0
+            else f"{int(size)} {units[unit_index]}"
+        )
+
+    def _format_speed(self, task_id: int) -> str:
+        """
+        Calculate and format download speed.
+
+        Args:
+            task_id: ID of the task
+
+        Returns:
+            str: Formatted speed string (e.g., '5.2 MB/s')
+        """
+        if task_id not in self.start_times:
+            return "? MB/s"
+
+        elapsed = time.time() - self.start_times[task_id]
+        if elapsed <= 0:
+            return "? MB/s"
+
+        task = self.tasks[task_id]
+        bytes_per_second = task["completed"] / elapsed
+
+        return f"{bytes_per_second / (1024 * 1024):.1f} MB/s"
+
+    def _format_eta(self, task_id: int) -> str:
+        """
+        Estimate and format time remaining.
+
+        Args:
+            task_id: ID of the task
+
+        Returns:
+            str: Formatted estimated time (e.g., '5m 30s')
+        """
+        if task_id not in self.start_times:
+            return "?"
+
+        task = self.tasks[task_id]
+        elapsed = time.time() - self.start_times[task_id]
+
+        if task["completed"] <= 0 or elapsed <= 0:
+            return "?"
+
+        # Calculate ETA based on current speed
+        bytes_remaining = task["total"] - task["completed"]
+        bytes_per_second = task["completed"] / elapsed
+
+        if bytes_per_second <= 0:
+            return "?"
+
+        seconds_remaining = bytes_remaining / bytes_per_second
+
+        # Format time
+        if seconds_remaining < 60:
+            return f"{int(seconds_remaining)}s"
+        elif seconds_remaining < 3600:
+            return f"{int(seconds_remaining / 60)}m {int(seconds_remaining % 60)}s"
+        else:
+            hours = int(seconds_remaining / 3600)
+            minutes = int((seconds_remaining % 3600) / 60)
+            return f"{hours}h {minutes}m"
+
+    def _render(self) -> None:
+        """Render progress bars for all visible tasks."""
+        if not self.active:
+            return
+
+        # Get only visible tasks
+        visible_tasks = [(tid, task) for tid, task in self.tasks.items() if task["visible"]]
+
+        if not visible_tasks:
+            return
+
+        # Clear previous output
+        if self.last_render_lines > 0:
+            for _ in range(self.last_render_lines):
+                sys.stdout.write("\033[K\033[1A")  # Clear line and move up
+            sys.stdout.write("\033[K")  # Clear the current line
+
+        # Count the lines we're about to render
+        self.last_render_lines = 0
+
+        # Render each task
+        for task_id, task in visible_tasks:
+            lines_rendered = self._render_task(task_id, task)
+            self.last_render_lines += lines_rendered
+
+        sys.stdout.flush()
+
+    def _render_task(self, task_id: int, task: Dict[str, Any]) -> int:
+        """
+        Render a single task's progress bar.
+
+        Args:
+            task_id: ID of the task
+            task: Task data dictionary
+
+        Returns:
+            int: Number of lines rendered
+        """
+        # Calculate percentage
+        percentage = 100 * (task["completed"] / task["total"]) if task["total"] > 0 else 0
+
+        # Create the progress bar
+        bar_width = 40  # Width of the progress bar
+        completed_width = int(bar_width * percentage / 100)
+
+        bar = "=" * completed_width + "-" * (bar_width - completed_width)
+
+        # Format the prefix
+        prefix = task["prefix"] if "prefix" in task else ""
+
+        # Line 1: Description and progress bar
+        line1 = f"{prefix}{task['description']}"
+        sys.stdout.write(f"{line1}\n")
+
+        # Line 2: Progress details
+        completed_size = self._format_size(task["completed"])
+        total_size = self._format_size(task["total"])
+        speed = self._format_speed(task_id)
+        eta = self._format_eta(task_id)
+
+        line2 = f"[{bar}] {percentage:.1f}% {completed_size}/{total_size} {speed} ETA: {eta}"
+        sys.stdout.write(f"{line2}\n")
+
+        # Return number of lines rendered
+        return 2  # We rendered 2 lines for this task
+
+
+class BasicProgressBar:
+    """
+    A simple progress bar implementation using standard terminal output.
+
+    This class provides basic progress tracking functionality without external dependencies.
+    """
+
+    def __init__(self, description: str = "", total: int = 100):
+        """
+        Initialize a progress bar.
+
+        Args:
+            description: Description of the progress bar
+            total: Total number of steps
+        """
+        self.description = description
+        self.total = total
+        self.completed = 0
+        self.start_time = time.time()
+        self.status = ""
+        self.visible = True
+
+    def update(self, completed: Optional[int] = None, advance: int = 0, status: str = ""):
+        """
+        Update the progress bar.
+
+        Args:
+            completed: Set absolute completion value
+            advance: Increment completion by this amount
+            status: Status message to display
+        """
+        if completed is not None:
+            self.completed = completed
+        else:
+            self.completed += advance
+
+        # Cap at total
+        if self.completed > self.total:
+            self.completed = self.total
+
+        if status:
+            self.status = status
+
+    def render(self) -> str:
+        """
+        Render the progress bar as a string.
+
+        Returns:
+            str: The formatted progress bar
+        """
+        if not self.visible:
+            return ""
+
+        # Calculate percentage
+        percentage = (self.completed / self.total) * 100 if self.total > 0 else 0
+
+        # Create the progress bar (30 chars wide)
+        bar_width = 30
+        filled_width = int(bar_width * percentage / 100)
+        bar = "=" * filled_width + "-" * (bar_width - filled_width)
+
+        # Calculate elapsed time
+        elapsed = time.time() - self.start_time
+        elapsed_str = f"{int(elapsed)}s"
+
+        # Format the output
+        return f"{self.description}: [{bar}] {percentage:.1f}% ({self.completed}/{self.total}) {elapsed_str} {self.status}"
+
+
+class ProgressManager:
+    """
+    Manages display of multiple progress bars in the terminal.
+    """
+
+    def __init__(self):
+        """Initialize the progress manager."""
+        self.progress_bars: Dict[int, BasicProgressBar] = {}
+        self.next_id = 0
+        self.active = False
+        self.last_render_lines = 0
+        self.lock = threading.RLock()
+
+    def add_task(self, description: str, total: int = 100, **kwargs) -> int:
+        """
+        Add a new task to the progress display.
+
+        Args:
+            description: Description of the task
+            total: Total number of steps
+            **kwargs: Additional arguments
+
+        Returns:
+            int: Task ID
+        """
+        with self.lock:
+            task_id = self.next_id
+            self.next_id += 1
+
+            self.progress_bars[task_id] = BasicProgressBar(description, total)
+
+            # Apply any additional properties from kwargs
+            for key, value in kwargs.items():
+                if key == "status" and value:
+                    self.progress_bars[task_id].status = value
+                elif key == "visible":
+                    self.progress_bars[task_id].visible = value
+
+            return task_id
+
+    def update(self, task_id: int, **kwargs):
+        """
+        Update a task's progress.
+
+        Args:
+            task_id: ID of the task to update
+            **kwargs: Arguments to update (completed, advance, status)
+        """
+        with self.lock:
+            if task_id not in self.progress_bars:
+                return
+
+            task = self.progress_bars[task_id]
+
+            # Update the task
+            completed = kwargs.get("completed", None)
+            advance = kwargs.get("advance", 0)
+            status = kwargs.get("status", "")
+
+            task.update(completed, advance, status)
+
+            if self.active:
+                self.render()
+
+    def remove_task(self, task_id: int):
+        """
+        Remove a task from the progress display.
+
+        Args:
+            task_id: ID of the task to remove
+        """
+        with self.lock:
+            if task_id in self.progress_bars:
+                del self.progress_bars[task_id]
+
+            if self.active:
+                self.render()
+
+    def start(self):
+        """Start the progress display."""
+        with self.lock:
+            self.active = True
+            self.render()
+
+    def stop(self):
+        """Stop the progress display."""
+        with self.lock:
+            self.active = False
+            self._clear_lines()
+
+    def render(self):
+        """Render all visible progress bars."""
+        if not self.active:
+            return
+
+        with self.lock:
+            # Clear previous output first
+            self._clear_lines()
+
+            # Get all visible tasks
+            visible_tasks = [(tid, bar) for tid, bar in self.progress_bars.items() if bar.visible]
+
+            if not visible_tasks:
+                return
+
+            # Count lines we'll render
+            lines_to_render = len(visible_tasks)
+
+            # Render each task
+            output_lines = []
+            for _, bar in visible_tasks:
+                output_lines.append(bar.render())
+
+            # Print all lines
+            print("\n".join(output_lines))
+            sys.stdout.flush()
+
+            # Store number of lines rendered
+            self.last_render_lines = lines_to_render
+
+    def _clear_lines(self):
+        """Clear previously rendered lines."""
+        if self.last_render_lines > 0:
+            # Move cursor up and clear lines
+            for _ in range(self.last_render_lines):
+                sys.stdout.write("\033[1A")  # Move up one line
+                sys.stdout.write("\033[K")  # Clear to the end of line
+            sys.stdout.flush()
 
 
 class DynamicProgressManager(Generic[T]):
     """
     Manages dynamic progress display for concurrent operations.
 
-    This class handles progress tracking for multiple concurrent operations,
-    with support for nested progress bars, different progress styles, and
-    both synchronous and asynchronous operation.
-
-    Attributes:
-        console (Console): Rich console for output
-        progress (Progress): The main progress instance
-        download_progress (Optional[Progress]): Separate progress for downloads
-        task_map (Dict): Mapping of item IDs to task IDs
-        task_stats (Dict): Statistics about tasks
-        _live (Optional[Live]): Rich Live display when active
+    This class handles progress tracking for multiple concurrent operations
+    with support for nested progress displays and both synchronous and
+    asynchronous operation.
     """
 
     def __init__(self) -> None:
         """Initialize the progress manager."""
-        self.console = Console()
+        # Initialize progress tracking
+        self.progress = ProgressManager()
 
-        # Main progress for overall operations
-        self.progress = NestedProgress(
-            SpinnerColumn(),
-            TextColumn("[bold blue]{task.description}[/]"),
-            BarColumn(bar_width=40),
-            TextColumn("[bold]{task.fields[status]}[/]"),
-            TimeElapsedColumn(),
-            expand=True,
-        )
-
-        # Download progress for file downloads
-        self.download_progress = None
-
-        # Tracking mappings
+        # Task mapping
         self.task_map: Dict[T, Dict[str, Any]] = {}
+
+        # Overall stats
         self.task_stats: Dict[str, Any] = {
             "start_time": None,
             "items": 0,
@@ -143,12 +528,14 @@ class DynamicProgressManager(Generic[T]):
             "failed": 0,
         }
 
-        # Live display
-        self._live: Optional[Live] = None
-        self._layout: Optional[Layout] = None
-
-        # Track if a task has a download in progress
+        # Download tracking
         self._download_in_progress: Dict[T, bool] = {}
+
+        # Reference counting for nested progress
+        self._user_count = 0
+
+        # For thread safety
+        self._lock = threading.Lock()
 
     @contextmanager
     def start_progress(self, total_items: int, title: str = "Processing") -> None:
@@ -163,64 +550,52 @@ class DynamicProgressManager(Generic[T]):
             self: The progress manager instance
         """
         try:
-            self.task_stats["start_time"] = time.time()
-            self.task_stats["items"] = total_items
+            with self._lock:
+                self.task_stats["start_time"] = time.time()
+                self.task_stats["items"] = total_items
+                self._user_count += 1
 
-            # Create layout
-            self._layout = Layout()
-            self._layout.split(
-                Layout(name="header", size=3),
-                Layout(name="progress"),
-                Layout(name="footer", size=3),
-            )
+                # Only start display if this is the first caller
+                if self._user_count == 1:
+                    # Print header
+                    start_time_str = datetime.now().strftime("%H:%M:%S")
+                    print("\n" + "=" * 60)
+                    print(f"{title} - Started at {start_time_str}")
+                    print(f"Processing {total_items} items")
+                    print("-" * 60)
 
-            # Set header content
-            start_time_str = datetime.now().strftime("%H:%M:%S")
-            header_text = f"[bold blue]{title} - Started at {start_time_str}[/]\n"
-            header_text += f"[bold cyan]Processing {total_items} items[/]"
-            self._layout["header"].update(Panel(header_text))
-
-            # Set progress content
-            self._layout["progress"].update(self.progress)
-
-            # Set footer content
-            self._layout["footer"].update(Panel("[bold]Press Ctrl+C to cancel[/]"))
-
-            # Start the live display
-            self._live = Live(self._layout, console=self.console, refresh_per_second=4)
-            self._live.start()
+                    # Start progress display
+                    self.progress.start()
 
             yield self
 
         finally:
-            # Update footer with completion info
-            if self._live and self._layout:
-                elapsed = time.time() - self.task_stats["start_time"]
-                completed = self.task_stats["completed"]
-                failed = self.task_stats["failed"]
-                in_progress = self.task_stats["items"] - completed - failed
+            with self._lock:
+                self._user_count -= 1
 
-                footer_text = (
-                    f"[bold]Completed in {elapsed:.1f}s - {completed} succeeded, {failed} failed"
-                )
-                if in_progress:
-                    footer_text += f", {in_progress} interrupted"
-                footer_text += "[/]"
+                # Only clean up if this is the last user
+                if self._user_count == 0:
+                    # Calculate stats for summary
+                    elapsed = time.time() - self.task_stats["start_time"]
+                    completed = self.task_stats["completed"]
+                    failed = self.task_stats["failed"]
+                    in_progress = self.task_stats["items"] - completed - failed
 
-                self._layout["footer"].update(Panel(footer_text))
-                self._live.refresh()
+                    # Stop progress display
+                    self.progress.stop()
 
-            # Stop the live display
-            if self._live:
-                self._live.stop()
+                    # Show completion summary
+                    print("\n" + "=" * 60)
+                    print(f"Completed in {elapsed:.1f}s - {completed} succeeded, {failed} failed")
+                    if in_progress > 0:
+                        print(f"Items not completed: {in_progress}")
+                    print("=" * 60)
 
-            # Reset progress displays
-            self.task_map.clear()
-            self._download_in_progress.clear()
-            if self.download_progress:
-                self.download_progress = None
+                    # Reset progress tracking
+                    self.task_map.clear()
+                    self._download_in_progress.clear()
 
-    def add_item(self, item_id: T, name: str, steps: List[str]) -> None:
+    def add_item(self, item_id: T, name: str, steps: List[str] = None) -> None:
         """
         Add an item to track in the progress display.
 
@@ -229,91 +604,101 @@ class DynamicProgressManager(Generic[T]):
             name: Display name for the item
             steps: List of step names for this item
         """
-        description = f"{name}"
-        task_id = self.progress.add_task(
-            description,
-            total=len(steps),
-            status="Starting...",
-            completed=0,
-            progress_type="process",  # Set the progress type for styling
-        )
+        if steps is None:
+            steps = []
 
-        self.task_map[item_id] = {
-            "name": name,
-            "task_id": task_id,
-            "steps": steps,
-            "current_step": None,
-            "completed_steps": set(),
-            "success": None,
-        }
+        with self._lock:
+            description = f"{name}"
+            task_id = self.progress.add_task(
+                description,
+                total=len(steps) if steps else 1,
+                status="Starting...",
+                completed=0,
+            )
 
-        # Initialize download tracking
-        self._download_in_progress[item_id] = False
+            self.task_map[item_id] = {
+                "name": name,
+                "task_id": task_id,
+                "steps": steps,
+                "current_step": None,
+                "completed_steps": set(),
+                "success": None,
+            }
+
+            # Initialize download tracking
+            self._download_in_progress[item_id] = False
 
     def start_item_step(self, item_id: T, step: str) -> None:
         """
-        Mark a step as started for an item.
+        Start a step for an item.
 
         Args:
-            item_id: Item identifier
-            step: Name of the step being started
+            item_id: Identifier for the item
+            step: Name of the step
         """
-        if item_id in self.task_map:
-            self.task_map[item_id]["current_step"] = step
-            self.progress.update(
-                self.task_map[item_id]["task_id"], status=f"[yellow]Working on {step}...[/]"
-            )
+        with self._lock:
+            if item_id in self.task_map:
+                task_data = self.task_map[item_id]
+                task_data["current_step"] = step
+
+                # Update progress display
+                self.progress.update(task_data["task_id"], status=f"Working on {step}...")
 
     def update_item_step(self, item_id: T, step: str, completed: bool = False) -> None:
         """
-        Update the status of a step for an item.
+        Update a step for an item.
 
         Args:
-            item_id: Item identifier
-            step: Name of the step to update
+            item_id: Identifier for the item
+            step: Name of the step
             completed: Whether the step is completed
         """
-        if item_id in self.task_map and step in self.task_map[item_id]["steps"]:
-            if completed:
-                self.task_map[item_id]["completed_steps"].add(step)
-                # Update progress based on completed steps
-                progress_value = len(self.task_map[item_id]["completed_steps"])
-                self.progress.update(
-                    self.task_map[item_id]["task_id"],
-                    completed=progress_value,
-                    status=f"[green]Completed {step}[/]",
-                )
+        with self._lock:
+            if item_id in self.task_map:
+                task_data = self.task_map[item_id]
+
+                if completed and step not in task_data["completed_steps"]:
+                    # Mark step as completed
+                    task_data["completed_steps"].add(step)
+
+                    # Update progress display
+                    self.progress.update(
+                        task_data["task_id"],
+                        completed=len(task_data["completed_steps"]),
+                        status=f"Completed {step}",
+                    )
 
     def complete_item(self, item_id: T, success: bool = True) -> None:
         """
         Mark an item as completed.
 
         Args:
-            item_id: Item identifier
-            success: Whether the item completed successfully
+            item_id: Identifier for the item
+            success: Whether the operation was successful
         """
-        if item_id in self.task_map:
-            self.task_map[item_id]["success"] = success
-            status = "[bold green]✓ Success[/]" if success else "[bold red]✗ Failed[/]"
+        with self._lock:
+            if item_id in self.task_map:
+                task_data = self.task_map[item_id]
+                task_data["success"] = success
 
-            # Update task in progress display
-            self.progress.update(
-                self.task_map[item_id]["task_id"],
-                completed=len(self.task_map[item_id]["steps"]),
-                status=status,
-            )
+                # Mark all steps as completed
+                steps_count = len(task_data["steps"])
 
-            # Update statistics
-            if success:
-                self.task_stats["completed"] += 1
-            else:
-                self.task_stats["failed"] += 1
+                # Update stats
+                if success:
+                    self.task_stats["completed"] += 1
+                    status_msg = "✓ Success"
+                else:
+                    self.task_stats["failed"] += 1
+                    status_msg = "✗ Failed"
 
-            # Clean up download tracking
-            if item_id in self._download_in_progress:
+                # Update progress display
+                self.progress.update(task_data["task_id"], completed=steps_count, status=status_msg)
+
+                # Mark download as no longer in progress
                 self._download_in_progress[item_id] = False
 
-    def start_download(self, item_id: T, filename: str, total_size: int) -> TaskID:
+    def start_download(self, item_id: T, filename: str, total_size: int) -> int:
         """
         Start tracking a file download.
 
@@ -323,24 +708,20 @@ class DynamicProgressManager(Generic[T]):
             total_size: Total size of the download in bytes
 
         Returns:
-            TaskID: Task ID for the download
+            int: Task ID for the download
         """
-        # Mark this item as having a download in progress
-        if item_id in self._download_in_progress:
-            self._download_in_progress[item_id] = True
+        with self._lock:
+            # Mark this item as having a download in progress
+            if item_id in self._download_in_progress:
+                self._download_in_progress[item_id] = True
 
-        # Update the main task status
-        if item_id in self.task_map:
-            main_task_id = self.task_map[item_id]["task_id"]
-            self.progress.update(main_task_id, status=f"[blue]Downloading {filename}[/]")
+            # Update the main task status
+            if item_id in self.task_map:
+                task_id = self.task_map[item_id]["task_id"]
+                self.progress.update(task_id, status=f"Downloading {filename}...")
+                return task_id
 
-            # Since we're now using the external download progress manager,
-            # we'll return a placeholder task ID
-            # The actual progress tracking will happen in the DownloadManager
-            return main_task_id
-
-        # Return a default task ID if item not found
-        return 0
+            return 0
 
     def update_download(
         self, item_id: T, filename: str, advance: int = 0, finished: bool = False
@@ -354,41 +735,48 @@ class DynamicProgressManager(Generic[T]):
             advance: Number of bytes to advance the progress
             finished: Whether the download is finished
         """
-        if item_id in self.task_map:
-            # Update the main task status based on download state
-            main_task_id = self.task_map[item_id]["task_id"]
+        with self._lock:
+            if item_id in self.task_map:
+                # Update the main task status based on download state
+                task_id = self.task_map[item_id]["task_id"]
 
-            if finished:
-                # Mark download as complete
-                self._download_in_progress[item_id] = False
-                self.progress.update(main_task_id, status=f"[green]Download completed[/]")
-            elif advance > 0 and self._download_in_progress.get(item_id, False):
-                # Only show downloading status if still in progress
-                self.progress.update(main_task_id, status=f"[blue]Downloading {filename}...[/]")
+                if finished:
+                    # Mark download as complete
+                    self._download_in_progress[item_id] = False
+                    self.progress.update(task_id, status="Download completed")
+                elif advance > 0 and self._download_in_progress.get(item_id, False):
+                    # Only show downloading status if still in progress
+                    self.progress.update(task_id, status=f"Downloading {filename}...")
 
-    def get_summary(self) -> Table:
+    def get_summary(self) -> str:
         """
-        Generate a summary table of all tracked items.
+        Generate a summary of all tracked items.
 
         Returns:
-            Table: Rich Table with summary information
+            str: Summary of operations
         """
-        table = Table(title="Operation Summary")
-        table.add_column("Item", style="cyan")
-        table.add_column("Status", style="bold")
-        table.add_column("Steps Completed", style="blue")
+        with self._lock:
+            summary = "Operation Summary\n"
+            summary += "-" * 60 + "\n"
+            summary += "Item                | Status      | Steps Completed\n"
+            summary += "-" * 60 + "\n"
 
-        for item_id, item in self.task_map.items():
-            status = (
-                "[green]Success[/]"
-                if item["success"] is True
-                else "[red]Failed[/]"
-                if item["success"] is False
-                else "[yellow]In Progress[/]"
-            )
+            for item_id, item in self.task_map.items():
+                name = item["name"]
 
-            steps_completed = f"{len(item['completed_steps'])}/{len(item['steps'])}"
+                # Determine status
+                if item["success"] is True:
+                    status = "Success"
+                elif item["success"] is False:
+                    status = "Failed"
+                else:
+                    status = "In Progress"
 
-            table.add_row(item["name"], status, steps_completed)
+                # Calculate steps completed
+                steps_completed = f"{len(item['completed_steps'])}/{len(item['steps'])}"
 
-        return table
+                # Add line to summary
+                summary += f"{name:<19} | {status:<11} | {steps_completed}\n"
+
+            summary += "-" * 60 + "\n"
+            return summary

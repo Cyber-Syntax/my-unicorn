@@ -56,8 +56,8 @@ class VerificationManager:
             bool: True if verification passed or skipped due to fallback, False otherwise
         """
         try:
-            # Skip verification if hash_type is set to no_hash or no SHA info available
-            if self.hash_type == "no_hash" or not self.sha_name or not self.sha_url:
+            # Skip verification if hash_type is set to no_hash or no SHA file name available
+            if self.hash_type == "no_hash" or not self.sha_name:
                 logging.info("Verification skipped - no hash file information available")
                 print("Note: Verification skipped - no hash file provided")
                 return True
@@ -74,7 +74,15 @@ class VerificationManager:
                 logging.info(f"Proceeding with unverified AppImage: {self.appimage_name}")
                 return True
 
-            self._download_sha_file()
+            # Download SHA file only if URL is provided and file doesn't exist
+            if self.sha_url and not os.path.exists(self.sha_name):
+                self._download_sha_file()
+
+            # Check if the SHA file exists before proceeding
+            if not os.path.exists(self.sha_name):
+                logging.error(f"SHA file not found: {self.sha_name}")
+                return False
+
             is_valid = self._parse_sha_file()
 
             if not is_valid and cleanup_on_failure:
@@ -84,9 +92,13 @@ class VerificationManager:
 
         except (requests.RequestException, IOError) as e:
             logging.error(f"Verification failed: {str(e)}")
+            if cleanup_on_failure:
+                self._cleanup_failed_file(self.appimage_name)
             return False
         except Exception as e:
             logging.error(f"Unexpected error during verification: {str(e)}")
+            if cleanup_on_failure:
+                self._cleanup_failed_file(self.appimage_name)
             return False
 
     def _download_sha_file(self):

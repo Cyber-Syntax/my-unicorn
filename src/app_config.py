@@ -373,266 +373,98 @@ class AppConfigManager:
             print("No JSON configuration files found.")
             return
 
-        # Initialize Rich console if not already imported
-        try:
-            from rich.console import Console
-            from rich.panel import Panel
-            from rich.table import Table
-            from rich import box
-
-            console = Console()
-        except ImportError:
-            logger.warning("Rich library not available for enhanced display")
-            # Fallback to standard display
-            logger.info("Displaying available JSON files for customization")
-            print("Available applications:")
-            for idx, file in enumerate(json_files, 1):
-                # Display just the app name without .json extension
-                app_name = os.path.splitext(file)[0]
-                print(f"{idx}. {app_name}")
-            print(f"{len(json_files) + 1}. Cancel")
-
-            # Continue with standard interface
-            while True:
-                file_choice = input("Select an application (number) or cancel: ")
-                if file_choice.isdigit():
-                    file_choice_num = int(file_choice)
-                    if 1 <= file_choice_num <= len(json_files):
-                        selected_file = json_files[file_choice_num - 1]
-                        break
-                    elif file_choice_num == len(json_files) + 1:
-                        logger.info("Configuration customization cancelled by user")
-                        print("Operation cancelled.")
-                        return
-                    else:
-                        logger.warning("Invalid choice. Please select a valid number.")
-                        print("Invalid choice. Please select a valid number.")
-                else:
-                    logger.warning("Invalid input. Please enter a number.")
-                    print("Please enter a number.")
-
-            selected_file_path = os.path.join(self.config_folder, selected_file)
-            self.load_appimage_config(selected_file)
-            self.config_file = selected_file_path  # Override to ensure saving to the selected file
-
-            # Show application name in title instead of filename
-            app_name = os.path.splitext(selected_file)[0]
-            logger.info(f"Displaying configuration options for {app_name}")
-            print(f"Configuration options for {app_name}:")
-            print("=================================================")
-            print(f"1. Owner: {self.owner}")
-            print(f"2. Repo: {self.repo}")
-            print(f"3. Version: {self.version}")
-            print(f"4. SHA Name: {self.sha_name}")
-            print(f"5. Hash Type: {self.hash_type}")
-            print(f"6. AppImage Name: {self.appimage_name}")
-            print(f"7. Architecture Keyword: {self.arch_keyword}")
-            print("8. Exit")
-            print("=================================================")
-
-            while True:
-                choice = input("Enter your choice: ")
-                if choice.isdigit() and 1 <= int(choice) <= 8:
-                    break
-                else:
-                    logger.warning("Invalid choice, please enter a number between 1 and 8.")
-                    print("Invalid choice, please enter a number between 1 and 8.")
-
-            if choice == "8":
-                logger.info("User exited configuration customization without changes")
-                print("Exiting without changes.")
-                return
-
-            config_dict = {
-                "owner": self.owner,
-                "repo": self.repo,
-                "version": self.version,
-                "sha_name": self.sha_name,
-                "hash_type": self.hash_type,
-                "appimage_name": self.appimage_name,
-                "arch_keyword": self.arch_keyword,
-            }
-            key = list(config_dict.keys())[int(choice) - 1]
-            new_value = input(f"Enter the new value for {key}: ")
-            old_value = getattr(self, key)
-            setattr(self, key, new_value)
-            self.save_config()
-            logger.info(f"Updated {key} from '{old_value}' to '{new_value}' in {selected_file}")
-            print(f"\033[42m{key.capitalize()} updated successfully in {app_name}\033[0m")
-            print("=================================================")
-            return
-
-        # Rich interface
-        console.print(
-            Panel.fit(
-                "[bold cyan]AppImage Configuration Settings[/bold cyan]",
-                border_style="cyan",
-                title="📱",
-            )
-        )
-
-        # Create application selection table
-        app_table = Table(
-            box=box.ROUNDED,
-            border_style="cyan",
-            title="[bold cyan]Available Applications[/bold cyan]",
-        )
-        app_table.add_column("Option", style="cyan", justify="right", width=4)
-        app_table.add_column("Application", style="green")
-
-        # Add applications to table
-        for idx, file in enumerate(json_files, start=1):
+        logger.info("Displaying available JSON files for customization")
+        print("Available applications:")
+        for idx, file in enumerate(json_files, 1):
+            # Display just the app name without .json extension
             app_name = os.path.splitext(file)[0]
-            app_table.add_row(f"{idx}", app_name)
+            print(f"{idx}. {app_name}")
+        print(f"{len(json_files) + 1}. Cancel")
 
-        app_table.add_row(f"{len(json_files) + 1}", "[yellow]Cancel[/yellow]")
-
-        # Print application selection table
-        console.print(app_table)
-
-        # Get user selection
-        try:
-            while True:
-                file_choice = console.input(
-                    "[bold cyan]Select an application (number):[/bold cyan] "
-                )
-                if file_choice.isdigit():
-                    file_choice_num = int(file_choice)
-                    if 1 <= file_choice_num <= len(json_files):
-                        selected_file = json_files[file_choice_num - 1]
-                        break
-                    elif file_choice_num == len(json_files) + 1:
-                        logger.info("Configuration customization cancelled by user")
-                        console.print("[yellow]Operation cancelled.[/yellow]")
-                        return
-                    else:
-                        console.print(
-                            "[bold red]Invalid choice. Please select a valid number.[/bold red]"
-                        )
-                else:
-                    console.print("[bold red]Invalid input. Please enter a number.[/bold red]")
-
-            selected_file_path = os.path.join(self.config_folder, selected_file)
-            self.load_appimage_config(selected_file)
-            self.config_file = selected_file_path  # Override to ensure saving to the selected file
-
-            # Show application name in title instead of filename
-            app_name = os.path.splitext(selected_file)[0]
-            logger.info(f"Displaying configuration options for {app_name}")
-
-            # Display current configuration
-            console.print(
-                Panel(
-                    f"[bold cyan]Configuration for: [green]{app_name}[/green][/bold cyan]",
-                    border_style="cyan",
-                )
-            )
-
-            # Create configuration status table
-            status_table = Table(box=box.ROUNDED, border_style="cyan", show_header=False)
-            status_table.add_column("Setting", style="dim blue", justify="right", width=20)
-            status_table.add_column("Value", style="green", justify="left")
-
-            # Add current configuration values to status table
-            status_table.add_row("Owner", f"{self.owner or 'Not set'}")
-            status_table.add_row("Repository", f"{self.repo or 'Not set'}")
-            status_table.add_row("Version", f"{self.version or 'Not set'}")
-            status_table.add_row("SHA Name", f"{self.sha_name or 'Auto-detect'}")
-            status_table.add_row("Hash Type", f"{self.hash_type or 'sha256'}")
-            status_table.add_row("AppImage Name", f"{self.appimage_name or 'Not set'}")
-            status_table.add_row("Architecture Keyword", f"{self.arch_keyword or 'Not set'}")
-
-            # Show configuration status
-            console.print(status_table)
-
-            # Create options layout with two columns
-            layout = Table.grid(expand=True)
-            layout.add_column(ratio=1)
-            layout.add_column(ratio=1)
-
-            # Repository settings panel
-            repo_table = Table(
-                box=box.ROUNDED,
-                show_header=False,
-                border_style="blue",
-                title="[bold blue]Repository Settings[/bold blue]",
-            )
-            repo_table.add_column("Option", style="cyan", justify="right", width=2)
-            repo_table.add_column("Description")
-            repo_table.add_row("1", "Owner")
-            repo_table.add_row("2", "Repository")
-            repo_table.add_row("3", "Version")
-            repo_table.add_row("4", "SHA Name")
-
-            # AppImage settings panel
-            app_settings_table = Table(
-                box=box.ROUNDED,
-                show_header=False,
-                border_style="green",
-                title="[bold green]AppImage Settings[/bold green]",
-            )
-            app_settings_table.add_column("Option", style="cyan", justify="right", width=2)
-            app_settings_table.add_column("Description")
-            app_settings_table.add_row("5", "Hash Type")
-            app_settings_table.add_row("6", "AppImage Name")
-            app_settings_table.add_row("7", "Architecture Keyword")
-            app_settings_table.add_row("8", "Exit")
-
-            # Add tables to layout grid
-            layout.add_row(repo_table, app_settings_table)
-
-            # Print the layout
-            console.print(layout)
-
-            try:
-                while True:
-                    choice = console.input("[bold cyan]Enter your choice (1-8):[/bold cyan] ")
-                    if choice.isdigit() and 1 <= int(choice) <= 8:
-                        break
-                    else:
-                        console.print(
-                            "[bold red]Invalid choice, please enter a number between 1 and 8.[/bold red]"
-                        )
-
-                if choice == "8":
-                    console.print("[yellow]Exiting without changes.[/yellow]")
+        # Continue with standard interface
+        while True:
+            file_choice = input("Select an application (number) or cancel: ")
+            if file_choice.isdigit():
+                file_choice_num = int(file_choice)
+                if 1 <= file_choice_num <= len(json_files):
+                    selected_file = json_files[file_choice_num - 1]
+                    break
+                elif file_choice_num == len(json_files) + 1:
+                    logger.info("Configuration customization cancelled by user")
+                    print("Operation cancelled.")
                     return
+                else:
+                    logger.warning("Invalid choice. Please select a valid number.")
+                    print("Invalid choice. Please select a valid number.")
+            else:
+                logger.warning("Invalid input. Please enter a number.")
+                print("Please enter a number.")
 
-                config_dict = {
-                    "owner": self.owner,
-                    "repo": self.repo,
-                    "version": self.version,
-                    "sha_name": self.sha_name,
-                    "hash_type": self.hash_type,
-                    "appimage_name": self.appimage_name,
-                    "arch_keyword": self.arch_keyword,
-                }
-                key = list(config_dict.keys())[int(choice) - 1]
-                new_value = console.input(f"[cyan]Enter the new value for {key}:[/cyan] ").strip()
-                old_value = getattr(self, key)
-                setattr(self, key, new_value)
-                self.save_config()
-                logger.info(f"Updated {key} from '{old_value}' to '{new_value}' in {selected_file}")
+        selected_file_path = os.path.join(self.config_folder, selected_file)
+        self.load_appimage_config(selected_file)
+        self.config_file = selected_file_path  # Override to ensure saving to the selected file
 
-                # Show updated configuration setting
-                console.print(
-                    Panel(
-                        f"[bold]Updated [cyan]{key.replace('_', ' ').title()}[/cyan] to: [green]{getattr(self, key)}[/green][/bold]",
-                        border_style="green",
-                    )
-                )
-            except KeyboardInterrupt:
-                logger.info("User interrupted configuration update")
-                console.print(
-                    "\n[yellow]Configuration update cancelled. No changes were made.[/yellow]"
-                )
-                return
-        except KeyboardInterrupt:
-            logger.info("User interrupted configuration customization")
-            console.print(
-                "\n[yellow]Configuration customization cancelled. No changes were made.[/yellow]"
-            )
+        # Show application name in title instead of filename
+        app_name = os.path.splitext(selected_file)[0]
+        logger.info(f"Displaying configuration options for {app_name}")
+
+        # Show current configuration values
+        print("\n" + "=" * 60)
+        print(f"Configuration for: {app_name}")
+        print("-" * 60)
+        print(f"Owner: {self.owner or 'Not set'}")
+        print(f"Repository: {self.repo or 'Not set'}")
+        print(f"Version: {self.version or 'Not set'}")
+        print(f"SHA Name: {self.sha_name or 'Auto-detect'}")
+        print(f"Hash Type: {self.hash_type or 'sha256'}")
+        print(f"AppImage Name: {self.appimage_name or 'Not set'}")
+        print(f"Architecture Keyword: {self.arch_keyword or 'Not set'}")
+        print("=" * 60)
+
+        print("\nConfiguration options:")
+        print("-" * 60)
+        print("Repository Settings:")
+        print("1. Owner")
+        print("2. Repository")
+        print("3. Version")
+        print("4. SHA Name")
+        print("\nAppImage Settings:")
+        print("5. Hash Type")
+        print("6. AppImage Name")
+        print("7. Architecture Keyword")
+        print("8. Exit")
+        print("-" * 60)
+
+        while True:
+            choice = input("Enter your choice (1-8): ")
+            if choice.isdigit() and 1 <= int(choice) <= 8:
+                break
+            else:
+                logger.warning("Invalid choice, please enter a number between 1 and 8.")
+                print("Invalid choice, please enter a number between 1 and 8.")
+
+        if choice == "8":
+            logger.info("User exited configuration customization without changes")
+            print("Exiting without changes.")
             return
+
+        config_dict = {
+            "owner": self.owner,
+            "repo": self.repo,
+            "version": self.version,
+            "sha_name": self.sha_name,
+            "hash_type": self.hash_type,
+            "appimage_name": self.appimage_name,
+            "arch_keyword": self.arch_keyword,
+        }
+        key = list(config_dict.keys())[int(choice) - 1]
+        new_value = input(f"Enter the new value for {key}: ")
+        old_value = getattr(self, key)
+        setattr(self, key, new_value)
+        self.save_config()
+        logger.info(f"Updated {key} from '{old_value}' to '{new_value}' in {selected_file}")
+        print(f"\033[42m{key.capitalize()} updated successfully in {app_name}\033[0m")
+        print("=" * 60)
 
     def temp_save_config(self):
         """

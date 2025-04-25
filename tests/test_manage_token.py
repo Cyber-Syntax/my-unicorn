@@ -35,7 +35,7 @@ logging.getLogger("src.secure_token").setLevel(logging.CRITICAL)
 logging.getLogger("src.auth_manager").setLevel(logging.CRITICAL)
 
 # Safe mock token value used throughout tests
-SAFE_MOCK_TOKEN = "test-token-XXXX"
+SAFE_MOCK_TOKEN =ghp_mocktokenfortesting123456789abcdefghijklmnopq"
 
 
 class TestManageTokenCommand:
@@ -145,66 +145,20 @@ class TestManageTokenCommand:
         return mock_manager
 
     @patch("builtins.print")
-    def test_show_token_status_with_token(self, mock_print, command, mock_secure_token_manager):
-        """Test showing token status when a token exists."""
-        # Execute
-        command._show_token_status()
-
-        # Verify
-        mock_secure_token_manager.token_exists.assert_called_once()
-        mock_secure_token_manager.get_token_metadata.assert_called_once()
-        mock_secure_token_manager.is_token_expired.assert_called_once()
-
-        # Check that appropriate messages were printed
-        mock_print.assert_any_call("\n--- GitHub Token Status ---")
-        mock_print.assert_any_call("✅ GitHub token is set")
-
-    @patch("builtins.print")
-    def test_show_token_status_no_token(self, mock_print, command, mock_secure_token_manager):
-        """Test showing token status when no token exists."""
-        # Setup
-        mock_secure_token_manager.token_exists.return_value = False
-
-        # Execute
-        command._show_token_status()
-
-        # Verify
-        mock_secure_token_manager.token_exists.assert_called_once()
-        # Should not try to get metadata for non-existent token
-        mock_secure_token_manager.get_token_metadata.assert_not_called()
-
-        # Check that appropriate messages were printed
-        mock_print.assert_any_call("\n--- GitHub Token Status ---")
-        mock_print.assert_any_call("❌ No GitHub token configured")
-
-    @patch("builtins.print")
-    def test_show_token_status_expired(self, mock_print, command, mock_secure_token_manager):
-        """Test showing token status when token is expired."""
-        # Setup
-        mock_secure_token_manager.is_token_expired.return_value = True
-
-        # Execute
-        command._show_token_status()
-
-        # Verify
-        mock_secure_token_manager.is_token_expired.assert_called_once()
-
-        # Check that appropriate warning was printed
-        mock_print.assert_any_call("⚠️ Token is EXPIRED - please rotate your token")
-
-    @patch("builtins.print")
-    @patch("builtins.input", side_effect=["1", "9"])  # First show menu, then exit
+    @patch(
+        "builtins.input", side_effect=["1", "8"]
+    )  # First choose option 1, then exit with option 8
     def test_execute_menu_and_exit(
         self, mock_input, mock_print, command, mock_secure_token_manager
     ):
         """Test executing the command and navigating the menu."""
         # Setup
-        with patch.object(command, "_add_update_token") as mock_add_update:
+        with patch.object(command, "_save_to_keyring") as mock_save_to_keyring:
             # Execute
             command.execute()
 
             # Verify
-            mock_add_update.assert_called_once()
+            mock_save_to_keyring.assert_called_once()
             # Check that menu was printed
             mock_print.assert_any_call("\nGitHub Token Management:")
 
@@ -370,46 +324,57 @@ class TestManageTokenCommand:
             assert headers["Authorization"] == f"Bearer {real_looking_token}"
 
     @patch("builtins.print")
-    @patch("builtins.input", side_effect=["n"])  # Say no to GNOME keyring
+    @patch(
+        "builtins.input", side_effect=["y", "n"]
+    )  # Yes to update token, No to additional prompts
     def test_add_update_token(
         self, mock_input, mock_print, command, mock_secure_token_manager, mock_auth_manager
     ):
         """Test adding/updating a token."""
-        # Setup
+        # The test is for updating an existing token
         with patch.object(command, "_get_token_expiration_days", return_value=30) as mock_get_days:
-            with patch.object(command, "_validate_token", return_value=True) as mock_validate:
-                # Execute
-                command._add_update_token()
+            # Execute
+            command._save_to_keyring()
 
-                # Verify
-                mock_secure_token_manager.prompt_for_token.assert_called_once()
-                mock_get_days.assert_called_once()
-                mock_validate.assert_called_once()
-                mock_secure_token_manager.save_token.assert_called_once_with(
-                    SAFE_MOCK_TOKEN, expires_in_days=30
-                )
-                mock_auth_manager.clear_cached_headers.assert_called_once()
+            # Verify
+            mock_secure_token_manager.get_token.assert_called_once()
+            mock_get_days.assert_called_once()
+
+            # Verify save_token was called with the right parameters
+            mock_secure_token_manager.save_token.assert_called_once()
+            call_args = mock_secure_token_manager.save_token.call_args
+            assert call_args[0][0] == SAFE_MOCK_TOKEN  # First positional arg is the token
+            assert call_args[1]["expires_in_days"] == 30  # Check expires_in_days kwarg
+            assert call_args[1]["storage_preference"] == "keyring_only"  # Check storage preference
+
+            mock_auth_manager.clear_cached_headers.assert_called_once()
 
     @patch("builtins.print")
-    @patch("builtins.input", side_effect=["y"])  # Yes to GNOME keyring
+    @patch("builtins.input", side_effect=["y"])  # Yes to using keyring
     def test_add_update_token_gnome_keyring(
         self, mock_input, mock_print, command, mock_secure_token_manager, mock_auth_manager
     ):
         """Test adding token to GNOME keyring."""
         # Setup
-        with patch.object(command, "_get_token_expiration_days", return_value=30) as mock_get_days:
-            with patch.object(command, "_validate_token", return_value=True) as mock_validate:
-                # Execute
-                command._add_update_token()
+        with patch.object(
+            command, "_get_token_expiration_days", return_value=30
+        ) as mock_get_days, patch.object(
+            command, "_validate_token", return_value=True
+        ) as mock_validate:
+            # Execute
+            command._save_to_keyring()
 
-                # Verify
-                mock_secure_token_manager.prompt_for_token.assert_called_once()
-                mock_get_days.assert_called_once()
-                mock_validate.assert_called_once()
-                mock_secure_token_manager.save_token_to_gnome_keyring.assert_called_once_with(
-                    SAFE_MOCK_TOKEN, expires_in_days=30
-                )
-                mock_auth_manager.clear_cached_headers.assert_called_once()
+            # Verify
+            mock_secure_token_manager.get_token.assert_called_once()
+            mock_get_days.assert_called_once()
+            mock_secure_token_manager.get_keyring_status.assert_called_once()
+            mock_secure_token_manager.save_token.assert_called_once_with(
+                SAFE_MOCK_TOKEN,
+                expires_in_days=30,
+                storage_preference="keyring_only",
+                metadata=mock_secure_token_manager.save_token.call_args[1].get("metadata"),
+            )
+            mock_auth_manager.clear_cached_headers.assert_called_once()
 
     @patch("builtins.print")
     @patch("builtins.input", side_effect=["y"])  # Say yes to storing in keyring
@@ -426,7 +391,12 @@ class TestManageTokenCommand:
             mock_secure_token_manager.get_token.assert_called_once()
             mock_secure_token_manager.get_keyring_status.assert_called_once()
             mock_get_days.assert_called_once()
-            mock_secure_token_manager.save_token_directly_to_keyring.assert_called_once()
+            mock_secure_token_manager.save_token.assert_called_once_with(
+                SAFE_MOCK_TOKEN,
+                expires_in_days=30,
+                storage_preference="keyring_only",
+                metadata=mock_secure_token_manager.save_token.call_args[1].get("metadata"),
+            )
             mock_auth_manager.clear_cached_headers.assert_called_once()
 
     @patch("builtins.print")
@@ -482,7 +452,7 @@ class TestManageTokenCommand:
         mock_print.assert_any_call("\n❌ No token configured")
 
     @patch("builtins.print")
-    @patch("builtins.input", side_effect=["invalid", "9"])  # Invalid input then exit
+    @patch("builtins.input", side_effect=["invalid", "8"])  # Invalid input then exit
     def test_execute_with_invalid_input(
         self, mock_input, mock_print, command, mock_secure_token_manager
     ):
@@ -505,7 +475,7 @@ class TestManageTokenCommand:
             # Call validate_token with a value that looks like a real token
             with patch.object(command, "_validate_token", return_value=True):
                 # This would normally save the token which would fail with our mock side_effect
-                command._add_update_token()
+                command._save_to_keyring()
 
         # The exception shouldn't contain the token value
         assert real_looking_token not in str(exc_info.value)

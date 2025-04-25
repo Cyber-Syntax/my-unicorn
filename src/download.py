@@ -3,70 +3,13 @@ import os
 import sys
 import asyncio
 import time
-from typing import Optional, List, Dict, Any, Union, Set
+from typing import Optional, List, Dict, Any, Union, Set, Tuple
 
 import requests
-from rich.console import Console
-from rich.progress import (
-    Progress,
-    BarColumn,
-    TextColumn,
-    DownloadColumn,
-    TransferSpeedColumn,
-    TimeRemainingColumn,
-)
 
 from .api import GitHubAPI
 from .global_config import GlobalConfigManager
-
-
-class MultiAppProgress(Progress):
-    """
-    Custom Progress class for displaying multiple app downloads simultaneously.
-
-    Each app gets its own progress bar with its own styling and prefix.
-    All progress bars are rendered together in a single display.
-    """
-
-    def get_renderables(self) -> List[Any]:
-        """
-        Override to customize the progress bar display for each task.
-
-        Returns:
-            List[Any]: A list of renderables for displaying download progress
-        """
-        renderables = []
-
-        # Safely iterate through tasks that actually exist
-        for task in self.tasks:
-            if task.visible:
-                # Get the custom prefix if provided
-                prefix = task.fields.get("prefix", "")
-
-                # Create app-specific columns for this task
-                temp_columns = [
-                    TextColumn(f"{prefix}[bold cyan]{{task.description}}[/]"),
-                    BarColumn(),
-                    "[progress.percentage]{task.percentage:>3.0f}%",
-                    "•",
-                    DownloadColumn(),
-                    "•",
-                    TransferSpeedColumn(),
-                    "•",
-                    TimeRemainingColumn(),
-                ]
-
-                # Create a table with just this task
-                # Note: make_tasks_table in Rich only takes the columns parameter
-                # and gets tasks from self.tasks. We need to create a new Progress
-                # instance with just this task.
-                single_task_progress = Progress(*temp_columns)
-                single_task_progress.add_task(
-                    task.description, total=task.total, completed=task.completed, **task.fields
-                )
-                renderables.append(single_task_progress)
-
-        return renderables
+from .progress_manager import BasicMultiAppProgress
 
 
 class DownloadManager:
@@ -82,7 +25,7 @@ class DownloadManager:
     """
 
     # Class variables for shared progress tracking
-    _global_progress: Optional[MultiAppProgress] = None
+    _global_progress: Optional[BasicMultiAppProgress] = None
     _active_tasks: Set[int] = set()
     _lock = (
         asyncio.Lock() if hasattr(asyncio, "Lock") else None
@@ -148,16 +91,16 @@ class DownloadManager:
         )
 
     @classmethod
-    def get_or_create_progress(cls) -> MultiAppProgress:
+    def get_or_create_progress(cls) -> BasicMultiAppProgress:
         """
         Get or create a shared progress instance for all downloads.
 
         Returns:
-            MultiAppProgress: The shared progress instance
+            BasicMultiAppProgress: The shared progress instance
         """
         # Use the first instance's progress or create a new one
         if cls._global_progress is None:
-            cls._global_progress = MultiAppProgress(
+            cls._global_progress = BasicMultiAppProgress(
                 expand=True,
                 transient=False,  # Keep all progress bars visible
             )
@@ -198,16 +141,11 @@ class DownloadManager:
             # Set up request with appropriate headers
             headers = {"User-Agent": "AppImage-Updater/1.0", "Accept": "application/octet-stream"}
 
-            # Create a console for output
-            console = Console()
-
             # Create a progress prefix if this is part of a multi-app update
             prefix = f"[{self.app_index}/{self.total_apps}] " if self.total_apps > 0 else ""
 
-            # Download with nested progress tracking
-            self._download_with_nested_progress(
-                appimage_url, appimage_name, headers, console, prefix
-            )
+            # Download with progress tracking
+            self._download_with_nested_progress(appimage_url, appimage_name, headers, prefix)
 
         except IOError as e:
             error_msg = f"File system error while downloading {appimage_name}: {str(e)}"
@@ -223,17 +161,15 @@ class DownloadManager:
         appimage_url: str,
         appimage_name: str,
         headers: Dict[str, str],
-        console: Console,
         prefix: str = "",
     ) -> None:
         """
-        Download with a nested progress bar display.
+        Download with a progress bar display.
 
         Args:
             appimage_url: URL to download from
             appimage_name: Name of the AppImage file
             headers: HTTP headers for the request
-            console: Rich console for output
             prefix: Prefix to add to progress messages (e.g., "[1/2] ")
 
         Raises:
@@ -272,7 +208,7 @@ class DownloadManager:
             except Exception as e:
                 self._logger.error(f"Error creating progress task: {str(e)}")
                 # Fallback to console output without progress bar
-                console.print(f"{prefix}[cyan]Downloading {appimage_name}...[/]")
+                print(f"{prefix}Downloading {appimage_name}...")
                 download_task = None
 
             # Start the actual download
@@ -319,8 +255,8 @@ class DownloadManager:
             speed_mbps = (total_size / (1024 * 1024)) / download_time if download_time > 0 else 0
 
             # Display completion message
-            logging.info(
-                f"{prefix}[green]✓ Downloaded {appimage_name}[/] "
+            print(
+                f"{prefix}✓ Downloaded {appimage_name} "
                 f"({self._format_size(total_size)}, {speed_mbps:.1f} MB/s)"
             )
             self._logger.info(f"Successfully downloaded {appimage_name}")
@@ -334,7 +270,7 @@ class DownloadManager:
         except requests.exceptions.RequestException as e:
             error_msg = f"Network error while downloading {appimage_name}: {str(e)}"
             self._logger.error(error_msg)
-            console.print(f"{prefix}[bold red]✗ Download failed:[/] {error_msg}")
+            print(f"{prefix}✗ Download failed: {error_msg}")
 
             # Clean up the progress task if it exists
             if hasattr(self, "_progress_task_id") and self._progress_task_id is not None:

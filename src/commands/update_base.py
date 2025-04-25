@@ -38,12 +38,12 @@ class BaseUpdateCommand(Command):
         self.global_config = GlobalConfigManager()
         self.app_config = AppConfigManager()
         self._logger = logging.getLogger(__name__)
-        
+
         self.max_concurrent_updates = self.global_config.max_concurrent_updates
         self._logger.debug(
             f"Set max_concurrent_updates to {self.max_concurrent_updates} from global config"
         )
-        
+
         self._logger.debug("Initializing semaphore")
         self.semaphore: Optional[asyncio.Semaphore] = None
 
@@ -84,42 +84,29 @@ class BaseUpdateCommand(Command):
             self._logger.info(update_msg)
             print(update_msg)
 
-            # 1. Load config for this app
-            app_config.load_appimage_config(app_data["config_file"])
-
-            # 2. Initialize GitHub API for this app
-            github_api = GitHubAPI(
-                owner=app_config.owner,
-                repo=app_config.repo,
-                sha_name=app_config.sha_name,
-                hash_type=app_config.hash_type,
-                arch_keyword=app_config.arch_keyword,
-            )
-
-            # 3. Determine max retry attempts
+            # Determine max retry attempts
             max_attempts = 1  # Default to 1 attempt for batch updates
 
             # For single app updates in interactive mode, allow retries
             if not is_batch and not global_config.batch_mode:
                 max_attempts = 3
 
-            # 4. Attempt update with possible retries
+            # Attempt update with possible retries
             for attempt in range(1, max_attempts + 1):
                 try:
-                    success = self._perform_update_attempt(
-                        github_api=github_api,
+                    # Use the core update method
+                    success, _ = self._perform_app_update_core(
+                        app_data=app_data,
                         app_config=app_config,
                         global_config=global_config,
-                        app_data=app_data,
-                        attempt=attempt,
-                        max_attempts=max_attempts,
+                        is_async=False,
                         is_batch=is_batch,
                     )
 
                     if success:
                         return True
 
-                    # If we reach here and it's the last attempt or user declined retry, break
+                    # If we reach here and it's the last attempt or batch mode, break
                     if attempt == max_attempts or is_batch:
                         break
 
@@ -630,134 +617,22 @@ class BaseUpdateCommand(Command):
         Returns:
             bool: True if update was successful, False otherwise
         """
-        app_name = app_data["name"]
         app_config = AppConfigManager()
         global_config = GlobalConfigManager()
         global_config.load_config()
 
-        logging.info(f"Starting async update for {app_name}")
+        # Use the core update method with async mode enabled
+        success, _ = self._perform_app_update_core(
+            app_data=app_data,
+            app_config=app_config,
+            global_config=global_config,
+            is_async=True,
+            is_batch=is_batch,
+            app_index=app_index,
+            total_apps=total_apps,
+        )
 
-        try:
-            # 1. Load config for this app
-            app_config.load_appimage_config(app_data["config_file"])
-
-            # 2. Initialize GitHub API for this app
-            github_api = GitHubAPI(
-                owner=app_config.owner,
-                repo=app_config.repo,
-                sha_name=app_config.sha_name,
-                hash_type=app_config.hash_type,
-                arch_keyword=app_config.arch_keyword,
-            )
-
-            # 3. Perform update with one attempt (async mode always uses a single attempt)
-            try:
-                # Get release data (with thread-safe rate limit handling)
-                success, response = github_api.get_response()
-                if not success:
-                    error_msg = f"Error fetching data from GitHub API: {response}"
-                    logging.error(error_msg)
-                    return False
-
-                # Verify appimage_name was properly set during release processing
-                if not github_api.appimage_name or not github_api.appimage_url:
-                    error_msg = (
-                        f"AppImage information not found for {app_name}. Check repository content."
-                    )
-                    logging.error(error_msg)
-                    return False
-
-                # Download AppImage - now with app index info
-                logging.info(f"Downloading {github_api.appimage_name} for {app_name}")
-                download_manager = DownloadManager(
-                    github_api, app_index=app_index, total_apps=total_apps
-                )
-                download_manager.download()
-
-                # Get the actual download path
-                download_path = os.path.join("downloads", github_api.appimage_name)
-
-                # If the file doesn't exist at the download path, log an error and return
-                if not os.path.exists(download_path):
-                    error_msg = f"Downloaded file not found at {download_path}"
-                    logging.error(error_msg)
-                    return False
-
-                # Move the file to the current directory for verification and processing
-                # This fixes the issue where downloaded files are stored in downloads/ but
-                # expected to be in the root directory
-                target_path = os.path.join(os.getcwd(), github_api.appimage_name)
-                try:
-                    # If the file already exists at the target, remove it first
-                    if os.path.exists(target_path):
-                        os.remove(target_path)
-                    # Copy the file from downloads to current directory
-                    import shutil
-
-                    shutil.copy2(download_path, target_path)
-                    # Update file permissions to make it executable
-                    os.chmod(target_path, os.stat(target_path).st_mode | 0o111)
-                    logging.info(f"Moved downloaded file from {download_path} to {target_path}")
-                except Exception as e:
-                    error_msg = f"Error moving downloaded file: {str(e)}"
-                    logging.error(error_msg)
-                    return False
-
-                # Verify the download
-                if not self._verify_appimage(github_api, cleanup_on_failure=True):
-                    verification_failed_msg = f"Verification failed for {app_name}."
-                    logging.warning(verification_failed_msg)
-                    return False
-
-                # Handle file operations
-                file_handler = self._create_file_handler(github_api, app_config, global_config)
-
-                # Download app icon if possible
-                from src.icon_manager import IconManager
-
-                icon_manager = IconManager()
-                icon_manager.ensure_app_icon(github_api.owner, github_api.repo)
-
-                # Perform file operations and update config
-                if file_handler.handle_appimage_operations(github_api=github_api):
-                    try:
-                        app_config.update_version(
-                            new_version=github_api.version,
-                            new_appimage_name=github_api.appimage_name,
-                        )
-                        success_msg = (
-                            f"Successfully updated {app_name} to version {github_api.version}"
-                        )
-                        logging.info(success_msg)
-
-                        # Clean up the downloaded file in downloads/ directory
-                        try:
-                            if os.path.exists(download_path):
-                                os.remove(download_path)
-                                logging.info(f"Cleaned up temporary download: {download_path}")
-                        except Exception as e:
-                            logging.warning(f"Could not clean up temporary download: {str(e)}")
-
-                        return True
-                    except Exception as e:
-                        error_msg = f"Failed to update version in config file: {str(e)}"
-                        logging.error(error_msg, exc_info=True)
-                        return False
-                else:
-                    error_msg = f"Failed to update AppImage for {app_name}"
-                    logging.error(error_msg)
-                    return False
-
-            except Exception as e:
-                error_msg = f"Error updating {app_name}: {str(e)}"
-                logging.error(error_msg, exc_info=True)
-                return False
-
-        except Exception as e:
-            # Catch any unexpected exceptions to ensure we continue to the next app
-            error_msg = f"Unexpected error updating {app_name}: {str(e)}"
-            logging.error(error_msg, exc_info=True)
-            return False
+        return success
 
     async def _update_app_async(
         self, app_data: Dict[str, Any], idx: int, total_apps: int = 0
@@ -893,3 +768,178 @@ class BaseUpdateCommand(Command):
         except Exception as e:
             logging.error(f"Error in async update process: {str(e)}", exc_info=True)
             return success_count, failure_count, results
+
+    def _perform_app_update_core(
+        self,
+        app_data: Dict[str, Any],
+        app_config: AppConfigManager,
+        global_config: GlobalConfigManager,
+        is_async: bool = False,
+        is_batch: bool = False,
+        app_index: int = 0,
+        total_apps: int = 0,
+    ) -> Tuple[bool, Optional[Dict[str, Any]]]:
+        """
+        Core method to update a single AppImage with consistent error handling.
+
+        This contains the shared update logic used by both async and sync update
+        processes. It handles loading configs, downloading, verification, and file
+        operations.
+
+        Args:
+            app_data: Dictionary with app information
+            app_config: App configuration manager
+            global_config: Global configuration manager
+            is_async: Whether this is running in an async context
+            is_batch: Whether this update is part of a batch operation
+            app_index: Index of this app in the update list (1-based)
+            total_apps: Total number of apps being updated
+
+        Returns:
+            Tuple containing:
+            - bool: True if update was successful, False otherwise
+            - Optional[Dict[str, Any]]: Additional result data (for async mode)
+        """
+        app_name = app_data["name"]
+        logger = self._logger
+        logger.info(f"Starting update for {app_name}")
+
+        result_data = {
+            "status": "failed",
+            "message": "Update failed",
+            "elapsed": 0,
+        }
+
+        start_time = time.time()
+
+        try:
+            # 1. Load config for this app if not already loaded
+            if not app_config.repo:
+                app_config.load_appimage_config(app_data["config_file"])
+
+            # 2. Initialize GitHub API for this app
+            github_api = GitHubAPI(
+                owner=app_config.owner,
+                repo=app_config.repo,
+                sha_name=app_config.sha_name,
+                hash_type=app_config.hash_type,
+                arch_keyword=app_config.arch_keyword,
+            )
+
+            # 3. Get release data from GitHub API
+            success, response = github_api.get_response()
+            if not success:
+                error_msg = f"Error fetching data from GitHub API: {response}"
+                logger.error(error_msg)
+                result_data["message"] = error_msg
+                return False, result_data
+
+            # 4. Verify appimage_name was properly set during release processing
+            if not github_api.appimage_name or not github_api.appimage_url:
+                error_msg = (
+                    f"AppImage information not found for {app_name}. Check repository content."
+                )
+                logger.error(error_msg)
+                result_data["message"] = error_msg
+                return False, result_data
+
+            # 5. Download AppImage
+            logger.info(f"Downloading {github_api.appimage_name} for {app_name}")
+            download_manager = DownloadManager(
+                github_api, app_index=app_index, total_apps=total_apps
+            )
+            download_manager.download()
+
+            # 6. Handle file path for verification
+            # In async mode, files are stored in downloads/ directory and need to be moved
+            if is_async:
+                download_path = os.path.join("downloads", github_api.appimage_name)
+
+                # Check if the file was downloaded successfully
+                if not os.path.exists(download_path):
+                    error_msg = f"Downloaded file not found at {download_path}"
+                    logger.error(error_msg)
+                    result_data["message"] = error_msg
+                    return False, result_data
+
+                # Move the file to the current directory for verification
+                target_path = os.path.join(os.getcwd(), github_api.appimage_name)
+                try:
+                    # Remove existing file if it exists
+                    if os.path.exists(target_path):
+                        os.remove(target_path)
+
+                    # Copy the file and set permissions
+                    import shutil
+
+                    shutil.copy2(download_path, target_path)
+                    os.chmod(target_path, os.stat(target_path).st_mode | 0o111)
+                    logger.info(f"Moved downloaded file from {download_path} to {target_path}")
+                except Exception as e:
+                    error_msg = f"Error moving downloaded file: {str(e)}"
+                    logger.error(error_msg)
+                    result_data["message"] = error_msg
+                    return False, result_data
+
+            # 7. Verify the download
+            if not self._verify_appimage(github_api, cleanup_on_failure=True):
+                error_msg = f"Verification failed for {app_name}."
+                logger.warning(error_msg)
+                result_data["message"] = error_msg
+                return False, result_data
+
+            # 8. Handle file operations
+            file_handler = self._create_file_handler(github_api, app_config, global_config)
+
+            # 9. Download app icon if possible
+            from src.icon_manager import IconManager
+
+            icon_manager = IconManager()
+            icon_manager.ensure_app_icon(github_api.owner, github_api.repo)
+
+            # 10. Perform file operations and update config
+            if file_handler.handle_appimage_operations(github_api=github_api):
+                try:
+                    app_config.update_version(
+                        new_version=github_api.version,
+                        new_appimage_name=github_api.appimage_name,
+                    )
+                    success_msg = f"Successfully updated {app_name} to version {github_api.version}"
+                    logger.info(success_msg)
+
+                    # 11. Clean up the downloaded file in downloads directory for async mode
+                    if is_async:
+                        try:
+                            download_path = os.path.join("downloads", github_api.appimage_name)
+                            if os.path.exists(download_path):
+                                os.remove(download_path)
+                                logger.info(f"Cleaned up temporary download: {download_path}")
+                        except Exception as e:
+                            logger.warning(f"Could not clean up temporary download: {str(e)}")
+
+                    # 12. Update result data for successful update
+                    result_data = {
+                        "status": "success",
+                        "message": f"Updated {app_name} to {github_api.version}",
+                        "elapsed": time.time() - start_time,
+                    }
+                    return True, result_data
+
+                except Exception as e:
+                    error_msg = f"Failed to update version in config file: {str(e)}"
+                    logger.error(error_msg, exc_info=True)
+                    result_data["message"] = error_msg
+                    return False, result_data
+            else:
+                error_msg = f"Failed to update AppImage for {app_name}"
+                logger.error(error_msg)
+                result_data["message"] = error_msg
+                return False, result_data
+
+        except Exception as e:
+            # Catch any unexpected exceptions
+            error_msg = f"Unexpected error updating {app_name}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            result_data["message"] = error_msg
+            result_data["elapsed"] = time.time() - start_time
+            return False, result_data
