@@ -31,8 +31,19 @@ class VerificationManager:
         self.sha_name = sha_name
         self.sha_url = sha_url
         self.appimage_name = appimage_name
+        self.appimage_path = appimage_name  # Initialize to same value as appimage_name initially
         self.hash_type = hash_type.lower()
         self._validate_hash_type()
+
+    def set_appimage_path(self, full_path: str) -> None:
+        """
+        Set the full path to the AppImage file for verification.
+
+        Args:
+            full_path: The complete path to the AppImage file
+        """
+        self.appimage_path = full_path
+        logging.info(f"Set AppImage path for verification: {full_path}")
 
     def _validate_hash_type(self):
         """Ensure the hash type is supported"""
@@ -62,8 +73,15 @@ class VerificationManager:
                 print("Note: Verification skipped - no hash file provided")
                 return True
 
-            if not self.appimage_name or not os.path.exists(self.appimage_name):
-                logging.error(f"AppImage file not found: {self.appimage_name}")
+            # Use appimage_path for existence check if available, otherwise fall back to appimage_name
+            check_path = (
+                self.appimage_path
+                if hasattr(self, "appimage_path") and self.appimage_path
+                else self.appimage_name
+            )
+
+            if not check_path or not os.path.exists(check_path):
+                logging.error(f"AppImage file not found: {check_path}")
                 return False
 
             # FALLBACK CASE: If sha_name matches appimage_name, this indicates
@@ -86,7 +104,7 @@ class VerificationManager:
             is_valid = self._parse_sha_file()
 
             if not is_valid and cleanup_on_failure:
-                self._cleanup_failed_file(self.appimage_name)
+                self._cleanup_failed_file(check_path)  # Use the same path for cleanup
 
             return is_valid
 
@@ -228,8 +246,15 @@ class VerificationManager:
 
     def _compare_hashes(self, expected_hash: str) -> bool:
         """Compare hashes using memory-efficient chunked reading."""
-        if not os.path.exists(self.appimage_name):
-            raise IOError(f"AppImage file not found: {self.appimage_name}")
+        # Use appimage_path for file operations if available, otherwise fall back to appimage_name
+        file_to_verify = (
+            self.appimage_path
+            if hasattr(self, "appimage_path") and self.appimage_path
+            else self.appimage_name
+        )
+
+        if not os.path.exists(file_to_verify):
+            raise IOError(f"AppImage file not found: {file_to_verify}")
 
         try:
             hash_func = hashlib.new(self.hash_type)
@@ -237,7 +262,7 @@ class VerificationManager:
             # Use larger chunk size for better performance with large files
             chunk_size = 65536  # 64KB chunks
 
-            with open(self.appimage_name, "rb") as f:
+            with open(file_to_verify, "rb") as f:
                 for chunk in iter(lambda: f.read(chunk_size), b""):
                     hash_func.update(chunk)
 

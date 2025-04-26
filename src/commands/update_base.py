@@ -195,10 +195,11 @@ class BaseUpdateCommand(Command):
 
         # Download AppImage
         print(f"Downloading {github_api.appimage_name}...")
-        DownloadManager(github_api).download()
+        download_manager = DownloadManager(github_api)
+        downloaded_file_path = download_manager.download()  # Capture the full downloaded file path
 
         # Verify the download
-        if not self._verify_appimage(github_api, cleanup_on_failure=True):
+        if not self._verify_appimage(github_api, downloaded_file_path, cleanup_on_failure=True):
             verification_failed_msg = f"Verification failed for {app_data['name']}."
             self._logger.warning(verification_failed_msg)
 
@@ -279,12 +280,18 @@ class BaseUpdateCommand(Command):
             max_backups=global_config.max_backups,
         )
 
-    def _verify_appimage(self, github_api: GitHubAPI, cleanup_on_failure: bool = True) -> bool:
+    def _verify_appimage(
+        self,
+        github_api: GitHubAPI,
+        downloaded_file_path: str = None,
+        cleanup_on_failure: bool = True,
+    ) -> bool:
         """
         Verify the downloaded AppImage using the SHA file.
 
         Args:
             github_api: GitHub API instance with release info
+            downloaded_file_path: Full path to the downloaded AppImage file
             cleanup_on_failure: Whether to delete the file on verification failure
 
         Returns:
@@ -302,6 +309,11 @@ class BaseUpdateCommand(Command):
             appimage_name=github_api.appimage_name,
             hash_type=github_api.hash_type,
         )
+
+        # If we have a downloaded file path, set it for verification
+        if downloaded_file_path:
+            verification_manager.set_appimage_path(downloaded_file_path)
+            self._logger.info(f"Using specific file path for verification: {downloaded_file_path}")
 
         # Verify and clean up on failure if requested
         return verification_manager.verify_appimage(cleanup_on_failure=cleanup_on_failure)
@@ -848,12 +860,13 @@ class BaseUpdateCommand(Command):
             download_manager = DownloadManager(
                 github_api, app_index=app_index, total_apps=total_apps
             )
-            download_manager.download()
+            downloaded_file_path = download_manager.download()  # Capture the file path
 
             # 6. Handle file path for verification
             # In async mode, files are stored in downloads/ directory and need to be moved
             if is_async:
-                download_path = os.path.join("downloads", github_api.appimage_name)
+                # We already know the file path from the download operation
+                download_path = downloaded_file_path
 
                 # Check if the file was downloaded successfully
                 if not os.path.exists(download_path):
@@ -875,14 +888,22 @@ class BaseUpdateCommand(Command):
                     shutil.copy2(download_path, target_path)
                     os.chmod(target_path, os.stat(target_path).st_mode | 0o111)
                     logger.info(f"Moved downloaded file from {download_path} to {target_path}")
+
+                    # Use the target path for verification
+                    verification_path = target_path
                 except Exception as e:
+                    # If there was an error copying, still use the download path
+                    verification_path = download_path
                     error_msg = f"Error moving downloaded file: {str(e)}"
                     logger.error(error_msg)
                     result_data["message"] = error_msg
                     return False, result_data
+            else:
+                # For synchronous operation, use the downloaded file path directly
+                verification_path = downloaded_file_path
 
             # 7. Verify the download
-            if not self._verify_appimage(github_api, cleanup_on_failure=True):
+            if not self._verify_appimage(github_api, verification_path, cleanup_on_failure=True):
                 error_msg = f"Verification failed for {app_name}."
                 logger.warning(error_msg)
                 result_data["message"] = error_msg

@@ -69,6 +69,11 @@ ICON_PATHS = {
         "exact_path": "packages/clipper/images/icon128.png",
         "filename": "standardnotes_icon.png",
     },
+    "pbek/qownnotes": {
+        "exact_path": "icons/icon.png",
+        "paths": ["icons/icon.png"],
+        "filename": "qownnotes_icon.png",
+    },
     # Add more repository configurations as needed...
 }
 

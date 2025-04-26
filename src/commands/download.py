@@ -60,7 +60,9 @@ class DownloadCommand(Command):
                 # 4. Use DownloadManager to download the AppImage
                 print(f"Downloading {api.appimage_name}...")
                 download = DownloadManager(api)
-                download.download()  # Pass the appimage URL to download method
+                downloaded_file_path = (
+                    download.download()
+                )  # Capture the full path to the downloaded file
 
                 global_config = GlobalConfigManager()
                 global_config.load_config()
@@ -75,9 +77,12 @@ class DownloadCommand(Command):
                     verification_manager = VerificationManager(
                         sha_name=api.sha_name,
                         sha_url=api.sha_url,
-                        appimage_name=api.appimage_name,
+                        appimage_name=api.appimage_name,  # Keep the original filename for logging
                         hash_type=api.hash_type,
                     )
+
+                    # Set the full path to the downloaded file
+                    verification_manager.set_appimage_path(downloaded_file_path)
 
                     is_valid = verification_manager.verify_appimage(cleanup_on_failure=True)
 
@@ -142,6 +147,8 @@ class DownloadCommand(Command):
         if success:
             # Save the configuration only if all previous steps succeed
             app_config.save_config()
-            print("Configuration saved successfully.")
+            logging.info("AppImage downloaded and verified successfully and saved in DownloadCommand.")
+            print("AppImage downloaded and verified successfully and saved.")
         else:
+            logging.error("An error occurred during file operations in DownloadCommand.")
             print("An error occurred during file operations.")

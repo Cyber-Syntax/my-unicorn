@@ -274,13 +274,19 @@ class FileHandler:
             bool: True if the move succeeded, False otherwise
         """
         try:
-            # Assume file was downloaded to current directory
-            current_path = os.path.join(os.getcwd(), self.appimage_name)
+            # Check for the file in the downloads directory
+            downloads_dir = os.path.join(os.getcwd(), "downloads")
+            current_path = os.path.join(downloads_dir, self.appimage_name)
 
             # Check if file exists
             if not os.path.exists(current_path):
-                logging.error(f"Downloaded AppImage not found at {current_path}")
-                return False
+                # Fall back to checking the current directory as before
+                current_path = os.path.join(os.getcwd(), self.appimage_name)
+                if not os.path.exists(current_path):
+                    logging.error(
+                        f"Downloaded AppImage not found at {current_path} or in downloads folder"
+                    )
+                    return False
 
             # Move file to destination
             logging.info(f"Moving {current_path} to {self.appimage_path}")

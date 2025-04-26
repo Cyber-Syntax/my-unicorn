@@ -121,9 +121,12 @@ class DownloadManager:
                 cls._global_progress = None
                 cls._active_tasks = set()
 
-    def download(self) -> None:
+    def download(self) -> str:
         """
         Download the AppImage from the GitHub release.
+
+        Returns:
+            str: The full path to the downloaded AppImage file
 
         Raises:
             ValueError: If AppImage URL or name is not available
@@ -145,7 +148,11 @@ class DownloadManager:
             prefix = f"[{self.app_index}/{self.total_apps}] " if self.total_apps > 0 else ""
 
             # Download with progress tracking
-            self._download_with_nested_progress(appimage_url, appimage_name, headers, prefix)
+            download_path = self._download_with_nested_progress(
+                appimage_url, appimage_name, headers, prefix
+            )
+
+            return download_path
 
         except IOError as e:
             error_msg = f"File system error while downloading {appimage_name}: {str(e)}"
@@ -162,7 +169,7 @@ class DownloadManager:
         appimage_name: str,
         headers: Dict[str, str],
         prefix: str = "",
-    ) -> None:
+    ) -> str:
         """
         Download with a progress bar display.
 
@@ -171,6 +178,9 @@ class DownloadManager:
             appimage_name: Name of the AppImage file
             headers: HTTP headers for the request
             prefix: Prefix to add to progress messages (e.g., "[1/2] ")
+
+        Returns:
+            str: The full path to the downloaded AppImage file
 
         Raises:
             Exception: Any error during download
@@ -184,11 +194,14 @@ class DownloadManager:
             response.raise_for_status()
             total_size = int(response.headers.get("content-length", 0))
 
+            # Always use the 'downloads' folder in the current directory for temporary storage
+            downloads_dir = os.path.join(os.getcwd(), "downloads")
+
             # Create output directory if it doesn't exist
-            os.makedirs("downloads", exist_ok=True)
+            os.makedirs(downloads_dir, exist_ok=True)
 
             # Prepare the output file path
-            file_path = os.path.join("downloads", appimage_name)
+            file_path = os.path.join(downloads_dir, appimage_name)
 
             # Get the shared progress instance with thread safety
             progress = self.get_or_create_progress()
@@ -259,13 +272,15 @@ class DownloadManager:
                 f"{prefix}✓ Downloaded {appimage_name} "
                 f"({self._format_size(total_size)}, {speed_mbps:.1f} MB/s)"
             )
-            self._logger.info(f"Successfully downloaded {appimage_name}")
+            self._logger.info(f"Successfully downloaded {file_path}")
 
             # If this is the last download and we're in async mode, clean up the progress display
             if self.is_async_mode and self.app_index == self.total_apps:
                 # Only stop if no active tasks remain
                 if not DownloadManager._active_tasks:
                     self.stop_progress()
+
+            return file_path
 
         except requests.exceptions.RequestException as e:
             error_msg = f"Network error while downloading {appimage_name}: {str(e)}"
