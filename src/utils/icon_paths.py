@@ -81,12 +81,21 @@ def get_icon_paths(repo_name: str) -> dict:
 
     # Try with original case, then lowercase
     repo_config = ICON_PATHS.get(repo_name) or ICON_PATHS.get(repo_name.lower())
-
-    # Also try with owner/repo format
-    if not repo_config and "/" in repo_name:
+    
+    if repo_config:
+        return repo_config
+        
+    # Handle owner/repo bidirectional matching
+    if "/" in repo_name:
+        # If repo_name is in owner/repo format, try with just the repo part
         _, name = repo_name.split("/", 1)
         repo_config = ICON_PATHS.get(name) or ICON_PATHS.get(name.lower())
+    else:
+        # If repo_name is just repo, try to find matching owner/repo keys
+        for key in ICON_PATHS:
+            if "/" in key and (key.split("/", 1)[1] == repo_name or 
+                             key.split("/", 1)[1].lower() == repo_name.lower()):
+                repo_config = ICON_PATHS[key]
+                break
 
-    # Return the found configuration or None
-    # We no longer return ICON_PATHS["default"] as fallback since it doesn't exist
     return repo_config

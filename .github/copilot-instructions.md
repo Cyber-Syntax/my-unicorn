@@ -124,9 +124,8 @@
 ## Testing Guidelines
 
 - All tests should be in ./tests directory
-- Write pytest tests with fixtures.
+- Write pytest for all tests with fixtures.
 - Mock external services in tests.
-- Test error handling explicitly.
 - Test error paths explicitly.
 - Use Hypothesis for property testing.
 - Run static type checks in CI.
