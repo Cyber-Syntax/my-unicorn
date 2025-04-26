@@ -7,22 +7,33 @@ from typing import Dict, Any, Generator
 import time
 import os
 import json
+from pathlib import Path
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
+# More reliable way to add the project root to the Python path
+# Using absolute paths with pathlib for better cross-platform compatibility
+project_root = str(Path(__file__).parent.parent.absolute())
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+
+# Add a pytest plugin that ensures src is in the path for all test modules
+def pytest_configure(config):
+    """Configure pytest."""
+    # Make sure src is in the Python path for all tests
+    src_path = os.path.join(project_root, "src")
+    if src_path not in sys.path:
+        sys.path.insert(0, src_path)
+
+
+# Now import after the path setup
 from src.progress_manager import DynamicProgressManager
 from src.secure_token import (
     SecureTokenManager,
     DEFAULT_TOKEN_EXPIRATION_DAYS,
-)  # Import the constant directly
+)
 
-# Add the project root to sys.path so that the 'src' package can be imported.
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-# Add the project root directory to Python's path
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 @pytest.fixture
 def mock_requests_get():
@@ -134,6 +145,7 @@ def download_fixture() -> Dict[str, Any]:
         ],
     }
 
+
 @pytest.fixture
 def simulated_time() -> Generator[None, None, None]:
     """Simulate time passing for progress bar speed/ETA calculations."""
@@ -156,10 +168,12 @@ def reset_env(monkeypatch):
     monkeypatch.setattr("src.secure_token.CRYPTO_AVAILABLE", False)
     yield
 
+
 @pytest.fixture
 def sample_token():
     # a valid GitHub token format: prefix + 40 chars
     return "ghp_" + "X" * 40
+
 
 @pytest.fixture
 def future_metadata():
@@ -167,11 +181,13 @@ def future_metadata():
     future = datetime.utcnow() + timedelta(days=DEFAULT_TOKEN_EXPIRATION_DAYS)
     return {"expires_at": future.isoformat()}
 
+
 @pytest.fixture
 def past_metadata():
     # ISO timestamp 1 day in the past
     past = datetime.utcnow() - timedelta(days=1)
     return {"expires_at": past.isoformat()}
+
 
 @pytest.fixture(autouse=True)
 def set_consts(monkeypatch):

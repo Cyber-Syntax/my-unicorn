@@ -8,17 +8,20 @@ downloading AppImages from GitHub releases.
 
 import os
 import sys
+from pathlib import Path
 from typing import Dict, Any
 
 import pytest
 from unittest.mock import MagicMock
 
-# Add the project root to sys.path so that the 'src' package can be imported.
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+# Add the project root to sys.path using pathlib for better cross-platform compatibility
+project_root = Path(__file__).parent.parent.parent.absolute()
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
-from commands.download import DownloadCommand
+# Import the modules directly to avoid import issues
+import src.commands.download
+from src.commands.download import DownloadCommand
 from src.api import GitHubAPI
 from src.app_config import AppConfigManager
 from src.download import DownloadManager
@@ -26,6 +29,7 @@ from src.file_handler import FileHandler
 from src.verify import VerificationManager
 from src.parser import ParseURL
 from src.global_config import GlobalConfigManager
+from src.icon_manager import IconManager
 
 
 @pytest.fixture

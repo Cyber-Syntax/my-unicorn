@@ -6,7 +6,15 @@ Icon path configuration module.
 This module defines paths to icon files for various repositories.
 Using a Python module instead of YAML allows for more complex configurations,
 comments, and easier maintenance.
+
+Examples:
+    >>> from src.utils.icon_paths import get_icon_paths
+    >>> config = get_icon_paths("joplin")
+    >>> print(config["exact_path"])
+    'Assets/LinuxIcons/256x256.png'
 """
+
+__all__ = ["ICON_PATHS", "get_icon_paths"]
 
 # Dictionary mapping repository names (keys) to their icon configurations (values)
 # Each configuration can be:
@@ -81,10 +89,10 @@ def get_icon_paths(repo_name: str) -> dict:
 
     # Try with original case, then lowercase
     repo_config = ICON_PATHS.get(repo_name) or ICON_PATHS.get(repo_name.lower())
-    
+
     if repo_config:
         return repo_config
-        
+
     # Handle owner/repo bidirectional matching
     if "/" in repo_name:
         # If repo_name is in owner/repo format, try with just the repo part
@@ -93,8 +101,10 @@ def get_icon_paths(repo_name: str) -> dict:
     else:
         # If repo_name is just repo, try to find matching owner/repo keys
         for key in ICON_PATHS:
-            if "/" in key and (key.split("/", 1)[1] == repo_name or 
-                             key.split("/", 1)[1].lower() == repo_name.lower()):
+            if "/" in key and (
+                key.split("/", 1)[1] == repo_name
+                or key.split("/", 1)[1].lower() == repo_name.lower()
+            ):
                 repo_config = ICON_PATHS[key]
                 break
 

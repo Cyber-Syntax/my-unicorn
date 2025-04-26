@@ -13,7 +13,7 @@ import requests
 from typing import Dict, Optional, List, Any, Tuple, Union
 
 # Import the icon paths configuration module instead of using YAML
-from utils.icon_paths import get_icon_paths
+from src.utils.icon_paths import get_icon_paths
 from src.auth_manager import GitHubAuthManager
 
 # Configure module logger

@@ -6,11 +6,26 @@ Tests for icon path utility functions.
 This module contains tests for the icon path utility functions in src/utils/icon_paths.py.
 """
 
-from typing import Dict, Any, Optional
-
+from typing import Any, Dict, Optional
+import os
+import sys
+from pathlib import Path
 import pytest
 
-from src.utils.icon_paths import get_icon_paths, ICON_PATHS
+# Add project root to sys.path if needed
+project_root = Path(__file__).parent.parent.parent.absolute()
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+# Import the module directly to avoid import issues
+import src.utils.icon_paths
+from src.utils.icon_paths import get_icon_paths
+
+
+# Use a function to access ICON_PATHS to avoid direct import issues in global test runs
+def get_icon_paths_map() -> Dict[str, Any]:
+    """Get the ICON_PATHS dictionary from the module."""
+    return src.utils.icon_paths.ICON_PATHS
 
 
 class TestGetIconPaths:
@@ -77,7 +92,7 @@ class TestGetIconPaths:
         # Make sure we can handle all the different ways a repo can be configured
 
         # Check each repo in ICON_PATHS
-        for repo_name, config in ICON_PATHS.items():
+        for repo_name, config in get_icon_paths_map().items():
             result = get_icon_paths(repo_name)
             assert result is not None
             assert result == config
@@ -94,9 +109,10 @@ class TestIconPathsConstant:
 
     def test_icon_paths_structure(self) -> None:
         """Test the structure of the ICON_PATHS dictionary."""
-        assert isinstance(ICON_PATHS, dict)
+        icon_paths = get_icon_paths_map()
+        assert isinstance(icon_paths, dict)
 
-        for repo, config in ICON_PATHS.items():
+        for repo, config in icon_paths.items():
             # Each repo should have a string key
             assert isinstance(repo, str)
             assert len(repo) > 0

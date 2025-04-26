@@ -14,15 +14,17 @@ from src.utils.icon_paths import get_icon_paths
 src = types.ModuleType("src")
 sys.modules["src"] = src
 
-# Create src.data.icon_paths with get_icon_paths stub
-data_pkg = types.ModuleType("src.data")
-icon_paths_mod = types.ModuleType("src.data.icon_paths")
+# Create src.utils package
+utils_pkg = types.ModuleType("src.utils")
+src.utils = utils_pkg
+sys.modules["src.utils"] = utils_pkg
+
+# Create src.utils.icon_paths with get_icon_paths stub
+icon_paths_mod = types.ModuleType("src.utils.icon_paths")
 # Default get_icon_paths returns None; individual tests can monkeypatch this
 icon_paths_mod.get_icon_paths = lambda key: None
-data_pkg.icon_paths = icon_paths_mod
-src.data = data_pkg
-sys.modules["src.data"] = data_pkg
-sys.modules["src.data.icon_paths"] = icon_paths_mod
+utils_pkg.icon_paths = icon_paths_mod
+sys.modules["src.utils.icon_paths"] = icon_paths_mod
 
 # Create src.secure_token module for tests that need to mock it
 secure_token_mod = types.ModuleType("src.secure_token")
