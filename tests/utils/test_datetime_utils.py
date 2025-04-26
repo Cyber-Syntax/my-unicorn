@@ -10,7 +10,14 @@ from datetime import datetime
 from typing import Any, Optional, Union
 
 import pytest
-from hypothesis import given, strategies as st
+
+# Try to import hypothesis, but make it optional
+try:
+    from hypothesis import given, strategies as st
+
+    HYPOTHESIS_AVAILABLE = True
+except ImportError:
+    HYPOTHESIS_AVAILABLE = False
 
 from src.utils.datetime_utils import parse_timestamp, format_timestamp, get_next_hour_timestamp
 
@@ -92,31 +99,36 @@ class TestParseTimestamp:
             # If it fails, that's acceptable too
             pass
 
-    @given(st.integers(min_value=0, max_value=2147483647))  # Valid Unix timestamps
-    def test_parse_property_valid_int_timestamp(self, timestamp: int) -> None:
-        """
-        Property test for parsing valid integer timestamps.
+    # Skip hypothesis tests if the module is not available
+    if HYPOTHESIS_AVAILABLE:
 
-        Args:
-            timestamp: Random valid Unix timestamp
-        """
-        result = parse_timestamp(timestamp)
-        assert isinstance(result, datetime)
-        # The parsed datetime should convert back to approximately the same timestamp
-        assert result.timestamp() == pytest.approx(timestamp, abs=1)
+        @pytest.mark.skipif(not HYPOTHESIS_AVAILABLE, reason="Hypothesis not installed")
+        @given(st.integers(min_value=0, max_value=2147483647))  # Valid Unix timestamps
+        def test_parse_property_valid_int_timestamp(self, timestamp: int) -> None:
+            """
+            Property test for parsing valid integer timestamps.
 
-    @given(st.text())
-    def test_parse_property_random_strings(self, random_string: str) -> None:
-        """
-        Property test for parsing random strings.
-
-        Args:
-            random_string: Random string
-        """
-        # For random strings, should either parse correctly or return None
-        result = parse_timestamp(random_string)
-        if result is not None:
+            Args:
+                timestamp: Random valid Unix timestamp
+            """
+            result = parse_timestamp(timestamp)
             assert isinstance(result, datetime)
+            # The parsed datetime should convert back to approximately the same timestamp
+            assert result.timestamp() == pytest.approx(timestamp, abs=1)
+
+        @pytest.mark.skipif(not HYPOTHESIS_AVAILABLE, reason="Hypothesis not installed")
+        @given(st.text())
+        def test_parse_property_random_strings(self, random_string: str) -> None:
+            """
+            Property test for parsing random strings.
+
+            Args:
+                random_string: Random string
+            """
+            # For random strings, should either parse correctly or return None
+            result = parse_timestamp(random_string)
+            if result is not None:
+                assert isinstance(result, datetime)
 
 
 class TestFormatTimestamp:

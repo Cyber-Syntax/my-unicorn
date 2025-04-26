@@ -7,6 +7,7 @@ import pytest
 
 # Now import the IconManager under test
 from src.icon_manager import IconManager
+from src.utils.icon_paths import get_icon_paths
 # --- Setup dummy src package modules so IconManager imports succeed ---
 
 # Create a dummy src package

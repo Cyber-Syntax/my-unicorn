@@ -43,140 +43,167 @@ def monkeypatch_path_exists():
         **{"TOKEN_FILE.exists.return_value": True, "TOKEN_METADATA_FILE.exists.return_value": True},
     )
 
+
 @pytest.fixture(autouse=True)
 def set_consts(monkeypatch):
     # override constants via monkeypatch, not via patch()
     monkeypatch.setattr("src.secure_token.KEYRING_AVAILABLE", False)
     monkeypatch.setattr("src.secure_token.CRYPTO_AVAILABLE", True)
 
+
 class TestSecureTokenManager:
     """Tests for the SecureTokenManager class."""
 
-    @patch("os.remove")
-    @patch("src.secure_token.KEYRING_AVAILABLE", False)
-    @patch("src.secure_token.TOKEN_FILE.exists")
-    @patch("src.secure_token.TOKEN_METADATA_FILE.exists")
-    def test_remove_token(
-        self, mock_token_metadata_exists, mock_token_exists, mock_keyring, mock_os_remove
-    ):
+    def test_remove_token(self, monkeypatch):
         """Test removing a token."""
-        # Setup
-        mock_token_exists.return_value = True
-        mock_token_metadata_exists.return_value = True
+        # Create mock Path objects that return True for exists()
+        mock_token_file = MagicMock()
+        mock_token_file.exists.return_value = True
+
+        mock_token_metadata_file = MagicMock()
+        mock_token_metadata_file.exists.return_value = True
+
+        # Patch the TOKEN_FILE and TOKEN_METADATA_FILE attributes with our mock objects
+        monkeypatch.setattr("src.secure_token.TOKEN_FILE", mock_token_file)
+        monkeypatch.setattr("src.secure_token.TOKEN_METADATA_FILE", mock_token_metadata_file)
+
+        # Disable keyring for this test
+        monkeypatch.setattr("src.secure_token.KEYRING_AVAILABLE", False)
+
+        # Mock os.remove
+        with patch("os.remove") as mock_remove:
+            # Execute
+            result = SecureTokenManager.remove_token()
+
+            # Verify
+            assert result is True
+            # Should attempt to remove both token and metadata files
+            assert mock_remove.call_count >= 1
+
+    def test_get_token_valid(self, monkeypatch):
+        """Test getting a valid token."""
+        # Create mock Path objects that return True for exists()
+        mock_token_file = MagicMock()
+        mock_token_file.exists.return_value = True
+
+        mock_token_metadata_file = MagicMock()
+        mock_token_metadata_file.exists.return_value = True
+
+        # Patch the TOKEN_FILE and TOKEN_METADATA_FILE attributes with our mock objects
+        monkeypatch.setattr("src.secure_token.TOKEN_FILE", mock_token_file)
+        monkeypatch.setattr("src.secure_token.TOKEN_METADATA_FILE", mock_token_metadata_file)
+
+        # Patch other dependencies
+        monkeypatch.setattr("src.secure_token.os.path.exists", lambda *args: True)
+        monkeypatch.setattr("src.secure_token.KEYRING_AVAILABLE", False)
+        monkeypatch.setattr("src.secure_token.CRYPTO_AVAILABLE", True)
+
+        # Mock the encryption key retrieval
+        mock_get_key = MagicMock(return_value=b"test_key")
+        monkeypatch.setattr("src.secure_token.SecureTokenManager._get_encryption_key", mock_get_key)
+
+        # Mock the file reading
+        mock_file = mock_open(read_data=b"encrypted_mock_token")
+        monkeypatch.setattr("builtins.open", mock_file)
+
+        # Mock JSON loading for metadata
+        metadata = {
+            "storage_method": "Encrypted file",
+            "created_at": datetime.now().timestamp(),
+            "expires_at": (datetime.now() + timedelta(days=30)).timestamp(),
+        }
+        mock_json_load = MagicMock(return_value=metadata)
+        monkeypatch.setattr("src.secure_token.json.load", mock_json_load)
+
+        # Mock Fernet for decryption
+        mock_fernet = MagicMock()
+        mock_fernet.decrypt.return_value = SAFE_MOCK_TOKEN.encode("utf-8")
+        mock_fernet_class = MagicMock(return_value=mock_fernet)
+        monkeypatch.setattr("src.secure_token.Fernet", mock_fernet_class)
 
         # Execute
-        result = SecureTokenManager.remove_token()
+        token = SecureTokenManager.get_token()
 
-        # Verify
-        assert result is True
-        # Should attempt to remove both token and metadata files
-        assert mock_os_remove.call_count >= 1
+        # Verify - should return our safe mock token
+        assert token == SAFE_MOCK_TOKEN
+        mock_get_key.assert_called_once()
+        mock_fernet_class.assert_called_once()
+        mock_fernet.decrypt.assert_called_once()
 
-    @patch("src.secure_token.os.path.exists")
-    @patch("builtins.open", new_callable=mock_open, read_data=b"encrypted_mock_token")
-    @patch("src.secure_token.json.load")
-    @patch("src.secure_token.SecureTokenManager._get_encryption_key")
-    @patch("src.secure_token.KEYRING_AVAILABLE", False)
-    @patch("src.secure_token.CRYPTO_AVAILABLE", True)
-    def test_get_token_valid(
-        self,
-        mock_crypto_available,
-        mock_keyring_available,
-        mock_get_key,
-        mock_json_load,
-        mock_open,
-        mock_path_exists,
-    ):
-        """Test getting a valid token."""
-        # Setup
-        mock_path_exists.return_value = True
-        mock_get_key.return_value = b"test_key"
-        mock_fernet = MagicMock()
-        mock_fernet.decrypt.return_value = SAFE_MOCK_TOKEN.encode("utf-8")
-        mock_fernet_class = MagicMock(return_value=mock_fernet)
-
-        with patch("src.secure_token.Fernet", mock_fernet_class):
-            # Mock Path.exists() for token files using MagicMock objects
-            token_file_patch = patch("src.secure_token.TOKEN_FILE.exists", return_value=True)
-            metadata_file_patch = patch(
-                "src.secure_token.TOKEN_METADATA_FILE.exists", return_value=True
-            )
-
-            # Add expiration date in the future to ensure token is not expired
-            mock_json_load.return_value = {
-                "storage_method": "Encrypted file",
-                "created_at": datetime.now().timestamp(),
-                "expires_at": (datetime.now() + timedelta(days=30)).timestamp(),
-            }
-
-            # Use context managers to properly patch Path.exists
-            with token_file_patch, metadata_file_patch:
-                # Execute
-                token = SecureTokenManager.get_token()
-
-                # Verify - should return our safe mock token
-                assert token == SAFE_MOCK_TOKEN
-                mock_get_key.assert_called_once()
-                mock_fernet_class.assert_called_once()
-                mock_fernet.decrypt.assert_called_once()
-
-    @patch("src.secure_token.os.path.exists")
-    @patch("builtins.open", new_callable=mock_open, read_data=b"encrypted_mock_token")
-    @patch("src.secure_token.json.load")
-    @patch("src.secure_token.SecureTokenManager._get_encryption_key")
-    @patch("src.secure_token.KEYRING_AVAILABLE", False)
-    @patch("src.secure_token.CRYPTO_AVAILABLE", True)
-    def test_get_token_expired(
-        self,
-        mock_crypto_available,
-        mock_keyring_available,
-        mock_get_key,
-        mock_json_load,
-        mock_open,
-        mock_exists,
-    ):
+    def test_get_token_expired(self, monkeypatch):
         """Test getting an expired token."""
-        # Setup
-        mock_exists.return_value = True
-        mock_get_key.return_value = b"test_key"
+        # Create mock Path objects that return True for exists()
+        mock_token_file = MagicMock()
+        mock_token_file.exists.return_value = True
+
+        mock_token_metadata_file = MagicMock()
+        mock_token_metadata_file.exists.return_value = True
+
+        # Patch the TOKEN_FILE and TOKEN_METADATA_FILE attributes with our mock objects
+        monkeypatch.setattr("src.secure_token.TOKEN_FILE", mock_token_file)
+        monkeypatch.setattr("src.secure_token.TOKEN_METADATA_FILE", mock_token_metadata_file)
+
+        # Patch other dependencies
+        monkeypatch.setattr("src.secure_token.os.path.exists", lambda *args: True)
+        monkeypatch.setattr("src.secure_token.KEYRING_AVAILABLE", False)
+        monkeypatch.setattr("src.secure_token.CRYPTO_AVAILABLE", True)
+
+        # Mock the encryption key retrieval
+        mock_get_key = MagicMock(return_value=b"test_key")
+        monkeypatch.setattr("src.secure_token.SecureTokenManager._get_encryption_key", mock_get_key)
+
+        # Mock the file reading
+        mock_file = mock_open(read_data=b"encrypted_mock_token")
+        monkeypatch.setattr("builtins.open", mock_file)
+
+        # Mock JSON loading for metadata with expired timestamp
+        metadata = {
+            "storage_method": "Encrypted file",
+            "created_at": datetime.now().timestamp(),
+            "expires_at": (datetime.now() - timedelta(days=1)).timestamp(),
+        }
+        mock_json_load = MagicMock(return_value=metadata)
+        monkeypatch.setattr("src.secure_token.json.load", mock_json_load)
+
+        # Mock Fernet for decryption
         mock_fernet = MagicMock()
         mock_fernet.decrypt.return_value = SAFE_MOCK_TOKEN.encode("utf-8")
         mock_fernet_class = MagicMock(return_value=mock_fernet)
+        monkeypatch.setattr("src.secure_token.Fernet", mock_fernet_class)
 
-        with patch("src.secure_token.Fernet", mock_fernet_class):
-            # Mock Path.exists() for token files
-            token_file_patch = patch("src.secure_token.TOKEN_FILE.exists", return_value=True)
-            metadata_file_patch = patch(
-                "src.secure_token.TOKEN_METADATA_FILE.exists", return_value=True
-            )
+        # Execute
+        token = SecureTokenManager.get_token(validate_expiration=True)
 
-            # Set metadata with expired timestamp
-            mock_json_load.return_value = {
-                "storage_method": "Encrypted file",
-                "created_at": datetime.now().timestamp(),
-                "expires_at": (datetime.now() - timedelta(days=1)).timestamp(),
-            }
+        # Verify - implementation returns empty string for expired token
+        assert token == ""
 
-            # Execute
-            with token_file_patch, metadata_file_patch:
-                token = SecureTokenManager.get_token(validate_expiration=True)
-
-                # Verify - implementation returns empty string for expired token
-                assert token == ""
-
-
+    @patch("os.replace")
+    @patch("os.chmod")
     @patch("builtins.open", new_callable=mock_open)
     @patch("src.secure_token.json.dump")
     @patch("src.secure_token.os.makedirs")
     @patch("src.secure_token.SecureTokenManager._get_encryption_key")
+    @patch("src.secure_token.TOKEN_FILE")
+    @patch("src.secure_token.TOKEN_METADATA_FILE")
     def test_save_token(
         self,
-        mock_open,     # ← from builtins.open (bottommost patch)
-        dump,          # ← from json.dump
-        mock_makedirs, # ← from os.makedirs
-        mock_get_key   # ← from _get_encryption_key (topmost patch)
+        mock_token_metadata_file,
+        mock_token_file,
+        mock_get_key,
+        mock_makedirs,
+        mock_dump,
+        mock_open,
+        mock_chmod,
+        mock_replace,
     ):
         """Test saving token with encryption."""
+        # Import Path class
+        from pathlib import Path
+
+        # Setup file path mocks
+        mock_token_file.with_suffix.return_value = Path("/tmp/token.tmp")
+        mock_token_metadata_file.with_suffix.return_value = Path("/tmp/token_metadata.tmp")
+
         # Arrange: stub encryption key and Fernet
         mock_get_key.return_value = b"test_key"
         with patch("src.secure_token.Fernet") as mock_fernet_class:
@@ -185,28 +212,26 @@ class TestSecureTokenManager:
             mock_fernet_class.return_value = inst
 
             # Act
-            ok = SecureTokenManager.save_token(
-                SAFE_MOCK_TOKEN,
-                expires_in_days=30,
-                storage_preference="file",
-                ask_for_fallback=False,
-            )
+            with patch("src.secure_token.CRYPTO_AVAILABLE", True):
+                with patch("src.secure_token.KEYRING_AVAILABLE", False):
+                    ok = SecureTokenManager.save_token(
+                        SAFE_MOCK_TOKEN,
+                        expires_in_days=30,
+                        storage_preference="file",
+                        ask_for_fallback=False,
+                    )
 
         # Assert
         assert ok is True
-        mock_get_key.assert_called_once()                    # key retrieved :contentReference[oaicite:3]{index=3}
-        mock_fernet_class.assert_called_once()               # Fernet constructed :contentReference[oaicite:4]{index=4}
-        inst.encrypt.assert_called_once()                    # encryption performed :contentReference[oaicite:5]{index=5}
-        mock_open.assert_any_call(                           # token file written :contentReference[oaicite:6]{index=6}
-            SecureTokenManager.TOKEN_FILE.with_suffix(".tmp"), "wb"
-        )
-        mock_open.assert_any_call(                           # metadata file written :contentReference[oaicite:7]{index=7}
-            SecureTokenManager.TOKEN_METADATA_FILE.with_suffix(".tmp"), "w"
-        )
-        assert dump.call_count > 0                           # metadata dumped :contentReference[oaicite:8]{index=8}
-        meta = dump.call_args[0][0]
+        mock_get_key.assert_called_once()
+        mock_fernet_class.assert_called_once()
+        inst.encrypt.assert_called_once()
+        mock_open.assert_any_call(mock_token_file.with_suffix.return_value, "wb")
+        mock_open.assert_any_call(mock_token_metadata_file.with_suffix.return_value, "w")
+        assert mock_dump.call_count > 0
+        meta = mock_dump.call_args[0][0]
         for key in ("created_at", "expires_at", "storage_method"):
-            assert key in meta                               # correct metadata keys :contentReference[oaicite:9]{index=9}
+            assert key in meta
 
     def test_file_storage_with_expiration(self, monkeypatch, tmp_path):
         """Test that file storage includes proper expiration in metadata."""
