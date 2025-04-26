@@ -30,6 +30,7 @@ class VerificationManager:
     ):
         self.sha_name = sha_name
         self.sha_url = sha_url
+        #TODO: This variable name must be changed to appimage_path
         self.appimage_name = appimage_name
         self.appimage_path = appimage_name  # Initialize to same value as appimage_name initially
         self.hash_type = hash_type.lower()

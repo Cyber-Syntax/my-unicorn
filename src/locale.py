@@ -5,8 +5,6 @@ from babel.support import Translations
 
 from .global_config import GlobalConfigManager
 
-# TODO: Need to setup for all of the prints with gettext
-
 
 class LocaleManager:
     """Handles locale settings and translations."""

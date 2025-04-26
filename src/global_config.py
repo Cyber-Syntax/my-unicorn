@@ -9,6 +9,7 @@ class GlobalConfigManager:
     """Manages global configuration settings."""
 
     config_file: str = field(default="~/.config/myunicorn/settings.json")
+    #TODO: Make better variable names when possible which currents are not good
     appimage_download_folder_path: str = field(default_factory=lambda: "~/Documents/appimages")
     appimage_download_backup_folder_path: str = field(
         default_factory=lambda: "~/Documents/appimages/backups"

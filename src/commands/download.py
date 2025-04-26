@@ -23,7 +23,6 @@ class DownloadCommand(Command):
         owner, repo = parser.owner, parser.repo
 
         # Get hash_type and sha_name from user
-        # TODO: able to learn without user input.
         app_config = AppConfigManager(owner=owner, repo=repo)
         sha_name, hash_type = app_config.ask_sha_hash()  # Returns sha_name and hash_type
 
