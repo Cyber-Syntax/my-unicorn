@@ -18,7 +18,7 @@ class DownloadCommand(Command):
         # 1. Initialize the URL parser
         parser = ParseURL()
         parser.ask_url()  # Get owner and repo by asking the user for the URL
-        #
+
         # 2. Get the owner and repo from ParseURL instance
         owner, repo = parser.owner, parser.repo
 

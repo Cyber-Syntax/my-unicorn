@@ -54,6 +54,7 @@ def secure_token_manager(monkeypatch):
     """Fixture to provide access to the SecureTokenManager class."""
     # Import the module here to avoid import issues at module level
     import src.secure_token
+
     return src.secure_token.SecureTokenManager
 
 
