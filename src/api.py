@@ -230,10 +230,19 @@ class GitHubAPI:
             return False, {"error": str(response)}
 
         try:
-            # At this point, response should be a single release object, not a list
+            # Check for empty or invalid response
+            if not response or not isinstance(response, dict):
+                return False, {
+                    "error": "Error parsing release information: empty or invalid response"
+                }
+
             latest_release = response
             latest_version = latest_release.get("tag_name", "")
             is_prerelease = latest_release.get("prerelease", False)
+
+            # Early return if no latest version found
+            if not latest_version:
+                return False, {"error": "No version information found in release"}
 
             # Normalize version strings for proper comparison
             current_version_clean = self._normalize_version_for_comparison(current_version)
@@ -243,25 +252,25 @@ class GitHubAPI:
                 f"Comparing versions: Current '{current_version_clean}' vs Latest '{latest_version_clean}'"
             )
 
-            # Check if update is available
+            # Initialize update_available as False
             update_available = False
-            if current_version_clean and latest_version_clean != current_version_clean:
-                # For repos that use beta versions, handle special comparison
+
+            # Only check for updates if we have a current version to compare against
+            if current_version_clean:
+                # For repos that use beta versions
                 if self._repo_uses_beta():
-                    # For FreeTube: if current is X.Y.Z and latest is vX.Y.Z-beta, consider it the same version
-                    # Only consider it an update if the version numbers differ
                     current_base = self._extract_base_version(current_version_clean)
                     latest_base = self._extract_base_version(latest_version_clean)
-
-                    if current_base != latest_base:
-                        update_available = True
-                        logger.info(
-                            f"Update available for beta app: {current_version} → {latest_version}"
-                        )
+                    # Update available if base versions are different
+                    update_available = current_base != latest_base
                 else:
-                    # Standard comparison for non-beta apps
-                    update_available = True
-                    logger.info(f"Update available: {current_version} → {latest_version}")
+                    # For regular repos
+                    update_available = (
+                        latest_version_clean != current_version_clean
+                        and latest_version_clean > current_version_clean
+                    )
+                    if update_available:
+                        logger.info(f"Update available: {current_version} → {latest_version}")
 
             # Get architecture keywords
             arch_keywords = self._get_arch_keywords()

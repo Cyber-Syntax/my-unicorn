@@ -57,7 +57,7 @@
 
 ## Classes & OOP
 
-- Apply single responsibility to modules and classes.
+- Desing single-purpose classes and methods.
 - Favor composition over inheritance.
 - Use `@property` instead of getters/setters.
 - Implement `__eq__` and `__hash__` when needed.
@@ -66,6 +66,8 @@
 
 ## Error Handling
 
+- Handle errors and edge cases at the beginning of functions.
+- Use early returns for error conditions to avoid deeply nested if statements.
 - Create custom exception classes.
 - Catch specific exception types.
 - Preserve error context with `raise...from`.

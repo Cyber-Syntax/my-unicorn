@@ -2,12 +2,17 @@
 """Main module for my-unicorn CLI application.
 This module configures logging, loads configuration files, and executes commands."""
 
+# Standard library imports
 import gettext
 import logging
 import os
 import sys
+from types import TracebackType
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from typing import NoReturn, Tuple, Optional
 
+# Local imports
 from src.commands.customize_app_config import CustomizeAppConfigCommand
 from src.commands.customize_global_config import CustomizeGlobalConfigCommand
 from src.commands.download import DownloadCommand
@@ -24,8 +29,16 @@ from src.auth_manager import GitHubAuthManager
 _ = gettext.gettext
 
 
-def custom_excepthook(exc_type, exc_value, exc_traceback):
-    """Custom excepthook to log uncaught exceptions"""
+def custom_excepthook(
+    exc_type: type[BaseException], exc_value: BaseException, exc_traceback: Optional[TracebackType]
+) -> None:
+    """Custom excepthook to log uncaught exceptions.
+
+    Args:
+        exc_type: Type of the exception
+        exc_value: Exception instance
+        exc_traceback: Traceback object
+    """
     logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
@@ -40,9 +53,9 @@ def get_user_choice() -> int:
         ValueError: If user input cannot be converted to an integer
         KeyboardInterrupt: If user cancels with Ctrl+C
     """
-    print("\n" + "=" * 60)
+    print(f"\n{'=' * 60}")
     print("                 Welcome to my-unicorn 🦄")
-    print("=" * 60)
+    print(f"{'=' * 60}")
 
     # Display GitHub API rate limit info if available
     try:
@@ -63,7 +76,7 @@ def get_user_choice() -> int:
             print(f"Authentication: ❌ Unauthenticated")
             print(f"Note: 🔑 Add token (option 6) for 5000 requests/hour")
 
-        print("-" * 40)
+        print(f"{'-' * 40}")
     except Exception as e:
         logging.debug(f"Error checking rate limits: {e}")
 
@@ -84,7 +97,7 @@ def get_user_choice() -> int:
     print("7. Update configuration files")
     print("8. Clean old backups")
     print("9. Exit")
-    print("-" * 40)
+    print(f"{'-' * 40}")
 
     try:
         choice = input("\nEnter your choice: ")
@@ -99,12 +112,12 @@ def get_user_choice() -> int:
         sys.exit(0)
 
 
-def configure_logging():
+def configure_logging() -> None:
     """Configure logging for the application."""
-    log_dir = os.path.join(os.path.dirname(__file__), "logs")
-    os.makedirs(log_dir, exist_ok=True)
+    log_dir = Path(__file__).parent / "logs"
+    log_dir.mkdir(exist_ok=True)
     log_file = "my-unicorn.log"
-    log_file_path = os.path.join(log_dir, log_file)
+    log_file_path = log_dir / log_file
 
     # Configure file handler for all log levels
     file_handler = RotatingFileHandler(log_file_path, maxBytes=1024 * 1024, backupCount=3)
@@ -133,7 +146,8 @@ def configure_logging():
     logging.info("Logging configured with DEBUG level")
 
 
-def main():
+def main() -> None:
+    """Main function to initialize and run the application."""
     configure_logging()
 
     # Config Initialize, global config auto loads the config file
