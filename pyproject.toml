@@ -4,21 +4,45 @@ version = '0.7.0-alpha'
 description = 'It downloads/updates appimages via GitHub API. It also validates the appimage with SHA256 and SHA512.'
 requires-python = ">= 3.8"
 dependencies = [
-"babel==2.16.0",
-"certifi==2024.8.30",
-"charset-normalizer==3.4.0",
-"idna==3.10",
-"pip==24.3.1",
-"PyYAML==6.0.2",
-"requests==2.32.3",
-"tqdm==4.67.1",
-"urllib3==2.2.3",
+    "babel==2.16.0",
+    "certifi==2024.8.30",
+    "charset-normalizer==3.4.0",
+    "idna==3.10",
+    "pip==24.3.1",
+    "PyYAML==6.0.2",
+    "requests==2.32.3",
+    "tqdm==4.67.1",
+    "urllib3==2.2.3",
 ]
-maintainers = [
-  {name = "Cyber-Syntax"}
-]
+maintainers = [{ name = "Cyber-Syntax" }]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0.0", "pytest-cov>=4.0.0", "pytest-mock>=3.10.0"]
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+# Add markers here if needed
+addopts = ["--import-mode=importlib"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+# Path to the src directory to ensure imports work correctly
+pythonpath = [".", "src"]
+
 [tool.ruff]
-include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py", "commands/**/*.py"]
+include = [
+    "pyproject.toml",
+    "src/**/*.py",
+    "scripts/**/*.py",
+    "commands/**/*.py",
+]
 # Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
@@ -97,22 +121,22 @@ fixable = ["ALL"]
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 select = [
-    "E", # pycodestyle (error)
-    "D", # test pycodestyle
-    "F", # pyflakes
-    "B", # bugbear
+    "E",   # pycodestyle (error)
+    "D",   # test pycodestyle
+    "F",   # pyflakes
+    "B",   # bugbear
     "B9",
-    "C4", # flake8-comprehensions
+    "C4",  # flake8-comprehensions
     "SIM", # flake8-simplify
-    "I", # isort
-    "UP", # pyupgrade
+    "I",   # isort
+    "UP",  # pyupgrade
     "PIE", # flake8-pie
     "PGH", # pygrep-hooks
     "PYI", # flake8-pyi
     "W",   # pycodestyle warnings
     "UP",  # pyupgrade
     "PL",  # pylint
-    "RUF"  # ruff-specific rules
+    "RUF", # ruff-specific rules
 ]
 
 ignore = [
@@ -128,4 +152,6 @@ ignore = [
 [tool.ruff.lint.pycodestyle]
 max-line-length = 100
 
-
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "scripts/*"]

@@ -7,6 +7,7 @@ from src.file_handler import FileHandler
 from src.global_config import GlobalConfigManager
 from src.parser import ParseURL
 from src.verify import VerificationManager
+from src.icon_manager import IconManager
 
 
 class DownloadCommand(Command):
@@ -17,12 +18,11 @@ class DownloadCommand(Command):
         # 1. Initialize the URL parser
         parser = ParseURL()
         parser.ask_url()  # Get owner and repo by asking the user for the URL
-        #
+
         # 2. Get the owner and repo from ParseURL instance
         owner, repo = parser.owner, parser.repo
 
         # Get hash_type and sha_name from user
-        # TODO: able to learn without user input.
         app_config = AppConfigManager(owner=owner, repo=repo)
         sha_name, hash_type = app_config.ask_sha_hash()  # Returns sha_name and hash_type
 
@@ -59,14 +59,16 @@ class DownloadCommand(Command):
                 # 4. Use DownloadManager to download the AppImage
                 print(f"Downloading {api.appimage_name}...")
                 download = DownloadManager(api)
-                download.download()  # Pass the appimage URL to download method
+                downloaded_file_path = (
+                    download.download()
+                )  # Capture the full path to the downloaded file
 
                 global_config = GlobalConfigManager()
                 global_config.load_config()
 
                 # Handle verification based on SHA file availability
                 if api.sha_name == "no_sha_file":
-                    print("Skipping verification for beta version")
+                    logging.info("Skipping verification due to no_sha_file.")
                     verification_success = True
                     break
                 else:
@@ -74,9 +76,12 @@ class DownloadCommand(Command):
                     verification_manager = VerificationManager(
                         sha_name=api.sha_name,
                         sha_url=api.sha_url,
-                        appimage_name=api.appimage_name,
+                        appimage_name=api.appimage_name,  # Keep the original filename for logging
                         hash_type=api.hash_type,
                     )
+
+                    # Set the full path to the downloaded file
+                    verification_manager.set_appimage_path(downloaded_file_path)
 
                     is_valid = verification_manager.verify_appimage(cleanup_on_failure=True)
 
@@ -132,14 +137,17 @@ class DownloadCommand(Command):
             max_backups=global_config.max_backups,
         )
 
-        # Install icon for the appimage
-        file_handler.download_app_icon(api.owner, api.repo)
+        # Download app icon if possible
+        icon_manager = IconManager()
+        icon_manager.ensure_app_icon(api.owner, api.repo)
 
         # Check if the file operations were successful
         success = file_handler.handle_appimage_operations()
         if success:
             # Save the configuration only if all previous steps succeed
             app_config.save_config()
-            print("Configuration saved successfully.")
+            logging.info("AppImage downloaded and verified successfully and saved in DownloadCommand.")
+            print("AppImage downloaded and verified successfully and saved.")
         else:
+            logging.error("An error occurred during file operations in DownloadCommand.")
             print("An error occurred during file operations.")

@@ -281,7 +281,6 @@ class DeleteBackupsCommand(Command):
 
                 total_removed += removed_count
                 if removed_count > 0:
-                    print(f"✓ Cleaned up {removed_count} old backup(s) for {app}")
                     logging.info(f"Cleaned up {removed_count} old backups for {app}")
 
         if total_removed > 0:

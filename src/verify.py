@@ -6,6 +6,8 @@ import os
 import re
 import requests
 import yaml
+from pathlib import Path
+from typing import Optional
 
 _ = gettext.gettext
 
@@ -30,9 +32,20 @@ class VerificationManager:
     ):
         self.sha_name = sha_name
         self.sha_url = sha_url
-        self.appimage_name = appimage_name
+        self.appimage_name = appimage_name  # File name without path
+        self.appimage_path = appimage_name  # Full path to the AppImage file, initialized to same value as appimage_name
         self.hash_type = hash_type.lower()
         self._validate_hash_type()
+
+    def set_appimage_path(self, full_path: str) -> None:
+        """
+        Set the full path to the AppImage file for verification.
+
+        Args:
+            full_path: The complete path to the AppImage file
+        """
+        self.appimage_path = full_path
+        logging.info(f"Set AppImage path for verification: {full_path}")
 
     def _validate_hash_type(self):
         """Ensure the hash type is supported"""
@@ -56,14 +69,17 @@ class VerificationManager:
             bool: True if verification passed or skipped due to fallback, False otherwise
         """
         try:
-            # Skip verification if hash_type is set to no_hash or no SHA info available
-            if self.hash_type == "no_hash" or not self.sha_name or not self.sha_url:
+            # Skip verification if hash_type is set to no_hash or no SHA file name available
+            if self.hash_type == "no_hash" or not self.sha_name:
                 logging.info("Verification skipped - no hash file information available")
                 print("Note: Verification skipped - no hash file provided")
                 return True
 
-            if not self.appimage_name or not os.path.exists(self.appimage_name):
-                logging.error(f"AppImage file not found: {self.appimage_name}")
+            # Use appimage_path for existence check if available, otherwise fall back to appimage_name
+            check_path = self.appimage_path
+
+            if not check_path or not os.path.exists(check_path):
+                logging.error(f"AppImage file not found: {check_path}")
                 return False
 
             # FALLBACK CASE: If sha_name matches appimage_name, this indicates
@@ -74,19 +90,31 @@ class VerificationManager:
                 logging.info(f"Proceeding with unverified AppImage: {self.appimage_name}")
                 return True
 
-            self._download_sha_file()
+            # Download SHA file only if URL is provided and file doesn't exist
+            if self.sha_url and not os.path.exists(self.sha_name):
+                self._download_sha_file()
+
+            # Check if the SHA file exists before proceeding
+            if not os.path.exists(self.sha_name):
+                logging.error(f"SHA file not found: {self.sha_name}")
+                return False
+
             is_valid = self._parse_sha_file()
 
             if not is_valid and cleanup_on_failure:
-                self._cleanup_failed_file(self.appimage_name)
+                self._cleanup_failed_file(check_path)  # Use the same path for cleanup
 
             return is_valid
 
         except (requests.RequestException, IOError) as e:
             logging.error(f"Verification failed: {str(e)}")
+            if cleanup_on_failure:
+                self._cleanup_failed_file(self.appimage_path)
             return False
         except Exception as e:
             logging.error(f"Unexpected error during verification: {str(e)}")
+            if cleanup_on_failure:
+                self._cleanup_failed_file(self.appimage_path)
             return False
 
     def _download_sha_file(self):
@@ -183,35 +211,56 @@ class VerificationManager:
                     if len(parts) < 2:
                         continue
 
-                    filename = parts[1].lower()
-                    if filename == target_name:
+                    # Check for both standard patterns:
+                    # 1. HASH FILENAME format (common for sha256sum output)
+                    # 2. FILENAME HASH format (used by some projects)
+                    hash_value = None
+                    if parts[1].lower() == target_name:
                         hash_value = parts[0]
-                        # Validate hash format
-                        expected_length = 64 if self.hash_type == "sha256" else 128
-                        if len(hash_value) != expected_length or not all(
-                            c in "0123456789abcdefABCDEF" for c in hash_value
-                        ):
-                            raise ValueError(f"Invalid {self.hash_type} hash format")
-                        return self._compare_hashes(hash_value)
+                    elif len(parts) > 2 and parts[0].lower() == target_name:
+                        hash_value = parts[1]
 
-            raise ValueError(f"No hash found for {self.appimage_name} in SHA file")
+                    if hash_value:
+                        # Validate hash format with proper hex check
+                        expected_length = 64 if self.hash_type == "sha256" else 128
+                        if len(hash_value) != expected_length:
+                            logging.warning(
+                                f"Hash for {target_name} has wrong length: {len(hash_value)}, "
+                                f"expected {expected_length}"
+                            )
+                            continue
+
+                        if not re.match(r"^[0-9a-f]+$", hash_value.lower()):
+                            logging.warning(f"Invalid hex characters in hash: {hash_value}")
+                            continue
+
+                        logging.info(f"Found valid hash for {target_name} in SHA file")
+                        return self._compare_hashes(hash_value.lower())
+
+            raise ValueError(f"No valid hash found for {self.appimage_name} in SHA file")
 
         except IOError as e:
             raise IOError(f"Failed to read SHA file: {str(e)}")
 
     def _compare_hashes(self, expected_hash: str) -> bool:
         """Compare hashes using memory-efficient chunked reading."""
-        if not os.path.exists(self.appimage_name):
-            raise IOError(f"AppImage file not found: {self.appimage_name}")
+        # Always use appimage_path for file operations
+        file_to_verify = self.appimage_path
+
+        if not os.path.exists(file_to_verify):
+            raise IOError(f"AppImage file not found: {file_to_verify}")
 
         try:
             hash_func = hashlib.new(self.hash_type)
 
-            with open(self.appimage_name, "rb") as f:
-                for chunk in iter(lambda: f.read(4096), b""):
+            # Use larger chunk size for better performance with large files
+            chunk_size = 65536  # 64KB chunks
+
+            with open(file_to_verify, "rb") as f:
+                for chunk in iter(lambda: f.read(chunk_size), b""):
                     hash_func.update(chunk)
 
-            actual_hash = hash_func.hexdigest()
+            actual_hash = hash_func.hexdigest().lower()  # Always use lowercase for comparison
             self._log_comparison(actual_hash, expected_hash)
 
             # Delete the SHA file after verification
@@ -243,9 +292,14 @@ class VerificationManager:
             return False
 
     def _log_comparison(self, actual: str, expected: str):
-        """Format and log hash comparison results."""
-        status = _("VERIFIED") if actual == expected else _("VERIFICATION FAILED")
-        color = COLOR_SUCCESS if actual == expected else COLOR_FAIL
+        """Format and log hash comparison results.
+
+        Successful verifications are only logged, not printed to console.
+        Failed verifications are both logged and printed to console.
+        """
+        is_verified = actual == expected
+        status = _("VERIFIED") if is_verified else _("VERIFICATION FAILED")
+        color = COLOR_SUCCESS if is_verified else COLOR_FAIL
 
         log_lines = [
             f"{color}{status}{COLOR_RESET}",
@@ -256,8 +310,12 @@ class VerificationManager:
             "----------------------------------------",
         ]
 
-        print("\n".join(log_lines))
+        # Always log the verification results
         logging.info("\n".join(log_lines))
+
+        # Only print to console if verification failed
+        if not is_verified:
+            print("\n".join(log_lines))
 
     def _cleanup_failed_file(self, filepath: str) -> bool:
         """Remove a file that failed verification to prevent future update issues."""

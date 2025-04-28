@@ -6,7 +6,7 @@
 
 - **This project is in a beta phase** due to limited testing at this time.. Although primarily developed for learning purposes, it effectively addresses my specific needs.
 - **Important:** Follow the instructions in the **Releases section** when updating the script. Updates may include new features or changes that could require different steps. I’ll strive to keep the instructions as simple as possible.
-- **Currently supported:** Linux only. While it might work on macOS, it has not been tested yet.
+- **Currently supported:** Linux only.
 
 
 ## **🦄 About my-unicorn**

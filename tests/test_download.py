@@ -1,70 +1,159 @@
-import unittest
-from unittest.mock import MagicMock, mock_open, patch
-import sys
 import os
+import stat
+import pytest
+import requests
+from types import SimpleNamespace
 
-# Add the project root to sys.path so that the 'src' package can be imported.
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-    
 from src.download import DownloadManager
 
-
-# A fake API object to simulate the attributes that DownloadManager expects.
-class FakeAPI:
-    def __init__(self, appimage_name, appimage_url):
-        self.appimage_name = appimage_name
-        self.appimage_url = appimage_url
-
-
-class TestDownloadManager(unittest.TestCase):
-    @patch("os.path.exists")
-    def test_is_app_exist_not_set(self, mock_exists):
-        # When appimage_name is not set, is_app_exist() should print a message and return False.
-        fake_api = FakeAPI(None, None)
-        dm = DownloadManager(fake_api)
-        with patch("builtins.print") as mock_print:
-            self.assertFalse(dm.is_app_exist())
-            mock_print.assert_called_with("AppImage name is not set.")
-
-    @patch("os.path.exists")
-    def test_is_app_exist_true(self, mock_exists):
-        # If the file exists (os.path.exists returns True), is_app_exist() should return True.
-        fake_api = FakeAPI("test.AppImage", "http://example.com/test.AppImage")
-        dm = DownloadManager(fake_api)
-        mock_exists.return_value = True
-        with patch("builtins.print") as mock_print:
-            self.assertTrue(dm.is_app_exist())
-            mock_print.assert_called_with("test.AppImage already exists in the current directory")
-
-    @patch("src.download.requests.get")
-    @patch("os.path.exists")
-    def test_download_success(self, mock_exists, mock_get):
-        # If the file does not exist, download() should call requests.get, write file chunks, and close the response.
-        fake_api = FakeAPI("test.AppImage", "http://example.com/test.AppImage")
-        dm = DownloadManager(fake_api)
-        mock_exists.return_value = False
-
-        # Create a fake response object with necessary attributes.
-        fake_response = MagicMock()
-        fake_response.status_code = 200
-        fake_response.headers = {"content-length": "16"}
-        # Simulate iter_content yielding several chunks.
-        fake_response.iter_content = lambda chunk_size: [b"1234", b"5678", b"abcd", b"efgh"]
-        fake_response.close = MagicMock()
-        mock_get.return_value = fake_response
-
-        # Patch open to simulate file writing and patch tqdm to avoid lengthy progress bar output.
-        m = mock_open()
-        with patch("builtins.open", m), patch("tqdm.tqdm") as mock_tqdm:
-            dm.download()
-
-        # Verify that write was called at least once and that the response was closed.
-        handle = m()
-        handle.write.assert_any_call(b"1234")
-        fake_response.close.assert_called_once()
+@pytest.fixture
+def github_api():
+    """Minimal stub for GitHubAPI with controlled URL and name."""
+    return SimpleNamespace(
+        appimage_url="https://example.com/fake.AppImage", appimage_name="fake.AppImage"
+    )
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.fixture(autouse=True)
+def isolate_download_dir(tmp_path, monkeypatch):
+    """
+    Change CWD to a tmp_path so that 'downloads/' is created in an isolated temp directory.
+    """
+    monkeypatch.chdir(tmp_path)  # :contentReference[oaicite:5]{index=5}
+    yield
+    # no cleanup needed—tmp_path is auto-removed
+
+
+@pytest.fixture
+def fake_head_response():
+    """A fake Response for requests.head with a content-length header."""
+
+    class Resp:
+        headers = {"content-length": "4096"}
+
+        def raise_for_status(self):
+            pass
+
+    return Resp()
+
+
+@pytest.fixture
+def fake_get_response():
+    """A fake Response for requests.get() with .iter_content()."""
+
+    class Resp:
+        def __init__(self):
+            self.status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, chunk_size):
+            # yield four 1 KiB chunks
+            for _ in range(4):
+                yield b"x" * 1024
+
+    return Resp()
+
+
+
+
+
+def test_successful_download(monkeypatch, github_api, fake_head_response, fake_get_response):
+    # Arrange: stub HTTP methods
+    monkeypatch.setattr(
+        requests, "head", lambda *args, **kw: fake_head_response
+    )  # :contentReference[oaicite:6]{index=6}
+    monkeypatch.setattr(requests, "get", lambda *args, **kw: fake_get_response)
+
+    # Act
+    dm = DownloadManager(github_api, app_index=1, total_apps=1)
+    dm.download()
+
+    # Assert: file exists in downloads/ with correct size and is executable
+    path = os.path.join("downloads", github_api.appimage_name)
+    assert os.path.isfile(path)
+    assert os.stat(path).st_size == 4096
+    # executable bit set
+    mode = os.stat(path).st_mode
+    assert bool(mode & stat.S_IXUSR)
+
+
+def test_missing_url_or_name_raises(github_api, monkeypatch):
+    # No URL
+    bad = SimpleNamespace(appimage_url="", appimage_name="n")
+    dm = DownloadManager(bad)
+    with pytest.raises(ValueError):
+        dm.download()
+    # No name
+    bad2 = SimpleNamespace(appimage_url="u", appimage_name=None)
+    dm2 = DownloadManager(bad2)
+    with pytest.raises(ValueError):
+        dm2.download()
+
+
+def test_head_network_error(monkeypatch, github_api, fake_get_response):
+    # Simulate head() raising a RequestException
+    def bad_head(*args, **kw):
+        raise requests.exceptions.RequestException("fail head")
+
+    monkeypatch.setattr(requests, "head", bad_head)  # :contentReference[oaicite:7]{index=7}
+    dm = DownloadManager(github_api)
+    with pytest.raises(RuntimeError) as exc:
+        dm.download()
+    assert "Network error" in str(exc.value)
+
+
+def test_get_network_error(monkeypatch, github_api, fake_head_response):
+    # head succeeds
+    monkeypatch.setattr(requests, "head", lambda *a, **k: fake_head_response)
+
+    # get() raises
+    def bad_get(*args, **kw):
+        raise requests.exceptions.RequestException("fail get")
+
+    monkeypatch.setattr(requests, "get", bad_get)  # :contentReference[oaicite:8]{index=8}
+
+    dm = DownloadManager(github_api)
+    with pytest.raises(RuntimeError) as exc:
+        dm.download()
+    assert "Network error" in str(exc.value)
+
+
+def test_progress_cleanup(monkeypatch, github_api, fake_head_response, fake_get_response):
+    # Spy on progress to ensure remove_task is called
+    calls = {}
+
+    class FakeProgress:
+        def __init__(self):
+            pass
+
+        def start(self):
+            pass
+
+        def add_task(self, desc, total, prefix, **kw):
+            calls["added"] = True
+            return 42
+
+        def update(self, *a, **k):
+            calls.setdefault("updates", 0)
+            calls["updates"] += 1
+
+        def remove_task(self, task_id):
+            calls["removed"] = task_id
+
+        def stop(self):
+            pass
+
+    monkeypatch.setattr(
+        DownloadManager, "get_or_create_progress", classmethod(lambda cls: FakeProgress())
+    )  # :contentReference[oaicite:9]{index=9}
+    monkeypatch.setattr(requests, "head", lambda *a, **k: fake_head_response)
+    monkeypatch.setattr(requests, "get", lambda *a, **k: fake_get_response)
+
+    dm = DownloadManager(github_api)
+    dm.download()
+
+    assert calls.get("added") is True
+    assert calls.get("updates", 0) >= 1
+    assert calls.get("removed") == 42

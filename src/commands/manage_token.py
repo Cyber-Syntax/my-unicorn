@@ -50,42 +50,47 @@ class ManageTokenCommand(Command):
             # Show current token status
             self._show_token_status()
 
-            # Display menu
+            # Display menu with standard print statements
             print("\nGitHub Token Management:")
             print("------------------------")
+            print("Security Settings:")
             print("1. Save Token to Secure Keyring (e.g GNOME keyring)")
             print("2. Remove Token")
             print("3. Check API Rate Limits")
             print("4. View Token Expiration")
+            print("\nAdvanced Options:")
             print("5. View Token Audit Logs")
             print("6. Rotate Token")
             print("7. View Storage Details")
             print("8. Back to Main Menu")
+            print("------------------------")
 
             try:
-                choice = int(input("\nEnter your choice (1-9): "))
-
-                if choice == 1:
-                    self._save_to_keyring()
-                elif choice == 2:
-                    self._remove_token()
-                elif choice == 3:
-                    self._check_rate_limits()
-                elif choice == 4:
-                    self._view_token_expiration()
-                elif choice == 5:
-                    self._view_audit_logs()
-                elif choice == 6:
-                    self._rotate_token()
-                elif choice == 7:
-                    self._view_storage_details()
-                elif choice == 8:
-                    self._logger.info("Exiting token management")
-                    return
-                else:
-                    print("Invalid choice. Please enter a number between 1 and 9.")
-            except ValueError:
-                print("Invalid input. Please enter a number.")
+                choice = input("\nEnter your choice (1-8): ")
+                try:
+                    choice_num = int(choice)
+                    if 1 <= choice_num <= 8:
+                        if choice_num == 1:
+                            self._save_to_keyring()
+                        elif choice_num == 2:
+                            self._remove_token()
+                        elif choice_num == 3:
+                            self._check_rate_limits()
+                        elif choice_num == 4:
+                            self._view_token_expiration()
+                        elif choice_num == 5:
+                            self._view_audit_logs()
+                        elif choice_num == 6:
+                            self._rotate_token()
+                        elif choice_num == 7:
+                            self._view_storage_details()
+                        elif choice_num == 8:
+                            self._logger.info("Exiting token management")
+                            return
+                    else:
+                        print("Invalid choice. Please enter a number between 1 and 8.")
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
             except KeyboardInterrupt:
                 print("\nOperation cancelled. Returning to main menu.")
                 return
@@ -234,7 +239,6 @@ class ManageTokenCommand(Command):
                   If not provided, the stored token will be used.
         """
         self._logger.info("Checking GitHub API rate limits directly from API")
-
         print("\n--- GitHub API Rate Limits ---")
 
         try:
@@ -261,6 +265,7 @@ class ManageTokenCommand(Command):
                 print("   Please check your token validity and network connection.")
                 return
 
+            # Standard text output
             # Display core rate limits
             core_limits = rate_limit_info.get("resources", {}).get("core", {})
             if core_limits:
@@ -804,6 +809,7 @@ class ManageTokenCommand(Command):
         current_token = SecureTokenManager.get_token(validate_expiration=False)
 
         # If a token already exists, confirm update
+        # TODO: if it is already exist, not need to write again? this is non-sense?
         if current_token:
             print("\nA token already exists.")
             choice = input("Do you want to update the token in the keyring? (y/n): ")
@@ -824,6 +830,7 @@ class ManageTokenCommand(Command):
 
             # Validate the token using GitHubAuthManager for improved validation
             if not self._validate_token(token):
+                logging.error("Invalid GitHub token! _validate_token returned False")
                 print("\n❌ Invalid GitHub token! Token was not saved.")
                 print("   Please make sure you've entered the token correctly.")
                 return
@@ -831,6 +838,9 @@ class ManageTokenCommand(Command):
         # Ask for token expiration
         expiration_days = self._get_token_expiration_days()
         if expiration_days is None:
+            logging.error(
+                "Token expiration days not provided. _get_token_expiration_days returned None"
+            )
             print("Operation cancelled.")
             return
 

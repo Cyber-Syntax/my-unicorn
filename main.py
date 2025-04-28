@@ -1,18 +1,26 @@
 #!/usr/bin/python3
+"""Main module for my-unicorn CLI application.
+This module configures logging, loads configuration files, and executes commands."""
+
+# Standard library imports
 import gettext
 import logging
 import os
 import sys
+from types import TracebackType
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from typing import NoReturn, Tuple, Optional
 
+# Local imports
 from src.commands.customize_app_config import CustomizeAppConfigCommand
 from src.commands.customize_global_config import CustomizeGlobalConfigCommand
 from src.commands.download import DownloadCommand
 from src.commands.invoker import CommandInvoker
 from src.commands.manage_token import ManageTokenCommand
 from src.commands.migrate_config import MigrateConfigCommand
-from src.commands.update_all import UpdateCommand
 from src.commands.update_all_auto import UpdateAllAutoCommand
+from src.commands.update_all_async import UpdateAsyncCommand
 from src.commands.delete_backups import DeleteBackupsCommand
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
@@ -21,65 +29,95 @@ from src.auth_manager import GitHubAuthManager
 _ = gettext.gettext
 
 
-def custom_excepthook(exc_type, exc_value, exc_traceback):
-    """Custom excepthook to log uncaught exceptions"""
+def custom_excepthook(
+    exc_type: type[BaseException], exc_value: BaseException, exc_traceback: Optional[TracebackType]
+) -> None:
+    """Custom excepthook to log uncaught exceptions.
+
+    Args:
+        exc_type: Type of the exception
+        exc_value: Exception instance
+        exc_traceback: Traceback object
+    """
     logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 
-def get_user_choice():
-    """Display menu and get user choice"""
-    print(_("Welcome to my-unicorn 🦄!"))
+def get_user_choice() -> int:
+    """Display menu and get user choice using standard terminal output.
+
+    Returns:
+        int: The user's menu choice as an integer
+
+    Raises:
+        ValueError: If user input cannot be converted to an integer
+        KeyboardInterrupt: If user cancels with Ctrl+C
+    """
+    print(f"\n{'=' * 60}")
+    print("                 Welcome to my-unicorn 🦄")
+    print(f"{'=' * 60}")
 
     # Display GitHub API rate limit info if available
     try:
         remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+
+        # Create a status display for API rate limit information
+        print("\n--- GitHub API Status ---")
+
         if is_authenticated:
-            print(_("GitHub API: {} of {} requests remaining (estimate)").format(remaining, limit))
+            print(f"GitHub API Status: {remaining} of {limit} requests remaining")
+            print(f"Authentication: ✅ Authenticated")
+            print(f"Reset Time: {reset_time}")
+
             if remaining < 100:
-                print(_("ℹ️ Running low on API requests! Resets at {}").format(reset_time))
+                print(f"Warning: ⚠️ Low API requests remaining!")
         else:
-            print(
-                _("ℹ️ GitHub API: {} of 60 requests remaining (unauthenticated)").format(
-                    remaining
-                )
-            )
-            print(_("🔑 Add your github token using option 6 to get 5000 requests/hour"))
+            print(f"GitHub API Status: {remaining} of 60 requests remaining")
+            print(f"Authentication: ❌ Unauthenticated")
+            print(f"Note: 🔑 Add token (option 6) for 5000 requests/hour")
+
+        print(f"{'-' * 40}")
     except Exception as e:
-        # Silently handle any errors to avoid breaking the main menu
         logging.debug(f"Error checking rate limits: {e}")
 
-    print(_("Choose one of the following options:"))
-    print("====================================")
-    print(_("1. Download AppImage (Must be installed to create config file)"))
-    print(_("2. Update selected AppImages"))
-    print(_("3. Update all AppImages automatically"))
-    print(_("4. Customize AppImages config file"))
-    print(_("5. Customize Global config file"))
-    print(_("6. Manage GitHub Token (for API rate limits)"))
-    print(_("7. Check and Migrate Configuration Files"))
-    print(_("8. Delete Old Backups"))
-    print(_("9. Exit"))
-    print("====================================")
+    # Download & Update section
+    print("\n--- Download & Update ---")
+    print("1. Download new AppImage")
+    print("2. Update all AppImages")
+    print("3. Select AppImages to update")
+
+    # Configuration section
+    print("\n--- Configuration ---")
+    print("4. Manage AppImage settings")
+    print("5. Manage global settings")
+    print("6. Manage GitHub token")
+
+    # Maintenance section
+    print("\n--- Maintenance ---")
+    print("7. Update configuration files")
+    print("8. Clean old backups")
+    print("9. Exit")
+    print(f"{'-' * 40}")
+
     try:
-        return int(input(_("Enter your choice: ")))
+        choice = input("\nEnter your choice: ")
+        return int(choice)
     except ValueError as error:
-        logging.error(f"Error: {error}", exc_info=True)
-        logging.error("Error: {error}. Exiting...".format(error=error))
-        print(_("Error: {error}. Exiting...").format(error=error))
+        print(f"Invalid input: {error}")
+        logging.error(f"Invalid menu choice: {error}", exc_info=True)
         sys.exit(1)
     except KeyboardInterrupt:
         logging.info("User interrupted the program with Ctrl+C")
-        print("\n" + _("Program interrupted. Exiting gracefully..."))
+        print("\nProgram interrupted. Exiting gracefully...")
         sys.exit(0)
 
 
-def configure_logging():
+def configure_logging() -> None:
     """Configure logging for the application."""
-    log_dir = os.path.join(os.path.dirname(__file__), "logs")
-    os.makedirs(log_dir, exist_ok=True)
+    log_dir = Path(__file__).parent / "logs"
+    log_dir.mkdir(exist_ok=True)
     log_file = "my-unicorn.log"
-    log_file_path = os.path.join(log_dir, log_file)
+    log_file_path = log_dir / log_file
 
     # Configure file handler for all log levels
     file_handler = RotatingFileHandler(log_file_path, maxBytes=1024 * 1024, backupCount=3)
@@ -108,7 +146,8 @@ def configure_logging():
     logging.info("Logging configured with DEBUG level")
 
 
-def main():
+def main() -> None:
+    """Main function to initialize and run the application."""
     configure_logging()
 
     # Config Initialize, global config auto loads the config file
@@ -124,8 +163,8 @@ def main():
     invoker = CommandInvoker()
 
     invoker.register_command(1, DownloadCommand())
-    invoker.register_command(2, UpdateCommand())
-    invoker.register_command(3, UpdateAllAutoCommand())
+    invoker.register_command(2, UpdateAllAutoCommand())
+    invoker.register_command(3, UpdateAsyncCommand())  # Register the new async update command
     invoker.register_command(4, CustomizeAppConfigCommand())
     invoker.register_command(5, CustomizeGlobalConfigCommand())
     invoker.register_command(6, ManageTokenCommand())
@@ -135,7 +174,7 @@ def main():
     # Main menu loop
     while True:
         choice = get_user_choice()
-        if choice == 9:
+        if choice == 9:  # Updated exit option number
             logging.info("User selected to exit application")
             print("Exiting...")
             sys.exit(0)

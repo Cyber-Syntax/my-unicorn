@@ -1,6 +1,38 @@
 import pytest
 import requests_mock
 from httmock import HTTMock, all_requests
+import sys
+import io
+from typing import Dict, Any, Generator
+import time
+import os
+import json
+from pathlib import Path
+from datetime import datetime, timedelta
+from unittest.mock import patch
+
+# More reliable way to add the project root to the Python path
+# Using absolute paths with pathlib for better cross-platform compatibility
+project_root = str(Path(__file__).parent.parent.absolute())
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+
+# Add a pytest plugin that ensures src is in the path for all test modules
+def pytest_configure(config):
+    """Configure pytest."""
+    # Make sure src is in the Python path for all tests
+    src_path = os.path.join(project_root, "src")
+    if src_path not in sys.path:
+        sys.path.insert(0, src_path)
+
+
+# Now import after the path setup
+from src.progress_manager import DynamicProgressManager
+from src.secure_token import (
+    SecureTokenManager,
+    DEFAULT_TOKEN_EXPIRATION_DAYS,
+)
 
 
 @pytest.fixture
@@ -63,3 +95,101 @@ def github_rate_limit_response():
         },
         "rate": {"limit": 5000, "remaining": 4990, "reset": reset_time, "used": 10},
     }
+
+
+# Fixtures specifically for progress_manager tests
+
+
+@pytest.fixture
+def captured_stdout() -> Generator[io.StringIO, None, None]:
+    """Capture stdout for testing terminal output.
+
+    Returns:
+        Generator[io.StringIO, None, None]: A StringIO object containing captured stdout
+    """
+    stdout = io.StringIO()
+    with patch("sys.stdout", stdout):
+        yield stdout
+
+
+@pytest.fixture(autouse=True)
+def cleanup_progress_manager() -> None:
+    """Reset the DynamicProgressManager singleton between tests."""
+    # Reset before test
+    DynamicProgressManager._instance = None
+
+    # Run the test
+    yield
+
+    # Reset after test
+    if DynamicProgressManager._instance is not None:
+        with DynamicProgressManager._instance._lock:
+            DynamicProgressManager._instance = None
+
+
+@pytest.fixture
+def download_fixture() -> Dict[str, Any]:
+    """Create a simulated download for testing progress tracking.
+
+    Returns:
+        Dict[str, Any]: Dictionary with download metadata
+    """
+    return {
+        "filename": "test_file.AppImage",
+        "total_size": 1024000,  # 1MB
+        "chunks": [
+            102400,  # 100KB
+            204800,  # 200KB
+            307200,  # 300KB
+            409600,  # 400KB
+        ],
+    }
+
+
+@pytest.fixture
+def simulated_time() -> Generator[None, None, None]:
+    """Simulate time passing for progress bar speed/ETA calculations."""
+    current_time = [time.time()]
+
+    def mock_time():
+        return current_time[0]
+
+    def mock_sleep(seconds):
+        current_time[0] += seconds
+
+    with patch("time.time", mock_time), patch("time.sleep", mock_sleep):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def reset_env(monkeypatch):
+    # ensure keyring and crypto paths are disabled by default
+    monkeypatch.setattr("src.secure_token.KEYRING_AVAILABLE", False)
+    monkeypatch.setattr("src.secure_token.CRYPTO_AVAILABLE", False)
+    yield
+
+
+@pytest.fixture
+def sample_token():
+    # a valid GitHub token format: prefix + 40 chars
+    return "ghp_" + "X" * 40
+
+
+@pytest.fixture
+def future_metadata():
+    # ISO timestamp DEFAULT_TOKEN_EXPIRATION_DAYS days in the future
+    future = datetime.utcnow() + timedelta(days=DEFAULT_TOKEN_EXPIRATION_DAYS)
+    return {"expires_at": future.isoformat()}
+
+
+@pytest.fixture
+def past_metadata():
+    # ISO timestamp 1 day in the past
+    past = datetime.utcnow() - timedelta(days=1)
+    return {"expires_at": past.isoformat()}
+
+
+@pytest.fixture(autouse=True)
+def set_consts(monkeypatch):
+    monkeypatch.setattr("src.secure_token.KEYRING_AVAILABLE", False)
+    monkeypatch.setattr("src.secure_token.CRYPTO_AVAILABLE", True)

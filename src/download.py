@@ -1,76 +1,329 @@
 import logging
 import os
 import sys
+import asyncio
+import time
+from typing import Optional, List, Dict, Any, Union, Set, Tuple, ClassVar
 
 import requests
-from tqdm import tqdm
 
 from .api import GitHubAPI
+from .global_config import GlobalConfigManager
+from .progress_manager import BasicMultiAppProgress
 
 
 class DownloadManager:
-    """Manages the downloading of the app image."""
+    """
+    Manages the download of AppImages from GitHub releases.
 
-    def __init__(self, api: GitHubAPI):
-        self.api = api
-        self.appimage_name = None
+    Attributes:
+        github_api: The GitHub API object containing release information
+        _logger: Logger for this class
+        is_async_mode: Whether the download is happening in an async context
+        app_index: Index of the app in a multi-app update (1-based)
+        total_apps: Total number of apps being updated
+    """
 
-    # TODO: we need a logic to check is .json file exists or
-    # not for the appimage and even are the values are not empty -e.g owner, repo -
+    # Class variables for shared progress tracking
+    _global_progress: Optional[BasicMultiAppProgress] = None
+    _active_tasks: Set[int] = set()
+    _lock = (
+        asyncio.Lock() if hasattr(asyncio, "Lock") else None
+    )  # For thread safety in async contexts
 
-    def is_app_exist(self):
-        """Check if the AppImage already exists in the current directory."""
-        if not self.api.appimage_name:
-            logging.error("AppImage name is not set.")
-            return False
+    # Use GlobalConfigManager for configuration
+    _global_config: Optional[GlobalConfigManager] = None
 
-        if os.path.exists(self.api.appimage_name):
-            logging.info(f"{self.api.appimage_name} already exists in the current directory")
-            print(f"{self.api.appimage_name} already exists in the current directory")
-            return True
-        return False
+    # Path for temporary downloads
+    _downloads_dir: ClassVar[str] = os.path.join(os.getcwd(), "downloads")
 
-    def download(self):
-        """Download the appimage from the github api."""
-        if self.is_app_exist():
-            # If the file exists, do not proceed with the download
-            return
+    def __init__(self, github_api: "GitHubAPI", app_index: int = 0, total_apps: int = 0) -> None:
+        """
+        Initialize the download manager with GitHub API instance.
 
-        logging.info(f"Starting download of {self.api.appimage_name}")
-        print(
-            f"{self.api.appimage_name} downloading... Grab a cup of coffee :), it will take some time depending on your internet speed."
+        Args:
+            github_api: GitHub API instance containing release information
+            app_index: Index of the app in a multi-app update (1-based)
+            total_apps: Total number of apps being updated
+        """
+        self.github_api = github_api
+        self._logger = logging.getLogger(__name__)
+        self.app_index = app_index
+        self.total_apps = total_apps
+
+        # Initialize global config if not already set
+        if DownloadManager._global_config is None:
+            DownloadManager._global_config = GlobalConfigManager()
+            DownloadManager._global_config.load_config()
+
+        # Detect if we're in an async context
+        try:
+            asyncio.get_running_loop()
+            self.is_async_mode = True
+        except RuntimeError:
+            self.is_async_mode = False
+
+        # Store task ID for this download instance
+        self._progress_task_id: Optional[int] = None
+
+    @classmethod
+    def get_downloads_dir(cls) -> str:
+        """
+        Get the path to the downloads directory, ensuring it exists.
+
+        Returns:
+            str: Path to the downloads directory
+        """
+        os.makedirs(cls._downloads_dir, exist_ok=True)
+        return cls._downloads_dir
+
+    def _format_size(self, size_bytes: int) -> str:
+        """
+        Format file size in human-readable format.
+
+        Args:
+            size_bytes: Size in bytes
+
+        Returns:
+            str: Formatted size string (e.g., '10.5 MB')
+        """
+        if size_bytes <= 0:
+            return "0 B"
+
+        units = ["B", "KB", "MB", "GB", "TB"]
+        unit_index = 0
+        size = float(size_bytes)
+
+        while size >= 1024 and unit_index < len(units) - 1:
+            size /= 1024
+            unit_index += 1
+
+        return (
+            f"{size:.1f} {units[unit_index]}"
+            if unit_index > 0
+            else f"{int(size)} {units[unit_index]}"
         )
 
+    @classmethod
+    def get_or_create_progress(cls) -> BasicMultiAppProgress:
+        """
+        Get or create a shared progress instance for all downloads.
+
+        Returns:
+            BasicMultiAppProgress: The shared progress instance
+        """
+        # Use the first instance's progress or create a new one
+        if cls._global_progress is None:
+            cls._global_progress = BasicMultiAppProgress(
+                expand=True,
+                transient=False,  # Keep all progress bars visible
+            )
+            cls._global_progress.start()
+            cls._active_tasks = set()
+
+        return cls._global_progress
+
+    @classmethod
+    def stop_progress(cls) -> None:
+        """Stop and clear the shared progress instance."""
+        if cls._global_progress is not None:
+            try:
+                cls._global_progress.stop()
+            except Exception as e:
+                logging.error(f"Error stopping progress display: {str(e)}")
+            finally:
+                cls._global_progress = None
+                cls._active_tasks = set()
+
+    def download(self) -> str:
+        """
+        Download the AppImage from the GitHub release.
+
+        Returns:
+            str: The full path to the downloaded AppImage file
+
+        Raises:
+            ValueError: If AppImage URL or name is not available
+            RuntimeError: For network errors, file system errors, or other unexpected issues
+        """
+        appimage_url = self.github_api.appimage_url
+        appimage_name = self.github_api.appimage_name
+
+        if not appimage_url or not appimage_name:
+            error_msg = "AppImage URL or name not available. Cannot download."
+            self._logger.error(error_msg)
+            raise ValueError(error_msg)
+
         try:
-            response = requests.get(self.api.appimage_url, stream=True, timeout=10)
+            # Set up request with appropriate headers
+            headers = {"User-Agent": "AppImage-Updater/1.0", "Accept": "application/octet-stream"}
+
+            # Create a progress prefix if this is part of a multi-app update
+            prefix = f"[{self.app_index}/{self.total_apps}] " if self.total_apps > 0 else ""
+
+            # Download with progress tracking
+            download_path = self._download_with_nested_progress(
+                appimage_url, appimage_name, headers, prefix
+            )
+
+            return download_path
+
+        except IOError as e:
+            error_msg = f"File system error while downloading {appimage_name}: {str(e)}"
+            self._logger.error(error_msg)
+            raise RuntimeError(error_msg)
+        except Exception as e:
+            error_msg = f"Unexpected error downloading {appimage_name}: {str(e)}"
+            self._logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+    def _download_with_nested_progress(
+        self,
+        appimage_url: str,
+        appimage_name: str,
+        headers: Dict[str, str],
+        prefix: str = "",
+    ) -> str:
+        """
+        Download with a progress bar display.
+
+        Args:
+            appimage_url: URL to download from
+            appimage_name: Name of the AppImage file
+            headers: HTTP headers for the request
+            prefix: Prefix to add to progress messages (e.g., "[1/2] ")
+
+        Returns:
+            str: The full path to the downloaded AppImage file
+
+        Raises:
+            Exception: Any error during download
+        """
+        try:
+            # Get file size
+            self._logger.info(f"Fetching headers for {appimage_url}")
+            response = requests.head(
+                appimage_url, allow_redirects=True, timeout=10, headers=headers
+            )
+            response.raise_for_status()
+            total_size = int(response.headers.get("content-length", 0))
+
+            # Get the downloads directory (ensures it exists)
+            downloads_dir = self.get_downloads_dir()
+
+            # Prepare the output file path
+            file_path = os.path.join(downloads_dir, appimage_name)
+
+            # Get the shared progress instance with thread safety
+            progress = self.get_or_create_progress()
+
+            # Add a task for this download with the app's prefix
+            try:
+                download_task = progress.add_task(
+                    f"Downloading {appimage_name}",
+                    total=total_size,
+                    prefix=prefix,  # Store prefix as a custom field
+                )
+
+                # Track this task
+                self._progress_task_id = download_task
+                DownloadManager._active_tasks.add(download_task)
+
+            except Exception as e:
+                self._logger.error(f"Error creating progress task: {str(e)}")
+                # Fallback to console output without progress bar
+                print(f"{prefix}Downloading {appimage_name}...")
+                download_task = None
+
+            # Start the actual download
+            start_time = time.time()
+            response = requests.get(appimage_url, stream=True, timeout=30, headers=headers)
+            response.raise_for_status()
+
+            # Download with progress tracking
+            downloaded_size = 0
+            chunk_size = 1024 * 1024  # 1MB per chunk
+
+            with open(file_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=chunk_size):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded_size += len(chunk)
+                        if download_task is not None and progress is not None:
+                            try:
+                                progress.update(download_task, completed=downloaded_size)
+                            except Exception as e:
+                                # If updating progress fails, log it but continue the download
+                                self._logger.debug(f"Error updating progress: {str(e)}")
+
+            # Make the AppImage executable
+            os.chmod(file_path, os.stat(file_path).st_mode | 0o111)
+
+            # Clean up progress tracking
+            if download_task is not None and progress is not None:
+                try:
+                    # Mark task as completed
+                    progress.update(download_task, completed=total_size)
+
+                    # Remove this task from tracking and the progress display
+                    if download_task in DownloadManager._active_tasks:
+                        DownloadManager._active_tasks.remove(download_task)
+
+                    progress.remove_task(download_task)
+                    self._progress_task_id = None
+                except Exception as e:
+                    self._logger.debug(f"Error cleaning up progress task: {str(e)}")
+
+            # Calculate download statistics
+            download_time = time.time() - start_time
+            speed_mbps = (total_size / (1024 * 1024)) / download_time if download_time > 0 else 0
+
+            # Display completion message
+            print(
+                f"{prefix}✓ Downloaded {appimage_name} "
+                f"({self._format_size(total_size)}, {speed_mbps:.1f} MB/s)"
+            )
+            self._logger.info(f"Successfully downloaded {file_path}")
+
+            # If this is the last download and we're in async mode, clean up the progress display
+            if self.is_async_mode and self.app_index == self.total_apps:
+                # Only stop if no active tasks remain
+                if not DownloadManager._active_tasks:
+                    self.stop_progress()
+
+            return file_path
+
         except requests.exceptions.RequestException as e:
-            logging.error(f"Error fetching data from GitHub API: {e}")
-            return None
+            error_msg = f"Network error while downloading {appimage_name}: {str(e)}"
+            self._logger.error(error_msg)
+            print(f"{prefix}✗ Download failed: {error_msg}")
 
-        total_size_in_bytes = int(response.headers.get("content-length", 0))
+            # Clean up the progress task if it exists
+            if hasattr(self, "_progress_task_id") and self._progress_task_id is not None:
+                try:
+                    if self._progress_task_id in DownloadManager._active_tasks:
+                        DownloadManager._active_tasks.remove(self._progress_task_id)
 
-        if response.status_code == 200:
-            with open(f"{self.api.appimage_name}", "wb") as file, tqdm(
-                desc=self.api.appimage_name,
-                total=total_size_in_bytes,
-                unit="iB",
-                unit_scale=True,
-                unit_divisor=1024,
-                miniters=1,
-            ) as progress_bar:
-                for chunk in response.iter_content(chunk_size=8192):
-                    file.write(chunk)
-                    file.flush()  # Force write to disk
-                    progress_bar.update(len(chunk))
-        else:
-            logging.error(f"Error downloading {self.api.appimage_name}: {response.status_code}")
-            print(f"Error downloading {self.api.appimage_name}")
-            sys.exit()
+                    if DownloadManager._global_progress is not None:
+                        DownloadManager._global_progress.remove_task(self._progress_task_id)
+                except Exception:
+                    pass  # Ignore errors during cleanup
 
-        if response is not None:
-            response.close()
-            logging.info(f"Download completed: {self.api.appimage_name} installed")
-            print(f"Download completed! {self.api.appimage_name} installed.")
-        else:
-            logging.error(f"Error downloading {self.api.appimage_name}")
-            print(f"Error downloading {self.api.appimage_name}")
+                self._progress_task_id = None
+
+            raise RuntimeError(error_msg)
+        except Exception as e:
+            # Ensure we clean up the task in case of any other error
+            if hasattr(self, "_progress_task_id") and self._progress_task_id is not None:
+                try:
+                    if self._progress_task_id in DownloadManager._active_tasks:
+                        DownloadManager._active_tasks.remove(self._progress_task_id)
+
+                    if DownloadManager._global_progress is not None:
+                        DownloadManager._global_progress.remove_task(self._progress_task_id)
+                except Exception:
+                    pass  # Ignore errors during cleanup
+
+                self._progress_task_id = None
+
+            raise  # Re-raise the original exception

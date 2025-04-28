@@ -57,6 +57,16 @@ class GitHubAPI:
         self._icon_manager = IconManager()
         logger.debug(f"API initialized for {owner}/{repo} with auth headers")
 
+    @property
+    def arch_keyword(self) -> Optional[str]:
+        """
+        Get the architecture keyword.
+
+        Returns:
+            str or None: The architecture keyword
+        """
+        return self._arch_keyword
+
     def _get_arch_keywords(self) -> List[str]:
         """
         Get architecture-specific keywords based on the current platform.
@@ -103,12 +113,12 @@ class GitHubAPI:
     def get_latest_release(self) -> Tuple[bool, Union[Dict[str, Any], str]]:
         """
         Get the latest stable release from GitHub API.
-        
+
         Returns:
             tuple: (Success flag, Release data or error message)
         """
         api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
-        
+
         try:
             logger.debug(f"Fetching latest release from {api_url}")
             response = GitHubAuthManager.make_authenticated_request(
@@ -116,41 +126,45 @@ class GitHubAPI:
                 api_url,
                 headers=self._headers,
                 timeout=30,
-                audit_action="fetch_latest_release"
+                audit_action="fetch_latest_release",
             )
-            
+
             if response.status_code == 200:
                 release = response.json()
                 self._process_release(release, release.get("prerelease", False))
                 return True, release
             elif response.status_code == 404:
-                logger.info(f"No stable release found for {self.owner}/{self.repo}, checking for beta releases")
+                logger.info(
+                    f"No stable release found for {self.owner}/{self.repo}, checking for beta releases"
+                )
                 return self.get_beta_releases()
             elif response.status_code == 403 and "rate limit exceeded" in response.text.lower():
                 logger.warning("GitHub API rate limit exceeded, refreshing authentication")
                 self.refresh_auth()
                 return False, "GitHub API rate limit exceeded. Please try again in a few minutes."
             else:
-                error_msg = f"Failed to fetch latest release: {response.status_code} - {response.text}"
+                error_msg = (
+                    f"Failed to fetch latest release: {response.status_code} - {response.text}"
+                )
                 logger.error(error_msg)
                 return False, error_msg
-                
+
         except requests.exceptions.RequestException as e:
             logger.error(f"Request error fetching latest release: {str(e)}")
             return False, f"Network error: {str(e)}"
         except Exception as e:
             logger.error(f"Unexpected error fetching latest release: {str(e)}")
             return False, f"Error: {str(e)}"
-    
+
     def get_beta_releases(self) -> Tuple[bool, Union[Dict[str, Any], str]]:
         """
         Get all releases including pre-releases/betas.
-        
+
         Returns:
             tuple: (Success flag, Latest release data or error message)
         """
         api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases"
-        
+
         try:
             logger.debug(f"Fetching all releases from {api_url}")
             response = GitHubAuthManager.make_authenticated_request(
@@ -158,14 +172,14 @@ class GitHubAPI:
                 api_url,
                 headers=self._headers,
                 timeout=30,
-                audit_action="fetch_beta_releases"
+                audit_action="fetch_beta_releases",
             )
-            
+
             if response.status_code == 200:
                 releases = response.json()
                 if not releases:
                     return False, "No releases found (including pre-releases)"
-                    
+
                 # Get the first (latest) release
                 latest_release = releases[0]
                 self._process_release(latest_release, latest_release.get("prerelease", False))
@@ -174,89 +188,100 @@ class GitHubAPI:
                 error_msg = f"Failed to fetch releases: {response.status_code} - {response.text}"
                 logger.error(error_msg)
                 return False, error_msg
-                
+
         except Exception as e:
             logger.error(f"Error checking beta releases: {str(e)}")
             return False, f"Error checking beta releases: {str(e)}"
-    
+
     def get_response(self, per_page: int = 100) -> Tuple[bool, Union[Dict[str, Any], str]]:
         """
         Get the response from the GitHub API for releases.
         Simplified to use dedicated endpoints for latest and all releases.
-        
+
         Returns:
             tuple: (Success flag, Response data or error message)
         """
         # First try to get the latest stable release
         success, response = self.get_latest_release()
-        
+
         if success:
             return True, response
-        
-        # If no stable release is found, the get_latest_release method will already 
+
+        # If no stable release is found, the get_latest_release method will already
         # try to get beta releases through the get_beta_releases method
         return success, response
-    
-    def check_latest_version(self, current_version: Optional[str] = None) -> Tuple[bool, Dict[str, str]]:
+
+    def check_latest_version(
+        self, current_version: Optional[str] = None
+    ) -> Tuple[bool, Dict[str, str]]:
         """
         Check if there's a newer version available.
-        
+
         Args:
             current_version: Current version to compare against
-            
+
         Returns:
             tuple: (Update available flag, Version information)
         """
         # Get latest release info (will try stable first, then fall back to beta if needed)
         success, response = self.get_response()
-        
+
         if not success:
             return False, {"error": str(response)}
-        
+
         try:
-            # At this point, response should be a single release object, not a list
+            # Check for empty or invalid response
+            if not response or not isinstance(response, dict):
+                return False, {
+                    "error": "Error parsing release information: empty or invalid response"
+                }
+
             latest_release = response
             latest_version = latest_release.get("tag_name", "")
             is_prerelease = latest_release.get("prerelease", False)
-            
+
+            # Early return if no latest version found
+            if not latest_version:
+                return False, {"error": "No version information found in release"}
+
             # Normalize version strings for proper comparison
             current_version_clean = self._normalize_version_for_comparison(current_version)
             latest_version_clean = self._normalize_version_for_comparison(latest_version)
-            
+
             logger.debug(
                 f"Comparing versions: Current '{current_version_clean}' vs Latest '{latest_version_clean}'"
             )
-            
-            # Check if update is available
+
+            # Initialize update_available as False
             update_available = False
-            if current_version_clean and latest_version_clean != current_version_clean:
-                # For repos that use beta versions, handle special comparison
+
+            # Only check for updates if we have a current version to compare against
+            if current_version_clean:
+                # For repos that use beta versions
                 if self._repo_uses_beta():
-                    # For FreeTube: if current is X.Y.Z and latest is vX.Y.Z-beta, consider it the same version
-                    # Only consider it an update if the version numbers differ
                     current_base = self._extract_base_version(current_version_clean)
                     latest_base = self._extract_base_version(latest_version_clean)
-                    
-                    if current_base != latest_base:
-                        update_available = True
-                        logger.info(
-                            f"Update available for beta app: {current_version} → {latest_version}"
-                        )
+                    # Update available if base versions are different
+                    update_available = current_base != latest_base
                 else:
-                    # Standard comparison for non-beta apps
-                    update_available = True
-                    logger.info(f"Update available: {current_version} → {latest_version}")
-                    
+                    # For regular repos
+                    update_available = (
+                        latest_version_clean != current_version_clean
+                        and latest_version_clean > current_version_clean
+                    )
+                    if update_available:
+                        logger.info(f"Update available: {current_version} → {latest_version}")
+
             # Get architecture keywords
             arch_keywords = self._get_arch_keywords()
-            
+
             # Filter assets by architecture
             compatible_assets = []
             for asset in latest_release.get("assets", []):
                 asset_name = asset.get("name", "").lower()
                 if any(keyword.lower() in asset_name for keyword in arch_keywords):
                     compatible_assets.append(asset)
-                    
+
             return update_available, {
                 "current_version": current_version,
                 "latest_version": latest_version,
@@ -266,7 +291,7 @@ class GitHubAPI:
                 "is_prerelease": is_prerelease,
                 "published_at": latest_release.get("published_at", ""),
             }
-            
+
         except Exception as e:
             logger.error(f"Error parsing release information: {str(e)}")
             return False, {"error": f"Error parsing release information: {str(e)}"}

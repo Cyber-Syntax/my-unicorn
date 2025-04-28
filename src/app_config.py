@@ -133,9 +133,7 @@ class AppConfigManager:
 
             if not final_icon_path:
                 icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
-                app_icon_dir = os.path.join(
-                    icon_base_dir, self.repo
-                )
+                app_icon_dir = os.path.join(icon_base_dir, self.repo)
                 repo_icon_dir = os.path.join(
                     icon_base_dir, self.repo
                 )  # Fallback for backward compatibility
@@ -315,7 +313,7 @@ class AppConfigManager:
                 print(f"{idx}. {app_name}")
 
             user_input = input(
-                "Enter the numbers of the configuration files you want to update (comma-separated): "
+                "Select application(s) (comma-separated numbers) or cancel: "
             ).strip()
 
             try:
@@ -326,7 +324,6 @@ class AppConfigManager:
                 return [json_files[idx] for idx in selected_indices]
             except (ValueError, IndexError):
                 logger.error("Invalid selection. Please enter valid numbers.")
-                print("Invalid selection. Please enter valid numbers.")
                 return None
         except KeyboardInterrupt:
             logger.info("User cancelled the selection.")
@@ -384,6 +381,7 @@ class AppConfigManager:
             print(f"{idx}. {app_name}")
         print(f"{len(json_files) + 1}. Cancel")
 
+        # Continue with standard interface
         while True:
             file_choice = input("Select an application (number) or cancel: ")
             if file_choice.isdigit():
@@ -409,20 +407,36 @@ class AppConfigManager:
         # Show application name in title instead of filename
         app_name = os.path.splitext(selected_file)[0]
         logger.info(f"Displaying configuration options for {app_name}")
-        print(f"Configuration options for {app_name}:")
-        print("=================================================")
-        print(f"1. Owner: {self.owner}")
-        print(f"2. Repo: {self.repo}")
-        print(f"3. Version: {self.version}")
-        print(f"4. SHA Name: {self.sha_name}")
-        print(f"5. Hash Type: {self.hash_type}")
-        print(f"6. AppImage Name: {self.appimage_name}")
-        print(f"7. Architecture Keyword: {self.arch_keyword}")
+
+        # Show current configuration values
+        print("\n" + "=" * 60)
+        print(f"Configuration for: {app_name}")
+        print("-" * 60)
+        print(f"Owner: {self.owner or 'Not set'}")
+        print(f"Repository: {self.repo or 'Not set'}")
+        print(f"Version: {self.version or 'Not set'}")
+        print(f"SHA Name: {self.sha_name or 'Auto-detect'}")
+        print(f"Hash Type: {self.hash_type or 'sha256'}")
+        print(f"AppImage Name: {self.appimage_name or 'Not set'}")
+        print(f"Architecture Keyword: {self.arch_keyword or 'Not set'}")
+        print("=" * 60)
+
+        print("\nConfiguration options:")
+        print("-" * 60)
+        print("Repository Settings:")
+        print("1. Owner")
+        print("2. Repository")
+        print("3. Version")
+        print("4. SHA Name")
+        print("\nAppImage Settings:")
+        print("5. Hash Type")
+        print("6. AppImage Name")
+        print("7. Architecture Keyword")
         print("8. Exit")
-        print("=================================================")
+        print("-" * 60)
 
         while True:
-            choice = input("Enter your choice: ")
+            choice = input("Enter your choice (1-8): ")
             if choice.isdigit() and 1 <= int(choice) <= 8:
                 break
             else:
@@ -450,7 +464,7 @@ class AppConfigManager:
         self.save_config()
         logger.info(f"Updated {key} from '{old_value}' to '{new_value}' in {selected_file}")
         print(f"\033[42m{key.capitalize()} updated successfully in {app_name}\033[0m")
-        print("=================================================")
+        print("=" * 60)
 
     def temp_save_config(self):
         """
