@@ -6,6 +6,8 @@ import os
 import re
 import requests
 import yaml
+from pathlib import Path
+from typing import Optional
 
 _ = gettext.gettext
 
@@ -30,9 +32,8 @@ class VerificationManager:
     ):
         self.sha_name = sha_name
         self.sha_url = sha_url
-        #TODO: This variable name must be changed to appimage_path
-        self.appimage_name = appimage_name
-        self.appimage_path = appimage_name  # Initialize to same value as appimage_name initially
+        self.appimage_name = appimage_name  # File name without path
+        self.appimage_path = appimage_name  # Full path to the AppImage file, initialized to same value as appimage_name
         self.hash_type = hash_type.lower()
         self._validate_hash_type()
 
@@ -75,11 +76,7 @@ class VerificationManager:
                 return True
 
             # Use appimage_path for existence check if available, otherwise fall back to appimage_name
-            check_path = (
-                self.appimage_path
-                if hasattr(self, "appimage_path") and self.appimage_path
-                else self.appimage_name
-            )
+            check_path = self.appimage_path
 
             if not check_path or not os.path.exists(check_path):
                 logging.error(f"AppImage file not found: {check_path}")
@@ -112,12 +109,12 @@ class VerificationManager:
         except (requests.RequestException, IOError) as e:
             logging.error(f"Verification failed: {str(e)}")
             if cleanup_on_failure:
-                self._cleanup_failed_file(self.appimage_name)
+                self._cleanup_failed_file(self.appimage_path)
             return False
         except Exception as e:
             logging.error(f"Unexpected error during verification: {str(e)}")
             if cleanup_on_failure:
-                self._cleanup_failed_file(self.appimage_name)
+                self._cleanup_failed_file(self.appimage_path)
             return False
 
     def _download_sha_file(self):
@@ -247,12 +244,8 @@ class VerificationManager:
 
     def _compare_hashes(self, expected_hash: str) -> bool:
         """Compare hashes using memory-efficient chunked reading."""
-        # Use appimage_path for file operations if available, otherwise fall back to appimage_name
-        file_to_verify = (
-            self.appimage_path
-            if hasattr(self, "appimage_path") and self.appimage_path
-            else self.appimage_name
-        )
+        # Always use appimage_path for file operations
+        file_to_verify = self.appimage_path
 
         if not os.path.exists(file_to_verify):
             raise IOError(f"AppImage file not found: {file_to_verify}")

@@ -862,63 +862,23 @@ class BaseUpdateCommand(Command):
             )
             downloaded_file_path = download_manager.download()  # Capture the file path
 
-            # 6. Handle file path for verification
-            # In async mode, files are stored in downloads/ directory and need to be moved
-            if is_async:
-                # We already know the file path from the download operation
-                download_path = downloaded_file_path
-
-                # Check if the file was downloaded successfully
-                if not os.path.exists(download_path):
-                    error_msg = f"Downloaded file not found at {download_path}"
-                    logger.error(error_msg)
-                    result_data["message"] = error_msg
-                    return False, result_data
-
-                # Move the file to the current directory for verification
-                target_path = os.path.join(os.getcwd(), github_api.appimage_name)
-                try:
-                    # Remove existing file if it exists
-                    if os.path.exists(target_path):
-                        os.remove(target_path)
-
-                    # Copy the file and set permissions
-                    import shutil
-
-                    shutil.copy2(download_path, target_path)
-                    os.chmod(target_path, os.stat(target_path).st_mode | 0o111)
-                    logger.info(f"Moved downloaded file from {download_path} to {target_path}")
-
-                    # Use the target path for verification
-                    verification_path = target_path
-                except Exception as e:
-                    # If there was an error copying, still use the download path
-                    verification_path = download_path
-                    error_msg = f"Error moving downloaded file: {str(e)}"
-                    logger.error(error_msg)
-                    result_data["message"] = error_msg
-                    return False, result_data
-            else:
-                # For synchronous operation, use the downloaded file path directly
-                verification_path = downloaded_file_path
-
-            # 7. Verify the download
-            if not self._verify_appimage(github_api, verification_path, cleanup_on_failure=True):
+            # 6. Verify the download with the downloaded path directly
+            if not self._verify_appimage(github_api, downloaded_file_path, cleanup_on_failure=True):
                 error_msg = f"Verification failed for {app_name}."
                 logger.warning(error_msg)
                 result_data["message"] = error_msg
                 return False, result_data
 
-            # 8. Handle file operations
+            # 7. Handle file operations
             file_handler = self._create_file_handler(github_api, app_config, global_config)
 
-            # 9. Download app icon if possible
+            # 8. Download app icon if possible
             from src.icon_manager import IconManager
 
             icon_manager = IconManager()
             icon_manager.ensure_app_icon(github_api.owner, github_api.repo)
 
-            # 10. Perform file operations and update config
+            # 9. Perform file operations and update config
             if file_handler.handle_appimage_operations(github_api=github_api):
                 try:
                     app_config.update_version(
@@ -928,17 +888,7 @@ class BaseUpdateCommand(Command):
                     success_msg = f"Successfully updated {app_name} to version {github_api.version}"
                     logger.info(success_msg)
 
-                    # 11. Clean up the downloaded file in downloads directory for async mode
-                    if is_async:
-                        try:
-                            download_path = os.path.join("downloads", github_api.appimage_name)
-                            if os.path.exists(download_path):
-                                os.remove(download_path)
-                                logger.info(f"Cleaned up temporary download: {download_path}")
-                        except Exception as e:
-                            logger.warning(f"Could not clean up temporary download: {str(e)}")
-
-                    # 12. Update result data for successful update
+                    # 10. Update result data for successful update
                     result_data = {
                         "status": "success",
                         "message": f"Updated {app_name} to {github_api.version}",

@@ -3,7 +3,7 @@ import os
 import sys
 import asyncio
 import time
-from typing import Optional, List, Dict, Any, Union, Set, Tuple
+from typing import Optional, List, Dict, Any, Union, Set, Tuple, ClassVar
 
 import requests
 
@@ -34,6 +34,9 @@ class DownloadManager:
     # Use GlobalConfigManager for configuration
     _global_config: Optional[GlobalConfigManager] = None
 
+    # Path for temporary downloads
+    _downloads_dir: ClassVar[str] = os.path.join(os.getcwd(), "downloads")
+
     def __init__(self, github_api: "GitHubAPI", app_index: int = 0, total_apps: int = 0) -> None:
         """
         Initialize the download manager with GitHub API instance.
@@ -62,6 +65,17 @@ class DownloadManager:
 
         # Store task ID for this download instance
         self._progress_task_id: Optional[int] = None
+
+    @classmethod
+    def get_downloads_dir(cls) -> str:
+        """
+        Get the path to the downloads directory, ensuring it exists.
+
+        Returns:
+            str: Path to the downloads directory
+        """
+        os.makedirs(cls._downloads_dir, exist_ok=True)
+        return cls._downloads_dir
 
     def _format_size(self, size_bytes: int) -> str:
         """
@@ -194,11 +208,8 @@ class DownloadManager:
             response.raise_for_status()
             total_size = int(response.headers.get("content-length", 0))
 
-            # Always use the 'downloads' folder in the current directory for temporary storage
-            downloads_dir = os.path.join(os.getcwd(), "downloads")
-
-            # Create output directory if it doesn't exist
-            os.makedirs(downloads_dir, exist_ok=True)
+            # Get the downloads directory (ensures it exists)
+            downloads_dir = self.get_downloads_dir()
 
             # Prepare the output file path
             file_path = os.path.join(downloads_dir, appimage_name)
