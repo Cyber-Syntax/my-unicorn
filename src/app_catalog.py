@@ -24,6 +24,7 @@ class AppInfo:
         description: Short description of the application
         owner: GitHub repository owner
         repo: GitHub repository name
+        app_id: Unique identifier for the app (defaults to repo name)
         sha_name: SHA file name for verification (or "no_sha_file")
         hash_type: Hash type used for verification (e.g., "sha256", "sha512")
         category: Application category for filtering/grouping
@@ -34,6 +35,7 @@ class AppInfo:
     description: str
     owner: str
     repo: str
+    app_id: str = None
     sha_name: str = "no_sha_file"
     hash_type: str = "sha256"
     category: str = "Other"
@@ -43,6 +45,8 @@ class AppInfo:
         """Initialize default values for optional fields."""
         if self.tags is None:
             self.tags = []
+        if self.app_id is None:
+            self.app_id = self.repo
 
 
 # Application catalog - mapping app_id (lowercase) to AppInfo
@@ -63,6 +67,7 @@ APP_CATALOG: Dict[str, AppInfo] = {
         description="A powerful knowledge base that works on local Markdown files",
         owner="obsidianmd",
         repo="obsidian-releases",
+        app_id="obsidian",
         sha_name="SHA256SUMS.txt",
         hash_type="sha256",
         category="Productivity",
@@ -139,6 +144,7 @@ APP_CATALOG: Dict[str, AppInfo] = {
         description="A simple and private notes app",
         owner="standardnotes",
         repo="app",
+        app_id="standardnotes",  # Use this instead of repo for file names
         sha_name="SHA256SUMS",
         hash_type="sha256",
         category="Productivity",

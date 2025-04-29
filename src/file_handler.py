@@ -47,11 +47,6 @@ class FileHandler:
     - Setting proper file permissions
     """
 
-    # Dictionary mapping repo names to app-specific handler modules
-    APP_HANDLERS = {
-        "app": "standard_notes",  # Standard Notes repo is called "app"
-    }
-
     def __init__(
         self,
         appimage_name: str,
@@ -67,6 +62,7 @@ class FileHandler:
         batch_mode: bool = False,
         keep_backup: bool = True,
         max_backups: int = 3,
+        app_id: Optional[str] = None,
     ):
         """
         Initialize file handler with paths and configuration.
@@ -85,6 +81,7 @@ class FileHandler:
             batch_mode: Whether to run in batch mode (no user prompts)
             keep_backup: Whether to keep backup files
             max_backups: Maximum number of backup files to keep per app
+            app_id: Unique identifier for the app (defaults to repo)
         """
         # Validate required parameters
         if not appimage_name:
@@ -94,6 +91,9 @@ class FileHandler:
 
         self.appimage_name = appimage_name
         self.repo = repo
+        self.app_id = (
+            app_id if app_id else repo
+        )  # Use app_id if provided, otherwise fallback to repo
         self.owner = owner
         self.version = version
         self.sha_name = sha_name
@@ -116,7 +116,8 @@ class FileHandler:
 
         # Derived paths
         # Construct the AppImage file path with proper .AppImage extension if missing
-        file_name = self.repo
+        # Use app_id instead of repo for file paths
+        file_name = self.app_id
         if not file_name.lower().endswith(APPIMAGE_EXTENSION.lower()):
             file_name += APPIMAGE_EXTENSION
 
@@ -198,7 +199,7 @@ class FileHandler:
                 return True
 
             # Get app name for grouping backups by app
-            app_base_name = self.repo.lower()
+            app_base_name = self.app_id.lower()
 
             # Create a unique backup name with timestamp
             timestamp = time.strftime("%Y%m%d-%H%M%S")
@@ -356,59 +357,9 @@ class FileHandler:
                  False otherwise
         """
         try:
-            # Check if there's a specialized handler for this application
-            if self.repo.lower() in self.APP_HANDLERS:
-                try:
-                    # Import the appropriate app handler module
-                    handler_module_name = self.APP_HANDLERS[self.repo.lower()]
-                    module_path = f"src.apps.{handler_module_name}"
-
-                    # Import the module dynamically
-                    handler_module = import_module(module_path)
-
-                    # Get the handler class (assuming it follows the pattern: RepoNameHandler)
-                    handler_class_name = (
-                        "".join(word.capitalize() for word in handler_module_name.split("_"))
-                        + "Handler"
-                    )
-                    handler_class = getattr(handler_module, handler_class_name)
-
-                    # Get the app_config instance
-                    from src.app_config import AppConfigManager
-
-                    app_config = AppConfigManager(
-                        owner=self.owner,
-                        repo=self.repo,
-                        version=self.version,
-                        sha_name=self.sha_name,
-                        appimage_name=self.appimage_name,
-                    )
-
-                    # Get icon path if available
-                    from src.icon_manager import IconManager
-
-                    icon_manager = IconManager()
-                    icon_path = icon_manager.get_icon_path(self.repo)
-
-                    # Use the specialized handler to create the desktop file
-                    success, result = handler_class.create_desktop_file(
-                        app_config=app_config, appimage_path=self.appimage_path, icon_path=icon_path
-                    )
-
-                    if success:
-                        logging.info(f"Created desktop entry using {handler_class_name}: {result}")
-                        return True
-                    else:
-                        logging.warning(
-                            f"App-specific handler failed: {result}, falling back to default"
-                        )
-                        # Continue with default implementation if specialized handler failed
-                except (ImportError, AttributeError, Exception) as e:
-                    logging.warning(f"Failed to use app-specific handler: {str(e)}, using default")
-
             # Default desktop entry creation implementation
-            app_name = self.repo  # Preserve original case for display name
-            desktop_file = f"{self.repo.lower()}.desktop"
+            app_name = self.app_id  # Use app_id instead of repo for display name
+            desktop_file = f"{self.app_id.lower()}.desktop"  # Use app_id for the filename
             desktop_path = DESKTOP_ENTRY_DIR / desktop_file
 
             logging.info(f"Processing desktop entry at {desktop_path}")
@@ -420,7 +371,7 @@ class FileHandler:
             from src.icon_manager import IconManager
 
             icon_manager = IconManager()
-            icon_path = icon_manager.get_icon_path(self.repo)
+            icon_path = icon_manager.get_icon_path(self.app_id)  # Use app_id for icon path
 
             # Read existing desktop file content if it exists
             existing_entries = {}

@@ -34,6 +34,12 @@ def normalize_version_for_comparison(version: Optional[str]) -> str:
     if normalized.startswith("v"):
         normalized = normalized[1:]
 
+    # Handle Standard Notes format: @standardnotes/desktop@3.195.13
+    std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", normalized)
+    if std_notes_match:
+        normalized = std_notes_match.group(1)
+        logger.debug(f"Normalized Standard Notes version format: {normalized}")
+
     return normalized
 
 
@@ -66,6 +72,12 @@ def extract_version(tag: str, is_beta: bool = False) -> Optional[str]:
     Returns:
         str or None: Extracted version or None if not found
     """
+    # Handle Standard Notes format: @standardnotes/desktop@3.195.13
+    std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", tag)
+    if std_notes_match:
+        logger.debug(f"Extracted version from Standard Notes format: {std_notes_match.group(1)}")
+        return std_notes_match.group(1)
+
     # Clean common prefixes/suffixes
     clean_tag = tag.lstrip("vV").replace("-stable", "")
 
@@ -96,6 +108,19 @@ def extract_version_from_filename(filename: str) -> Optional[str]:
     """
     if not filename:
         return None
+
+    # Handle Standard Notes format: @standardnotes/desktop@3.195.13
+    std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", filename)
+    if std_notes_match:
+        logger.debug(f"Extracted version from Standard Notes filename: {std_notes_match.group(1)}")
+        return std_notes_match.group(1)
+
+    # Handle Standard Notes AppImage format: app-3.195.13-x86_64.AppImage
+    if filename.startswith("app-") and "standardnotes" in str(filename).lower():
+        match = re.search(r"-(\d+\.\d+\.\d+)", filename)
+        if match:
+            logger.debug(f"Extracted version from Standard Notes AppImage: {match.group(1)}")
+            return match.group(1)
 
     # First try a direct match for semantic version pattern
     version_match = re.search(r"(\d+\.\d+\.\d+)(?!-)", filename)

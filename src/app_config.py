@@ -39,6 +39,7 @@ class AppConfigManager:
         self,
         owner: Union[str, None] = None,
         repo: Union[str, None] = None,
+        app_id: Union[str, None] = None,
         version: Union[str, None] = None,
         sha_name: Union[str, None] = None,
         hash_type: str = DEFAULT_HASH_TYPE,
@@ -52,6 +53,7 @@ class AppConfigManager:
         Args:
             owner: GitHub repository owner/organization
             repo: Repository name
+            app_id: Unique identifier for the app (defaults to repo)
             version: Application version
             sha_name: SHA verification file name
             hash_type: Hash type (sha256, sha512, etc.)
@@ -61,6 +63,7 @@ class AppConfigManager:
         """
         self.owner = owner
         self.repo = repo
+        self.app_id = app_id if app_id else repo
         self.version = version
         self.sha_name = sha_name
         self.hash_type = hash_type
@@ -68,8 +71,8 @@ class AppConfigManager:
         self.arch_keyword = arch_keyword
         self.config_folder = Path(config_folder).expanduser()
 
-        # Use repo directly for app identifier
-        self.config_file_name = f"{self.repo}.json" if self.repo else None
+        # Use app_id for file naming instead of repo
+        self.config_file_name = f"{self.app_id}.json" if self.app_id else None
         self.config_file = (
             self.config_folder / self.config_file_name if self.config_file_name else None
         )
@@ -94,7 +97,7 @@ class AppConfigManager:
             if new_appimage_name is not None:
                 self.appimage_name = new_appimage_name
 
-            self.config_file = self.config_folder / f"{self.repo}.json"
+            self.config_file = self.config_folder / f"{self.app_id}.json"
             config_data: Dict[str, Any] = {}
 
             if self.config_file.exists():
@@ -119,31 +122,20 @@ class AppConfigManager:
     ) -> Tuple[bool, str]:
         """
         Create or update a desktop entry file for the AppImage.
-
-        Compares existing desktop entry content with new content to avoid
-        unnecessary writes when nothing has changed. This preserves user
-        customizations and prevents excessive file operations.
-
-        Args:
-            appimage_path: Full path to the AppImage file
-            icon_path: Path to the icon file, if available
-
-        Returns:
-            Tuple[bool, str]: Success status and error message or filepath if successful
         """
         try:
-            if not self.repo:
+            if not self.app_id:
                 return False, "Application identifier not available"
 
             # Ensure desktop file directory exists
             desktop_dir = Path(DESKTOP_ENTRY_DIR).expanduser()
             desktop_dir.mkdir(parents=True, exist_ok=True)
 
-            desktop_file_path = desktop_dir / f"{self.repo.lower()}.desktop"
+            desktop_file_path = desktop_dir / f"{self.app_id.lower()}.desktop"
             desktop_file_temp = desktop_file_path.with_suffix(".desktop.tmp")
 
-            # Determine display name (preserve original case of repo name for better desktop integration)
-            display_name = self.repo
+            # Determine display name (using app name instead of repo)
+            display_name = self.app_id
 
             # Use the provided icon path if available
             final_icon_path = icon_path
@@ -384,6 +376,7 @@ class AppConfigManager:
                     # Update instance variables with the loaded config
                     self.owner = config.get("owner", self.owner)
                     self.repo = config.get("repo", self.repo)
+                    self.app_id = config.get("app_id", self.app_id or self.repo)
                     self.version = config.get("version", self.version)
                     self.sha_name = config.get("sha_name", self.sha_name)
                     self.hash_type = config.get("hash_type", self.hash_type)
@@ -540,6 +533,7 @@ class AppConfigManager:
         return {
             "owner": self.owner,
             "repo": self.repo,
+            "app_id": self.app_id,
             "version": self.version,
             "sha_name": self.sha_name,
             "hash_type": self.hash_type,
