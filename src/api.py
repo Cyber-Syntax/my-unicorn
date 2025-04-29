@@ -7,15 +7,14 @@ This module provides functionality for interacting with the GitHub API.
 """
 
 import logging
-import platform
 import re
-import os
 import requests
-from datetime import datetime
+import os
 from typing import Dict, Any, Optional, List, Tuple, Union
 
 from src.icon_manager import IconManager
 from src.auth_manager import GitHubAuthManager
+from src.utils import arch_utils, version_utils, sha_utils, ui_utils
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -51,7 +50,7 @@ class GitHubAPI:
         self.appimage_url = None
         self.appimage_name = None
         self._arch_keyword = arch_keyword
-        self.arch_keywords = self._get_arch_keywords()
+        self.arch_keywords = arch_utils.get_arch_keywords(arch_keyword)
         # Get authentication headers from GitHubAuthManager
         self._headers = GitHubAuthManager.get_auth_headers()
         self._icon_manager = IconManager()
@@ -66,49 +65,6 @@ class GitHubAPI:
             str or None: The architecture keyword
         """
         return self._arch_keyword
-
-    def _get_arch_keywords(self) -> List[str]:
-        """
-        Get architecture-specific keywords based on the current platform.
-
-        Returns:
-            list: List of architecture keywords
-        """
-        if self._arch_keyword:
-            return [self._arch_keyword]
-
-        system = platform.system().lower()
-        machine = platform.machine().lower()
-
-        # Simplified architecture mapping based on system and machine
-        arch_map = {
-            "linux": {
-                "x86_64": ["x86_64", "amd64", "x64", "linux64"],
-                "aarch64": ["aarch64", "arm64", "aarch", "arm"],
-                "armv7l": ["armv7", "arm32", "armhf"],
-                "armv6l": ["armv6", "arm"],
-                "i686": ["i686", "x86", "i386", "linux32"],
-            },
-            "darwin": {
-                "x86_64": ["x86_64", "amd64", "x64", "darwin64", "macos"],
-                "arm64": ["arm64", "aarch64", "arm", "macos"],
-            },
-            "windows": {
-                "AMD64": ["x86_64", "amd64", "x64", "win64"],
-                "x86": ["x86", "i686", "i386", "win32"],
-                "ARM64": ["arm64", "aarch64", "arm"],
-            },
-        }
-
-        # Return default keywords for the current platform or empty list
-        default_keywords = arch_map.get(system, {}).get(machine, [])
-        if not default_keywords:
-            logger.warning(
-                f"No architecture keywords found for {system}/{machine}. "
-                "Using system name as fallback."
-            )
-            return [system]
-        return default_keywords
 
     def get_latest_release(self) -> Tuple[bool, Union[Dict[str, Any], str]]:
         """
@@ -245,8 +201,8 @@ class GitHubAPI:
                 return False, {"error": "No version information found in release"}
 
             # Normalize version strings for proper comparison
-            current_version_clean = self._normalize_version_for_comparison(current_version)
-            latest_version_clean = self._normalize_version_for_comparison(latest_version)
+            current_version_clean = version_utils.normalize_version_for_comparison(current_version)
+            latest_version_clean = version_utils.normalize_version_for_comparison(latest_version)
 
             logger.debug(
                 f"Comparing versions: Current '{current_version_clean}' vs Latest '{latest_version_clean}'"
@@ -258,9 +214,9 @@ class GitHubAPI:
             # Only check for updates if we have a current version to compare against
             if current_version_clean:
                 # For repos that use beta versions
-                if self._repo_uses_beta():
-                    current_base = self._extract_base_version(current_version_clean)
-                    latest_base = self._extract_base_version(latest_version_clean)
+                if version_utils.repo_uses_beta(self.repo):
+                    current_base = version_utils.extract_base_version(current_version_clean)
+                    latest_base = version_utils.extract_base_version(latest_version_clean)
                     # Update available if base versions are different
                     update_available = current_base != latest_base
                 else:
@@ -273,7 +229,7 @@ class GitHubAPI:
                         logger.info(f"Update available: {current_version} → {latest_version}")
 
             # Get architecture keywords
-            arch_keywords = self._get_arch_keywords()
+            arch_keywords = arch_utils.get_arch_keywords(self._arch_keyword)
 
             # Filter assets by architecture
             compatible_assets = []
@@ -295,94 +251,6 @@ class GitHubAPI:
         except Exception as e:
             logger.error(f"Error parsing release information: {str(e)}")
             return False, {"error": f"Error parsing release information: {str(e)}"}
-
-    def _process_latest_release(self, releases):
-        """
-        Process the latest release to set appimage_name, version, and other attributes.
-
-        Args:
-            releases: List of release data from GitHub API
-        """
-        try:
-            # Filter out draft releases
-            valid_releases = [r for r in releases if not r.get("draft", False)]
-
-            if not valid_releases:
-                logger.warning("No valid releases found after filtering drafts")
-                return
-
-            # Get the latest release (first in the list)
-            latest_release = valid_releases[0]
-
-            # Process with our existing method
-            logger.info(f"Processing latest release: {latest_release.get('tag_name')}")
-            result = self._process_release(latest_release, latest_release.get("prerelease", False))
-
-            if not result:
-                logger.warning("Failed to process release data")
-
-            # Ensure we have the required data
-            if not self.appimage_name or not self.appimage_url:
-                logger.warning("Missing appimage_name or appimage_url after processing release")
-
-        except Exception as e:
-            logger.error(f"Error processing latest release: {e}")
-
-    def _normalize_version_for_comparison(self, version: Optional[str]) -> str:
-        """
-        Normalize version string for consistent comparison.
-
-        Args:
-            version: Version string to normalize
-
-        Returns:
-            str: Normalized version string
-        """
-        if not version:
-            return ""
-
-        # Convert to lowercase for case-insensitive comparison
-        normalized = version.lower()
-
-        # Remove 'v' prefix if present
-        if normalized.startswith("v"):
-            normalized = normalized[1:]
-
-        return normalized
-
-    def _extract_base_version(self, version: str) -> str:
-        """
-        Extract the base version number without beta/alpha suffixes.
-
-        Args:
-            version: Version string to extract from
-
-        Returns:
-            str: Base version number (e.g., "0.23.3" from "0.23.3-beta")
-        """
-        # Split on common version separators
-        for separator in ["-", "+", "_"]:
-            if separator in version:
-                return version.split(separator)[0]
-
-        return version
-
-    def _repo_uses_beta(self) -> bool:
-        """
-        Determine if this repository typically uses beta/pre-releases.
-
-        Returns:
-            bool: True if the repository typically uses beta releases
-        """
-        # List of repos that are known to use beta releases
-        beta_repos = ["FreeTube"]
-
-        # Check if the current repo is in the list
-        if self.repo in beta_repos:
-            logger.info(f"Repository {self.repo} is configured to use beta releases")
-            return True
-
-        return False
 
     def find_app_icon(self) -> Optional[Dict[str, Any]]:
         """
@@ -421,13 +289,22 @@ class GitHubAPI:
         logger.info("Authentication headers refreshed")
 
     def _process_release(self, release_data: dict, is_beta: bool):
-        """Process release data with robust version parsing"""
+        """
+        Process release data to extract version and asset information.
+
+        Args:
+            release_data: Release data from GitHub API
+            is_beta: Whether this is a beta release
+
+        Returns:
+            dict or None: Processed release data or None if processing failed
+        """
         try:
             raw_tag = release_data["tag_name"]
             assets = release_data.get("assets", [])
 
             # First try to extract version from tag name
-            version = self._extract_version(raw_tag, is_beta)
+            version = version_utils.extract_version(raw_tag, is_beta)
 
             # Find AppImage - THIS MUST SUCCEED
             self._find_appimage_asset(assets)
@@ -435,7 +312,7 @@ class GitHubAPI:
                 raise ValueError("No AppImage found in release assets")
 
             if not version:
-                version = self._extract_version_from_filename(self.appimage_name)
+                version = version_utils.extract_version_from_filename(self.appimage_name)
 
             if not version:
                 raise ValueError(f"Could not determine version from tag: {raw_tag}")
@@ -459,50 +336,20 @@ class GitHubAPI:
             logging.error(f"Missing expected key in release data: {e}")
             return None
 
-    def _extract_version(self, tag: str, is_beta: bool) -> str:
-        """Extract semantic version from tag string"""
-        # Clean common prefixes/suffixes
-        clean_tag = tag.lstrip("vV").replace("-beta", "").replace("-stable", "")
-
-        # Match semantic version pattern
-        version_match = re.search(r"\d+\.\d+\.\d+(?:\.\d+)*", clean_tag)
-        if version_match:
-            return version_match.group(0)
-
-        # Try alternative patterns if standard semantic version not found
-        alt_match = re.search(r"(\d+[\w\.]+)", clean_tag)
-        return alt_match.group(1) if alt_match else None
-
-    def _extract_version_from_filename(self, filename: str) -> str:
-        """Fallback version extraction from appimage filename"""
-        if not filename:
-            return None
-
-        # Try to find version in filename segments
-        for part in filename.split("-"):
-            version = self._extract_version(part, False)
-            if version:
-                return version
-
-        # Final fallback to regex search
-        version_match = re.search(r"\d+\.\d+\.\d+", filename)
-
-        return version_match.group(0) if version_match else None
-
     def _find_appimage_asset(self, assets: list):
         """
-        Reliable AppImage selection with architecture keywords.
+        Find and select appropriate AppImage asset based on system architecture.
 
         Args:
             assets: List of release assets from GitHub API
         """
         # Current system architecture for logging
-        current_arch = platform.machine().lower()
+        current_arch = arch_utils.get_current_arch()
         logging.info(f"Current arch_keyword: {self._arch_keyword}")
         logging.info(f"Current system architecture: {current_arch}")
 
         # Get incompatible architectures to explicitly filter out
-        incompatible_archs = self._get_incompatible_archs(current_arch)
+        incompatible_archs = arch_utils.get_incompatible_archs(current_arch)
         logging.info(f"Filtering out incompatible architectures: {incompatible_archs}")
 
         # Filter all AppImage files
@@ -568,7 +415,7 @@ class GitHubAPI:
         elif candidates:
             logging.info(f"Found {len(candidates)} architecture-matched AppImages")
             print(f"Found {len(candidates)} architecture-matched AppImages:")
-            self._select_from_list(candidates)
+            ui_utils.select_from_list(candidates, "Select AppImage", callback=self._select_appimage)
             return
 
         # 4. For generic Linux builds without architecture in name, prefer those
@@ -599,7 +446,9 @@ class GitHubAPI:
         elif generic_linux_builds:
             logging.info(f"Found {len(generic_linux_builds)} generic Linux builds")
             print(f"Found {len(generic_linux_builds)} generic Linux builds:")
-            self._select_from_list(generic_linux_builds)
+            ui_utils.select_from_list(
+                generic_linux_builds, "Select AppImage", callback=self._select_appimage
+            )
             return
 
         # 5. Auto select if only one AppImage is left
@@ -610,92 +459,9 @@ class GitHubAPI:
         # 6. Fallback to asking user to choose from all compatible AppImages
         logging.info("No architecture-specific builds found, select from compatible AppImages")
         print("Please select the AppImage appropriate for your system:")
-        self._select_from_list(filtered_appimages)
-
-    def _get_incompatible_archs(self, current_arch: str) -> List[str]:
-        """
-        Get a list of architecture keywords that are incompatible with the current architecture.
-
-        Args:
-            current_arch: Current system architecture
-
-        Returns:
-            list: List of incompatible architecture keywords to filter out
-        """
-        # Define incompatible architectures based on current architecture
-        incompatible_map = {
-            # On x86_64, filter out ARM and 32-bit architectures
-            "x86_64": [
-                "arm64",
-                "aarch64",
-                "armhf",
-                "arm32",
-                "armv7",
-                "armv6",
-                "i686",
-                "i386",
-                "arm-",
-                "-arm",
-                "win",
-                "windows",
-                "darwin",
-                "mac",
-                "osx",
-            ],
-            # On ARM, filter out x86_64 and other incompatible architectures
-            "aarch64": [
-                "x86_64",
-                "amd64",
-                "i686",
-                "i386",
-                "win",
-                "windows",
-                "darwin",
-                "mac",
-                "osx",
-            ],
-            "arm64": ["x86_64", "amd64", "i686", "i386", "win", "windows", "darwin", "mac", "osx"],
-            # On 32-bit x86, filter out 64-bit and ARM
-            "i686": [
-                "x86_64",
-                "amd64",
-                "arm64",
-                "aarch64",
-                "win",
-                "windows",
-                "darwin",
-                "mac",
-                "osx",
-            ],
-            "i386": [
-                "x86_64",
-                "amd64",
-                "arm64",
-                "aarch64",
-                "win",
-                "windows",
-                "darwin",
-                "mac",
-                "osx",
-            ],
-        }
-
-        # Return incompatible architectures or empty list if not defined
-        return incompatible_map.get(current_arch, [])
-
-    def _select_from_list(self, appimages):
-        """User selection handler with persistence"""
-        for idx, asset in enumerate(appimages, 1):
-            print(f"{idx}. {asset['name']}")
-
-        while True:
-            choice = input(f"Select AppImage (1-{len(appimages)}): ")
-            if choice.isdigit() and 1 <= int(choice) <= len(appimages):
-                selected = appimages[int(choice) - 1]
-                self._select_appimage(selected)
-                return
-            logging.warning("Invalid input, try again")
-            print("Invalid input, try again")
+        ui_utils.select_from_list(
+            filtered_appimages, "Select AppImage", callback=self._select_appimage
+        )
 
     def _select_appimage(self, asset):
         """
@@ -707,6 +473,7 @@ class GitHubAPI:
         self.appimage_url = asset["browser_download_url"]
         self.appimage_name = asset["name"]
         logging.info(f"Selected: {self.appimage_name}")
+
         # Extract an arch keyword from the selected asset name.
         # Prioritize more specific identifiers.
         lower_name = self.appimage_name.lower()
@@ -716,20 +483,16 @@ class GitHubAPI:
                 break
         else:
             # If no specific keyword is found, fallback to a default pattern.
-            # For instance, extract the substring starting with "-linux"
             match = re.search(r"(-linux(?:64)?\.appimage)$", lower_name)
             if match:
                 self._arch_keyword = match.group(1)
             else:
-                # Last resort: use the file extension (this is less specific)
+                # Last resort: use the file extension
                 self._arch_keyword = ".appimage"
 
     def _find_sha_asset(self, assets: list):
         """
         Find and select appropriate SHA file for verification.
-
-        This method intelligently filters SHA files based on the selected AppImage architecture
-        and prioritizes architecture-specific SHA files that match the selected AppImage.
 
         Args:
             assets: List of release assets from GitHub API
@@ -740,41 +503,65 @@ class GitHubAPI:
             return
 
         # Extract architecture from selected AppImage name for better SHA matching
-        appimage_arch = self._extract_arch_from_filename(self.appimage_name)
+        appimage_arch = arch_utils.extract_arch_from_filename(self.appimage_name)
+        appimage_base_name = os.path.basename(self.appimage_name)
         logging.info(f"Extracted architecture from AppImage: {appimage_arch}")
+        logging.info(f"AppImage base name: {appimage_base_name}")
 
         # 1. Try exact match first if SHA name is provided
-        if self.sha_name:
+        if self.sha_name and self.sha_name != "sha256" and self.sha_name != "sha512":
             for asset in assets:
                 if asset["name"] == self.sha_name:
                     self._select_sha_asset(asset)
                     return
 
-        # 2. Find architecture-specific SHA files that match the AppImage architecture
-        sha_candidates = []
-        generic_sha_candidates = []
-        sha256sums = None
-        linux_yml = None
+        # Initialize category buckets for SHA files
+        direct_appimage_sha = None  # Highest priority: AppImage name with .sha512/.sha256 extension
+        arch_specific_sha_candidates = []  # Architecture-specific SHA files
+        linux_yml = None  # Linux YML file (common in Electron apps)
+        latest_yml = None  # Generic latest.yml (usually for other platforms)
+        sha256sums = None  # Common SHA256SUMS file
+        generic_sha_candidates = []  # Other generic SHA files
+        all_sha_files = []  # All SHA files as fallback
 
+        # 2. Categorize all SHA files
         for asset in assets:
             name = asset["name"].lower()
-            if not self._is_sha_file(name):
+            if not sha_utils.is_sha_file(name):
                 continue
+
+            # Add to all SHA files list for fallback
+            all_sha_files.append(asset)
+
+            # Check for direct AppImage SHA file (e.g., "Joplin-3.2.13.AppImage.sha512")
+            appimage_sha_pattern = f"{appimage_base_name.lower()}.sha"
+            if name.startswith(appimage_base_name.lower()) and (
+                name.endswith(".sha256") or name.endswith(".sha512")
+            ):
+                direct_appimage_sha = asset
+                logging.info(f"Found direct AppImage SHA file: {asset['name']}")
+                break  # Highest priority, exit loop immediately
 
             # Special handling for common SHA files
             if name == "sha256sums":
                 sha256sums = asset
+                continue
 
             if name == "latest-linux.yml":
                 linux_yml = asset
+                continue
+
+            if name == "latest.yml":
+                latest_yml = asset
+                continue
 
             # Match architecture-specific SHA files with the AppImage architecture
-            asset_arch = self._extract_arch_from_filename(name)
+            asset_arch = arch_utils.extract_arch_from_filename(name)
 
             if asset_arch:
                 # Only include architecture-specific files if they match the AppImage architecture
                 if asset_arch == appimage_arch:
-                    sha_candidates.append(asset)
+                    arch_specific_sha_candidates.append(asset)
                 # Skip SHA files that are for other architectures
                 continue
 
@@ -783,31 +570,42 @@ class GitHubAPI:
             if "mac" not in name and "windows" not in name and "win" not in name:
                 generic_sha_candidates.append(asset)
 
-        # 3. Select SHA file based on intelligent prioritization
+        # 3. Select SHA file based on improved prioritization
 
-        # Use architecture-specific SHA files if available
-        if len(sha_candidates) == 1:
-            logging.info(f"Found architecture-specific SHA file: {sha_candidates[0]['name']}")
-            self._select_sha_asset(sha_candidates[0])
+        # Highest priority: Direct AppImage SHA file
+        if direct_appimage_sha:
+            logging.info(f"Selected direct AppImage SHA file: {direct_appimage_sha['name']}")
+            self._select_sha_asset(direct_appimage_sha)
             return
-        elif len(sha_candidates) > 1:
+
+        # Second priority: Architecture-specific SHA files
+        if len(arch_specific_sha_candidates) == 1:
+            logging.info(
+                f"Found architecture-specific SHA file: {arch_specific_sha_candidates[0]['name']}"
+            )
+            self._select_sha_asset(arch_specific_sha_candidates[0])
+            return
+        elif len(arch_specific_sha_candidates) > 1:
             logging.info("Multiple architecture-specific SHA files found")
             print("Multiple architecture-specific SHA files found:")
-            self._select_sha_from_list(sha_candidates)
+            ui_utils.select_from_list(
+                arch_specific_sha_candidates, "Select SHA file", callback=self._select_sha_asset
+            )
             return
 
-        # Set default SHA files based on common naming patterns
+        # Third priority: Linux YML file for Linux AppImages
+        if linux_yml:
+            logging.info("Using latest-linux.yml file as default SHA for Linux")
+            self._select_sha_asset(linux_yml)
+            return
+
+        # Fourth priority: Common SHA256SUMS file
         if sha256sums:
             logging.info("Using SHA256SUMS file as default SHA256 checksums file")
             self._select_sha_asset(sha256sums)
             return
 
-        if linux_yml and "linux" in self.appimage_name.lower():
-            logging.info("Using latest-linux.yml file as default SHA for Linux")
-            self._select_sha_asset(linux_yml)
-            return
-
-        # Use generic SHA candidates if available
+        # Fifth priority: Generic SHA candidates
         if len(generic_sha_candidates) == 1:
             logging.info(f"Using generic SHA file: {generic_sha_candidates[0]['name']}")
             self._select_sha_asset(generic_sha_candidates[0])
@@ -815,131 +613,74 @@ class GitHubAPI:
         elif generic_sha_candidates:
             logging.info("Multiple generic SHA files found")
             print("SHA files compatible with your architecture:")
-            self._select_sha_from_list(generic_sha_candidates)
+            ui_utils.select_from_list(
+                generic_sha_candidates, "Select SHA file", callback=self._select_sha_asset
+            )
             return
 
-        # 4. Fallback to any SHA file if no architecture-specific or generic files found
-        all_sha = [a for a in assets if self._is_sha_file(a["name"])]
-        if len(all_sha) == 1:
-            self._select_sha_asset(all_sha[0])
+        # Sixth priority: Latest.yml as fallback for non-Linux platforms
+        if latest_yml and "linux" not in self.appimage_name.lower():
+            logging.info("Using latest.yml file as fallback SHA (non-Linux platform)")
+            self._select_sha_asset(latest_yml)
             return
-        elif all_sha:
+
+        # Last resort: any SHA file
+        if len(all_sha_files) == 1:
+            logging.info(f"Using only available SHA file: {all_sha_files[0]['name']}")
+            self._select_sha_asset(all_sha_files[0])
+            return
+        elif all_sha_files:
             logging.info("Found multiple SHA files")
             print("Found multiple SHA files:")
-            self._select_sha_from_list(all_sha)
+            ui_utils.select_from_list(
+                all_sha_files, "Select SHA file", callback=self._select_sha_asset
+            )
             return
 
-        # 5. Final fallback to manual input
+        # Final fallback to manual input
         self._handle_sha_fallback(assets)
 
-    def _extract_arch_from_filename(self, filename: str) -> str:
+    def _select_sha_asset(self, asset):
         """
-        Extract architecture information from a filename.
-
-        This helper method identifies the architecture pattern in filenames
-        to allow better matching between AppImages and SHA files.
+        Select a SHA asset and set instance attributes.
 
         Args:
-            filename: The filename to analyze
-
-        Returns:
-            str: Architecture identifier or empty string if not found
+            asset: GitHub API asset information dictionary
         """
-        if not filename:
-            return ""
-
-        filename_lower = filename.lower()
-
-        # Check for common architecture patterns in the filename
-        arch_patterns = {
-            "x86_64": ["x86_64", "x86-64", "amd64", "x64"],
-            "arm64": ["arm64", "aarch64"],
-            "armv7": ["armv7", "armhf", "arm32"],
-            "arm": ["arm"],
-            "i386": ["i386", "i686", "x86"],
-            "mac": ["mac", "darwin"],
-            "win": ["win", "windows"],
-        }
-
-        # Find which architecture pattern matches the filename
-        for arch, patterns in arch_patterns.items():
-            if any(pattern in filename_lower for pattern in patterns):
-                return arch
-
-        return ""
-
-    def _is_sha_file(self, filename: str) -> bool:
-        """Check if file is a valid SHA file using simple rules"""
-        name = filename.lower()
-        return (
-            any(
-                name.endswith(ext)
-                for ext in (
-                    ".sha256",
-                    ".sha512",
-                    ".yml",
-                    ".yaml",
-                    ".txt",
-                    ".sum",
-                    ".sha",
-                )
-            )
-            or "checksum" in name
-            or "sha256" in name
-            or "sha512" in name
-        )
-
-    def _select_sha_asset(self, asset):
-        """Your original hash type detection with improvements"""
         self.sha_name = asset["name"]
         self.sha_url = asset["browser_download_url"]
 
-        # Original auto-detection logic
-        name_lower = self.sha_name.lower()
-        if "sha256" in name_lower:
-            self.hash_type = "sha256"
-        elif "sha512" in name_lower:
-            self.hash_type = "sha512"
-        elif name_lower.endswith((".yml", ".yaml")):
-            # Default for YAML files as in original code
-            self.hash_type = "sha512"
-        else:
-            # Fallback to user input
+        # Auto-detect hash type
+        self.hash_type = sha_utils.detect_hash_type(self.sha_name)
+
+        # If hash type couldn't be detected, ask user
+        if not self.hash_type:
             logging.info(f"Could not detect hash type from {self.sha_name}")
             print(f"Could not detect hash type from {self.sha_name}")
-            default = "sha256"
-            user_input = input(f"Enter hash type (default: {default}): ").strip()
-            self.hash_type = user_input if user_input else default
+            self.hash_type = ui_utils.get_user_input("Enter hash type", default="sha256")
 
         logging.info(f"Selected SHA file: {self.sha_name} (hash type: {self.hash_type})")
 
-    def _select_sha_from_list(self, sha_assets):
-        """Simple user selection prompt"""
-        for idx, asset in enumerate(sha_assets, 1):
-            print(f"{idx}. {asset['name']}")
-
-        while True:
-            choice = input(f"Select SHA file (1-{len(sha_assets)}): ")
-            if choice.isdigit() and 1 <= int(choice) <= len(sha_assets):
-                self._select_sha_asset(sha_assets[int(choice) - 1])
-                return
-            logging.warning("Invalid input, try again")
-            print("Invalid input, try again")
-
     def _handle_sha_fallback(self, assets):
-        """Original fallback logic with improved prompts"""
+        """
+        Handle fallback when SHA file couldn't be automatically determined.
+
+        Args:
+            assets: List of release assets from GitHub API
+        """
         logging.warning("Could not find SHA file automatically")
         print(f"Could not find SHA file automatically for {self.appimage_name}")
         print("1. Enter filename manually")
         print("2. Skip verification")
-        choice = input("Your choice (1-2): ")
+
+        choice = ui_utils.get_user_input("Your choice (1-2)")
 
         if choice == "1":
-            self.sha_name = input("Enter exact SHA filename: ")
+            self.sha_name = ui_utils.get_user_input("Enter exact SHA filename")
             for asset in assets:
                 if asset["name"] == self.sha_name:
                     self.sha_url = asset["browser_download_url"]
-                    self._select_sha_asset(asset)  # Trigger hash type detection
+                    self._select_sha_asset(asset)
                     return
             raise ValueError(f"SHA file {self.sha_name} not found")
         else:

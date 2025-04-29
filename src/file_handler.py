@@ -7,23 +7,33 @@ This module handles file operations related to AppImages, including moving files
 creating desktop entries, and downloading icons.
 """
 
+# Standard library imports
 import logging
-import os
 import re
 import shutil
 import stat
 import subprocess
 import sys
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+import time
 from importlib import import_module
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union, Any
 
+# Third-party imports
 import requests
 
+# Local imports
 from src.api import GitHubAPI
 
 # Configure module logger
 logger = logging.getLogger(__name__)
+
+# Constants
+APPIMAGE_EXTENSION = ".AppImage"
+DESKTOP_ENTRY_DIR = Path("~/.local/share/applications").expanduser()
+DESKTOP_ENTRY_FILE_MODE = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+DEFAULT_CATEGORIES = "Utility;"
+DESKTOP_FILE_SECTION = "Desktop Entry"
 
 
 class FileHandler:
@@ -46,14 +56,14 @@ class FileHandler:
         self,
         appimage_name: str,
         repo: str,
-        owner: str = None,
-        version: str = None,
-        sha_name: str = None,
-        config_file: str = None,
-        appimage_download_folder_path: str = None,
-        appimage_download_backup_folder_path: str = None,
-        config_folder: str = None,
-        config_file_name: str = None,
+        owner: Optional[str] = None,
+        version: Optional[str] = None,
+        sha_name: Optional[str] = None,
+        config_file: Optional[str] = None,
+        appimage_download_folder_path: Optional[str] = None,
+        appimage_download_backup_folder_path: Optional[str] = None,
+        config_folder: Optional[str] = None,
+        config_file_name: Optional[str] = None,
         batch_mode: bool = False,
         keep_backup: bool = True,
         max_backups: int = 3,
@@ -76,30 +86,51 @@ class FileHandler:
             keep_backup: Whether to keep backup files
             max_backups: Maximum number of backup files to keep per app
         """
+        # Validate required parameters
+        if not appimage_name:
+            raise ValueError("AppImage name cannot be empty")
+        if not repo:
+            raise ValueError("Repository name cannot be empty")
+
         self.appimage_name = appimage_name
         self.repo = repo
         self.owner = owner
         self.version = version
         self.sha_name = sha_name
         self.config_file = config_file
-        self.appimage_download_folder_path = appimage_download_folder_path
-        self.appimage_download_backup_folder_path = appimage_download_backup_folder_path
         self.config_folder = config_folder
         self.config_file_name = config_file_name
         self.batch_mode = batch_mode
         self.keep_backup = keep_backup
         self.max_backups = max_backups
 
+        # Convert paths to Path objects
+        self.appimage_download_folder_path = (
+            Path(appimage_download_folder_path) if appimage_download_folder_path else None
+        )
+        self.appimage_download_backup_folder_path = (
+            Path(appimage_download_backup_folder_path)
+            if appimage_download_backup_folder_path
+            else None
+        )
+
         # Derived paths
         # Construct the AppImage file path with proper .AppImage extension if missing
         file_name = self.repo
-        if not file_name.lower().endswith(".appimage"):
-            file_name += ".AppImage"
-        self.appimage_path = os.path.join(self.appimage_download_folder_path, file_name)
+        if not file_name.lower().endswith(APPIMAGE_EXTENSION.lower()):
+            file_name += APPIMAGE_EXTENSION
+
+        self.appimage_path = (
+            self.appimage_download_folder_path / file_name
+            if self.appimage_download_folder_path
+            else None
+        )
 
         # Use original appimage_name for backup path so we can properly match downloaded files
-        self.backup_path = os.path.join(
-            self.appimage_download_backup_folder_path, self.appimage_name
+        self.backup_path = (
+            self.appimage_download_backup_folder_path / self.appimage_name
+            if self.appimage_download_backup_folder_path
+            else None
         )
 
     def handle_appimage_operations(self, github_api: Optional[GitHubAPI] = None) -> bool:
@@ -117,7 +148,7 @@ class FileHandler:
             self._ensure_directories_exist()
 
             # Make backup of existing AppImage if it exists
-            if os.path.exists(self.appimage_path):
+            if self.appimage_path and self.appimage_path.exists():
                 if not self._backup_appimage():
                     return False
 
@@ -141,8 +172,10 @@ class FileHandler:
 
     def _ensure_directories_exist(self) -> None:
         """Create required directories if they don't exist."""
-        os.makedirs(self.appimage_download_folder_path, exist_ok=True)
-        os.makedirs(self.appimage_download_backup_folder_path, exist_ok=True)
+        if self.appimage_download_folder_path:
+            self.appimage_download_folder_path.mkdir(parents=True, exist_ok=True)
+        if self.appimage_download_backup_folder_path:
+            self.appimage_download_backup_folder_path.mkdir(parents=True, exist_ok=True)
 
     def _backup_appimage(self) -> bool:
         """
@@ -156,7 +189,8 @@ class FileHandler:
         """
         try:
             # Check if the backup folder exists or create it
-            os.makedirs(self.appimage_download_backup_folder_path, exist_ok=True)
+            if self.appimage_download_backup_folder_path:
+                self.appimage_download_backup_folder_path.mkdir(parents=True, exist_ok=True)
 
             # If keep_backup is False, skip backup creation
             if not self.keep_backup:
@@ -164,14 +198,12 @@ class FileHandler:
                 return True
 
             # Get app name for grouping backups by app
-            app_base_name = os.path.splitext(self.repo)[0].lower()
+            app_base_name = self.repo.lower()
 
             # Create a unique backup name with timestamp
-            import time
-
             timestamp = time.strftime("%Y%m%d-%H%M%S")
             backup_name = f"{app_base_name}_{timestamp}.AppImage"
-            new_backup_path = os.path.join(self.appimage_download_backup_folder_path, backup_name)
+            new_backup_path = self.appimage_download_backup_folder_path / backup_name
 
             # Move current AppImage to timestamped backup
             logging.info(f"Backing up {self.appimage_path} to {new_backup_path}")
@@ -195,12 +227,12 @@ class FileHandler:
         """
         try:
             # Skip cleanup if backup is disabled
-            if not self.keep_backup:
+            if not self.keep_backup or not self.appimage_download_backup_folder_path:
                 return
 
             # Ensure backup directory exists
             backup_dir = self.appimage_download_backup_folder_path
-            if not os.path.exists(backup_dir):
+            if not backup_dir.exists():
                 logging.info(f"Backup directory does not exist: {backup_dir}")
                 return
 
@@ -210,22 +242,21 @@ class FileHandler:
             # Find all backup files for this app
             all_backups = []
 
-            for filename in os.listdir(backup_dir):
-                filepath = os.path.join(backup_dir, filename)
-                if not filename.lower().endswith(".appimage") or not os.path.isfile(filepath):
+            for filepath in backup_dir.iterdir():
+                if not filepath.name.lower().endswith(".appimage") or not filepath.is_file():
                     continue
 
                 # Simplified matching - just check if the normalized filename starts with the app name
-                filename_lower = filename.lower()
+                filename_lower = filepath.name.lower()
                 if (
                     filename_lower.startswith(f"{app_base_name}-")
                     or filename_lower.startswith(f"{app_base_name}_")
                     or filename_lower == f"{app_base_name}.appimage"
                 ):
                     # Get file modification time for sorting
-                    mod_time = os.path.getmtime(filepath)
-                    all_backups.append((filepath, mod_time, filename))
-                    logging.debug(f"Found backup file: {filename}")
+                    mod_time = filepath.stat().st_mtime
+                    all_backups.append((filepath, mod_time, filepath.name))
+                    logging.debug(f"Found backup file: {filepath.name}")
 
             # Sort backups by modification time (newest first)
             all_backups.sort(key=lambda x: x[1], reverse=True)
@@ -243,7 +274,7 @@ class FileHandler:
 
                 for filepath, _, filename in files_to_remove:
                     try:
-                        os.remove(filepath)
+                        filepath.unlink()
                         removed_count += 1
                         logging.info(f"Removed old backup: {filename}")
                     except OSError as e:
@@ -279,16 +310,16 @@ class FileHandler:
 
             # Get the downloads directory path using the class method
             downloads_dir = DownloadManager.get_downloads_dir()
-            current_path = os.path.join(downloads_dir, self.appimage_name)
+            current_path = Path(downloads_dir) / self.appimage_name
 
             # Check if file exists in downloads directory
-            if not os.path.exists(current_path):
+            if not current_path.exists():
                 logging.error(f"Downloaded AppImage not found at {current_path}")
                 return False
 
             # Move file to destination
             logging.info(f"Moving {current_path} to {self.appimage_path}")
-            shutil.move(current_path, self.appimage_path)
+            shutil.move(str(current_path), str(self.appimage_path))
             return True
 
         except Exception as e:
@@ -304,10 +335,7 @@ class FileHandler:
         """
         try:
             # Make the AppImage executable (add +x to current permissions)
-            os.chmod(
-                self.appimage_path,
-                os.stat(self.appimage_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
-            )
+            self.appimage_path.chmod(self.appimage_path.stat().st_mode | DESKTOP_ENTRY_FILE_MODE)
             logging.info(f"Set executable permissions on {self.appimage_path}")
             return True
 
@@ -380,14 +408,13 @@ class FileHandler:
 
             # Default desktop entry creation implementation
             app_name = self.repo  # Preserve original case for display name
-            desktop_dir = os.path.expanduser("~/.local/share/applications")
             desktop_file = f"{self.repo.lower()}.desktop"
-            desktop_path = os.path.join(desktop_dir, desktop_file)
+            desktop_path = DESKTOP_ENTRY_DIR / desktop_file
 
             logging.info(f"Processing desktop entry at {desktop_path}")
 
             # Ensure desktop directory exists
-            os.makedirs(desktop_dir, exist_ok=True)
+            DESKTOP_ENTRY_DIR.mkdir(parents=True, exist_ok=True)
 
             # Get icon path if available
             from src.icon_manager import IconManager
@@ -397,9 +424,9 @@ class FileHandler:
 
             # Read existing desktop file content if it exists
             existing_entries = {}
-            if os.path.exists(desktop_path):
+            if desktop_path.exists():
                 try:
-                    with open(desktop_path, "r", encoding="utf-8") as f:
+                    with desktop_path.open("r", encoding="utf-8") as f:
                         section = None
                         for line in f:
                             line = line.strip()
@@ -408,7 +435,7 @@ class FileHandler:
                             if line.startswith("[") and line.endswith("]"):
                                 section = line[1:-1]
                                 continue
-                            if section == "Desktop Entry" and "=" in line:
+                            if section == DESKTOP_FILE_SECTION and "=" in line:
                                 key, value = line.split("=", 1)
                                 existing_entries[key.strip()] = value.strip()
                     logging.info(f"Found existing desktop file: {desktop_path}")
@@ -419,15 +446,15 @@ class FileHandler:
             new_entries = {
                 "Type": "Application",
                 "Name": app_name,  # Use original case for display name
-                "Exec": self.appimage_path,  # Use full path to AppImage
+                "Exec": str(self.appimage_path),  # Use full path to AppImage
                 "Terminal": "false",
-                "Categories": "Utility;",
+                "Categories": DEFAULT_CATEGORIES,
                 "Comment": f"AppImage for {app_name}",
             }
 
             # Add icon if available
             if icon_path:
-                new_entries["Icon"] = icon_path
+                new_entries["Icon"] = str(icon_path)
                 logging.info(f"Using icon from: {icon_path}")
             else:
                 logging.info("No icon found for desktop entry")
@@ -448,9 +475,9 @@ class FileHandler:
                 return True
 
             # Write updated desktop file with atomic operation pattern
-            temp_path = f"{desktop_path}.tmp"
-            with open(temp_path, "w", encoding="utf-8") as f:
-                f.write("[Desktop Entry]\n")
+            temp_path = desktop_path.with_suffix(".tmp")
+            with temp_path.open("w", encoding="utf-8") as f:
+                f.write(f"[{DESKTOP_FILE_SECTION}]\n")
                 for key, value in new_entries.items():
                     f.write(f"{key}={value}\n")
 
@@ -460,10 +487,10 @@ class FileHandler:
                         f.write(f"{key}={value}\n")
 
             # Set proper executable permissions
-            os.chmod(temp_path, os.stat(temp_path).st_mode | stat.S_IXUSR)
+            temp_path.chmod(temp_path.stat().st_mode | DESKTOP_ENTRY_FILE_MODE)
 
             # Replace original file with temp file (atomic operation)
-            os.replace(temp_path, desktop_path)
+            temp_path.replace(desktop_path)
 
             logging.info(f"Updated desktop entry at {desktop_path}")
             return True
