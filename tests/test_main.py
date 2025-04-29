@@ -197,15 +197,39 @@ def test_main_exit(monkeypatch: pytest.MonkeyPatch, mock_invoker: CommandInvoker
         monkeypatch: Pytest's monkeypatch fixture
         mock_invoker: Mock command invoker fixture
     """
-    # Mock get_user_choice to return exit option (9)
-    monkeypatch.setattr("main.get_user_choice", lambda: 9)
+    # Mock get_user_choice to return exit option (10) - updated to match current exit option
+    monkeypatch.setattr("main.get_user_choice", lambda: 10)
+
+    # Mock sys.exit to avoid actual exit but track if it was called
+    exit_called = False
+
+    def mock_exit(code: int = 0) -> None:
+        nonlocal exit_called
+        exit_called = True
+        # Raise RuntimeError instead of SystemExit to break out of the while loop
+        raise RuntimeError(f"sys.exit({code}) called")
+
+    monkeypatch.setattr("sys.exit", mock_exit)
 
     # Mock CommandInvoker
     monkeypatch.setattr("main.CommandInvoker", lambda: mock_invoker)
 
-    with pytest.raises(SystemExit) as exc_info:
+    # Mock other functions that might cause issues
+    monkeypatch.setattr("main.configure_logging", lambda: None)
+
+    # Mock GitHubAuthManager to avoid API calls
+    monkeypatch.setattr(
+        "src.auth_manager.GitHubAuthManager.get_rate_limit_info",
+        lambda: (100, 5000, "2024-01-01 00:00:00", True),
+    )
+
+    # Run main and expect RuntimeError from our mock_exit
+    with pytest.raises(RuntimeError) as exc_info:
         main.main()
-    assert exc_info.value.code == 0
+
+    # Verify sys.exit was called
+    assert exit_called
+    assert "sys.exit(0) called" in str(exc_info.value)
 
 
 def test_main_command_execution(

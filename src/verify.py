@@ -7,7 +7,7 @@ import re
 import requests
 import yaml
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 _ = gettext.gettext
 
@@ -153,7 +153,16 @@ class VerificationManager:
             ".sha512": self._parse_simple_sha,
         }.get(ext, self._parse_text_sha)
 
-        return parser()
+        try:
+            # Try the standard parser first
+            return parser()
+        except ValueError as e:
+            # If standard parsing fails with "No valid hash found", try the path-based parser
+            if "No valid hash found" in str(e):
+                logging.info("Standard hash parsing failed, trying path-based fallback...")
+                return self._parse_path_sha()
+            # Re-raise other value errors
+            raise
 
     def _parse_yaml_sha(self) -> bool:
         """Parse SHA hash from YAML file with error handling."""
@@ -200,8 +209,112 @@ class VerificationManager:
             raise IOError(f"Failed to read SHA file: {str(e)}")
 
     def _parse_text_sha(self) -> bool:
-        """Parse SHA hash from text file with pattern matching."""
+        """
+        Parse SHA hash from text file with pattern matching.
+
+        This method handles multiple common formats:
+        - <hash> <filename> (most common format)
+        - <filename> <hash> (alternate format)
+        - Entries prefixed with indicators like '*' or other markers
+        - GitHub-style checksums with headers
+
+        Args:
+            None
+
+        Returns:
+            bool: True if verification passes, False otherwise
+
+        Raises:
+            ValueError: If no valid hash is found
+            IOError: If file can't be read
+        """
         target_name = os.path.basename(self.appimage_name).lower()
+
+        try:
+            with open(self.sha_name, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Try GitHub-style format with headers first
+            # Look for headers like "## SHA256 Checksums" followed by hash entries
+            sha_section_match = re.search(r"##\s+SHA2?56.+", content, re.MULTILINE | re.IGNORECASE)
+            if sha_section_match:
+                # Look for pattern like "hash *filename" or "hash filename"
+                hash_pattern = rf"([0-9a-f]{{{64 if self.hash_type == 'sha256' else 128}}})\s+\*?{re.escape(target_name)}"
+                hash_match = re.search(hash_pattern, content, re.MULTILINE | re.IGNORECASE)
+                if hash_match:
+                    hash_value = hash_match.group(1).lower()
+                    logging.info(f"Found valid hash for {target_name} in GitHub-style SHA file")
+                    return self._compare_hashes(hash_value)
+
+            # Process the file line by line for common formats
+            for line in content.splitlines():
+                line = line.strip()
+                if not line or len(line.split()) < 2:
+                    continue
+
+                # Normalize the line by removing common markers and extra spaces
+                normalized_line = line.replace("*", " ").replace("  ", " ")
+                parts = normalized_line.strip().split()
+
+                # Skip lines that are too short after normalization
+                if len(parts) < 2:
+                    continue
+
+                # Try multiple formats
+                hash_value = None
+
+                # Format: <hash> <filename> (most common)
+                if len(parts[0]) in (64, 128) and parts[1].lower() == target_name:
+                    hash_value = parts[0]
+                # Format: <filename> <hash> (alternate format)
+                elif parts[0].lower() == target_name and len(parts[1]) in (64, 128):
+                    hash_value = parts[1]
+                # Look for target filename anywhere in the line with a valid hash
+                else:
+                    # Find any hex string of appropriate length (hash) in the line
+                    for part in parts:
+                        if len(part) in (64, 128) and re.match(r"^[0-9a-f]+$", part, re.IGNORECASE):
+                            # If we found a hash, check if the target filename is elsewhere on the line
+                            if target_name in line.lower():
+                                hash_value = part
+                                break
+
+                if hash_value:
+                    # Validate hash format
+                    expected_length = 64 if self.hash_type == "sha256" else 128
+                    if len(hash_value) != expected_length:
+                        logging.warning(
+                            f"Hash for {target_name} has wrong length: {len(hash_value)}, "
+                            f"expected {expected_length}"
+                        )
+                        continue
+
+                    if not re.match(r"^[0-9a-f]+$", hash_value, re.IGNORECASE):
+                        logging.warning(f"Invalid hex characters in hash: {hash_value}")
+                        continue
+
+                    logging.info(f"Found valid hash for {target_name} in SHA file")
+                    return self._compare_hashes(hash_value.lower())
+
+            raise ValueError(f"No valid hash found for {self.appimage_name} in SHA file")
+
+        except IOError as e:
+            raise IOError(f"Failed to read SHA file: {str(e)}")
+        except Exception as e:
+            logging.error(f"Error parsing SHA file: {str(e)}")
+            raise
+
+    def _parse_path_sha(self) -> bool:
+        """
+        Parse SHA hash from text file that contains relative paths.
+
+        This handles formats like:
+        <hash>  ./path/to/filename.AppImage
+
+        Returns:
+            bool: True if verification passes, False otherwise
+        """
+        target_filename = os.path.basename(self.appimage_name).lower()
 
         try:
             with open(self.sha_name, "r", encoding="utf-8") as f:
@@ -210,21 +323,19 @@ class VerificationManager:
                     if len(parts) < 2:
                         continue
 
-                    # Check for both standard patterns:
-                    # 1. HASH FILENAME format (common for sha256sum output)
-                    # 2. FILENAME HASH format (used by some projects)
-                    hash_value = None
-                    if parts[1].lower() == target_name:
-                        hash_value = parts[0]
-                    elif len(parts) > 2 and parts[0].lower() == target_name:
-                        hash_value = parts[1]
+                    # The hash is typically the first element, path is the second
+                    hash_value = parts[0]
+                    file_path = parts[1]
 
-                    if hash_value:
-                        # Validate hash format with proper hex check
+                    # Extract filename from the path and compare with target
+                    path_filename = os.path.basename(file_path).lower()
+
+                    if path_filename == target_filename:
+                        # Validate hash format
                         expected_length = 64 if self.hash_type == "sha256" else 128
                         if len(hash_value) != expected_length:
                             logging.warning(
-                                f"Hash for {target_name} has wrong length: {len(hash_value)}, "
+                                f"Hash for {path_filename} has wrong length: {len(hash_value)}, "
                                 f"expected {expected_length}"
                             )
                             continue
@@ -233,10 +344,10 @@ class VerificationManager:
                             logging.warning(f"Invalid hex characters in hash: {hash_value}")
                             continue
 
-                        logging.info(f"Found valid hash for {target_name} in SHA file")
+                        logging.info(f"Found valid hash for {path_filename} in path-based SHA file")
                         return self._compare_hashes(hash_value.lower())
 
-            raise ValueError(f"No valid hash found for {self.appimage_name} in SHA file")
+            raise ValueError(f"No valid hash found for {target_filename} in path-based SHA file")
 
         except IOError as e:
             raise IOError(f"Failed to read SHA file: {str(e)}")
@@ -316,10 +427,30 @@ class VerificationManager:
             print("\n".join(log_lines))
 
     def _cleanup_failed_file(self, filepath: str) -> bool:
-        """Remove a file that failed verification to prevent future update issues."""
+        """
+        Remove a file that failed verification after asking for user confirmation.
+
+        Args:
+            filepath: Path to the file that failed verification
+
+        Returns:
+            bool: True if cleanup succeeded or was declined, False on error
+        """
         try:
             if not os.path.exists(filepath):
                 logging.info(f"File not found, nothing to clean up: {filepath}")
+                return True
+
+            # Ask user for confirmation before removing the file
+            confirmation = self._get_user_confirmation(filepath)
+            if not confirmation:
+                logging.info(
+                    f"User chose to keep the file despite verification failure: {filepath}"
+                )
+                print(f"File kept: {filepath}")
+                print(
+                    "Note: You may want to investigate this verification failure or report it as an issue."
+                )
                 return True
 
             os.remove(filepath)
@@ -331,3 +462,35 @@ class VerificationManager:
             logging.error(f"Failed to remove file after verification failure: {str(e)}")
             print(f"Warning: Could not remove failed file: {filepath}")
             return False
+
+    def _get_user_confirmation(self, filepath: str) -> bool:
+        """
+        Ask the user for confirmation before removing a file that failed verification.
+
+        Args:
+            filepath: Path to the file that failed verification
+
+        Returns:
+            bool: True if user confirms removal, False otherwise
+        """
+        filename = os.path.basename(filepath)
+
+        print("\n" + "=" * 70)
+        print(f"WARNING: The file '{filename}' failed verification.")
+        print("This could indicate tampering or download corruption.")
+        print("You have two options:")
+        print("  1. Remove the file (recommended for security)")
+        print("  2. Keep the file (if you want to manually verify or report an issue)")
+        print("=" * 70)
+
+        while True:
+            try:
+                response = input("\nRemove the file? [y/N]: ").strip().lower()
+                if response in ("y", "yes"):
+                    return True
+                if response in ("", "n", "no"):
+                    return False
+                print("Please answer 'y' for yes or 'n' for no.")
+            except KeyboardInterrupt:
+                print("\nOperation cancelled by user.")
+                return False

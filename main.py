@@ -22,6 +22,7 @@ from src.commands.migrate_config import MigrateConfigCommand
 from src.commands.update_all_auto import UpdateAllAutoCommand
 from src.commands.update_all_async import UpdateAsyncCommand
 from src.commands.delete_backups import DeleteBackupsCommand
+from src.commands.install_app import InstallAppCommand
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
 from src.auth_manager import GitHubAuthManager
@@ -74,7 +75,7 @@ def get_user_choice() -> int:
         else:
             print(f"GitHub API Status: {remaining} of 60 requests remaining")
             print(f"Authentication: ❌ Unauthenticated")
-            print(f"Note: 🔑 Add token (option 6) for 5000 requests/hour")
+            print(f"Note: 🔑 Add token (option 7) for 5000 requests/hour")
 
         print(f"{'-' * 40}")
     except Exception as e:
@@ -82,21 +83,22 @@ def get_user_choice() -> int:
 
     # Download & Update section
     print("\n--- Download & Update ---")
-    print("1. Download new AppImage")
-    print("2. Update all AppImages")
-    print("3. Select AppImages to update")
+    print("1. Download new AppImage from URL")
+    print("2. Install app from catalog")  # New option
+    print("3. Update all AppImages")
+    print("4. Select AppImages to update")
 
     # Configuration section
     print("\n--- Configuration ---")
-    print("4. Manage AppImage settings")
-    print("5. Manage global settings")
-    print("6. Manage GitHub token")
+    print("5. Manage AppImage settings")
+    print("6. Manage global settings")
+    print("7. Manage GitHub token")
 
     # Maintenance section
     print("\n--- Maintenance ---")
-    print("7. Update configuration files")
-    print("8. Clean old backups")
-    print("9. Exit")
+    print("8. Update configuration files")
+    print("9. Clean old backups")
+    print("10. Exit")  # Updated exit option
     print(f"{'-' * 40}")
 
     try:
@@ -163,18 +165,19 @@ def main() -> None:
     invoker = CommandInvoker()
 
     invoker.register_command(1, DownloadCommand())
-    invoker.register_command(2, UpdateAllAutoCommand())
-    invoker.register_command(3, UpdateAsyncCommand())  # Register the new async update command
-    invoker.register_command(4, CustomizeAppConfigCommand())
-    invoker.register_command(5, CustomizeGlobalConfigCommand())
-    invoker.register_command(6, ManageTokenCommand())
-    invoker.register_command(7, MigrateConfigCommand())
-    invoker.register_command(8, DeleteBackupsCommand())
+    invoker.register_command(2, InstallAppCommand())  # New command
+    invoker.register_command(3, UpdateAllAutoCommand())
+    invoker.register_command(4, UpdateAsyncCommand())
+    invoker.register_command(5, CustomizeAppConfigCommand())
+    invoker.register_command(6, CustomizeGlobalConfigCommand())
+    invoker.register_command(7, ManageTokenCommand())
+    invoker.register_command(8, MigrateConfigCommand())
+    invoker.register_command(9, DeleteBackupsCommand())
 
     # Main menu loop
     while True:
         choice = get_user_choice()
-        if choice == 9:  # Updated exit option number
+        if choice == 10:  # Updated exit option number
             logging.info("User selected to exit application")
             print("Exiting...")
             sys.exit(0)

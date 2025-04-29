@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.9.0-alpha
+### Changed
+Added a new feature that allows you to install AppImages from the catalog of compatible apps instead of dealing with URLs. This will not affect existing functionality.
+
 ## v0.8.0-alpha
 # BREAKING CHANGES
 Added download more than 1 app at a time feature. `max_concurrent_updates` is added to the global config file and default value is 3. Migrate with choice migrate to add this default value to your settings.json file to be able to use this feature. 

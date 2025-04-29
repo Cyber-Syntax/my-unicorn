@@ -114,14 +114,14 @@ run_my_unicorn() {
         # Simple choices without extra input
         cat >"/tmp/input.txt" <<EOF
 $choice
-9
+10
 EOF
     else
         # Choices with extra input
         cat >"/tmp/input.txt" <<EOF
 $choice
 $extra_input
-9
+10
 EOF
     fi
 
@@ -147,21 +147,21 @@ test_update_both_apps() {
     # Set up outdated versions for both apps
     setup_qownnotes_config "21.8.0" # Old version for QOwnNotes
     setup_joplin_config "2.9.17"    # Old version for Joplin
-    run_my_unicorn "2" "all"        # Update all
+    run_my_unicorn "3" "all"        # Update all
     log "Combined QOwnNotes and Joplin update test completed"
 }
 
 test_update_qownnotes() {
     log "=== Testing QOwnNotes Update ==="
     setup_qownnotes_config "21.8.0" # Old version
-    run_my_unicorn "2" "all"        # Update all
+    run_my_unicorn "3" "all"        # Update all
     log "QOwnNotes update test completed"
 }
 
 test_update_joplin() {
     log "=== Testing Joplin Update ==="
     setup_joplin_config "2.9.17" # Old version
-    run_my_unicorn "2" "all"     # Update all
+    run_my_unicorn "3" "all"     # Update all
     log "Joplin update test completed"
 }
 
@@ -171,7 +171,7 @@ test_selective_update() {
 
     # Find QOwnNotes position in the app list (usually 3)
     # Add "y" to confirm the update after selecting the app
-    run_my_unicorn "3" "3\ny" # Selective update, select QOwnNotes and confirm with "y"
+    run_my_unicorn "4" "4\ny" # Selective update, select QOwnNotes and confirm with "y"
     log "Selective update test completed"
 }
 
@@ -186,7 +186,7 @@ test_install_qownnotes() {
 https://github.com/pbek/QOwnNotes
 
 
-9
+10
 EOF
 
     cd "$APP_ROOT"
@@ -207,7 +207,7 @@ test_install_joplin() {
 https://github.com/laurent22/joplin
 
 
-9
+10
 EOF
 
     cd "$APP_ROOT"
