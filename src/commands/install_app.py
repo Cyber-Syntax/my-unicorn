@@ -189,12 +189,13 @@ class InstallAppCommand(Command):
     def _install_app(self, app_info: AppInfo) -> None:
         """
         Download and install the application with verification.
-
-        Args:
-            app_info: AppInfo object for the application to install
         """
         # Create a properly initialized app config manager for this app
-        app_config = AppConfigManager(owner=app_info.owner, repo=app_info.repo)
+        app_config = AppConfigManager(
+            owner=app_info.owner,
+            repo=app_info.repo,
+            app_id=app_info.app_id,  # Pass the app_id from catalog
+        )
 
         # Initialize GitHubAPI with parameters based on app catalog information
         if app_info.sha_name != "no_sha_file":
@@ -321,6 +322,7 @@ class InstallAppCommand(Command):
         file_handler = FileHandler(
             appimage_name=api.appimage_name,
             repo=api.repo,
+            owner=api.owner,
             version=api.version,
             sha_name=api.sha_name,
             config_file=self.global_config.config_file,
@@ -331,6 +333,7 @@ class InstallAppCommand(Command):
             batch_mode=self.global_config.batch_mode,
             keep_backup=self.global_config.keep_backup,
             max_backups=self.global_config.max_backups,
+            app_id=app_info.app_id,  # Pass app_id from app_info to FileHandler
         )
 
         # Download app icon if possible

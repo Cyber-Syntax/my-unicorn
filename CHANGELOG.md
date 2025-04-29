@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.9.1-alpha
+### Changed
+This release includes a fix for the issue where the standard notes app repo name was `app` which script was using repo name to name the appimage, config, desktop file and backup files. The script now uses app_id to name the appimage and similar files. Changes is not breaking because app_id is still fallback to repo name if app_id is not found. I encourage you to use app_id in your config file to avoid any confusion in the future and solve the standard notes app issue.
+
 ## v0.9.0-alpha
 ### Changed
 Added a new feature that allows you to install AppImages from the catalog of compatible apps instead of dealing with URLs. This will not affect existing functionality.
