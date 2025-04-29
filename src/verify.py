@@ -11,10 +11,9 @@ from typing import Optional
 
 _ = gettext.gettext
 
-# Constants for color formatting
-COLOR_SUCCESS = "\033[92m"
-COLOR_FAIL = "\033[41m"
-COLOR_RESET = "\033[0m"
+# Constants for status indicators
+STATUS_SUCCESS = "✓ "  # Unicode check mark
+STATUS_FAIL = "✗ "  # Unicode cross mark
 
 # Supported hash types
 SUPPORTED_HASH_TYPES = ["sha256", "sha512", "no_hash"]
@@ -298,11 +297,10 @@ class VerificationManager:
         Failed verifications are both logged and printed to console.
         """
         is_verified = actual == expected
-        status = _("VERIFIED") if is_verified else _("VERIFICATION FAILED")
-        color = COLOR_SUCCESS if is_verified else COLOR_FAIL
+        status = STATUS_SUCCESS if is_verified else STATUS_FAIL
 
         log_lines = [
-            f"{color}{status}{COLOR_RESET}",
+            f"{status}{_('VERIFIED') if is_verified else _('VERIFICATION FAILED')}",
             _("File: {name}").format(name=self.appimage_name),
             _("Algorithm: {type}").format(type=self.hash_type.upper()),
             _("Expected: {hash}").format(hash=expected),

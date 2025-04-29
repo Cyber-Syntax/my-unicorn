@@ -34,16 +34,15 @@ class ParseURL:
         else:
             raise ValueError("Invalid GitHub URL. Unable to parse owner and repository.")
 
-    # TODO: are these properties necessary?
     @property
-    def owner(self):
+    def owner(self) -> str:
         """Return the owner from URL."""
         if not self._owner:
             raise ValueError("Owner not set. Please call 'ask_url()' first.")
         return self._owner
 
     @property
-    def repo(self):
+    def repo(self) -> str:
         """Return the repo from URL."""
         if not self._repo:
             raise ValueError("Repo not set. Please call 'ask_url()' first.")

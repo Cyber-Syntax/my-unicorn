@@ -4,16 +4,16 @@
 Icon management module.
 
 This module provides functionality for finding, fetching and storing
-application icons from GitHub repositories.
+application icons from GitHub repositories using exact paths.
 """
 
 import logging
 import os
-import requests
-from typing import Dict, Optional, List, Any, Tuple, Union
+from pathlib import Path
+from typing import Dict, Optional, Any, Tuple, Union
 
-# Import the icon paths configuration module instead of using YAML
-from src.utils.icon_paths import get_icon_paths
+# Import the icon paths configuration
+from src.utils.icon_paths import get_icon_path, get_icon_filename, get_icon_paths
 from src.auth_manager import GitHubAuthManager
 
 # Configure module logger
@@ -24,26 +24,19 @@ class IconManager:
     """
     Manages finding and retrieving application icons from GitHub repositories.
 
-    This class provides methods to find icons in GitHub repositories either
-    through exact paths, common file patterns, or by searching repository files.
+    This class provides methods to find icons in GitHub repositories
+    using exact paths defined in the configuration.
     """
 
-    def __init__(self):
-        """
-        Initialize the icon manager.
-
-        No longer loads YAML as we're using the Python module directly.
-        """
+    def __init__(self) -> None:
+        """Initialize the icon manager."""
         pass
 
     def find_icon(
         self, owner: str, repo: str, headers: Optional[Dict[str, str]] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Find the best icon for a given repository.
-
-        Only checks paths from icon_paths.py configuration without falling back to
-        searching other directories in the repository. This reduces API calls.
+        Find an icon for a given repository using the exact path.
 
         Args:
             owner: Repository owner/organization
@@ -57,90 +50,44 @@ class IconManager:
             logger.warning("Missing owner or repo name")
             return None
 
-        # Get repository-specific configuration
-        repo_config = self._get_repo_config(owner, repo)
+        # Use GitHubAuthManager for authentication if no headers provided
+        if headers is None:
+            headers = GitHubAuthManager.get_auth_headers()
+            logger.debug("Using GitHubAuthManager for icon search authentication")
 
-        # Check if repo_config is None or empty
-        if not repo_config:
+        # For backward compatibility, check if old-style config exists
+        config = get_icon_paths(repo)
+
+        # Get the exact path from configuration
+        exact_path = get_icon_path(repo)
+        if not exact_path and config:
+            # Fall back to config from get_icon_paths if needed
+            exact_path = config.get("exact_path")
+
+        if not exact_path:
             logger.info(
                 f"No icon configuration found for {owner}/{repo}. "
                 f"Will use app name in desktop file; this may work with system icon themes like Papirus."
             )
             return None
 
-        # Use GitHubAuthManager for authentication if no headers provided
-        if headers is None:
-            headers = GitHubAuthManager.get_auth_headers()
-            logger.debug("Using GitHubAuthManager for icon search authentication")
+        # Check the exact path
+        logger.info(f"Checking exact icon path: {exact_path}")
+        icon_info = self._check_icon_path(owner, repo, exact_path, headers)
 
-        # Step 1: Try exact path if specified (highest priority)
-        if isinstance(repo_config, dict) and "exact_path" in repo_config:
-            exact_path = repo_config["exact_path"]
-            if not exact_path or exact_path == "default":
-                logger.warning(f"Invalid exact_path '{exact_path}' for {owner}/{repo}")
-            else:
-                logger.info(f"Trying exact icon path: {exact_path}")
-                icon_info = self._check_icon_path(owner, repo, exact_path, headers)
-                if icon_info:
-                    # Add filename preference if specified
-                    if "filename" in repo_config:
-                        icon_info["preferred_filename"] = repo_config["filename"]
-                    return icon_info
+        if icon_info:
+            # Add filename preference if available
+            preferred_filename = get_icon_filename(repo)
+            if not preferred_filename and config:
+                # Fall back to config from get_icon_paths if needed
+                preferred_filename = config.get("filename")
 
-        # Step 2: Try paths from configuration
-        paths_to_check = []
-        if isinstance(repo_config, dict) and "paths" in repo_config:
-            paths_to_check = repo_config["paths"]
-        elif isinstance(repo_config, list):
-            paths_to_check = repo_config
+            if preferred_filename:
+                icon_info["preferred_filename"] = preferred_filename
+            return icon_info
 
-        # Filter out any invalid paths
-        valid_paths = [p for p in paths_to_check if p and p != "default"]
-
-        if len(valid_paths) < len(paths_to_check):
-            logger.warning(
-                f"Filtered out {len(paths_to_check) - len(valid_paths)} invalid paths for {owner}/{repo}"
-            )
-
-        # Check each repository-specific path
-        for path in valid_paths:
-            logger.debug(f"Checking repository-specific icon path: {path}")
-            icon_info = self._check_icon_path(owner, repo, path, headers)
-            if icon_info:
-                # Add filename preference if specified
-                if isinstance(repo_config, dict) and "filename" in repo_config:
-                    icon_info["preferred_filename"] = repo_config["filename"]
-                return icon_info
-
-        # Skip default fallback paths to reduce API calls
-        logger.info(f"No suitable icon found for {owner}/{repo}")
+        logger.info(f"No icon found at exact path for {owner}/{repo}")
         return None
-
-    def _get_repo_config(self, owner: str, repo: str) -> Union[Dict[str, Any], List[str], None]:
-        """
-        Get repository configuration for icon paths.
-
-        Tries multiple formats to find a match:
-        1. Full owner/repo format
-        2. Just repo name
-
-        Args:
-            owner: Repository owner/organization
-            repo: Repository name
-
-        Returns:
-            Union[Dict[str, Any], List[str], None]: Repository configuration or None if not found
-        """
-        # Try different formats to find a match
-        full_name = f"{owner}/{repo}"
-        config = get_icon_paths(full_name) or get_icon_paths(repo)
-
-        if config:
-            logger.debug(f"Using icon configuration for {repo}: {type(config)}")
-        else:
-            logger.debug(f"No icon configuration found for {repo}")
-
-        return config
 
     def _check_icon_path(
         self, owner: str, repo: str, path: str, headers: Dict[str, str]
@@ -318,10 +265,8 @@ class IconManager:
         """
         Find the path to an existing icon for an application.
 
-        Searches for icons in various locations in the following order:
-        1. Repository-specific directory with preferred filename
-        2. Standard icon filenames in repository directory
-        3. Legacy system locations
+        Only checks the repository-specific directory using the preferred filename
+        from the configuration.
 
         Args:
             repo: Repository name (used for directory names)
@@ -330,80 +275,30 @@ class IconManager:
         Returns:
             str or None: Path to icon file if found, None otherwise
         """
-        if not app_name:
-            app_name = repo
+        if not repo:
+            logger.debug("Cannot check icon path: repo name is empty")
+            return None
 
-        # Base icon directory for myunicorn
-        icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
+        # Get the preferred filename from configuration
+        preferred_filename = get_icon_filename(repo)
+        if not preferred_filename:
+            logger.info(
+                f"No preferred filename configured for {repo}, cannot check for existing icon"
+            )
+            return None
 
-        # Primary and fallback directories
-        app_icon_dir = os.path.join(icon_base_dir, repo)
-        repo_icon_dir = os.path.join(icon_base_dir, app_name)
+        # Use pathlib for file operations to ensure cross-platform compatibility
+        icon_base_dir = Path("~/.local/share/icons/myunicorn").expanduser()
+        repo_icon_dir = icon_base_dir / repo
+        icon_path = repo_icon_dir / preferred_filename
 
-        # Build list of search directories in priority order
-        icon_dirs = []
-        if repo != app_name:
-            icon_dirs.append(app_icon_dir)
-        icon_dirs.append(repo_icon_dir)
+        logger.info(f"Checking if icon already exists at: {icon_path}")
 
-        # Check standard icon filenames in each directory
-        search_paths = []
-        for icon_dir in icon_dirs:
-            if os.path.exists(icon_dir) and os.path.isdir(icon_dir):
-                # Add standard filenames
-                search_paths.extend(
-                    [
-                        os.path.join(icon_dir, f"{name}{ext}")
-                        for name in ["icon", "logo", repo.lower()]
-                        for ext in [".svg", ".png", ".jpg", ".jpeg"]
-                    ]
-                )
+        if icon_path.exists() and icon_path.is_file():
+            logger.info(f"✓ Found existing icon at: {icon_path}")
+            return str(icon_path)
 
-                # Add any other image files in the directory
-                search_paths.extend(
-                    [
-                        os.path.join(icon_dir, f)
-                        for f in os.listdir(icon_dir)
-                        if os.path.isfile(os.path.join(icon_dir, f))
-                        and any(
-                            f.lower().endswith(ext) for ext in [".svg", ".png", ".jpg", ".jpeg"]
-                        )
-                    ]
-                )
-
-        # Also check legacy locations
-        search_paths.extend(
-            [
-                os.path.join(icon_base_dir, "scalable/apps", f"{name}.svg")
-                for name in [app_name, repo]
-            ]
-        )
-        search_paths.extend(
-            [
-                os.path.join(icon_base_dir, "256x256/apps", f"{name}.png")
-                for name in [app_name, repo]
-            ]
-        )
-        search_paths.extend(
-            [
-                os.path.expanduser(f"~/.local/share/icons/{name}{ext}")
-                for name in [app_name, repo]
-                for ext in [".svg", ".png"]
-            ]
-        )
-
-        # Check each location for a valid icon file
-        for icon_path in search_paths:
-            try:
-                if os.path.exists(icon_path) and os.path.isfile(icon_path):
-                    logger.debug(f"Found icon at: {icon_path}")
-                    return icon_path
-            except Exception as e:
-                # Skip paths with access errors
-                logger.debug(f"Error checking icon path {icon_path}: {e}")
-                continue
-
-        logger.debug(f"No icon found for {app_name} or {repo}")
+        logger.info(f"✗ No existing icon found for {repo} at {icon_path}")
         return None
 
     def ensure_app_icon(
@@ -430,14 +325,20 @@ class IconManager:
             app_config = AppConfigManager(owner=owner, repo=repo)
             app_id = app_config.repo
 
+            logger.info(
+                f"Checking if icon for {repo} is already installed (to avoid unnecessary API requests)"
+            )
+
             # Check if icon already exists
             existing_icon = self.get_icon_path(app_id, repo)
             if existing_icon:
-                logger.info(f"Using existing icon: {existing_icon}")
+                logger.info(f"✓ Using existing icon: {existing_icon} (skipping API request)")
                 return True, existing_icon
 
             # No existing icon found, proceed with download
-            logger.info(f"No existing icon found for {repo}, will download")
+            logger.info(
+                f"✗ No existing icon found for {repo}, proceeding with API request to download icon"
+            )
 
             # Prepare icon directory
             icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
@@ -448,9 +349,11 @@ class IconManager:
             if not headers:
                 from src.auth_manager import GitHubAuthManager
 
+                logger.info("Getting authentication headers for GitHub API request")
                 headers = GitHubAuthManager.get_auth_headers()
 
             # Find icon in the repository
+            logger.info(f"Making API request to find icon for {owner}/{repo}")
             icon_info = self.find_icon(owner, repo, headers)
 
             if not icon_info:
@@ -463,13 +366,14 @@ class IconManager:
                 return True, message
 
             # Download the icon
+            logger.info(f"Icon found for {repo}, downloading to {target_icon_dir}")
             success, result_path = self.download_icon(icon_info, target_icon_dir)
 
             if success:
-                logger.info(f"Successfully downloaded icon to {result_path}")
+                logger.info(f"✓ Successfully downloaded icon to {result_path}")
                 return True, result_path
             else:
-                logger.error(f"Failed to download icon: {result_path}")
+                logger.error(f"✗ Failed to download icon: {result_path}")
                 return False, result_path
 
         except Exception as e:

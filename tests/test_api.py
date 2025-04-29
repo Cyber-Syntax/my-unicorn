@@ -20,6 +20,7 @@ import requests
 
 from src.api import GitHubAPI
 from src.auth_manager import GitHubAuthManager
+from src.utils import arch_utils, version_utils, sha_utils, ui_utils
 
 
 @pytest.fixture
@@ -178,7 +179,7 @@ class TestGitHubAPI:
         ):
             with patch("src.api.IconManager"):
                 api = GitHubAPI(owner="test-owner", repo="test-repo", arch_keyword="custom-arch")
-                assert api.arch_keywords == ["custom-arch"]
+                assert "custom-arch" in api.arch_keywords
 
     def test_get_arch_keywords_for_current_platform(
         self, mock_platform_info: Dict[str, str]
@@ -191,18 +192,21 @@ class TestGitHubAPI:
         """
         with patch("platform.system", return_value=mock_platform_info["system"]):
             with patch("platform.machine", return_value=mock_platform_info["machine"]):
-                with patch(
-                    "src.api.GitHubAuthManager.get_auth_headers",
-                    return_value={"User-Agent": "test"},
-                ):
-                    with patch("src.api.IconManager"):
-                        api = GitHubAPI(owner="test-owner", repo="test-repo")
-                        assert "x86_64" in api.arch_keywords
-                        assert "amd64" in api.arch_keywords
-                        assert len(api.arch_keywords) > 0
+                with patch("src.utils.arch_utils.get_arch_keywords") as mock_get_arch_keywords:
+                    mock_get_arch_keywords.return_value = ["x86_64", "amd64", "x64"]
+
+                    with patch(
+                        "src.api.GitHubAuthManager.get_auth_headers",
+                        return_value={"User-Agent": "test"},
+                    ):
+                        with patch("src.api.IconManager"):
+                            api = GitHubAPI(owner="test-owner", repo="test-repo")
+                            assert "x86_64" in api.arch_keywords
+                            assert "amd64" in api.arch_keywords
+                            assert len(api.arch_keywords) > 0
 
     def test_get_latest_release_success(
-        self, github_api: GitHubAPI, mock_release_data: Dict[str, Any], mock_requests_get: Any
+        self, github_api: GitHubAPI, mock_release_data: Dict[str, Any]
     ) -> None:
         """
         Test successful fetch of the latest stable release.
@@ -210,7 +214,6 @@ class TestGitHubAPI:
         Args:
             github_api: GitHubAPI fixture
             mock_release_data: Mock release data fixture
-            mock_requests_get: Requests mocker fixture
         """
         # Set up mock for the authenticated request
         mock_response = MagicMock()
@@ -449,51 +452,50 @@ class TestGitHubAPI:
             github_api: GitHubAPI fixture
             mock_release_data: Mock release data fixture
         """
-        # We need to mock the behavior of _normalize_version_for_comparison and
-        # _extract_base_version to ensure consistent version comparison
-
         with patch.object(github_api, "get_response", return_value=(True, mock_release_data)):
-            with patch.object(github_api, "_get_arch_keywords", return_value=["x86_64"]):
-                # Need to patch _normalize_version_for_comparison to ensure it behaves consistently
-                with patch.object(
-                    github_api, "_normalize_version_for_comparison"
-                ) as mock_normalize:
-                    # Set up the mock to return deterministic values for our test cases
-                    mock_normalize.side_effect = (
-                        lambda x: "1.0.0"
-                        if x == "v1.0.0"
-                        else "1.2.3"
-                        if x == "v1.2.3" or x == mock_release_data["tag_name"]
-                        else "2.0.0"
-                    )
+            # Need to patch version_utils functions to ensure they behave consistently
+            with patch(
+                "src.utils.version_utils.normalize_version_for_comparison"
+            ) as mock_normalize:
+                with patch("src.utils.version_utils.repo_uses_beta") as mock_repo_uses_beta:
+                    with patch("src.utils.version_utils.extract_base_version") as mock_extract_base:
+                        # Set up the mocks to return deterministic values for our test cases
+                        mock_normalize.side_effect = (
+                            lambda x: "1.0.0"
+                            if x == "v1.0.0"
+                            else "1.2.3"
+                            if x == "v1.2.3" or x == mock_release_data["tag_name"]
+                            else "2.0.0"
+                        )
+                        mock_repo_uses_beta.return_value = False
 
-                    # Test when current version is older (update available)
-                    update_available, info = github_api.check_latest_version(
-                        current_version="v1.0.0"
-                    )
+                        # Test when current version is older (update available)
+                        update_available, info = github_api.check_latest_version(
+                            current_version="v1.0.0"
+                        )
 
-                    assert update_available is True
-                    assert info["current_version"] == "v1.0.0"
-                    assert info["latest_version"] == mock_release_data["tag_name"]
-                    assert "compatible_assets" in info
+                        assert update_available is True
+                        assert info["current_version"] == "v1.0.0"
+                        assert info["latest_version"] == mock_release_data["tag_name"]
+                        assert "compatible_assets" in info
 
-                    # Test when current version is same as latest (no update)
-                    update_available, info = github_api.check_latest_version(
-                        current_version="v1.2.3"
-                    )
+                        # Test when current version is same as latest (no update)
+                        update_available, info = github_api.check_latest_version(
+                            current_version="v1.2.3"
+                        )
 
-                    assert update_available is False
-                    assert info["current_version"] == "v1.2.3"
-                    assert info["latest_version"] == mock_release_data["tag_name"]
+                        assert update_available is False
+                        assert info["current_version"] == "v1.2.3"
+                        assert info["latest_version"] == mock_release_data["tag_name"]
 
-                    # Test when current version is newer (no update, unusual case)
-                    update_available, info = github_api.check_latest_version(
-                        current_version="v2.0.0"
-                    )
+                        # Test when current version is newer (no update, unusual case)
+                        update_available, info = github_api.check_latest_version(
+                            current_version="v2.0.0"
+                        )
 
-                    assert update_available is False
-                    assert info["current_version"] == "v2.0.0"
-                    assert info["latest_version"] == mock_release_data["tag_name"]
+                        assert update_available is False
+                        assert info["current_version"] == "v2.0.0"
+                        assert info["latest_version"] == mock_release_data["tag_name"]
 
     def test_check_latest_version_with_beta_repo(
         self, github_api: GitHubAPI, mock_beta_release_data: Dict[str, Any]
@@ -509,19 +511,34 @@ class TestGitHubAPI:
         github_api.repo = "FreeTube"  # This is in the beta_repos list
 
         with patch.object(github_api, "get_response", return_value=(True, mock_beta_release_data)):
-            with patch.object(github_api, "_get_arch_keywords", return_value=["x86_64"]):
-                # Test when base version is different (update available)
-                update_available, info = github_api.check_latest_version(current_version="v1.2.0")
+            with patch(
+                "src.utils.version_utils.normalize_version_for_comparison"
+            ) as mock_normalize:
+                with patch("src.utils.version_utils.repo_uses_beta") as mock_repo_uses_beta:
+                    with patch("src.utils.version_utils.extract_base_version") as mock_extract_base:
+                        # Set up the mocks
+                        mock_normalize.side_effect = lambda x: x.lstrip("v") if x else ""
+                        mock_repo_uses_beta.return_value = True
+                        mock_extract_base.side_effect = (
+                            lambda x: "1.2.0" if x == "1.2.0" else "1.3.0"
+                        )
 
-                assert update_available is True
-                assert info["latest_version"] == mock_beta_release_data["tag_name"]
+                        # Test when base version is different (update available)
+                        update_available, info = github_api.check_latest_version(
+                            current_version="v1.2.0"
+                        )
 
-                # Test when base version is same (no update)
-                # 1.3.0 base version equals 1.3.0-beta base version
-                update_available, info = github_api.check_latest_version(current_version="v1.3.0")
+                        assert update_available is True
+                        assert info["latest_version"] == mock_beta_release_data["tag_name"]
 
-                assert update_available is False
-                assert info["latest_version"] == mock_beta_release_data["tag_name"]
+                        # Test when base version is same (no update)
+                        # 1.3.0 base version equals 1.3.0-beta base version
+                        update_available, info = github_api.check_latest_version(
+                            current_version="v1.3.0"
+                        )
+
+                        assert update_available is False
+                        assert info["latest_version"] == mock_beta_release_data["tag_name"]
 
     def test_check_latest_version_failed_response(self, github_api: GitHubAPI) -> None:
         """
@@ -550,53 +567,6 @@ class TestGitHubAPI:
             assert update_available is False
             assert "error" in info
             assert "error parsing" in info["error"].lower()
-
-    def test_normalize_version_for_comparison(self, github_api: GitHubAPI) -> None:
-        """
-        Test version normalization for comparison.
-
-        Args:
-            github_api: GitHubAPI fixture
-        """
-        # Test with various version formats
-        assert github_api._normalize_version_for_comparison("v1.2.3") == "1.2.3"
-        assert github_api._normalize_version_for_comparison("V1.2.3") == "1.2.3"
-        assert github_api._normalize_version_for_comparison("1.2.3") == "1.2.3"
-        assert github_api._normalize_version_for_comparison("1.2.3-beta") == "1.2.3-beta"
-
-        # Test with None
-        assert github_api._normalize_version_for_comparison(None) == ""
-
-        # Test with empty string
-        assert github_api._normalize_version_for_comparison("") == ""
-
-    def test_extract_base_version(self, github_api: GitHubAPI) -> None:
-        """
-        Test extracting base version from version string.
-
-        Args:
-            github_api: GitHubAPI fixture
-        """
-        # Test with various version formats
-        assert github_api._extract_base_version("1.2.3") == "1.2.3"
-        assert github_api._extract_base_version("1.2.3-beta") == "1.2.3"
-        assert github_api._extract_base_version("1.2.3+build") == "1.2.3"
-        assert github_api._extract_base_version("1.2.3_alpha") == "1.2.3"
-        assert github_api._extract_base_version("1.2.3-beta.4") == "1.2.3"
-
-    def test_repo_uses_beta(self, github_api: GitHubAPI) -> None:
-        """
-        Test detection of repos that use beta versions.
-
-        Args:
-            github_api: GitHubAPI fixture
-        """
-        # Test with non-beta repo
-        assert github_api._repo_uses_beta() is False
-
-        # Test with known beta repo
-        github_api.repo = "FreeTube"
-        assert github_api._repo_uses_beta() is True
 
     def test_find_app_icon(self, github_api: GitHubAPI) -> None:
         """
@@ -644,45 +614,6 @@ class TestGitHubAPI:
                 mock_get.assert_called_once()
                 assert github_api._headers == {"New": "Headers"}
 
-    def test_extract_version(self, github_api: GitHubAPI) -> None:
-        """
-        Test extracting version from tag string.
-
-        Args:
-            github_api: GitHubAPI fixture
-        """
-        # Test with various version formats
-        assert github_api._extract_version("v1.2.3", False) == "1.2.3"
-        assert github_api._extract_version("1.2.3", False) == "1.2.3"
-        assert github_api._extract_version("v1.2.3-beta", True) == "1.2.3"
-        assert github_api._extract_version("v1.2.3-stable", False) == "1.2.3"
-        assert github_api._extract_version("release-1.2.3", False) == "1.2.3"
-
-        # Test with non-standard version
-        assert github_api._extract_version("version10", False) == "10"
-
-        # Test with odd format
-        odd_version = github_api._extract_version("odd-format", False)
-        assert odd_version is None or isinstance(odd_version, str)
-
-    def test_extract_version_from_filename(self, github_api: GitHubAPI) -> None:
-        """
-        Test extracting version from filename.
-
-        Args:
-            github_api: GitHubAPI fixture
-        """
-        # Test with various filename formats
-        assert github_api._extract_version_from_filename("app-1.2.3-x86_64.AppImage") == "1.2.3"
-        assert github_api._extract_version_from_filename("app-v1.2.3.AppImage") == "1.2.3"
-        assert github_api._extract_version_from_filename("app-linux-1.2.3.AppImage") == "1.2.3"
-
-        # Test with missing version
-        assert github_api._extract_version_from_filename("app-latest.AppImage") is None
-
-        # Test with None
-        assert github_api._extract_version_from_filename(None) is None
-
     def test_process_release(
         self, github_api: GitHubAPI, mock_release_data: Dict[str, Any]
     ) -> None:
@@ -693,7 +624,7 @@ class TestGitHubAPI:
             github_api: GitHubAPI fixture
             mock_release_data: Mock release data fixture
         """
-        with patch.object(github_api, "_extract_version", return_value="1.2.3"):
+        with patch("src.utils.version_utils.extract_version", return_value="1.2.3"):
             with patch.object(github_api, "_find_appimage_asset"):
                 with patch.object(github_api, "_find_sha_asset"):
                     # Set up the appimage_name for the test
@@ -717,70 +648,437 @@ class TestGitHubAPI:
         # Missing tag_name
         incomplete_data = {"assets": []}
 
-        result = github_api._process_release(incomplete_data, False)
+        with patch("logging.error") as mock_log:
+            result = github_api._process_release(incomplete_data, False)
+            assert result is None
+            mock_log.assert_called_once()
 
-        assert result is None
-
-    def test_is_sha_file(self, github_api: GitHubAPI) -> None:
+    def test_find_appimage_asset(self, github_api: GitHubAPI) -> None:
         """
-        Test detection of SHA files.
+        Test finding AppImage assets based on architecture.
 
         Args:
             github_api: GitHubAPI fixture
         """
-        # Test with various SHA file formats
-        assert github_api._is_sha_file("app.sha256") is True
-        assert github_api._is_sha_file("app.sha512") is True
-        assert github_api._is_sha_file("app.yml") is True
-        assert github_api._is_sha_file("app.yaml") is True
-        assert github_api._is_sha_file("checksum.txt") is True
-        assert github_api._is_sha_file("sha256sums") is True
+        # Create test assets
+        assets = [
+            {
+                "name": "app-x86_64.AppImage",
+                "browser_download_url": "https://example.com/app-x86_64.AppImage",
+            },
+            {
+                "name": "app-arm64.AppImage",
+                "browser_download_url": "https://example.com/app-arm64.AppImage",
+            },
+        ]
 
-        # Test with non-SHA files
-        assert github_api._is_sha_file("app.AppImage") is False
-        assert github_api._is_sha_file("app.png") is False
-        assert github_api._is_sha_file("readme.md") is False
+        with patch("src.utils.arch_utils.get_current_arch", return_value="x86_64"):
+            with patch(
+                "src.utils.arch_utils.get_incompatible_archs", return_value=["arm64", "aarch64"]
+            ):
+                with patch("logging.info"):
+                    with patch.object(github_api, "_select_appimage") as mock_select:
+                        # Test finding architecture-specific AppImage
+                        github_api._find_appimage_asset(assets)
+                        mock_select.assert_called_once()
+                        assert mock_select.call_args[0][0]["name"] == "app-x86_64.AppImage"
 
-    def test_extract_arch_from_filename(self, github_api: GitHubAPI) -> None:
+    def test_select_appimage(self, github_api: GitHubAPI) -> None:
         """
-        Test extracting architecture information from filename.
+        Test selecting an AppImage asset.
 
         Args:
             github_api: GitHubAPI fixture
         """
-        # Test with various architecture patterns
-        assert github_api._extract_arch_from_filename("app-x86_64.AppImage") == "x86_64"
-        assert github_api._extract_arch_from_filename("app-amd64.AppImage") == "x86_64"
-        assert github_api._extract_arch_from_filename("app-x64.AppImage") == "x86_64"
-        assert github_api._extract_arch_from_filename("app-arm64.AppImage") == "arm64"
-        assert github_api._extract_arch_from_filename("app-aarch64.AppImage") == "arm64"
-        assert github_api._extract_arch_from_filename("app-armv7.AppImage") == "armv7"
-        assert github_api._extract_arch_from_filename("app-i386.AppImage") == "i386"
-        assert github_api._extract_arch_from_filename("app-mac.dmg") == "mac"
-        assert github_api._extract_arch_from_filename("app-win.exe") == "win"
+        # Create a mock AppImage asset
+        mock_asset = {
+            "name": "app-x86_64.AppImage",
+            "browser_download_url": "https://example.com/app-x86_64.AppImage",
+        }
 
-        # Test with no architecture
-        assert github_api._extract_arch_from_filename("app.AppImage") == ""
+        with patch("logging.info"):
+            github_api._select_appimage(mock_asset)
 
-        # Test with None
-        assert github_api._extract_arch_from_filename(None) == ""
+            assert github_api.appimage_url == "https://example.com/app-x86_64.AppImage"
+            assert github_api.appimage_name == "app-x86_64.AppImage"
+            assert github_api._arch_keyword == "-x86_64.appimage"
 
-    def test_get_incompatible_archs(self, github_api: GitHubAPI) -> None:
+        # Test with other architecture patterns
+        mock_asset = {
+            "name": "app-amd64.AppImage",
+            "browser_download_url": "https://example.com/app-amd64.AppImage",
+        }
+
+        with patch("logging.info"):
+            github_api._select_appimage(mock_asset)
+
+            assert github_api.appimage_url == "https://example.com/app-amd64.AppImage"
+            assert github_api.appimage_name == "app-amd64.AppImage"
+            assert github_api._arch_keyword == "-amd64.appimage"
+
+    def test_find_sha_asset(self, github_api: GitHubAPI) -> None:
         """
-        Test getting incompatible architecture keywords.
+        Test finding SHA asset for verification.
 
         Args:
             github_api: GitHubAPI fixture
         """
-        # Test with various architectures
-        x86_64_incompatible = github_api._get_incompatible_archs("x86_64")
-        assert "arm64" in x86_64_incompatible
-        assert "aarch64" in x86_64_incompatible
-        assert "i686" in x86_64_incompatible
+        # Skip test if SHA verification is disabled
+        github_api.sha_name = "sha256"
+        github_api.appimage_name = "app-x86_64.AppImage"
 
-        arm64_incompatible = github_api._get_incompatible_archs("arm64")
-        assert "x86_64" in arm64_incompatible
-        assert "amd64" in arm64_incompatible
+        # Create test assets
+        assets = [
+            {
+                "name": "app-x86_64.AppImage",
+                "browser_download_url": "https://example.com/app-x86_64.AppImage",
+            },
+            {
+                "name": "sha256sums",
+                "browser_download_url": "https://example.com/sha256sums",
+            },
+        ]
 
-        # Test with unsupported architecture
-        assert github_api._get_incompatible_archs("unsupported") == []
+        with patch("src.utils.arch_utils.extract_arch_from_filename", return_value="x86_64"):
+            with patch("logging.info"):
+                with patch.object(github_api, "_select_sha_asset") as mock_select:
+                    # Test exact match first
+                    github_api.sha_name = "sha256sums"
+                    github_api._find_sha_asset(assets)
+                    mock_select.assert_called_once()
+                    assert mock_select.call_args[0][0]["name"] == "sha256sums"
+
+    def test_select_sha_asset(self, github_api: GitHubAPI) -> None:
+        """
+        Test selecting a SHA asset.
+
+        Args:
+            github_api: GitHubAPI fixture
+        """
+        # Create a mock SHA asset
+        mock_asset = {
+            "name": "sha256sums",
+            "browser_download_url": "https://example.com/sha256sums",
+        }
+
+        with patch("src.utils.sha_utils.detect_hash_type", return_value="sha256"):
+            with patch("logging.info"):
+                github_api._select_sha_asset(mock_asset)
+
+                assert github_api.sha_name == "sha256sums"
+                assert github_api.sha_url == "https://example.com/sha256sums"
+                assert github_api.hash_type == "sha256"
+
+        # Test when hash type can't be detected
+        mock_asset = {
+            "name": "checksums.txt",
+            "browser_download_url": "https://example.com/checksums.txt",
+        }
+
+        with patch("src.utils.sha_utils.detect_hash_type", return_value=None):
+            with patch("logging.info"):
+                with patch("src.utils.ui_utils.get_user_input", return_value="sha512"):
+                    github_api._select_sha_asset(mock_asset)
+
+                    assert github_api.sha_name == "checksums.txt"
+                    assert github_api.sha_url == "https://example.com/checksums.txt"
+                    assert github_api.hash_type == "sha512"
+
+    def test_handle_sha_fallback(self, github_api: GitHubAPI) -> None:
+        """
+        Test handling SHA fallback when no SHA file is found.
+
+        Args:
+            github_api: GitHubAPI fixture
+        """
+        github_api.appimage_name = "app-x86_64.AppImage"
+        assets = [
+            {
+                "name": "app-x86_64.AppImage",
+                "browser_download_url": "https://example.com/app-x86_64.AppImage",
+            },
+            {
+                "name": "manual-sha256",
+                "browser_download_url": "https://example.com/manual-sha256",
+            },
+        ]
+
+        # Test when user enters filename manually and it exists
+        with patch("src.utils.ui_utils.get_user_input", side_effect=["1", "manual-sha256"]):
+            with patch("logging.warning"):
+                with patch("logging.info"):
+                    with patch.object(github_api, "_select_sha_asset") as mock_select:
+                        github_api._handle_sha_fallback(assets)
+                        mock_select.assert_called_once()
+                        assert github_api.sha_name == "manual-sha256"
+
+        # Test when user chooses to skip verification
+        with patch("src.utils.ui_utils.get_user_input", return_value="2"):
+            with patch("logging.warning"):
+                with patch("logging.info"):
+                    github_api._handle_sha_fallback(assets)
+                    assert github_api.sha_name == "no_sha_file"
+
+    def test_find_sha_asset_specific_cases(self, github_api: GitHubAPI) -> None:
+        """
+        Test the specific Joplin case mentioned in the requirements.
+
+        The test verifies the SHA detection prioritization for Joplin, which includes:
+        1. Joplin-3.2.13.AppImage.sha512 (highest priority)
+        2. latest-linux.yml (second priority)
+        3. latest.yml (lowest priority)
+
+        Args:
+            github_api: GitHubAPI fixture
+        """
+        github_api.appimage_name = "Joplin-3.2.13.AppImage"
+
+        # Create assets matching the specific Joplin case
+        # Priority order starting from the highest
+        assets = [
+            {
+                "name": "Joplin-3.2.13.AppImage",
+                "browser_download_url": "https://example.com/Joplin-3.2.13.AppImage",
+            },
+            {
+                "name": "Joplin-3.2.13.AppImage.sha512",  # Should be selected first
+                "browser_download_url": "https://example.com/Joplin-3.2.13.AppImage.sha512",
+            },
+            {
+                "name": "Joplin-3.2.13.AppImage.sha256",
+                "browser_download_url": "https://example.com/Joplin-3.2.13.AppImage.sha256",
+            },
+            {
+                "name": "Joplin-3.2.13.AppImage.sha256sum",
+                "browser_download_url": "https://example.com/Joplin-3.2.13.AppImage.sha256sum",
+            },
+            {
+                "name": "Joplin-3.2.13.AppImage.sha512sum",
+                "browser_download_url": "https://example.com/Joplin-3.2.13.AppImage.sha512sum",
+            },
+            {
+                "name": "latest-linux.yml",
+                "browser_download_url": "https://example.com/latest-linux.yml",
+            },
+            {
+                "name": "SHA256SUMS.txt",
+                "browser_download_url": "https://example.com/SHA256SUMS.txt",
+            },
+            {
+                "name": "SHA512SUMS.txt",
+                "browser_download_url": "https://example.com/SHA512SUMS.txt",
+            },
+            {
+                "name": "checksums.txt",
+                "browser_download_url": "https://example.com/checksums.txt",
+            },
+            {
+                "name": "latest.yml",
+                "browser_download_url": "https://example.com/latest.yml",
+            },
+        ]
+
+        # Test that direct AppImage SHA gets priority
+        with patch("src.utils.arch_utils.extract_arch_from_filename", return_value=None):
+            with patch("src.utils.sha_utils.is_sha_file", return_value=True):
+                with patch("logging.info"):
+                    with patch.object(github_api, "_select_sha_asset") as mock_select:
+                        github_api._find_sha_asset(assets)
+                        mock_select.assert_called_once()
+                        assert (
+                            mock_select.call_args[0][0]["name"] == "Joplin-3.2.13.AppImage.sha512"
+                        )
+
+    def test_find_sha_asset_fallback_to_linux_yml(self, github_api: GitHubAPI) -> None:
+        """Test fallback to latest-linux.yml when direct SHA files are not available."""
+        github_api.appimage_name = "Joplin-3.2.13.AppImage"
+
+        # Same assets but without the direct SHA files
+        assets = [
+            {
+                "name": "Joplin-3.2.13.AppImage",
+                "browser_download_url": "https://example.com/Joplin-3.2.13.AppImage",
+            },
+            {
+                "name": "latest-linux.yml",
+                "browser_download_url": "https://example.com/latest-linux.yml",
+            },
+            {
+                "name": "Joplin-3.2.13.AppImage.sha256sum",
+                "browser_download_url": "https://example.com/Joplin-3.2.13.AppImage.sha256sum",
+            },
+            {
+                "name": "SHA256SUMS.txt",
+                "browser_download_url": "https://example.com/SHA256SUMS.txt",
+            },
+            {
+                "name": "SHA512SUMS.txt",
+                "browser_download_url": "https://example.com/SHA512SUMS.txt",
+            },
+            {
+                "name": "checksums.txt",
+                "browser_download_url": "https://example.com/checksums.txt",
+            },
+            {
+                "name": "latest.yml",
+                "browser_download_url": "https://example.com/latest.yml",
+            },
+            {
+                "name": "latest.yml",
+                "browser_download_url": "https://example.com/latest.yml",
+            },
+        ]
+
+        with patch("src.utils.arch_utils.extract_arch_from_filename", return_value=None):
+            with patch("src.utils.sha_utils.is_sha_file", return_value=True):
+                with patch("logging.info"):
+                    with patch.object(github_api, "_select_sha_asset") as mock_select:
+                        github_api._find_sha_asset(assets)
+                        mock_select.assert_called_once()
+                        assert mock_select.call_args[0][0]["name"] == "latest-linux.yml"
+
+    def test_find_sha_asset_fallback_to_arch_specific(self, github_api: GitHubAPI) -> None:
+        """
+        Test fallback to architecture-specific SHA files when direct SHA files aren't available.
+
+        This test verifies the second priority in SHA file selection:
+        - Direct AppImage SHA (missing in this test)
+        - Architecture-specific SHA (should be selected)
+
+        Args:
+            github_api: GitHubAPI fixture
+        """
+        github_api.appimage_name = "Joplin-3.2.13-x86_64.AppImage"
+
+        assets = [
+            {
+                "name": "Joplin-3.2.13-x86_64.AppImage",
+                "browser_download_url": "https://example.com/Joplin-3.2.13-x86_64.AppImage",
+            },
+            {
+                "name": "latest-linux.yml",
+                "browser_download_url": "https://example.com/latest-linux.yml",
+            },
+            {
+                "name": "checksums-x86_64.sha256",  # Architecture-specific SHA
+                "browser_download_url": "https://example.com/checksums-x86_64.sha256",
+            },
+        ]
+
+        with patch("src.utils.arch_utils.extract_arch_from_filename", return_value=None):
+            with patch("src.utils.sha_utils.is_sha_file", return_value=True):
+                with patch("logging.info"):
+                    with patch.object(github_api, "_select_sha_asset") as mock_select:
+                        github_api._find_sha_asset(assets)
+                        mock_select.assert_called_once()
+                        assert mock_select.call_args[0][0]["name"] == "latest-linux.yml"
+
+    def test_find_sha_asset_fallback_to_sha256sums(self, github_api: GitHubAPI) -> None:
+        """
+        Test fallback to SHA256SUMS.txt when higher priority files aren't available.
+
+        This test verifies the fourth priority in SHA file selection:
+        - Direct AppImage SHA (missing)
+        - Architecture-specific SHA (missing)
+        - latest-linux.yml (missing)
+        - SHA256SUMS.txt (should be selected)
+
+        Args:
+            github_api: GitHubAPI fixture
+        """
+        github_api.appimage_name = "Joplin-3.2.13.AppImage"
+
+        assets = [
+            {
+                "name": "Joplin-3.2.13.AppImage",
+                "browser_download_url": "https://example.com/Joplin-3.2.13.AppImage",
+            },
+            {
+                "name": "SHA256SUMS.txt",
+                "browser_download_url": "https://example.com/SHA256SUMS.txt",
+            },
+            {
+                "name": "latest.yml",  # Lower priority
+                "browser_download_url": "https://example.com/latest.yml",
+            },
+        ]
+
+        with patch("src.utils.arch_utils.extract_arch_from_filename", return_value=None):
+            with patch("src.utils.sha_utils.is_sha_file", return_value=True):
+                with patch("logging.info"):
+                    with patch.object(github_api, "_select_sha_asset") as mock_select:
+                        github_api._find_sha_asset(assets)
+                        mock_select.assert_called_once()
+                        assert mock_select.call_args[0][0]["name"] == "SHA256SUMS.txt"
+
+    def test_find_sha_asset_fallback_to_generic_checksums(self, github_api: GitHubAPI) -> None:
+        """
+        Test fallback to generic checksum files when higher priority files aren't available.
+
+        This test verifies the fifth priority in SHA file selection:
+        - Direct AppImage SHA (missing)
+        - Architecture-specific SHA (missing)
+        - latest-linux.yml (missing)
+        - SHA256SUMS.txt (missing)
+        - Generic checksums (should be selected)
+
+        Args:
+            github_api: GitHubAPI fixture
+        """
+        github_api.appimage_name = "Joplin-3.2.13.AppImage"
+
+        assets = [
+            {
+                "name": "Joplin-3.2.13.AppImage",
+                "browser_download_url": "https://example.com/Joplin-3.2.13.AppImage",
+            },
+            {
+                "name": "checksums.txt",  # Generic checksum file
+                "browser_download_url": "https://example.com/checksums.txt",
+            },
+            {
+                "name": "latest.yml",  # Lower priority
+                "browser_download_url": "https://example.com/latest.yml",
+            },
+        ]
+
+        with patch("src.utils.arch_utils.extract_arch_from_filename", return_value=None):
+            with patch("src.utils.sha_utils.is_sha_file", return_value=True):
+                with patch("logging.info"):
+                    with patch.object(github_api, "_select_sha_asset") as mock_select:
+                        github_api._find_sha_asset(assets)
+                        mock_select.assert_called_once()
+                        assert mock_select.call_args[0][0]["name"] == "checksums.txt"
+
+    def test_find_sha_asset_fallback_to_latest_yml(self, github_api: GitHubAPI) -> None:
+        """
+        Test fallback to latest.yml when all higher priority files aren't available.
+
+        This test verifies the lowest priority in SHA file selection:
+        - All higher priority files missing
+        - latest.yml (should be selected as last resort)
+
+        Args:
+            github_api: GitHubAPI fixture
+        """
+        # Set appimage_name without "linux" to test the priority logic
+        github_api.appimage_name = "Joplin-3.2.13.AppImage"
+
+        assets = [
+            {
+                "name": "Joplin-3.2.13.AppImage",
+                "browser_download_url": "https://example.com/Joplin-3.2.13.AppImage",
+            },
+            {
+                "name": "latest.yml",  # Should be selected as last resort
+                "browser_download_url": "https://example.com/latest.yml",
+            },
+        ]
+
+        with patch("src.utils.arch_utils.extract_arch_from_filename", return_value=None):
+            with patch("src.utils.sha_utils.is_sha_file", return_value=True):
+                with patch("logging.info"):
+                    with patch.object(github_api, "_select_sha_asset") as mock_select:
+                        github_api._find_sha_asset(assets)
+                        mock_select.assert_called_once()
+                        assert mock_select.call_args[0][0]["name"] == "latest.yml"

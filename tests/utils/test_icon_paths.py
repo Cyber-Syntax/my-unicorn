@@ -19,7 +19,7 @@ if str(project_root) not in sys.path:
 
 # Import the module directly to avoid import issues
 import src.utils.icon_paths
-from src.utils.icon_paths import get_icon_paths
+from src.utils.icon_paths import get_icon_paths, get_icon_path, get_icon_filename
 
 
 # Use a function to access ICON_PATHS to avoid direct import issues in global test runs
@@ -88,20 +88,24 @@ class TestGetIconPaths:
 
     def test_all_config_structures(self) -> None:
         """Test all configuration structure variations."""
-        # Test repositories with different configuration structures
-        # Make sure we can handle all the different ways a repo can be configured
-
         # Check each repo in ICON_PATHS
         for repo_name, config in get_icon_paths_map().items():
             result = get_icon_paths(repo_name)
             assert result is not None
-            assert result == config
+
+            # The paths key might be added by the compatibility layer
+            # Copy the config and ensure it has paths for comparison
+            expected = config.copy()
+            if "paths" not in expected:
+                expected["paths"] = []
+
+            assert result == expected
 
             # Verify it works with uppercase too
             if repo_name.upper() != repo_name:  # Only if name can be uppercased
                 upper_result = get_icon_paths(repo_name.upper())
                 assert upper_result is not None
-                assert upper_result == config
+                assert upper_result == expected
 
 
 class TestIconPathsConstant:
@@ -134,3 +138,91 @@ class TestIconPathsConstant:
 
             if "filename" in config:
                 assert isinstance(config["filename"], str)
+
+
+class TestGetIconPath:
+    """Tests for get_icon_path function."""
+
+    def test_exact_repo_match(self) -> None:
+        """Test getting exact icon path with direct repository name match."""
+        # Test with a known repository
+        path = get_icon_path("joplin")
+        assert path is not None
+        assert path == "Assets/LinuxIcons/256x256.png"
+
+    def test_case_insensitive_match(self) -> None:
+        """Test case-insensitive repository name matching."""
+        # Test with uppercase
+        upper_path = get_icon_path("JOPLIN")
+        lower_path = get_icon_path("joplin")
+        assert upper_path is not None
+        assert upper_path == lower_path
+
+    def test_owner_repo_format(self) -> None:
+        """Test repository name with owner/repo format."""
+        # Test with owner/repo format
+        path = get_icon_path("siyuan-note/siyuan")
+        assert path is not None
+        assert path == "app/src/assets/icon.png"
+
+        # Test with only repo part
+        repo_only_path = get_icon_path("siyuan")
+        assert repo_only_path == path
+
+    def test_unknown_repo(self) -> None:
+        """Test with unknown repository names."""
+        # Unknown repository
+        path = get_icon_path("unknown-repo")
+        assert path is None
+
+        # Empty repository name
+        path = get_icon_path("")
+        assert path is None
+
+        # None repository name
+        path = get_icon_path(None)  # type: ignore
+        assert path is None
+
+
+class TestGetIconFilename:
+    """Tests for get_icon_filename function."""
+
+    def test_exact_repo_match(self) -> None:
+        """Test getting icon filename with direct repository name match."""
+        # Test with a known repository
+        filename = get_icon_filename("joplin")
+        assert filename is not None
+        assert filename == "joplin_icon.png"
+
+    def test_case_insensitive_match(self) -> None:
+        """Test case-insensitive repository name matching."""
+        # Test with uppercase
+        upper_filename = get_icon_filename("JOPLIN")
+        lower_filename = get_icon_filename("joplin")
+        assert upper_filename is not None
+        assert upper_filename == lower_filename
+
+    def test_owner_repo_format(self) -> None:
+        """Test repository name with owner/repo format."""
+        # Test with owner/repo format
+        filename = get_icon_filename("siyuan-note/siyuan")
+        assert filename is not None
+        assert filename == "siyuan_icon.png"
+
+        # Test with only repo part
+        repo_only_filename = get_icon_filename("siyuan")
+        assert repo_only_filename == filename
+
+    def test_unknown_repo(self) -> None:
+        """Test with unknown repository names."""
+        # Unknown repository
+        filename = get_icon_filename("unknown-repo")
+        assert filename is None
+
+        # Empty repository name
+        filename = get_icon_filename("")
+        assert filename is None
+
+        # None repository name
+        filename = get_icon_filename(None)  # type: ignore
+        assert filename is None

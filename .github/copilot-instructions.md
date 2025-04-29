@@ -7,24 +7,18 @@
 - Put docs in `docs/`.
 - Put configs in `config/`.
 - Use `__init__.py` files to define package boundaries.
-- Place reusable functions in their own modules.
 - Order imports: standard library, third-party, then local.
 - Use absolute imports over relative imports.
-- Define public API with `__all__`.
 
 ## Code Style
 
 - Prioritize code clarity over cleverness.
 - Use snake_case naming convention.
-- Avoid wildcard imports.
 - Keep functions under 50 lines.
 - Use f-strings for string formatting.
 - Use pathlib for file operations.
 - Replace magic numbers with named constants.
 - Use guard clauses to reduce nesting.
-- Extract repeated code into functions.
-- Make code modular to improve testing and maintenance.
-- Use ruff rulestyle for linting and formatting.
 - Use match/case for pattern matching.
 - Specify file encoding explicitly.
 
@@ -32,7 +26,6 @@
 
 - Add type hints to all functions.
 - Specify return type annotations.
-- Use union types instead of Optional[].
 - Write docstrings for public modules, classes, and functions.
 - Keep docstrings under 100 characters per line.
 - Show usage examples in module docstrings.
@@ -46,7 +39,7 @@
 
 ## Functions & Design
 
-- Design single-purpose functions.
+- One function one responsibility.
 - Validate parameters at function start.
 - Separate pure and stateful code.
 - Prefer immutable data structures.
@@ -73,7 +66,7 @@
 - Preserve error context with `raise...from`.
 - Log exceptions with tracebacks.
 - Log with `logging.exception()` without secrets.
-- Redact secrets from logs.
+- Redact secrets from logs and prints.
 - Validate inputs at system boundaries.
 - Keep try blocks minimal.
 - Use `with` or `finally` for cleanup.
@@ -85,30 +78,24 @@
 
 - Validate and sanitize all external inputs.
 - Use parameterized database queries.
-- Validate file paths rigorously.
+- Validate file paths and names.
 - Prevent directory traversal by validating paths.
 - Avoid eval() with untrusted input.
 - Load secrets from environment variables.
 - Use bcrypt/Argon2 for password hashing.
 - Generate unique salts per password.
 - Use HTTPS for network communication.
-- Never commit secrets.
-
-## Configuration
-
-- Keep config separate from code.
-- Use environment variables for settings.
-- Validate config at startup.
-- Maintain separate configs per environment.
+- Make sure secrets aren't printed or logged.
+- Secrets should be stored in a secure vault or service.
 
 ## Performance
 
+- Use asyncio for I/O tasks.
 - Profile code before optimizing.
 - Choose appropriate data structures.
 - Use generators for large datasets.
 - Cache pure functions with `@lru_cache`.
 - Avoid globals in hot paths.
-- Use asyncio for I/O tasks.
 - Limit threads for CPU tasks.
 - Set timeouts on all blocking calls.
 - Use `''.join()` for many strings.
@@ -125,8 +112,7 @@
 
 ## Testing Guidelines
 
-- All tests should be in ./tests directory
-- Write pytest for all tests with fixtures.
+- Use pytest for all tests with fixtures.
 - Mock external services in tests.
 - Test error paths explicitly.
 - Use Hypothesis for property testing.
@@ -134,4 +120,3 @@
 - Focus on important behaviors, not coverage.
 - Use dependency injection for testability.
 - All tests should have typing annotations and docstrings
-- Create __init__.py files in test directories if they don't exist
