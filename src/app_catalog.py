@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Application catalog module.
 
 This module provides a catalog of supported applications that can be
@@ -29,6 +28,7 @@ class AppInfo:
         hash_type: Hash type used for verification (e.g., "sha256", "sha512")
         category: Application category for filtering/grouping
         tags: List of tags associated with the application
+
     """
 
     name: str
@@ -172,6 +172,7 @@ def get_app_info(app_id: str) -> Optional[AppInfo]:
 
     Returns:
         AppInfo object if found, None otherwise
+
     """
     return APP_CATALOG.get(app_id.lower())
 
@@ -181,6 +182,7 @@ def get_all_apps() -> List[AppInfo]:
 
     Returns:
         List of AppInfo objects
+
     """
     return list(APP_CATALOG.values())
 
@@ -193,6 +195,7 @@ def get_apps_by_category(category: str) -> List[AppInfo]:
 
     Returns:
         List of AppInfo objects in the specified category
+
     """
     return [app for app in APP_CATALOG.values() if app.category.lower() == category.lower()]
 
@@ -205,6 +208,7 @@ def get_apps_by_tag(tag: str) -> List[AppInfo]:
 
     Returns:
         List of AppInfo objects with the specified tag
+
     """
     return [
         app
@@ -221,6 +225,7 @@ def search_apps(query: str) -> List[AppInfo]:
 
     Returns:
         List of matching AppInfo objects
+
     """
     query = query.lower()
     results = []
@@ -241,6 +246,7 @@ def get_categories() -> List[str]:
 
     Returns:
         List of category names
+
     """
     return sorted({app.category for app in APP_CATALOG.values()})
 

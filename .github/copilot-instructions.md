@@ -12,6 +12,7 @@
 
 ## Code Style
 
+- All Python code must be formatted and linted according to Ruff.
 - Prioritize code clarity over cleverness.
 - Use snake_case naming convention.
 - Keep functions under 50 lines.

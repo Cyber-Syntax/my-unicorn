@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Configuration migration command module.
+"""Configuration migration command module.
 
 This module provides a command to check and migrate configuration settings
 when the application is updated with new configuration options.
 """
 
-import logging
 import json
+import logging
 import os
 
 from src.commands.base import Command
@@ -16,8 +14,7 @@ from src.config_migrator import ConfigMigrator
 
 
 class MigrateConfigCommand(Command):
-    """
-    Command to check and migrate configuration settings.
+    """Command to check and migrate configuration settings.
 
     This command identifies missing configuration keys in both global and app-specific
     configurations, then adds those keys with appropriate default values.
@@ -28,8 +25,7 @@ class MigrateConfigCommand(Command):
         self._logger = logging.getLogger(__name__)
 
     def execute(self):
-        """
-        Execute the configuration migration command.
+        """Execute the configuration migration command.
 
         Checks both global and app-specific configurations for missing keys
         and updates them with default values when needed.
@@ -44,7 +40,7 @@ class MigrateConfigCommand(Command):
         # Check if file exists and display its content for debugging
         if os.path.isfile(global_config_path):
             try:
-                with open(global_config_path, "r", encoding="utf-8") as f:
+                with open(global_config_path, encoding="utf-8") as f:
                     current_config = json.load(f)
                 print(f"Current config keys: {list(current_config.keys())}")
                 self._logger.debug(f"Current config content: {current_config}")

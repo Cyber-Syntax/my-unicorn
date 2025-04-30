@@ -1,35 +1,29 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Install app by name command module.
+"""Install app by name command module.
 
 This module provides a command to install applications from the app catalog
 by name, without requiring the user to enter URLs.
 """
 
 import logging
-import os
-import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List
 
-from src.commands.base import Command
+from src.api import GitHubAPI
 from src.app_catalog import (
-    APP_CATALOG,
-    get_app_info,
+    AppInfo,
     get_all_apps,
     get_apps_by_category,
     get_categories,
     search_apps,
-    AppInfo,
 )
-from src.api import GitHubAPI
 from src.app_config import AppConfigManager
+from src.commands.base import Command
 from src.download import DownloadManager
 from src.file_handler import FileHandler
 from src.global_config import GlobalConfigManager
-from src.verify import VerificationManager
 from src.icon_manager import IconManager
+from src.verify import VerificationManager
 
 
 class InstallAppCommand(Command):
@@ -128,8 +122,7 @@ class InstallAppCommand(Command):
             print("\nSearch cancelled.")
 
     def _display_app_list(self, apps: List[AppInfo]) -> None:
-        """
-        Display a list of applications and allow user to select one for installation.
+        """Display a list of applications and allow user to select one for installation.
 
         Args:
             apps: List of AppInfo objects to display
@@ -161,8 +154,7 @@ class InstallAppCommand(Command):
             print("\nOperation cancelled.")
 
     def _confirm_and_install_app(self, app_info: AppInfo) -> None:
-        """
-        Confirm and install the selected application.
+        """Confirm and install the selected application.
 
         Args:
             app_info: AppInfo object for the selected application
@@ -187,9 +179,7 @@ class InstallAppCommand(Command):
             print("\nInstallation cancelled.")
 
     def _install_app(self, app_info: AppInfo) -> None:
-        """
-        Download and install the application with verification.
-        """
+        """Download and install the application with verification."""
         # Create a properly initialized app config manager for this app
         app_config = AppConfigManager(
             owner=app_info.owner,
@@ -285,24 +275,23 @@ class InstallAppCommand(Command):
                         verification_success = True
                         print("Verification successful!")
                         break
+                    # Verification failed
+                    elif attempt == self.MAX_ATTEMPTS:
+                        print(
+                            f"Verification failed. Maximum retry attempts ({self.MAX_ATTEMPTS}) reached."
+                        )
+                        return
                     else:
-                        # Verification failed
-                        if attempt == self.MAX_ATTEMPTS:
-                            print(
-                                f"Verification failed. Maximum retry attempts ({self.MAX_ATTEMPTS}) reached."
-                            )
+                        print(f"Verification failed. Attempt {attempt} of {self.MAX_ATTEMPTS}.")
+                        retry = input("Retry download? (y/N): ").strip().lower()
+                        if retry != "y":
+                            print("Installation cancelled.")
                             return
-                        else:
-                            print(f"Verification failed. Attempt {attempt} of {self.MAX_ATTEMPTS}.")
-                            retry = input("Retry download? (y/N): ").strip().lower()
-                            if retry != "y":
-                                print("Installation cancelled.")
-                                return
                             # Continue to next attempt
 
             except Exception as e:
-                logging.error(f"Download attempt {attempt} failed: {str(e)}", exc_info=True)
-                print(f"Error during download: {str(e)}")
+                logging.error(f"Download attempt {attempt} failed: {e!s}", exc_info=True)
+                print(f"Error during download: {e!s}")
 
                 if attempt == self.MAX_ATTEMPTS:
                     print(f"Maximum retry attempts ({self.MAX_ATTEMPTS}) reached.")

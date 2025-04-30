@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Icon management module.
+"""Icon management module.
 
 This module provides functionality for finding, fetching and storing
 application icons from GitHub repositories using exact paths.
@@ -10,19 +8,19 @@ application icons from GitHub repositories using exact paths.
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Optional, Any, Tuple, Union
+from typing import Any, Dict, Optional, Tuple
+
+from src.auth_manager import GitHubAuthManager
 
 # Import the icon paths configuration
-from src.utils.icon_paths import get_icon_path, get_icon_filename, get_icon_paths
-from src.auth_manager import GitHubAuthManager
+from src.utils.icon_paths import get_icon_filename, get_icon_path, get_icon_paths
 
 # Configure module logger
 logger = logging.getLogger(__name__)
 
 
 class IconManager:
-    """
-    Manages finding and retrieving application icons from GitHub repositories.
+    """Manages finding and retrieving application icons from GitHub repositories.
 
     This class provides methods to find icons in GitHub repositories
     using exact paths defined in the configuration.
@@ -30,13 +28,11 @@ class IconManager:
 
     def __init__(self) -> None:
         """Initialize the icon manager."""
-        pass
 
     def find_icon(
         self, owner: str, repo: str, headers: Optional[Dict[str, str]] = None
     ) -> Optional[Dict[str, Any]]:
-        """
-        Find an icon for a given repository using the exact path.
+        """Find an icon for a given repository using the exact path.
 
         Args:
             owner: Repository owner/organization
@@ -92,8 +88,7 @@ class IconManager:
     def _check_icon_path(
         self, owner: str, repo: str, path: str, headers: Dict[str, str]
     ) -> Optional[Dict[str, Any]]:
-        """
-        Check if an icon exists at a specific path in the repository.
+        """Check if an icon exists at a specific path in the repository.
 
         Args:
             owner: Repository owner/organization
@@ -157,12 +152,11 @@ class IconManager:
             return None
 
         except Exception as e:
-            logger.debug(f"Error checking icon path {path}: {str(e)}")
+            logger.debug(f"Error checking icon path {path}: {e!s}")
             return None
 
     def _format_icon_info(self, content: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Format icon file information from GitHub API response.
+        """Format icon file information from GitHub API response.
 
         Args:
             content: GitHub API content information
@@ -187,8 +181,7 @@ class IconManager:
         }
 
     def download_icon(self, icon_info: Dict[str, Any], destination_dir: str) -> Tuple[bool, str]:
-        """
-        Download an icon file to the specified destination.
+        """Download an icon file to the specified destination.
 
         Args:
             icon_info: Icon information from find_icon method
@@ -252,18 +245,17 @@ class IconManager:
             return True, icon_path
 
         except Exception as e:
-            logger.error(f"Failed to download icon: {str(e)}")
+            logger.error(f"Failed to download icon: {e!s}")
             # Clean up temp file if exists
             if "temp_icon_path" in locals() and os.path.exists(temp_icon_path):
                 try:
                     os.remove(temp_icon_path)
                 except Exception:
                     pass
-            return False, f"Error: {str(e)}"
+            return False, f"Error: {e!s}"
 
     def get_icon_path(self, repo: str, app_name: Optional[str] = None) -> Optional[str]:
-        """
-        Find the path to an existing icon for an application.
+        """Find the path to an existing icon for an application.
 
         Only checks the repository-specific directory using the preferred filename
         from the configuration.
@@ -304,8 +296,7 @@ class IconManager:
     def ensure_app_icon(
         self, owner: str, repo: str, headers: Optional[Dict[str, str]] = None
     ) -> Tuple[bool, str]:
-        """
-        Ensure an icon exists for the specified app, downloading if necessary.
+        """Ensure an icon exists for the specified app, downloading if necessary.
 
         First checks if an icon already exists in expected locations.
         If not, downloads the icon from the GitHub repository.
@@ -377,5 +368,5 @@ class IconManager:
                 return False, result_path
 
         except Exception as e:
-            logger.error(f"Failed to ensure app icon: {str(e)}")
-            return False, f"Error: {str(e)}"
+            logger.error(f"Failed to ensure app icon: {e!s}")
+            return False, f"Error: {e!s}"

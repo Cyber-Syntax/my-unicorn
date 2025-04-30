@@ -1,9 +1,8 @@
+import asyncio
 import logging
 import os
-import sys
-import asyncio
 import time
-from typing import Optional, List, Dict, Any, Union, Set, Tuple, ClassVar
+from typing import ClassVar, Dict, Optional, Set
 
 import requests
 
@@ -13,8 +12,7 @@ from .progress_manager import BasicMultiAppProgress
 
 
 class DownloadManager:
-    """
-    Manages the download of AppImages from GitHub releases.
+    """Manages the download of AppImages from GitHub releases.
 
     Attributes:
         github_api: The GitHub API object containing release information
@@ -36,8 +34,7 @@ class DownloadManager:
     _downloads_dir: ClassVar[str] = os.path.join(os.getcwd(), "downloads")
 
     def __init__(self, github_api: "GitHubAPI", app_index: int = 0, total_apps: int = 0) -> None:
-        """
-        Initialize the download manager with GitHub API instance.
+        """Initialize the download manager with GitHub API instance.
 
         Args:
             github_api: GitHub API instance containing release information
@@ -61,8 +58,7 @@ class DownloadManager:
         self._progress_task_id: Optional[int] = None
 
     def _detect_async_mode(self) -> bool:
-        """
-        Detect if we're running in an async context.
+        """Detect if we're running in an async context.
 
         Returns:
             bool: True if running in an async context
@@ -75,8 +71,7 @@ class DownloadManager:
 
     @classmethod
     def get_downloads_dir(cls) -> str:
-        """
-        Get the path to the downloads directory, ensuring it exists.
+        """Get the path to the downloads directory, ensuring it exists.
 
         Returns:
             str: Path to the downloads directory
@@ -88,8 +83,7 @@ class DownloadManager:
         return downloads_dir
 
     def _format_size(self, size_bytes: int) -> str:
-        """
-        Format file size in human-readable format.
+        """Format file size in human-readable format.
 
         Args:
             size_bytes: Size in bytes
@@ -116,8 +110,7 @@ class DownloadManager:
 
     @classmethod
     def get_or_create_progress(cls) -> BasicMultiAppProgress:
-        """
-        Get or create a shared progress instance for all downloads.
+        """Get or create a shared progress instance for all downloads.
 
         Returns:
             BasicMultiAppProgress: The shared progress instance
@@ -140,14 +133,13 @@ class DownloadManager:
             try:
                 cls._global_progress.stop()
             except Exception as e:
-                logging.error(f"Error stopping progress display: {str(e)}")
+                logging.error(f"Error stopping progress display: {e!s}")
             finally:
                 cls._global_progress = None
                 cls._active_tasks = set()
 
     def download(self) -> str:
-        """
-        Download the AppImage from the GitHub release.
+        """Download the AppImage from the GitHub release.
 
         Returns:
             str: The full path to the downloaded AppImage file
@@ -178,18 +170,17 @@ class DownloadManager:
 
             return download_path
 
-        except IOError as e:
-            error_msg = f"File system error while downloading {appimage_name}: {str(e)}"
+        except OSError as e:
+            error_msg = f"File system error while downloading {appimage_name}: {e!s}"
             self._logger.error(error_msg)
             raise RuntimeError(error_msg)
         except Exception as e:
-            error_msg = f"Unexpected error downloading {appimage_name}: {str(e)}"
+            error_msg = f"Unexpected error downloading {appimage_name}: {e!s}"
             self._logger.error(error_msg)
             raise RuntimeError(error_msg)
 
     def _get_file_size(self, url: str, headers: Dict[str, str]) -> int:
-        """
-        Get the file size by making a HEAD request.
+        """Get the file size by making a HEAD request.
 
         Args:
             url: URL to check
@@ -207,8 +198,7 @@ class DownloadManager:
         return int(response.headers.get("content-length", 0))
 
     def _setup_progress_task(self, filename: str, total_size: int, prefix: str) -> Optional[int]:
-        """
-        Set up a progress tracking task.
+        """Set up a progress tracking task.
 
         Args:
             filename: Name of the file being downloaded
@@ -233,15 +223,13 @@ class DownloadManager:
             return task_id
 
         except Exception as e:
-            self._logger.error(f"Error creating progress task: {str(e)}")
+            self._logger.error(f"Error creating progress task: {e!s}")
             # Fallback to console output without progress bar
             print(f"{prefix}Downloading {filename}...")
             return None
 
     def _cleanup_progress_task(self) -> None:
-        """
-        Clean up progress tracking task, ignoring any errors.
-        """
+        """Clean up progress tracking task, ignoring any errors."""
         if not hasattr(self, "_progress_task_id") or self._progress_task_id is None:
             return
 
@@ -266,8 +254,7 @@ class DownloadManager:
         task_id: Optional[int],
         total_size: int,
     ) -> float:
-        """
-        Perform the actual file download with progress updates.
+        """Perform the actual file download with progress updates.
 
         Args:
             url: URL to download from
@@ -318,8 +305,7 @@ class DownloadManager:
     def _display_completion_stats(
         self, filename: str, total_size: int, download_time: float, prefix: str
     ) -> None:
-        """
-        Calculate and display download completion statistics.
+        """Calculate and display download completion statistics.
 
         Args:
             filename: Name of the downloaded file
@@ -341,8 +327,7 @@ class DownloadManager:
         headers: Dict[str, str],
         prefix: str = "",
     ) -> str:
-        """
-        Download with a progress bar display.
+        """Download with a progress bar display.
 
         Args:
             url: URL to download from
@@ -385,12 +370,12 @@ class DownloadManager:
             return file_path
 
         except requests.exceptions.RequestException as e:
-            error_msg = f"Network error while downloading {filename}: {str(e)}"
+            error_msg = f"Network error while downloading {filename}: {e!s}"
             self._logger.error(error_msg)
             print(f"{prefix}✗ Download failed: {error_msg}")
             self._cleanup_progress_task()
             raise RuntimeError(error_msg)
 
-        except Exception as e:
+        except Exception:
             self._cleanup_progress_task()
             raise  # Re-raise the original exception

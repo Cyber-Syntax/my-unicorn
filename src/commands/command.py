@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Command interface for the application.
+"""Command interface for the application.
 
 This module defines the base Command interface that all command implementations must follow.
 """
@@ -15,4 +13,3 @@ class Command(ABC):
     @abstractmethod
     def execute(self) -> None:
         """Execute the command's logic."""
-        pass

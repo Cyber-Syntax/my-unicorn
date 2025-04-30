@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-GitHub API handler module.
+"""GitHub API handler module.
 
 This module provides functionality for interacting with the GitHub API.
 """
 
 import logging
-import re
-import requests
 import os
-from typing import Dict, Any, Optional, List, Tuple, Union
+import re
+from typing import Any, Dict, Optional, Tuple, Union
 
-from src.icon_manager import IconManager
+import requests
+
 from src.auth_manager import GitHubAuthManager
-from src.utils import arch_utils, version_utils, sha_utils, ui_utils
+from src.icon_manager import IconManager
+from src.utils import arch_utils, sha_utils, ui_utils, version_utils
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -31,8 +30,7 @@ class GitHubAPI:
         hash_type: str = "sha256",
         arch_keyword: Optional[str] = None,
     ):
-        """
-        Initialize the GitHub API handler.
+        """Initialize the GitHub API handler.
 
         Args:
             owner: Repository owner/organization
@@ -40,6 +38,7 @@ class GitHubAPI:
             sha_name: Name of the sha algorithm used in the release assets
             hash_type: Type of hash to use for file verification
             arch_keyword: Architecture keyword to filter releases
+
         """
         self.owner = owner
         self.repo = repo
@@ -58,20 +57,20 @@ class GitHubAPI:
 
     @property
     def arch_keyword(self) -> Optional[str]:
-        """
-        Get the architecture keyword.
+        """Get the architecture keyword.
 
         Returns:
             str or None: The architecture keyword
+
         """
         return self._arch_keyword
 
     def get_latest_release(self) -> Tuple[bool, Union[Dict[str, Any], str]]:
-        """
-        Get the latest stable release from GitHub API.
+        """Get the latest stable release from GitHub API.
 
         Returns:
             tuple: (Success flag, Release data or error message)
+
         """
         api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
 
@@ -106,18 +105,18 @@ class GitHubAPI:
                 return False, error_msg
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request error fetching latest release: {str(e)}")
-            return False, f"Network error: {str(e)}"
+            logger.error(f"Request error fetching latest release: {e!s}")
+            return False, f"Network error: {e!s}"
         except Exception as e:
-            logger.error(f"Unexpected error fetching latest release: {str(e)}")
-            return False, f"Error: {str(e)}"
+            logger.error(f"Unexpected error fetching latest release: {e!s}")
+            return False, f"Error: {e!s}"
 
     def get_beta_releases(self) -> Tuple[bool, Union[Dict[str, Any], str]]:
-        """
-        Get all releases including pre-releases/betas.
+        """Get all releases including pre-releases/betas.
 
         Returns:
             tuple: (Success flag, Latest release data or error message)
+
         """
         api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases"
 
@@ -146,16 +145,16 @@ class GitHubAPI:
                 return False, error_msg
 
         except Exception as e:
-            logger.error(f"Error checking beta releases: {str(e)}")
-            return False, f"Error checking beta releases: {str(e)}"
+            logger.error(f"Error checking beta releases: {e!s}")
+            return False, f"Error checking beta releases: {e!s}"
 
     def get_response(self, per_page: int = 100) -> Tuple[bool, Union[Dict[str, Any], str]]:
-        """
-        Get the response from the GitHub API for releases.
+        """Get the response from the GitHub API for releases.
         Simplified to use dedicated endpoints for latest and all releases.
 
         Returns:
             tuple: (Success flag, Response data or error message)
+
         """
         # First try to get the latest stable release
         success, response = self.get_latest_release()
@@ -170,14 +169,14 @@ class GitHubAPI:
     def check_latest_version(
         self, current_version: Optional[str] = None
     ) -> Tuple[bool, Dict[str, str]]:
-        """
-        Check if there's a newer version available.
+        """Check if there's a newer version available.
 
         Args:
             current_version: Current version to compare against
 
         Returns:
             tuple: (Update available flag, Version information)
+
         """
         # Get latest release info (will try stable first, then fall back to beta if needed)
         success, response = self.get_response()
@@ -249,17 +248,17 @@ class GitHubAPI:
             }
 
         except Exception as e:
-            logger.error(f"Error parsing release information: {str(e)}")
-            return False, {"error": f"Error parsing release information: {str(e)}"}
+            logger.error(f"Error parsing release information: {e!s}")
+            return False, {"error": f"Error parsing release information: {e!s}"}
 
     def find_app_icon(self) -> Optional[Dict[str, Any]]:
-        """
-        Find application icon for the repository.
+        """Find application icon for the repository.
 
         Uses IconManager with the current authentication headers.
 
         Returns:
             dict or None: Icon information dictionary or None if not found
+
         """
         try:
             # Use the IconManager with current authentication headers
@@ -271,12 +270,11 @@ class GitHubAPI:
 
             return None
         except Exception as e:
-            logger.error(f"Error finding app icon: {str(e)}")
+            logger.error(f"Error finding app icon: {e!s}")
             return None
 
     def refresh_auth(self) -> None:
-        """
-        Refresh authentication headers.
+        """Refresh authentication headers.
 
         This method should be called when encountering rate limits
         or authentication issues.
@@ -289,8 +287,7 @@ class GitHubAPI:
         logger.info("Authentication headers refreshed")
 
     def _process_release(self, release_data: dict, is_beta: bool):
-        """
-        Process release data to extract version and asset information.
+        """Process release data to extract version and asset information.
 
         Args:
             release_data: Release data from GitHub API
@@ -298,6 +295,7 @@ class GitHubAPI:
 
         Returns:
             dict or None: Processed release data or None if processing failed
+
         """
         try:
             raw_tag = release_data["tag_name"]
@@ -337,11 +335,11 @@ class GitHubAPI:
             return None
 
     def _find_appimage_asset(self, assets: list):
-        """
-        Find and select appropriate AppImage asset based on system architecture.
+        """Find and select appropriate AppImage asset based on system architecture.
 
         Args:
             assets: List of release assets from GitHub API
+
         """
         # Current system architecture for logging
         current_arch = arch_utils.get_current_arch()
@@ -464,11 +462,11 @@ class GitHubAPI:
         )
 
     def _select_appimage(self, asset):
-        """
-        Select an AppImage asset and set instance attributes.
+        """Select an AppImage asset and set instance attributes.
 
         Args:
             asset: GitHub API asset information dictionary
+
         """
         self.appimage_url = asset["browser_download_url"]
         self.appimage_name = asset["name"]
@@ -491,11 +489,11 @@ class GitHubAPI:
                 self._arch_keyword = ".appimage"
 
     def _find_sha_asset(self, assets: list):
-        """
-        Find and select appropriate SHA file for verification.
+        """Find and select appropriate SHA file for verification.
 
         Args:
             assets: List of release assets from GitHub API
+
         """
         # Skip if SHA verification is disabled
         if self.sha_name == "no_sha_file":
@@ -641,11 +639,11 @@ class GitHubAPI:
         self._handle_sha_fallback(assets)
 
     def _select_sha_asset(self, asset):
-        """
-        Select a SHA asset and set instance attributes.
+        """Select a SHA asset and set instance attributes.
 
         Args:
             asset: GitHub API asset information dictionary
+
         """
         self.sha_name = asset["name"]
         self.sha_url = asset["browser_download_url"]
@@ -662,11 +660,11 @@ class GitHubAPI:
         logging.info(f"Selected SHA file: {self.sha_name} (hash type: {self.hash_type})")
 
     def _handle_sha_fallback(self, assets):
-        """
-        Handle fallback when SHA file couldn't be automatically determined.
+        """Handle fallback when SHA file couldn't be automatically determined.
 
         Args:
             assets: List of release assets from GitHub API
+
         """
         logging.warning("Could not find SHA file automatically")
         print(f"Could not find SHA file automatically for {self.appimage_name}")

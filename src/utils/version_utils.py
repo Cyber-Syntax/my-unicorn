@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Version utilities.
+"""Version utilities.
 
 This module provides functions for parsing and comparing version strings.
 """
 
-import re
 import logging
+import re
 from typing import Optional
 
 # Configure module logger
@@ -15,8 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_version_for_comparison(version: Optional[str]) -> str:
-    """
-    Normalize version string for consistent comparison.
+    """Normalize version string for consistent comparison.
 
     Args:
         version: Version string to normalize
@@ -44,8 +41,7 @@ def normalize_version_for_comparison(version: Optional[str]) -> str:
 
 
 def extract_base_version(version: str) -> str:
-    """
-    Extract the base version number without beta/alpha suffixes.
+    """Extract the base version number without beta/alpha suffixes.
 
     Args:
         version: Version string to extract from
@@ -62,8 +58,7 @@ def extract_base_version(version: str) -> str:
 
 
 def extract_version(tag: str, is_beta: bool = False) -> Optional[str]:
-    """
-    Extract semantic version from tag string.
+    """Extract semantic version from tag string.
 
     Args:
         tag: Version tag to extract from
@@ -97,8 +92,7 @@ def extract_version(tag: str, is_beta: bool = False) -> Optional[str]:
 
 
 def extract_version_from_filename(filename: str) -> Optional[str]:
-    """
-    Extract version from AppImage filename.
+    """Extract version from AppImage filename.
 
     Args:
         filename: AppImage filename
@@ -148,8 +142,7 @@ def extract_version_from_filename(filename: str) -> Optional[str]:
 
 
 def repo_uses_beta(repo_name: str) -> bool:
-    """
-    Determine if a repository typically uses beta/pre-releases.
+    """Determine if a repository typically uses beta/pre-releases.
 
     Args:
         repo_name: Repository name to check

@@ -1,32 +1,29 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Base update command module.
+"""Base update command module.
 
 This module provides a base class for AppImage update commands with common
 functionality for version checking and update operations, including both
 synchronous and asynchronous update capabilities.
 """
 
+import asyncio
 import logging
 import os
-import asyncio
 import time
-from typing import List, Dict, Any, Optional, Tuple, Set, Union
+from typing import Any, Dict, List, Optional, Tuple
 
-from src.commands.base import Command
-from src.app_config import AppConfigManager
-from src.global_config import GlobalConfigManager
 from src.api import GitHubAPI
-from src.download import DownloadManager
-from src.verify import VerificationManager
-from src.file_handler import FileHandler
+from src.app_config import AppConfigManager
 from src.auth_manager import GitHubAuthManager
+from src.commands.base import Command
+from src.download import DownloadManager
+from src.file_handler import FileHandler
+from src.global_config import GlobalConfigManager
+from src.verify import VerificationManager
 
 
 class BaseUpdateCommand(Command):
-    """
-    Base class for AppImage update commands.
+    """Base class for AppImage update commands.
 
     This class provides common functionality for checking and updating AppImages,
     to be inherited by specific update command implementations. Supports both
@@ -48,8 +45,7 @@ class BaseUpdateCommand(Command):
         self.semaphore: Optional[asyncio.Semaphore] = None
 
     def execute(self):
-        """
-        Abstract execute method to be implemented by subclasses.
+        """Abstract execute method to be implemented by subclasses.
 
         Raises:
             NotImplementedError: This method must be overridden by subclasses.
@@ -63,8 +59,7 @@ class BaseUpdateCommand(Command):
         app_config: Optional[AppConfigManager] = None,
         global_config: Optional[GlobalConfigManager] = None,
     ) -> bool:
-        """
-        Update a single AppImage with error handling.
+        """Update a single AppImage with error handling.
 
         Args:
             app_data: Dictionary with app information (config_file, name, current, latest)
@@ -117,19 +112,19 @@ class BaseUpdateCommand(Command):
                         break
 
                 except Exception as e:
-                    error_msg = f"Error updating {app_data['name']}: {str(e)}"
+                    error_msg = f"Error updating {app_data['name']}: {e!s}"
                     self._logger.error(error_msg)
 
                     # For batch updates or last attempt, skip to next app
                     if is_batch or attempt == max_attempts:
                         if is_batch:
-                            print(f"Error: {str(e)}. Skipping to next app.")
+                            print(f"Error: {e!s}. Skipping to next app.")
                         else:
-                            print(f"Error: {str(e)}. Maximum retry attempts reached.")
+                            print(f"Error: {e!s}. Maximum retry attempts reached.")
                         return False
 
                     # For single app update with retries remaining, ask to retry
-                    print(f"Download failed. Attempt {attempt} of {max_attempts}. Error: {str(e)}")
+                    print(f"Download failed. Attempt {attempt} of {max_attempts}. Error: {e!s}")
                     if not self._should_retry_download(attempt, max_attempts):
                         print("Update cancelled.")
                         break
@@ -141,11 +136,9 @@ class BaseUpdateCommand(Command):
 
         except Exception as e:
             # Catch any unexpected exceptions to ensure we continue to the next app
-            error_msg = f"Unexpected error updating {app_data['name']}: {str(e)}"
+            error_msg = f"Unexpected error updating {app_data['name']}: {e!s}"
             self._logger.error(error_msg)
-            print(
-                f"Unexpected error updating {app_data['name']}: {str(e)}. Continuing to next app."
-            )
+            print(f"Unexpected error updating {app_data['name']}: {e!s}. Continuing to next app.")
             return False
 
     def _perform_update_attempt(
@@ -158,8 +151,7 @@ class BaseUpdateCommand(Command):
         max_attempts: int,
         is_batch: bool,
     ) -> bool:
-        """
-        Perform a single update attempt for an AppImage.
+        """Perform a single update attempt for an AppImage.
 
         Args:
             github_api: GitHub API instance for this app
@@ -238,7 +230,7 @@ class BaseUpdateCommand(Command):
                 print(success_msg)
                 return True
             except Exception as e:
-                error_msg = f"Failed to update version in config file: {str(e)}"
+                error_msg = f"Failed to update version in config file: {e!s}"
                 self._logger.error(error_msg)
                 print(error_msg)
                 return False
@@ -254,8 +246,7 @@ class BaseUpdateCommand(Command):
         app_config: AppConfigManager,
         global_config: GlobalConfigManager,
     ) -> FileHandler:
-        """
-        Create a FileHandler instance with proper configuration.
+        """Create a FileHandler instance with proper configuration.
 
         Args:
             github_api: GitHub API instance with release info
@@ -286,8 +277,7 @@ class BaseUpdateCommand(Command):
         downloaded_file_path: str = None,
         cleanup_on_failure: bool = True,
     ) -> bool:
-        """
-        Verify the downloaded AppImage using the SHA file.
+        """Verify the downloaded AppImage using the SHA file.
 
         Args:
             github_api: GitHub API instance with release info
@@ -319,8 +309,7 @@ class BaseUpdateCommand(Command):
         return verification_manager.verify_appimage(cleanup_on_failure=cleanup_on_failure)
 
     def _should_retry_download(self, attempt: int, max_attempts: int) -> bool:
-        """
-        Ask user if they want to retry a failed download.
+        """Ask user if they want to retry a failed download.
 
         Args:
             attempt: Current attempt number
@@ -337,8 +326,7 @@ class BaseUpdateCommand(Command):
             return False
 
     def _display_update_list(self, updatable_apps: List[Dict[str, Any]]) -> None:
-        """
-        Display list of apps to update.
+        """Display list of apps to update.
 
         Args:
             updatable_apps: List of updatable app dictionaries
@@ -352,8 +340,7 @@ class BaseUpdateCommand(Command):
     def _check_single_app_version(
         self, app_config: AppConfigManager, config_file: str
     ) -> Optional[Dict[str, Any]]:
-        """
-        Check version for single AppImage.
+        """Check version for single AppImage.
 
         Args:
             app_config: App configuration manager
@@ -397,8 +384,7 @@ class BaseUpdateCommand(Command):
         return None
 
     def _update_apps(self, apps_to_update: List[Dict[str, Any]]) -> None:
-        """
-        Update the specified apps using the base implementation.
+        """Update the specified apps using the base implementation.
 
         Args:
             apps_to_update: List of app information dictionaries to update
@@ -497,8 +483,7 @@ class BaseUpdateCommand(Command):
     def _check_rate_limits(
         self, apps_to_update: List[Dict[str, Any]]
     ) -> Tuple[bool, List[Dict[str, Any]], str]:
-        """
-        Check if updating the specified apps would exceed GitHub API rate limits.
+        """Check if updating the specified apps would exceed GitHub API rate limits.
 
         Calculates required API requests and compares against remaining limits.
         Each app update requires at least 1 API request, plus potentially 1 more for icon download.
@@ -598,8 +583,8 @@ class BaseUpdateCommand(Command):
                 return False, prioritized_apps, status_message
             else:
                 status_message += (
-                    f"❌ ERROR: Not enough API requests to perform any updates.\n"
-                    f"Please wait until rate limits reset or add a GitHub token."
+                    "❌ ERROR: Not enough API requests to perform any updates.\n"
+                    "Please wait until rate limits reset or add a GitHub token."
                 )
                 return False, [], status_message
 
@@ -614,8 +599,7 @@ class BaseUpdateCommand(Command):
         app_index: int = 0,
         total_apps: int = 0,
     ) -> bool:
-        """
-        Update a single AppImage with specialized handling for async context.
+        """Update a single AppImage with specialized handling for async context.
 
         This method is designed to work within the async update system but
         runs synchronously within its own thread to avoid blocking the event loop.
@@ -649,8 +633,7 @@ class BaseUpdateCommand(Command):
     async def _update_app_async(
         self, app_data: Dict[str, Any], idx: int, total_apps: int = 0
     ) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Asynchronous wrapper for single app update.
+        """Asynchronous wrapper for single app update.
 
         Args:
             app_data: Dictionary with app information
@@ -712,8 +695,7 @@ class BaseUpdateCommand(Command):
     async def _update_apps_async(
         self, apps_to_update: List[Dict[str, Any]]
     ) -> Tuple[int, int, List[Dict[str, Any]]]:
-        """
-        Update multiple apps concurrently using asyncio.
+        """Update multiple apps concurrently using asyncio.
 
         Args:
             apps_to_update: List of app information dictionaries to update
@@ -778,7 +760,7 @@ class BaseUpdateCommand(Command):
             return success_count, failure_count, results
 
         except Exception as e:
-            logging.error(f"Error in async update process: {str(e)}", exc_info=True)
+            logging.error(f"Error in async update process: {e!s}", exc_info=True)
             return success_count, failure_count, results
 
     def _perform_app_update_core(
@@ -791,8 +773,7 @@ class BaseUpdateCommand(Command):
         app_index: int = 0,
         total_apps: int = 0,
     ) -> Tuple[bool, Optional[Dict[str, Any]]]:
-        """
-        Core method to update a single AppImage with consistent error handling.
+        """Core method to update a single AppImage with consistent error handling.
 
         This contains the shared update logic used by both async and sync update
         processes. It handles loading configs, downloading, verification, and file
@@ -897,7 +878,7 @@ class BaseUpdateCommand(Command):
                     return True, result_data
 
                 except Exception as e:
-                    error_msg = f"Failed to update version in config file: {str(e)}"
+                    error_msg = f"Failed to update version in config file: {e!s}"
                     logger.error(error_msg, exc_info=True)
                     result_data["message"] = error_msg
                     return False, result_data
@@ -909,7 +890,7 @@ class BaseUpdateCommand(Command):
 
         except Exception as e:
             # Catch any unexpected exceptions
-            error_msg = f"Unexpected error updating {app_name}: {str(e)}"
+            error_msg = f"Unexpected error updating {app_name}: {e!s}"
             logger.error(error_msg, exc_info=True)
             result_data["message"] = error_msg
             result_data["elapsed"] = time.time() - start_time

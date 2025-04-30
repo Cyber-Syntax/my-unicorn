@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-GitHub authentication manager module.
+"""GitHub authentication manager module.
 
 This module provides functionality for handling GitHub API authentication
 with proper Bearer token formatting and reuse.
 """
 
 import logging
-import time
 import os
-import json
-from typing import Dict, Optional, Tuple, List, Any, Union
+import time
 from datetime import datetime
+from typing import Any, Dict, Optional, Tuple, Union
 
 import requests
 
 from src.secure_token import SecureTokenManager
-from src.utils.datetime_utils import parse_timestamp, format_timestamp, get_next_hour_timestamp
 from src.utils.cache_utils import ensure_directory_exists, load_json_cache, save_json_cache
+from src.utils.datetime_utils import format_timestamp, get_next_hour_timestamp, parse_timestamp
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -32,8 +29,7 @@ CACHE_DIR = os.path.expanduser("~/.cache/myunicorn")  # Cache directory
 
 
 class GitHubAuthManager:
-    """
-    Manages GitHub API authentication.
+    """Manages GitHub API authentication.
 
     This class provides methods to generate properly formatted authentication
     headers for GitHub API requests using securely stored tokens.
@@ -53,8 +49,7 @@ class GitHubAuthManager:
 
     @classmethod
     def get_auth_headers(cls, force_refresh: bool = False) -> Dict[str, str]:
-        """
-        Get authentication headers for GitHub API requests.
+        """Get authentication headers for GitHub API requests.
 
         Returns properly formatted headers with Bearer authentication if a token
         is available, or basic headers if no token is found.
@@ -142,8 +137,7 @@ class GitHubAuthManager:
 
     @classmethod
     def clear_cached_headers(cls) -> None:
-        """
-        Clear cached authentication headers.
+        """Clear cached authentication headers.
 
         Call this method when the token changes to force regeneration of headers.
         """
@@ -154,8 +148,7 @@ class GitHubAuthManager:
 
     @classmethod
     def clear_rate_limit_cache(cls) -> None:
-        """
-        Clear the cached rate limit information.
+        """Clear the cached rate limit information.
 
         This should be called when the authentication status changes,
         especially when a token is removed to ensure the rate limits
@@ -193,8 +186,7 @@ class GitHubAuthManager:
 
     @staticmethod
     def has_valid_token() -> bool:
-        """
-        Check if a valid GitHub token is available.
+        """Check if a valid GitHub token is available.
 
         Returns:
             bool: True if a token exists and is not expired, False otherwise
@@ -205,8 +197,7 @@ class GitHubAuthManager:
 
     @classmethod
     def _should_rotate_token(cls) -> bool:
-        """
-        Check if token should be rotated based on expiration.
+        """Check if token should be rotated based on expiration.
 
         Returns:
             bool: True if token should be rotated, False otherwise
@@ -241,8 +232,7 @@ class GitHubAuthManager:
 
     @classmethod
     def _get_cache_file_path(cls) -> str:
-        """
-        Get the path to the rate limit cache file.
+        """Get the path to the rate limit cache file.
 
         Returns:
             str: Path to the cache file
@@ -251,8 +241,7 @@ class GitHubAuthManager:
 
     @classmethod
     def _load_rate_limit_cache(cls) -> Dict[str, Any]:
-        """
-        Load rate limit information from cache.
+        """Load rate limit information from cache.
 
         Returns:
             dict: Rate limit cache or empty dict if no cache
@@ -265,8 +254,7 @@ class GitHubAuthManager:
 
     @classmethod
     def _save_rate_limit_cache(cls, data: Dict[str, Any]) -> bool:
-        """
-        Save rate limit information to cache.
+        """Save rate limit information to cache.
 
         Args:
             data: Rate limit data to cache
@@ -283,8 +271,7 @@ class GitHubAuthManager:
 
     @classmethod
     def _update_cached_rate_limit(cls, decrement: int = 1) -> None:
-        """
-        Update the cached rate limit by decrementing the remaining count.
+        """Update the cached rate limit by decrementing the remaining count.
 
         GitHub API rate limits reset on an hourly basis (both for authenticated and
         unauthenticated requests). The limit counts will refresh at the top of each hour.
@@ -315,8 +302,7 @@ class GitHubAuthManager:
         custom_headers: Optional[Dict[str, str]] = None,
         return_dict: bool = False,
     ) -> Union[Tuple[int, int, str, bool], Dict[str, Any]]:
-        """
-        Core implementation for rate limit data retrieval.
+        """Core implementation for rate limit data retrieval.
 
         This method handles both cached and live rate limit information.
 
@@ -536,8 +522,7 @@ class GitHubAuthManager:
     def get_rate_limit_info(
         cls, custom_headers: Optional[Dict[str, str]] = None, return_dict: bool = False
     ) -> Union[Tuple[int, int, str, bool], Dict[str, Any]]:
-        """
-        Get the current GitHub API rate limit information.
+        """Get the current GitHub API rate limit information.
 
         Uses a local cache to avoid frequent API calls.
 
@@ -562,8 +547,7 @@ class GitHubAuthManager:
         audit_action: Optional[str] = None,
         **kwargs,
     ) -> requests.Response:
-        """
-        Make an authenticated request to GitHub API with automatic token handling.
+        """Make an authenticated request to GitHub API with automatic token handling.
 
         Args:
             method: HTTP method (GET, POST, etc)
@@ -632,8 +616,7 @@ class GitHubAuthManager:
 
     @classmethod
     def set_audit_enabled(cls, enabled: bool) -> None:
-        """
-        Enable or disable audit logging for authentication activities.
+        """Enable or disable audit logging for authentication activities.
 
         Args:
             enabled: Whether to enable audit logging
@@ -643,8 +626,7 @@ class GitHubAuthManager:
 
     @classmethod
     def get_token_info(cls) -> Dict[str, Any]:
-        """
-        Get information about the current token.
+        """Get information about the current token.
 
         Returns:
             Dict with token information including expiration status
@@ -669,7 +651,6 @@ class GitHubAuthManager:
                         days_until_rotation = days_until_expiration - TOKEN_REFRESH_THRESHOLD_DAYS
             except Exception as e:
                 logger.warning(f"Error calculating token rotation time: {e}")
-                pass
 
         # Use our own has_valid_token method
         result = {
@@ -705,8 +686,7 @@ class GitHubAuthManager:
     def get_live_rate_limit_info(
         cls, custom_headers: Optional[Dict[str, str]] = None
     ) -> Dict[str, Any]:
-        """
-        Get the current GitHub API rate limit information directly from the API without using cache.
+        """Get the current GitHub API rate limit information directly from the API without using cache.
 
         This method is used when the user explicitly wants to check the current rate limits.
 
@@ -760,8 +740,7 @@ class GitHubAuthManager:
     def validate_token(
         cls, custom_headers: Optional[Dict[str, str]] = None
     ) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Validate a GitHub token by making a test request and analyzing the response.
+        """Validate a GitHub token by making a test request and analyzing the response.
 
         Args:
             custom_headers: Custom headers containing the token to validate
@@ -851,10 +830,10 @@ class GitHubAuthManager:
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Network error during token validation: {e}")
-            token_info["error"] = f"Network error: {str(e)}"
+            token_info["error"] = f"Network error: {e!s}"
             return False, token_info
 
         except Exception as e:
             logger.error(f"Unexpected error during token validation: {e}")
-            token_info["error"] = f"Unexpected error: {str(e)}"
+            token_info["error"] = f"Unexpected error: {e!s}"
             return False, token_info

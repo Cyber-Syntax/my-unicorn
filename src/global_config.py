@@ -9,7 +9,7 @@ class GlobalConfigManager:
     """Manages global configuration settings."""
 
     config_file: str = field(default="~/.config/myunicorn/settings.json")
-    #TODO: Make better variable names when possible which currents are not good
+    # TODO: Make better variable names when possible which currents are not good
     appimage_download_folder_path: str = field(default_factory=lambda: "~/Documents/appimages")
     appimage_download_backup_folder_path: str = field(
         default_factory=lambda: "~/Documents/appimages/backups"
@@ -35,7 +35,7 @@ class GlobalConfigManager:
         """Load global settings from a JSON file or initialize defaults."""
         if os.path.isfile(self.config_file):  # Check if file exists
             try:
-                with open(self.config_file, "r", encoding="utf-8") as file:
+                with open(self.config_file, encoding="utf-8") as file:
                     config = json.load(file)
 
                     # Get all expected config keys from to_dict method

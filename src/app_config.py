@@ -1,5 +1,4 @@
-"""
-Application configuration management module.
+"""Application configuration management module.
 
 This module provides functionality for managing application-specific configurations
 including creating desktop entries, managing versions, and storing app settings.
@@ -9,9 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from pathlib import Path
-from typing import Any, Dict, List, Union, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -28,8 +26,7 @@ IMAGE_EXTENSIONS = [".svg", ".png", ".jpg", ".jpeg"]
 
 
 class AppConfigManager:
-    """
-    Manages app-specific configuration settings.
+    """Manages app-specific configuration settings.
 
     This class handles operations related to application configuration including
     creating desktop files, managing versions, and storing app-specific settings.
@@ -47,8 +44,7 @@ class AppConfigManager:
         arch_keyword: Union[str, None] = None,
         config_folder: str = DEFAULT_CONFIG_PATH,
     ):
-        """
-        Initialize the AppConfigManager with application-specific settings.
+        """Initialize the AppConfigManager with application-specific settings.
 
         Args:
             owner: GitHub repository owner/organization
@@ -83,8 +79,7 @@ class AppConfigManager:
     def update_version(
         self, new_version: Union[str, None] = None, new_appimage_name: Union[str, None] = None
     ) -> None:
-        """
-        Update the configuration file with the new version and AppImage name.
+        """Update the configuration file with the new version and AppImage name.
         If new_version or new_appimage_name is provided, update the instance variables accordingly.
 
         Args:
@@ -120,9 +115,7 @@ class AppConfigManager:
     def create_desktop_file(
         self, appimage_path: str, icon_path: Union[str, None] = None
     ) -> Tuple[bool, str]:
-        """
-        Create or update a desktop entry file for the AppImage.
-        """
+        """Create or update a desktop entry file for the AppImage."""
         try:
             if not self.app_id:
                 return False, "Application identifier not available"
@@ -231,8 +224,7 @@ class AppConfigManager:
             return False, error_msg
 
     def list_json_files(self) -> List[str]:
-        """
-        List JSON files in the configuration directory.
+        """List JSON files in the configuration directory.
 
         Returns:
             List[str]: List of JSON files in the configuration directory
@@ -251,8 +243,7 @@ class AppConfigManager:
             raise FileNotFoundError(f"Configuration folder access error: {error}")
 
     def temp_save_config(self) -> bool:
-        """
-        Atomically save configuration using temporary file.
+        """Atomically save configuration using temporary file.
 
         Returns:
             bool: True if save successful, False otherwise
@@ -282,8 +273,7 @@ class AppConfigManager:
             return False
 
     def save_config(self) -> bool:
-        """
-        Commit temporary config by replacing original.
+        """Commit temporary config by replacing original.
 
         Returns:
             bool: True if commit successful, False otherwise
@@ -314,8 +304,7 @@ class AppConfigManager:
             return False
 
     def select_files(self) -> Union[List[str], None]:
-        """
-        List available JSON configuration files and allow the user to select multiple.
+        """List available JSON configuration files and allow the user to select multiple.
 
         Shows application names without the .json extension for better readability.
 
@@ -356,8 +345,7 @@ class AppConfigManager:
             return None
 
     def load_appimage_config(self, config_file_name: str) -> Union[Dict[str, Any], None]:
-        """
-        Load a specific AppImage configuration file.
+        """Load a specific AppImage configuration file.
 
         Args:
             config_file_name: Name of the configuration file
@@ -425,8 +413,7 @@ class AppConfigManager:
         self._handle_config_customization(app_name)
 
     def _get_user_selection(self, json_files: List[str]) -> Union[str, None]:
-        """
-        Get user's file selection.
+        """Get user's file selection.
 
         Args:
             json_files: List of JSON files to choose from
@@ -453,8 +440,7 @@ class AppConfigManager:
                 print("Invalid choice. Please select a valid number.")
 
     def _display_config_info(self, app_name: str) -> None:
-        """
-        Display current configuration information.
+        """Display current configuration information.
 
         Args:
             app_name: Name of the application
@@ -486,8 +472,7 @@ class AppConfigManager:
         print("-" * 60)
 
     def _handle_config_customization(self, app_name: str) -> None:
-        """
-        Handle configuration customization based on user input.
+        """Handle configuration customization based on user input.
 
         Args:
             app_name: Name of the application
@@ -524,8 +509,7 @@ class AppConfigManager:
         print("=" * 60)
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert the instance variables to a dictionary.
+        """Convert the instance variables to a dictionary.
 
         Returns:
             Dict[str, Any]: Dictionary representation of app configuration
@@ -542,8 +526,7 @@ class AppConfigManager:
         }
 
     def ask_sha_hash(self) -> Tuple[Union[str, None], str]:
-        """
-        Set up app-specific configuration interactively.
+        """Set up app-specific configuration interactively.
 
         Returns:
             Tuple[Union[str, None], str]: The hash file name and hash type

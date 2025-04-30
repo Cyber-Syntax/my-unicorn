@@ -4,10 +4,9 @@ import hashlib
 import logging
 import os
 import re
+
 import requests
 import yaml
-from pathlib import Path
-from typing import Optional, Tuple
 
 _ = gettext.gettext
 
@@ -37,8 +36,7 @@ class VerificationManager:
         self._validate_hash_type()
 
     def set_appimage_path(self, full_path: str) -> None:
-        """
-        Set the full path to the AppImage file for verification.
+        """Set the full path to the AppImage file for verification.
 
         Args:
             full_path: The complete path to the AppImage file
@@ -58,8 +56,7 @@ class VerificationManager:
             raise ValueError(f"Hash type {self.hash_type} not available in this system")
 
     def verify_appimage(self, cleanup_on_failure: bool = False) -> bool:
-        """
-        Verify the AppImage using the SHA file with proper error handling and fallbacks.
+        """Verify the AppImage using the SHA file with proper error handling and fallbacks.
 
         Args:
             cleanup_on_failure: Whether to remove the AppImage if verification fails
@@ -105,13 +102,13 @@ class VerificationManager:
 
             return is_valid
 
-        except (requests.RequestException, IOError) as e:
-            logging.error(f"Verification failed: {str(e)}")
+        except (OSError, requests.RequestException) as e:
+            logging.error(f"Verification failed: {e!s}")
             if cleanup_on_failure:
                 self._cleanup_failed_file(self.appimage_path)
             return False
         except Exception as e:
-            logging.error(f"Unexpected error during verification: {str(e)}")
+            logging.error(f"Unexpected error during verification: {e!s}")
             if cleanup_on_failure:
                 self._cleanup_failed_file(self.appimage_path)
             return False
@@ -123,7 +120,7 @@ class VerificationManager:
                 os.remove(self.sha_name)
                 logging.info(f"Removed existing {self.sha_name}")
             except OSError as e:
-                raise IOError(f"Failed to remove existing SHA file: {str(e)}")
+                raise OSError(f"Failed to remove existing SHA file: {e!s}")
 
         try:
             response = requests.get(self.sha_url, timeout=10)
@@ -132,9 +129,9 @@ class VerificationManager:
                 f.write(response.text)
             logging.info(f"Successfully downloaded {self.sha_name}")
         except requests.RequestException as e:
-            raise IOError(f"Failed to download SHA file: {str(e)}")
+            raise OSError(f"Failed to download SHA file: {e!s}")
         except Exception as e:
-            raise IOError(f"Failed to write SHA file: {str(e)}")
+            raise OSError(f"Failed to write SHA file: {e!s}")
 
     def _parse_sha_file(self) -> bool:
         """Dispatch to appropriate SHA parsing method based on file extension."""
@@ -143,7 +140,7 @@ class VerificationManager:
             return True
 
         if not os.path.exists(self.sha_name):
-            raise IOError(f"SHA file not found: {self.sha_name}")
+            raise OSError(f"SHA file not found: {self.sha_name}")
 
         ext = os.path.splitext(self.sha_name)[1].lower()
         parser = {
@@ -167,7 +164,7 @@ class VerificationManager:
     def _parse_yaml_sha(self) -> bool:
         """Parse SHA hash from YAML file with error handling."""
         try:
-            with open(self.sha_name, "r", encoding="utf-8") as f:
+            with open(self.sha_name, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
 
             if not data:
@@ -181,15 +178,15 @@ class VerificationManager:
                 decoded_hash = base64.b64decode(encoded_hash).hex()
                 return self._compare_hashes(decoded_hash)
             except Exception as e:
-                raise ValueError(f"Failed to decode hash: {str(e)}")
+                raise ValueError(f"Failed to decode hash: {e!s}")
 
         except (yaml.YAMLError, ValueError, TypeError) as e:
-            raise IOError(f"YAML parsing failed: {str(e)}")
+            raise OSError(f"YAML parsing failed: {e!s}")
 
     def _parse_simple_sha(self) -> bool:
         """Parse SHA hash from simple hash file."""
         try:
-            with open(self.sha_name, "r", encoding="utf-8") as f:
+            with open(self.sha_name, encoding="utf-8") as f:
                 content = f.read().strip()
 
             if not content:
@@ -205,12 +202,11 @@ class VerificationManager:
 
             return self._compare_hashes(hash_value)
 
-        except IOError as e:
-            raise IOError(f"Failed to read SHA file: {str(e)}")
+        except OSError as e:
+            raise OSError(f"Failed to read SHA file: {e!s}")
 
     def _parse_text_sha(self) -> bool:
-        """
-        Parse SHA hash from text file with pattern matching.
+        """Parse SHA hash from text file with pattern matching.
 
         This method handles multiple common formats:
         - <hash> <filename> (most common format)
@@ -231,7 +227,7 @@ class VerificationManager:
         target_name = os.path.basename(self.appimage_name).lower()
 
         try:
-            with open(self.sha_name, "r", encoding="utf-8") as f:
+            with open(self.sha_name, encoding="utf-8") as f:
                 content = f.read()
 
             # Try GitHub-style format with headers first
@@ -298,15 +294,14 @@ class VerificationManager:
 
             raise ValueError(f"No valid hash found for {self.appimage_name} in SHA file")
 
-        except IOError as e:
-            raise IOError(f"Failed to read SHA file: {str(e)}")
+        except OSError as e:
+            raise OSError(f"Failed to read SHA file: {e!s}")
         except Exception as e:
-            logging.error(f"Error parsing SHA file: {str(e)}")
+            logging.error(f"Error parsing SHA file: {e!s}")
             raise
 
     def _parse_path_sha(self) -> bool:
-        """
-        Parse SHA hash from text file that contains relative paths.
+        """Parse SHA hash from text file that contains relative paths.
 
         This handles formats like:
         <hash>  ./path/to/filename.AppImage
@@ -317,7 +312,7 @@ class VerificationManager:
         target_filename = os.path.basename(self.appimage_name).lower()
 
         try:
-            with open(self.sha_name, "r", encoding="utf-8") as f:
+            with open(self.sha_name, encoding="utf-8") as f:
                 for line in f:
                     parts = line.strip().split()
                     if len(parts) < 2:
@@ -349,8 +344,8 @@ class VerificationManager:
 
             raise ValueError(f"No valid hash found for {target_filename} in path-based SHA file")
 
-        except IOError as e:
-            raise IOError(f"Failed to read SHA file: {str(e)}")
+        except OSError as e:
+            raise OSError(f"Failed to read SHA file: {e!s}")
 
     def _compare_hashes(self, expected_hash: str) -> bool:
         """Compare hashes using memory-efficient chunked reading."""
@@ -358,7 +353,7 @@ class VerificationManager:
         file_to_verify = self.appimage_path
 
         if not os.path.exists(file_to_verify):
-            raise IOError(f"AppImage file not found: {file_to_verify}")
+            raise OSError(f"AppImage file not found: {file_to_verify}")
 
         try:
             hash_func = hashlib.new(self.hash_type)
@@ -378,10 +373,10 @@ class VerificationManager:
 
             return actual_hash == expected_hash
 
-        except IOError as e:
-            raise IOError(f"Failed to read AppImage file: {str(e)}")
+        except OSError as e:
+            raise OSError(f"Failed to read AppImage file: {e!s}")
         except Exception as e:
-            raise ValueError(f"Hash calculation failed: {str(e)}")
+            raise ValueError(f"Hash calculation failed: {e!s}")
 
     def _cleanup_verification_file(self) -> bool:
         """Remove SHA file after verification to keep the system clean.
@@ -398,7 +393,7 @@ class VerificationManager:
             logging.info(f"Removed verification file: {self.sha_name}")
             return True
         except OSError as e:
-            logging.warning(f"Failed to remove verification file: {str(e)}")
+            logging.warning(f"Failed to remove verification file: {e!s}")
             return False
 
     def _log_comparison(self, actual: str, expected: str):
@@ -427,8 +422,7 @@ class VerificationManager:
             print("\n".join(log_lines))
 
     def _cleanup_failed_file(self, filepath: str) -> bool:
-        """
-        Remove a file that failed verification after asking for user confirmation.
+        """Remove a file that failed verification after asking for user confirmation.
 
         Args:
             filepath: Path to the file that failed verification
@@ -459,13 +453,12 @@ class VerificationManager:
             return True
 
         except Exception as e:
-            logging.error(f"Failed to remove file after verification failure: {str(e)}")
+            logging.error(f"Failed to remove file after verification failure: {e!s}")
             print(f"Warning: Could not remove failed file: {filepath}")
             return False
 
     def _get_user_confirmation(self, filepath: str) -> bool:
-        """
-        Ask the user for confirmation before removing a file that failed verification.
+        """Ask the user for confirmation before removing a file that failed verification.
 
         Args:
             filepath: Path to the file that failed verification

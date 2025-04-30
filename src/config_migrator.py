@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Configuration migration module for detecting and updating config files."""
 
+import json
 import logging
 import os
-import json
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple
 
-from src.global_config import GlobalConfigManager
 from src.app_config import AppConfigManager
+from src.global_config import GlobalConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +17,7 @@ class ConfigMigrator:
 
     @staticmethod
     def check_and_migrate_global_config() -> Tuple[bool, List[str]]:
-        """
-        Check global configuration for missing keys and migrate if needed.
+        """Check global configuration for missing keys and migrate if needed.
 
         Returns:
             Tuple[bool, List[str]]: (True if migration occurred, list of migrated keys)
@@ -40,7 +38,7 @@ class ConfigMigrator:
         try:
             if os.path.isfile(config_file):
                 # Read the existing config file directly
-                with open(config_file, "r", encoding="utf-8") as f:
+                with open(config_file, encoding="utf-8") as f:
                     file_content = f.read()
 
                 # Debug output for raw file content
@@ -89,13 +87,12 @@ class ConfigMigrator:
             logger.error(f"Invalid JSON in config file: {e}")
             return False, []
         except Exception as e:
-            logger.error(f"Error during global config migration: {str(e)}", exc_info=True)
+            logger.error(f"Error during global config migration: {e!s}", exc_info=True)
             return False, []
 
     @staticmethod
     def check_and_migrate_app_configs() -> Tuple[int, Dict[str, List[str]]]:
-        """
-        Check all app configuration files for missing keys and migrate if needed.
+        """Check all app configuration files for missing keys and migrate if needed.
 
         Returns:
             Tuple[int, Dict[str, List[str]]]: (Migrated config count, dict of app name -> migrated keys)
@@ -129,7 +126,7 @@ class ConfigMigrator:
 
                 try:
                     # Read the app config file
-                    with open(config_path, "r", encoding="utf-8") as f:
+                    with open(config_path, encoding="utf-8") as f:
                         file_content = f.read()
 
                     # Parse JSON content
@@ -159,20 +156,17 @@ class ConfigMigrator:
                 except json.JSONDecodeError as e:
                     logger.error(f"Invalid JSON in app config '{app_name}': {e}")
                 except Exception as e:
-                    logger.error(
-                        f"Error processing app config '{app_name}': {str(e)}", exc_info=True
-                    )
+                    logger.error(f"Error processing app config '{app_name}': {e!s}", exc_info=True)
 
             return len(migrated_configs), migrated_configs
 
         except Exception as e:
-            logger.error(f"Error during app config migration: {str(e)}", exc_info=True)
+            logger.error(f"Error during app config migration: {e!s}", exc_info=True)
             return 0, {}
 
     @staticmethod
     def run_full_migration() -> Dict[str, Any]:
-        """
-        Run a complete migration of global and app configurations.
+        """Run a complete migration of global and app configurations.
 
         Returns:
             Dict[str, Any]: Migration results summary

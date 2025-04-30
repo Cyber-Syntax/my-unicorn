@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-File handling module for AppImage operations.
+"""File handling module for AppImage operations.
 
 This module handles file operations related to AppImages, including moving files,
 creating desktop entries, and downloading icons.
@@ -9,19 +7,13 @@ creating desktop entries, and downloading icons.
 
 # Standard library imports
 import logging
-import re
 import shutil
 import stat
-import subprocess
-import sys
 import time
-from importlib import import_module
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Optional
 
 # Third-party imports
-import requests
-
 # Local imports
 from src.api import GitHubAPI
 
@@ -37,8 +29,7 @@ DESKTOP_FILE_SECTION = "Desktop Entry"
 
 
 class FileHandler:
-    """
-    Handles file operations for AppImage management.
+    """Handles file operations for AppImage management.
 
     This class provides methods for:
     - Moving AppImage files to installation directories
@@ -64,8 +55,7 @@ class FileHandler:
         max_backups: int = 3,
         app_id: Optional[str] = None,
     ):
-        """
-        Initialize file handler with paths and configuration.
+        """Initialize file handler with paths and configuration.
 
         Args:
             appimage_name: Name of the AppImage file
@@ -135,8 +125,7 @@ class FileHandler:
         )
 
     def handle_appimage_operations(self, github_api: Optional[GitHubAPI] = None) -> bool:
-        """
-        Perform all required file operations for an AppImage.
+        """Perform all required file operations for an AppImage.
 
         Args:
             github_api: Optional GitHubAPI instance for additional operations
@@ -168,7 +157,7 @@ class FileHandler:
             return True
 
         except Exception as e:
-            logging.error(f"Error handling AppImage operations: {str(e)}")
+            logging.error(f"Error handling AppImage operations: {e!s}")
             return False
 
     def _ensure_directories_exist(self) -> None:
@@ -179,8 +168,7 @@ class FileHandler:
             self.appimage_download_backup_folder_path.mkdir(parents=True, exist_ok=True)
 
     def _backup_appimage(self) -> bool:
-        """
-        Backup existing AppImage file and maintain backup rotation.
+        """Backup existing AppImage file and maintain backup rotation.
 
         Keeps only the specified number of backup files per app, removing older backups
         when the limit is reached.
@@ -216,12 +204,11 @@ class FileHandler:
             return True
 
         except OSError as e:
-            logging.error(f"Failed to backup AppImage: {str(e)}")
+            logging.error(f"Failed to backup AppImage: {e!s}")
             return False
 
     def _cleanup_old_backups(self, app_base_name: str) -> None:
-        """
-        Remove old backup files based on max_backups setting.
+        """Remove old backup files based on max_backups setting.
 
         Args:
             app_base_name: Base name of the app to clean up backups for
@@ -293,14 +280,13 @@ class FileHandler:
 
         except OSError as e:
             # Log but don't fail the whole operation if cleanup fails
-            logging.warning(f"Error during backup cleanup: {str(e)}")
+            logging.warning(f"Error during backup cleanup: {e!s}")
         except Exception as e:
             # Catch any other unexpected errors
-            logging.warning(f"Unexpected error during backup cleanup: {str(e)}")
+            logging.warning(f"Unexpected error during backup cleanup: {e!s}")
 
     def _move_appimage(self) -> bool:
-        """
-        Move downloaded AppImage to destination folder.
+        """Move downloaded AppImage to destination folder.
 
         Returns:
             bool: True if the move succeeded, False otherwise
@@ -324,12 +310,11 @@ class FileHandler:
             return True
 
         except Exception as e:
-            logging.error(f"Failed to move AppImage: {str(e)}")
+            logging.error(f"Failed to move AppImage: {e!s}")
             return False
 
     def _set_executable_permission(self) -> bool:
-        """
-        Set executable permissions on the AppImage.
+        """Set executable permissions on the AppImage.
 
         Returns:
             bool: True if permissions were set successfully, False otherwise
@@ -341,12 +326,11 @@ class FileHandler:
             return True
 
         except Exception as e:
-            logging.error(f"Failed to set executable permissions: {str(e)}")
+            logging.error(f"Failed to set executable permissions: {e!s}")
             return False
 
     def _create_desktop_entry(self) -> bool:
-        """
-        Create or update .desktop file for easy launching of the AppImage.
+        """Create or update .desktop file for easy launching of the AppImage.
 
         Creates a standard conformant desktop entry file in the user's
         applications directory with proper permissions and icon support.
@@ -391,7 +375,7 @@ class FileHandler:
                                 existing_entries[key.strip()] = value.strip()
                     logging.info(f"Found existing desktop file: {desktop_path}")
                 except Exception as e:
-                    logging.warning(f"Error reading existing desktop file: {str(e)}")
+                    logging.warning(f"Error reading existing desktop file: {e!s}")
 
             # New desktop entry content
             new_entries = {
@@ -447,8 +431,8 @@ class FileHandler:
             return True
 
         except OSError as e:
-            logging.error(f"Failed to create desktop entry due to file system error: {str(e)}")
+            logging.error(f"Failed to create desktop entry due to file system error: {e!s}")
             return False
         except Exception as e:
-            logging.error(f"Unexpected error creating desktop entry: {str(e)}")
+            logging.error(f"Unexpected error creating desktop entry: {e!s}")
             return False
