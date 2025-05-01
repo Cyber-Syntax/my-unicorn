@@ -133,12 +133,13 @@ Key=Value
         """
         desktop_path = Path("/nonexistent/directory/file.desktop")
 
-        with patch("logging.Logger.warning") as mock_warning:
-            entries = desktop_manager.read_desktop_file(desktop_path)
+        with patch("pathlib.Path.exists", return_value=True):
+            with patch("logging.Logger.warning") as mock_warning:
+                entries = desktop_manager.read_desktop_file(desktop_path)
 
-            assert entries == {}
-            assert mock_warning.call_count == 1
-            assert "OS error" in mock_warning.call_args[0][0]
+                assert entries == {}
+                assert mock_warning.call_count == 1
+                assert "OS error" in mock_warning.call_args[0][0]
 
     def test_needs_update_no_change(self) -> None:
         """Test needs_update when no change is needed."""

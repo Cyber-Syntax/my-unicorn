@@ -105,8 +105,8 @@ class TestFileHandler:
         assert file_handler.max_backups == 3
         assert isinstance(file_handler.app_storage_path, Path)
         assert isinstance(file_handler.app_backup_storage_path, Path)
-        assert isinstance(file_handler.appimage_path, Path)
-        assert isinstance(file_handler.backup_path, Path)
+        assert isinstance(file_handler.installed_path, Path)
+        assert isinstance(file_handler.download_path, Path)
 
     def test_initialization_with_empty_params(self) -> None:
         """Test FileHandler initialization validation with empty parameters."""
@@ -145,8 +145,8 @@ class TestFileHandler:
             temp_dirs: Dictionary of test directories
 
         """
-        # Ensure the file exists at appimage_path location
-        assert file_handler.appimage_path.exists()
+        # Ensure the file exists at installed_path location
+        assert file_handler.installed_path.exists()
 
         # Test backup creation
         success = file_handler._backup_appimage()
@@ -220,8 +220,8 @@ class TestFileHandler:
             assert not downloaded_file.exists()
 
             # Check destination file exists
-            assert file_handler.appimage_path.exists()
-            assert file_handler.appimage_path.read_bytes() == b"DownloadedAppImageContent"
+            assert file_handler.installed_path.exists()
+            assert file_handler.installed_path.read_bytes() == b"DownloadedAppImageContent"
 
     def test_move_appimage_source_not_found(
         self, file_handler: FileHandler, temp_dirs: Dict[str, Path]
@@ -261,7 +261,7 @@ class TestFileHandler:
         assert success is True
 
         # Check permission was set
-        st_mode = file_handler.appimage_path.stat().st_mode
+        st_mode = file_handler.installed_path.stat().st_mode
         assert bool(st_mode & stat.S_IXUSR)
         assert bool(st_mode & stat.S_IXGRP)
         assert bool(st_mode & stat.S_IXOTH)
