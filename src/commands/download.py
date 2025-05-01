@@ -128,8 +128,8 @@ class DownloadCommand(Command):
             version=api.version,
             sha_name=api.sha_name,
             config_file=global_config.config_file,
-            appimage_download_folder_path=global_config.expanded_appimage_download_folder_path,
-            appimage_download_backup_folder_path=global_config.expanded_appimage_download_backup_folder_path,
+            app_storage_path=global_config.expanded_app_storage_path,
+            app_backup_storage_path=global_config.expanded_app_backup_storage_path,
             config_folder=app_config.config_folder,
             config_file_name=app_config.config_file_name,
             batch_mode=global_config.batch_mode,
@@ -139,7 +139,13 @@ class DownloadCommand(Command):
 
         # Download app icon if possible
         icon_manager = IconManager()
-        icon_manager.ensure_app_icon(api.owner, api.repo)
+        # First get the app_display_name (if available from app_config) or let the fallback handle it
+        app_display_name = (
+            app_config.app_display_name
+            if hasattr(app_config, "app_display_name") and app_config.app_display_name
+            else None
+        )
+        icon_manager.ensure_app_icon(api.owner, api.repo, app_display_name=app_display_name)
 
         # Check if the file operations were successful
         success = file_handler.handle_appimage_operations()

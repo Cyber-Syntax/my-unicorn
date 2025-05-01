@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+"""Delete backup files command module.
+
+This module provides functionality to delete backup files for applications.
+It includes options to delete all backups, delete backups for a specific app,
+delete backups older than a specific date, and clean up to keep only a specified
+number of backups per app.
+"""
+
 import logging
 import os
 from typing import List
@@ -41,7 +49,7 @@ class DeleteBackupsCommand(Command):
 
     def _delete_all_backups(self, global_config: GlobalConfigManager) -> None:
         """Delete all backup files."""
-        backup_dir = global_config.expanded_appimage_download_backup_folder_path
+        backup_dir = global_config.expanded_app_backup_storage_path
 
         if not os.path.exists(backup_dir):
             print(f"Backup directory {backup_dir} does not exist.")
@@ -75,7 +83,7 @@ class DeleteBackupsCommand(Command):
 
     def _delete_app_backups(self, global_config: GlobalConfigManager) -> None:
         """Delete backup files for a specific app."""
-        backup_dir = global_config.expanded_appimage_download_backup_folder_path
+        backup_dir = global_config.expanded_app_backup_storage_path
 
         if not os.path.exists(backup_dir):
             print(f"Backup directory {backup_dir} does not exist.")
@@ -138,7 +146,7 @@ class DeleteBackupsCommand(Command):
 
     def _delete_old_backups(self, global_config: GlobalConfigManager) -> None:
         """Delete backup files older than a specified date."""
-        backup_dir = global_config.expanded_appimage_download_backup_folder_path
+        backup_dir = global_config.expanded_app_backup_storage_path
 
         if not os.path.exists(backup_dir):
             print(f"Backup directory {backup_dir} does not exist.")
@@ -219,7 +227,7 @@ class DeleteBackupsCommand(Command):
 
     def _cleanup_to_max_backups(self, global_config: GlobalConfigManager) -> None:
         """Clean up backups to keep only max_backups per app."""
-        backup_dir = global_config.expanded_appimage_download_backup_folder_path
+        backup_dir = global_config.expanded_app_backup_storage_path
         max_backups = global_config.max_backups
 
         if not os.path.exists(backup_dir):
@@ -299,6 +307,7 @@ class DeleteBackupsCommand(Command):
 
         Returns:
             List of unique app names extracted from backup filenames
+
         """
         apps = set()
 

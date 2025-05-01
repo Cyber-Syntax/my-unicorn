@@ -13,22 +13,28 @@ from typing import Optional, Union
 logger = logging.getLogger(__name__)
 
 
-def parse_timestamp(timestamp_value: Union[str, float, None]) -> Optional[datetime]:
+def parse_timestamp(timestamp_value: Union[str, float, datetime, None]) -> Optional[datetime]:
     """Parse timestamp from various formats into datetime object.
 
     Handles different input formats including:
     - ISO format strings (e.g. "2023-01-01T12:00:00")
     - Unix timestamps as integers or floats
     - Unix timestamps as strings
+    - datetime objects (returned as-is)
 
     Args:
         timestamp_value: Timestamp in various formats
 
     Returns:
         datetime: Parsed datetime object or None if parsing fails
+
     """
     if timestamp_value is None:
         return None
+
+    # If already a datetime object, return it directly
+    if isinstance(timestamp_value, datetime):
+        return timestamp_value
 
     # Handle string timestamps
     if isinstance(timestamp_value, str):
@@ -67,6 +73,7 @@ def format_timestamp(
 
     Returns:
         str: Formatted timestamp string or None if parsing fails
+
     """
     dt = parse_timestamp(timestamp_value)
     if dt:
@@ -81,6 +88,7 @@ def get_next_hour_timestamp() -> int:
 
     Returns:
         int: Unix timestamp for the beginning of the next hour
+
     """
     current_time = int(datetime.now().timestamp())
     return (current_time // 3600 + 1) * 3600

@@ -7,7 +7,7 @@ This module provides functionality for interacting with the GitHub API.
 import logging
 import os
 import re
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import requests
 

@@ -23,7 +23,7 @@ class AppInfo:
         description: Short description of the application
         owner: GitHub repository owner
         repo: GitHub repository name
-        app_id: Unique identifier for the app (defaults to repo name)
+        app_display_name: Unique identifier for the app (defaults to repo name)
         sha_name: SHA file name for verification (or "no_sha_file")
         hash_type: Hash type used for verification (e.g., "sha256", "sha512")
         category: Application category for filtering/grouping
@@ -35,7 +35,7 @@ class AppInfo:
     description: str
     owner: str
     repo: str
-    app_id: str = None
+    app_display_name: Optional[str] = None
     sha_name: str = "no_sha_file"
     hash_type: str = "sha256"
     category: str = "Other"
@@ -45,12 +45,12 @@ class AppInfo:
         """Initialize default values for optional fields."""
         if self.tags is None:
             self.tags = []
-        if self.app_id is None:
-            self.app_id = self.repo
+        if self.app_display_name is None:
+            self.app_display_name = self.repo
 
 
-# Application catalog - mapping app_id (lowercase) to AppInfo
-# The app_id is used for lookup and should be simple, like 'joplin', 'freetube', etc.
+# Application catalog - mapping app_display_name (lowercase) to AppInfo
+# The app_display_name is used for lookup and should be simple, like 'joplin', 'freetube', etc.
 APP_CATALOG: Dict[str, AppInfo] = {
     "tagspaces": AppInfo(
         name="TagSpaces",
@@ -67,7 +67,7 @@ APP_CATALOG: Dict[str, AppInfo] = {
         description="A powerful knowledge base that works on local Markdown files",
         owner="obsidianmd",
         repo="obsidian-releases",
-        app_id="obsidian",
+        app_display_name="obsidian",
         sha_name="SHA256SUMS.txt",
         hash_type="sha256",
         category="Productivity",
@@ -144,7 +144,7 @@ APP_CATALOG: Dict[str, AppInfo] = {
         description="A simple and private notes app",
         owner="standardnotes",
         repo="app",
-        app_id="standardnotes",  # Use this instead of repo for file names
+        app_display_name="standardnotes",  # Use this instead of repo for file names
         sha_name="SHA256SUMS",
         hash_type="sha256",
         category="Productivity",
@@ -164,17 +164,67 @@ APP_CATALOG: Dict[str, AppInfo] = {
 }
 
 
-def get_app_info(app_id: str) -> Optional[AppInfo]:
+def get_app_info(app_display_name: str) -> Optional[AppInfo]:
     """Get information about an application by its ID.
 
     Args:
-        app_id: The application identifier (case-insensitive)
+        app_display_name: The application identifier (case-insensitive)
 
     Returns:
         AppInfo object if found, None otherwise
 
     """
-    return APP_CATALOG.get(app_id.lower())
+    return APP_CATALOG.get(app_display_name.lower())
+
+
+def find_app_by_owner_repo(owner: str, repo: str) -> Optional[AppInfo]:
+    """Find an application in the catalog by owner and repo.
+
+    Args:
+        owner: Repository owner
+        repo: Repository name
+
+    Returns:
+        AppInfo object if found, None otherwise
+
+    """
+    # Convert to lowercase for case-insensitive comparison
+    owner_lower = owner.lower()
+    repo_lower = repo.lower()
+
+    # Search through the catalog for a matching app
+    for app in APP_CATALOG.values():
+        if app.owner.lower() == owner_lower and app.repo.lower() == repo_lower:
+            return app
+
+    # No match found
+    return None
+
+
+def get_app_display_name_for_owner_repo(owner: str, repo: str) -> str:
+    """Get the app_display_name for a given owner/repo combination.
+
+    This helps ensure we always use the correct app_display_name from
+    the catalog for naming purposes, even when only owner/repo is available.
+
+    Args:
+        owner: Repository owner
+        repo: Repository name
+
+    Returns:
+        The app_display_name from the catalog if found, otherwise defaults to repo name
+
+    """
+    app_info = find_app_by_owner_repo(owner, repo)
+    if app_info and app_info.app_display_name:
+        logger.debug(
+            f"Found app_display_name '{app_info.app_display_name}' in catalog for {owner}/{repo}"
+        )
+        return app_info.app_display_name
+
+    # Default to repo name if not found in catalog
+    logger.debug(f"No app_display_name found in catalog for {owner}/{repo}, using repo name")
+    return repo
 
 
 def get_all_apps() -> List[AppInfo]:
@@ -258,14 +308,14 @@ def sync_with_icon_paths():
     """
     missing_icons = []
 
-    for app_id, app_info in APP_CATALOG.items():
+    for app_display_name, app_info in APP_CATALOG.items():
         repo_key = f"{app_info.owner}/{app_info.repo}".lower()
         repo_only_key = app_info.repo.lower()
 
         if repo_key not in ICON_PATHS and repo_only_key not in ICON_PATHS:
-            missing_icons.append((app_id, repo_key))
+            missing_icons.append((app_display_name, repo_key))
 
     if missing_icons:
         logger.warning(f"Missing icon paths for {len(missing_icons)} apps:")
-        for app_id, repo_key in missing_icons:
-            logger.warning(f"  - {app_id} ({repo_key})")
+        for app_display_name, repo_key in missing_icons:
+            logger.warning(f"  - {app_display_name} ({repo_key})")

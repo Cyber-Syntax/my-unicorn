@@ -4,6 +4,9 @@ import hashlib
 import logging
 import os
 import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
 
 import requests
 import yaml
@@ -18,21 +21,35 @@ STATUS_FAIL = "✗ "  # Unicode cross mark
 SUPPORTED_HASH_TYPES = ["sha256", "sha512", "no_hash"]
 
 
+@dataclass
 class VerificationManager:
-    """Coordinates the verification of downloaded AppImages."""
+    """Coordinates the verification of downloaded AppImages.
 
-    def __init__(
-        self,
-        sha_name: str = None,
-        sha_url: str = None,
-        appimage_name: str = None,
-        hash_type: str = "sha256",
-    ):
-        self.sha_name = sha_name
-        self.sha_url = sha_url
-        self.appimage_name = appimage_name  # File name without path
-        self.appimage_path = appimage_name  # Full path to the AppImage file, initialized to same value as appimage_name
-        self.hash_type = hash_type.lower()
+    The VerificationManager performs hash verification on downloaded AppImage files
+    before they are moved to their final installation location.
+    """
+
+    sha_name: Optional[str] = None
+    sha_url: Optional[str] = None
+    appimage_name: Optional[str] = None  # Original filename from GitHub
+    hash_type: str = "sha256"
+    appimage_path: Optional[str] = None  # Full path to the AppImage file for verification
+
+    def __post_init__(self) -> None:
+        """Initialize and validate the verification manager."""
+        # Initialize appimage_path to appimage_name in downloads directory if not set
+        if self.appimage_path is None and self.appimage_name is not None:
+            # Always verify files from the downloads directory
+            from src.download import DownloadManager
+
+            downloads_dir = DownloadManager.get_downloads_dir()
+            self.appimage_path = str(Path(downloads_dir) / self.appimage_name)
+
+        # Convert hash_type to lowercase for consistent comparisons
+        if self.hash_type:
+            self.hash_type = self.hash_type.lower()
+
+        # Validate the hash type
         self._validate_hash_type()
 
     def set_appimage_path(self, full_path: str) -> None:
@@ -40,11 +57,12 @@ class VerificationManager:
 
         Args:
             full_path: The complete path to the AppImage file
+
         """
         self.appimage_path = full_path
         logging.info(f"Set AppImage path for verification: {full_path}")
 
-    def _validate_hash_type(self):
+    def _validate_hash_type(self) -> None:
         """Ensure the hash type is supported"""
         if self.hash_type not in SUPPORTED_HASH_TYPES:
             raise ValueError(
@@ -63,6 +81,7 @@ class VerificationManager:
 
         Returns:
             bool: True if verification passed or skipped due to fallback, False otherwise
+
         """
         try:
             # Skip verification if hash_type is set to no_hash or no SHA file name available
@@ -223,6 +242,7 @@ class VerificationManager:
         Raises:
             ValueError: If no valid hash is found
             IOError: If file can't be read
+
         """
         target_name = os.path.basename(self.appimage_name).lower()
 
@@ -308,6 +328,7 @@ class VerificationManager:
 
         Returns:
             bool: True if verification passes, False otherwise
+
         """
         target_filename = os.path.basename(self.appimage_name).lower()
 
@@ -383,6 +404,7 @@ class VerificationManager:
 
         Returns:
             bool: True if cleanup succeeded or file didn't exist, False otherwise
+
         """
         if not self.sha_name or not os.path.exists(self.sha_name):
             logging.debug(f"No SHA file to clean up: {self.sha_name}")
@@ -429,6 +451,7 @@ class VerificationManager:
 
         Returns:
             bool: True if cleanup succeeded or was declined, False on error
+
         """
         try:
             if not os.path.exists(filepath):
@@ -465,6 +488,7 @@ class VerificationManager:
 
         Returns:
             bool: True if user confirms removal, False otherwise
+
         """
         filename = os.path.basename(filepath)
 

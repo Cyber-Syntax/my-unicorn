@@ -49,6 +49,7 @@ class BaseUpdateCommand(Command):
 
         Raises:
             NotImplementedError: This method must be overridden by subclasses.
+
         """
         raise NotImplementedError("Subclasses must implement execute()")
 
@@ -69,6 +70,7 @@ class BaseUpdateCommand(Command):
 
         Returns:
             bool: True if update was successful, False otherwise
+
         """
         # Use provided config managers or instance variables
         app_config = app_config or self.app_config
@@ -167,6 +169,7 @@ class BaseUpdateCommand(Command):
 
         Raises:
             Exception: Any error during the update process
+
         """
         # Get release data
         success, response = github_api.get_response()
@@ -214,7 +217,15 @@ class BaseUpdateCommand(Command):
         from src.icon_manager import IconManager
 
         icon_manager = IconManager()
-        icon_manager.ensure_app_icon(github_api.owner, github_api.repo)
+        # First get the app_display_name (if available from app_config) or let the fallback handle it
+        app_display_name = (
+            app_config.app_display_name
+            if hasattr(app_config, "app_display_name") and app_config.app_display_name
+            else None
+        )
+        icon_manager.ensure_app_icon(
+            github_api.owner, github_api.repo, app_display_name=app_display_name
+        )
 
         # Perform file operations and update config
         if file_handler.handle_appimage_operations(github_api=github_api):
@@ -255,20 +266,23 @@ class BaseUpdateCommand(Command):
 
         Returns:
             FileHandler: Configured file handler
+
         """
         return FileHandler(
             appimage_name=github_api.appimage_name,
             repo=github_api.repo,
+            owner=github_api.owner,
             version=github_api.version,
             sha_name=github_api.sha_name,
             config_file=global_config.config_file,
-            appimage_download_folder_path=global_config.expanded_appimage_download_folder_path,
-            appimage_download_backup_folder_path=global_config.expanded_appimage_download_backup_folder_path,
+            app_storage_path=global_config.expanded_app_storage_path,
+            app_backup_storage_path=global_config.expanded_app_backup_storage_path,
             config_folder=app_config.config_folder,
             config_file_name=app_config.config_file_name,
             batch_mode=global_config.batch_mode,
             keep_backup=global_config.keep_backup,
             max_backups=global_config.max_backups,
+            app_display_name=app_config.app_display_name,  # Pass app_display_name explicitly to ensure it's used
         )
 
     def _verify_appimage(
@@ -286,6 +300,7 @@ class BaseUpdateCommand(Command):
 
         Returns:
             bool: True if verification succeeds or is skipped, False otherwise
+
         """
         # Skip verification for beta versions or when SHA file is not available
         if github_api.sha_name == "no_sha_file":
@@ -317,6 +332,7 @@ class BaseUpdateCommand(Command):
 
         Returns:
             bool: True if retry should be attempted, False otherwise
+
         """
         try:
             return input("Retry download? (y/N): ").strip().lower() == "y"
@@ -330,6 +346,7 @@ class BaseUpdateCommand(Command):
 
         Args:
             updatable_apps: List of updatable app dictionaries
+
         """
         print(f"\nFound {len(updatable_apps)} apps to update:")
         for idx, app in enumerate(updatable_apps, 1):
@@ -348,6 +365,7 @@ class BaseUpdateCommand(Command):
 
         Returns:
             dict or None: App data if update available, None otherwise
+
         """
         # Load the specified config file
         app_config.load_appimage_config(config_file)
@@ -388,6 +406,7 @@ class BaseUpdateCommand(Command):
 
         Args:
             apps_to_update: List of app information dictionaries to update
+
         """
         logging.info(f"Beginning update of {len(apps_to_update)} AppImages")
         total_apps = len(apps_to_update)
@@ -496,6 +515,7 @@ class BaseUpdateCommand(Command):
                 - bool: True if update can proceed, False if rate limits would be exceeded
                 - List[Dict[str, Any]]: Filtered list of apps that can be updated within limits
                 - str: Message explaining rate limit status
+
         """
         # Get current rate limit information
         remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
@@ -612,6 +632,7 @@ class BaseUpdateCommand(Command):
 
         Returns:
             bool: True if update was successful, False otherwise
+
         """
         app_config = AppConfigManager()
         global_config = GlobalConfigManager()
@@ -642,6 +663,7 @@ class BaseUpdateCommand(Command):
 
         Returns:
             Tuple containing success flag and result information
+
         """
         app_name = app_data["name"]
 
@@ -702,6 +724,7 @@ class BaseUpdateCommand(Command):
 
         Returns:
             Tuple containing success count, failure count, and list of results
+
         """
         # Set up progress tracking
         total_apps = len(apps_to_update)
@@ -792,6 +815,7 @@ class BaseUpdateCommand(Command):
             Tuple containing:
             - bool: True if update was successful, False otherwise
             - Optional[Dict[str, Any]]: Additional result data (for async mode)
+
         """
         app_name = app_data["name"]
         logger = self._logger
@@ -857,10 +881,20 @@ class BaseUpdateCommand(Command):
             from src.icon_manager import IconManager
 
             icon_manager = IconManager()
-            icon_manager.ensure_app_icon(github_api.owner, github_api.repo)
+            # First get the app_display_name (if available from app_config) or let the fallback handle it
+            app_display_name = (
+                app_config.app_display_name
+                if hasattr(app_config, "app_display_name") and app_config.app_display_name
+                else None
+            )
+            icon_success, icon_path = icon_manager.ensure_app_icon(
+                github_api.owner, github_api.repo, app_display_name=app_display_name
+            )
 
             # 9. Perform file operations and update config
-            if file_handler.handle_appimage_operations(github_api=github_api):
+            if file_handler.handle_appimage_operations(
+                github_api=github_api, icon_path=icon_path if icon_success else None
+            ):
                 try:
                     app_config.update_version(
                         new_version=github_api.version,

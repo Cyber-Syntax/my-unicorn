@@ -1,36 +1,32 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Tests for the file handler module.
+"""Tests for the file handler module.
 
 This module contains pytest tests for the FileHandler class, which handles
 AppImage file operations, desktop entry creation, and backup management.
 """
 
-import logging
-import stat
 import shutil
+import stat
 import time
-from importlib import import_module
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
-from unittest.mock import MagicMock, patch, PropertyMock
+from typing import Dict
+from unittest.mock import patch
 
 import pytest
 
-from src.file_handler import FileHandler, APPIMAGE_EXTENSION, DESKTOP_ENTRY_DIR
+from src.file_handler import FileHandler
 
 
 @pytest.fixture
 def temp_dirs(tmp_path: Path) -> Dict[str, Path]:
-    """
-    Create temporary directories for testing.
+    """Create temporary directories for testing.
 
     Args:
         tmp_path: Pytest temporary directory fixture
 
     Returns:
         Dict[str, Path]: Dictionary of test directories
+
     """
     app_dir = tmp_path / "apps"
     backup_dir = tmp_path / "backups"
@@ -44,14 +40,14 @@ def temp_dirs(tmp_path: Path) -> Dict[str, Path]:
 
 @pytest.fixture
 def file_handler(temp_dirs: Dict[str, Path]) -> FileHandler:
-    """
-    Create a FileHandler instance for testing.
+    """Create a FileHandler instance for testing.
 
     Args:
         temp_dirs: Dictionary of test directories
 
     Returns:
         FileHandler: Configured FileHandler instance
+
     """
     return FileHandler(
         appimage_name="test-app.AppImage",
@@ -59,8 +55,8 @@ def file_handler(temp_dirs: Dict[str, Path]) -> FileHandler:
         owner="test-owner",
         version="1.0.0",
         sha_name="sha256sums",
-        appimage_download_folder_path=str(temp_dirs["app_dir"]),
-        appimage_download_backup_folder_path=str(temp_dirs["backup_dir"]),
+        app_storage_path=str(temp_dirs["app_dir"]),
+        app_backup_storage_path=str(temp_dirs["backup_dir"]),
         config_folder=str(temp_dirs["app_dir"]),
         config_file_name="test-app.json",
         batch_mode=True,
@@ -69,14 +65,14 @@ def file_handler(temp_dirs: Dict[str, Path]) -> FileHandler:
 
 @pytest.fixture
 def mock_appimage(temp_dirs: Dict[str, Path]) -> Path:
-    """
-    Create a mock AppImage file for testing.
+    """Create a mock AppImage file for testing.
 
     Args:
         temp_dirs: Dictionary of test directories
 
     Returns:
         Path: Path to the mock AppImage file
+
     """
     # Create app directory
     app_path = temp_dirs["app_dir"] / "test-app.AppImage"
@@ -93,11 +89,11 @@ class TestFileHandler:
     """Tests for the FileHandler class."""
 
     def test_initialization(self, file_handler: FileHandler) -> None:
-        """
-        Test FileHandler initialization with default parameters.
+        """Test FileHandler initialization with default parameters.
 
         Args:
             file_handler: FileHandler fixture
+
         """
         assert file_handler.appimage_name == "test-app.AppImage"
         assert file_handler.repo == "test-app"
@@ -107,8 +103,8 @@ class TestFileHandler:
         assert file_handler.batch_mode is True
         assert file_handler.keep_backup is True
         assert file_handler.max_backups == 3
-        assert isinstance(file_handler.appimage_download_folder_path, Path)
-        assert isinstance(file_handler.appimage_download_backup_folder_path, Path)
+        assert isinstance(file_handler.app_storage_path, Path)
+        assert isinstance(file_handler.app_backup_storage_path, Path)
         assert isinstance(file_handler.appimage_path, Path)
         assert isinstance(file_handler.backup_path, Path)
 
@@ -121,33 +117,33 @@ class TestFileHandler:
             FileHandler(appimage_name="test-app.AppImage", repo="")
 
     def test_ensure_directories_exist(self, file_handler: FileHandler) -> None:
-        """
-        Test directory creation.
+        """Test directory creation.
 
         Args:
             file_handler: FileHandler fixture
+
         """
         # Remove directories to test creation
-        if file_handler.appimage_download_folder_path.exists():
-            shutil.rmtree(file_handler.appimage_download_folder_path)
-        if file_handler.appimage_download_backup_folder_path.exists():
-            shutil.rmtree(file_handler.appimage_download_backup_folder_path)
+        if file_handler.app_storage_path.exists():
+            shutil.rmtree(file_handler.app_storage_path)
+        if file_handler.app_backup_storage_path.exists():
+            shutil.rmtree(file_handler.app_backup_storage_path)
 
         file_handler._ensure_directories_exist()
 
-        assert file_handler.appimage_download_folder_path.exists()
-        assert file_handler.appimage_download_backup_folder_path.exists()
+        assert file_handler.app_storage_path.exists()
+        assert file_handler.app_backup_storage_path.exists()
 
     def test_backup_appimage(
         self, file_handler: FileHandler, mock_appimage: Path, temp_dirs: Dict[str, Path]
     ) -> None:
-        """
-        Test AppImage backup functionality.
+        """Test AppImage backup functionality.
 
         Args:
             file_handler: FileHandler fixture
             mock_appimage: Path to mock AppImage file
             temp_dirs: Dictionary of test directories
+
         """
         # Ensure the file exists at appimage_path location
         assert file_handler.appimage_path.exists()
@@ -172,12 +168,12 @@ class TestFileHandler:
     def test_cleanup_old_backups(
         self, file_handler: FileHandler, temp_dirs: Dict[str, Path]
     ) -> None:
-        """
-        Test cleanup of old backup files.
+        """Test cleanup of old backup files.
 
         Args:
             file_handler: FileHandler fixture
             temp_dirs: Dictionary of test directories
+
         """
         backup_dir = temp_dirs["backup_dir"]
 
@@ -202,12 +198,12 @@ class TestFileHandler:
             assert backup_file.name.startswith("test-app_")
 
     def test_move_appimage(self, file_handler: FileHandler, temp_dirs: Dict[str, Path]) -> None:
-        """
-        Test moving an AppImage file from downloads to the app directory.
+        """Test moving an AppImage file from downloads to the app directory.
 
         Args:
             file_handler: FileHandler fixture
             temp_dirs: Dictionary of test directories
+
         """
         with patch("src.download.DownloadManager.get_downloads_dir") as mock_get_downloads_dir:
             mock_get_downloads_dir.return_value = str(temp_dirs["downloads_dir"])
@@ -230,12 +226,12 @@ class TestFileHandler:
     def test_move_appimage_source_not_found(
         self, file_handler: FileHandler, temp_dirs: Dict[str, Path]
     ) -> None:
-        """
-        Test moving an AppImage file when the source file doesn't exist.
+        """Test moving an AppImage file when the source file doesn't exist.
 
         Args:
             file_handler: FileHandler fixture
             temp_dirs: Dictionary of test directories
+
         """
         with patch("src.download.DownloadManager.get_downloads_dir") as mock_get_downloads_dir:
             mock_get_downloads_dir.return_value = str(temp_dirs["downloads_dir"])
@@ -250,12 +246,12 @@ class TestFileHandler:
     def test_set_executable_permission(
         self, file_handler: FileHandler, mock_appimage: Path
     ) -> None:
-        """
-        Test setting executable permissions on an AppImage.
+        """Test setting executable permissions on an AppImage.
 
         Args:
             file_handler: FileHandler fixture
             mock_appimage: Path to mock AppImage file
+
         """
         # Remove executable permission first
         mock_appimage.chmod(0o644)
@@ -270,48 +266,6 @@ class TestFileHandler:
         assert bool(st_mode & stat.S_IXGRP)
         assert bool(st_mode & stat.S_IXOTH)
 
-    def test_create_desktop_entry(
-        self, file_handler: FileHandler, mock_appimage: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """
-        Test creation of desktop entry file.
-
-        Args:
-            file_handler: FileHandler fixture
-            mock_appimage: Path to mock AppImage file
-            monkeypatch: pytest monkeypatch fixture
-        """
-        # Mock the DESKTOP_ENTRY_DIR to use a temporary location
-        monkeypatch.setattr(
-            "src.file_handler.DESKTOP_ENTRY_DIR",
-            Path(file_handler.appimage_download_folder_path) / "applications",
-        )
-
-        # Mock the IconManager
-        mock_icon_manager = MagicMock()
-        mock_icon_manager.get_icon_path.return_value = "/path/to/icon.png"
-
-        with patch("src.icon_manager.IconManager", return_value=mock_icon_manager):
-            # Test desktop entry creation
-            success = file_handler._create_desktop_entry()
-            assert success is True
-
-            # Check desktop file was created
-            desktop_path = (
-                Path(file_handler.appimage_download_folder_path)
-                / "applications"
-                / f"{file_handler.repo.lower()}.desktop"
-            )
-            assert desktop_path.exists()
-
-            # Read file content and check basics
-            content = desktop_path.read_text()
-            assert "[Desktop Entry]" in content
-            assert f"Name={file_handler.repo}" in content
-            assert f"Exec={file_handler.appimage_path}" in content
-            assert "Type=Application" in content
-            assert "Icon=/path/to/icon.png" in content
-
     def test_handle_appimage_operations(
         self,
         file_handler: FileHandler,
@@ -319,19 +273,19 @@ class TestFileHandler:
         temp_dirs: Dict[str, Path],
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """
-        Test the main handle_appimage_operations method.
+        """Test the main handle_appimage_operations method.
 
         Args:
             file_handler: FileHandler fixture
             mock_appimage: Path to mock AppImage file
             temp_dirs: Dictionary of test directories
             monkeypatch: pytest monkeypatch fixture
+
         """
         # Mock dependencies
         monkeypatch.setattr(
             "src.file_handler.DESKTOP_ENTRY_DIR",
-            Path(file_handler.appimage_download_folder_path) / "applications",
+            Path(file_handler.app_storage_path) / "applications",
         )
 
         # Mock the individual operations
@@ -358,11 +312,11 @@ class TestFileHandler:
                             mock_create_desktop.assert_called_once()
 
     def test_handle_appimage_operations_with_failures(self, file_handler: FileHandler) -> None:
-        """
-        Test handle_appimage_operations with failures in the process.
+        """Test handle_appimage_operations with failures in the process.
 
         Args:
             file_handler: FileHandler fixture
+
         """
         # Mock individual operations with one failing
         with patch.object(file_handler, "_ensure_directories_exist"):
@@ -375,38 +329,3 @@ class TestFileHandler:
 
                     # Check result - should fail when move fails
                     assert success is False
-
-    def test_app_specific_handler(
-        self, file_handler: FileHandler, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """
-        Test using an app-specific handler for desktop entry creation.
-
-        Args:
-            file_handler: FileHandler fixture
-            monkeypatch: pytest monkeypatch fixture
-        """
-        # Modify the file_handler to use a specific app handler
-        file_handler.repo = "app"  # This is in the APP_HANDLERS dict mapped to standard_notes
-
-        # Create a mock handler class
-        mock_handler_class = MagicMock()
-        mock_handler_class.create_desktop_file.return_value = (
-            True,
-            "Created desktop entry successfully",
-        )
-
-        # Mock the import_module to return our mock
-        mock_module = MagicMock()
-        mock_module.StandardNotesHandler = mock_handler_class
-
-        # Mock dependencies
-        with patch("src.file_handler.import_module", return_value=mock_module):
-            with patch("src.app_config.AppConfigManager"):
-                with patch("src.icon_manager.IconManager"):
-                    # Test desktop entry creation with app-specific handler
-                    success = file_handler._create_desktop_entry()
-
-                    # Check result
-                    assert success is True
-                    mock_handler_class.create_desktop_file.assert_called_once()

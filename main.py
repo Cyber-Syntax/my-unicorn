@@ -1,16 +1,16 @@
 #!/usr/bin/python3
 """Main module for my-unicorn CLI application.
+
 This module configures logging, loads configuration files, and executes commands."""
 
 # Standard library imports
 import gettext
 import logging
-import os
 import sys
 from types import TracebackType
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import NoReturn, Tuple, Optional
+from typing import NoReturn, Tuple, Optional, Dict, Any
 
 # Local imports
 from src.commands.customize_app_config import CustomizeAppConfigCommand
@@ -29,6 +29,11 @@ from src.auth_manager import GitHubAuthManager
 
 _ = gettext.gettext
 
+# Constants
+LOW_API_REQUESTS_THRESHOLD = 100
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
+
 
 def custom_excepthook(
     exc_type: type[BaseException], exc_value: BaseException, exc_traceback: Optional[TracebackType]
@@ -44,21 +49,8 @@ def custom_excepthook(
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 
-def get_user_choice() -> int:
-    """Display menu and get user choice using standard terminal output.
-
-    Returns:
-        int: The user's menu choice as an integer
-
-    Raises:
-        ValueError: If user input cannot be converted to an integer
-        KeyboardInterrupt: If user cancels with Ctrl+C
-    """
-    print(f"\n{'=' * 60}")
-    print("                 Welcome to my-unicorn 🦄")
-    print(f"{'=' * 60}")
-
-    # Display GitHub API rate limit info if available
+def display_github_api_status() -> None:
+    """Display GitHub API rate limit information to the user."""
     try:
         remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
 
@@ -70,7 +62,7 @@ def get_user_choice() -> int:
             print(f"Authentication: ✅ Authenticated")
             print(f"Reset Time: {reset_time}")
 
-            if remaining < 100:
+            if remaining < LOW_API_REQUESTS_THRESHOLD:
                 print(f"Warning: ⚠️ Low API requests remaining!")
         else:
             print(f"GitHub API Status: {remaining} of 60 requests remaining")
@@ -81,10 +73,20 @@ def get_user_choice() -> int:
     except Exception as e:
         logging.debug(f"Error checking rate limits: {e}")
 
+
+def display_menu() -> None:
+    """Display the main application menu."""
+    print(f"\n{'=' * 60}")
+    print("                 Welcome to my-unicorn 🦄")
+    print(f"{'=' * 60}")
+
+    # Display GitHub API rate limit info if available
+    display_github_api_status()
+
     # Download & Update section
     print("\n--- Download & Update ---")
     print("1. Download new AppImage from URL")
-    print("2. Install app from catalog")  # New option
+    print("2. Install app from catalog")
     print("3. Update all AppImages")
     print("4. Select AppImages to update")
 
@@ -98,8 +100,21 @@ def get_user_choice() -> int:
     print("\n--- Maintenance ---")
     print("8. Update configuration files")
     print("9. Clean old backups")
-    print("10. Exit")  # Updated exit option
+    print("0. Exit")
     print(f"{'-' * 40}")
+
+
+def get_user_choice() -> int:
+    """Display menu and get user choice using standard terminal output.
+
+    Returns:
+        int: The user's menu choice as an integer
+
+    Raises:
+        ValueError: If user input cannot be converted to an integer
+        KeyboardInterrupt: If user cancels with Ctrl+C
+    """
+    display_menu()
 
     try:
         choice = input("\nEnter your choice: ")
@@ -107,11 +122,11 @@ def get_user_choice() -> int:
     except ValueError as error:
         print(f"Invalid input: {error}")
         logging.error(f"Invalid menu choice: {error}", exc_info=True)
-        sys.exit(1)
+        sys.exit(EXIT_FAILURE)
     except KeyboardInterrupt:
         logging.info("User interrupted the program with Ctrl+C")
         print("\nProgram interrupted. Exiting gracefully...")
-        sys.exit(0)
+        sys.exit(EXIT_SUCCESS)
 
 
 def configure_logging() -> None:
@@ -125,7 +140,7 @@ def configure_logging() -> None:
     file_handler = RotatingFileHandler(log_file_path, maxBytes=1024 * 1024, backupCount=3)
     file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s")
     file_handler.setFormatter(file_formatter)
-    file_handler.setLevel(logging.DEBUG)  # Changed to DEBUG level
+    file_handler.setLevel(logging.DEBUG)
 
     # Configure console handler for ERROR and above only
     console_handler = logging.StreamHandler()
@@ -135,7 +150,7 @@ def configure_logging() -> None:
 
     # Get root logger and configure it
     logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)  # Changed to DEBUG level
+    logger.setLevel(logging.DEBUG)
 
     # Remove any existing handlers (in case this function is called multiple times)
     for handler in logger.handlers[:]:
@@ -148,6 +163,23 @@ def configure_logging() -> None:
     logging.info("Logging configured with DEBUG level")
 
 
+def setup_commands(invoker: CommandInvoker) -> None:
+    """Register all available commands with the command invoker.
+
+    Args:
+        invoker: The CommandInvoker instance to register commands with
+    """
+    invoker.register_command(1, DownloadCommand())
+    invoker.register_command(2, InstallAppCommand())
+    invoker.register_command(3, UpdateAllAutoCommand())
+    invoker.register_command(4, UpdateAsyncCommand())
+    invoker.register_command(5, CustomizeAppConfigCommand())
+    invoker.register_command(6, CustomizeGlobalConfigCommand())
+    invoker.register_command(7, ManageTokenCommand())
+    invoker.register_command(8, MigrateConfigCommand())
+    invoker.register_command(9, DeleteBackupsCommand())
+
+
 def main() -> None:
     """Main function to initialize and run the application."""
     configure_logging()
@@ -157,30 +189,22 @@ def main() -> None:
     global_config = GlobalConfigManager()
     app_config = AppConfigManager()
 
-    # # Instantiate LocaleManager and set locale
+    # TODO: Uncomment and implement locale management
+    # Initialize LocaleManager and set locale
     # locale_manager = LocaleManager()
     # locale_manager.load_translations(global_config.locale)
 
     # Initialize CommandInvoker and register commands
     invoker = CommandInvoker()
-
-    invoker.register_command(1, DownloadCommand())
-    invoker.register_command(2, InstallAppCommand())  # New command
-    invoker.register_command(3, UpdateAllAutoCommand())
-    invoker.register_command(4, UpdateAsyncCommand())
-    invoker.register_command(5, CustomizeAppConfigCommand())
-    invoker.register_command(6, CustomizeGlobalConfigCommand())
-    invoker.register_command(7, ManageTokenCommand())
-    invoker.register_command(8, MigrateConfigCommand())
-    invoker.register_command(9, DeleteBackupsCommand())
+    setup_commands(invoker)
 
     # Main menu loop
     while True:
         choice = get_user_choice()
-        if choice == 10:  # Updated exit option number
+        if choice == 0:
             logging.info("User selected to exit application")
             print("Exiting...")
-            sys.exit(0)
+            sys.exit(EXIT_SUCCESS)
         invoker.execute_command(choice)
 
 

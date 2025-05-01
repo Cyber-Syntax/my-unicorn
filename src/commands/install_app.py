@@ -126,6 +126,7 @@ class InstallAppCommand(Command):
 
         Args:
             apps: List of AppInfo objects to display
+
         """
         if not apps:
             print("No applications available in this category.")
@@ -158,6 +159,7 @@ class InstallAppCommand(Command):
 
         Args:
             app_info: AppInfo object for the selected application
+
         """
         print(f"\n=== Install {app_info.name} ===")
         print(f"Name: {app_info.name}")
@@ -184,7 +186,7 @@ class InstallAppCommand(Command):
         app_config = AppConfigManager(
             owner=app_info.owner,
             repo=app_info.repo,
-            app_id=app_info.app_id,  # Pass the app_id from catalog
+            app_display_name=app_info.app_display_name,  # Pass the app_display_name from catalog
         )
 
         # Initialize GitHubAPI with parameters based on app catalog information
@@ -315,19 +317,25 @@ class InstallAppCommand(Command):
             version=api.version,
             sha_name=api.sha_name,
             config_file=self.global_config.config_file,
-            appimage_download_folder_path=self.global_config.expanded_appimage_download_folder_path,
-            appimage_download_backup_folder_path=self.global_config.expanded_appimage_download_backup_folder_path,
+            app_storage_path=self.global_config.expanded_app_storage_path,
+            app_backup_storage_path=self.global_config.expanded_app_backup_storage_path,
             config_folder=app_config.config_folder,
             config_file_name=app_config.config_file_name,
             batch_mode=self.global_config.batch_mode,
             keep_backup=self.global_config.keep_backup,
             max_backups=self.global_config.max_backups,
-            app_id=app_info.app_id,  # Pass app_id from app_info to FileHandler
+            app_display_name=app_info.app_display_name,  # Pass app_display_name from app_info to FileHandler
         )
 
         # Download app icon if possible
         icon_manager = IconManager()
-        icon_manager.ensure_app_icon(api.owner, api.repo)
+        # First get the app_display_name (if available from app_config) or let the fallback handle it
+        app_display_name = (
+            app_config.app_display_name
+            if hasattr(app_config, "app_display_name") and app_config.app_display_name
+            else None
+        )
+        icon_manager.ensure_app_icon(api.owner, api.repo, app_display_name=app_display_name)
 
         # Perform file operations
         print("Finalizing installation...")
@@ -345,9 +353,7 @@ class InstallAppCommand(Command):
             print(f"Config file created at: {config_path}")
 
             # Show location of executable
-            app_path = (
-                Path(self.global_config.expanded_appimage_download_folder_path) / api.appimage_name
-            )
+            app_path = Path(self.global_config.expanded_app_storage_path) / api.appimage_name
             print(f"Application installed to: {app_path}")
             print("You can run it from the command line or create a desktop shortcut.")
         else:

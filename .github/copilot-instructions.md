@@ -12,7 +12,7 @@
 
 ## Code Style
 
-- All Python code must be formatted and linted according to Ruff.
+- Follow Single Responsibility Principle (SRP).
 - Prioritize code clarity over cleverness.
 - Use snake_case naming convention.
 - Keep functions under 50 lines.
@@ -46,12 +46,12 @@
 - Prefer immutable data structures.
 - Use context managers for resources.
 - Use contextvars for async state.
-- Use dataclasses for simple data holders.
 - Leverage Python's built-in functions and standard library.
 
 ## Classes & OOP
 
 - Desing single-purpose classes and methods.
+- Prefer dataclasses for simple data containers.
 - Favor composition over inheritance.
 - Use `@property` instead of getters/setters.
 - Implement `__eq__` and `__hash__` when needed.

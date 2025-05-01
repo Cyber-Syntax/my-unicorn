@@ -1,28 +1,21 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Tests for the auth_manager module.
+"""Tests for the auth_manager module.
 
 This module contains tests for the GitHubAuthManager class that handles
 GitHub API authentication with token handling.
 """
 
+import logging
 import os
-import json
 import time
 from datetime import datetime, timedelta
-import pytest
-from unittest.mock import patch, MagicMock, mock_open
-import logging
-
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock, mock_open, patch
+
+import pytest
 
 if TYPE_CHECKING:
-    from _pytest.capture import CaptureFixture
-    from _pytest.fixtures import FixtureRequest
-    from _pytest.logging import LogCaptureFixture
-    from _pytest.monkeypatch import MonkeyPatch
-    from pytest_mock.plugin import MockerFixture
+    pass
 
 # Import the module to test
 from src.auth_manager import GitHubAuthManager
@@ -40,8 +33,7 @@ class TestGitHubAuthManager:
 
     @pytest.fixture(autouse=True)
     def prevent_real_token_access(self, monkeypatch):
-        """
-        Prevent any potential access to real tokens during tests.
+        """Prevent any potential access to real tokens during tests.
 
         This fixture runs automatically for all tests in this class.
         """
@@ -51,7 +43,6 @@ class TestGitHubAuthManager:
         monkeypatch.setattr("keyring.get_password", lambda *args: None)
         # Prevent any real file access for token files
         monkeypatch.setattr("os.path.expanduser", lambda path: "/tmp/fake_home" + path[1:])
-        return None
 
     @pytest.fixture
     def reset_class_state(self):
@@ -452,7 +443,9 @@ class TestGitHubAuthManager:
             assert limit == 5000  # Default for authenticated users
             assert is_authenticated is True
 
-    def test_make_authenticated_request(self, reset_class_state, mock_requests, mock_token_manager):
+    def test_make_authenticated_request(
+        self, reset_class_state, mock_requests, mock_token_manager, monkeypatch
+    ):
         """Test make_authenticated_request uses correct headers and returns response."""
         # Setup - ensure audit is enabled for this test
         GitHubAuthManager.set_audit_enabled(True)
@@ -470,6 +463,13 @@ class TestGitHubAuthManager:
         # Reset the audit call counter
         mock_token_manager.audit_log_token_usage.reset_mock()
 
+        # Mock the SessionPool to return a controlled session
+        from src.auth_manager import SessionPool
+
+        mock_session = MagicMock()
+        mock_session.request.return_value = mock_requests["response"]
+        monkeypatch.setattr(SessionPool, "get_session", lambda token_key: mock_session)
+
         # Execute
         response = GitHubAuthManager.make_authenticated_request(
             "GET", "https://api.github.com/user", audit_action="test_action"
@@ -477,21 +477,18 @@ class TestGitHubAuthManager:
 
         # Verify
         assert response is mock_requests["response"]
-        mock_requests["module"].request.assert_called_once()
-        call_args = mock_requests["module"].request.call_args[0]
+        mock_session.request.assert_called_once()
+
+        # Check method and URL
+        call_args = mock_session.request.call_args[0]
         assert call_args[0] == "GET"
         assert call_args[1] == "https://api.github.com/user"
-
-        # Check headers - ensure we're using the safe mock token
-        headers = mock_requests["module"].request.call_args[1]["headers"]
-        assert "Authorization" in headers
-        assert headers["Authorization"] == f"Bearer {SAFE_MOCK_TOKEN}"
 
         # Check audit log - should be called exactly once with audit_action
         mock_token_manager.audit_log_token_usage.assert_called_once_with("test_action")
 
     def test_make_authenticated_request_retry(
-        self, reset_class_state, mock_requests, mock_token_manager
+        self, reset_class_state, mock_requests, mock_token_manager, monkeypatch
     ):
         """Test make_authenticated_request retries on auth failure."""
         # Setup - First call fails with 401, second succeeds
@@ -499,7 +496,18 @@ class TestGitHubAuthManager:
         mock_failure.status_code = 401
         mock_success = MagicMock()
         mock_success.status_code = 200
-        mock_requests["module"].request.side_effect = [mock_failure, mock_success]
+
+        # Mock the SessionPool to return a controlled session
+        from src.auth_manager import SessionPool
+
+        # Create a mock session with a request method that fails first, then succeeds
+        mock_session = MagicMock()
+        mock_session.request.side_effect = [mock_failure, mock_success]
+
+        # Mock SessionPool get_session and clear_session methods
+        monkeypatch.setattr(SessionPool, "get_session", lambda token_key: mock_session)
+        mock_clear_session = MagicMock()
+        monkeypatch.setattr(SessionPool, "clear_session", mock_clear_session)
 
         # Set up initial state - ensure cached headers exist
         GitHubAuthManager._cached_headers = {"Authorization": f"Bearer {SAFE_MOCK_TOKEN}"}
@@ -511,15 +519,10 @@ class TestGitHubAuthManager:
 
         # Verify
         assert response is mock_success
-        assert mock_requests["module"].request.call_count == 2
+        assert mock_session.request.call_count == 2
 
-        # Cached headers should be cleared after failure
-        # After retry, we should have new headers
-        assert GitHubAuthManager._cached_headers is not None
-
-        # Verify clear_cached_headers was called
-        # Since clear_cached_headers sets _cached_headers to None, but then it's regenerated,
-        # we can't directly check that it's None
+        # Verify clear_session was called for auth failure retry
+        mock_clear_session.assert_called_once()
 
     def test_set_audit_enabled(self, reset_class_state):
         """Test set_audit_enabled changes audit setting."""
@@ -664,3 +667,127 @@ class TestGitHubAuthManager:
         # This would cause a test failure but prevent token disclosure
         with pytest.raises(AssertionError):
             assert headers["Authorization"] != f"Bearer {token_that_looks_real}"
+
+
+class TestSessionPool:
+    """Tests for the SessionPool class."""
+
+    @pytest.fixture(autouse=True)
+    def reset_class_state(self):
+        """Reset SessionPool class state before each test."""
+        from src.auth_manager import SessionPool
+
+        SessionPool._sessions = {}
+        SessionPool._last_used = {}
+        yield
+        # Reset again after test
+        SessionPool._sessions = {}
+        SessionPool._last_used = {}
+
+    def test_get_session_new(self, monkeypatch, reset_class_state):
+        """Test getting a new session when one doesn't exist."""
+        # Import here to use the monkeypatched version
+        from src.auth_manager import GitHubAuthManager, SessionPool
+
+        # Mock get_auth_headers
+        mock_headers = {"Authorization": f"Bearer {SAFE_MOCK_TOKEN}", "User-Agent": "test"}
+        monkeypatch.setattr(GitHubAuthManager, "get_auth_headers", lambda: mock_headers)
+
+        # Mock requests.Session
+        mock_session = MagicMock()
+        mock_session_class = MagicMock(return_value=mock_session)
+        monkeypatch.setattr("src.auth_manager.requests.Session", mock_session_class)
+
+        # Test getting a new session
+        session = SessionPool.get_session("test-token-key")
+
+        # Verify session was created with correct headers
+        assert session is mock_session
+        mock_session.headers.update.assert_called_once_with(mock_headers)
+        assert "test-token-key" in SessionPool._sessions
+        assert "test-token-key" in SessionPool._last_used
+
+    def test_get_session_existing(self, monkeypatch, reset_class_state):
+        """Test getting an existing session."""
+        # Import here to use the monkeypatched version
+        from src.auth_manager import GitHubAuthManager, SessionPool
+
+        # Create a mock session
+        mock_session = MagicMock()
+
+        # Add it to the session pool
+        SessionPool._sessions["test-token-key"] = mock_session
+        SessionPool._last_used["test-token-key"] = time.time() - 60  # 1 minute ago
+
+        # Mock get_auth_headers to ensure it's not called
+        mock_get_headers = MagicMock()
+        monkeypatch.setattr(GitHubAuthManager, "get_auth_headers", mock_get_headers)
+
+        # Test getting the existing session
+        session = SessionPool.get_session("test-token-key")
+
+        # Verify
+        assert session is mock_session
+        assert mock_get_headers.call_count == 0  # Shouldn't be called for existing session
+        assert SessionPool._last_used["test-token-key"] > time.time() - 10  # Updated recently
+
+    def test_clean_idle_sessions(self, monkeypatch, reset_class_state):
+        """Test cleaning idle sessions."""
+        # Import here to use the monkeypatched version
+        from src.auth_manager import SessionPool
+
+        # Create mock sessions
+        active_session = MagicMock()
+        idle_session = MagicMock()
+
+        # Add them to the session pool with different timestamps
+        now = time.time()
+        SessionPool._sessions["active-key"] = active_session
+        SessionPool._last_used["active-key"] = now - 60  # 1 minute ago
+
+        SessionPool._sessions["idle-key"] = idle_session
+        SessionPool._last_used["idle-key"] = now - 600  # 10 minutes ago (> _max_idle_time)
+
+        # Set a shorter idle time for testing
+        old_idle_time = SessionPool._max_idle_time
+        SessionPool._max_idle_time = 300  # 5 minutes
+
+        try:
+            # Test cleaning idle sessions
+            SessionPool._clean_idle_sessions()
+
+            # Verify
+            assert "active-key" in SessionPool._sessions
+            assert "idle-key" not in SessionPool._sessions
+            assert "active-key" in SessionPool._last_used
+            assert "idle-key" not in SessionPool._last_used
+            idle_session.close.assert_called_once()
+        finally:
+            # Restore original idle time
+            SessionPool._max_idle_time = old_idle_time
+
+    def test_clear_session(self, reset_class_state):
+        """Test explicitly clearing a session."""
+        # Import here
+        from src.auth_manager import SessionPool
+
+        # Create mock sessions
+        session1 = MagicMock()
+        session2 = MagicMock()
+
+        # Add them to the session pool
+        SessionPool._sessions["key1"] = session1
+        SessionPool._sessions["key2"] = session2
+        SessionPool._last_used["key1"] = time.time()
+        SessionPool._last_used["key2"] = time.time()
+
+        # Test clearing one session
+        SessionPool.clear_session("key1")
+
+        # Verify
+        assert "key1" not in SessionPool._sessions
+        assert "key2" in SessionPool._sessions
+        assert "key1" not in SessionPool._last_used
+        assert "key2" in SessionPool._last_used
+        session1.close.assert_called_once()
+        assert session2.close.call_count == 0

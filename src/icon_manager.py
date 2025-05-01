@@ -41,6 +41,7 @@ class IconManager:
 
         Returns:
             dict or None: Icon information dictionary or None if not found
+
         """
         if not owner or not repo:
             logger.warning("Missing owner or repo name")
@@ -98,6 +99,7 @@ class IconManager:
 
         Returns:
             dict or None: Icon information dictionary or None if not found
+
         """
         # Validate path before attempting to check
         if not path or path == "default":
@@ -163,6 +165,7 @@ class IconManager:
 
         Returns:
             dict: Formatted icon information
+
         """
         name = content.get("name", "").lower()
         # Determine content type based on file extension
@@ -189,6 +192,7 @@ class IconManager:
 
         Returns:
             tuple: (Success flag, path to downloaded icon or error message)
+
         """
         if not icon_info or "download_url" not in icon_info:
             return False, "Invalid icon information"
@@ -254,21 +258,22 @@ class IconManager:
                     pass
             return False, f"Error: {e!s}"
 
-    def get_icon_path(self, repo: str, app_name: Optional[str] = None) -> Optional[str]:
+    def get_icon_path(self, app_display_name: str, repo: str) -> Optional[str]:
         """Find the path to an existing icon for an application.
 
         Only checks the repository-specific directory using the preferred filename
         from the configuration.
 
         Args:
-            repo: Repository name (used for directory names)
-            app_name: Optional alternative name (original case preserved)
+            app_display_name: Unique identifier for the app (used for directory names)
+            repo: Repository name (used for configuration lookups)
 
         Returns:
             str or None: Path to icon file if found, None otherwise
+
         """
-        if not repo:
-            logger.debug("Cannot check icon path: repo name is empty")
+        if not repo or not app_display_name:
+            logger.debug("Cannot check icon path: repo or app_display_name is empty")
             return None
 
         # Get the preferred filename from configuration
@@ -281,20 +286,30 @@ class IconManager:
 
         # Use pathlib for file operations to ensure cross-platform compatibility
         icon_base_dir = Path("~/.local/share/icons/myunicorn").expanduser()
-        repo_icon_dir = icon_base_dir / repo
-        icon_path = repo_icon_dir / preferred_filename
+        app_icon_dir = (
+            icon_base_dir / app_display_name
+        )  # Use app_display_name instead of repo for directory
+        icon_path = app_icon_dir / preferred_filename
 
-        logger.info(f"Checking if icon already exists at: {icon_path}")
+        logger.info(
+            f"Checking if icon already exists at: {icon_path} (app_display_name: {app_display_name})"
+        )
 
         if icon_path.exists() and icon_path.is_file():
             logger.info(f"✓ Found existing icon at: {icon_path}")
             return str(icon_path)
 
-        logger.info(f"✗ No existing icon found for {repo} at {icon_path}")
+        logger.info(
+            f"✗ No existing icon found for {repo} (app_display_name: {app_display_name}) at {icon_path}"
+        )
         return None
 
     def ensure_app_icon(
-        self, owner: str, repo: str, headers: Optional[Dict[str, str]] = None
+        self,
+        owner: str,
+        repo: str,
+        app_display_name: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> Tuple[bool, str]:
         """Ensure an icon exists for the specified app, downloading if necessary.
 
@@ -304,24 +319,29 @@ class IconManager:
         Args:
             owner: Repository owner
             repo: Repository name (original case preserved)
+            app_display_name: Optional app identifier for naming (defaults to lookup or repo name)
             headers: Optional authentication headers
 
         Returns:
             Tuple[bool, str]: (Success status, Path to icon or status message)
+
         """
         try:
-            from src.app_config import AppConfigManager
+            # If app_display_name not provided, fallback to lookup mechanism for backward compatibility
+            if app_display_name is None:
+                from src.app_catalog import get_app_display_name_for_owner_repo
 
-            # Get app ID for consistent directory naming
-            app_config = AppConfigManager(owner=owner, repo=repo)
-            app_id = app_config.repo
+                app_display_name = get_app_display_name_for_owner_repo(owner, repo)
+                logger.debug(
+                    f"No app_display_name provided, looked up from catalog: '{app_display_name}'"
+                )
 
             logger.info(
-                f"Checking if icon for {repo} is already installed (to avoid unnecessary API requests)"
+                f"Using app_display_name '{app_display_name}' for icon folder (owner={owner}, repo={repo})"
             )
 
             # Check if icon already exists
-            existing_icon = self.get_icon_path(app_id, repo)
+            existing_icon = self.get_icon_path(app_display_name, repo)
             if existing_icon:
                 logger.info(f"✓ Using existing icon: {existing_icon} (skipping API request)")
                 return True, existing_icon
@@ -333,7 +353,7 @@ class IconManager:
 
             # Prepare icon directory
             icon_base_dir = os.path.expanduser("~/.local/share/icons/myunicorn")
-            target_icon_dir = os.path.join(icon_base_dir, app_id)
+            target_icon_dir = os.path.join(icon_base_dir, app_display_name)
             os.makedirs(target_icon_dir, exist_ok=True)
 
             # Get authentication headers if not provided
@@ -350,7 +370,7 @@ class IconManager:
             if not icon_info:
                 message = (
                     f"No icon configuration found for {owner}/{repo}. "
-                    f"Desktop entry will use the app name ('{repo}') which may work with "
+                    f"Desktop entry will use the app name ('{app_display_name}') which may work with "
                     f"system icon themes like Papirus or Adwaita."
                 )
                 logger.info(message)
