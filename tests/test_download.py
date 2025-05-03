@@ -33,9 +33,22 @@ def mock_global_config(monkeypatch):
 @pytest.fixture(autouse=True)
 def isolate_download_dir(tmp_path, monkeypatch):
     """Change CWD to a tmp_path so that 'downloads/' is created in an isolated temp directory."""
+    downloads_dir = tmp_path / "downloads"
+
+    # Create the downloads directory
+    downloads_dir.mkdir(exist_ok=True)
+
+    # Change to the temp directory for the duration of the test
     monkeypatch.chdir(tmp_path)
+
     yield
-    # no cleanup needed—tmp_path is auto-removed
+
+    # Explicit cleanup after test completes or fails
+    if downloads_dir.exists():
+        # Remove all files in the downloads directory
+        for file_path in downloads_dir.glob("*"):
+            if file_path.is_file():
+                file_path.unlink()
 
 
 @pytest.fixture
