@@ -473,14 +473,32 @@ class GitHubAPI:
         logging.info(f"Selected: {self.appimage_name}")
 
         # Extract an arch keyword from the selected asset name.
-        # Prioritize more specific identifiers.
         lower_name = self.appimage_name.lower()
-        for key in ["arm64", "aarch64", "amd64", "x86_64"]:
+
+        # Improved architecture extraction that keeps additional components like Qt6
+        # First try to identify the architecture component in the filename
+        arch_found = False
+        for key in ["arm64", "aarch64", "amd64", "x86_64", "x86", "i686", "i386"]:
             if key in lower_name:
-                self._arch_keyword = f"-{key}.appimage"
-                break
-        else:
-            # If no specific keyword is found, fallback to a default pattern.
+                # Find position of architecture in name
+                pos = lower_name.find(key)
+                if pos >= 0:
+                    # Extract everything from the dash before architecture to the end of filename
+                    # But remove the .appimage extension
+                    dash_pos = lower_name.rfind("-", 0, pos)
+                    if dash_pos >= 0:
+                        # Extract suffix from dash through end (without extension)
+                        suffix = lower_name[dash_pos:]
+                        if suffix.endswith(".appimage"):
+                            suffix = suffix[:-9]  # Remove .appimage
+                        self._arch_keyword = f"{suffix}.appimage"
+                        arch_found = True
+                        logging.info(f"Extracted architecture keyword: {self._arch_keyword}")
+                        break
+
+        # Fallbacks if we couldn't extract using the improved method
+        if not arch_found:
+            # Check for Linux pattern
             match = re.search(r"(-linux(?:64)?\.appimage)$", lower_name)
             if match:
                 self._arch_keyword = match.group(1)
