@@ -12,6 +12,7 @@ import os
 
 from src.commands.base import Command
 from src.config_migrator import ConfigMigrator
+from src.global_config import GlobalConfigManager
 
 
 class MigrateConfigCommand(Command):
@@ -38,6 +39,8 @@ class MigrateConfigCommand(Command):
             action="store_true",
             help="Remove unused settings without user confirmation",
         )
+        # Create instance of GlobalConfigManager for use in the command
+        self._global_config = GlobalConfigManager()
 
     def execute(self, args=None):
         """Execute the configuration migration command.
@@ -99,6 +102,9 @@ class MigrateConfigCommand(Command):
         results = ConfigMigrator.run_full_migration(
             delete_unused=delete_unused, require_confirmation=require_confirmation
         )
+
+        # Reload the global configuration after migration
+        self._global_config.reload()
 
         # Report on global config migration
         global_migrated = results["global_config"]["migrated"]

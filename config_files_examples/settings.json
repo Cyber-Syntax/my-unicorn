@@ -1,6 +1,6 @@
 {
-	"app_storage_path": "~/Documents/appimages",
-	"app_backup_storage_path": "~/Documents/appimages/backups",
+	"app_storage_path": "~/.local/share/myunicorn",
+	"app_backup_storage_path": "~/.local/share/myunicorn/backups",
 	"keep_backup": true,
 	"max_backups": 1,
 	"batch_mode": false,

@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 import time
-from typing import ClassVar, Dict, Optional, Set
+from typing import Dict, Optional, Set
 
 import requests
 
@@ -20,6 +20,7 @@ class DownloadManager:
         is_async_mode: Whether the download is happening in an async context
         app_index: Index of the app in a multi-app update (1-based)
         total_apps: Total number of apps being updated
+
     """
 
     # Class variables for shared progress tracking
@@ -30,9 +31,6 @@ class DownloadManager:
     # Use GlobalConfigManager for configuration
     _global_config: Optional[GlobalConfigManager] = None
 
-    # Path for temporary downloads
-    _downloads_dir: ClassVar[str] = os.path.join(os.getcwd(), "downloads")
-
     def __init__(self, github_api: "GitHubAPI", app_index: int = 0, total_apps: int = 0) -> None:
         """Initialize the download manager with GitHub API instance.
 
@@ -40,6 +38,7 @@ class DownloadManager:
             github_api: GitHub API instance containing release information
             app_index: Index of the app in a multi-app update (1-based)
             total_apps: Total number of apps being updated
+
         """
         self.github_api = github_api
         self._logger = logging.getLogger(__name__)
@@ -62,6 +61,7 @@ class DownloadManager:
 
         Returns:
             bool: True if running in an async context
+
         """
         try:
             asyncio.get_running_loop()
@@ -75,10 +75,15 @@ class DownloadManager:
 
         Returns:
             str: Path to the downloads directory
+
         """
-        # Create downloads directory based on current working directory
-        # This allows tests to redirect it to a temporary location
-        downloads_dir = os.path.join(os.getcwd(), "downloads")
+        # Initialize global config if not already set
+        if cls._global_config is None:
+            cls._global_config = GlobalConfigManager()
+            cls._global_config.load_config()
+
+        # Use the app_download_path from GlobalConfigManager
+        downloads_dir = cls._global_config.expanded_app_download_path
         os.makedirs(downloads_dir, exist_ok=True)
         return downloads_dir
 
@@ -90,6 +95,7 @@ class DownloadManager:
 
         Returns:
             str: Formatted size string (e.g., '10.5 MB')
+
         """
         if size_bytes <= 0:
             return "0 B"
@@ -114,6 +120,7 @@ class DownloadManager:
 
         Returns:
             BasicMultiAppProgress: The shared progress instance
+
         """
         # Use the first instance's progress or create a new one
         if cls._global_progress is None:
@@ -147,6 +154,7 @@ class DownloadManager:
         Raises:
             ValueError: If AppImage URL or name is not available
             RuntimeError: For network errors, file system errors, or other unexpected issues
+
         """
         appimage_url = self.github_api.appimage_url
         appimage_name = self.github_api.appimage_name
@@ -191,6 +199,7 @@ class DownloadManager:
 
         Raises:
             requests.exceptions.RequestException: For network errors
+
         """
         self._logger.info(f"Fetching headers for {url}")
         response = requests.head(url, allow_redirects=True, timeout=10, headers=headers)
@@ -207,6 +216,7 @@ class DownloadManager:
 
         Returns:
             Optional[int]: ID of the progress task, or None if setup failed
+
         """
         progress = self.get_or_create_progress()
 
@@ -268,6 +278,7 @@ class DownloadManager:
 
         Raises:
             requests.exceptions.RequestException: For network errors
+
         """
         start_time = time.time()
         response = requests.get(url, stream=True, timeout=30, headers=headers)
@@ -312,6 +323,7 @@ class DownloadManager:
             total_size: Size in bytes
             download_time: Time taken to download in seconds
             prefix: Message prefix
+
         """
         speed_mbps = (total_size / (1024 * 1024)) / download_time if download_time > 0 else 0
 
@@ -340,6 +352,7 @@ class DownloadManager:
 
         Raises:
             RuntimeError: Any error during download
+
         """
         try:
             # Get file size

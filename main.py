@@ -1,31 +1,33 @@
 #!/usr/bin/python3
 """Main module for my-unicorn CLI application.
 
-This module configures logging, loads configuration files, and executes commands."""
+This module configures logging, loads configuration files, and executes commands.
+"""
 
 # Standard library imports
 import gettext
 import logging
 import sys
-from types import TracebackType
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import NoReturn, Tuple, Optional, Dict, Any
+from types import TracebackType
+from typing import Optional
+
+from src.app_config import AppConfigManager
+from src.auth_manager import GitHubAuthManager
 
 # Local imports
 from src.commands.customize_app_config import CustomizeAppConfigCommand
 from src.commands.customize_global_config import CustomizeGlobalConfigCommand
+from src.commands.delete_backups import DeleteBackupsCommand
 from src.commands.download import DownloadCommand
+from src.commands.install_app import InstallAppCommand
 from src.commands.invoker import CommandInvoker
 from src.commands.manage_token import ManageTokenCommand
 from src.commands.migrate_config import MigrateConfigCommand
-from src.commands.update_all_auto import UpdateAllAutoCommand
 from src.commands.update_all_async import UpdateAsyncCommand
-from src.commands.delete_backups import DeleteBackupsCommand
-from src.commands.install_app import InstallAppCommand
-from src.app_config import AppConfigManager
+from src.commands.update_all_auto import UpdateAllAutoCommand
 from src.global_config import GlobalConfigManager
-from src.auth_manager import GitHubAuthManager
 
 _ = gettext.gettext
 
@@ -44,30 +46,37 @@ def custom_excepthook(
         exc_type: Type of the exception
         exc_value: Exception instance
         exc_traceback: Traceback object
+
     """
     logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 
 def display_github_api_status() -> None:
-    """Display GitHub API rate limit information to the user."""
+    """Display GitHub API rate limit information to the user.
+
+    Uses estimated values from cache to avoid API calls during startup.
+    """
     try:
-        remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+        # Use estimated method instead of get_rate_limit_info to avoid API calls during startup
+        remaining, limit, reset_time, is_authenticated = (
+            GitHubAuthManager.get_estimated_rate_limit_info()
+        )
 
         # Create a status display for API rate limit information
         print("\n--- GitHub API Status ---")
 
         if is_authenticated:
             print(f"GitHub API Status: {remaining} of {limit} requests remaining")
-            print(f"Authentication: ✅ Authenticated")
+            print("Authentication: ✅ Authenticated")
             print(f"Reset Time: {reset_time}")
 
             if remaining < LOW_API_REQUESTS_THRESHOLD:
-                print(f"Warning: ⚠️ Low API requests remaining!")
+                print("Warning: ⚠️ Low API requests remaining!")
         else:
             print(f"GitHub API Status: {remaining} of 60 requests remaining")
-            print(f"Authentication: ❌ Unauthenticated")
-            print(f"Note: 🔑 Add token (option 7) for 5000 requests/hour")
+            print("Authentication: ❌ Unauthenticated")
+            print("Note: 🔑 Add token (option 7) for 5000 requests/hour")
 
         print(f"{'-' * 40}")
     except Exception as e:
@@ -113,6 +122,7 @@ def get_user_choice() -> int:
     Raises:
         ValueError: If user input cannot be converted to an integer
         KeyboardInterrupt: If user cancels with Ctrl+C
+
     """
     display_menu()
 
@@ -168,6 +178,7 @@ def setup_commands(invoker: CommandInvoker) -> None:
 
     Args:
         invoker: The CommandInvoker instance to register commands with
+
     """
     invoker.register_command(1, DownloadCommand())
     invoker.register_command(2, InstallAppCommand())

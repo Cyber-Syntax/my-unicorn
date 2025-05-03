@@ -590,6 +590,128 @@ class GitHubAuthManager:
         )
 
     @classmethod
+    def get_estimated_rate_limit_info(cls) -> Union[Tuple[int, int, str, bool], Dict[str, Any]]:
+        """Get estimated GitHub API rate limit information based only on cached data.
+
+        This method is optimized for startup performance and never makes API calls.
+        Instead, it calculates an estimate based on the time elapsed since the last
+        cache update and GitHub's hourly reset cycle.
+
+        Returns:
+            tuple: (estimated_remaining, limit, reset_time, is_authenticated)
+
+        """
+        logger.debug("Getting estimated rate limit information from cache only")
+
+        # First try the in-memory cache
+        current_time = time.time()
+        if cls._rate_limit_cache:
+            logger.debug("Using existing memory cache for rate limit estimation")
+            cached_data = cls._rate_limit_cache
+            cache_time = cls._rate_limit_cache_time
+        else:
+            # Try to load from file cache
+            cached_data = cls._load_rate_limit_cache()
+            if cached_data:
+                logger.debug("Loaded rate limit data from file cache for estimation")
+                cls._rate_limit_cache = cached_data
+                cls._rate_limit_cache_time = current_time
+                cache_time = current_time
+            else:
+                # No cache exists, provide default values based on authentication status
+                token = SecureTokenManager.get_token(validate_expiration=True)
+                is_authenticated = bool(token)
+
+                # Calculate next hour boundary for reset
+                next_hour_timestamp = get_next_hour_timestamp()
+                next_hour_formatted = datetime.fromtimestamp(next_hour_timestamp).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+
+                # Set defaults based on authentication status
+                if is_authenticated:
+                    logger.debug("No cache found, using default authenticated values")
+                    return (
+                        5000,
+                        5000,
+                        next_hour_formatted,
+                        True,
+                    )  # Assume full limit if no cache exists
+                else:
+                    logger.debug("No cache found, using default unauthenticated values")
+                    return 60, 60, next_hour_formatted, False  # Full unauthenticated limit
+
+        # Extract key values from cache
+        cached_remaining = cached_data.get("remaining", 0)
+        cached_limit = cached_data.get("limit", 0)
+        is_authenticated = cached_data.get("is_authenticated", False)
+        request_count = cached_data.get("request_count", 0) + cls._request_count_since_cache
+
+        # Get reset time from cache
+        reset_time = None
+        if "reset" in cached_data:
+            reset_time = cached_data.get("reset", 0)
+
+        reset_formatted = cached_data.get("reset_formatted", "")
+
+        # Determine if we're past the reset time
+        reset_passed = False
+
+        if reset_time:
+            # Check if current time is past or exactly at the reset time from GitHub API
+            if current_time >= reset_time:
+                reset_passed = True
+                logger.debug(
+                    f"Rate limit reset detected: current={datetime.fromtimestamp(current_time).strftime('%H:%M:%S')}, "
+                    f"reset={datetime.fromtimestamp(reset_time).strftime('%H:%M:%S')}"
+                )
+        else:
+            # If no reset time available, check if we've crossed an hour boundary
+            # GitHub resets at the top of each hour
+            cache_datetime = datetime.fromtimestamp(cache_time)
+            current_datetime = datetime.fromtimestamp(current_time)
+
+            if (
+                current_datetime.hour != cache_datetime.hour
+                or current_datetime.day != cache_datetime.day
+                or current_datetime.month != cache_datetime.month
+                or current_datetime.year != cache_datetime.year
+            ):
+                reset_passed = True
+                logger.debug(
+                    "Hour boundary crossed since last cache update, assuming rate limit reset"
+                )
+
+        # Calculate the estimated remaining based on reset status
+        if reset_passed:
+            # If we're past the reset, rate limits would have been reset to full
+            if is_authenticated:
+                estimated_remaining = cached_limit  # Default to full limit (5000 for authenticated)
+                logger.debug(
+                    f"Reset passed: setting estimated remaining to full limit ({cached_limit})"
+                )
+            else:
+                estimated_remaining = 60  # Default GitHub unauthenticated limit
+                logger.debug(
+                    "Reset passed: setting estimated remaining to unauthenticated limit (60)"
+                )
+
+            # Calculate next hour boundary for new reset time
+            next_reset = get_next_hour_timestamp()
+            reset_formatted = datetime.fromtimestamp(next_reset).strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            # If reset hasn't occurred, adjust remaining based on tracked request count
+            estimated_remaining = max(0, cached_remaining - request_count)
+            logger.debug(
+                f"No reset detected: estimated remaining = {cached_remaining} - {request_count} = {estimated_remaining}"
+            )
+
+        logger.debug(
+            f"Final estimated rate limit: {estimated_remaining}/{cached_limit}, reset at {reset_formatted}"
+        )
+        return estimated_remaining, cached_limit, reset_formatted, is_authenticated
+
+    @classmethod
     def make_authenticated_request(
         cls,
         method: str,

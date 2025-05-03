@@ -16,7 +16,6 @@ from typing import Optional
 
 # Local imports
 from src.api import GitHubAPI
-from src.download import DownloadManager
 from src.icon_manager import IconManager
 from src.utils.desktop_entry import DesktopEntryManager
 
@@ -97,7 +96,9 @@ class FileHandler:
             Path: Full path to the downloaded AppImage
 
         """
-        downloads_dir = Path(DownloadManager.get_downloads_dir())
+        from src.global_config import GlobalConfigManager
+
+        downloads_dir = Path(GlobalConfigManager().expanded_app_download_path)
         return downloads_dir / self.appimage_name
 
     @property

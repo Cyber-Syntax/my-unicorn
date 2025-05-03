@@ -10,11 +10,35 @@ import stat
 import time
 from pathlib import Path
 from typing import Dict
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.file_handler import FileHandler
+from src.global_config import GlobalConfigManager
+
+
+@pytest.fixture
+def mock_global_config(monkeypatch, temp_dirs):
+    """Mock GlobalConfigManager for testing FileHandler.
+
+    Args:
+        monkeypatch: pytest monkeypatch fixture
+        temp_dirs: Temporary directories fixture
+
+    Returns:
+        MagicMock: Configured mock GlobalConfigManager
+
+    """
+    mock_config = MagicMock(spec=GlobalConfigManager)
+    mock_config.expanded_app_download_path = str(temp_dirs["downloads_dir"])
+
+    # Mock the GlobalConfigManager's constructor to return our mock
+    def mock_gc_init():
+        return mock_config
+
+    monkeypatch.setattr("src.file_handler.GlobalConfigManager", mock_gc_init)
+    return mock_config
 
 
 @pytest.fixture
@@ -205,12 +229,16 @@ class TestFileHandler:
             temp_dirs: Dictionary of test directories
 
         """
-        with patch("src.download.DownloadManager.get_downloads_dir") as mock_get_downloads_dir:
-            mock_get_downloads_dir.return_value = str(temp_dirs["downloads_dir"])
+        # Create source file in downloads dir
+        downloaded_file = temp_dirs["downloads_dir"] / file_handler.appimage_name
+        downloaded_file.write_bytes(b"DownloadedAppImageContent")
 
-            # Create source file in downloads dir
-            downloaded_file = temp_dirs["downloads_dir"] / file_handler.appimage_name
-            downloaded_file.write_bytes(b"DownloadedAppImageContent")
+        # Patch the GlobalConfigManager class in its own module
+        with patch("src.global_config.GlobalConfigManager") as MockGlobalConfigClass:
+            # Configure the mock instance that will be returned when the class is instantiated
+            mock_gc_instance = MagicMock()
+            mock_gc_instance.expanded_app_download_path = str(temp_dirs["downloads_dir"])
+            MockGlobalConfigClass.return_value = mock_gc_instance
 
             # Test move
             success = file_handler._move_appimage()
@@ -233,12 +261,17 @@ class TestFileHandler:
             temp_dirs: Dictionary of test directories
 
         """
-        with patch("src.download.DownloadManager.get_downloads_dir") as mock_get_downloads_dir:
-            mock_get_downloads_dir.return_value = str(temp_dirs["downloads_dir"])
+        # No source file, should fail
+        downloaded_file = temp_dirs["downloads_dir"] / file_handler.appimage_name
+        if downloaded_file.exists():
+            downloaded_file.unlink()
 
-            # No source file, should fail
-            if (temp_dirs["downloads_dir"] / file_handler.appimage_name).exists():
-                (temp_dirs["downloads_dir"] / file_handler.appimage_name).unlink()
+        # Patch the GlobalConfigManager class
+        with patch("src.global_config.GlobalConfigManager") as MockGlobalConfigClass:
+            # Configure the mock instance
+            mock_gc_instance = MagicMock()
+            mock_gc_instance.expanded_app_download_path = str(temp_dirs["downloads_dir"])
+            MockGlobalConfigClass.return_value = mock_gc_instance
 
             success = file_handler._move_appimage()
             assert success is False

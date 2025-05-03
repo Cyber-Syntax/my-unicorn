@@ -9,8 +9,9 @@ class GlobalConfigManager:
     """Manages global configuration settings."""
 
     config_file: str = field(default="~/.config/myunicorn/settings.json")
-    app_storage_path: str = field(default_factory=lambda: "~/Documents/appimages")
-    app_backup_storage_path: str = field(default_factory=lambda: "~/Documents/appimages/backups")
+    app_storage_path: str = field(default_factory=lambda: "~/.local/share/myunicorn")
+    app_backup_storage_path: str = field(default_factory=lambda: "~/.local/share/myunicorn/backups")
+    app_download_path: str = field(default_factory=lambda: "~/Downloads")
     keep_backup: bool = field(default=True)
     max_backups: int = field(default=3)  # Number of backups to keep per app
     batch_mode: bool = field(default=False)
@@ -27,6 +28,18 @@ class GlobalConfigManager:
     def expanded_path(self, path):
         """Expand and return a user path."""
         return os.path.expanduser(path)
+
+    def reload(self):
+        """Explicitly reload configuration from disk.
+
+        This ensures any external changes to the configuration file are loaded.
+
+        Returns:
+            bool: True if config was loaded successfully, False otherwise
+
+        """
+        logging.info("Explicitly reloading global configuration from disk")
+        return self.load_config()
 
     def load_config(self):
         """Load global settings from a JSON file or initialize defaults."""
@@ -47,6 +60,10 @@ class GlobalConfigManager:
                     self.app_backup_storage_path = config.get(
                         "app_backup_storage_path",
                         self.app_backup_storage_path,
+                    )
+                    self.app_download_path = config.get(
+                        "app_download_path",
+                        self.app_download_path,
                     )
                     self.keep_backup = config.get("keep_backup", self.keep_backup)
                     self.max_backups = config.get("max_backups", self.max_backups)
@@ -75,6 +92,7 @@ class GlobalConfigManager:
         return {
             "app_storage_path": self.app_storage_path,
             "app_backup_storage_path": self.app_backup_storage_path,
+            "app_download_path": self.app_download_path,
             "keep_backup": self.keep_backup,
             "max_backups": self.max_backups,
             "batch_mode": self.batch_mode,
@@ -90,9 +108,15 @@ class GlobalConfigManager:
             # Use default values if input is blank
             app_storage_path = (
                 input(
-                    "Enter the folder path to save appimages (default: '~/Documents/appimages'): "
+                    "Enter the folder path to save appimages (default: '~/.local/share/myunicorn'): "
                 ).strip()
-                or "~/Documents/appimages"
+                or "~/.local/share/myunicorn"
+            )
+            app_download_path = (
+                input(
+                    "Enter the folder path to download appimages (default: '~/Downloads'): "
+                ).strip()
+                or "~/Downloads"
             )
             keep_backup = (
                 input("Enable backup for old appimages? (yes/no, default: yes): ").strip().lower()
@@ -109,7 +133,8 @@ class GlobalConfigManager:
 
             # Update current instance values
             self.app_storage_path = app_storage_path
-            self.app_backup_storage_path = "~/Documents/appimages/backups"
+            self.app_backup_storage_path = "~/.local/share/myunicorn/backups"
+            self.app_download_path = app_download_path
             self.keep_backup = keep_backup == "yes"
             self.max_backups = int(max_backups)
             self.batch_mode = batch_mode == "yes"
@@ -124,8 +149,9 @@ class GlobalConfigManager:
             print("\nConfiguration setup interrupted. Using default values.")
 
             # Set default values
-            self.app_storage_path = "~/Documents/appimages"
-            self.app_backup_storage_path = "~/Documents/appimages/backups"
+            self.app_storage_path = "~/.local/share/myunicorn"
+            self.app_backup_storage_path = "~/.local/share/myunicorn/backups"
+            self.app_download_path = "~/Downloads"
             self.keep_backup = True
             self.max_backups = 3
             self.batch_mode = False
@@ -152,6 +178,10 @@ class GlobalConfigManager:
     def expanded_app_backup_storage_path(self):
         return os.path.expanduser(self.app_backup_storage_path)
 
+    @property
+    def expanded_app_download_path(self):
+        return os.path.expanduser(self.app_download_path)
+
     def customize_global_config(self):
         """Customize the configuration settings for the Global Config."""
         self.load_config()
@@ -159,28 +189,30 @@ class GlobalConfigManager:
         print("Select which key to modify:")
         print("=================================================")
         print(f"1. AppImage Download Folder: {self.app_storage_path}")
-        print(f"2. Enable Backup: {'Yes' if self.keep_backup else 'No'}")
-        print(f"3. Max Backups Per App: {self.max_backups}")
-        print(f"4. Batch Mode: {'Yes' if self.batch_mode else 'No'}")
-        print(f"5. Locale: {self.locale}")
-        print(f"6. Max Concurrent Updates: {self.max_concurrent_updates}")
-        print("7. Exit")
+        print(f"2. AppImage Download Path: {self.app_download_path}")
+        print(f"3. Enable Backup: {'Yes' if self.keep_backup else 'No'}")
+        print(f"4. Max Backups Per App: {self.max_backups}")
+        print(f"5. Batch Mode: {'Yes' if self.batch_mode else 'No'}")
+        print(f"6. Locale: {self.locale}")
+        print(f"7. Max Concurrent Updates: {self.max_concurrent_updates}")
+        print("8. Exit")
         print("=================================================")
 
         try:
             while True:
                 choice = input("Enter your choice: ")
-                if choice.isdigit() and 1 <= int(choice) <= 7:
+                if choice.isdigit() and 1 <= int(choice) <= 8:
                     break
                 else:
-                    print("Invalid choice, please enter a number between 1 and 7.")
+                    print("Invalid choice, please enter a number between 1 and 8.")
 
-            if choice == "7":
+            if choice == "8":
                 print("Exiting without changes.")
                 return
 
             config_dict = {
                 "app_storage_path": self.app_storage_path,
+                "app_download_path": self.app_download_path,
                 "keep_backup": self.keep_backup,
                 "max_backups": self.max_backups,
                 "batch_mode": self.batch_mode,
@@ -193,7 +225,12 @@ class GlobalConfigManager:
                 if key == "app_storage_path":
                     new_value = (
                         input("Enter the new folder path to save appimages: ").strip()
-                        or "~/Documents/appimages"
+                        or "~/.local/share/myunicorn"
+                    )
+                elif key == "app_download_path":
+                    new_value = (
+                        input("Enter the new folder path to download appimages: ").strip()
+                        or "~/Downloads"
                     )
                 elif key == "keep_backup":
                     new_value = (

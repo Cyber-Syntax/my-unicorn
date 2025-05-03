@@ -1,13 +1,11 @@
 [![en](https://img.shields.io/badge/lang-en-green.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.md)
 [![tr](https://img.shields.io/badge/lang-tr-blue.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.tr.md)
 
-
 # **⚠️ Attention**
 
 - **This project is in a beta phase** due to limited testing at this time.. Although primarily developed for learning purposes, it effectively addresses my specific needs.
 - **Important:** Follow the instructions in the **Releases section** when updating the script. Updates may include new features or changes that could require different steps. I’ll strive to keep the instructions as simple as possible.
 - **Currently supported:** Linux only.
-
 
 ## **🦄 About my-unicorn**
 
@@ -27,7 +25,6 @@
 
   - [x] sha256
   - [x] sha512
-
 
 ## **💡 How to Use**
 
@@ -65,19 +62,17 @@
 
 5. Continue reading below to learn how to use.
 
-
 ### Using app:
 
-1. You can copy `super-productivity.json` or other example config files from the `config_files_examples/` folder to your appimage folder path (default: `~/Documents/appimages/config_files/super-productivity.json`). This config file is an example for super-productivity appimage.
+1. You can copy `super-productivity.json` or other example config files from the `config_files_examples/` folder to your appimage folder path (default: `~/.local/share/myunicorn/config_files/super-productivity.json`). This config file is an example for super-productivity appimage.
 
 2. Using the app to create one for you, but you'll need to know some information about the application:
    - **GitHub URL:** The repository URL of the app (e.g., `https://github.com/johannesjo/super-productivity`).
 3. Hash type and Hash file name are automatically detected. You need to provide below informations, if the app compatibility is not available or error occurs:
-    - **Hash type:** Specify the hash type (e.g., sha512 for super-productivity).
-    - **Hash verification issues:** If the hash verification fails, you can manually add the hash to the JSON file:
-      - Look for the latest hash in the GitHub release page (e.g., [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
-      - Check the `apps/` folder for examples. All JSON files should work as expected.
-
+   - **Hash type:** Specify the hash type (e.g., sha512 for super-productivity).
+   - **Hash verification issues:** If the hash verification fails, you can manually add the hash to the JSON file:
+     - Look for the latest hash in the GitHub release page (e.g., [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
+     - Check the `apps/` folder for examples. All JSON files should work as expected.
 
 ## **🙏 Support This Project**
 
@@ -89,7 +84,6 @@
 
 - This project is primarily a learning resource for me, but I appreciate any feedback or suggestions! While I can't promise to incorporate all contributions or maintain active involvement, I’m open to improvements and ideas that align with the project’s goals.
 - Anyway, please refer to the [CONTRIBUTING.md](.github/CONTRIBUTING.md) file for more detailed explanation.
-
 
 ## **📝 License**
 

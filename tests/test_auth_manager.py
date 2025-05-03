@@ -668,6 +668,239 @@ class TestGitHubAuthManager:
         with pytest.raises(AssertionError):
             assert headers["Authorization"] != f"Bearer {token_that_looks_real}"
 
+    @pytest.mark.parametrize(
+        "test_case, cache_data, cache_time, current_time, auth_status, expected_result",
+        [
+            # Test case 1: Unauthenticated user after hourly reset (10pm -> 11pm)
+            (
+                "unauthenticated_after_reset",
+                {
+                    "remaining": 50,  # 10 requests used out of 60
+                    "limit": 60,
+                    "reset": int(datetime(2023, 1, 1, 22, 0, 0).timestamp())
+                    + 3600,  # Reset at 11pm
+                    "reset_formatted": "2023-01-01 23:00:00",
+                    "is_authenticated": False,
+                },
+                int(datetime(2023, 1, 1, 22, 0, 0).timestamp()),  # Cache from 10pm
+                int(
+                    datetime(2023, 1, 1, 23, 5, 0).timestamp()
+                ),  # Current time is 11:05pm (after reset)
+                False,
+                (60, 60, None, False),  # Should show full limit after reset
+            ),
+            # Test case 2: Unauthenticated user before hourly reset (10:30pm -> 10:45pm)
+            (
+                "unauthenticated_before_reset",
+                {
+                    "remaining": 50,
+                    "limit": 60,
+                    "reset": int(datetime(2023, 1, 1, 23, 0, 0).timestamp()),  # Reset at 11pm
+                    "reset_formatted": "2023-01-01 23:00:00",
+                    "is_authenticated": False,
+                },
+                int(datetime(2023, 1, 1, 22, 30, 0).timestamp()),  # Cache from 10:30pm
+                int(
+                    datetime(2023, 1, 1, 22, 45, 0).timestamp()
+                ),  # Current time is 10:45pm (before reset)
+                False,
+                (50, 60, "2023-01-01 23:00:00", False),  # Should show remaining count from cache
+            ),
+            # Test case 3: Authenticated user after hourly reset (10pm -> 11pm)
+            (
+                "authenticated_after_reset",
+                {
+                    "remaining": 4800,  # 200 requests used
+                    "limit": 5000,
+                    "reset": int(datetime(2023, 1, 1, 22, 0, 0).timestamp())
+                    + 3600,  # Reset at 11pm
+                    "reset_formatted": "2023-01-01 23:00:00",
+                    "is_authenticated": True,
+                },
+                int(datetime(2023, 1, 1, 22, 0, 0).timestamp()),  # Cache from 10pm
+                int(
+                    datetime(2023, 1, 1, 23, 5, 0).timestamp()
+                ),  # Current time is 11:05pm (after reset)
+                True,
+                (5000, 5000, None, True),  # Should show full limit after reset
+            ),
+            # Test case 4: Authenticated user before hourly reset (10:30pm -> 10:45pm)
+            (
+                "authenticated_before_reset",
+                {
+                    "remaining": 4800,
+                    "limit": 5000,
+                    "reset": int(datetime(2023, 1, 1, 23, 0, 0).timestamp()),  # Reset at 11pm
+                    "reset_formatted": "2023-01-01 23:00:00",
+                    "is_authenticated": True,
+                },
+                int(datetime(2023, 1, 1, 22, 30, 0).timestamp()),  # Cache from 10:30pm
+                int(
+                    datetime(2023, 1, 1, 22, 45, 0).timestamp()
+                ),  # Current time is 10:45pm (before reset)
+                True,
+                (4800, 5000, "2023-01-01 23:00:00", True),  # Should show remaining count from cache
+            ),
+            # Test case 5: No cache available, unauthenticated user
+            (
+                "no_cache_unauthenticated",
+                None,  # No cache data
+                0,  # No cache time
+                int(datetime(2023, 1, 1, 22, 0, 0).timestamp()),  # Current time is 10pm
+                False,
+                (60, 60, None, False),  # Should return default unauthenticated values
+            ),
+            # Test case 6: No cache available, authenticated user
+            (
+                "no_cache_authenticated",
+                None,  # No cache data
+                0,  # No cache time
+                int(datetime(2023, 1, 1, 22, 0, 0).timestamp()),  # Current time is 10pm
+                True,
+                (5000, 5000, None, True),  # Should return default authenticated values
+            ),
+            # Test case 7: Exactly at reset time
+            (
+                "exactly_at_reset_time",
+                {
+                    "remaining": 30,
+                    "limit": 60,
+                    "reset": int(datetime(2023, 1, 1, 23, 0, 0).timestamp()),  # Reset at 11pm
+                    "reset_formatted": "2023-01-01 23:00:00",
+                    "is_authenticated": False,
+                },
+                int(datetime(2023, 1, 1, 22, 30, 0).timestamp()),  # Cache from 10:30pm
+                int(
+                    datetime(2023, 1, 1, 23, 0, 0).timestamp()
+                ),  # Current time is exactly 11pm (reset time)
+                False,
+                (60, 60, None, False),  # Should show full limit at reset time
+            ),
+            # Test case 8: Additional API requests since last cache update
+            (
+                "requests_since_cache_update",
+                {
+                    "remaining": 50,
+                    "limit": 60,
+                    "reset": int(datetime(2023, 1, 1, 23, 0, 0).timestamp()),  # Reset at 11pm
+                    "reset_formatted": "2023-01-01 23:00:00",
+                    "is_authenticated": False,
+                    "request_count": 0,
+                },
+                int(datetime(2023, 1, 1, 22, 30, 0).timestamp()),  # Cache from 10:30pm
+                int(
+                    datetime(2023, 1, 1, 22, 45, 0).timestamp()
+                ),  # Current time is 10:45pm (before reset)
+                False,
+                (
+                    45,
+                    60,
+                    "2023-01-01 23:00:00",
+                    False,
+                ),  # Should subtract request_count_since_cache (5)
+            ),
+        ],
+    )
+    def test_get_estimated_rate_limit_info(
+        self,
+        test_case,
+        cache_data,
+        cache_time,
+        current_time,
+        auth_status,
+        expected_result,
+        reset_class_state,
+        mock_token_manager,
+        monkeypatch,
+    ):
+        """Test get_estimated_rate_limit_info calculates correct rate limits based on cache and time.
+
+        This tests the core functionality that estimates GitHub API rate limits without making
+        API calls, especially the logic that detects when an hourly reset has occurred.
+
+        Args:
+            test_case: Descriptive name of the test case for better error messages
+            cache_data: The cached rate limit data to use for the test
+            cache_time: The timestamp when the cache was last updated
+            current_time: The current time to simulate during the test
+            auth_status: Whether the user should be authenticated or not
+            expected_result: Expected return values (remaining, limit, reset_formatted, is_authenticated)
+            reset_class_state: Fixture to reset GitHubAuthManager class state
+            mock_token_manager: Fixture that mocks the SecureTokenManager
+            monkeypatch: pytest's monkeypatch fixture
+
+        """
+        # Setup authentication status
+        mock_token_manager.get_token.return_value = SAFE_MOCK_TOKEN if auth_status else None
+
+        # Setup cached data if provided
+        if cache_data is not None:
+            GitHubAuthManager._rate_limit_cache = cache_data.copy()
+            GitHubAuthManager._rate_limit_cache_time = cache_time
+            # For test case 8, simulate additional requests since cache
+            if test_case == "requests_since_cache_update":
+                GitHubAuthManager._request_count_since_cache = 5
+        else:
+            # Ensure no cached data
+            GitHubAuthManager._rate_limit_cache = {}
+            GitHubAuthManager._rate_limit_cache_time = 0
+            GitHubAuthManager._request_count_since_cache = 0
+
+        # Mock the cache loading function if needed
+        if cache_data is not None:
+            monkeypatch.setattr(
+                GitHubAuthManager, "_load_rate_limit_cache", lambda: cache_data.copy()
+            )
+        else:
+            monkeypatch.setattr(GitHubAuthManager, "_load_rate_limit_cache", dict)
+
+        # Mock the current time
+        monkeypatch.setattr(time, "time", lambda: current_time)
+
+        # Execute - call the method we're testing
+        result = GitHubAuthManager.get_estimated_rate_limit_info()
+
+        # Verify results - unpack expected values
+        expected_remaining, expected_limit, expected_reset_formatted, expected_auth = (
+            expected_result
+        )
+        remaining, limit, reset_formatted, is_authenticated = result
+
+        # Verify each part of the result
+        assert remaining == expected_remaining, f"Test case {test_case}: Remaining count mismatch"
+        assert limit == expected_limit, f"Test case {test_case}: Limit mismatch"
+
+        # Special handling for reset time - using a more flexible approach
+        if expected_reset_formatted is None:
+            # For dynamic reset times, verify that:
+            # 1. It's a valid timestamp string in the expected format
+            try:
+                reset_dt = datetime.strptime(reset_formatted, "%Y-%m-%d %H:%M:%S")
+                # 2. It represents a time in the future from current_time
+                reset_timestamp = reset_dt.timestamp()
+                assert reset_timestamp > current_time, (
+                    f"Test case {test_case}: Reset time should be in future"
+                )
+
+                # 3. It should be close to an hour boundary (within 5 minutes)
+                minutes = reset_dt.minute
+                seconds = reset_dt.second
+                time_from_hour_boundary = minutes * 60 + seconds
+                is_near_hour_boundary = time_from_hour_boundary < 300  # 5 minutes
+                assert is_near_hour_boundary, (
+                    f"Test case {test_case}: Reset time should be near hour boundary"
+                )
+            except ValueError:
+                pytest.fail(f"Test case {test_case}: Invalid reset time format: {reset_formatted}")
+        else:
+            assert reset_formatted == expected_reset_formatted, (
+                f"Test case {test_case}: Reset time mismatch"
+            )
+
+        assert is_authenticated == expected_auth, (
+            f"Test case {test_case}: Authentication status mismatch"
+        )
+
 
 class TestSessionPool:
     """Tests for the SessionPool class."""

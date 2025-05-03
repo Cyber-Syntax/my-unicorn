@@ -313,6 +313,28 @@ class AppConfigManager:
             logger.warning(f"Configuration file {config_file_name} not found.")
             return None
 
+    def reload(self) -> bool:
+        """Explicitly reload the current app configuration from disk.
+
+        Reloads the configuration for the currently loaded app, if any.
+        This ensures any external changes to the configuration file are loaded.
+
+        Returns:
+            bool: True if config was successfully reloaded, False otherwise
+
+        """
+        logger.info("Explicitly reloading app configuration from disk")
+        if self.config_file_name is None:
+            logger.warning("Cannot reload: No app configuration is currently loaded")
+            return False
+
+        try:
+            self.load_appimage_config(self.config_file_name)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to reload app configuration: {e}")
+            return False
+
     def customize_appimage_config(self) -> None:
         """Customize the configuration settings for an AppImage."""
         json_files = self.list_json_files()

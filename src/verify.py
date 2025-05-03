@@ -40,9 +40,9 @@ class VerificationManager:
         # Initialize appimage_path to appimage_name in downloads directory if not set
         if self.appimage_path is None and self.appimage_name is not None:
             # Always verify files from the downloads directory
-            from src.download import DownloadManager
+            from src.global_config import GlobalConfigManager
 
-            downloads_dir = DownloadManager.get_downloads_dir()
+            downloads_dir = GlobalConfigManager().expanded_app_download_path
             self.appimage_path = str(Path(downloads_dir) / self.appimage_name)
 
         # Convert hash_type to lowercase for consistent comparisons
