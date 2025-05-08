@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Secure token management module.
+"""Secure token management module.
 
 This module handles secure storage and retrieval of API tokens using the system's
 keyring when available, with a fallback to encrypted file storage.
 """
 
 import base64
+import datetime
 import getpass
 import json
 import logging
 import os
 import time
 import uuid
-import datetime
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any, List
+from typing import Any, Dict, List, Optional, Tuple
 
-from src.utils.datetime_utils import parse_timestamp, format_timestamp
+from src.utils.datetime_utils import format_timestamp, parse_timestamp
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -174,7 +172,6 @@ except ImportError as e:
     # Try to import from system Python as fallback
     try:
         import subprocess
-        import sys
 
         # Find system Python path
         python_path = subprocess.check_output(["which", "python3"]).decode().strip()
@@ -189,6 +186,7 @@ except ImportError as e:
             [python_path, "-c", "import keyring; print('KEYRING_FOUND')"],
             capture_output=True,
             text=True,
+            check=False,
         )
 
         if "KEYRING_FOUND" in result.stdout:
@@ -205,7 +203,7 @@ except ImportError as e:
                         + '""")'
                     )
                     result = subprocess.run(
-                        [python_path, "-c", cmd], capture_output=True, text=True
+                        [python_path, "-c", cmd], capture_output=True, text=True, check=False
                     )
                     if result.returncode != 0:
                         raise Exception(f"Failed to set password: {result.stderr}")
@@ -215,7 +213,7 @@ except ImportError as e:
                 def get_password(service, username):
                     cmd = f'import keyring; print(keyring.get_password("{service}", "{username}"))'
                     result = subprocess.run(
-                        [python_path, "-c", cmd], capture_output=True, text=True
+                        [python_path, "-c", cmd], capture_output=True, text=True, check=False
                     )
                     if result.returncode != 0:
                         raise Exception(f"Failed to get password: {result.stderr}")
@@ -225,7 +223,7 @@ except ImportError as e:
                 def delete_password(service, username):
                     cmd = f'import keyring; keyring.delete_password("{service}", "{username}")'
                     result = subprocess.run(
-                        [python_path, "-c", cmd], capture_output=True, text=True
+                        [python_path, "-c", cmd], capture_output=True, text=True, check=False
                     )
                     if result.returncode != 0:
                         raise Exception(f"Failed to delete password: {result.stderr}")
@@ -240,6 +238,7 @@ except ImportError as e:
                 [python_path, "-c", "import keyring.backends.SecretService; print('GNOME_FOUND')"],
                 capture_output=True,
                 text=True,
+                check=False,
             )
             if "GNOME_FOUND" in result.stdout:
                 GNOME_KEYRING_AVAILABLE = True
@@ -250,6 +249,7 @@ except ImportError as e:
                 [python_path, "-c", "import keyring.backends.KWallet; print('KDE_FOUND')"],
                 capture_output=True,
                 text=True,
+                check=False,
             )
             if "KDE_FOUND" in result.stdout:
                 KDE_WALLET_AVAILABLE = True
@@ -277,8 +277,7 @@ except ImportError:
 
 
 class SecureTokenManager:
-    """
-    Manages secure storage and retrieval of API tokens.
+    """Manages secure storage and retrieval of API tokens.
 
     This class provides methods to save and retrieve tokens securely using the system's
     keyring when available, with fallbacks to encrypted file storage or configuration file.
@@ -289,8 +288,7 @@ class SecureTokenManager:
 
     @staticmethod
     def get_token(validate_expiration: bool = True) -> str:
-        """
-        Retrieve the GitHub token from secure storage.
+        """Retrieve the GitHub token from secure storage.
 
         Tries multiple retrieval methods in order of security preference:
         1. Seahorse/GNOME keyring (if available)
@@ -346,7 +344,7 @@ class SecureTokenManager:
                 # Try to get metadata
                 if TOKEN_METADATA_FILE.exists():
                     try:
-                        with open(TOKEN_METADATA_FILE, "r") as f:
+                        with open(TOKEN_METADATA_FILE) as f:
                             metadata = json.load(f)
                     except Exception as e:
                         logger.debug(f"Could not retrieve token metadata from file: {e}")
@@ -380,8 +378,7 @@ class SecureTokenManager:
 
     @staticmethod
     def _update_token_usage_stats(metadata: Dict[str, Any]) -> None:
-        """
-        Update token usage statistics in metadata.
+        """Update token usage statistics in metadata.
 
         Args:
             metadata: Token metadata dictionary
@@ -412,8 +409,7 @@ class SecureTokenManager:
 
     @staticmethod
     def get_token_metadata() -> Dict[str, Any]:
-        """
-        Get metadata about the stored token.
+        """Get metadata about the stored token.
 
         Returns:
             Dict: Token metadata including creation time and expiration
@@ -427,13 +423,13 @@ class SecureTokenManager:
                 if metadata_str:
                     metadata = json.loads(metadata_str)
             except json.JSONDecodeError:
-                logger.debug(f"Could not decode token metadata from keyring")
+                logger.debug("Could not decode token metadata from keyring")
                 metadata = {}
 
         # Try encrypted file as fallback
         if not metadata and CRYPTO_AVAILABLE and TOKEN_METADATA_FILE.exists():
             try:
-                with open(TOKEN_METADATA_FILE, "r") as f:
+                with open(TOKEN_METADATA_FILE) as f:
                     metadata = json.load(f)
             except Exception as e:
                 logger.debug(f"Could not retrieve token metadata from file: {e}")
@@ -442,8 +438,7 @@ class SecureTokenManager:
 
     @staticmethod
     def is_token_expired() -> bool:
-        """
-        Check if the current token has expired.
+        """Check if the current token has expired.
 
         Returns:
             bool: True if token has expired or doesn't exist, False if valid
@@ -466,8 +461,7 @@ class SecureTokenManager:
 
     @staticmethod
     def get_token_expiration_info() -> Tuple[bool, Optional[str]]:
-        """
-        Get token expiration information.
+        """Get token expiration information.
 
         Returns:
             Tuple[bool, Optional[str]]: (is_expired, expiration_date_string)
@@ -495,8 +489,7 @@ class SecureTokenManager:
 
     @staticmethod
     def remove_token() -> bool:
-        """
-        Remove the GitHub token from all storage locations.
+        """Remove the GitHub token from all storage locations.
 
         Returns:
             bool: True if removal was successful, False otherwise
@@ -545,8 +538,7 @@ class SecureTokenManager:
 
     @staticmethod
     def token_exists() -> bool:
-        """
-        Check if a token exists in any storage location.
+        """Check if a token exists in any storage location.
 
         Returns:
             bool: True if a token exists, False otherwise
@@ -568,8 +560,7 @@ class SecureTokenManager:
 
     @staticmethod
     def _get_encryption_key() -> bytes:
-        """
-        Get or create an encryption key for token storage.
+        """Get or create an encryption key for token storage.
 
         This method either retrieves an existing key or generates a new one
         based on a machine-specific identifier and a persistent salt value.
@@ -602,8 +593,7 @@ class SecureTokenManager:
 
     @staticmethod
     def _get_or_create_salt() -> bytes:
-        """
-        Get existing salt or create a new one.
+        """Get existing salt or create a new one.
 
         Returns:
             bytes: Salt value for key derivation
@@ -612,7 +602,7 @@ class SecureTokenManager:
             try:
                 with open(SALT_FILE, "rb") as f:
                     return f.read()
-            except (IOError, OSError) as e:
+            except OSError as e:
                 logging.error(f"Failed to read salt file: {e}")
                 # Generate a new salt if reading fails
                 logging.info("Generating new salt due to read error")
@@ -636,7 +626,7 @@ class SecureTokenManager:
 
             logging.info("Created new salt file with secure permissions")
 
-        except (IOError, OSError) as e:
+        except OSError as e:
             logging.error(f"Failed to create salt file: {e}")
             # Still return a valid salt even if file creation fails
 
@@ -644,8 +634,7 @@ class SecureTokenManager:
 
     @staticmethod
     def _get_machine_id() -> bytes:
-        """
-        Get a unique machine identifier or create one.
+        """Get a unique machine identifier or create one.
 
         This tries to use system-specific identifiers when available,
         falling back to a generated ID if needed.
@@ -659,15 +648,15 @@ class SecureTokenManager:
         # Try reading machine-id from standard Linux location
         if os.path.exists("/etc/machine-id"):
             try:
-                with open("/etc/machine-id", "r") as f:
+                with open("/etc/machine-id") as f:
                     machine_id = f.read().strip()
             except Exception:
                 pass
 
         # Fallback to hostname + user
         if not machine_id:
-            import socket
             import getpass
+            import socket
 
             machine_id = f"{socket.gethostname()}-{getpass.getuser()}"
 
@@ -675,8 +664,7 @@ class SecureTokenManager:
 
     @staticmethod
     def prompt_for_token() -> str:
-        """
-        Securely prompt the user for a GitHub token.
+        """Securely prompt the user for a GitHub token.
 
         Returns:
             str: The entered token or empty string if cancelled
@@ -694,8 +682,7 @@ class SecureTokenManager:
 
     @staticmethod
     def get_keyring_status() -> Dict[str, bool]:
-        """
-        Get the status of available keyring backends.
+        """Get the status of available keyring backends.
 
         Returns:
             Dict[str, bool]: Dictionary with status of keyring backends
@@ -709,8 +696,7 @@ class SecureTokenManager:
 
     @staticmethod
     def configure_keyring() -> bool:
-        """
-        Configure the Seahorse/GNOME keyring for secure token storage.
+        """Configure the Seahorse/GNOME keyring for secure token storage.
 
         This method provides a direct way to configure the GNOME keyring,
         bypassing the python-keyring library for more control.
@@ -722,8 +708,8 @@ class SecureTokenManager:
             print("\nAttempting to configure Seahorse/GNOME keyring...")
 
             # Check if seahorse is installed
-            import subprocess
             import shutil
+            import subprocess
 
             # Check if Seahorse is installed
             if shutil.which("seahorse"):
@@ -820,7 +806,7 @@ class SecureTokenManager:
                 )
                 if launch.lower() == "y":
                     result = subprocess.run(
-                        ["seahorse"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                        ["seahorse"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
                     )
                     if result.returncode == 0:
                         print("\nSeahorse launched successfully. Please configure your keyring.")
@@ -852,8 +838,7 @@ class SecureTokenManager:
 
     @staticmethod
     def audit_log_token_usage(action: str, source_ip: Optional[str] = None) -> None:
-        """
-        Log token usage for auditing purposes.
+        """Log token usage for auditing purposes.
 
         Args:
             action: The action being performed with the token
@@ -887,8 +872,7 @@ class SecureTokenManager:
 
     @staticmethod
     def get_audit_logs() -> List[Dict[str, Any]]:
-        """
-        Get token usage audit logs.
+        """Get token usage audit logs.
 
         Returns:
             List[Dict[str, Any]]: List of audit log entries in reverse chronological order (newest first)
@@ -900,7 +884,7 @@ class SecureTokenManager:
             return audit_logs
 
         try:
-            with open(audit_log_path, "r") as f:
+            with open(audit_log_path) as f:
                 for line in f:
                     try:
                         log_entry = json.loads(line.strip())
@@ -926,8 +910,7 @@ class SecureTokenManager:
     def _create_token_metadata(
         token: str, expires_in_days: int, storage_info: Optional[Dict[str, str]] = None
     ) -> Dict[str, Any]:
-        """
-        Create basic token metadata.
+        """Create basic token metadata.
 
         Args:
             token: The GitHub token to store
@@ -966,8 +949,7 @@ class SecureTokenManager:
 
     @staticmethod
     def _save_to_keyring(token: str, metadata: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Save token to system keyring.
+        """Save token to system keyring.
 
         Args:
             token: The GitHub token to store
@@ -1018,8 +1000,7 @@ class SecureTokenManager:
     def _save_to_encrypted_file(
         token: str, metadata: Dict[str, Any]
     ) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Save token to encrypted file.
+        """Save token to encrypted file.
 
         Args:
             token: The GitHub token to store
@@ -1100,8 +1081,7 @@ class SecureTokenManager:
         metadata: Optional[Dict[str, Any]] = None,
         ask_for_fallback: bool = True,
     ) -> bool:
-        """
-        Save a GitHub token securely with expiration metadata.
+        """Save a GitHub token securely with expiration metadata.
 
         Tries multiple storage methods in order of security preference:
         1. Seahorse/GNOME keyring (if available)

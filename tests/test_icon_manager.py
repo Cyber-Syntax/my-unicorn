@@ -1,14 +1,14 @@
 # tests/test_icon_manager.py
+import os
 import sys
 import types
-import os
-import io
 from pathlib import Path
+
 import pytest
 
 # Now import the IconManager under test
 from src.icon_manager import IconManager
-from src.utils.icon_paths import get_icon_paths, get_icon_path, get_icon_filename
+
 # --- Setup dummy src package modules so IconManager imports succeed ---
 
 # Create a dummy src package
@@ -115,6 +115,15 @@ app_config_mod.AppConfigManager = DummyAppConfigManager
 src.app_config = app_config_mod
 sys.modules["src.app_config"] = app_config_mod
 
+# Create src.app_catalog with get_app_display_name_for_owner_repo
+app_catalog_mod = types.ModuleType("src.app_catalog")
+app_catalog_mod.get_app_display_name_for_owner_repo = (
+    lambda owner, repo: repo
+)  # Simply return repo as app_display_name
+app_catalog_mod.AppInfo = types.SimpleNamespace  # Add AppInfo class placeholder
+src.app_catalog = app_catalog_mod
+sys.modules["src.app_catalog"] = app_catalog_mod
+
 # Override IconManager._check_icon_path to properly track paths
 original_check_icon_path = IconManager._check_icon_path
 
@@ -178,17 +187,13 @@ def patch_download_icon(monkeypatch):
 
 @pytest.fixture
 def icon_manager():
-    """
-    Provides a fresh IconManager instance for each test.
-    """
+    """Provides a fresh IconManager instance for each test."""
     return IconManager()
 
 
 @pytest.fixture(autouse=True)
 def temp_home(monkeypatch, tmp_path):
-    """
-    Redirects user's home directory to a temporary path so file system tests don't pollute real home.
-    """
+    """Redirects user's home directory to a temporary path so file system tests don't pollute real home."""
     # Monkeypatch expanduser to use tmp_path as home
     monkeypatch.setenv("HOME", str(tmp_path))
     return tmp_path
@@ -401,7 +406,7 @@ def test_ensure_app_icon_download(monkeypatch, icon_manager):
 
 def test_ensure_app_icon_no_config(monkeypatch, icon_manager):
     # No existing, find_icon returns None
-    monkeypatch.setattr(IconManager, "get_icon_path", lambda self, repo, app_name=None: None)
+    monkeypatch.setattr(IconManager, "get_icon_path", lambda self, app_display_name, repo: None)
     monkeypatch.setattr(IconManager, "find_icon", lambda self, owner, repo, headers: None)
 
     success, msg = icon_manager.ensure_app_icon("owner", "repo")

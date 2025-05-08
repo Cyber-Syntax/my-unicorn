@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-SHA utilities.
+"""SHA utilities.
 
 This module provides functions for handling SHA verification files.
 """
 
 import logging
-from typing import List, Dict, Any
 
 # Configure module logger
 logger = logging.getLogger(__name__)
 
 
 def is_sha_file(filename: str) -> bool:
-    """
-    Check if a file is a valid SHA file using simple rules.
+    """Check if a file is a valid SHA file using simple rules.
 
     Args:
         filename: Filename to check
@@ -50,8 +46,7 @@ def is_sha_file(filename: str) -> bool:
 
 
 def detect_hash_type(sha_name: str) -> str:
-    """
-    Detect hash type from SHA filename.
+    """Detect hash type from SHA filename.
 
     Args:
         sha_name: SHA filename

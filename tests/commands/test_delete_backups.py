@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Unit tests for the DeleteBackupsCommand class.
+"""Unit tests for the DeleteBackupsCommand class.
 
 This module contains test cases for validating the functionality of backup
 deletion operations including deleting all backups, app-specific backups,
@@ -9,10 +7,8 @@ old backups, and cleaning up according to maximum backup settings.
 """
 
 import datetime
-import os
-from pathlib import Path
-from typing import Any, Dict, List, Generator, Callable
-from unittest.mock import MagicMock, patch, mock_open
+from typing import Generator
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -22,36 +18,36 @@ from src.global_config import GlobalConfigManager
 
 @pytest.fixture
 def mock_global_config() -> MagicMock:
-    """
-    Fixture providing a mocked GlobalConfigManager.
+    """Fixture providing a mocked GlobalConfigManager.
 
     Returns:
         MagicMock: A mock GlobalConfigManager with pre-configured test values.
+
     """
     mock_config = MagicMock(spec=GlobalConfigManager)
-    mock_config.expanded_appimage_download_backup_folder_path = "/mock/backup/dir"
+    mock_config.expanded_app_backup_storage_path = "/mock/backup/dir"
     mock_config.max_backups = 3
     return mock_config
 
 
 @pytest.fixture
 def delete_command() -> DeleteBackupsCommand:
-    """
-    Fixture providing a DeleteBackupsCommand instance for testing.
+    """Fixture providing a DeleteBackupsCommand instance for testing.
 
     Returns:
         DeleteBackupsCommand: An instance of the DeleteBackupsCommand class.
+
     """
     return DeleteBackupsCommand()
 
 
 @pytest.fixture
 def mock_file_operations() -> Generator[None, None, None]:
-    """
-    Fixture that mocks file operations to prevent actual file system changes.
+    """Fixture that mocks file operations to prevent actual file system changes.
 
     Yields:
         None: This fixture doesn't yield a value, it just sets up mocks.
+
     """
     with patch("os.path.exists") as mock_exists, patch("os.listdir") as mock_listdir, patch(
         "os.remove"
@@ -86,13 +82,13 @@ def test_execute_with_invalid_choice(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test the execute method with an invalid choice input.
+    """Test the execute method with an invalid choice input.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Mock GlobalConfigManager
     with patch("src.commands.delete_backups.GlobalConfigManager", return_value=mock_global_config):
@@ -117,13 +113,13 @@ def test_execute_calls_correct_method(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test that execute method calls the correct sub-method based on user input.
+    """Test that execute method calls the correct sub-method based on user input.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     with patch("src.commands.delete_backups.GlobalConfigManager", return_value=mock_global_config):
         # Create mock methods
@@ -166,13 +162,13 @@ def test_delete_all_backups_nonexistent_dir(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test _delete_all_backups with a non-existent backup directory.
+    """Test _delete_all_backups with a non-existent backup directory.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Mock path.exists to return False
     with patch("os.path.exists", return_value=False):
@@ -187,7 +183,7 @@ def test_delete_all_backups_nonexistent_dir(
 
         # Assert the correct message was printed
         assert (
-            f"Backup directory {mock_global_config.expanded_appimage_download_backup_folder_path} does not exist."
+            f"Backup directory {mock_global_config.expanded_app_backup_storage_path} does not exist."
             in printed_messages
         )
 
@@ -198,14 +194,14 @@ def test_delete_all_backups_operation_cancelled(
     monkeypatch: pytest.MonkeyPatch,
     mock_file_operations: None,
 ) -> None:
-    """
-    Test _delete_all_backups when user cancels the operation.
+    """Test _delete_all_backups when user cancels the operation.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
         mock_file_operations: Fixture that mocks file operations.
+
     """
     # Mock user input to cancel the operation
     monkeypatch.setattr("builtins.input", lambda _: "no")
@@ -232,13 +228,13 @@ def test_delete_all_backups_success(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test successful execution of _delete_all_backups.
+    """Test successful execution of _delete_all_backups.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Mock path operations
     with patch("os.path.exists", return_value=True), patch("os.listdir") as mock_listdir, patch(
@@ -275,13 +271,13 @@ def test_delete_all_backups_no_files(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test _delete_all_backups when no backup files are found.
+    """Test _delete_all_backups when no backup files are found.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Mock path operations
     with patch("os.path.exists", return_value=True), patch(
@@ -311,13 +307,13 @@ def test_delete_app_backups_nonexistent_dir(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test _delete_app_backups with a non-existent backup directory.
+    """Test _delete_app_backups with a non-existent backup directory.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Mock path.exists to return False
     with patch("os.path.exists", return_value=False):
@@ -332,7 +328,7 @@ def test_delete_app_backups_nonexistent_dir(
 
         # Assert the correct message was printed
         assert (
-            f"Backup directory {mock_global_config.expanded_appimage_download_backup_folder_path} does not exist."
+            f"Backup directory {mock_global_config.expanded_app_backup_storage_path} does not exist."
             in printed_messages
         )
 
@@ -342,13 +338,13 @@ def test_delete_app_backups_no_apps_found(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test _delete_app_backups when no app backups are found.
+    """Test _delete_app_backups when no app backups are found.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Mock _get_available_apps to return empty list
     with patch.object(delete_command, "_get_available_apps", return_value=[]), patch(
@@ -372,13 +368,13 @@ def test_delete_app_backups_invalid_selection(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test _delete_app_backups with an invalid app selection.
+    """Test _delete_app_backups with an invalid app selection.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Mock _get_available_apps to return some apps
     with patch.object(delete_command, "_get_available_apps", return_value=["app1", "app2"]), patch(
@@ -406,13 +402,13 @@ def test_delete_app_backups_cancelled(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test _delete_app_backups when user cancels the operation.
+    """Test _delete_app_backups when user cancels the operation.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Mock _get_available_apps to return some apps
     with patch.object(delete_command, "_get_available_apps", return_value=["app1", "app2"]), patch(
@@ -443,13 +439,13 @@ def test_delete_app_backups_success(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test successful execution of _delete_app_backups.
+    """Test successful execution of _delete_app_backups.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Sample backup files
     mock_files = [
@@ -495,13 +491,13 @@ def test_delete_old_backups_nonexistent_dir(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test _delete_old_backups with a non-existent backup directory.
+    """Test _delete_old_backups with a non-existent backup directory.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Mock path.exists to return False
     with patch("os.path.exists", return_value=False):
@@ -516,7 +512,7 @@ def test_delete_old_backups_nonexistent_dir(
 
         # Assert the correct message was printed
         assert (
-            f"Backup directory {mock_global_config.expanded_appimage_download_backup_folder_path} does not exist."
+            f"Backup directory {mock_global_config.expanded_app_backup_storage_path} does not exist."
             in printed_messages
         )
 
@@ -526,13 +522,13 @@ def test_delete_old_backups_invalid_choice(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test _delete_old_backups with an invalid choice.
+    """Test _delete_old_backups with an invalid choice.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Mock path operations
     with patch("os.path.exists", return_value=True):
@@ -557,13 +553,13 @@ def test_delete_old_backups_predefined_date(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test _delete_old_backups with a predefined date option.
+    """Test _delete_old_backups with a predefined date option.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     today = datetime.datetime.now()
     week_ago = today - datetime.timedelta(days=7)
@@ -621,13 +617,13 @@ def test_delete_old_backups_custom_date(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test _delete_old_backups with a custom date.
+    """Test _delete_old_backups with a custom date.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Create concrete timestamp values for testing
     old_timestamp = datetime.datetime(2022, 1, 1).timestamp()
@@ -686,13 +682,13 @@ def test_cleanup_to_max_backups_nonexistent_dir(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test _cleanup_to_max_backups with a non-existent backup directory.
+    """Test _cleanup_to_max_backups with a non-existent backup directory.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Mock path.exists to return False
     with patch("os.path.exists", return_value=False):
@@ -707,7 +703,7 @@ def test_cleanup_to_max_backups_nonexistent_dir(
 
         # Assert the correct message was printed
         assert (
-            f"Backup directory {mock_global_config.expanded_appimage_download_backup_folder_path} does not exist."
+            f"Backup directory {mock_global_config.expanded_app_backup_storage_path} does not exist."
             in printed_messages
         )
 
@@ -717,13 +713,13 @@ def test_cleanup_to_max_backups_cancelled(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test _cleanup_to_max_backups when user cancels the operation.
+    """Test _cleanup_to_max_backups when user cancels the operation.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Mock path operations
     with patch("os.path.exists", return_value=True), patch("os.remove") as mock_remove:
@@ -751,13 +747,13 @@ def test_cleanup_to_max_backups_no_apps(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test _cleanup_to_max_backups when no app backups are found.
+    """Test _cleanup_to_max_backups when no app backups are found.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Mock path operations and _get_available_apps
     with patch("os.path.exists", return_value=True), patch.object(
@@ -784,13 +780,13 @@ def test_cleanup_to_max_backups_success(
     mock_global_config: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Test successful execution of _cleanup_to_max_backups.
+    """Test successful execution of _cleanup_to_max_backups.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
         mock_global_config: Mocked configuration manager.
         monkeypatch: Pytest monkeypatch fixture for patching functions.
+
     """
     # Set max_backups to 2 for this test
     mock_global_config.max_backups = 2
@@ -844,11 +840,11 @@ def test_cleanup_to_max_backups_success(
 
 
 def test_get_available_apps(delete_command: DeleteBackupsCommand) -> None:
-    """
-    Test _get_available_apps method with various filename patterns.
+    """Test _get_available_apps method with various filename patterns.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
+
     """
     # Test data with various filename patterns
     test_files = [
@@ -869,11 +865,11 @@ def test_get_available_apps(delete_command: DeleteBackupsCommand) -> None:
 
 
 def test_get_available_apps_error_handling(delete_command: DeleteBackupsCommand) -> None:
-    """
-    Test error handling in _get_available_apps method.
+    """Test error handling in _get_available_apps method.
 
     Args:
         delete_command: The DeleteBackupsCommand instance to test.
+
     """
     # Mock operations to raise an error
     with patch("os.listdir", side_effect=OSError("Test error")), patch(

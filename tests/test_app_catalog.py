@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """Tests for AppCatalog functionality.
 
 This module contains tests for the app_catalog module, which provides
@@ -8,10 +7,9 @@ a database of applications that can be installed by name.
 
 import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from unittest.mock import MagicMock
 
 import pytest
-from unittest.mock import MagicMock
 
 # Add the project root to sys.path using pathlib for better cross-platform compatibility
 project_root = Path(__file__).parent.parent.absolute()
@@ -20,14 +18,14 @@ if str(project_root) not in sys.path:
 
 # Import modules
 from src.app_catalog import (
-    AppInfo,
     APP_CATALOG,
-    get_app_info,
+    AppInfo,
     get_all_apps,
+    get_app_info,
     get_apps_by_category,
     get_apps_by_tag,
-    search_apps,
     get_categories,
+    search_apps,
     sync_with_icon_paths,
 )
 
@@ -38,6 +36,7 @@ def sample_app_info() -> AppInfo:
 
     Returns:
         AppInfo: Sample application information
+
     """
     return AppInfo(
         name="Test App",
@@ -98,7 +97,7 @@ def test_app_catalog_contains_entries() -> None:
     assert "freetube" in APP_CATALOG
 
     # Check that app entries have expected structure
-    for app_id, app_info in APP_CATALOG.items():
+    for app_display_name, app_info in APP_CATALOG.items():
         assert isinstance(app_info, AppInfo)
         assert app_info.name
         assert app_info.description
@@ -213,6 +212,7 @@ def test_sync_with_icon_paths(monkeypatch: pytest.MonkeyPatch) -> None:
 
     Args:
         monkeypatch: Pytest fixture for patching
+
     """
     # Create a mock logger
     mock_logger = MagicMock()

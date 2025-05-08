@@ -1,34 +1,30 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Dynamic progress management for concurrent operations with standard terminal output.
+"""Dynamic progress management for concurrent operations with standard terminal output.
 
 This module provides customizable progress tracking for both synchronous and asynchronous
 operations with support for nested progress bars using standard terminal output.
 """
 
-from typing import Dict, Any, Generic, TypeVar, Optional, List, Tuple, Set, Union
-from contextlib import contextmanager
-import time
 import sys
 import threading
+import time
+from contextlib import contextmanager
 from datetime import datetime
+from typing import Any, Dict, Generic, List, Optional, TypeVar
 
 # Type variable for item IDs
 T = TypeVar("T")
 
 
 class BasicMultiAppProgress:
-    """
-    Basic progress display for multiple app downloads using terminal output.
+    """Basic progress display for multiple app downloads using terminal output.
 
     Each app gets its own progress bar with its own styling and prefix.
     All progress bars are rendered together in a single display
     """
 
     def __init__(self, expand: bool = True, transient: bool = False) -> None:
-        """
-        Initialize a new progress instance.
+        """Initialize a new progress instance.
 
         Args:
             expand: Whether to expand the progress bar
@@ -54,8 +50,7 @@ class BasicMultiAppProgress:
         visible: bool = True,
         **kwargs,
     ) -> int:
-        """
-        Add a new task to track.
+        """Add a new task to track.
 
         Args:
             description: Description of the task
@@ -90,8 +85,7 @@ class BasicMultiAppProgress:
         return task_id
 
     def update(self, task_id: int, **kwargs) -> None:
-        """
-        Update a task's progress.
+        """Update a task's progress.
 
         Args:
             task_id: ID of the task to update
@@ -110,16 +104,16 @@ class BasicMultiAppProgress:
                 self.tasks[task_id][key] = value
 
         # Ensure completed doesn't exceed total
-        if self.tasks[task_id]["completed"] > self.tasks[task_id]["total"]:
-            self.tasks[task_id]["completed"] = self.tasks[task_id]["total"]
+        self.tasks[task_id]["completed"] = min(
+            self.tasks[task_id]["completed"], self.tasks[task_id]["total"]
+        )
 
         # If display is active, refresh it
         if self.active:
             self._render()
 
     def remove_task(self, task_id: int) -> None:
-        """
-        Remove a task from progress tracking.
+        """Remove a task from progress tracking.
 
         Args:
             task_id: ID of the task to remove
@@ -151,8 +145,7 @@ class BasicMultiAppProgress:
             self.last_render_lines = 0
 
     def _format_size(self, size_bytes: int) -> str:
-        """
-        Format size in human-readable format.
+        """Format size in human-readable format.
 
         Args:
             size_bytes: Size in bytes
@@ -178,8 +171,7 @@ class BasicMultiAppProgress:
         )
 
     def _format_speed(self, task_id: int) -> str:
-        """
-        Calculate and format download speed.
+        """Calculate and format download speed.
 
         Args:
             task_id: ID of the task
@@ -200,8 +192,7 @@ class BasicMultiAppProgress:
         return f"{bytes_per_second / (1024 * 1024):.1f} MB/s"
 
     def _format_eta(self, task_id: int) -> str:
-        """
-        Estimate and format time remaining.
+        """Estimate and format time remaining.
 
         Args:
             task_id: ID of the task
@@ -265,8 +256,7 @@ class BasicMultiAppProgress:
         sys.stdout.flush()
 
     def _render_task(self, task_id: int, task: Dict[str, Any]) -> int:
-        """
-        Render a single task's progress bar.
+        """Render a single task's progress bar.
 
         Args:
             task_id: ID of the task
@@ -305,15 +295,13 @@ class BasicMultiAppProgress:
 
 
 class BasicProgressBar:
-    """
-    A simple progress bar implementation using standard terminal output.
+    """A simple progress bar implementation using standard terminal output.
 
     This class provides basic progress tracking functionality without external dependencies.
     """
 
     def __init__(self, description: str = "", total: int = 100):
-        """
-        Initialize a progress bar.
+        """Initialize a progress bar.
 
         Args:
             description: Description of the progress bar
@@ -327,8 +315,7 @@ class BasicProgressBar:
         self.visible = True
 
     def update(self, completed: Optional[int] = None, advance: int = 0, status: str = ""):
-        """
-        Update the progress bar.
+        """Update the progress bar.
 
         Args:
             completed: Set absolute completion value
@@ -341,15 +328,13 @@ class BasicProgressBar:
             self.completed += advance
 
         # Cap at total
-        if self.completed > self.total:
-            self.completed = self.total
+        self.completed = min(self.completed, self.total)
 
         if status:
             self.status = status
 
     def render(self) -> str:
-        """
-        Render the progress bar as a string.
+        """Render the progress bar as a string.
 
         Returns:
             str: The formatted progress bar
@@ -374,9 +359,7 @@ class BasicProgressBar:
 
 
 class ProgressManager:
-    """
-    Manages display of multiple progress bars in the terminal.
-    """
+    """Manages display of multiple progress bars in the terminal."""
 
     def __init__(self):
         """Initialize the progress manager."""
@@ -387,8 +370,7 @@ class ProgressManager:
         self.lock = threading.RLock()
 
     def add_task(self, description: str, total: int = 100, **kwargs) -> int:
-        """
-        Add a new task to the progress display.
+        """Add a new task to the progress display.
 
         Args:
             description: Description of the task
@@ -414,8 +396,7 @@ class ProgressManager:
             return task_id
 
     def update(self, task_id: int, **kwargs):
-        """
-        Update a task's progress.
+        """Update a task's progress.
 
         Args:
             task_id: ID of the task to update
@@ -428,7 +409,7 @@ class ProgressManager:
             task = self.progress_bars[task_id]
 
             # Update the task
-            completed = kwargs.get("completed", None)
+            completed = kwargs.get("completed")
             advance = kwargs.get("advance", 0)
             status = kwargs.get("status", "")
 
@@ -438,8 +419,7 @@ class ProgressManager:
                 self.render()
 
     def remove_task(self, task_id: int):
-        """
-        Remove a task from the progress display.
+        """Remove a task from the progress display.
 
         Args:
             task_id: ID of the task to remove
@@ -504,8 +484,7 @@ class ProgressManager:
 
 
 class DynamicProgressManager(Generic[T]):
-    """
-    Manages dynamic progress display for concurrent operations.
+    """Manages dynamic progress display for concurrent operations.
 
     This class handles progress tracking for multiple concurrent operations
     with support for nested progress displays and both synchronous and
@@ -539,8 +518,7 @@ class DynamicProgressManager(Generic[T]):
 
     @contextmanager
     def start_progress(self, total_items: int, title: str = "Processing") -> None:
-        """
-        Start progress tracking with a live display.
+        """Start progress tracking with a live display.
 
         Args:
             total_items: Total number of items to process
@@ -596,8 +574,7 @@ class DynamicProgressManager(Generic[T]):
                     self._download_in_progress.clear()
 
     def add_item(self, item_id: T, name: str, steps: List[str] = None) -> None:
-        """
-        Add an item to track in the progress display.
+        """Add an item to track in the progress display.
 
         Args:
             item_id: Unique identifier for the item
@@ -629,8 +606,7 @@ class DynamicProgressManager(Generic[T]):
             self._download_in_progress[item_id] = False
 
     def start_item_step(self, item_id: T, step: str) -> None:
-        """
-        Start a step for an item.
+        """Start a step for an item.
 
         Args:
             item_id: Identifier for the item
@@ -645,8 +621,7 @@ class DynamicProgressManager(Generic[T]):
                 self.progress.update(task_data["task_id"], status=f"Working on {step}...")
 
     def update_item_step(self, item_id: T, step: str, completed: bool = False) -> None:
-        """
-        Update a step for an item.
+        """Update a step for an item.
 
         Args:
             item_id: Identifier for the item
@@ -669,8 +644,7 @@ class DynamicProgressManager(Generic[T]):
                     )
 
     def complete_item(self, item_id: T, success: bool = True) -> None:
-        """
-        Mark an item as completed.
+        """Mark an item as completed.
 
         Args:
             item_id: Identifier for the item
@@ -699,8 +673,7 @@ class DynamicProgressManager(Generic[T]):
                 self._download_in_progress[item_id] = False
 
     def start_download(self, item_id: T, filename: str, total_size: int) -> int:
-        """
-        Start tracking a file download.
+        """Start tracking a file download.
 
         Args:
             item_id: Identifier for the parent item
@@ -726,8 +699,7 @@ class DynamicProgressManager(Generic[T]):
     def update_download(
         self, item_id: T, filename: str, advance: int = 0, finished: bool = False
     ) -> None:
-        """
-        Update the progress of a download.
+        """Update the progress of a download.
 
         Args:
             item_id: Identifier for the parent item
@@ -749,8 +721,7 @@ class DynamicProgressManager(Generic[T]):
                     self.progress.update(task_id, status=f"Downloading {filename}...")
 
     def get_summary(self) -> str:
-        """
-        Generate a summary of all tracked items.
+        """Generate a summary of all tracked items.
 
         Returns:
             str: Summary of operations

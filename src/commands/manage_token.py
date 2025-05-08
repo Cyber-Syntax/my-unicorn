@@ -1,28 +1,22 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-GitHub token management command module.
+"""GitHub token management command module.
 
 This module provides the command implementation for managing GitHub API tokens,
 allowing users to view, add, update, and remove tokens securely.
 """
 
 import logging
-import sys
-from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+from typing import Optional
 
-import requests
-
-from src.commands.base import Command
-from src.secure_token import SecureTokenManager, TOKEN_FILE, TOKEN_METADATA_FILE, CONFIG_DIR
 from src.auth_manager import GitHubAuthManager
-from src.utils.datetime_utils import parse_timestamp, format_timestamp
+from src.commands.base import Command
+from src.secure_token import CONFIG_DIR, TOKEN_FILE, TOKEN_METADATA_FILE, SecureTokenManager
+from src.utils.datetime_utils import parse_timestamp
 
 
 class ManageTokenCommand(Command):
-    """
-    Command for managing GitHub API tokens securely.
+    """Command for managing GitHub API tokens securely.
 
     This command allows users to:
     - Check token status
@@ -38,8 +32,7 @@ class ManageTokenCommand(Command):
         self._logger = logging.getLogger(__name__)
 
     def execute(self) -> None:
-        """
-        Execute the token management command.
+        """Execute the token management command.
 
         This displays the token management menu and handles user input to manage
         GitHub tokens securely.
@@ -96,8 +89,7 @@ class ManageTokenCommand(Command):
                 return
 
     def _show_token_status(self) -> None:
-        """
-        Display the current token status and storage method.
+        """Display the current token status and storage method.
 
         This shows whether a token exists and gives basic information about its validity.
         """
@@ -116,25 +108,20 @@ class ManageTokenCommand(Command):
                 # Check expiration
                 if SecureTokenManager.is_token_expired():
                     print("⚠️ Token is EXPIRED - please rotate your token")
-                else:
-                    # Get expiration date - use our datetime utility for safe parsing
-                    if "expires_at" in metadata:
-                        try:
-                            expires_dt = parse_timestamp(metadata.get("expires_at"))
-                            if expires_dt:
-                                days_remaining = (expires_dt - datetime.now()).days
+                # Get expiration date - use our datetime utility for safe parsing
+                elif "expires_at" in metadata:
+                    try:
+                        expires_dt = parse_timestamp(metadata.get("expires_at"))
+                        if expires_dt:
+                            days_remaining = (expires_dt - datetime.now()).days
 
-                                if days_remaining <= 7:
-                                    print(
-                                        f"⚠️ Token expiring soon - {days_remaining} days remaining"
-                                    )
-                                else:
-                                    print(
-                                        f"✅ Token valid - {days_remaining} days until expiration"
-                                    )
-                        except Exception as e:
-                            self._logger.error(f"Error processing expiration date: {e}")
-                            print("⚠️ Token expiration date could not be determined")
+                            if days_remaining <= 7:
+                                print(f"⚠️ Token expiring soon - {days_remaining} days remaining")
+                            else:
+                                print(f"✅ Token valid - {days_remaining} days until expiration")
+                    except Exception as e:
+                        self._logger.error(f"Error processing expiration date: {e}")
+                        print("⚠️ Token expiration date could not be determined")
 
                 # Show when the token was last used
                 if "last_used_at" in metadata:
@@ -152,8 +139,7 @@ class ManageTokenCommand(Command):
         print("Token Security: ✅ Protected")
 
     def _get_token_expiration_days(self) -> Optional[int]:
-        """
-        Prompt user for token expiration period.
+        """Prompt user for token expiration period.
 
         Returns:
             Optional[int]: Number of days until token expiration or None if cancelled
@@ -198,8 +184,7 @@ class ManageTokenCommand(Command):
             return None
 
     def _remove_token(self) -> None:
-        """
-        Remove the GitHub token from secure storage.
+        """Remove the GitHub token from secure storage.
 
         This removes the token from all potential storage locations.
         After removal, it clears any cached authentication headers and rate limit information.
@@ -228,8 +213,7 @@ class ManageTokenCommand(Command):
             print("\n❓ No tokens were found to remove or removal failed")
 
     def _check_rate_limits(self, token: str = None) -> None:
-        """
-        Check and display GitHub API rate limits for the current token.
+        """Check and display GitHub API rate limits for the current token.
 
         This method makes a direct API call to GitHub to get the most up-to-date
         rate limit information, bypassing any cache.
@@ -419,16 +403,15 @@ class ManageTokenCommand(Command):
 
         except Exception as e:
             # Log both the error type and the message for better debugging
-            self._logger.error(f"Error checking rate limits: {type(e).__name__}: {str(e)}")
+            self._logger.error(f"Error checking rate limits: {type(e).__name__}: {e!s}")
             self._logger.exception("Detailed exception info:")
 
-            print(f"❌ Error checking rate limits: {type(e).__name__}: {str(e)}")
+            print(f"❌ Error checking rate limits: {type(e).__name__}: {e!s}")
             print("   Please check your network connection and token validity.")
             print("   Check application logs for more details.")
 
     def _validate_token(self, token: str) -> bool:
-        """
-        Validate a GitHub token by testing API access.
+        """Validate a GitHub token by testing API access.
 
         This uses GitHubAuthManager for more reliable token validation.
 
@@ -478,13 +461,11 @@ class ManageTokenCommand(Command):
                 return False
         except Exception as e:
             self._logger.error(f"Error validating token: {e}")
-            print(f" ❌ Error! {str(e)}")
+            print(f" ❌ Error! {e!s}")
             return False
 
     def _view_token_expiration(self) -> None:
-        """
-        Display detailed information about token expiration.
-        """
+        """Display detailed information about token expiration."""
         if not SecureTokenManager.token_exists():
             print("\n❌ No token configured")
             return
@@ -559,9 +540,7 @@ class ManageTokenCommand(Command):
                 print("Last used: Unknown")
 
     def _view_audit_logs(self) -> None:
-        """
-        Display token usage audit logs.
-        """
+        """Display token usage audit logs."""
         audit_logs = SecureTokenManager.get_audit_logs()
 
         if not audit_logs:
@@ -631,9 +610,7 @@ class ManageTokenCommand(Command):
                         )
 
     def _rotate_token(self) -> None:
-        """
-        Guide the user through rotating their GitHub token.
-        """
+        """Guide the user through rotating their GitHub token."""
         if not SecureTokenManager.token_exists():
             print("\n❌ No token configured to rotate")
             return
@@ -701,9 +678,7 @@ class ManageTokenCommand(Command):
             print("   Make sure you have keyring or cryptography modules installed.")
 
     def _view_storage_details(self) -> None:
-        """
-        Display detailed information about the current storage method for the token.
-        """
+        """Display detailed information about the current storage method for the token."""
         if not SecureTokenManager.token_exists():
             print("\n❌ No token configured")
             return
@@ -797,8 +772,7 @@ class ManageTokenCommand(Command):
         print("➤ Never share your token or commit it to version control")
 
     def _save_to_keyring(self) -> None:
-        """
-        Save token specifically to the keyring using the keyring library.
+        """Save token specifically to the keyring using the keyring library.
 
         This is a simpler approach than the standard save method, directly
         targeting the keyring without complex fallback logic.

@@ -1,21 +1,18 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Auto update command module.
+"""Auto update command module.
 
 This module provides a command to automatically check and update all AppImages
 without requiring manual selection of each app. Supports both synchronous and
 asynchronous updates for improved performance.
 """
 
+import asyncio
 import logging
 import os
-import sys
-import asyncio
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any, Dict, List
 
-from src.commands.update_base import BaseUpdateCommand
 from src.auth_manager import GitHubAuthManager
+from src.commands.update_base import BaseUpdateCommand
 
 
 class UpdateAllAutoCommand(BaseUpdateCommand):
@@ -29,8 +26,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         # and the global_config is already loaded in __post_init__
 
     def execute(self):
-        """
-        Check all AppImage configurations and update those with new versions available.
+        """Check all AppImage configurations and update those with new versions available.
 
         This method automatically scans all available AppImage configurations and
         updates any that have newer versions available. By default, it uses the
@@ -64,7 +60,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                     f"Insufficient API requests to check all apps: {remaining}/{min_requests_needed} available"
                 )
                 print("\n--- GitHub API Rate Limit Warning ---")
-                print(f"⚠️  Not enough API requests available to check all apps!")
+                print("⚠️  Not enough API requests available to check all apps!")
                 print(
                     f"Rate limit status: {remaining}/{limit} requests remaining{' (authenticated)' if is_authenticated else ' (unauthenticated)'}"
                 )
@@ -115,8 +111,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             return
 
     def _find_all_updatable_apps(self) -> List[Dict[str, Any]]:
-        """
-        Find all AppImages that have updates available.
+        """Find all AppImages that have updates available.
 
         Returns:
             List[Dict[str, Any]]: List of updatable app information dictionaries
@@ -151,24 +146,23 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                         print(f"{app_name}: already up to date")
 
                 except Exception as e:
-                    error_msg = f"Error checking {config_file}: {str(e)}"
+                    error_msg = f"Error checking {config_file}: {e!s}"
                     logging.error(error_msg)
-                    print(f"{app_name}: error: {str(e)}")
+                    print(f"{app_name}: error: {e!s}")
                 except KeyboardInterrupt:
                     logging.info("Update check cancelled by user (Ctrl+C)")
                     print("\nUpdate check cancelled by user (Ctrl+C)")
                     return updatable_apps
 
         except Exception as e:
-            error_msg = f"Error during update check: {str(e)}"
+            error_msg = f"Error during update check: {e!s}"
             logging.error(error_msg)
             print(error_msg)
 
         return updatable_apps
 
     def _list_all_config_files(self) -> List[str]:
-        """
-        Get a list of all AppImage configuration files.
+        """Get a list of all AppImage configuration files.
 
         Returns:
             List[str]: List of configuration filenames
@@ -178,8 +172,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
     def _handle_interactive_update(
         self, updatable_apps: List[Dict[str, Any]], use_async: bool = False
     ) -> None:
-        """
-        Handle interactive mode where user selects which apps to update.
+        """Handle interactive mode where user selects which apps to update.
 
         Args:
             updatable_apps: List of updatable app information dictionaries
@@ -237,8 +230,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             return
 
     def _update_apps_async_wrapper(self, apps_to_update: List[Dict[str, Any]]) -> None:
-        """
-        Wrapper to call the async update method from a synchronous context.
+        """Wrapper to call the async update method from a synchronous context.
 
         Args:
             apps_to_update: List of app information dictionaries to update
@@ -309,12 +301,11 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             logging.info("Update process cancelled by user (Ctrl+C)")
             print("\nUpdate process cancelled by user (Ctrl+C)")
         except Exception as e:
-            logging.error(f"Error in async update process: {str(e)}", exc_info=True)
-            print(f"\nError in update process: {str(e)}")
+            logging.error(f"Error in async update process: {e!s}", exc_info=True)
+            print(f"\nError in update process: {e!s}")
 
     def _display_update_list(self, updatable_apps: List[Dict[str, Any]]) -> None:
-        """
-        Display a list of updatable apps with standard print statements.
+        """Display a list of updatable apps with standard print statements.
 
         Args:
             updatable_apps: List of updatable app information dictionaries
@@ -330,9 +321,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         print("-" * 60)
 
     def _display_rate_limit_info(self) -> None:
-        """
-        Display GitHub API rate limit information after updates using standard print statements.
-        """
+        """Display GitHub API rate limit information after updates using standard print statements."""
         try:
             # Use the cached rate limit info to avoid unnecessary API calls
             remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()

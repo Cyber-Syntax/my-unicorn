@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Cache utility functions.
+"""Cache utility functions.
 
 This module provides common functionality for handling cache operations,
 particularly for API rate limits and other data that needs to be persisted.
@@ -11,15 +9,14 @@ import json
 import logging
 import os
 import time
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 # Configure module logger
 logger = logging.getLogger(__name__)
 
 
 def ensure_directory_exists(directory_path: str) -> str:
-    """
-    Ensure the specified directory exists, creating it if necessary.
+    """Ensure the specified directory exists, creating it if necessary.
 
     Args:
         directory_path: Path to directory to ensure exists
@@ -34,8 +31,7 @@ def ensure_directory_exists(directory_path: str) -> str:
 def load_json_cache(
     cache_file_path: str, ttl_seconds: int = 3600, hard_refresh_seconds: Optional[int] = None
 ) -> Dict[str, Any]:
-    """
-    Load cached data from a JSON file with TTL validation.
+    """Load cached data from a JSON file with TTL validation.
 
     Args:
         cache_file_path: Path to the cache file
@@ -47,7 +43,7 @@ def load_json_cache(
     """
     try:
         if os.path.exists(cache_file_path):
-            with open(cache_file_path, "r") as f:
+            with open(cache_file_path) as f:
                 data = json.load(f)
 
             # Check if cache is still valid
@@ -75,8 +71,7 @@ def load_json_cache(
 
 
 def save_json_cache(cache_file_path: str, data: Dict[str, Any]) -> bool:
-    """
-    Save data to a JSON cache file with atomic updates.
+    """Save data to a JSON cache file with atomic updates.
 
     Args:
         cache_file_path: Path to the cache file
