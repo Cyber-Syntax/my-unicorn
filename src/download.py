@@ -160,7 +160,7 @@ class DownloadManager:
         appimage_name = self.github_api.appimage_name
 
         if not appimage_url or not appimage_name:
-            error_msg = "AppImage URL or name not available. Cannot download."
+            error_msg = "AppImage URL or name is not available. Cannot download."
             self._logger.error(error_msg)
             raise ValueError(error_msg)
 
@@ -392,3 +392,53 @@ class DownloadManager:
         except Exception:
             self._cleanup_progress_task()
             raise  # Re-raise the original exception
+
+    def verify_download(self, downloaded_file: str) -> bool:
+        """Verify the downloaded file using checksums.
+
+        This method uses the appropriate checksum verification strategy based on
+        the application's configuration, including special handling for apps
+        that store checksums in GitHub release descriptions.
+
+        Args:
+            downloaded_file: Path to the downloaded file to verify
+
+        Returns:
+            bool: True if verification passed or skipped, False otherwise
+
+        """
+        logging.info("Verifying download integrity...")
+
+        # Skip verification if hash verification is disabled
+        if self.github_api.hash_type == "no_hash" or not self.github_api.sha_name:
+            logging.info("Skipping verification as requested (no hash provided)")
+            return True
+
+        # Special handling for checksums extracted from release description
+        if self.github_api.sha_name == "extracted_checksum":
+            logging.info("Using GitHub release description for verification")
+
+            # Import our checksum extraction utility
+            from src.utils.extract_checksums import verify_with_release_checksums
+
+            # Use direct owner/repo from github_api for verification
+            owner = self.github_api.owner
+            repo = self.github_api.repo
+
+            logging.info(f"Extracting checksums from {owner}/{repo} release description")
+            return verify_with_release_checksums(
+                owner=owner, repo=repo, appimage_path=downloaded_file, cleanup_on_failure=True
+            )
+
+        # Standard verification with SHA file
+        from src.verify import VerificationManager
+
+        verifier = VerificationManager(
+            sha_name=self.github_api.sha_name,
+            sha_url=self.github_api.sha_url,
+            appimage_name=os.path.basename(self.github_api.appimage_url),
+            appimage_path=downloaded_file,
+            hash_type=self.github_api.hash_type,
+        )
+
+        return verifier.verify_appimage(cleanup_on_failure=True)

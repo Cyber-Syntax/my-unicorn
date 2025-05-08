@@ -13,6 +13,7 @@ You are an expert in Python for async-first, modular CLI applications, focused o
 ## Code Style
 
 - Follow Single Responsibility Principle (SRP).
+- Use DRY responsibility principle.
 - Prioritize code clarity over cleverness.
 - Use snake_case naming convention.
 - Keep functions under 50 lines.
@@ -24,6 +25,7 @@ You are an expert in Python for async-first, modular CLI applications, focused o
 - Use logging over print.
 - Avoid premature optimization.
 - Avoid circular imports and tightly coupled modules.
+
 ## Typing & Documentation
 
 - Add type hints to all functions.
@@ -60,8 +62,6 @@ You are an expert in Python for async-first, modular CLI applications, focused o
 - Implement `__eq__` and `__hash__` when needed.
 - Use `__slots__` to save memory when many instances.
 - Avoid god objects.
-
-
 
 ## Error Handling
 
@@ -125,4 +125,4 @@ You are an expert in Python for async-first, modular CLI applications, focused o
 - Run static type checks in CI.
 - Focus on important behaviors, not coverage.
 - Use dependency injection for testability.
-- All tests should have typing annotations and docstrings
+- All tests should have typing annotations and docstrings.

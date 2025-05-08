@@ -10,6 +10,7 @@ Examples:
     >>> path = get_icon_path("joplin")
     >>> print(path)
     'Assets/LinuxIcons/256x256.png'
+
 """
 
 from typing import Any, Dict, Optional
@@ -59,6 +60,10 @@ ICON_PATHS: Dict[str, Dict[str, str]] = {
         "exact_path": "icons/icon.png",
         "filename": "qownnotes_icon.png",
     },
+    "zen-browser/desktop": {
+        "exact_path": "docs/assets/zen-black.svg",
+        "filename": "zen_browser_icon.png",
+    },
     # Add more repository configurations as needed...
 }
 
@@ -71,6 +76,7 @@ def get_icon_path(repo_name: str) -> Optional[str]:
 
     Returns:
         str or None: Exact path to the icon file or None if not configured
+
     """
     if not repo_name:
         return None
@@ -106,6 +112,7 @@ def get_icon_filename(repo_name: str) -> Optional[str]:
 
     Returns:
         str or None: Preferred filename or None if not configured
+
     """
     if not repo_name:
         return None
@@ -144,6 +151,7 @@ def get_icon_paths(repo_name: str) -> Optional[Dict[str, Any]]:
 
     Returns:
         Dict or None: Icon configuration for the repository in the old format
+
     """
     if not repo_name:
         return None

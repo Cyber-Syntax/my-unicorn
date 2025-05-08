@@ -6,6 +6,7 @@ installed directly by name, without requiring the user to enter URLs.
 """
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -159,6 +160,17 @@ APP_CATALOG: Dict[str, AppInfo] = {
         hash_type="sha256",
         category="Productivity",
         tags=["notes", "markdown", "owncloud"],
+    ),
+    "zen-browser": AppInfo(
+        name="Zen Browser",
+        description="A content-focused browser for distraction-free browsing",
+        owner="zen-browser",
+        repo="desktop",
+        app_display_name="zen-browser",
+        sha_name="extracted_checksum",  # Special marker to use release description for verification
+        hash_type="sha256",
+        category="Productivity",
+        tags=["browser", "focus", "distraction-free", "privacy"],
     ),
     # Add more applications as needed
 }
@@ -319,3 +331,53 @@ def sync_with_icon_paths():
         logger.warning(f"Missing icon paths for {len(missing_icons)} apps:")
         for app_display_name, repo_key in missing_icons:
             logger.warning(f"  - {app_display_name} ({repo_key})")
+
+
+def find_app_by_name_in_filename(filename: str) -> Optional[AppInfo]:
+    """Find app information based on the AppImage filename.
+
+    This function tries to match the filename with entries in the app catalog,
+    which is particularly useful when verifying AppImages with extracted checksums.
+
+    Args:
+        filename: The AppImage filename (with or without path)
+
+    Returns:
+        AppInfo object if found, None otherwise
+
+    """
+    if not filename:
+        logger.error("Empty filename provided to find_app_by_name_in_filename")
+        return None
+
+    # Extract just the basename without path
+    basename = os.path.basename(filename).lower()
+    logger.debug(f"Looking for app match for filename: {basename}")
+
+    # Extract the first part before hyphen (likely the app name)
+    name_part = basename.split("-")[0].lower()
+
+    # First, direct match against app_display_name in the catalog
+    for app_id, app_info in APP_CATALOG.items():
+        if app_id.lower() == name_part:
+            logger.debug(f"Found direct app_id match: {app_id}")
+            return app_info
+
+        # Check if app_display_name matches the first part of the filename
+        if hasattr(app_info, "app_display_name") and app_info.app_display_name:
+            if app_info.app_display_name.lower() == name_part:
+                logger.debug(f"Found display name match: {app_info.app_display_name}")
+                return app_info
+
+        # Check if repo name matches the first part of the filename
+        if app_info.repo.lower() == name_part:
+            logger.debug(f"Found repo name match: {app_info.repo}")
+            return app_info
+
+    # Special hard-coded fallbacks for known cases
+    if "zen" in basename.lower():
+        logger.info("Detected Zen Browser AppImage")
+        return APP_CATALOG.get("zen-browser")
+
+    logger.warning(f"Could not find app information for filename: {basename}")
+    return None

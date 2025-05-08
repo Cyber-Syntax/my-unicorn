@@ -707,6 +707,19 @@ class GitHubAPI:
             assets: List of release assets from GitHub API
 
         """
+        # Check if this app uses release description for checksums
+        from src.app_catalog import find_app_by_owner_repo
+
+        app_info = find_app_by_owner_repo(self.owner, self.repo)
+
+        if app_info and hasattr(app_info, "sha_name") and app_info.sha_name == "extracted_checksum":
+            logging.info(f"App {self.owner}/{self.repo} uses release description for checksums")
+            self.sha_name = "extracted_checksum"
+            self.hash_type = getattr(app_info, "hash_type", "sha256") or "sha256"
+            logging.info("Will extract checksums from release description for verification")
+            return
+
+        # Original fallback code continues for other cases...
         logging.warning("Could not find SHA file automatically")
         print(f"Could not find SHA file automatically for {self.appimage_name}")
         print("1. Enter filename manually")

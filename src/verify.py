@@ -18,7 +18,7 @@ STATUS_SUCCESS = "✓ "  # Unicode check mark
 STATUS_FAIL = "✗ "  # Unicode cross mark
 
 # Supported hash types
-SUPPORTED_HASH_TYPES = ["sha256", "sha512", "no_hash"]
+SUPPORTED_HASH_TYPES = ["sha256", "sha512", "no_hash", "extracted_checksum"]
 
 
 @dataclass
@@ -70,7 +70,11 @@ class VerificationManager:
                 f"Supported types are: {', '.join(SUPPORTED_HASH_TYPES)}"
             )
 
-        if self.hash_type != "no_hash" and self.hash_type not in hashlib.algorithms_available:
+        # Skip hashlib validation for special verification types
+        if self.hash_type in ["no_hash", "extracted_checksum"]:
+            return
+
+        if self.hash_type not in hashlib.algorithms_available:
             raise ValueError(f"Hash type {self.hash_type} not available in this system")
 
     def verify_appimage(self, cleanup_on_failure: bool = False) -> bool:
@@ -84,6 +88,34 @@ class VerificationManager:
 
         """
         try:
+            # Handle special case for release description checksums
+            if self.sha_name == "extracted_checksum":
+                logging.info("Using release description for checksums verification")
+
+                # Import the utility outside the main module to avoid circular imports
+                # We need owner/repo information from app_catalog
+                from src.app_catalog import find_app_by_name_in_filename
+                from src.utils.extract_checksums import verify_with_release_checksums
+
+                if not self.appimage_name:
+                    logging.error("No AppImage name provided, cannot extract checksums")
+                    return False
+
+                # Get owner/repo from app catalog based on AppImage filename
+                app_info = find_app_by_name_in_filename(self.appimage_name)
+
+                if app_info:
+                    # Use extracted owner/repo to verify with release checksums
+                    return verify_with_release_checksums(
+                        owner=app_info.owner,
+                        repo=app_info.repo,
+                        appimage_path=self.appimage_path,
+                        cleanup_on_failure=cleanup_on_failure,
+                    )
+                else:
+                    logging.error(f"Could not find app info for {self.appimage_name}")
+                    return False
+
             # Skip verification if hash_type is set to no_hash or no SHA file name available
             if self.hash_type == "no_hash" or not self.sha_name:
                 logging.info("Verification skipped - no hash file information available")
