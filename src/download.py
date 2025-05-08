@@ -419,7 +419,7 @@ class DownloadManager:
             logging.info("Using GitHub release description for verification")
 
             # Import our checksum extraction utility
-            from src.utils.extract_checksums import verify_with_release_checksums
+            from src.utils.checksums import verify_with_release_checksums
 
             # Use direct owner/repo from github_api for verification
             owner = self.github_api.owner

@@ -95,7 +95,7 @@ class VerificationManager:
                 # Import the utility outside the main module to avoid circular imports
                 # We need owner/repo information from app_catalog
                 from src.app_catalog import find_app_by_name_in_filename
-                from src.utils.extract_checksums import verify_with_release_checksums
+                from src.utils.checksums import verify_with_release_checksums
 
                 if not self.appimage_name:
                     logging.error("No AppImage name provided, cannot extract checksums")

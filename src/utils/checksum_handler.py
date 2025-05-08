@@ -10,7 +10,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-from src.utils.extract_hash import handle_release_description_verification
+# Import from the new checksums package
+from src.utils.checksums import handle_release_description_verification
 from src.verify import VerificationManager
 
 logger = logging.getLogger(__name__)

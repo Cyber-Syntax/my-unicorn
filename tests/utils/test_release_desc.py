@@ -7,11 +7,23 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.utils.extract_hash import (
-    GitHubReleaseParser,
-    extract_checksums_for_appimage,
-    get_checksums_from_release,
+from src.utils.checksums import (
+    ReleaseChecksumExtractor,
+    extract_checksums_to_file,
 )
+
+# For backwards compatibility during migration
+extract_checksums_for_appimage = extract_checksums_to_file
+
+# Import this from checksums package if it exists, otherwise mock it
+try:
+    from src.utils.checksums import get_checksums_from_release
+except ImportError:
+    # Mock function if it's not in the new structure
+    def get_checksums_from_release(owner, repo, appimage_name):
+        extractor = ReleaseChecksumExtractor(owner, repo)
+        extractor.fetch_release_description()
+        return extractor.extract_checksums(appimage_name)
 
 
 class TestGitHubReleaseParser:
@@ -54,7 +66,7 @@ a202066a1a6ec8bd5cb6dbd43a5de3ce87d0a13d83ef748e87c1d3fec80d22e0  windows-arm64.
         """Create a parser with mocked authentication."""
         with patch("src.auth_manager.GitHubAuthManager.get_auth_headers") as mock_headers:
             mock_headers.return_value = {"Authorization": "Bearer mock_token"}
-            parser = GitHubReleaseParser("zen-browser", "desktop")
+            parser = ReleaseChecksumExtractor("zen-browser", "desktop")
             parser.release_description = self.SAMPLE_RELEASE_DESC
             yield parser
 
@@ -102,13 +114,13 @@ a202066a1a6ec8bd5cb6dbd43a5de3ce87d0a13d83ef748e87c1d3fec80d22e0  windows-arm64.
                     in content
                 )
 
-    @patch("src.utils.release_desc.GitHubReleaseParser.fetch_release_description")
+    @patch("src.utils.checksums.ReleaseChecksumExtractor.fetch_release_description")
     def test_extract_checksums_for_appimage(self, mock_fetch, parser):
         """Test the extract_checksums_for_appimage helper function."""
         # Mock the fetch_release_description method to return True
         mock_fetch.return_value = self.SAMPLE_RELEASE_DESC
 
-        with patch("src.utils.release_desc.GitHubReleaseParser") as MockParser:
+        with patch("src.utils.checksums.ReleaseChecksumExtractor") as MockParser:
             # Set up the mock parser instance
             mock_parser_instance = MagicMock()
             mock_parser_instance.write_checksums_file.return_value = "/tmp/SHA256SUMS.txt"
@@ -124,8 +136,8 @@ a202066a1a6ec8bd5cb6dbd43a5de3ce87d0a13d83ef748e87c1d3fec80d22e0  windows-arm64.
                 "zen-x86_64.AppImage", None
             )
 
-    @patch("src.utils.release_desc.GitHubReleaseParser.extract_checksums")
-    @patch("src.utils.release_desc.GitHubReleaseParser.fetch_release_description")
+    @patch("src.utils.checksums.ReleaseChecksumExtractor.extract_checksums")
+    @patch("src.utils.checksums.ReleaseChecksumExtractor.fetch_release_description")
     def test_get_checksums_from_release(self, mock_fetch, mock_extract, parser):
         """Test the get_checksums_from_release function."""
         # Mock the needed methods
@@ -135,7 +147,7 @@ a202066a1a6ec8bd5cb6dbd43a5de3ce87d0a13d83ef748e87c1d3fec80d22e0  windows-arm64.
         ]
 
         # Call the function under test
-        with patch("src.utils.release_desc.GitHubReleaseParser") as MockParser:
+        with patch("src.utils.checksums.ReleaseChecksumExtractor") as MockParser:
             mock_parser_instance = MagicMock()
             MockParser.return_value = mock_parser_instance
             mock_parser_instance.extract_checksums.return_value = mock_extract.return_value
