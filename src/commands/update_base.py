@@ -9,6 +9,7 @@ synchronous and asynchronous update capabilities.
 import asyncio
 import logging
 import os
+import threading # Added for cancel_event
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -16,7 +17,7 @@ from src.api.github_api import GitHubAPI
 from src.app_config import AppConfigManager
 from src.auth_manager import GitHubAuthManager
 from src.commands.base import Command
-from src.download import DownloadManager
+from src.download import DownloadManager, DownloadCancelledError # Added DownloadCancelledError
 from src.file_handler import FileHandler
 from src.global_config import GlobalConfigManager
 from src.verify import VerificationManager
@@ -433,7 +434,7 @@ class BaseUpdateCommand(Command):
         )
 
         # Call check_latest_version without owner and repo arguments
-        update_available, version_info = github_api.check_latest_version(current_version)
+        update_available, version_info = github_api.check_latest_version(current_version, version_check_only=True) # Pass flag
         latest_version = version_info.get("latest_version") if update_available else None
 
         if "error" in version_info:
@@ -900,6 +901,7 @@ class BaseUpdateCommand(Command):
         }
 
         start_time = time.time()
+        download_cancel_event = threading.Event() # Create cancel event
 
         try:
             # 1. Load config for this app if not already loaded
@@ -925,7 +927,9 @@ class BaseUpdateCommand(Command):
 
             # 3. Check for latest version using GitHub API. This also populates github_api instance.
             update_available, version_check_response = github_api.check_latest_version(
-                current_version=app_config.version
+                current_version=app_config.version,
+                # Pass is_batch, version_check_only will default to False here, which is correct for actual update
+                is_batch=is_batch
             )
 
             if "error" in version_check_response:
@@ -956,11 +960,24 @@ class BaseUpdateCommand(Command):
             # 5. Download AppImage
             logger.info(f"Downloading {github_api.appimage_name} for {app_name}")
             download_manager = DownloadManager(
-                github_api, app_index=app_index, total_apps=total_apps
+                github_api,
+                app_index=app_index,
+                total_apps=total_apps,
+                cancel_event=download_cancel_event # Pass the event
             )
             downloaded_file_path = download_manager.download()  # Capture the file path
 
             # 6. Verify the download with the downloaded path directly
+            # In async mode, use async SHA fallback handling
+            if is_async and hasattr(github_api.sha_manager, '_handle_sha_fallback_async'):
+                try:
+                    await github_api.sha_manager._handle_sha_fallback_async(github_api.assets)
+                except Exception as e:
+                    error_msg = f"SHA fallback failed for {app_name}: {e}"
+                    logger.error(error_msg)
+                    result_data["message"] = error_msg
+                    return False, result_data
+
             if not self._verify_appimage(github_api, downloaded_file_path, cleanup_on_failure=True):
                 error_msg = f"Verification failed for {app_name}."
                 logger.warning(error_msg)
@@ -1015,8 +1032,24 @@ class BaseUpdateCommand(Command):
                 result_data["message"] = error_msg
                 return False, result_data
 
+        except KeyboardInterrupt:
+            logger.warning(f"Update of {app_name} cancelled by user (Ctrl+C).")
+            if download_cancel_event:
+                download_cancel_event.set() # Signal download to stop
+            result_data["message"] = f"Update of {app_name} cancelled by user."
+            result_data["status"] = "cancelled"
+            result_data["elapsed"] = time.time() - start_time
+            # Re-raise KeyboardInterrupt so higher-level handlers (like in _update_apps_async) can catch it
+            # to stop the overall async process or prompt to continue.
+            raise
+        except DownloadCancelledError as dce:
+            logger.info(f"Download cancelled for {app_name}: {dce}")
+            result_data["message"] = str(dce)
+            result_data["status"] = "cancelled"
+            result_data["elapsed"] = time.time() - start_time
+            return False, result_data # Handled failure, don't re-raise KI
         except Exception as e:
-            # Catch any unexpected exceptions
+            # Catch any other unexpected exceptions
             error_msg = f"Unexpected error updating {app_name}: {e!s}"
             logger.error(error_msg, exc_info=True)
             result_data["message"] = error_msg

@@ -55,7 +55,7 @@ class GitHubAPI:
     def arch_keyword(self) -> Optional[str]:
         return self._arch_keyword
 
-    def get_latest_release(self) -> Tuple[bool, Union[Dict[str, Any], str]]:
+    def get_latest_release(self, version_check_only: bool = False, is_batch: bool = False) -> Tuple[bool, Union[Dict[str, Any], str]]:
         """Fetch latest stable or fallback to beta release using ReleaseManager, then process it."""
         success, raw_data_or_error = self._release_fetcher.get_latest_release_data(self._headers)
 
@@ -85,7 +85,7 @@ class GitHubAPI:
 
             raw_release_json: Dict[str, Any] = raw_data_or_error
             try:
-                self._process_release(raw_release_json)  # Existing processing logic
+                self._process_release(raw_release_json, version_check_only=version_check_only, is_batch=is_batch)  # Pass flags
                 # self._release_info should now be populated by _process_release
                 return True, raw_release_json  # Return the raw JSON as per original logic
             except ValueError as e:
@@ -99,10 +99,10 @@ class GitHubAPI:
     # and picking the latest if /releases/latest returns a 404.
     # Thus, get_all_releases() can be removed.
 
-    def _process_release(self, release_data: Dict[str, Any]) -> None:
+    def _process_release(self, release_data: Dict[str, Any], version_check_only: bool = False, is_batch: bool = False) -> None:
         """Populate version, assets, and release info using normalized version."""
         logger.debug(
-            f"Processing release in github_api.py: {release_data.get('tag_name', 'Unknown tag')}"
+            f"Processing release in github_api.py: {release_data.get('tag_name', 'Unknown tag')}, version_check_only: {version_check_only}, is_batch: {is_batch}"
         )
 
         raw_tag = release_data.get("tag_name", "")
@@ -183,7 +183,7 @@ class GitHubAPI:
                     f"Could not extract architecture from AppImage filename: {self.appimage_name}. Current arch_keyword '{self._arch_keyword}' remains."
                 )
 
-        if self.appimage_name:
+        if self.appimage_name and not version_check_only: # Conditionally process SHA
             # self.sha_name is Optional[str], but at this point (first call to _process_release),
             # it holds the initial hint from __init__ which is str.
             # SHAManager expects sha_name: str for its initial hint.
@@ -198,7 +198,8 @@ class GitHubAPI:
             else:
                 initial_sha_name_hint = self.sha_name  # This is str here
 
-            sha_mgr = SHAManager(self.owner, self.repo, initial_sha_name_hint, self.appimage_name)
+            # Pass is_batch to SHAManager constructor
+            sha_mgr = SHAManager(self.owner, self.repo, initial_sha_name_hint, self.appimage_name, is_batch=is_batch)
             sha_mgr.find_sha_asset(assets)
             # Update instance attributes with results from SHAManager
             self.sha_name = (
@@ -209,6 +210,12 @@ class GitHubAPI:
             self.extracted_hash_from_body = (
                 sha_mgr.extracted_hash_from_body
             )  # Get the extracted hash
+        elif version_check_only:
+            logger.info(f"Skipping SHA processing for {self.appimage_name} due to version_check_only=True.")
+            self.sha_name = None # Ensure SHA info is cleared if skipping
+            self.sha_url = None
+            self.hash_type = None
+            self.extracted_hash_from_body = None
         else:  # No AppImage name, so no SHA to find related to it
             self.sha_name = None
             self.sha_url = None
@@ -238,10 +245,17 @@ class GitHubAPI:
         )
 
     def check_latest_version(
-        self, current_version: Optional[str] = None
+        self, current_version: Optional[str] = None, version_check_only: bool = False, is_batch: bool = False
     ) -> Tuple[bool, Dict[str, Any]]:
-        """Check and return structured update info."""
-        ok, data = self.get_latest_release()
+        """Check and return structured update info.
+
+        Args:
+            current_version: The current version of the application.
+            version_check_only: If True, skip SHA file resolution.
+            is_batch: If True, indicates a non-interactive batch mode.
+        """
+        # Pass both flags down
+        ok, data = self.get_latest_release(version_check_only=version_check_only, is_batch=is_batch)
 
         if not ok:
             return False, {"error": str(data)}

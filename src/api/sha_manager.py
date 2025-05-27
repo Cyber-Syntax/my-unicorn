@@ -3,6 +3,7 @@
 This module handles SHA-related operations for GitHub releases.
 """
 
+import asyncio
 import logging
 from typing import Dict, List, Optional
 import re # For hash validation
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 class SHAManager:
     """Handles SHA-related operations for GitHub releases."""
 
-    def __init__(self, owner: str, repo: str, sha_name: str, appimage_name: Optional[str] = None):
+    def __init__(self, owner: str, repo: str, sha_name: str, appimage_name: Optional[str] = None, is_batch: bool = False):
         """Initialize the SHAManager.
 
         Args:
@@ -25,11 +26,13 @@ class SHAManager:
             repo: Repository name
             sha_name: Name of the SHA algorithm used in the release assets
             appimage_name: Name of the selected AppImage
+            is_batch: True if running in a non-interactive batch mode
         """
         self.owner = owner
         self.repo = repo
         self.sha_name = sha_name
         self.appimage_name = appimage_name
+        self.is_batch = is_batch  # Store the flag
         self.sha_url = None
         self.hash_type = None
         self.extracted_hash_from_body: Optional[str] = None # For hash from release body
@@ -130,6 +133,7 @@ class SHAManager:
 
         if not detected_hash_type:
             logger.info(f"Could not detect hash type from {self.sha_name}")
+            # Always ask for hash type if not detected, regardless of is_batch
             self.hash_type = ui_utils.get_user_input("Enter hash type", default="sha256")
 
         logger.info(f"Selected SHA file: {self.sha_name} (hash type: {self.hash_type})")
@@ -140,21 +144,65 @@ class SHAManager:
         Args:
             assets: List of release assets from GitHub API
         """
+        return self._handle_sha_fallback_sync(assets)
+
+    async def _handle_sha_fallback_async(self, assets: List[Dict]) -> None:
+        """Async version of SHA fallback handler.
+
+        Args:
+            assets: List of release assets from GitHub API
+        """
         logger.warning("Could not find SHA file automatically")
         print(f"Could not find SHA file automatically for {self.appimage_name}")
         print("1. Enter filename manually")
         print("2. Skip verification")
 
-        choice = ui_utils.get_user_input("Your choice (1-2)")
+        try:
+            # Use asyncio.to_thread for input operations
+            choice = await asyncio.to_thread(ui_utils.get_user_input, "Your choice (1-2)")
 
-        if choice == "1":
-            self.sha_name = ui_utils.get_user_input("Enter exact SHA filename")
-            for asset in assets:
-                if asset["name"] == self.sha_name:
-                    self._select_sha_asset(asset)
-                    return
-            raise ValueError(f"SHA file {self.sha_name} not found")
-        else:
-            self.sha_name = "no_sha_file"
-            self.hash_type = "no_hash"
-            logger.info("User chose to skip SHA verification")
+            if choice == "1":
+                self.sha_name = await asyncio.to_thread(ui_utils.get_user_input, "Enter exact SHA filename")
+                for asset in assets:
+                    if asset["name"] == self.sha_name:
+                        self._select_sha_asset(asset)
+                        return
+                raise ValueError(f"SHA file {self.sha_name} not found")
+            else:
+                self.sha_name = "no_sha_file"
+                self.hash_type = "no_hash"
+                logger.info("User chose to skip SHA verification")
+
+        except KeyboardInterrupt:
+            logger.info("SHA fallback cancelled by user")
+            raise
+
+    def _handle_sha_fallback_sync(self, assets: List[Dict]) -> None:
+        """Synchronous version of SHA fallback handler.
+
+        Args:
+            assets: List of release assets from GitHub API
+        """
+        logger.warning("Could not find SHA file automatically")
+        print(f"Could not find SHA file automatically for {self.appimage_name}")
+        print("1. Enter filename manually")
+        print("2. Skip verification")
+
+        try:
+            choice = ui_utils.get_user_input("Your choice (1-2)")
+
+            if choice == "1":
+                self.sha_name = ui_utils.get_user_input("Enter exact SHA filename")
+                for asset in assets:
+                    if asset["name"] == self.sha_name:
+                        self._select_sha_asset(asset)
+                        return
+                raise ValueError(f"SHA file {self.sha_name} not found")
+            else:
+                self.sha_name = "no_sha_file"
+                self.hash_type = "no_hash"
+                logger.info("User chose to skip SHA verification")
+
+        except KeyboardInterrupt:
+            logger.info("SHA fallback cancelled by user")
+            raise
