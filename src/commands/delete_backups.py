@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
+"""Delete backup files command module.
+
+This module provides functionality to delete backup files for applications.
+It includes options to delete all backups, delete backups for a specific app,
+delete backups older than a specific date, and clean up to keep only a specified
+number of backups per app.
+"""
+
 import logging
 import os
-import shutil
-from typing import Dict, List, Optional, Tuple
+from typing import List
 
 from src.commands.command import Command
 from src.global_config import GlobalConfigManager
@@ -42,7 +49,7 @@ class DeleteBackupsCommand(Command):
 
     def _delete_all_backups(self, global_config: GlobalConfigManager) -> None:
         """Delete all backup files."""
-        backup_dir = global_config.expanded_appimage_download_backup_folder_path
+        backup_dir = global_config.expanded_app_backup_storage_path
 
         if not os.path.exists(backup_dir):
             print(f"Backup directory {backup_dir} does not exist.")
@@ -71,12 +78,12 @@ class DeleteBackupsCommand(Command):
                 print("No backup files found to delete.")
 
         except OSError as e:
-            logging.error(f"Error deleting backup files: {str(e)}")
-            print(f"Error deleting backup files: {str(e)}")
+            logging.error(f"Error deleting backup files: {e!s}")
+            print(f"Error deleting backup files: {e!s}")
 
     def _delete_app_backups(self, global_config: GlobalConfigManager) -> None:
         """Delete backup files for a specific app."""
-        backup_dir = global_config.expanded_appimage_download_backup_folder_path
+        backup_dir = global_config.expanded_app_backup_storage_path
 
         if not os.path.exists(backup_dir):
             print(f"Backup directory {backup_dir} does not exist.")
@@ -134,12 +141,12 @@ class DeleteBackupsCommand(Command):
         except ValueError:
             print("Invalid input. Please enter a number.")
         except OSError as e:
-            logging.error(f"Error deleting app backups: {str(e)}")
-            print(f"Error deleting app backups: {str(e)}")
+            logging.error(f"Error deleting app backups: {e!s}")
+            print(f"Error deleting app backups: {e!s}")
 
     def _delete_old_backups(self, global_config: GlobalConfigManager) -> None:
         """Delete backup files older than a specified date."""
-        backup_dir = global_config.expanded_appimage_download_backup_folder_path
+        backup_dir = global_config.expanded_app_backup_storage_path
 
         if not os.path.exists(backup_dir):
             print(f"Backup directory {backup_dir} does not exist.")
@@ -215,12 +222,12 @@ class DeleteBackupsCommand(Command):
                 print(f"No backup files found older than {date_desc}.")
 
         except OSError as e:
-            logging.error(f"Error deleting old backups: {str(e)}")
-            print(f"Error deleting old backups: {str(e)}")
+            logging.error(f"Error deleting old backups: {e!s}")
+            print(f"Error deleting old backups: {e!s}")
 
     def _cleanup_to_max_backups(self, global_config: GlobalConfigManager) -> None:
         """Clean up backups to keep only max_backups per app."""
-        backup_dir = global_config.expanded_appimage_download_backup_folder_path
+        backup_dir = global_config.expanded_app_backup_storage_path
         max_backups = global_config.max_backups
 
         if not os.path.exists(backup_dir):
@@ -293,14 +300,14 @@ class DeleteBackupsCommand(Command):
             )
 
     def _get_available_apps(self, backup_dir: str) -> List[str]:
-        """
-        Get a list of app names that have backups.
+        """Get a list of app names that have backups.
 
         Args:
             backup_dir: Path to backup directory
 
         Returns:
             List of unique app names extracted from backup filenames
+
         """
         apps = set()
 
@@ -322,6 +329,6 @@ class DeleteBackupsCommand(Command):
 
                     apps.add(app_name)
         except OSError as e:
-            logging.error(f"Error getting available apps: {str(e)}")
+            logging.error(f"Error getting available apps: {e!s}")
 
         return sorted(list(apps))

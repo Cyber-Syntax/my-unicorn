@@ -1,10 +1,12 @@
 import os
 import stat
-import pytest
-import requests
 from types import SimpleNamespace
 
+import pytest
+import requests
+
 from src.download import DownloadManager
+
 
 @pytest.fixture
 def github_api():
@@ -14,14 +16,39 @@ def github_api():
     )
 
 
+@pytest.fixture
+def mock_global_config(monkeypatch):
+    """Create a mock GlobalConfigManager that uses the 'downloads' directory."""
+
+    class MockGlobalConfig:
+        @property
+        def expanded_app_download_path(self):
+            return "downloads"
+
+    # Mock the GlobalConfigManager class and its expanded_app_download_path property
+    monkeypatch.setattr(DownloadManager, "_global_config", MockGlobalConfig())
+    return MockGlobalConfig()
+
+
 @pytest.fixture(autouse=True)
 def isolate_download_dir(tmp_path, monkeypatch):
-    """
-    Change CWD to a tmp_path so that 'downloads/' is created in an isolated temp directory.
-    """
-    monkeypatch.chdir(tmp_path)  # :contentReference[oaicite:5]{index=5}
+    """Change CWD to a tmp_path so that 'downloads/' is created in an isolated temp directory."""
+    downloads_dir = tmp_path / "downloads"
+
+    # Create the downloads directory
+    downloads_dir.mkdir(exist_ok=True)
+
+    # Change to the temp directory for the duration of the test
+    monkeypatch.chdir(tmp_path)
+
     yield
-    # no cleanup needed—tmp_path is auto-removed
+
+    # Explicit cleanup after test completes or fails
+    if downloads_dir.exists():
+        # Remove all files in the downloads directory
+        for file_path in downloads_dir.glob("*"):
+            if file_path.is_file():
+                file_path.unlink()
 
 
 @pytest.fixture
@@ -56,15 +83,15 @@ def fake_get_response():
     return Resp()
 
 
-
-
-
-def test_successful_download(monkeypatch, github_api, fake_head_response, fake_get_response):
+def test_successful_download(
+    monkeypatch, github_api, fake_head_response, fake_get_response, mock_global_config
+):
     # Arrange: stub HTTP methods
-    monkeypatch.setattr(
-        requests, "head", lambda *args, **kw: fake_head_response
-    )  # :contentReference[oaicite:6]{index=6}
+    monkeypatch.setattr(requests, "head", lambda *args, **kw: fake_head_response)
     monkeypatch.setattr(requests, "get", lambda *args, **kw: fake_get_response)
+
+    # Create downloads directory for test
+    os.makedirs("downloads", exist_ok=True)
 
     # Act
     dm = DownloadManager(github_api, app_index=1, total_apps=1)
@@ -97,7 +124,7 @@ def test_head_network_error(monkeypatch, github_api, fake_get_response):
     def bad_head(*args, **kw):
         raise requests.exceptions.RequestException("fail head")
 
-    monkeypatch.setattr(requests, "head", bad_head)  # :contentReference[oaicite:7]{index=7}
+    monkeypatch.setattr(requests, "head", bad_head)
     dm = DownloadManager(github_api)
     with pytest.raises(RuntimeError) as exc:
         dm.download()
@@ -112,7 +139,7 @@ def test_get_network_error(monkeypatch, github_api, fake_head_response):
     def bad_get(*args, **kw):
         raise requests.exceptions.RequestException("fail get")
 
-    monkeypatch.setattr(requests, "get", bad_get)  # :contentReference[oaicite:8]{index=8}
+    monkeypatch.setattr(requests, "get", bad_get)
 
     dm = DownloadManager(github_api)
     with pytest.raises(RuntimeError) as exc:
@@ -120,7 +147,9 @@ def test_get_network_error(monkeypatch, github_api, fake_head_response):
     assert "Network error" in str(exc.value)
 
 
-def test_progress_cleanup(monkeypatch, github_api, fake_head_response, fake_get_response):
+def test_progress_cleanup(
+    monkeypatch, github_api, fake_head_response, fake_get_response, mock_global_config
+):
     # Spy on progress to ensure remove_task is called
     calls = {}
 
@@ -147,9 +176,12 @@ def test_progress_cleanup(monkeypatch, github_api, fake_head_response, fake_get_
 
     monkeypatch.setattr(
         DownloadManager, "get_or_create_progress", classmethod(lambda cls: FakeProgress())
-    )  # :contentReference[oaicite:9]{index=9}
+    )
     monkeypatch.setattr(requests, "head", lambda *a, **k: fake_head_response)
     monkeypatch.setattr(requests, "get", lambda *a, **k: fake_get_response)
+
+    # Create downloads directory for test
+    os.makedirs("downloads", exist_ok=True)
 
     dm = DownloadManager(github_api)
     dm.download()

@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-UI utilities.
+"""UI utilities.
 
 This module provides functions for user interface interactions.
 """
 
 import logging
-from typing import List, Dict, Any, Optional, Callable
+from typing import Any, Callable, Dict, List, Optional
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -19,8 +17,7 @@ def select_from_list(
     display_key: str = "name",
     callback: Optional[Callable] = None,
 ) -> Dict[str, Any]:
-    """
-    Prompt user to select an item from a list.
+    """Prompt user to select an item from a list.
 
     Args:
         items: List of items to choose from
@@ -53,8 +50,7 @@ def select_from_list(
 
 
 def get_user_input(prompt: str, default: Optional[str] = None) -> str:
-    """
-    Get user input with optional default value.
+    """Get user input with optional default value.
 
     Args:
         prompt: Prompt message for the user
@@ -71,8 +67,7 @@ def get_user_input(prompt: str, default: Optional[str] = None) -> str:
 
 
 def confirm_action(prompt: str, default: bool = False) -> bool:
-    """
-    Ask user to confirm an action.
+    """Ask user to confirm an action.
 
     Args:
         prompt: Prompt message for the user

@@ -1,5 +1,4 @@
-"""
-Application configuration management module.
+"""Application configuration management module.
 
 This module provides functionality for managing application-specific configurations
 including creating desktop entries, managing versions, and storing app settings.
@@ -9,9 +8,12 @@ from __future__ import annotations
 
 import json
 import logging
-import re
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+# Local imports
+from src.utils.desktop_entry import DesktopEntryManager
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -27,52 +29,42 @@ DESKTOP_ENTRY_PERMISSIONS = 0o755
 IMAGE_EXTENSIONS = [".svg", ".png", ".jpg", ".jpeg"]
 
 
+@dataclass
 class AppConfigManager:
-    """
-    Manages app-specific configuration settings.
+    """Manages app-specific configuration settings.
 
     This class handles operations related to application configuration including
     creating desktop files, managing versions, and storing app-specific settings.
     """
 
-    def __init__(
-        self,
-        owner: Union[str, None] = None,
-        repo: Union[str, None] = None,
-        app_id: Union[str, None] = None,
-        version: Union[str, None] = None,
-        sha_name: Union[str, None] = None,
-        hash_type: str = DEFAULT_HASH_TYPE,
-        appimage_name: Union[str, None] = None,
-        arch_keyword: Union[str, None] = None,
-        config_folder: str = DEFAULT_CONFIG_PATH,
-    ):
-        """
-        Initialize the AppConfigManager with application-specific settings.
+    owner: Optional[str] = None
+    repo: Optional[str] = None
+    app_display_name: Optional[str] = None
+    version: Optional[str] = None
+    sha_name: Optional[str] = None
+    hash_type: str = DEFAULT_HASH_TYPE
+    appimage_name: Optional[str] = None
+    arch_keyword: Optional[str] = None
+    config_folder: Path = field(default_factory=lambda: Path(DEFAULT_CONFIG_PATH).expanduser())
 
-        Args:
-            owner: GitHub repository owner/organization
-            repo: Repository name
-            app_id: Unique identifier for the app (defaults to repo)
-            version: Application version
-            sha_name: SHA verification file name
-            hash_type: Hash type (sha256, sha512, etc.)
-            appimage_name: Name of the AppImage file
-            arch_keyword: Architecture keyword in filename
-            config_folder: Path to configuration folder
-        """
-        self.owner = owner
-        self.repo = repo
-        self.app_id = app_id if app_id else repo
-        self.version = version
-        self.sha_name = sha_name
-        self.hash_type = hash_type
-        self.appimage_name = appimage_name
-        self.arch_keyword = arch_keyword
-        self.config_folder = Path(config_folder).expanduser()
+    # These fields are calculated in __post_init__ and not directly initialized
+    config_file_name: Optional[str] = field(init=False, default=None)
+    config_file: Optional[Path] = field(init=False, default=None)
 
-        # Use app_id for file naming instead of repo
-        self.config_file_name = f"{self.app_id}.json" if self.app_id else None
+    def __post_init__(self) -> None:
+        """Post-initialization to handle derived attributes.
+
+        Sets up app_display_name based on repo if not provided and calculates config paths.
+        Also ensures the configuration directory exists.
+        """
+        # Set app_display_name to repo if not provided and repo exists
+        if self.app_display_name is None and self.repo is not None:
+            self.app_display_name = self.repo
+
+        # Set config_file_name based on app_display_name
+        self.config_file_name = f"{self.app_display_name}.json" if self.app_display_name else None
+
+        # Set config_file path
         self.config_file = (
             self.config_folder / self.config_file_name if self.config_file_name else None
         )
@@ -81,15 +73,15 @@ class AppConfigManager:
         self.config_folder.mkdir(parents=True, exist_ok=True)
 
     def update_version(
-        self, new_version: Union[str, None] = None, new_appimage_name: Union[str, None] = None
+        self, new_version: Optional[str] = None, new_appimage_name: Optional[str] = None
     ) -> None:
-        """
-        Update the configuration file with the new version and AppImage name.
+        """Update the configuration file with the new version and AppImage name.
         If new_version or new_appimage_name is provided, update the instance variables accordingly.
 
         Args:
             new_version: New version to update to
             new_appimage_name: New AppImage filename
+
         """
         try:
             if new_version is not None:
@@ -97,7 +89,7 @@ class AppConfigManager:
             if new_appimage_name is not None:
                 self.appimage_name = new_appimage_name
 
-            self.config_file = self.config_folder / f"{self.app_id}.json"
+            self.config_file = self.config_folder / f"{self.app_display_name}.json"
             config_data: Dict[str, Any] = {}
 
             if self.config_file.exists():
@@ -118,127 +110,51 @@ class AppConfigManager:
             logger.error(f"An error occurred while updating version: {e}")
 
     def create_desktop_file(
-        self, appimage_path: str, icon_path: Union[str, None] = None
+        self, appimage_path: str, icon_path: Optional[str] = None
     ) -> Tuple[bool, str]:
-        """
-        Create or update a desktop entry file for the AppImage.
+        """Create or update a desktop entry file for the AppImage.
+
+        Args:
+            appimage_path: Path to the AppImage executable
+            icon_path: Optional path to the application icon
+
+        Returns:
+            Tuple[bool, str]: Success status and path to desktop file or error message
+
         """
         try:
-            if not self.app_id:
+            if not self.app_display_name:
                 return False, "Application identifier not available"
 
-            # Ensure desktop file directory exists
-            desktop_dir = Path(DESKTOP_ENTRY_DIR).expanduser()
-            desktop_dir.mkdir(parents=True, exist_ok=True)
+            # Convert paths to Path objects if they're strings
+            if isinstance(appimage_path, str):
+                appimage_path = Path(appimage_path)
 
-            desktop_file_path = desktop_dir / f"{self.app_id.lower()}.desktop"
-            desktop_file_temp = desktop_file_path.with_suffix(".desktop.tmp")
+            if icon_path and isinstance(icon_path, str):
+                icon_path = Path(icon_path)
 
-            # Determine display name (using app name instead of repo)
-            display_name = self.app_id
-
-            # Use the provided icon path if available
-            final_icon_path = icon_path
-
-            # If no icon path provided, use the repo name as fallback for system themes
-            if not final_icon_path:
-                final_icon_path = self.repo  # Use original case for better theme matching
-                logger.info(f"Using fallback icon name: {final_icon_path}")
-
-            # Parse existing desktop file if it exists
-            existing_entries: Dict[str, str] = {}
-            if desktop_file_path.exists():
-                try:
-                    with desktop_file_path.open("r", encoding="utf-8") as f:
-                        section = None
-                        for line in f:
-                            line = line.strip()
-                            if not line:
-                                continue
-
-                            # Check for section headers [SectionName]
-                            if line.startswith("[") and line.endswith("]"):
-                                section = line[1:-1]  # Extract section name without brackets
-                                continue
-
-                            # Only process lines with key=value format in Desktop Entry section
-                            if section == "Desktop Entry" and "=" in line:
-                                key, value = line.split("=", 1)
-                                existing_entries[key.strip()] = value.strip()
-
-                    logger.info(f"Found existing desktop file: {desktop_file_path}")
-                except Exception as e:
-                    logger.warning(f"Error reading existing desktop file: {e}")
-
-            # Create new desktop file content - only include standard desktop entry keys
-            new_entries = {
-                "Name": display_name,
-                "Exec": appimage_path,  # Use the provided appimage_path directly
-                "Terminal": "false",
-                "Type": "Application",
-                "Comment": f"AppImage for {display_name}",
-                "Categories": "Utility;",
-            }
-
-            # Add icon only if we have a path (don't include if using default repo name)
-            if final_icon_path:
-                new_entries["Icon"] = final_icon_path
-
-            # Check if content would actually change to avoid unnecessary writes
-            needs_update = False
-
-            # Compare existing vs new entries for required fields
-            for key, value in new_entries.items():
-                if key not in existing_entries or existing_entries[key] != value:
-                    needs_update = True
-                    logger.info(f"Desktop entry needs update: {key} changed")
-                    break
-
-            # If no update needed, return early
-            if not needs_update:
-                logger.info(f"Desktop file {desktop_file_path} already up to date")
-                return True, str(desktop_file_path)
-
-            # Write to temporary file for atomic replacement
-            with desktop_file_temp.open("w", encoding="utf-8") as f:
-                f.write("[Desktop Entry]\n")
-                for key, value in new_entries.items():
-                    f.write(f"{key}={value}\n")
-
-                # Preserve additional entries that we don't explicitly set
-                for key, value in existing_entries.items():
-                    if key not in new_entries and key not in [key.lower() for key in new_entries]:
-                        f.write(f"{key}={value}\n")
-
-            # Ensure proper permissions on the temp file
-            desktop_file_temp.chmod(DESKTOP_ENTRY_PERMISSIONS)  # Make executable
-
-            # Atomic replace
-            desktop_file_temp.replace(desktop_file_path)
-
-            logger.info(f"Updated desktop file at {desktop_file_path}")
-            return True, str(desktop_file_path)
+            # Use the DesktopEntryManager to handle desktop entry operations
+            desktop_manager = DesktopEntryManager()
+            return desktop_manager.create_or_update_desktop_entry(
+                app_display_name=self.app_display_name,
+                appimage_path=appimage_path,
+                icon_path=icon_path,
+            )
 
         except Exception as e:
             error_msg = f"Failed to create/update desktop file: {e}"
             logger.error(error_msg)
-            # Clean up temp file if exists
-            if desktop_file_temp.exists():
-                try:
-                    desktop_file_temp.unlink()
-                except Exception as cleanup_error:
-                    logger.warning(f"Failed to clean up temporary file: {cleanup_error}")
             return False, error_msg
 
     def list_json_files(self) -> List[str]:
-        """
-        List JSON files in the configuration directory.
+        """List JSON files in the configuration directory.
 
         Returns:
             List[str]: List of JSON files in the configuration directory
 
         Raises:
             FileNotFoundError: If the configuration folder doesn't exist
+
         """
         try:
             self.config_folder.mkdir(parents=True, exist_ok=True)
@@ -251,11 +167,11 @@ class AppConfigManager:
             raise FileNotFoundError(f"Configuration folder access error: {error}")
 
     def temp_save_config(self) -> bool:
-        """
-        Atomically save configuration using temporary file.
+        """Atomically save configuration using temporary file.
 
         Returns:
             bool: True if save successful, False otherwise
+
         """
         if not self.config_file:
             logger.error("Config file path is not set")
@@ -282,11 +198,11 @@ class AppConfigManager:
             return False
 
     def save_config(self) -> bool:
-        """
-        Commit temporary config by replacing original.
+        """Commit temporary config by replacing original.
 
         Returns:
             bool: True if commit successful, False otherwise
+
         """
         if not self.config_file:
             logger.error("Config file path is not set")
@@ -313,14 +229,14 @@ class AppConfigManager:
                     logger.warning(f"Failed to clean up temporary file: {cleanup_error}")
             return False
 
-    def select_files(self) -> Union[List[str], None]:
-        """
-        List available JSON configuration files and allow the user to select multiple.
+    def select_files(self) -> Optional[List[str]]:
+        """List available JSON configuration files and allow the user to select multiple.
 
         Shows application names without the .json extension for better readability.
 
         Returns:
             List[str] or None: List of selected JSON files or None if no selection made
+
         """
         try:
             json_files = self.list_json_files()
@@ -355,9 +271,8 @@ class AppConfigManager:
             print("\nSelection cancelled.")
             return None
 
-    def load_appimage_config(self, config_file_name: str) -> Union[Dict[str, Any], None]:
-        """
-        Load a specific AppImage configuration file.
+    def load_appimage_config(self, config_file_name: str) -> Optional[Dict[str, Any]]:
+        """Load a specific AppImage configuration file.
 
         Args:
             config_file_name: Name of the configuration file
@@ -367,6 +282,7 @@ class AppConfigManager:
 
         Raises:
             ValueError: If JSON parsing fails
+
         """
         config_file_path = self.config_folder / config_file_name
         if config_file_path.is_file():
@@ -376,12 +292,18 @@ class AppConfigManager:
                     # Update instance variables with the loaded config
                     self.owner = config.get("owner", self.owner)
                     self.repo = config.get("repo", self.repo)
-                    self.app_id = config.get("app_id", self.app_id or self.repo)
+                    self.app_display_name = config.get(
+                        "app_display_name", self.app_display_name or self.repo
+                    )
                     self.version = config.get("version", self.version)
                     self.sha_name = config.get("sha_name", self.sha_name)
                     self.hash_type = config.get("hash_type", self.hash_type)
                     self.appimage_name = config.get("appimage_name", self.appimage_name)
                     self.arch_keyword = config.get("arch_keyword", self.arch_keyword)
+
+                    # Update derived fields
+                    self.__post_init__()
+
                     logger.info(f"Successfully loaded configuration from {config_file_name}")
                     return config
             except json.JSONDecodeError as e:
@@ -390,6 +312,28 @@ class AppConfigManager:
         else:
             logger.warning(f"Configuration file {config_file_name} not found.")
             return None
+
+    def reload(self) -> bool:
+        """Explicitly reload the current app configuration from disk.
+
+        Reloads the configuration for the currently loaded app, if any.
+        This ensures any external changes to the configuration file are loaded.
+
+        Returns:
+            bool: True if config was successfully reloaded, False otherwise
+
+        """
+        logger.info("Explicitly reloading app configuration from disk")
+        if self.config_file_name is None:
+            logger.warning("Cannot reload: No app configuration is currently loaded")
+            return False
+
+        try:
+            self.load_appimage_config(self.config_file_name)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to reload app configuration: {e}")
+            return False
 
     def customize_appimage_config(self) -> None:
         """Customize the configuration settings for an AppImage."""
@@ -424,15 +368,15 @@ class AppConfigManager:
         self._display_config_info(app_name)
         self._handle_config_customization(app_name)
 
-    def _get_user_selection(self, json_files: List[str]) -> Union[str, None]:
-        """
-        Get user's file selection.
+    def _get_user_selection(self, json_files: List[str]) -> Optional[str]:
+        """Get user's file selection.
 
         Args:
             json_files: List of JSON files to choose from
 
         Returns:
             Selected file name or None if cancelled
+
         """
         while True:
             file_choice = input("Select an application (number) or cancel: ")
@@ -453,11 +397,11 @@ class AppConfigManager:
                 print("Invalid choice. Please select a valid number.")
 
     def _display_config_info(self, app_name: str) -> None:
-        """
-        Display current configuration information.
+        """Display current configuration information.
 
         Args:
             app_name: Name of the application
+
         """
         print("\n" + "=" * 60)
         print(f"Configuration for: {app_name}")
@@ -486,11 +430,11 @@ class AppConfigManager:
         print("-" * 60)
 
     def _handle_config_customization(self, app_name: str) -> None:
-        """
-        Handle configuration customization based on user input.
+        """Handle configuration customization based on user input.
 
         Args:
             app_name: Name of the application
+
         """
         while True:
             choice = input("Enter your choice (1-8): ")
@@ -524,16 +468,19 @@ class AppConfigManager:
         print("=" * 60)
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert the instance variables to a dictionary.
+        """Convert the instance variables to a dictionary.
 
         Returns:
             Dict[str, Any]: Dictionary representation of app configuration
+
         """
+        # Use self.repo as fallback for app_display_name if it's None
+        app_display_name = self.app_display_name if self.app_display_name is not None else self.repo
+
         return {
             "owner": self.owner,
             "repo": self.repo,
-            "app_id": self.app_id,
+            "app_display_name": app_display_name,
             "version": self.version,
             "sha_name": self.sha_name,
             "hash_type": self.hash_type,
@@ -541,12 +488,12 @@ class AppConfigManager:
             "arch_keyword": self.arch_keyword,
         }
 
-    def ask_sha_hash(self) -> Tuple[Union[str, None], str]:
-        """
-        Set up app-specific configuration interactively.
+    def ask_sha_hash(self) -> Tuple[Optional[str], str]:
+        """Set up app-specific configuration interactively.
 
         Returns:
-            Tuple[Union[str, None], str]: The hash file name and hash type
+            Tuple[Optional[str], str]: The hash file name and hash type
+
         """
         logger.info("Setting up app-specific configuration")
         self.sha_name = (

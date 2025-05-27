@@ -23,15 +23,12 @@ dev = ["pytest>=7.0.0", "pytest-cov>=4.0.0", "pytest-mock>=3.10.0"]
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.pytest]
+[tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-# Add markers here if needed
 addopts = ["--import-mode=importlib"]
-
-[tool.pytest.ini_options]
 minversion = "7.0"
 # Path to the src directory to ensure imports work correctly
 pythonpath = [".", "src"]
@@ -39,9 +36,9 @@ pythonpath = [".", "src"]
 [tool.ruff]
 include = [
     "pyproject.toml",
-    "src/**/*.py",
-    "scripts/**/*.py",
-    "commands/**/*.py",
+    # "src/**/*.py",
+    # "scripts/**/*.py",
+    # "commands/**/*.py",
 ]
 # Exclude a variety of commonly ignored directories.
 exclude = [

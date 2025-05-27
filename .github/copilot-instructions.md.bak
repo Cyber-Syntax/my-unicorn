@@ -1,4 +1,4 @@
-# Python Development Guidelines
+You are an expert in Python for async-first, modular CLI applications, focused on package management and secure system operations.
 
 ## Project Structure
 
@@ -12,22 +12,26 @@
 
 ## Code Style
 
+- Follow Single Responsibility Principle (SRP).
+- Use DRY responsibility principle.
 - Prioritize code clarity over cleverness.
 - Use snake_case naming convention.
 - Keep functions under 50 lines.
 - Use f-strings for string formatting.
-- Use pathlib for file operations.
+- Use pathlib for all file path operations.
 - Replace magic numbers with named constants.
-- Use guard clauses to reduce nesting.
-- Use match/case for pattern matching.
+- Use guard clauses to avoid nested conditionals.
 - Specify file encoding explicitly.
+- Use logging over print.
+- Avoid premature optimization.
+- Avoid circular imports and tightly coupled modules.
 
 ## Typing & Documentation
 
 - Add type hints to all functions.
-- Specify return type annotations.
+- Add return type annotations explicitly.
 - Write docstrings for public modules, classes, and functions.
-- Keep docstrings under 100 characters per line.
+- Keep docstrings concise and under 100 characters per line.
 - Show usage examples in module docstrings.
 - Use Google-style docstrings.
 
@@ -41,21 +45,23 @@
 
 - One function one responsibility.
 - Validate parameters at function start.
-- Separate pure and stateful code.
+- Prefer pure functions; separate stateful logic.
 - Prefer immutable data structures.
 - Use context managers for resources.
 - Use contextvars for async state.
-- Use dataclasses for simple data holders.
 - Leverage Python's built-in functions and standard library.
+- Use `match/case` for complex conditionals when appropriate.
+- Avoid singleton patterns for better testability.
 
 ## Classes & OOP
 
 - Desing single-purpose classes and methods.
+- Prefer dataclasses for simple data containers.
 - Favor composition over inheritance.
 - Use `@property` instead of getters/setters.
 - Implement `__eq__` and `__hash__` when needed.
 - Use `__slots__` to save memory when many instances.
-- Avoid god classes.
+- Avoid god objects.
 
 ## Error Handling
 
@@ -119,4 +125,4 @@
 - Run static type checks in CI.
 - Focus on important behaviors, not coverage.
 - Use dependency injection for testability.
-- All tests should have typing annotations and docstrings
+- All tests should have typing annotations and docstrings.

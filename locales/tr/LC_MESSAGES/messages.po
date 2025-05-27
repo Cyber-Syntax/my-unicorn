@@ -130,18 +130,18 @@ msgstr "Uygulama github url'sini girin:"
 #: src/app_image_downloader.py:111
 msgid ""
 "Which directory to save appimage \n"
-"(Default: '~/Documents/appimages/' if you leave it blank):"
+"(Default: '~/.local/share/myunicorn/' if you leave it blank):"
 msgstr ""
 "Appimage'i hangi dizine kaydetmek istiyorsunuz \n"
-"(Boş bırakılırsa varsayılan: '~/Documents/appimages/')"
+"(Boş bırakılırsa varsayılan: '~/.local/share/myunicorn/')"
 
 #: src/app_image_downloader.py:119
 msgid ""
 "Which directory to save old appimage \n"
-"(Default: '~/Documents/appimages/backup/' if you leave it blank):"
+"(Default: '~/.local/share/myunicorn/backup/' if you leave it blank):"
 msgstr ""
 "Eski appimage'i hangi dizine kaydetmek istiyorsunuz \n"
-"(Boş bırakılırsa varsayılan: '~/Documents/appimages/backup/')"
+"(Boş bırakılırsa varsayılan: '~/.local/share/myunicorn/backup/')"
 
 #: src/app_image_downloader.py:127
 msgid "Enter the hash type for your sha(sha256, sha512) file: "

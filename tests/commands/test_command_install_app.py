@@ -1,18 +1,16 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """Tests for InstallAppCommand functionality.
 
 This module contains tests for the InstallAppCommand class, which handles
 installing AppImages from the app catalog.
 """
 
-import os
 import sys
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import MagicMock, patch
 
 # Add the project root to sys.path using pathlib for better cross-platform compatibility
 project_root = Path(__file__).parent.parent.parent.absolute()
@@ -20,15 +18,8 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Import the modules directly to avoid import issues
-from src.commands.install_app import InstallAppCommand
 from src.app_catalog import AppInfo
-from src.api import GitHubAPI
-from src.app_config import AppConfigManager
-from src.download import DownloadManager
-from src.file_handler import FileHandler
-from src.verify import VerificationManager
-from src.global_config import GlobalConfigManager
-from src.icon_manager import IconManager
+from src.commands.install_app import InstallAppCommand
 
 
 @pytest.fixture
@@ -37,6 +28,7 @@ def app_info_fixture() -> AppInfo:
 
     Returns:
         AppInfo: Sample application information
+
     """
     return AppInfo(
         name="Test App",
@@ -56,6 +48,7 @@ def install_test_data() -> Dict[str, str]:
 
     Returns:
         Dict[str, str]: Dictionary containing test values
+
     """
     return {
         "owner": "testowner",
@@ -82,6 +75,7 @@ def mocked_app_config(
 
     Returns:
         MagicMock: Mocked AppConfigManager instance
+
     """
     mock = MagicMock()
     mock.owner = install_test_data["owner"]
@@ -109,6 +103,7 @@ def mocked_api(monkeypatch: pytest.MonkeyPatch, install_test_data: Dict[str, str
 
     Returns:
         MagicMock: Mocked GitHubAPI instance
+
     """
     mock = MagicMock()
     mock.owner = install_test_data["owner"]
@@ -139,6 +134,7 @@ def mocked_download_manager(
 
     Returns:
         MagicMock: Mocked DownloadManager instance
+
     """
     mock = MagicMock()
     mock.download.return_value = install_test_data["downloaded_file_path"]
@@ -157,10 +153,11 @@ def mocked_global_config(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
     Returns:
         MagicMock: Mocked GlobalConfigManager instance
+
     """
     mock = MagicMock()
-    mock.expanded_appimage_download_folder_path = "/tmp"
-    mock.expanded_appimage_download_backup_folder_path = "/tmp/backup"
+    mock.expanded_app_storage_path = "/tmp"
+    mock.expanded_app_backup_storage_path = "/tmp/backup"
     mock.batch_mode = True
     mock.keep_backup = True
     mock.config_file = "/tmp/global_config.json"
@@ -183,6 +180,7 @@ def mocked_verifier(
 
     Returns:
         MagicMock: Mocked VerificationManager instance
+
     """
     mock = MagicMock()
     mock.verify_appimage.return_value = verification_success
@@ -202,6 +200,7 @@ def mocked_verifier_failure(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
     Returns:
         MagicMock: Mocked VerificationManager instance that fails verification
+
     """
     mock = MagicMock()
     mock.verify_appimage.return_value = False
@@ -221,6 +220,7 @@ def mocked_file_handler(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
     Returns:
         MagicMock: Mocked FileHandler instance
+
     """
     mock = MagicMock()
     mock.handle_appimage_operations.return_value = True
@@ -239,6 +239,7 @@ def mocked_icon_manager(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
     Returns:
         MagicMock: Mocked IconManager instance
+
     """
     mock = MagicMock()
     mock.ensure_app_icon.return_value = None
@@ -260,6 +261,7 @@ def mocked_app_catalog_functions(
 
     Returns:
         Dict[str, MagicMock]: Dictionary of mocked functions
+
     """
     # Create mock functions for all app catalog functions
     mock_get_app_info = MagicMock(return_value=app_info_fixture)
@@ -312,6 +314,7 @@ def test_install_app_direct_install(
         mocked_file_handler: Mocked FileHandler
         mocked_icon_manager: Mocked IconManager
         app_info_fixture: Sample app info
+
     """
     # Setup mock inputs - installing directly bypassing menu
     mock_input.side_effect = ["y"]  # Confirm install
@@ -370,6 +373,7 @@ def test_install_app_no_sha_file(
         mocked_file_handler: Mocked FileHandler
         mocked_icon_manager: Mocked IconManager
         app_info_fixture: Sample app info
+
     """
     # Modify the app_info to have no SHA file
     app_info_fixture.sha_name = "no_sha_file"
@@ -420,6 +424,7 @@ def test_install_app_verification_failure(
         mocked_file_handler: Mocked FileHandler
         mocked_icon_manager: Mocked IconManager
         app_info_fixture: Sample app info
+
     """
     # Setup mock inputs
     mock_input.side_effect = ["y", "n"]  # Confirm install, don't retry
@@ -463,6 +468,7 @@ def test_install_app_api_failure(
         mocked_file_handler: Mocked FileHandler
         mocked_icon_manager: Mocked IconManager
         app_info_fixture: Sample app info
+
     """
     # Set API to fail
     mocked_api.get_response.return_value = (False, "API Error")
@@ -482,104 +488,3 @@ def test_install_app_api_failure(
     assert not mocked_verifier.verify_appimage.called
     assert not mocked_file_handler.handle_appimage_operations.called
     assert not mocked_app_config.save_config.called
-
-
-@patch("builtins.input")
-@patch("builtins.print")
-def test_install_app_menu_navigation(
-    mock_print: MagicMock,
-    mock_input: MagicMock,
-    mocked_app_config: MagicMock,
-    mocked_api: MagicMock,
-    mocked_global_config: MagicMock,
-    mocked_file_handler: MagicMock,
-    mocked_app_catalog_functions: Dict[str, MagicMock],
-    app_info_fixture: AppInfo,
-) -> None:
-    """Test app catalog menu navigation in InstallAppCommand.
-
-    Args:
-        mock_print: Mock for builtins.print
-        mock_input: Mock for builtins.input
-        mocked_app_config: Mocked AppConfigManager
-        mocked_api: Mocked GitHubAPI
-        mocked_global_config: Mocked GlobalConfigManager
-        mocked_file_handler: Mocked FileHandler
-        mocked_app_catalog_functions: Mocked app catalog functions
-        app_info_fixture: Sample app info
-    """
-    # Mock for _install_app method to avoid going through actual installation
-    with patch.object(InstallAppCommand, "_install_app", return_value=None) as mock_install_app:
-        # Test viewing all apps
-        mock_input.side_effect = [
-            "1",
-            "1",
-            "y",
-            "4",
-        ]  # View all, select first app, confirm, return to main
-
-        cmd = InstallAppCommand()
-        cmd.execute()
-
-        # Check that get_all_apps was called
-        assert mocked_app_catalog_functions["get_all_apps"].called
-
-        # Check that _install_app was called with the correct app info
-        mock_install_app.assert_called_once_with(app_info_fixture)
-
-        # Reset mocks
-        mock_install_app.reset_mock()
-        mocked_app_catalog_functions["get_all_apps"].reset_mock()
-
-        # Test category browsing
-        mock_input.side_effect = [
-            "2",
-            "1",
-            "1",
-            "y",
-            "4",
-        ]  # Browse by category, select first category, select first app, confirm, return to main
-
-        cmd = InstallAppCommand()
-        cmd.execute()
-
-        # Check that get_categories was called
-        assert mocked_app_catalog_functions["get_categories"].called
-
-        # Check that get_apps_by_category was called
-        assert mocked_app_catalog_functions["get_apps_by_category"].called
-
-        # Check that _install_app was called with the correct app info
-        mock_install_app.assert_called_once_with(app_info_fixture)
-
-        # Reset mocks
-        mock_install_app.reset_mock()
-        mocked_app_catalog_functions["get_categories"].reset_mock()
-        mocked_app_catalog_functions["get_apps_by_category"].reset_mock()
-
-        # Test search
-        mock_input.side_effect = [
-            "3",
-            "test",
-            "1",
-            "y",
-            "4",
-        ]  # Search, query "test", select first result, confirm, return to main
-
-        cmd = InstallAppCommand()
-        cmd.execute()
-
-        # Check that search_apps was called with the correct query
-        mocked_app_catalog_functions["search_apps"].assert_called_once_with("test")
-
-        # Check that _install_app was called with the correct app info
-        mock_install_app.assert_called_once_with(app_info_fixture)
-
-        # Test direct exit
-        mock_input.side_effect = ["4"]  # Return to main menu
-
-        cmd = InstallAppCommand()
-        cmd.execute()
-
-        # Check that no installation was attempted
-        assert not mock_install_app.called

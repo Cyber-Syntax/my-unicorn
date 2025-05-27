@@ -1,16 +1,16 @@
 # FIX: not work
+import os
+import sys
 import unittest
 from unittest.mock import patch
-import sys
-import os
 
 # Add the project root to sys.path so that the 'src' package can be imported.
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+from src.api.github_api import GitHubAPI
 from src.commands.download import DownloadCommand
-from src.api import GitHubAPI
 
 
 class TestIntegrationDownloadFlow(unittest.TestCase):
@@ -19,7 +19,7 @@ class TestIntegrationDownloadFlow(unittest.TestCase):
     @patch("src.verify.VerificationManager.verify_appimage", return_value=True)
     @patch("src.file_handler.FileHandler.handle_appimage_operations", return_value=True)
     @patch("src.app_config.AppConfigManager.ask_sha_hash", return_value=("test.sha256", "sha256"))
-    @patch("src.api.GitHubAPI.get_response")
+    @patch("src.api.github_api.GitHubAPI.get_response")
     @patch("src.app_config.AppConfigManager.temp_save_config")
     @patch("src.app_config.AppConfigManager.save_config")
     @patch("src.global_config.GlobalConfigManager.load_config")

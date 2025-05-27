@@ -1,35 +1,29 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Install app by name command module.
+"""Install app by name command module.
 
 This module provides a command to install applications from the app catalog
 by name, without requiring the user to enter URLs.
 """
 
 import logging
-import os
-import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List
 
-from src.commands.base import Command
+from src.api.github_api import GitHubAPI
 from src.app_catalog import (
-    APP_CATALOG,
-    get_app_info,
+    AppInfo,
     get_all_apps,
     get_apps_by_category,
     get_categories,
     search_apps,
-    AppInfo,
 )
-from src.api import GitHubAPI
 from src.app_config import AppConfigManager
+from src.commands.base import Command
 from src.download import DownloadManager
 from src.file_handler import FileHandler
 from src.global_config import GlobalConfigManager
-from src.verify import VerificationManager
 from src.icon_manager import IconManager
+from src.verify import VerificationManager
 
 
 class InstallAppCommand(Command):
@@ -128,11 +122,11 @@ class InstallAppCommand(Command):
             print("\nSearch cancelled.")
 
     def _display_app_list(self, apps: List[AppInfo]) -> None:
-        """
-        Display a list of applications and allow user to select one for installation.
+        """Display a list of applications and allow user to select one for installation.
 
         Args:
             apps: List of AppInfo objects to display
+
         """
         if not apps:
             print("No applications available in this category.")
@@ -161,11 +155,11 @@ class InstallAppCommand(Command):
             print("\nOperation cancelled.")
 
     def _confirm_and_install_app(self, app_info: AppInfo) -> None:
-        """
-        Confirm and install the selected application.
+        """Confirm and install the selected application.
 
         Args:
             app_info: AppInfo object for the selected application
+
         """
         print(f"\n=== Install {app_info.name} ===")
         print(f"Name: {app_info.name}")
@@ -187,14 +181,12 @@ class InstallAppCommand(Command):
             print("\nInstallation cancelled.")
 
     def _install_app(self, app_info: AppInfo) -> None:
-        """
-        Download and install the application with verification.
-        """
+        """Download and install the application with verification."""
         # Create a properly initialized app config manager for this app
         app_config = AppConfigManager(
             owner=app_info.owner,
             repo=app_info.repo,
-            app_id=app_info.app_id,  # Pass the app_id from catalog
+            app_display_name=app_info.app_display_name,  # Pass the app_display_name from catalog
         )
 
         # Initialize GitHubAPI with parameters based on app catalog information
@@ -285,24 +277,23 @@ class InstallAppCommand(Command):
                         verification_success = True
                         print("Verification successful!")
                         break
+                    # Verification failed
+                    elif attempt == self.MAX_ATTEMPTS:
+                        print(
+                            f"Verification failed. Maximum retry attempts ({self.MAX_ATTEMPTS}) reached."
+                        )
+                        return
                     else:
-                        # Verification failed
-                        if attempt == self.MAX_ATTEMPTS:
-                            print(
-                                f"Verification failed. Maximum retry attempts ({self.MAX_ATTEMPTS}) reached."
-                            )
+                        print(f"Verification failed. Attempt {attempt} of {self.MAX_ATTEMPTS}.")
+                        retry = input("Retry download? (y/N): ").strip().lower()
+                        if retry != "y":
+                            print("Installation cancelled.")
                             return
-                        else:
-                            print(f"Verification failed. Attempt {attempt} of {self.MAX_ATTEMPTS}.")
-                            retry = input("Retry download? (y/N): ").strip().lower()
-                            if retry != "y":
-                                print("Installation cancelled.")
-                                return
                             # Continue to next attempt
 
             except Exception as e:
-                logging.error(f"Download attempt {attempt} failed: {str(e)}", exc_info=True)
-                print(f"Error during download: {str(e)}")
+                logging.error(f"Download attempt {attempt} failed: {e!s}", exc_info=True)
+                print(f"Error during download: {e!s}")
 
                 if attempt == self.MAX_ATTEMPTS:
                     print(f"Maximum retry attempts ({self.MAX_ATTEMPTS}) reached.")
@@ -326,19 +317,25 @@ class InstallAppCommand(Command):
             version=api.version,
             sha_name=api.sha_name,
             config_file=self.global_config.config_file,
-            appimage_download_folder_path=self.global_config.expanded_appimage_download_folder_path,
-            appimage_download_backup_folder_path=self.global_config.expanded_appimage_download_backup_folder_path,
+            app_storage_path=self.global_config.expanded_app_storage_path,
+            app_backup_storage_path=self.global_config.expanded_app_backup_storage_path,
             config_folder=app_config.config_folder,
             config_file_name=app_config.config_file_name,
             batch_mode=self.global_config.batch_mode,
             keep_backup=self.global_config.keep_backup,
             max_backups=self.global_config.max_backups,
-            app_id=app_info.app_id,  # Pass app_id from app_info to FileHandler
+            app_display_name=app_info.app_display_name,  # Pass app_display_name from app_info to FileHandler
         )
 
         # Download app icon if possible
         icon_manager = IconManager()
-        icon_manager.ensure_app_icon(api.owner, api.repo)
+        # First get the app_display_name (if available from app_config) or let the fallback handle it
+        app_display_name = (
+            app_config.app_display_name
+            if hasattr(app_config, "app_display_name") and app_config.app_display_name
+            else None
+        )
+        icon_manager.ensure_app_icon(api.owner, api.repo, app_display_name=app_display_name)
 
         # Perform file operations
         print("Finalizing installation...")
@@ -356,9 +353,7 @@ class InstallAppCommand(Command):
             print(f"Config file created at: {config_path}")
 
             # Show location of executable
-            app_path = (
-                Path(self.global_config.expanded_appimage_download_folder_path) / api.appimage_name
-            )
+            app_path = Path(self.global_config.expanded_app_storage_path) / api.appimage_name
             print(f"Application installed to: {app_path}")
             print("You can run it from the command line or create a desktop shortcut.")
         else:

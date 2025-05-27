@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Asynchronous update command module for concurrent AppImage updates.
+"""Asynchronous update command module for concurrent AppImage updates.
 
 This module provides a command to update multiple AppImages concurrently
 using asynchronous I/O operations. It leverages Python's asyncio library
@@ -18,26 +16,17 @@ Key features:
 
 import asyncio
 import logging
-import os
 import time
-import sys
-from typing import List, Dict, Any, Optional, Tuple, Set
-from datetime import datetime
-from contextlib import contextmanager
+from typing import Any, Dict, List, Set, Tuple
 
-from src.commands.update_base import BaseUpdateCommand
 from src.app_config import AppConfigManager
-from src.global_config import GlobalConfigManager
-from src.api import GitHubAPI
-from src.download import DownloadManager
-from src.verify import VerificationManager
-from src.file_handler import FileHandler
 from src.auth_manager import GitHubAuthManager
+from src.commands.update_base import BaseUpdateCommand
+from src.global_config import GlobalConfigManager
 
 
 class UpdateAsyncCommand(BaseUpdateCommand):
-    """
-    Command to update multiple AppImages concurrently using async I/O.
+    """Command to update multiple AppImages concurrently using async I/O.
 
     This class extends the BaseUpdateCommand to provide asynchronous update
     capabilities, allowing multiple AppImages to be updated in parallel for
@@ -57,8 +46,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         # that was already loaded in BaseUpdateCommand.__post_init__()
 
     def execute(self) -> None:
-        """
-        Main update execution flow with asynchronous processing.
+        """Main update execution flow with asynchronous processing.
 
         This method orchestrates the async update process:
         1. Loads configuration and checks for available AppImages
@@ -162,13 +150,12 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             print("\nOperation cancelled by user (Ctrl+C)")
             return
         except Exception as e:
-            logging.error(f"Unexpected error in async update: {str(e)}", exc_info=True)
-            print(f"\nUnexpected error: {str(e)}")
+            logging.error(f"Unexpected error in async update: {e!s}", exc_info=True)
+            print(f"\nUnexpected error: {e!s}")
             return
 
     def _find_updatable_apps(self) -> List[Dict[str, Any]]:
-        """
-        Find applications that can be updated through user selection.
+        """Find applications that can be updated through user selection.
 
         This method handles rate limits during the scanning process by:
         1. Checking available rate limits before API calls
@@ -280,7 +267,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                 else:
                     print(f"{app_name}: Already up to date" + " " * 20)
             except Exception as e:
-                print(f"{app_name}: Failed: {str(e)}" + " " * 20)
+                print(f"{app_name}: Failed: {e!s}" + " " * 20)
                 failed_checks += 1
                 # If we hit rate limits, provide clear feedback
                 if "rate limit exceeded" in str(e).lower():
@@ -300,8 +287,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         return updatable_apps
 
     def _confirm_updates(self, updatable: List[Dict[str, Any]]) -> bool:
-        """
-        Handle user confirmation based on batch mode.
+        """Handle user confirmation based on batch mode.
 
         Args:
             updatable: List of updatable app information dictionaries
@@ -335,8 +321,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
     def _check_rate_limits(
         self, apps: List[Dict[str, Any]]
     ) -> Tuple[bool, List[Dict[str, Any]], str]:
-        """
-        Check if we have enough API rate limits for the selected apps.
+        """Check if we have enough API rate limits for the selected apps.
 
         This method:
         1. Gets current GitHub API rate limits
@@ -416,8 +401,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         return False, filtered_apps, status
 
     def _update_apps_async(self, apps_to_update: List[Dict[str, Any]]) -> None:
-        """
-        Update multiple apps concurrently using asyncio.
+        """Update multiple apps concurrently using asyncio.
 
         This method is the core of the async update functionality. It:
         1. Sets up tracking for in-progress and completed updates
@@ -461,8 +445,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             async def update_app_async(
                 app_data: Dict[str, Any], idx: int
             ) -> Tuple[bool, Dict[str, Any]]:
-                """
-                Asynchronous wrapper for single app update.
+                """Asynchronous wrapper for single app update.
 
                 Args:
                     app_data: Dictionary with app information
@@ -603,8 +586,8 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                 print("\nUpdate process interrupted!")
 
         except Exception as e:
-            logging.error(f"Error in async update process: {str(e)}", exc_info=True)
-            print(f"\nError in update process: {str(e)}")
+            logging.error(f"Error in async update process: {e!s}", exc_info=True)
+            print(f"\nError in update process: {e!s}")
 
     def _update_single_app_async(
         self,
@@ -613,8 +596,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         app_index: int = 0,
         total_apps: int = 0,
     ) -> bool:
-        """
-        Update a single AppImage with specialized handling for async context.
+        """Update a single AppImage with specialized handling for async context.
 
         This method is designed to work within the async update system but
         runs synchronously within its own thread to avoid blocking the event loop.
@@ -650,9 +632,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         return success
 
     def _display_rate_limit_info(self) -> None:
-        """
-        Display GitHub API rate limit information after updates using standard print statements.
-        """
+        """Display GitHub API rate limit information after updates using standard print statements."""
         try:
             # Use the cached rate limit info to avoid unnecessary API calls
             remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()

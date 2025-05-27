@@ -1,26 +1,21 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Tests for the base update command module.
+"""Tests for the base update command module.
 
 This module contains unit tests for the BaseUpdateCommand class, testing both
 synchronous and asynchronous update operations, version checking, and error handling.
 """
 
-import os
-import pytest
 import asyncio
-from typing import Dict, Any, List, Tuple, Optional
-from unittest.mock import MagicMock, patch, PropertyMock, AsyncMock
+from typing import Any, Dict, Tuple
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.commands.update_base import BaseUpdateCommand
+import pytest
+
+from src.api.github_api import GitHubAPI
 from src.app_config import AppConfigManager
-from src.global_config import GlobalConfigManager
-from src.api import GitHubAPI
-from src.download import DownloadManager
-from src.verify import VerificationManager
+from src.commands.update_base import BaseUpdateCommand
 from src.file_handler import FileHandler
-from src.auth_manager import GitHubAuthManager
+from src.global_config import GlobalConfigManager
 
 
 class TestBaseUpdateCommand:
@@ -795,8 +790,8 @@ class TestBaseUpdateCommand:
         mock_app_config.arch_keyword = "x86_64"  # Add arch_keyword
 
         mock_global_config = MagicMock(spec=GlobalConfigManager)
-        mock_global_config.expanded_appimage_download_folder_path = "/path/to/downloads"
-        mock_global_config.expanded_appimage_download_backup_folder_path = "/path/to/backups"
+        mock_global_config.expanded_app_storage_path = "/path/to/downloads"
+        mock_global_config.expanded_app_backup_storage_path = "/path/to/backups"
         mock_global_config.batch_mode = False
         mock_global_config.keep_backup = True
         mock_global_config.max_backups = 3
@@ -895,8 +890,8 @@ class TestBaseUpdateCommand:
 
         mock_global_config = MagicMock(spec=GlobalConfigManager)
         mock_global_config.config_file = "/path/to/global_config.json"
-        mock_global_config.expanded_appimage_download_folder_path = "/path/to/downloads"
-        mock_global_config.expanded_appimage_download_backup_folder_path = "/path/to/backups"
+        mock_global_config.expanded_app_storage_path = "/path/to/downloads"
+        mock_global_config.expanded_app_backup_storage_path = "/path/to/backups"
         mock_global_config.batch_mode = False
         mock_global_config.keep_backup = True
         mock_global_config.max_backups = 3
@@ -916,8 +911,8 @@ class TestBaseUpdateCommand:
                 version=mock_github_api.version,
                 sha_name=mock_github_api.sha_name,
                 config_file=mock_global_config.config_file,
-                appimage_download_folder_path=mock_global_config.expanded_appimage_download_folder_path,
-                appimage_download_backup_folder_path=mock_global_config.expanded_appimage_download_backup_folder_path,
+                app_storage_path=mock_global_config.expanded_app_storage_path,
+                app_backup_storage_path=mock_global_config.expanded_app_backup_storage_path,
                 config_folder=mock_app_config.config_folder,
                 config_file_name=mock_app_config.config_file_name,
                 batch_mode=mock_global_config.batch_mode,

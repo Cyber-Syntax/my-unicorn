@@ -1,9 +1,8 @@
+import asyncio
 import logging
 import os
-import sys
-import asyncio
 import time
-from typing import Optional, List, Dict, Any, Union, Set, Tuple, ClassVar
+from typing import Dict, Optional, Set
 
 import requests
 
@@ -13,8 +12,7 @@ from .progress_manager import BasicMultiAppProgress
 
 
 class DownloadManager:
-    """
-    Manages the download of AppImages from GitHub releases.
+    """Manages the download of AppImages from GitHub releases.
 
     Attributes:
         github_api: The GitHub API object containing release information
@@ -22,6 +20,7 @@ class DownloadManager:
         is_async_mode: Whether the download is happening in an async context
         app_index: Index of the app in a multi-app update (1-based)
         total_apps: Total number of apps being updated
+
     """
 
     # Class variables for shared progress tracking
@@ -32,17 +31,14 @@ class DownloadManager:
     # Use GlobalConfigManager for configuration
     _global_config: Optional[GlobalConfigManager] = None
 
-    # Path for temporary downloads
-    _downloads_dir: ClassVar[str] = os.path.join(os.getcwd(), "downloads")
-
     def __init__(self, github_api: "GitHubAPI", app_index: int = 0, total_apps: int = 0) -> None:
-        """
-        Initialize the download manager with GitHub API instance.
+        """Initialize the download manager with GitHub API instance.
 
         Args:
             github_api: GitHub API instance containing release information
             app_index: Index of the app in a multi-app update (1-based)
             total_apps: Total number of apps being updated
+
         """
         self.github_api = github_api
         self._logger = logging.getLogger(__name__)
@@ -61,11 +57,11 @@ class DownloadManager:
         self._progress_task_id: Optional[int] = None
 
     def _detect_async_mode(self) -> bool:
-        """
-        Detect if we're running in an async context.
+        """Detect if we're running in an async context.
 
         Returns:
             bool: True if running in an async context
+
         """
         try:
             asyncio.get_running_loop()
@@ -75,27 +71,31 @@ class DownloadManager:
 
     @classmethod
     def get_downloads_dir(cls) -> str:
-        """
-        Get the path to the downloads directory, ensuring it exists.
+        """Get the path to the downloads directory, ensuring it exists.
 
         Returns:
             str: Path to the downloads directory
+
         """
-        # Create downloads directory based on current working directory
-        # This allows tests to redirect it to a temporary location
-        downloads_dir = os.path.join(os.getcwd(), "downloads")
+        # Initialize global config if not already set
+        if cls._global_config is None:
+            cls._global_config = GlobalConfigManager()
+            cls._global_config.load_config()
+
+        # Use the app_download_path from GlobalConfigManager
+        downloads_dir = cls._global_config.expanded_app_download_path
         os.makedirs(downloads_dir, exist_ok=True)
         return downloads_dir
 
     def _format_size(self, size_bytes: int) -> str:
-        """
-        Format file size in human-readable format.
+        """Format file size in human-readable format.
 
         Args:
             size_bytes: Size in bytes
 
         Returns:
             str: Formatted size string (e.g., '10.5 MB')
+
         """
         if size_bytes <= 0:
             return "0 B"
@@ -116,11 +116,11 @@ class DownloadManager:
 
     @classmethod
     def get_or_create_progress(cls) -> BasicMultiAppProgress:
-        """
-        Get or create a shared progress instance for all downloads.
+        """Get or create a shared progress instance for all downloads.
 
         Returns:
             BasicMultiAppProgress: The shared progress instance
+
         """
         # Use the first instance's progress or create a new one
         if cls._global_progress is None:
@@ -140,14 +140,13 @@ class DownloadManager:
             try:
                 cls._global_progress.stop()
             except Exception as e:
-                logging.error(f"Error stopping progress display: {str(e)}")
+                logging.error(f"Error stopping progress display: {e!s}")
             finally:
                 cls._global_progress = None
                 cls._active_tasks = set()
 
     def download(self) -> str:
-        """
-        Download the AppImage from the GitHub release.
+        """Download the AppImage from the GitHub release.
 
         Returns:
             str: The full path to the downloaded AppImage file
@@ -155,12 +154,13 @@ class DownloadManager:
         Raises:
             ValueError: If AppImage URL or name is not available
             RuntimeError: For network errors, file system errors, or other unexpected issues
+
         """
         appimage_url = self.github_api.appimage_url
         appimage_name = self.github_api.appimage_name
 
         if not appimage_url or not appimage_name:
-            error_msg = "AppImage URL or name not available. Cannot download."
+            error_msg = "AppImage URL or name is not available. Cannot download."
             self._logger.error(error_msg)
             raise ValueError(error_msg)
 
@@ -178,18 +178,17 @@ class DownloadManager:
 
             return download_path
 
-        except IOError as e:
-            error_msg = f"File system error while downloading {appimage_name}: {str(e)}"
+        except OSError as e:
+            error_msg = f"File system error while downloading {appimage_name}: {e!s}"
             self._logger.error(error_msg)
             raise RuntimeError(error_msg)
         except Exception as e:
-            error_msg = f"Unexpected error downloading {appimage_name}: {str(e)}"
+            error_msg = f"Unexpected error downloading {appimage_name}: {e!s}"
             self._logger.error(error_msg)
             raise RuntimeError(error_msg)
 
     def _get_file_size(self, url: str, headers: Dict[str, str]) -> int:
-        """
-        Get the file size by making a HEAD request.
+        """Get the file size by making a HEAD request.
 
         Args:
             url: URL to check
@@ -200,6 +199,7 @@ class DownloadManager:
 
         Raises:
             requests.exceptions.RequestException: For network errors
+
         """
         self._logger.info(f"Fetching headers for {url}")
         response = requests.head(url, allow_redirects=True, timeout=10, headers=headers)
@@ -207,8 +207,7 @@ class DownloadManager:
         return int(response.headers.get("content-length", 0))
 
     def _setup_progress_task(self, filename: str, total_size: int, prefix: str) -> Optional[int]:
-        """
-        Set up a progress tracking task.
+        """Set up a progress tracking task.
 
         Args:
             filename: Name of the file being downloaded
@@ -217,6 +216,7 @@ class DownloadManager:
 
         Returns:
             Optional[int]: ID of the progress task, or None if setup failed
+
         """
         progress = self.get_or_create_progress()
 
@@ -233,15 +233,13 @@ class DownloadManager:
             return task_id
 
         except Exception as e:
-            self._logger.error(f"Error creating progress task: {str(e)}")
+            self._logger.error(f"Error creating progress task: {e!s}")
             # Fallback to console output without progress bar
             print(f"{prefix}Downloading {filename}...")
             return None
 
     def _cleanup_progress_task(self) -> None:
-        """
-        Clean up progress tracking task, ignoring any errors.
-        """
+        """Clean up progress tracking task, ignoring any errors."""
         if not hasattr(self, "_progress_task_id") or self._progress_task_id is None:
             return
 
@@ -266,8 +264,7 @@ class DownloadManager:
         task_id: Optional[int],
         total_size: int,
     ) -> float:
-        """
-        Perform the actual file download with progress updates.
+        """Perform the actual file download with progress updates.
 
         Args:
             url: URL to download from
@@ -281,6 +278,7 @@ class DownloadManager:
 
         Raises:
             requests.exceptions.RequestException: For network errors
+
         """
         start_time = time.time()
         response = requests.get(url, stream=True, timeout=30, headers=headers)
@@ -318,14 +316,14 @@ class DownloadManager:
     def _display_completion_stats(
         self, filename: str, total_size: int, download_time: float, prefix: str
     ) -> None:
-        """
-        Calculate and display download completion statistics.
+        """Calculate and display download completion statistics.
 
         Args:
             filename: Name of the downloaded file
             total_size: Size in bytes
             download_time: Time taken to download in seconds
             prefix: Message prefix
+
         """
         speed_mbps = (total_size / (1024 * 1024)) / download_time if download_time > 0 else 0
 
@@ -341,8 +339,7 @@ class DownloadManager:
         headers: Dict[str, str],
         prefix: str = "",
     ) -> str:
-        """
-        Download with a progress bar display.
+        """Download with a progress bar display.
 
         Args:
             url: URL to download from
@@ -355,6 +352,7 @@ class DownloadManager:
 
         Raises:
             RuntimeError: Any error during download
+
         """
         try:
             # Get file size
@@ -385,12 +383,76 @@ class DownloadManager:
             return file_path
 
         except requests.exceptions.RequestException as e:
-            error_msg = f"Network error while downloading {filename}: {str(e)}"
+            error_msg = f"Network error while downloading {filename}: {e!s}"
             self._logger.error(error_msg)
             print(f"{prefix}✗ Download failed: {error_msg}")
             self._cleanup_progress_task()
             raise RuntimeError(error_msg)
 
-        except Exception as e:
+        except Exception:
             self._cleanup_progress_task()
             raise  # Re-raise the original exception
+
+    def verify_download(self, downloaded_file: str) -> bool:
+        """Verify the downloaded file using checksums.
+
+        This method uses the appropriate checksum verification strategy based on
+        the application's configuration, including special handling for apps
+        that store checksums in GitHub release descriptions.
+
+        Args:
+            downloaded_file: Path to the downloaded file to verify
+
+        Returns:
+            bool: True if verification passed or skipped, False otherwise
+
+        """
+        logging.info("Verifying download integrity...")
+
+        # Skip verification if hash verification is disabled
+        if self.github_api.hash_type == "no_hash" or not self.github_api.sha_name:
+            logging.info("Skipping verification as requested (no hash provided)")
+            return True
+
+        from src.verify import VerificationManager # Import once at the top of the relevant scope
+
+        # Handle "extracted_checksum" (which now implies hash might be directly available)
+        # or other standard SHA file scenarios.
+        # VerificationManager will internally decide whether to use direct_expected_hash
+        # or fall back to legacy "extracted_checksum" logic, or parse a SHA file.
+
+        direct_hash_to_pass: Optional[str] = None
+        sha_name_to_pass: Optional[str] = self.github_api.sha_name
+        sha_url_to_pass: Optional[str] = self.github_api.sha_url
+
+        if self.github_api.sha_name == "extracted_checksum":
+            logging.info(f"Processing 'extracted_checksum' for {self.github_api.appimage_name}.")
+            # SHAManager should have set extracted_hash_from_body if it successfully parsed one.
+            # It also sets hash_type to "sha256".
+            direct_hash_to_pass = self.github_api.extracted_hash_from_body
+            if direct_hash_to_pass:
+                logging.info("Direct hash found for 'extracted_checksum', will pass to VerificationManager.")
+                # sha_url is not needed if direct_hash is used by VerificationManager's "extracted_checksum" path
+                sha_url_to_pass = None
+            else:
+                # If no direct hash, VerificationManager's "extracted_checksum" will use its legacy path
+                logging.info("No direct hash for 'extracted_checksum', VerificationManager will use legacy path.")
+
+        # For all other cases (actual SHA file names), direct_hash_to_pass remains None.
+        # VerificationManager will download and parse the sha_name file.
+
+        logging.info(
+            f"Instantiating VerificationManager for {self.github_api.appimage_name} with: "
+            f"sha_name='{sha_name_to_pass}', hash_type='{self.github_api.hash_type}', "
+            f"direct_hash_provided={direct_hash_to_pass is not None}"
+        )
+
+        verifier = VerificationManager(
+            sha_name=sha_name_to_pass,
+            sha_url=sha_url_to_pass,
+            appimage_name=self.github_api.appimage_name,
+            appimage_path=downloaded_file,
+            hash_type=self.github_api.hash_type if self.github_api.hash_type is not None else "sha256",
+            direct_expected_hash=direct_hash_to_pass,
+        )
+        return verifier.verify_appimage(cleanup_on_failure=True)

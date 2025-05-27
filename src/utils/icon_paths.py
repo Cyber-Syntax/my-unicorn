@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Icon path configuration module.
+"""Icon path configuration module.
 
 This module defines exact paths to icon files for various repositories.
 Using a Python module instead of YAML allows for better documentation
@@ -12,9 +10,10 @@ Examples:
     >>> path = get_icon_path("joplin")
     >>> print(path)
     'Assets/LinuxIcons/256x256.png'
+
 """
 
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
 
 __all__ = ["ICON_PATHS", "get_icon_path"]
 
@@ -61,19 +60,23 @@ ICON_PATHS: Dict[str, Dict[str, str]] = {
         "exact_path": "icons/icon.png",
         "filename": "qownnotes_icon.png",
     },
+    "zen-browser/desktop": {
+        "exact_path": "docs/assets/zen-black.svg",
+        "filename": "zen_browser_icon.png",
+    },
     # Add more repository configurations as needed...
 }
 
 
 def get_icon_path(repo_name: str) -> Optional[str]:
-    """
-    Get the exact icon path for a repository.
+    """Get the exact icon path for a repository.
 
     Args:
         repo_name: Repository name (case-insensitive)
 
     Returns:
         str or None: Exact path to the icon file or None if not configured
+
     """
     if not repo_name:
         return None
@@ -102,14 +105,14 @@ def get_icon_path(repo_name: str) -> Optional[str]:
 
 
 def get_icon_filename(repo_name: str) -> Optional[str]:
-    """
-    Get the preferred filename for saving an icon.
+    """Get the preferred filename for saving an icon.
 
     Args:
         repo_name: Repository name (case-insensitive)
 
     Returns:
         str or None: Preferred filename or None if not configured
+
     """
     if not repo_name:
         return None
@@ -139,8 +142,7 @@ def get_icon_filename(repo_name: str) -> Optional[str]:
 
 # For backwards compatibility
 def get_icon_paths(repo_name: str) -> Optional[Dict[str, Any]]:
-    """
-    Legacy function for backwards compatibility with existing tests and code.
+    """Legacy function for backwards compatibility with existing tests and code.
 
     This function recreates the old dictionary format that tests expect.
 
@@ -149,6 +151,7 @@ def get_icon_paths(repo_name: str) -> Optional[Dict[str, Any]]:
 
     Returns:
         Dict or None: Icon configuration for the repository in the old format
+
     """
     if not repo_name:
         return None

@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Architecture utilities.
+"""Architecture utilities.
 
 This module provides functions for detecting and managing system architecture
 information for AppImage compatibility.
@@ -10,20 +8,19 @@ Note: Currently, this application is designed primarily for Linux systems.
 Windows support is experimental and not officially supported.
 """
 
-import platform
 import logging
-from typing import List, Dict, Optional
+import platform
+from typing import List, Optional
 
 # Configure module logger
 logger = logging.getLogger(__name__)
 
 # Supported platform indicator - currently only Linux is officially supported
-SUPPORTED_PLATFORMS = ["linux", "darwin"]
+SUPPORTED_PLATFORMS = ["linux"]
 
 
 def get_arch_keywords(arch_keyword: Optional[str] = None) -> List[str]:
-    """
-    Get architecture-specific keywords based on the current platform.
+    """Get architecture-specific keywords based on the current platform.
 
     Args:
         arch_keyword: Optional specific architecture keyword to use instead of detection
@@ -80,8 +77,7 @@ def get_arch_keywords(arch_keyword: Optional[str] = None) -> List[str]:
 
 
 def get_incompatible_archs(current_arch: str) -> List[str]:
-    """
-    Get a list of architecture keywords that are incompatible with the current architecture.
+    """Get a list of architecture keywords that are incompatible with the current architecture.
 
     Args:
         current_arch: Current system architecture
@@ -152,8 +148,7 @@ def get_incompatible_archs(current_arch: str) -> List[str]:
 
 
 def extract_arch_from_filename(filename: str) -> str:
-    """
-    Extract architecture information from a filename.
+    """Extract architecture information from a filename.
 
     Args:
         filename: The filename to analyze
@@ -186,8 +181,7 @@ def extract_arch_from_filename(filename: str) -> str:
 
 
 def get_current_arch() -> str:
-    """
-    Get the current system architecture.
+    """Get the current system architecture.
 
     Returns:
         str: Current system architecture (e.g., 'x86_64', 'arm64')

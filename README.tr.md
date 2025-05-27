@@ -1,13 +1,11 @@
 [![en](https://img.shields.io/badge/lang-en-green.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.md)
 [![tr](https://img.shields.io/badge/lang-tr-blue.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.tr.md)
 
-
 # **⚠️ Dikkat**
 
 - Bu proje sınırlı testlerden dolayı şu anlık **beta aşamasındadır** . Başlangıçta öğrenme amaçlı geliştirilmiş olsa da, benim özel ihtiyaçlarımı etkin bir şekilde karşılamaktadır.
 - **Önemli:** Script’i güncellerken **Releases** bölümündeki talimatları takip edin. Güncellemeler yeni özellikler veya değişiklikler içerebilir ve bu değişiklikler farklı adımlar gerektirebilir. Talimatları olabildiğince basit tutmaya çalışacağım.
 - **Şu anda desteklenen:** Sadece Linux.
-
 
 ## **🦄 my-unicorn Hakkında**
 
@@ -24,7 +22,6 @@
 
   - [x] sha256
   - [x] sha512
-
 
 # **💡 Nasıl Kullanılır**
 
@@ -62,10 +59,9 @@
 
 5. Nasıl kulllanılacağını öğrenmek için alttakileri okumaya devam edin.
 
-
 ## **🛠️ Uygulama Kullanımı**
 
-1. `super-productivity.json` veya diğer örnek yapılandırma dosyalarını `config_files_examples/` klasöründen, uygulamanızın appimage dosyalarının bulunduğu dizine kopyalayabilirsiniz (varsayılan: `~/Documents/appimages/config_files/super-productivity.json`). Bu yapılandırma dosyası, super-productivity appimage için bir örnektir.
+1. `super-productivity.json` veya diğer örnek yapılandırma dosyalarını `config_files_examples/` klasöründen, uygulamanızın appimage dosyalarının bulunduğu dizine kopyalayabilirsiniz (varsayılan: `~/.local/share/myunicorn/config_files/super-productivity.json`). Bu yapılandırma dosyası, super-productivity appimage için bir örnektir.
 
 2. Uygulama ile bir yapılandırma dosyası oluşturabilirsiniz. Ancak bunun için uygulama hakkında bazı bilgilere ihtiyacınız olacak:
    - **GitHub URL:** Uygulamanın GitHub depo adresi (örn. `https://github.com/johannesjo/super-productivity`).
@@ -81,14 +77,11 @@
 - **💖 Projeyi Destekle:** Çalışmalarımı desteklemek ve projeler yapmaya devam etmemi sağlamak istersen, bana sponsor olmayı düşünebilirsin:
   - [![Sponsor Ol](https://img.shields.io/badge/Sponsor-💖-brightgreen)](https://github.com/sponsors/Cyber-Syntax)
 
-
 ### **🤝 Katkı Sağlama**
 
 - Bu proje benim için öncelikle bir öğrenme kaynağıdır, ancak geri bildirim veya önerilerden memnuniyet duyarım! Tüm katkıları entegre etmeyi veya sürekli olarak katılım sağlamayı vaat edemem, ancak proje hedeflerine uygun iyileştirmelere ve fikirlere açığım.
 - Yine de, daha ayrıntılı bir açıklama için lütfen [CONTRIBUTING.tr.md](.github/CONTRIBUTING.tr.md) dosyasına göz atın.
 
-
 ## **📝 Lisans**
 
 Bu script, [GPL 3.0 Lisansı](https://www.gnu.org/licenses/gpl-3.0.en.html) altında lisanslanmıştır. Lisansın bir kopyasını [LICENSE](https://github.com/Cyber-Syntax/my-unicorn/blob/main/LICENSE) dosyasından veya [www.gnu.org](https://www.gnu.org/licenses/gpl-3.0.en.html) adresinden bulabilirsiniz.
-

@@ -1,13 +1,14 @@
-from src.commands.base import Command
 import logging
-from src.api import GitHubAPI
+
+from src.api.github_api import GitHubAPI
 from src.app_config import AppConfigManager
+from src.commands.base import Command
 from src.download import DownloadManager
 from src.file_handler import FileHandler
 from src.global_config import GlobalConfigManager
+from src.icon_manager import IconManager
 from src.parser import ParseURL
 from src.verify import VerificationManager
-from src.icon_manager import IconManager
 
 
 class DownloadCommand(Command):
@@ -88,24 +89,23 @@ class DownloadCommand(Command):
                     if is_valid:
                         verification_success = True
                         break
+                    # Verification failed
+                    elif attempt == max_attempts:
+                        print(
+                            f"Verification failed. Maximum retry attempts ({max_attempts}) reached."
+                        )
+                        return
                     else:
-                        # Verification failed
-                        if attempt == max_attempts:
-                            print(
-                                f"Verification failed. Maximum retry attempts ({max_attempts}) reached."
-                            )
+                        print(f"Verification failed. Attempt {attempt} of {max_attempts}.")
+                        retry = input("Retry download? (y/N): ").strip().lower()
+                        if retry != "y":
+                            print("Download cancelled.")
                             return
-                        else:
-                            print(f"Verification failed. Attempt {attempt} of {max_attempts}.")
-                            retry = input("Retry download? (y/N): ").strip().lower()
-                            if retry != "y":
-                                print("Download cancelled.")
-                                return
                             # Continue to next attempt
 
             except Exception as e:
-                logging.error(f"Download attempt {attempt} failed: {str(e)}")
-                print(f"Error during download: {str(e)}")
+                logging.error(f"Download attempt {attempt} failed: {e!s}")
+                print(f"Error during download: {e!s}")
 
                 if attempt == max_attempts:
                     print(f"Maximum retry attempts ({max_attempts}) reached.")
@@ -128,8 +128,8 @@ class DownloadCommand(Command):
             version=api.version,
             sha_name=api.sha_name,
             config_file=global_config.config_file,
-            appimage_download_folder_path=global_config.expanded_appimage_download_folder_path,
-            appimage_download_backup_folder_path=global_config.expanded_appimage_download_backup_folder_path,
+            app_storage_path=global_config.expanded_app_storage_path,
+            app_backup_storage_path=global_config.expanded_app_backup_storage_path,
             config_folder=app_config.config_folder,
             config_file_name=app_config.config_file_name,
             batch_mode=global_config.batch_mode,
@@ -139,14 +139,22 @@ class DownloadCommand(Command):
 
         # Download app icon if possible
         icon_manager = IconManager()
-        icon_manager.ensure_app_icon(api.owner, api.repo)
+        # First get the app_display_name (if available from app_config) or let the fallback handle it
+        app_display_name = (
+            app_config.app_display_name
+            if hasattr(app_config, "app_display_name") and app_config.app_display_name
+            else None
+        )
+        icon_manager.ensure_app_icon(api.owner, api.repo, app_display_name=app_display_name)
 
         # Check if the file operations were successful
         success = file_handler.handle_appimage_operations()
         if success:
             # Save the configuration only if all previous steps succeed
             app_config.save_config()
-            logging.info("AppImage downloaded and verified successfully and saved in DownloadCommand.")
+            logging.info(
+                "AppImage downloaded and verified successfully and saved in DownloadCommand."
+            )
             print("AppImage downloaded and verified successfully and saved.")
         else:
             logging.error("An error occurred during file operations in DownloadCommand.")
