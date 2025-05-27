@@ -1,24 +1,18 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Tests for the UpdateAsyncCommand class.
+"""Tests for the UpdateAsyncCommand class.
 
 This module contains tests for the UpdateAsyncCommand class that handles
 updating multiple AppImages concurrently using async I/O operations.
 """
 
 import asyncio
-import os
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock, call
-from typing import Dict, Any, List, Set, Tuple, Optional, Union
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, MagicMock
 
-from src.commands.update_all_async import UpdateAsyncCommand
-from src.app_config import AppConfigManager
-from src.global_config import GlobalConfigManager
-from src.api import GitHubAPI
-from src.download import DownloadManager
+import pytest
+
 from src.auth_manager import GitHubAuthManager
+from src.commands.update_all_async import UpdateAsyncCommand
 
 
 class DummyApp:
@@ -29,6 +23,7 @@ class DummyApp:
 
         Args:
             name: App name for identification
+
         """
         self.name = name
         self.current = "1.0.0"
@@ -41,6 +36,7 @@ def no_github_actual_calls(monkeypatch):
 
     Args:
         monkeypatch: pytest monkeypatch fixture
+
     """
     # Stub out real GitHub API rate limit
     monkeypatch.setattr(GitHubAuthManager, "get_rate_limit_info", lambda: (100, 5000, None, True))
@@ -53,6 +49,7 @@ def update_command():
 
     Returns:
         UpdateAsyncCommand: A command instance
+
     """
     cmd = UpdateAsyncCommand()
     cmd.console = MagicMock()
@@ -66,6 +63,7 @@ def mock_app_configs() -> List[Dict[str, Any]]:
 
     Returns:
         List[Dict[str, Any]]: List of app config dictionaries
+
     """
     return [
         {

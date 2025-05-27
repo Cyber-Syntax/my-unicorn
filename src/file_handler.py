@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 # Local imports
-from src.api import GitHubAPI
+from src.api.github_api import GitHubAPI
 from src.icon_manager import IconManager
 from src.utils.desktop_entry import DesktopEntryManager
 

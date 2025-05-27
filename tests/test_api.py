@@ -1,49 +1,42 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Tests for the GitHub API module.
+"""Tests for the GitHub API module.
 
 This module contains pytest tests for the GitHubAPI class, which handles
 GitHub API requests, version comparison, and AppImage selection.
 """
 
-import json
-import platform
-import re
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List
 from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
 
-from src.api import GitHubAPI
-from src.auth_manager import GitHubAuthManager
-from src.utils import arch_utils, version_utils, sha_utils, ui_utils
+from src.api.github_api import GitHubAPI
 
 
 @pytest.fixture
 def github_api() -> GitHubAPI:
-    """
-    Create a basic GitHubAPI instance for testing.
+    """Create a basic GitHubAPI instance for testing.
 
     Returns:
         GitHubAPI: A basic GitHubAPI instance
+
     """
-    with patch("src.api.GitHubAuthManager.get_auth_headers", return_value={"User-Agent": "test"}):
-        with patch("src.api.IconManager"):
+    with patch(
+        "src.api.github_api.GitHubAuthManager.get_auth_headers", return_value={"User-Agent": "test"}
+    ):
+        with patch("src.api.github_api.IconManager"):
             api = GitHubAPI(owner="test-owner", repo="test-repo")
             return api
 
 
 @pytest.fixture
 def mock_release_data() -> Dict[str, Any]:
-    """
-    Create sample GitHub release data for testing.
+    """Create sample GitHub release data for testing.
 
     Returns:
         Dict[str, Any]: Sample GitHub release data
+
     """
     return {
         "tag_name": "v1.2.3",
@@ -75,11 +68,11 @@ def mock_release_data() -> Dict[str, Any]:
 
 @pytest.fixture
 def mock_beta_release_data() -> Dict[str, Any]:
-    """
-    Create sample GitHub beta release data for testing.
+    """Create sample GitHub beta release data for testing.
 
     Returns:
         Dict[str, Any]: Sample GitHub beta release data
+
     """
     return {
         "tag_name": "v1.3.0-beta",
@@ -113,8 +106,7 @@ def mock_beta_release_data() -> Dict[str, Any]:
 def mock_all_releases_data(
     mock_release_data: Dict[str, Any], mock_beta_release_data: Dict[str, Any]
 ) -> List[Dict[str, Any]]:
-    """
-    Create a list of all releases (stable and beta) for testing.
+    """Create a list of all releases (stable and beta) for testing.
 
     Args:
         mock_release_data: Sample stable release data
@@ -122,30 +114,58 @@ def mock_all_releases_data(
 
     Returns:
         List[Dict[str, Any]]: List of GitHub release data objects
+
     """
     return [mock_beta_release_data, mock_release_data]  # Beta is newer, so it comes first
 
 
 @pytest.fixture
 def mock_platform_info() -> Dict[str, str]:
-    """
-    Create mock platform information for testing.
+    """Create mock platform information for testing.
 
     Returns:
         Dict[str, str]: Mock platform system and machine info
+
     """
     return {"system": "Linux", "machine": "x86_64"}
+
+
+@pytest.fixture
+def mock_release_info() -> "ReleaseInfo":
+    """Create a mock ReleaseInfo dataclass instance for testing.
+
+    Returns:
+        ReleaseInfo: A mock ReleaseInfo instance
+
+    """
+    from api.assets import ReleaseInfo
+
+    return ReleaseInfo(
+        owner="test-owner",
+        repo="test-repo",
+        version="1.2.3",
+        appimage_name="app-x86_64.AppImage",
+        appimage_url="https://example.com/app-x86_64.AppImage",
+        sha_name="sha256sums",
+        sha_url="https://example.com/sha256sums",
+        hash_type="sha256",
+        arch_keyword="x86_64",
+        release_notes="Release notes for version 1.2.3",
+        release_url="https://github.com/test-owner/test-repo/releases/tag/v1.2.3",
+        is_prerelease=False,
+        published_at="2023-01-15T12:00:00Z",
+    )
 
 
 class TestGitHubAPI:
     """Tests for the GitHubAPI class."""
 
     def test_initialization(self, github_api: GitHubAPI) -> None:
-        """
-        Test GitHubAPI initialization with default parameters.
+        """Test GitHubAPI initialization with default parameters.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         assert github_api.owner == "test-owner"
         assert github_api.repo == "test-repo"
@@ -160,35 +180,34 @@ class TestGitHubAPI:
         assert isinstance(github_api._headers, dict)
 
     def test_arch_keyword_property(self, github_api: GitHubAPI) -> None:
-        """
-        Test the arch_keyword property getter.
+        """Test the arch_keyword property getter.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         assert github_api.arch_keyword is None
         github_api._arch_keyword = "x86_64"
         assert github_api.arch_keyword == "x86_64"
 
     def test_get_arch_keywords_with_provided_keyword(self) -> None:
-        """
-        Test getting architecture keywords when one is explicitly provided.
-        """
+        """Test getting architecture keywords when one is explicitly provided."""
         with patch(
-            "src.api.GitHubAuthManager.get_auth_headers", return_value={"User-Agent": "test"}
+            "src.api.github_api.GitHubAuthManager.get_auth_headers",
+            return_value={"User-Agent": "test"},
         ):
-            with patch("src.api.IconManager"):
+            with patch("src.api.github_api.IconManager"):
                 api = GitHubAPI(owner="test-owner", repo="test-repo", arch_keyword="custom-arch")
                 assert "custom-arch" in api.arch_keywords
 
     def test_get_arch_keywords_for_current_platform(
         self, mock_platform_info: Dict[str, str]
     ) -> None:
-        """
-        Test getting architecture keywords for the current platform.
+        """Test getting architecture keywords for the current platform.
 
         Args:
             mock_platform_info: Mock platform info fixture
+
         """
         with patch("platform.system", return_value=mock_platform_info["system"]):
             with patch("platform.machine", return_value=mock_platform_info["machine"]):
@@ -196,10 +215,10 @@ class TestGitHubAPI:
                     mock_get_arch_keywords.return_value = ["x86_64", "amd64", "x64"]
 
                     with patch(
-                        "src.api.GitHubAuthManager.get_auth_headers",
+                        "src.api.github_api.GitHubAuthManager.get_auth_headers",
                         return_value={"User-Agent": "test"},
                     ):
-                        with patch("src.api.IconManager"):
+                        with patch("src.api.github_api.IconManager"):
                             api = GitHubAPI(owner="test-owner", repo="test-repo")
                             assert "x86_64" in api.arch_keywords
                             assert "amd64" in api.arch_keywords
@@ -208,12 +227,12 @@ class TestGitHubAPI:
     def test_get_latest_release_success(
         self, github_api: GitHubAPI, mock_release_data: Dict[str, Any]
     ) -> None:
-        """
-        Test successful fetch of the latest stable release.
+        """Test successful fetch of the latest stable release.
 
         Args:
             github_api: GitHubAPI fixture
             mock_release_data: Mock release data fixture
+
         """
         # Set up mock for the authenticated request
         mock_response = MagicMock()
@@ -231,11 +250,11 @@ class TestGitHubAPI:
                 assert data == mock_release_data
 
     def test_get_latest_release_not_found(self, github_api: GitHubAPI) -> None:
-        """
-        Test handling of 404 response when fetching the latest release.
+        """Test handling of 404 response when fetching the latest release.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         # Set up mock for the authenticated request
         mock_response = MagicMock()
@@ -257,11 +276,11 @@ class TestGitHubAPI:
                 assert data.get("tag_name") == "v1.0.0-beta"
 
     def test_get_latest_release_rate_limit_exceeded(self, github_api: GitHubAPI) -> None:
-        """
-        Test handling of rate limit exceeded response.
+        """Test handling of rate limit exceeded response.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         # Set up mock for the authenticated request
         mock_response = MagicMock()
@@ -280,11 +299,11 @@ class TestGitHubAPI:
                 mock_refresh.assert_called_once()
 
     def test_get_latest_release_other_error(self, github_api: GitHubAPI) -> None:
-        """
-        Test handling of other errors when fetching the latest release.
+        """Test handling of other errors when fetching the latest release.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         # Set up mock for the authenticated request
         mock_response = MagicMock()
@@ -302,11 +321,11 @@ class TestGitHubAPI:
             assert "500" in data  # Status code should be included
 
     def test_get_latest_release_network_error(self, github_api: GitHubAPI) -> None:
-        """
-        Test handling of network errors when fetching the latest release.
+        """Test handling of network errors when fetching the latest release.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         with patch(
             "src.auth_manager.GitHubAuthManager.make_authenticated_request",
@@ -318,11 +337,11 @@ class TestGitHubAPI:
             assert "network error" in data.lower()
 
     def test_get_latest_release_exception(self, github_api: GitHubAPI) -> None:
-        """
-        Test handling of unexpected exceptions when fetching the latest release.
+        """Test handling of unexpected exceptions when fetching the latest release.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         with patch(
             "src.auth_manager.GitHubAuthManager.make_authenticated_request",
@@ -336,12 +355,12 @@ class TestGitHubAPI:
     def test_get_beta_releases_success(
         self, github_api: GitHubAPI, mock_all_releases_data: List[Dict[str, Any]]
     ) -> None:
-        """
-        Test successful fetch of beta releases.
+        """Test successful fetch of beta releases.
 
         Args:
             github_api: GitHubAPI fixture
             mock_all_releases_data: Mock releases data fixture
+
         """
         # Set up mock for the authenticated request
         mock_response = MagicMock()
@@ -359,11 +378,11 @@ class TestGitHubAPI:
                 assert data == mock_all_releases_data[0]  # Should return the first (latest) release
 
     def test_get_beta_releases_no_releases(self, github_api: GitHubAPI) -> None:
-        """
-        Test handling of empty releases list.
+        """Test handling of empty releases list.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         # Set up mock for the authenticated request
         mock_response = MagicMock()
@@ -380,11 +399,11 @@ class TestGitHubAPI:
             assert "no releases found" in data.lower()
 
     def test_get_beta_releases_error(self, github_api: GitHubAPI) -> None:
-        """
-        Test handling of errors when fetching beta releases.
+        """Test handling of errors when fetching beta releases.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         # Set up mock for the authenticated request
         mock_response = MagicMock()
@@ -401,11 +420,11 @@ class TestGitHubAPI:
             assert "failed to fetch releases" in data.lower()
 
     def test_get_beta_releases_exception(self, github_api: GitHubAPI) -> None:
-        """
-        Test handling of exceptions when fetching beta releases.
+        """Test handling of exceptions when fetching beta releases.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         with patch(
             "src.auth_manager.GitHubAuthManager.make_authenticated_request",
@@ -417,11 +436,11 @@ class TestGitHubAPI:
             assert "error checking beta releases" in data.lower()
 
     def test_get_response(self, github_api: GitHubAPI) -> None:
-        """
-        Test the get_response method which tries stable release then falls back to beta.
+        """Test the get_response method which tries stable release then falls back to beta.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         with patch.object(
             github_api, "get_latest_release", return_value=(True, {"tag_name": "v1.0.0"})
@@ -445,12 +464,12 @@ class TestGitHubAPI:
     def test_check_latest_version_success(
         self, github_api: GitHubAPI, mock_release_data: Dict[str, Any]
     ) -> None:
-        """
-        Test successful version check with update available.
+        """Test successful version check with update available.
 
         Args:
             github_api: GitHubAPI fixture
             mock_release_data: Mock release data fixture
+
         """
         with patch.object(github_api, "get_response", return_value=(True, mock_release_data)):
             # Need to patch version_utils functions to ensure they behave consistently
@@ -500,12 +519,12 @@ class TestGitHubAPI:
     def test_check_latest_version_with_beta_repo(
         self, github_api: GitHubAPI, mock_beta_release_data: Dict[str, Any]
     ) -> None:
-        """
-        Test version check with a repo that uses beta versions.
+        """Test version check with a repo that uses beta versions.
 
         Args:
             github_api: GitHubAPI fixture
             mock_beta_release_data: Mock beta release data fixture
+
         """
         # Make the repo use beta versions
         github_api.repo = "FreeTube"  # This is in the beta_repos list
@@ -541,11 +560,11 @@ class TestGitHubAPI:
                         assert info["latest_version"] == mock_beta_release_data["tag_name"]
 
     def test_check_latest_version_failed_response(self, github_api: GitHubAPI) -> None:
-        """
-        Test version check when getting response fails.
+        """Test version check when getting response fails.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         with patch.object(github_api, "get_response", return_value=(False, "API error")):
             update_available, info = github_api.check_latest_version(current_version="v1.0.0")
@@ -555,11 +574,11 @@ class TestGitHubAPI:
             assert info["error"] == "API error"
 
     def test_check_latest_version_exception(self, github_api: GitHubAPI) -> None:
-        """
-        Test handling of exceptions during version check.
+        """Test handling of exceptions during version check.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         with patch.object(github_api, "get_response", return_value=(True, {})):  # Empty response
             update_available, info = github_api.check_latest_version(current_version="v1.0.0")
@@ -569,11 +588,11 @@ class TestGitHubAPI:
             assert "error parsing" in info["error"].lower()
 
     def test_find_app_icon(self, github_api: GitHubAPI) -> None:
-        """
-        Test finding application icon.
+        """Test finding application icon.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         mock_icon_info = {"name": "app-icon.png", "url": "https://example.com/icon.png"}
 
@@ -597,11 +616,11 @@ class TestGitHubAPI:
             assert icon_info is None
 
     def test_refresh_auth(self, github_api: GitHubAPI) -> None:
-        """
-        Test refreshing authentication headers.
+        """Test refreshing authentication headers.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         with patch("src.auth_manager.GitHubAuthManager.clear_cached_headers") as mock_clear:
             with patch(
@@ -617,12 +636,12 @@ class TestGitHubAPI:
     def test_process_release(
         self, github_api: GitHubAPI, mock_release_data: Dict[str, Any]
     ) -> None:
-        """
-        Test processing release data.
+        """Test processing release data.
 
         Args:
             github_api: GitHubAPI fixture
             mock_release_data: Mock release data fixture
+
         """
         with patch("src.utils.version_utils.extract_version", return_value="1.2.3"):
             with patch.object(github_api, "_find_appimage_asset"):
@@ -639,11 +658,11 @@ class TestGitHubAPI:
                     assert github_api.version == "1.2.3"
 
     def test_process_release_missing_key(self, github_api: GitHubAPI) -> None:
-        """
-        Test handling of missing keys in release data.
+        """Test handling of missing keys in release data.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         # Missing tag_name
         incomplete_data = {"assets": []}
@@ -654,11 +673,11 @@ class TestGitHubAPI:
             mock_log.assert_called_once()
 
     def test_find_appimage_asset(self, github_api: GitHubAPI) -> None:
-        """
-        Test finding AppImage assets based on architecture.
+        """Test finding AppImage assets based on architecture.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         # Create test assets
         assets = [
@@ -684,11 +703,11 @@ class TestGitHubAPI:
                         assert mock_select.call_args[0][0]["name"] == "app-x86_64.AppImage"
 
     def test_select_appimage(self, github_api: GitHubAPI) -> None:
-        """
-        Test selecting an AppImage asset.
+        """Test selecting an AppImage asset.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         # Create a mock AppImage asset
         mock_asset = {
@@ -717,11 +736,11 @@ class TestGitHubAPI:
             assert github_api._arch_keyword == "-amd64.appimage"
 
     def test_find_sha_asset(self, github_api: GitHubAPI) -> None:
-        """
-        Test finding SHA asset for verification.
+        """Test finding SHA asset for verification.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         # Skip test if SHA verification is disabled
         github_api.sha_name = "sha256"
@@ -749,11 +768,11 @@ class TestGitHubAPI:
                     assert mock_select.call_args[0][0]["name"] == "sha256sums"
 
     def test_select_sha_asset(self, github_api: GitHubAPI) -> None:
-        """
-        Test selecting a SHA asset.
+        """Test selecting a SHA asset.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         # Create a mock SHA asset
         mock_asset = {
@@ -785,11 +804,11 @@ class TestGitHubAPI:
                     assert github_api.hash_type == "sha512"
 
     def test_handle_sha_fallback(self, github_api: GitHubAPI) -> None:
-        """
-        Test handling SHA fallback when no SHA file is found.
+        """Test handling SHA fallback when no SHA file is found.
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         github_api.appimage_name = "app-x86_64.AppImage"
         assets = [
@@ -820,8 +839,7 @@ class TestGitHubAPI:
                     assert github_api.sha_name == "no_sha_file"
 
     def test_find_sha_asset_specific_cases(self, github_api: GitHubAPI) -> None:
-        """
-        Test the specific Joplin case mentioned in the requirements.
+        """Test the specific Joplin case mentioned in the requirements.
 
         The test verifies the SHA detection prioritization for Joplin, which includes:
         1. Joplin-3.2.13.AppImage.sha512 (highest priority)
@@ -830,6 +848,7 @@ class TestGitHubAPI:
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         github_api.appimage_name = "Joplin-3.2.13.AppImage"
 
@@ -938,8 +957,7 @@ class TestGitHubAPI:
                         assert mock_select.call_args[0][0]["name"] == "latest-linux.yml"
 
     def test_find_sha_asset_fallback_to_arch_specific(self, github_api: GitHubAPI) -> None:
-        """
-        Test fallback to architecture-specific SHA files when direct SHA files aren't available.
+        """Test fallback to architecture-specific SHA files when direct SHA files aren't available.
 
         This test verifies the second priority in SHA file selection:
         - Direct AppImage SHA (missing in this test)
@@ -947,6 +965,7 @@ class TestGitHubAPI:
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         github_api.appimage_name = "Joplin-3.2.13-x86_64.AppImage"
 
@@ -974,8 +993,7 @@ class TestGitHubAPI:
                         assert mock_select.call_args[0][0]["name"] == "latest-linux.yml"
 
     def test_find_sha_asset_fallback_to_sha256sums(self, github_api: GitHubAPI) -> None:
-        """
-        Test fallback to SHA256SUMS.txt when higher priority files aren't available.
+        """Test fallback to SHA256SUMS.txt when higher priority files aren't available.
 
         This test verifies the fourth priority in SHA file selection:
         - Direct AppImage SHA (missing)
@@ -985,6 +1003,7 @@ class TestGitHubAPI:
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         github_api.appimage_name = "Joplin-3.2.13.AppImage"
 
@@ -1012,8 +1031,7 @@ class TestGitHubAPI:
                         assert mock_select.call_args[0][0]["name"] == "SHA256SUMS.txt"
 
     def test_find_sha_asset_fallback_to_generic_checksums(self, github_api: GitHubAPI) -> None:
-        """
-        Test fallback to generic checksum files when higher priority files aren't available.
+        """Test fallback to generic checksum files when higher priority files aren't available.
 
         This test verifies the fifth priority in SHA file selection:
         - Direct AppImage SHA (missing)
@@ -1024,6 +1042,7 @@ class TestGitHubAPI:
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         github_api.appimage_name = "Joplin-3.2.13.AppImage"
 
@@ -1051,8 +1070,7 @@ class TestGitHubAPI:
                         assert mock_select.call_args[0][0]["name"] == "checksums.txt"
 
     def test_find_sha_asset_fallback_to_latest_yml(self, github_api: GitHubAPI) -> None:
-        """
-        Test fallback to latest.yml when all higher priority files aren't available.
+        """Test fallback to latest.yml when all higher priority files aren't available.
 
         This test verifies the lowest priority in SHA file selection:
         - All higher priority files missing
@@ -1060,6 +1078,7 @@ class TestGitHubAPI:
 
         Args:
             github_api: GitHubAPI fixture
+
         """
         # Set appimage_name without "linux" to test the priority logic
         github_api.appimage_name = "Joplin-3.2.13.AppImage"

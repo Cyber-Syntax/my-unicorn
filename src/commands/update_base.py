@@ -12,7 +12,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.api import GitHubAPI
+from src.api.github_api import GitHubAPI
 from src.app_config import AppConfigManager
 from src.auth_manager import GitHubAuthManager
 from src.commands.base import Command
@@ -41,8 +41,21 @@ class BaseUpdateCommand(Command):
             f"Set max_concurrent_updates to {self.max_concurrent_updates} from global config"
         )
 
-        self._logger.debug("Initializing semaphore")
-        self.semaphore: Optional[asyncio.Semaphore] = None
+        # Initialize semaphore in __init__
+        if not isinstance(self.max_concurrent_updates, int) or self.max_concurrent_updates <= 0:
+            self._logger.warning(
+                f"Invalid max_concurrent_updates value: {self.max_concurrent_updates} from global config. Defaulting to 1 for semaphore."
+            )
+            # Ensure max_concurrent_updates is a positive int for Semaphore,
+            # but keep the original value if it was just for logging/other non-semaphore uses.
+            # For the semaphore itself, we need a valid positive integer.
+            semaphore_value = 1
+        else:
+            semaphore_value = self.max_concurrent_updates
+
+        self.semaphore: asyncio.Semaphore = asyncio.Semaphore(semaphore_value)
+        self._logger.debug(f"Semaphore initialized with value: {semaphore_value}")
+
 
     def execute(self):
         """Abstract execute method to be implemented by subclasses.
@@ -171,13 +184,24 @@ class BaseUpdateCommand(Command):
             Exception: Any error during the update process
 
         """
-        # Get release data
-        success, response = github_api.get_response()
-        if not success:
-            error_msg = f"Error fetching data from GitHub API: {response}"
+        # Check for latest version using GitHub API. This also populates github_api instance.
+        current_version_for_check = app_config.version if app_config and app_config.version else ""
+
+        update_available, version_check_response = github_api.check_latest_version(
+            current_version=current_version_for_check
+        )
+
+        if "error" in version_check_response:
+            error_msg = f"Error checking latest version from GitHub API for {app_data['name']}: {version_check_response['error']}"
             self._logger.error(error_msg)
-            print(error_msg)
-            raise ValueError(error_msg)
+            print(error_msg) # Keep print for this older path
+            raise ValueError(error_msg) # This path raises an error
+
+        # If no update is available, this attempt to update does not proceed.
+        if not update_available:
+            self._logger.info(f"No update available for {app_data['name']} during update attempt. Current: {current_version_for_check}, Latest on server: {github_api.version}")
+            # This function is expected to return False if the update *attempt* doesn't lead to an update.
+            return False
 
         # Verify appimage_name was properly set during release processing
         if not github_api.appimage_name or not github_api.appimage_url:
@@ -268,27 +292,45 @@ class BaseUpdateCommand(Command):
             FileHandler: Configured file handler
 
         """
+        # Ensure critical FileHandler parameters are not None
+        # GitHubAPI attributes like appimage_name, version, owner, repo should be populated
+        # by check_latest_version if it completed without error and an update is available (or even if not, for repo/owner).
+        # AppConfig attributes should also be valid.
+
+        required_fh_params = {
+            "appimage_name": github_api.appimage_name,
+            "repo": github_api.repo, # repo comes from app_config originally, should be solid
+            "owner": github_api.owner, # owner comes from app_config originally, should be solid
+            "version": github_api.version,
+            "app_display_name": app_config.app_display_name
+        }
+        for param, value in required_fh_params.items():
+            if value is None:
+                # This indicates a logic error earlier, as these should be set if we reach here.
+                raise ValueError(f"FileHandler critical parameter '{param}' is None before instantiation for {github_api.owner}/{github_api.repo}.")
+
+        from pathlib import Path # Import Path for conversions
         return FileHandler(
-            appimage_name=github_api.appimage_name,
-            repo=github_api.repo,
-            owner=github_api.owner,
-            version=github_api.version,
-            sha_name=github_api.sha_name,
-            config_file=global_config.config_file,
-            app_storage_path=global_config.expanded_app_storage_path,
-            app_backup_storage_path=global_config.expanded_app_backup_storage_path,
-            config_folder=app_config.config_folder,
-            config_file_name=app_config.config_file_name,
+            appimage_name=str(github_api.appimage_name), # Cast to str after check
+            repo=str(github_api.repo), # Cast to str
+            owner=str(github_api.owner), # Cast to str
+            version=str(github_api.version), # Cast to str
+            sha_name=github_api.sha_name, # This can be None if no SHA
+            config_file=global_config.config_file, # Assuming this is str
+            app_storage_path=Path(global_config.expanded_app_storage_path) if global_config.expanded_app_storage_path else None,
+            app_backup_storage_path=Path(global_config.expanded_app_backup_storage_path) if global_config.expanded_app_backup_storage_path else None,
+            config_folder=str(app_config.config_folder) if app_config.config_folder else None,
+            config_file_name=app_config.config_file_name, # Assuming this is str
             batch_mode=global_config.batch_mode,
             keep_backup=global_config.keep_backup,
             max_backups=global_config.max_backups,
-            app_display_name=app_config.app_display_name,  # Pass app_display_name explicitly to ensure it's used
+            app_display_name=str(app_config.app_display_name), # Cast to str after check
         )
 
     def _verify_appimage(
         self,
         github_api: GitHubAPI,
-        downloaded_file_path: str = None,
+        downloaded_file_path: Optional[str] = None, # Changed to Optional[str]
         cleanup_on_failure: bool = True,
     ) -> bool:
         """Verify the downloaded AppImage using the SHA file.
@@ -308,11 +350,17 @@ class BaseUpdateCommand(Command):
             print("Skipping verification for beta version")
             return True
 
+        # Ensure critical VerificationManager parameters are not None where required by its constructor
+        if github_api.appimage_name is None:
+            raise ValueError(f"VerificationManager: appimage_name is None for {github_api.owner}/{github_api.repo}.")
+        # sha_name can be None (e.g. "no_hash" effectively, or if SHAManager sets it to None)
+        # hash_type can be None if sha_name is None or "no_hash"
+
         verification_manager = VerificationManager(
             sha_name=github_api.sha_name,
             sha_url=github_api.sha_url,
-            appimage_name=github_api.appimage_name,
-            hash_type=github_api.hash_type,
+            appimage_name=str(github_api.appimage_name),
+            hash_type=github_api.hash_type if github_api.hash_type is not None else "sha256", # Ensure str
         )
 
         # If we have a downloaded file path, set it for verification
@@ -372,11 +420,16 @@ class BaseUpdateCommand(Command):
         current_version = app_config.version
 
         # Get latest version from GitHub
+        # Ensure owner and repo from app_config are not None before creating GitHubAPI
+        if app_config.owner is None or app_config.repo is None:
+            raise ValueError(f"Cannot initialize GitHubAPI: owner ('{app_config.owner}') or repo ('{app_config.repo}') is None for config file {config_file}.")
+
         github_api = GitHubAPI(
-            owner=app_config.owner,
-            repo=app_config.repo,
-            sha_name=app_config.sha_name,
-            hash_type=app_config.hash_type,
+            owner=str(app_config.owner), # Cast to str after check
+            repo=str(app_config.repo),   # Cast to str after check
+            # sha_name and hash_type from app_config can be None, GitHubAPI __init__ handles defaults
+            sha_name=app_config.sha_name if app_config.sha_name is not None else "sha256", # Provide default if None
+            hash_type=app_config.hash_type if app_config.hash_type is not None else "sha256", # Provide default if None
         )
 
         # Call check_latest_version without owner and repo arguments
@@ -473,8 +526,15 @@ class BaseUpdateCommand(Command):
     def _display_rate_limit_info(self) -> None:
         """Display GitHub API rate limit information after updates."""
         try:
-            # Use the cached rate limit info to avoid unnecessary API calls
-            remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+            raw_remaining, raw_limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+            try:
+                remaining = int(raw_remaining)
+                limit = int(raw_limit)
+            except (ValueError, TypeError):
+                self._logger.error(f"Could not parse rate limit 'remaining' ({raw_remaining}) or 'limit' ({raw_limit}) as integers for display.")
+                print("\n--- GitHub API Rate Limits ---")
+                print("Error: Could not display rate limit details due to parsing error.")
+                return
 
             print("\n--- GitHub API Rate Limits ---")
             if is_authenticated:
@@ -482,12 +542,12 @@ class BaseUpdateCommand(Command):
                 if reset_time:
                     print(f"Resets at: {reset_time}")
 
-                if remaining < 100:
+                if remaining < 100: # Now an int comparison
                     print("⚠️ Running low on API requests!")
             else:
                 print(f"Remaining requests: {remaining}/60 (unauthenticated)")
 
-                if remaining < 20:
+                if remaining < 20: # Now an int comparison
                     print("⚠️ Low on unauthenticated requests!")
                     print(
                         "Tip: Add a GitHub token using option 6 in the main menu to increase rate limits (5000/hour)."
@@ -518,7 +578,15 @@ class BaseUpdateCommand(Command):
 
         """
         # Get current rate limit information
-        remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+        raw_remaining, raw_limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+        try:
+            remaining = int(raw_remaining)
+            limit = int(raw_limit)
+        except (ValueError, TypeError):
+            self._logger.error(f"Could not parse rate limit 'remaining' ({raw_remaining}) or 'limit' ({raw_limit}) as integers for rate limit check.")
+            status_message = "Error: Could not determine API rate limits due to parsing error. Aborting update check."
+            return False, [], status_message # Cannot proceed if limits are unknown
+
 
         # Calculate required API requests (1 for update check + potentially 1 for icon)
         required_requests = 0
@@ -535,19 +603,23 @@ class BaseUpdateCommand(Command):
 
             # Extract owner and repo for icon check
             owner = app_config.owner
-            repo = app_config.repo
+            repo = app_config.repo # repo is str | None
 
             icon_exists = False
-            icon_locations = [
-                # Primary location
-                os.path.expanduser(f"~/.local/share/icons/myunicorn/{repo}/{repo}_icon.svg"),
-                os.path.expanduser(f"~/.local/share/icons/myunicorn/{repo}/{repo}_icon.png"),
-                # System theme locations that might be used
-                os.path.expanduser(
-                    f"~/.local/share/icons/hicolor/scalable/apps/{repo.lower()}.svg"
-                ),
-                os.path.expanduser(f"~/.local/share/icons/hicolor/256x256/apps/{repo.lower()}.png"),
-            ]
+            if repo: # Only proceed if repo is not None
+                icon_locations = [
+                    # Primary location
+                    os.path.expanduser(f"~/.local/share/icons/myunicorn/{repo}/{repo}_icon.svg"),
+                    os.path.expanduser(f"~/.local/share/icons/myunicorn/{repo}/{repo}_icon.png"),
+                    # System theme locations that might be used
+                    os.path.expanduser(
+                        f"~/.local/share/icons/hicolor/scalable/apps/{repo.lower()}.svg"
+                    ),
+                    os.path.expanduser(f"~/.local/share/icons/hicolor/256x256/apps/{repo.lower()}.png"),
+                ]
+            else:
+                icon_locations = []
+                self._logger.warning(f"Repo name is None for app {app_data.get('name', 'Unknown app')}, cannot check for existing icon.")
 
             # Check if any icon exists
             for icon_path in icon_locations:
@@ -737,9 +809,9 @@ class BaseUpdateCommand(Command):
         try:
             logging.info(f"Beginning asynchronous update of {total_apps} AppImages")
 
-            # Create a semaphore to limit concurrent operations if not already created
-            if self.semaphore is None:
-                self.semaphore = asyncio.Semaphore(self.max_concurrent_updates)
+            # Semaphore is now initialized in __init__.
+            # We can assert its existence here if desired for extra safety, but Pylance should be fine.
+            assert self.semaphore is not None, "Semaphore should be initialized in __init__"
 
             # Create task list
             tasks = []
@@ -835,20 +907,41 @@ class BaseUpdateCommand(Command):
                 app_config.load_appimage_config(app_data["config_file"])
 
             # 2. Initialize GitHub API for this app
-            github_api = GitHubAPI(
-                owner=app_config.owner,
-                repo=app_config.repo,
-                sha_name=app_config.sha_name,
-                hash_type=app_config.hash_type,
-                arch_keyword=app_config.arch_keyword,
-            )
-
-            # 3. Get release data from GitHub API
-            success, response = github_api.get_response()
-            if not success:
-                error_msg = f"Error fetching data from GitHub API: {response}"
+            # Ensure owner and repo from app_config are not None
+            if app_config.owner is None or app_config.repo is None:
+                error_msg = f"Cannot initialize GitHubAPI for {app_name}: owner ('{app_config.owner}') or repo ('{app_config.repo}') is None."
                 logger.error(error_msg)
                 result_data["message"] = error_msg
+                return False, result_data
+
+            github_api = GitHubAPI(
+                owner=str(app_config.owner), # Cast to str after check
+                repo=str(app_config.repo),   # Cast to str after check
+                # sha_name and hash_type from app_config can be None, GitHubAPI __init__ handles defaults
+                sha_name=app_config.sha_name if app_config.sha_name is not None else "sha256",
+                hash_type=app_config.hash_type if app_config.hash_type is not None else "sha256",
+                arch_keyword=app_config.arch_keyword, # This is Optional[str], GitHubAPI handles it
+            )
+
+            # 3. Check for latest version using GitHub API. This also populates github_api instance.
+            update_available, version_check_response = github_api.check_latest_version(
+                current_version=app_config.version
+            )
+
+            if "error" in version_check_response:
+                error_msg = f"Error checking latest version from GitHub API for {app_name}: {version_check_response['error']}"
+                logger.error(error_msg)
+                result_data["message"] = error_msg
+                return False, result_data # False: operation failed
+
+            # If no update is available, log and exit successfully for this app (no update performed)
+            if not update_available:
+                logger.info(f"No update available for {app_name}. Current version {app_config.version} is up-to-date. Latest on server: {github_api.version}.")
+                result_data["status"] = "no_update"
+                result_data["message"] = f"No update available for {app_name}. Current: {app_config.version}, Latest: {github_api.version}"
+                result_data["elapsed"] = time.time() - start_time
+                # Return False because an update was not *performed*.
+                # The calling function _update_single_app_async interprets this as "update failed or not needed".
                 return False, result_data
 
             # 4. Verify appimage_name was properly set during release processing

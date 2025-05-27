@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.api import GitHubAPI
+from src.api.github_api import GitHubAPI
 from src.app_config import AppConfigManager
 from src.commands.update_base import BaseUpdateCommand
 from src.file_handler import FileHandler

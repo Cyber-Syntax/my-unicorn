@@ -414,31 +414,45 @@ class DownloadManager:
             logging.info("Skipping verification as requested (no hash provided)")
             return True
 
-        # Special handling for checksums extracted from release description
+        from src.verify import VerificationManager # Import once at the top of the relevant scope
+
+        # Handle "extracted_checksum" (which now implies hash might be directly available)
+        # or other standard SHA file scenarios.
+        # VerificationManager will internally decide whether to use direct_expected_hash
+        # or fall back to legacy "extracted_checksum" logic, or parse a SHA file.
+
+        direct_hash_to_pass: Optional[str] = None
+        sha_name_to_pass: Optional[str] = self.github_api.sha_name
+        sha_url_to_pass: Optional[str] = self.github_api.sha_url
+
         if self.github_api.sha_name == "extracted_checksum":
-            logging.info("Using GitHub release description for verification")
+            logging.info(f"Processing 'extracted_checksum' for {self.github_api.appimage_name}.")
+            # SHAManager should have set extracted_hash_from_body if it successfully parsed one.
+            # It also sets hash_type to "sha256".
+            direct_hash_to_pass = self.github_api.extracted_hash_from_body
+            if direct_hash_to_pass:
+                logging.info("Direct hash found for 'extracted_checksum', will pass to VerificationManager.")
+                # sha_url is not needed if direct_hash is used by VerificationManager's "extracted_checksum" path
+                sha_url_to_pass = None
+            else:
+                # If no direct hash, VerificationManager's "extracted_checksum" will use its legacy path
+                logging.info("No direct hash for 'extracted_checksum', VerificationManager will use legacy path.")
 
-            # Import our checksum extraction utility
-            from src.utils.checksums import verify_with_release_checksums
+        # For all other cases (actual SHA file names), direct_hash_to_pass remains None.
+        # VerificationManager will download and parse the sha_name file.
 
-            # Use direct owner/repo from github_api for verification
-            owner = self.github_api.owner
-            repo = self.github_api.repo
-
-            logging.info(f"Extracting checksums from {owner}/{repo} release description")
-            return verify_with_release_checksums(
-                owner=owner, repo=repo, appimage_path=downloaded_file, cleanup_on_failure=True
-            )
-
-        # Standard verification with SHA file
-        from src.verify import VerificationManager
-
-        verifier = VerificationManager(
-            sha_name=self.github_api.sha_name,
-            sha_url=self.github_api.sha_url,
-            appimage_name=os.path.basename(self.github_api.appimage_url),
-            appimage_path=downloaded_file,
-            hash_type=self.github_api.hash_type,
+        logging.info(
+            f"Instantiating VerificationManager for {self.github_api.appimage_name} with: "
+            f"sha_name='{sha_name_to_pass}', hash_type='{self.github_api.hash_type}', "
+            f"direct_hash_provided={direct_hash_to_pass is not None}"
         )
 
+        verifier = VerificationManager(
+            sha_name=sha_name_to_pass,
+            sha_url=sha_url_to_pass,
+            appimage_name=self.github_api.appimage_name,
+            appimage_path=downloaded_file,
+            hash_type=self.github_api.hash_type if self.github_api.hash_type is not None else "sha256",
+            direct_expected_hash=direct_hash_to_pass,
+        )
         return verifier.verify_appimage(cleanup_on_failure=True)

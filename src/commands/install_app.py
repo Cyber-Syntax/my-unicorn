@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from typing import List
 
-from src.api import GitHubAPI
+from src.api.github_api import GitHubAPI
 from src.app_catalog import (
     AppInfo,
     get_all_apps,

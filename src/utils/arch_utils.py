@@ -16,7 +16,7 @@ from typing import List, Optional
 logger = logging.getLogger(__name__)
 
 # Supported platform indicator - currently only Linux is officially supported
-SUPPORTED_PLATFORMS = ["linux", "darwin"]
+SUPPORTED_PLATFORMS = ["linux"]
 
 
 def get_arch_keywords(arch_keyword: Optional[str] = None) -> List[str]:
