@@ -1,0 +1,15 @@
+{
+    "owner": "FreeTubeApp",
+    "repo": "FreeTube",
+    "app_display_name": "FreeTube",
+    "description": "An open source desktop YouTube player built with privacy in mind",
+    "category": "Media",
+    "tags": ["video", "youtube", "privacy"],
+    "hash_type": "no_hash",
+    "appimage_name_template": "{repo_name}-{latest_version}-{characteristic_suffix}.AppImage",
+    "sha_name": "no_sha_file",
+    "preferred_characteristic_suffixes": ["amd64", "x86_64"],
+    "icon_info": "https://raw.githubusercontent.com/FreeTubeApp/FreeTube/development/_icons/icon.svg",
+    "icon_file_name": "freetube_icon.svg",
+    "icon_repo_path": "_icons/icon.svg"
+}

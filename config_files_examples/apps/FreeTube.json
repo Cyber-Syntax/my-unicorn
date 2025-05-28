@@ -1,9 +1,4 @@
 {
-    "owner": "FreeTubeApp",
-    "repo": "FreeTube",
-    "version": "0.23.3",
-    "sha_name": "no_sha_file",
-    "hash_type": "no_hash",
-    "appimage_name": "freetube-0.23.3-amd64.AppImage",
-    "arch_keyword": "-amd64.appimage"
+    "version": "0.23.5",
+    "appimage_name": "freetube-0.23.5-amd64.AppImage"
 }

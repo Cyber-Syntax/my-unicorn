@@ -1,9 +1,0 @@
-{
-    "owner": "zettlr",
-    "repo": "zettlr",
-    "version": "3.4.4",
-    "sha_name": "SHA256SUMS.txt",
-    "hash_type": "sha256",
-    "appimage_name": "Zettlr-3.4.4-x86_64.AppImage",
-    "arch_keyword": "-x86_64.appimage"
-}

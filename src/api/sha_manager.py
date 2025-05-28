@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 import re # For hash validation
 from pathlib import Path
 
-from api.sha_asset_finder import SHAAssetFinder
+from src.api.sha_asset_finder import SHAAssetFinder
 from src.utils import sha_utils, ui_utils
 from src.utils.checksums.extractor import ReleaseChecksumExtractor # Added import
 
@@ -106,8 +106,26 @@ class SHAManager:
             logger.error("Cannot find SHA asset: AppImage name not set")
             return
 
-        finder = SHAAssetFinder(assets, self.appimage_name, self.sha_name)
-        sha_asset = finder.find_best_match()
+        # Create a minimal AppInfo object for SHA finding
+        from src.app_catalog import AppInfo
+        app_info = AppInfo(
+            owner=self.owner,
+            repo=self.repo,
+            app_display_name=self.repo,
+            description="",
+            category="",
+            tags=[],
+            hash_type="sha256",
+            appimage_name_template="",
+            sha_name=self.sha_name,
+            preferred_characteristic_suffixes=[],
+            icon_info=None,
+            icon_file_name=None,
+            icon_repo_path=None
+        )
+
+        finder = SHAAssetFinder()
+        sha_asset = finder.find_best_match(self.appimage_name, app_info, assets)
 
         if sha_asset:
             self._select_sha_asset(sha_asset)

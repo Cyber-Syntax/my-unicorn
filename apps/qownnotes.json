@@ -1,0 +1,15 @@
+{
+    "owner": "pbek",
+    "repo": "QOwnNotes",
+    "app_display_name": "QOwnNotes",
+    "description": "Plain-text file notepad with markdown support and ownCloud & nextcloud and git integration",
+    "category": "Productivity",
+    "tags": ["notes", "markdown", "owncloud"],
+    "hash_type": "sha256",
+    "appimage_name_template": "{repo_name}-{characteristic_suffix}.AppImage",
+    "sha_name": "QOwnNotes-x86_64-Qt6.AppImage.sha256sum",
+    "preferred_characteristic_suffixes": ["x86_64-Qt6", "x86_64"],
+    "icon_info": "https://raw.githubusercontent.com/pbek/QOwnNotes/develop/icons/icon.png",
+    "icon_file_name": "qownnotes_icon.png",
+    "icon_repo_path": "icons/icon.png"
+}
