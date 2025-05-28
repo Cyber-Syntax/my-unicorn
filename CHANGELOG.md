@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.10.1-alpha
+### Changed
+Added a new feature that allows github workflows to write who committed the changes to the release notes. Also created a test script to test the release notes generation. This will not affect existing functionality.
+
 ## v0.10.0-alpha
 ### BREAKING CHANGES
 This release add new app catalog feature to use a new format. The new format is as follows to `apps/<app_id>.json`:

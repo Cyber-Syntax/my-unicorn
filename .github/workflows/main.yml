@@ -34,15 +34,57 @@ jobs:
             END { print notes; }
           ' CHANGELOG.md)
 
-          # Get recent commits since last tag
+          # Get recent commits since last tag with GitHub usernames
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || echo "")
+
+          # Function to get GitHub username from email
+          get_github_username() {
+            local email="$1"
+            local commit_hash="$2"
+            
+            # First try to extract username from GitHub noreply email
+            if [[ "$email" =~ ([0-9]+\+)?([^@]+)@users\.noreply\.github\.com ]]; then
+              echo "${BASH_REMATCH[2]}"
+              return
+            fi
+            
+            # Try to get GitHub username via API using commit hash
+            local github_user=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$commit_hash" | \
+              jq -r '.author.login // empty' 2>/dev/null)
+            
+            if [ -n "$github_user" ] && [ "$github_user" != "null" ]; then
+              echo "$github_user"
+              return
+            fi
+            
+            # Fallback: try to get user by email via API
+            local api_user=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/search/users?q=$email+in:email" | \
+              jq -r '.items[0].login // empty' 2>/dev/null)
+            
+            if [ -n "$api_user" ] && [ "$api_user" != "null" ]; then
+              echo "$api_user"
+            else
+              # Final fallback: use the part before @ in email
+              echo "${email%%@*}"
+            fi
+          }
+
           if [ -z "$PREVIOUS_TAG" ]; then
             # If no previous tag exists, get all commits
-            COMMITS=$(git log --pretty=format:"  - %s" | grep -E "^  - (feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)" || echo "")
+            COMMIT_DATA=$(git log --pretty=format:"%H|%s|%ae" | grep -E "\|(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)")
           else
             # Get commits between previous tag and HEAD
-            COMMITS=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"  - %s" | grep -E "^  - (feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)" || echo "")
+            COMMIT_DATA=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"%H|%s|%ae" | grep -E "\|(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)")
           fi
+
+          COMMITS=""
+          while IFS='|' read -r hash message email; do
+            [ -z "$hash" ] && continue
+            username=$(get_github_username "$email" "$hash")
+            COMMITS="${COMMITS}  - $message (@$username)\n"
+          done <<< "$COMMIT_DATA"
 
           # Combine CHANGELOG notes with commit messages
           FULL_NOTES="${NOTES}\n\n### Commits\n${COMMITS}"
