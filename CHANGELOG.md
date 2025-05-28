@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.10.2-alpha
+### Changed
+This will not affect existing functionality, but it will change the location of the logs. The logs will now be stored in `~/.local/state/myunicorn/` folder instead of repository dir. This is done to comply with the XDG Base Directory Specification.
+
 ## v0.10.1-alpha
 ### Changed
 Added a new feature that allows github workflows to write who committed the changes to the release notes. Also created a test script to test the release notes generation. This will not affect existing functionality.
