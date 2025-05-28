@@ -1,15 +1,15 @@
 [![en](https://img.shields.io/badge/lang-en-green.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.md)
 [![tr](https://img.shields.io/badge/lang-tr-blue.svg)](https://github.com/Cyber-Syntax/my-unicorn/blob/main/README.tr.md)
 
-# **⚠️ Attention**
-
-- **This project is in a beta phase** due to limited testing at this time.. Although primarily developed for learning purposes, it effectively addresses my specific needs.
-- **Important:** Follow the instructions in the **Releases section** when updating the script. Updates may include new features or changes that could require different steps. I’ll strive to keep the instructions as simple as possible.
-- **Currently supported:** Linux only.
+> [!WARNING]  
+> **This project is in a beta phase** due to limited testing at this time.. Although primarily developed for learning purposes, it effectively addresses my specific needs.
+> **Important:** Follow the instructions in the **Releases section** when updating the script. Updates may include new features or changes that could require different steps. I’ll strive to keep the instructions as simple as possible.
+> **Currently supported:** Linux only.
 
 ## **🦄 About my-unicorn**
 
-- I created this project to solve my problem. This script installs an AppImage from the GitHub API, saves it to a user-selected directory, creates a config file (JSON) to save information about the AppImage and automate the update process. Also, this script is able to verify whether the AppImage has been installed correctly from GitHub by checking the SHA256 or SHA512 hash of the verification file from the GitHub repository against the actual AppImage.
+> [!NOTE]  
+> I created this project to solve my problem. This script installs an AppImage from the GitHub API, saves it to a user-selected directory, creates a config file (JSON) to save information about the AppImage and automate the update process. Also, this script is able to verify whether the AppImage has been installed correctly from GitHub by checking the SHA256 or SHA512 hash of the verification file from the GitHub repository against the actual AppImage.
 
 - **Applications tested with this script:**
 
@@ -20,11 +20,13 @@
     - [x] FreeTube (Without verification because developer doesn't provide hash. Related issue: https://github.com/FreeTubeApp/FreeTube/issues/4720)
     - [x] Standard-notes
     - [x] AppFlowy (Without verification because developer doesn't provide hash.)
+    - More can be found in the [apps/](apps/) folder.
 
 - 🛠️ **Tested:**
 
   - [x] sha256
   - [x] sha512
+  - Without verification (e.g., FreeTube, AppFlowy)
 
 ## **💡 How to Use**
 
@@ -45,14 +47,21 @@
 
 3. **Optional: Create a virtual environment (Recommended)**
 
-   - Create a virtual environment:
-     - `python3 -m venv .venv`
-   - Activate the virtual environment:
-     - `source .venv/bin/activate`
-   - Install dependencies using `pip`:
-     - `pip install -r requirements.txt`
-   - If this doesn't work, install manually (some of them may already be installed; exclude those if you encounter an error again).
-     - `pip3 install babel certifi idna charset-normalizer PyYAML requests tqdm urllib3`
+> [!IMPORTANT]  
+> This would increase performance.
+
+  - Install `uv` and `pip` if you haven't already(Example for fedora-based systems):
+
+    ```bash
+    sudo dnf python3-pip uv
+    ```
+
+  - Create a virtual environment:
+  - `uv venv`
+  - Activate the virtual environment:
+    - `source .venv/bin/activate`
+  - Install dependencies using `pip`:
+    - `uv pip install -r requirements.txt`
 
 4. Activate the virtual environment (if applicable):
 
@@ -60,19 +69,21 @@
    source .venv/bin/activate
    ```
 
-5. Continue reading below to learn how to use.
+5. Start the script:
 
-### Using app:
+   ```bash
+    uv run main.py
+   ```
 
-1. You can copy `super-productivity.json` or other example config files from the `config_files_examples/` folder to your appimage folder path (default: `~/.local/share/myunicorn/config_files/super-productivity.json`). This config file is an example for super-productivity appimage.
+#### For using uncompatible apps:
 
-2. Using the app to create one for you, but you'll need to know some information about the application:
+1. Using the app to create one for you, but you'll need to know some information about the application:
    - **GitHub URL:** The repository URL of the app (e.g., `https://github.com/johannesjo/super-productivity`).
-3. Hash type and Hash file name are automatically detected. You need to provide below informations, if the app compatibility is not available or error occurs:
+2. Hash type and Hash file name are automatically detected. You need to provide below informations, if the app compatibility is not available or error occurs:
    - **Hash type:** Specify the hash type (e.g., sha512 for super-productivity).
    - **Hash verification issues:** If the hash verification fails, you can manually add the hash to the JSON file:
      - Look for the latest hash in the GitHub release page (e.g., [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
-     - Check the `apps/` folder for examples. All JSON files should work as expected.
+     - Check the `apps/` folder for examples.
 
 ## **🙏 Support This Project**
 
