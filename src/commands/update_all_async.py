@@ -16,16 +16,11 @@ Key features:
 
 import asyncio
 import logging
-import time
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Tuple
 
-from src.api.github_api import GitHubAPI
-from src.api.sha_manager import SHAManager
-from src.app_config import AppConfigManager
 from src.auth_manager import GitHubAuthManager
 from src.commands.update_base import BaseUpdateCommand
-from src.global_config import GlobalConfigManager
-from src.utils import ui_utils # Added import for ui_utils
+from src.utils import ui_utils
 
 
 class UpdateAsyncCommand(BaseUpdateCommand):
@@ -73,7 +68,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                 remaining = int(raw_remaining)
                 limit = int(raw_limit)
             except (ValueError, TypeError):
-                logging.error(f"Could not parse rate limit values: remaining={raw_remaining}, limit={raw_limit}")
+                self._logger.error("Could not parse rate limit values: remaining=%s, limit=%s", raw_remaining, raw_limit)
                 print("Error: Could not determine API rate limits. Cannot proceed.")
                 return
 
@@ -153,14 +148,14 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                 print(f"\nProceeding with update of {len(updatable)} apps within rate limits.")
 
             # 4. Perform async updates
-            self._update_apps_async(updatable)
+            self._perform_async_updates(updatable)
 
         except KeyboardInterrupt:
             logging.info("Operation cancelled by user (Ctrl+C)")
             print("\nOperation cancelled by user (Ctrl+C)")
             return
         except Exception as e:
-            logging.error(f"Unexpected error in async update: {e!s}", exc_info=True)
+            self._logger.error("Unexpected error in async update: %s", str(e), exc_info=True)
             print(f"\nUnexpected error: {e!s}")
             return
 
@@ -191,7 +186,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             remaining = int(raw_remaining)
             limit = int(raw_limit)
         except (ValueError, TypeError):
-            logging.error(f"Could not parse rate limit values: remaining={raw_remaining}, limit={raw_limit}")
+            self._logger.error("Could not parse rate limit values: remaining=%s, limit=%s", raw_remaining, raw_limit)
             print("Error: Could not determine API rate limits. Cannot proceed.")
             return []
 
@@ -220,7 +215,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             if remaining == 0:
                 print("\n❌ ERROR: No API requests available.")
                 print("Please wait until rate limits reset or add a GitHub token.")
-                logging.error("Update aborted: No API requests available (0 remaining)")
+                self._logger.error("Update aborted: No API requests available (0 remaining)")
                 return []
 
             # Ask user what to do
@@ -240,7 +235,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                     if not limited_files:
                         print("\n❌ ERROR: Cannot proceed with 0 apps.")
                         print("Please wait until rate limits reset or add a GitHub token.")
-                        logging.error("Update aborted: Rate limits allow 0 apps")
+                        self._logger.error("Update aborted: Rate limits allow 0 apps")
                         return []
 
                     selected_files = limited_files
@@ -315,7 +310,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             bool: True if updates are confirmed, False otherwise
         """
         if self.global_config.batch_mode:
-            logging.info("Batch mode: Auto-confirming updates")
+            self._logger.info("Batch mode: Auto-confirming updates")
             print("Batch mode: Auto-confirming updates")
             return True
 
@@ -333,7 +328,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         try:
             return input("\nProceed with updates? [y/N]: ").strip().lower() == "y"
         except KeyboardInterrupt:
-            logging.info("Confirmation cancelled by user (Ctrl+C)")
+            self._logger.info("Confirmation cancelled by user (Ctrl+C)")
             print("\nConfirmation cancelled by user (Ctrl+C)")
             return False
 
@@ -363,7 +358,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             remaining = int(raw_remaining)
             limit = int(raw_limit)
         except (ValueError, TypeError):
-            logging.error(f"Could not parse rate limit values: remaining={raw_remaining}, limit={raw_limit}")
+            self._logger.error("Could not parse rate limit values: remaining=%s, limit=%s", raw_remaining, raw_limit)
             return False, [], "Error: Could not determine API rate limits."
 
         # For each app, we need approximately:
@@ -425,192 +420,46 @@ class UpdateAsyncCommand(BaseUpdateCommand):
 
         return False, filtered_apps, status
 
-    def _update_apps_async(self, apps_to_update: List[Dict[str, Any]]) -> None:
-        """Update multiple apps concurrently using asyncio.
+    def _perform_async_updates(self, apps_to_update: List[Dict[str, Any]]) -> None:
+        """Perform async updates using the base class functionality.
 
-        This method is the core of the async update functionality. It:
-        1. Sets up tracking for in-progress and completed updates
-        2. Creates an event loop and semaphore for concurrency control
-        3. Launches asyncio tasks for each app update
-        4. Provides real-time progress updates
-        5. Handles results and generates a summary
+        This method sets up the event loop and calls the base class async update
+        method, then displays the results in a format suitable for this command.
 
         Args:
             apps_to_update: List of app information dictionaries to update
         """
-        # Set up progress tracking
-        total_apps = len(apps_to_update)
-        success_count = 0
-        failure_count = 0
-        # Track apps currently being processed and completed apps
-        in_progress: Set[str] = set()
-        completed: Set[str] = set()
-        # Store results for summary display
-        results: Dict[str, Dict[str, Any]] = {}
-
         try:
-            logging.info(f"Beginning asynchronous update of {total_apps} AppImages")
             print(
-                f"\nUpdating {total_apps} AppImages concurrently (max {self.max_concurrent_updates} at once)..."
+                f"\nUpdating {len(apps_to_update)} AppImages concurrently (max {self.max_concurrent_updates} at once)..."
             )
-
-            # Create a semaphore to limit concurrent operations
-            self.semaphore = asyncio.Semaphore(self.max_concurrent_updates)
 
             # Get or create the event loop
             try:
-                # Try to get the existing event loop
                 loop = asyncio.get_event_loop()
             except RuntimeError:
-                # If no event loop exists in current thread, create a new one
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
             # Set the main event loop in ui_utils
             ui_utils.set_main_event_loop(loop)
 
-            # Define the async update wrapper
-            async def update_app_async(
-                app_data: Dict[str, Any], idx: int
-            ) -> Tuple[bool, Dict[str, Any]]:
-                """Asynchronous wrapper for single app update.
-
-                Args:
-                    app_data: Dictionary with app information
-                    idx: Index of app being processed (1-based)
-
-                Returns:
-                    Tuple containing success flag and result information
-                """
-                app_name = app_data["name"]
-
-                # Acquire semaphore to limit concurrency
-                async with self.semaphore:
-                    # Track the app as in progress
-                    in_progress.add(app_name)
-                    start_time = time.time()
-
-                    # Print status
-                    print(f"[{idx}/{total_apps}] Starting update for {app_name}...")
-
-                    try:
-                        # Initialize GitHub API and SHAManager for async operation
-                        app_config = AppConfigManager()
-                        app_config.load_appimage_config(app_data["config_file"])
-                        github_api = GitHubAPI(
-                            owner=str(app_config.owner),
-                            repo=str(app_config.repo),
-                            sha_name=app_config.sha_name if app_config.sha_name else "sha256",
-                            hash_type=app_config.hash_type if app_config.hash_type else "sha256",
-                        )
-
-                        # Get latest version info
-                        update_available, version_info = github_api.check_latest_version(app_config.version)
-                        if not update_available:
-                            return False, {"status": "no_update", "message": "No update available"}
-
-                        # If update is available, create SHA manager in async mode
-                        sha_manager = SHAManager(
-                            github_api.owner,
-                            github_api.repo,
-                            github_api.sha_name,
-                            github_api.appimage_name,
-                            is_batch=True
-                        )
-
-                        # Call the existing update logic in a thread executor to make it non-blocking
-                        # Pass app index and total apps count to the update method
-                        result = await loop.run_in_executor(
-                            None,
-                            lambda: self._update_single_app_async(
-                                app_data, is_batch=True, app_index=idx, total_apps=total_apps
-                            ),
-                        )
-
-                        # Calculate elapsed time
-                        elapsed_time = time.time() - start_time
-
-                        if result:
-                            print(
-                                f"[{idx}/{total_apps}] ✓ Successfully updated {app_name} ({elapsed_time:.1f}s)"
-                            )
-                            return (
-                                True,
-                                {
-                                    "status": "success",
-                                    "message": f"Updated {app_name} to {app_data['latest']}",
-                                    "elapsed": elapsed_time,
-                                },
-                            )
-                        else:
-                            print(
-                                f"[{idx}/{total_apps}] ✗ Failed to update {app_name} ({elapsed_time:.1f}s)"
-                            )
-                            return (
-                                False,
-                                {
-                                    "status": "failed",
-                                    "message": "Update failed",
-                                    "elapsed": elapsed_time,
-                                },
-                            )
-                    except Exception as e:
-                        error_message = str(e)
-                        logging.error(f"Error updating {app_name}: {error_message}", exc_info=True)
-                        elapsed_time = time.time() - start_time
-
-                        print(
-                            f"[{idx}/{total_apps}] ✗ Error updating {app_name}: {error_message} ({elapsed_time:.1f}s)"
-                        )
-                        return (
-                            False,
-                            {"status": "error", "message": error_message, "elapsed": elapsed_time},
-                        )
-                    finally:
-                        # Track completion
-                        if app_name in in_progress:
-                            in_progress.remove(app_name)
-                        completed.add(app_name)
-
-            # Create task list
-            tasks = []
-
-            # Add all update tasks
-            for idx, app_data in enumerate(apps_to_update, 1):
-                tasks.append(update_app_async(app_data, idx))
-
-            # Run all tasks and wait for completion
             print("Asynchronous update started")
-            update_results = loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
 
-            # Process results
-            for i, result in enumerate(update_results):
-                app_name = apps_to_update[i]["name"]
-
-                if isinstance(result, tuple) and len(result) == 2:
-                    success, result_data = result
-                    results[app_name] = result_data
-
-                    if success:
-                        success_count += 1
-                    else:
-                        failure_count += 1
-                else:
-                    # Handle exceptions that escaped the task
-                    failure_count += 1
-                    error_msg = str(result) if isinstance(result, Exception) else "Unknown error"
-                    logging.error(f"Update of {app_name} failed with exception: {error_msg}")
-                    results[app_name] = {"status": "exception", "message": error_msg, "elapsed": 0}
+            # Use the base class async update method
+            success_count, failure_count, results = loop.run_until_complete(
+                super()._update_apps_async(apps_to_update)
+            )
 
             # Show completion message
             print("\n=== Update Summary ===")
-            print(f"Total apps processed: {success_count + failure_count}/{total_apps}")
+            print(f"Total apps processed: {success_count + failure_count}/{len(apps_to_update)}")
             print(f"Successfully updated: {success_count}")
 
             if failure_count > 0:
                 print(f"Failed updates: {failure_count}")
 
-                # List failed updates
+                # List failed updates - results format is Dict[str, Dict[str, Any]]
                 for app_name, result in results.items():
                     if result.get("status") != "success":
                         print(f"  - {app_name}: {result.get('message', 'Unknown error')}")
@@ -621,67 +470,11 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             self._display_rate_limit_info()
 
         except KeyboardInterrupt:
-            logging.info("Async update process cancelled by user (Ctrl+C)")
             print("\nUpdate process cancelled by user (Ctrl+C)")
-
-            # Show partial results
-            if success_count > 0 or failure_count > 0 or in_progress:
-                print("\n=== Partial Update Summary ===")
-                print(f"Total apps: {total_apps}")
-                print(f"Successfully updated: {success_count}")
-                print(f"Failed updates: {failure_count}")
-
-                if in_progress:
-                    print(f"In progress when cancelled: {len(in_progress)}")
-                    print(f"Apps in progress: {', '.join(sorted(in_progress))}")
-
-                print("\nUpdate process interrupted!")
-
         except Exception as e:
-            logging.error(f"Error in async update process: {e!s}", exc_info=True)
             print(f"\nError in update process: {e!s}")
 
-    def _update_single_app_async(
-        self,
-        app_data: Dict[str, Any],
-        is_batch: bool = False,
-        app_index: int = 0,
-        total_apps: int = 0,
-    ) -> bool:
-        """Update a single AppImage with specialized handling for async context.
 
-        This method is designed to work within the async update system but
-        runs synchronously within its own thread to avoid blocking the event loop.
-        It handles the complete update process for a single app, including:
-        1. Loading the app configuration
-        2. Fetching release information from GitHub
-        3. Downloading and verifying the AppImage
-        4. Handling file operations and updating configuration
-
-        Args:
-            app_data: Dictionary with app information
-            is_batch: Whether this update is part of a batch operation
-            app_index: Index of this app in the update list (1-based)
-            total_apps: Total number of apps being updated
-
-        Returns:
-            bool: True if update was successful, False otherwise
-        """
-        app_config = AppConfigManager()
-        global_config = GlobalConfigManager()
-
-        # Use the core update method with async mode enabled
-        success, _ = self._perform_app_update_core(
-            app_data=app_data,
-            app_config=app_config,
-            global_config=global_config,
-            is_async=True,
-            is_batch=is_batch,
-            app_index=app_index,
-            total_apps=total_apps,
-        )
-
-        return success
 
     def _display_rate_limit_info(self) -> None:
         """Display GitHub API rate limit information after updates using standard print statements."""
@@ -692,7 +485,6 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                 remaining = int(raw_remaining)
                 limit = int(raw_limit)
             except (ValueError, TypeError):
-                logging.debug("Could not parse rate limit values for display")
                 return
 
             print("\n--- GitHub API Rate Limits ---")
@@ -712,6 +504,6 @@ class UpdateAsyncCommand(BaseUpdateCommand):
 
             print("Note: Rate limit information is an estimate based on usage since last refresh.")
 
-        except Exception as e:
+        except Exception:
             # Silently handle any errors to avoid breaking update completion
-            logging.debug(f"Error displaying rate limit info: {e}")
+            pass

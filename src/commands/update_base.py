@@ -9,6 +9,7 @@ synchronous and asynchronous update capabilities.
 import asyncio
 import logging
 import os
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.api.github_api import GitHubAPI
@@ -64,6 +65,146 @@ class BaseUpdateCommand(Command):
     def execute(self):
         """Abstract execute method to be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement execute()")
+
+    async def _update_apps_async(self, apps_to_update: List[Dict[str, Any]]) -> Tuple[int, int, Dict[str, Dict[str, Any]]]:
+        """Update multiple apps concurrently using asyncio.
+
+        This method provides the core async update functionality that can be used
+        by any subclass. It handles concurrency control, progress tracking, and
+        error handling consistently across all async update operations.
+
+        Args:
+            apps_to_update: List of app information dictionaries to update
+
+        Returns:
+            Tuple containing:
+            - int: Number of successfully updated apps
+            - int: Number of failed updates
+            - Dict[str, Dict[str, Any]]: Dictionary mapping app names to their results
+        """
+        total_apps = len(apps_to_update)
+        success_count = 0
+        failure_count = 0
+        results = {}
+
+        try:
+            self._logger.info(f"Beginning asynchronous update of {total_apps} AppImages")
+
+            # Create tasks for all apps
+            tasks = []
+            for idx, app_data in enumerate(apps_to_update, 1):
+                task = self._update_single_app_async(app_data, idx, total_apps)
+                tasks.append(task)
+
+            # Run all tasks concurrently
+            update_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Process results
+            for i, result in enumerate(update_results):
+                app_name = apps_to_update[i]["name"]
+
+                if isinstance(result, tuple) and len(result) == 2:
+                    success, result_data = result
+                    results[app_name] = result_data
+
+                    if success:
+                        success_count += 1
+                    else:
+                        failure_count += 1
+                elif isinstance(result, Exception):
+                    # Handle exceptions that escaped the task
+                    failure_count += 1
+                    error_msg = str(result)
+                    self._logger.error(f"Update of {app_name} failed with exception: {error_msg}")
+                    results[app_name] = {"status": "exception", "message": error_msg, "elapsed": 0}
+                else:
+                    # Handle unexpected result format
+                    failure_count += 1
+                    self._logger.error(f"Unexpected result format for {app_name}: {result}")
+                    results[app_name] = {"status": "error", "message": "Unexpected result format", "elapsed": 0}
+
+        except Exception as e:
+            self._logger.error(f"Error in async update process: {e!s}", exc_info=True)
+
+        return success_count, failure_count, results
+
+    async def _update_single_app_async(
+        self,
+        app_data: Dict[str, Any],
+        app_index: int,
+        total_apps: int
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """Update a single app asynchronously with concurrency control.
+
+        This method handles the async wrapper around the core update logic,
+        providing consistent behavior for all async update operations.
+
+        Args:
+            app_data: Dictionary with app information
+            app_index: Index of app being processed (1-based)
+            total_apps: Total number of apps being updated
+
+        Returns:
+            Tuple containing:
+            - bool: True if update was successful, False otherwise
+            - Dict[str, Any]: Result information including status, message, and elapsed time
+        """
+        app_name = app_data["name"]
+
+        # Acquire semaphore to limit concurrency
+        async with self.semaphore:
+            start_time = time.time()
+
+            try:
+                self._logger.info(f"[{app_index}/{total_apps}] Starting update for {app_name}")
+
+                # Create separate config managers for this app to avoid conflicts
+                app_config = AppConfigManager()
+                global_config = GlobalConfigManager()
+                global_config.load_config()
+
+                # Call the existing update logic in a thread executor to make it non-blocking
+                result = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: self._perform_app_update_core(
+                        app_data=app_data,
+                        app_config=app_config,
+                        global_config=global_config,
+                        is_async=True,
+                        is_batch=True,
+                        app_index=app_index,
+                        total_apps=total_apps,
+                    )
+                )
+
+                # Calculate elapsed time
+                elapsed_time = time.time() - start_time
+
+                if result[0]:  # result is (success, result_data)
+                    self._logger.info(f"[{app_index}/{total_apps}] ✓ Successfully updated {app_name} ({elapsed_time:.1f}s)")
+                    return True, {
+                        "status": "success",
+                        "message": f"Updated to {app_data['latest']}",
+                        "elapsed": elapsed_time,
+                    }
+                else:
+                    self._logger.warning(f"[{app_index}/{total_apps}] ✗ Failed to update {app_name} ({elapsed_time:.1f}s)")
+                    return False, {
+                        "status": "failed",
+                        "message": result[1].get("error", "Update failed") if result[1] else "Update failed",
+                        "elapsed": elapsed_time,
+                    }
+
+            except Exception as e:
+                error_message = str(e)
+                elapsed_time = time.time() - start_time
+                self._logger.error(f"Error updating {app_name}: {error_message}", exc_info=True)
+
+                return False, {
+                    "status": "error",
+                    "message": error_message,
+                    "elapsed": elapsed_time,
+                }
 
     def _perform_app_update_core(
         self,

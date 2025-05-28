@@ -9,7 +9,8 @@ asynchronous updates for improved performance.
 import asyncio
 import logging
 import os
-from typing import Any, Dict, List
+import time
+from typing import Any, Dict, List, Tuple
 
 from src.auth_manager import GitHubAuthManager
 from src.commands.update_base import BaseUpdateCommand
@@ -243,59 +244,20 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
-            # Create a semaphore to limit concurrency - use max_concurrent_updates from base class
-            self.semaphore = asyncio.Semaphore(self.max_concurrent_updates)
-
             print(
                 f"\nStarting asynchronous update of {len(apps_to_update)} AppImages (max {self.max_concurrent_updates} concurrent)..."
             )
+            logging.info(
+                f"Starting asynchronous update of {len(apps_to_update)} AppImages with concurrency limit {self.max_concurrent_updates}"
+            )
 
-            # Run the async update method
+            # Run the async function using the base class method
             success_count, failure_count, results = loop.run_until_complete(
                 self._update_apps_async(apps_to_update)
             )
 
-            # Show completion message with standard output
-            print("\n=== Update Results ===")
-            print("App                  | Result       | Details                 | Time")
-            print("-" * 80)
-
-            for result in results:
-                app_name = result["app"]["name"]
-                result_data = result["result"]
-                status = result_data["status"]
-
-                if status == "success":
-                    result_text = "✓ Success"
-                elif status == "failed":
-                    result_text = "✗ Failed"
-                else:
-                    result_text = "! Error"
-
-                message = result_data.get("message", "")
-                if len(message) > 25:
-                    message = message[:22] + "..."
-
-                elapsed = f"{result_data.get('elapsed', 0):.1f}s"
-
-                print(f"{app_name:<20} | {result_text:<12} | {message:<25} | {elapsed}")
-
-            # Show summary
-            print("\n=== Update Summary ===")
-            print(f"Total apps processed: {success_count + failure_count}/{len(apps_to_update)}")
-            print(f"Successfully updated: {success_count}")
-            if failure_count > 0:
-                print(f"Failed updates: {failure_count}")
-
-                # List failed updates
-                for app_name, result in results.items():
-                    if result.get("status") != "success":
-                        print(f"  - {app_name}: {result.get('message', 'Unknown error')}")
-
-            print("Update process completed!")
-
-            # Display updated rate limit information after updates
-            self._display_rate_limit_info()
+            # Display results
+            self._display_async_results(success_count, failure_count, results, len(apps_to_update))
 
         except KeyboardInterrupt:
             logging.info("Update process cancelled by user (Ctrl+C)")
@@ -303,6 +265,67 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         except Exception as e:
             logging.error(f"Error in async update process: {e!s}", exc_info=True)
             print(f"\nError in update process: {e!s}")
+
+    def _display_async_results(
+        self, success_count: int, failure_count: int, results: Dict[str, Dict[str, Any]], total_apps: int
+    ) -> None:
+        """Display the results of async update operation.
+
+        Args:
+            success_count: Number of successful updates
+            failure_count: Number of failed updates
+            results: Dictionary mapping app names to their result data
+            total_apps: Total number of apps processed
+        """
+        print("\n=== Update Summary ===")
+        print(f"Total apps processed: {success_count + failure_count}/{total_apps}")
+        print(f"Successfully updated: {success_count}")
+
+        if failure_count > 0:
+            print(f"Failed updates: {failure_count}")
+
+            # List failed updates
+            for app_name, result in results.items():
+                if result.get("status") != "success":
+                    message = result.get("message", "Unknown error")
+                    print(f"  - {app_name}: {message}")
+
+        print("\nUpdate process completed!")
+
+        # Display updated rate limit information after updates
+        self._display_rate_limit_info()
+
+    def _update_apps(self, apps_to_update: List[Dict[str, Any]]) -> None:
+        """Update multiple apps synchronously.
+
+        Args:
+            apps_to_update: List of app information dictionaries to update
+        """
+        success_count = 0
+        failure_count = 0
+
+        for idx, app_data in enumerate(apps_to_update, 1):
+            print(f"\n[{idx}/{len(apps_to_update)}] Updating {app_data['name']}...")
+            result = self._update_single_app(app_data, is_batch=True)
+
+            if result:
+                success_count += 1
+                logging.info(f"Successfully updated {app_data['name']}")
+            else:
+                failure_count += 1
+                logging.error(f"Failed to update {app_data['name']}")
+
+        print("\n=== Update Summary ===")
+        print(f"Total apps processed: {success_count + failure_count}/{len(apps_to_update)}")
+        print(f"Successfully updated: {success_count}")
+
+        if failure_count > 0:
+            print(f"Failed updates: {failure_count}")
+
+        print("\nUpdate process completed!")
+
+        # Display updated rate limit information after updates
+        self._display_rate_limit_info()
 
     def _display_update_list(self, updatable_apps: List[Dict[str, Any]]) -> None:
         """Display a list of updatable apps with standard print statements.
