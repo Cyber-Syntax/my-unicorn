@@ -1,6 +1,6 @@
 [project]
 name = 'my-unicorn'
-version = '0.10.4-alpha'
+version = '0.10.5-alpha'
 description = 'It downloads/updates appimages via GitHub API. It also validates the appimage with SHA256 and SHA512.'
 requires-python = ">= 3.12"
 dependencies = [
@@ -15,10 +15,10 @@ dependencies = [
 maintainers = [{ name = "Cyber-Syntax" }]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0.0", "pytest-cov>=4.0.0", "pytest-mock>=3.10.0"]
+dev = ["pytest>=8.3.4", "pytest-cov>=6.0.0", "pytest-mock>=3.14.0"]
 
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=79", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
@@ -27,7 +27,7 @@ python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
 addopts = ["--import-mode=importlib"]
-minversion = "7.0"
+minversion = "8.3.4"
 # Path to the src directory to ensure imports work correctly
 pythonpath = [".", "src"]
 

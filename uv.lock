@@ -266,7 +266,7 @@ wheels = [
 
 [[package]]
 name = "my-unicorn"
-version = "0.10.4a0"
+version = "0.10.5a0"
 source = { editable = "." }
 dependencies = [
     { name = "babel" },
@@ -292,9 +292,9 @@ requires-dist = [
     { name = "keyring", specifier = "==25.6.0" },
     { name = "packaging", specifier = "==25.0" },
     { name = "pip", specifier = "==25.1.1" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.10.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.4" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0.0" },
+    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.14.0" },
     { name = "pyyaml", specifier = "==6.0.2" },
     { name = "requests", specifier = "==2.32.3" },
 ]
