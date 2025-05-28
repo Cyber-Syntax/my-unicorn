@@ -8,6 +8,7 @@ This module configures logging, loads configuration files, and executes commands
 import gettext
 import logging
 import sys
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from types import TracebackType
@@ -144,8 +145,15 @@ def get_user_choice() -> int:
 
 def configure_logging() -> None:
     """Configure logging for the application."""
-    log_dir = Path(__file__).parent / "logs"
-    log_dir.mkdir(exist_ok=True)
+    # Determine the XDG state directory
+    xdg_state_home = os.getenv("XDG_STATE_HOME")
+    if xdg_state_home:
+        log_dir_base = Path(xdg_state_home)
+    else:
+        log_dir_base = Path.home() / ".local" / "state"
+
+    log_dir = log_dir_base / "my-unicorn"
+    log_dir.mkdir(parents=True, exist_ok=True)  # Use parents=True to create intermediate dirs
     log_file = "my-unicorn.log"
     log_file_path = log_dir / log_file
 

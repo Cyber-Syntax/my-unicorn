@@ -31,9 +31,15 @@ class SHAAssetFinder:
 
         Returns:
             dict: Selected SHA asset if found, None otherwise
+
         """
         logger.info(f"Looking for SHA file matching: {selected_appimage_name}")
         logger.info(f"Using SHA name from definitive info: {definitive_app_info.sha_name}")
+
+        # Skip SHA search if no_sha_file is specified
+        if definitive_app_info.sha_name == "no_sha_file":
+            logger.info("Skipping SHA file search as 'no_sha_file' is specified")
+            return None
 
         # 1. Try exact match from definitive app info
         if definitive_app_info.sha_name != "no_sha_file":
@@ -70,7 +76,7 @@ class SHAAssetFinder:
             r"\.sha\d+sum$",
             r"sha\d+sums?\.txt$",
             r"checksums?\.txt$",
-            r"\.sum$"
+            r"\.sum$",
         ]
 
         sha_assets = []

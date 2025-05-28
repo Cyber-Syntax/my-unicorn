@@ -9,13 +9,11 @@ synchronous and asynchronous update capabilities.
 import asyncio
 import logging
 import os
-import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.api.github_api import GitHubAPI
 from src.app_catalog import load_app_definition
 from src.app_config import AppConfigManager
-from src.auth_manager import GitHubAuthManager
 from src.commands.base import Command
 from src.download import DownloadManager
 from src.file_handler import FileHandler
@@ -96,6 +94,7 @@ class BaseUpdateCommand(Command):
             Tuple containing:
             - bool: True if update was successful, False otherwise
             - Optional[Dict[str, Any]]: Additional result data (for async mode)
+
         """
         # Extract app name from config file
         app_name = app_data["name"]
@@ -141,14 +140,15 @@ class BaseUpdateCommand(Command):
             # Download AppImage
             print(f"\nDownloading {github_api.appimage_name}...")
             download_manager = DownloadManager(
-                github_api,
-                app_index=app_index,
-                total_apps=total_apps
+                github_api, app_index=app_index, total_apps=total_apps
             )
             downloaded_file_path = download_manager.download()
 
             # Verify the download
-            if not self._verify_appimage(github_api, downloaded_file_path, cleanup_on_failure=True):
+            verification_result, verification_skipped = self._verify_appimage(
+                github_api, downloaded_file_path, cleanup_on_failure=True
+            )
+            if not verification_result:
                 error_msg = f"Verification failed for {app_data['name']}."
                 self._logger.warning(error_msg)
                 return False, {"error": error_msg}
@@ -158,30 +158,37 @@ class BaseUpdateCommand(Command):
 
             # Download app icon if possible
             from src.icon_manager import IconManager
+
             icon_manager = IconManager()
             icon_success, icon_path = icon_manager.ensure_app_icon(
-                github_api.owner,
-                github_api.repo,
-                app_display_name=app_config.app_display_name
+                github_api.owner, github_api.repo, app_display_name=app_config.app_display_name
             )
 
             # Perform file operations and update config
             if file_handler.handle_appimage_operations(
-                github_api=github_api,
-                icon_path=icon_path if icon_success else None
+                github_api=github_api, icon_path=icon_path if icon_success else None
             ):
                 app_config.update_version(
                     new_version=github_api.version,
                     new_appimage_name=github_api.appimage_name,
                 )
 
-                success_msg = f"Successfully updated {app_data['name']} to version {github_api.version}"
+                # Create appropriate success message based on verification status
+                if verification_skipped:
+                    success_msg = (
+                        f"Updated {app_data['name']} to version {github_api.version} "
+                        "(verification skipped - no hash file provided by developer)"
+                    )
+                else:
+                    success_msg = f"Successfully updated and verified {app_data['name']} to version {github_api.version}"
+
                 self._logger.info(success_msg)
                 print(success_msg)
                 return True, {
                     "status": "success",
                     "message": success_msg,
-                    "new_version": github_api.version
+                    "new_version": github_api.version,
+                    "verification_skipped": verification_skipped,
                 }
             else:
                 error_msg = f"Failed to perform file operations for {app_data['name']}"
@@ -280,16 +287,35 @@ class BaseUpdateCommand(Command):
         github_api: GitHubAPI,
         downloaded_file_path: Optional[str] = None,
         cleanup_on_failure: bool = True,
-    ) -> bool:
-        """Verify the downloaded AppImage using the SHA file."""
+    ) -> Tuple[bool, bool]:
+        """Verify the downloaded AppImage using the SHA file.
+
+        Args:
+            github_api: The GitHub API instance with release information
+            downloaded_file_path: Path to the downloaded file for verification
+            cleanup_on_failure: Whether to delete the file on verification failure
+
+        Returns:
+            Tuple containing:
+            - bool: True if verification succeeded or was skipped, False if failed
+            - bool: True if verification was skipped, False otherwise
+
+        """
+        verification_skipped = False
+
         if github_api.sha_name == "no_sha_file":
-            self._logger.info("Skipping verification for beta version")
-            print("Skipping verification for beta version")
-            return True
+            self._logger.info("Skipping verification - no hash file provided by the developer")
+            print("Note: Verification skipped - no hash file provided by the developer")
+            verification_skipped = True
+            # Return verification_skipped=True instead of verification_success=True
+            # This better reflects that verification didn't actually succeed but was skipped
+            return True, verification_skipped
 
         # Ensure critical VerificationManager parameters are not None
         if github_api.appimage_name is None:
-            raise ValueError(f"VerificationManager: appimage_name is None for {github_api.owner}/{github_api.repo}.")
+            raise ValueError(
+                f"VerificationManager: appimage_name is None for {github_api.owner}/{github_api.repo}."
+            )
 
         verification_manager = VerificationManager(
             sha_name=github_api.sha_name,
@@ -304,7 +330,11 @@ class BaseUpdateCommand(Command):
             self._logger.info(f"Using specific file path for verification: {downloaded_file_path}")
 
         # Verify and clean up on failure if requested
-        return verification_manager.verify_appimage(cleanup_on_failure=cleanup_on_failure)
+        verification_result = verification_manager.verify_appimage(
+            cleanup_on_failure=cleanup_on_failure
+        )
+        # Return the result along with verification_skipped flag (False in this case)
+        return verification_result, verification_skipped
 
     def _create_file_handler(
         self,
@@ -319,14 +349,17 @@ class BaseUpdateCommand(Command):
             "repo": github_api.repo,
             "owner": github_api.owner,
             "version": github_api.version,
-            "app_display_name": app_config.app_display_name
+            "app_display_name": app_config.app_display_name,
         }
 
         for param, value in required_fh_params.items():
             if value is None:
-                raise ValueError(f"FileHandler critical parameter '{param}' is None before instantiation for {github_api.owner}/{github_api.repo}.")
+                raise ValueError(
+                    f"FileHandler critical parameter '{param}' is None before instantiation for {github_api.owner}/{github_api.repo}."
+                )
 
         from pathlib import Path
+
         return FileHandler(
             appimage_name=str(github_api.appimage_name),
             repo=str(github_api.repo),

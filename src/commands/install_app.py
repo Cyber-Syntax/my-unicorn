@@ -7,7 +7,7 @@ by name, without requiring the user to enter URLs.
 
 import logging
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple, cast
+from typing import List, Optional
 
 from src.api.github_api import GitHubAPI
 from src.app_catalog import AppInfo, get_all_apps
@@ -168,8 +168,9 @@ class InstallAppCommand(Command):
             f"sha={api.sha_name}, hash_type={api.hash_type}, arch={api.arch_keyword}"
         )
 
-        # Track verification success across attempts
+        # Track verification success and skip status across attempts
         verification_success = False
+        verification_skipped = False  # New flag to track if verification was skipped
         downloaded_file_path: Optional[str] = None
 
         # Try up to MAX_ATTEMPTS times to download and verify
@@ -201,6 +202,7 @@ class InstallAppCommand(Command):
                         logging.info("Skipping verification due to no_sha_file setting.")
                         print("Skipping verification (no SHA file specified).")
                         verification_success = True
+                        verification_skipped = True  # Set the flag that verification was skipped
                         break
                     else:
                         # Perform verification with cleanup on failure
@@ -272,16 +274,13 @@ class InstallAppCommand(Command):
         # Download app icon if possible
         icon_manager = IconManager()
         icon_success, icon_path = icon_manager.ensure_app_icon(
-            api.owner,
-            api.repo,
-            app_display_name=app_info.app_display_name
+            api.owner, api.repo, app_display_name=app_info.app_display_name
         )
 
         # Perform file operations
         print("Finalizing installation...")
         success = file_handler.handle_appimage_operations(
-            github_api=api,
-            icon_path=icon_path if icon_success else None
+            github_api=api, icon_path=icon_path if icon_success else None
         )
 
         if success:
@@ -289,7 +288,12 @@ class InstallAppCommand(Command):
             app_config.save_config()
 
             # Display success message with paths
-            print(f"\n✅ {app_info.app_display_name} successfully installed!")
+            if verification_skipped:
+                print(f"\n✅ {app_info.app_display_name} successfully installed!")
+                print("⚠️ Note: AppImage was not verified because developers did not provide")
+                print("   a SHA file for this AppImage.")
+            else:
+                print(f"\n✅ {app_info.app_display_name} successfully installed and verified!")
 
             # Show config file location
             if app_config.config_file:
