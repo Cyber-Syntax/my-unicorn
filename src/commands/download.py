@@ -39,6 +39,7 @@ class DownloadCommand(Command):
         # Maximum number of download/verification attempts
         max_attempts = 3
         verification_success = False
+        verification_skipped = False  # New flag to track if verification was skipped
 
         for attempt in range(1, max_attempts + 1):
             try:
@@ -70,7 +71,9 @@ class DownloadCommand(Command):
                 # Handle verification based on SHA file availability
                 if api.sha_name == "no_sha_file":
                     logging.info("Skipping verification due to no_sha_file.")
+                    print("Note: Verification skipped - no hash file provided by the developer")
                     verification_success = True
+                    verification_skipped = True  # Set the flag that verification was skipped
                     break
                 else:
                     # Perform verification with cleanup on failure
@@ -152,10 +155,22 @@ class DownloadCommand(Command):
         if success:
             # Save the configuration only if all previous steps succeed
             app_config.save_config()
-            logging.info(
-                "AppImage downloaded and verified successfully and saved in DownloadCommand."
-            )
-            print("AppImage downloaded and verified successfully and saved.")
+
+            # Use different log/print messages based on verification status
+            if verification_skipped:
+                logging.info(
+                    "AppImage downloaded but not verified because developers not provided "
+                    "sha file for this appimage."
+                )
+                print(
+                    "AppImage downloaded but not verified because developers not provided "
+                    "sha file for this appimage."
+                )
+            else:
+                logging.info(
+                    "AppImage downloaded and verified successfully and saved in DownloadCommand."
+                )
+                print("AppImage downloaded and verified successfully and saved.")
         else:
             logging.error("An error occurred during file operations in DownloadCommand.")
             print("An error occurred during file operations.")

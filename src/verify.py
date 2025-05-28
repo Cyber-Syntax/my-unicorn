@@ -18,7 +18,12 @@ STATUS_SUCCESS = "✓ "  # Unicode check mark
 STATUS_FAIL = "✗ "  # Unicode cross mark
 
 # Supported hash types
-SUPPORTED_HASH_TYPES = ["sha256", "sha512", "no_hash", "extracted_checksum"] # Removed "from_release_description"
+SUPPORTED_HASH_TYPES = [
+    "sha256",
+    "sha512",
+    "no_hash",
+    "extracted_checksum",
+]  # Removed "from_release_description"
 
 
 @dataclass
@@ -34,7 +39,7 @@ class VerificationManager:
     appimage_name: Optional[str] = None  # Original filename from GitHub
     hash_type: str = "sha256"
     appimage_path: Optional[str] = None  # Full path to the AppImage file for verification
-    direct_expected_hash: Optional[str] = None # For hashes extracted from release body
+    direct_expected_hash: Optional[str] = None  # For hashes extracted from release body
 
     def __post_init__(self) -> None:
         """Initialize and validate the verification manager."""
@@ -73,7 +78,11 @@ class VerificationManager:
 
         # Skip hashlib validation for special verification types
         # "extracted_checksum" can now mean direct hash or legacy path, both might have non-standard hash_type initially
-        if self.hash_type == "no_hash" or self.sha_name == "extracted_checksum":
+        if (
+            self.hash_type == "no_hash"
+            or self.sha_name == "extracted_checksum"
+            or self.sha_name == "no_sha_file"
+        ):
             return
 
         if self.hash_type not in hashlib.algorithms_available:
@@ -95,23 +104,34 @@ class VerificationManager:
             # 2. Else, fall back to the legacy path (verify_with_release_checksums).
             if self.sha_name == "extracted_checksum":
                 if self.direct_expected_hash:
-                    logging.info(f"Verifying {self.appimage_name} using directly provided hash (type: {self.hash_type}) for 'extracted_checksum'.")
+                    logging.info(
+                        f"Verifying {self.appimage_name} using directly provided hash (type: {self.hash_type}) for 'extracted_checksum'."
+                    )
                     if not self.appimage_path:
-                        logging.error(f"AppImage path not set for direct hash verification of {self.appimage_name}.")
+                        logging.error(
+                            f"AppImage path not set for direct hash verification of {self.appimage_name}."
+                        )
                         return False
                     if not os.path.exists(self.appimage_path):
-                        logging.error(f"AppImage file not found for direct hash verification: {self.appimage_path}")
+                        logging.error(
+                            f"AppImage file not found for direct hash verification: {self.appimage_path}"
+                        )
                         if cleanup_on_failure:
                             self._cleanup_failed_file(self.appimage_path)
                         return False
 
                     # Ensure hash_type is valid for hashlib if it's not 'no_hash'
                     # This is important because self.hash_type would be "sha256" from SHAManager
-                    if self.hash_type != "no_hash" and self.hash_type not in hashlib.algorithms_available:
-                         logging.error(f"Hash type {self.hash_type} not available in this system for direct comparison with 'extracted_checksum'.")
-                         if cleanup_on_failure and self.appimage_path:
+                    if (
+                        self.hash_type != "no_hash"
+                        and self.hash_type not in hashlib.algorithms_available
+                    ):
+                        logging.error(
+                            f"Hash type {self.hash_type} not available in this system for direct comparison with 'extracted_checksum'."
+                        )
+                        if cleanup_on_failure and self.appimage_path:
                             self._cleanup_failed_file(self.appimage_path)
-                         return False
+                        return False
 
                     is_valid = self._compare_hashes(self.direct_expected_hash)
                     if not is_valid and cleanup_on_failure and self.appimage_path:
@@ -119,7 +139,9 @@ class VerificationManager:
                     return is_valid
                 else:
                     # Fallback to legacy path if direct_expected_hash is not provided
-                    logging.info("Using GitHub release description for verification (legacy path for 'extracted_checksum')")
+                    logging.info(
+                        "Using GitHub release description for verification (legacy path for 'extracted_checksum')"
+                    )
                     # Import the utility outside the main module to avoid circular imports
                 # We need owner/repo information from app_catalog
                 from src.app_catalog import find_app_by_name_in_filename
@@ -134,13 +156,15 @@ class VerificationManager:
 
                 if app_info:
                     if not self.appimage_path:
-                        logging.error(f"AppImage path not set for 'extracted_checksum' verification of {self.appimage_name}.")
+                        logging.error(
+                            f"AppImage path not set for 'extracted_checksum' verification of {self.appimage_name}."
+                        )
                         return False
                     # Use extracted owner/repo to verify with release checksums
                     return verify_with_release_checksums(
                         owner=app_info.owner,
                         repo=app_info.repo,
-                        appimage_path=self.appimage_path, # Now checked for None
+                        appimage_path=self.appimage_path,  # Now checked for None
                         cleanup_on_failure=cleanup_on_failure,
                     )
                 else:
@@ -156,7 +180,7 @@ class VerificationManager:
             # Use appimage_path for existence check. It should be set by now if appimage_name was provided.
             if not self.appimage_path:
                 logging.error(f"AppImage path is not set for {self.appimage_name}.")
-                return False # Cannot proceed without a path to the AppImage
+                return False  # Cannot proceed without a path to the AppImage
 
             if not os.path.exists(self.appimage_path):
                 logging.error(f"AppImage file not found: {self.appimage_path}")
@@ -171,25 +195,27 @@ class VerificationManager:
                 return True
 
             # Download SHA file only if URL is provided and file doesn't exist
-            if self.sha_url: # Check if sha_url is set
+            if self.sha_url:  # Check if sha_url is set
                 if self.sha_name is None:
-                    logging.error("SHA URL is present, but SHA name is not set. Cannot download SHA file.")
-                    return False # Critical error
+                    logging.error(
+                        "SHA URL is present, but SHA name is not set. Cannot download SHA file."
+                    )
+                    return False  # Critical error
                 if not os.path.exists(self.sha_name):
-                    self._download_sha_file() # self.sha_name and self.sha_url must be valid here
+                    self._download_sha_file()  # self.sha_name and self.sha_url must be valid here
 
             # Check if the SHA file exists before proceeding
-            if self.sha_name is None: # If no sha_name (e.g. skipped or error in SHAManager)
+            if self.sha_name is None:  # If no sha_name (e.g. skipped or error in SHAManager)
                 logging.info("No SHA file name specified, skipping file-based verification.")
                 # This case should ideally be caught by hash_type == "no_hash" or sha_name == "from_release_description"
                 # If it reaches here, it implies a logic gap or an unexpected state.
-                return True # Or False, depending on desired strictness for unhandled cases
+                return True  # Or False, depending on desired strictness for unhandled cases
 
             if not os.path.exists(self.sha_name):
                 logging.error(f"SHA file not found: {self.sha_name}")
                 return False
 
-            is_valid = self._parse_sha_file() # self.sha_name must be valid str here
+            is_valid = self._parse_sha_file()  # self.sha_name must be valid str here
 
             if not is_valid and cleanup_on_failure and self.appimage_path:
                 self._cleanup_failed_file(self.appimage_path)
@@ -221,9 +247,9 @@ class VerificationManager:
                 raise OSError(f"Failed to remove existing SHA file: {e!s}")
 
         try:
-            response = requests.get(self.sha_url, timeout=10) # self.sha_url is now checked
+            response = requests.get(self.sha_url, timeout=10)  # self.sha_url is now checked
             response.raise_for_status()
-            with open(self.sha_name, "w", encoding="utf-8") as f: # self.sha_name is now checked
+            with open(self.sha_name, "w", encoding="utf-8") as f:  # self.sha_name is now checked
                 f.write(response.text)
             logging.info(f"Successfully downloaded {self.sha_name}")
         except requests.RequestException as e:
@@ -241,10 +267,10 @@ class VerificationManager:
             logging.info("Skipping hash verification as requested")
             return True
 
-        if not os.path.exists(self.sha_name): # self.sha_name is now checked
+        if not os.path.exists(self.sha_name):  # self.sha_name is now checked
             raise OSError(f"SHA file not found: {self.sha_name}")
 
-        ext = os.path.splitext(self.sha_name)[1].lower() # self.sha_name is now checked
+        ext = os.path.splitext(self.sha_name)[1].lower()  # self.sha_name is now checked
         parser = {
             ".yml": self._parse_yaml_sha,
             ".yaml": self._parse_yaml_sha,
@@ -267,7 +293,7 @@ class VerificationManager:
         """Parse SHA hash from YAML file with error handling."""
         try:
             # self.sha_name is asserted to be str by _parse_sha_file caller context
-            with open(self.sha_name, encoding="utf-8") as f: # type: ignore
+            with open(self.sha_name, encoding="utf-8") as f:  # type: ignore
                 data = yaml.safe_load(f)
 
             if not data:
@@ -290,7 +316,7 @@ class VerificationManager:
         """Parse SHA hash from simple hash file."""
         try:
             # self.sha_name is asserted to be str by _parse_sha_file caller context
-            with open(self.sha_name, encoding="utf-8") as f: # type: ignore
+            with open(self.sha_name, encoding="utf-8") as f:  # type: ignore
                 content = f.read().strip()
 
             if not content:
@@ -335,7 +361,7 @@ class VerificationManager:
 
         try:
             # self.sha_name is asserted to be str by _parse_sha_file caller context
-            with open(self.sha_name, encoding="utf-8") as f: # type: ignore
+            with open(self.sha_name, encoding="utf-8") as f:  # type: ignore
                 content = f.read()
 
             # Try GitHub-style format with headers first
@@ -424,7 +450,7 @@ class VerificationManager:
 
         try:
             # self.sha_name is asserted to be str by _parse_sha_file caller context
-            with open(self.sha_name, encoding="utf-8") as f: # type: ignore
+            with open(self.sha_name, encoding="utf-8") as f:  # type: ignore
                 for line in f:
                     parts = line.strip().split()
                     if len(parts) < 2:
@@ -463,9 +489,9 @@ class VerificationManager:
         """Compare hashes using memory-efficient chunked reading."""
         if not self.appimage_path:
             raise ValueError("AppImage path not set for hash comparison.")
-        file_to_verify = self.appimage_path # Now we know it's a str
+        file_to_verify = self.appimage_path  # Now we know it's a str
 
-        if not os.path.exists(file_to_verify): # file_to_verify is str
+        if not os.path.exists(file_to_verify):  # file_to_verify is str
             raise OSError(f"AppImage file not found: {file_to_verify}")
 
         try:
@@ -475,16 +501,16 @@ class VerificationManager:
             # or "extracted_checksum" (where hash_type might be sha256)
             # The _validate_hash_type and the new check in verify_appimage for "from_release_description"
             # should ensure self.hash_type is usable by hashlib.new() if it's not a special skip type.
-            if self.hash_type == "no_hash": # Should not happen if called for actual comparison
-                 logging.warning("Attempted to compare hashes with hash_type 'no_hash'. Skipping.")
-                 return True # Or False, as this is an inconsistent state for comparison
+            if self.hash_type == "no_hash":  # Should not happen if called for actual comparison
+                logging.warning("Attempted to compare hashes with hash_type 'no_hash'. Skipping.")
+                return True  # Or False, as this is an inconsistent state for comparison
 
             hash_func = hashlib.new(self.hash_type)
 
             # Use larger chunk size for better performance with large files
             chunk_size = 65536  # 64KB chunks
 
-            with open(file_to_verify, "rb") as f: # file_to_verify is str
+            with open(file_to_verify, "rb") as f:  # file_to_verify is str
                 for chunk in iter(lambda: f.read(chunk_size), b""):
                     hash_func.update(chunk)
 

@@ -9,6 +9,7 @@ import gettext
 import logging
 import os  # Add os import
 import sys
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from types import TracebackType
