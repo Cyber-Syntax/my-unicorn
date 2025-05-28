@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.10.5-alpha
+### Changed
+Updated dependencies to the latest versions. This will not affect existing functionality, but it will improve the performance and security of the app.
+
 ## v0.10.4-alpha
 ### Changed
 Fixes github action duplicate commits in release notes. This release will make it workflow to show only PR commits in the release notes. 

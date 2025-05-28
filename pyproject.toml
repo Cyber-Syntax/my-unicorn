@@ -1,18 +1,16 @@
 [project]
 name = 'my-unicorn'
-version = '0.7.0-alpha'
+version = '0.10.4-alpha'
 description = 'It downloads/updates appimages via GitHub API. It also validates the appimage with SHA256 and SHA512.'
-requires-python = ">= 3.8"
+requires-python = ">= 3.12"
 dependencies = [
-    "babel==2.16.0",
-    "certifi==2024.8.30",
-    "charset-normalizer==3.4.0",
-    "idna==3.10",
-    "pip==24.3.1",
-    "PyYAML==6.0.2",
+    "babel==2.17.0",
+    "pip==25.1.1",
     "requests==2.32.3",
-    "tqdm==4.67.1",
-    "urllib3==2.2.3",
+    "cryptography==45.0.3",
+    "keyring==25.6.0",
+    "packaging==25.0",
+    "PyYAML==6.0.2",
 ]
 maintainers = [{ name = "Cyber-Syntax" }]
 
