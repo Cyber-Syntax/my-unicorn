@@ -1,383 +1,164 @@
-#!/usr/bin/env python3
 """Application catalog module.
 
-This module provides a catalog of supported applications that can be
-installed directly by name, without requiring the user to enter URLs.
+This module handles loading and managing application definitions from JSON files.
 """
 
+import json
 import logging
-import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Optional
-
-from src.utils.icon_paths import ICON_PATHS
 
 logger = logging.getLogger(__name__)
 
+DEFINITIONS_PATH: Optional[Path] = None
 
 @dataclass
 class AppInfo:
-    """Information about an application in the catalog.
+    """Application information from definition file.
 
     Attributes:
-        name: User-friendly display name
-        description: Short description of the application
-        owner: GitHub repository owner
-        repo: GitHub repository name
-        app_display_name: Unique identifier for the app (defaults to repo name)
-        sha_name: SHA file name for verification (or "no_sha_file")
-        hash_type: Hash type used for verification (e.g., "sha256", "sha512")
-        category: Application category for filtering/grouping
-        tags: List of tags associated with the application
-
+        owner: Repository owner/organization
+        repo: Repository name
+        app_display_name: Display name for the application
+        description: Description of the application
+        category: Application category
+        tags: List of tags describing the application
+        hash_type: Type of hash used for verification (e.g., "sha256")
+        appimage_name_template: Template for AppImage filename
+        sha_name: Name of SHA file or "no_sha_file"
+        preferred_characteristic_suffixes: List of characteristic suffixes in order of preference
+        icon_info: Direct URL to icon file
+        icon_file_name: Preferred filename for saving the icon
+        icon_repo_path: Repository path to icon file (fallback if icon_info not available)
     """
-
-    name: str
-    description: str
     owner: str
     repo: str
-    app_display_name: Optional[str] = None
-    sha_name: str = "no_sha_file"
-    hash_type: str = "sha256"
-    category: str = "Other"
-    tags: List[str] = None
+    app_display_name: str
+    description: str
+    category: str
+    tags: List[str]
+    hash_type: str
+    appimage_name_template: str
+    sha_name: str
+    preferred_characteristic_suffixes: List[str]
+    icon_info: Optional[str]
+    icon_file_name: Optional[str]
+    icon_repo_path: Optional[str]
 
-    def __post_init__(self):
-        """Initialize default values for optional fields."""
-        if self.tags is None:
-            self.tags = []
-        if self.app_display_name is None:
-            self.app_display_name = self.repo
-
-
-# Application catalog - mapping app_display_name (lowercase) to AppInfo
-# The app_display_name is used for lookup and should be simple, like 'joplin', 'freetube', etc.
-APP_CATALOG: Dict[str, AppInfo] = {
-    "tagspaces": AppInfo(
-        name="TagSpaces",
-        description="A free and open-source personal data manager with tagging support",
-        owner="tagspaces",
-        repo="tagspaces",
-        sha_name="SHA256SUMS.txt",
-        hash_type="sha256",
-        category="Productivity",
-        tags=["file-manager", "tagging", "local-files"],
-    ),
-    "obsidian": AppInfo(
-        name="Obsidian",
-        description="A powerful knowledge base that works on local Markdown files",
-        owner="obsidianmd",
-        repo="obsidian-releases",
-        app_display_name="obsidian",
-        sha_name="SHA256SUMS.txt",
-        hash_type="sha256",
-        category="Productivity",
-        tags=["markdown", "knowledge-base", "local-files"],
-    ),
-    "logseq": AppInfo(
-        name="Logseq",
-        description="A privacy-first, open-source knowledge base that works on local files (opt-out google telemetry, can be disabled)",
-        owner="logseq",
-        repo="logseq",
-        sha_name="SHA256SUMS.txt",
-        hash_type="sha256",
-        category="Productivity",
-        tags=["knowledge-base", "markdown", "privacy"],
-    ),
-    "joplin": AppInfo(
-        name="Joplin",
-        description="A note-taking and to-do application with synchronization capabilities",
-        owner="laurent22",
-        repo="joplin",
-        sha_name="latest-linux.yml",
-        hash_type="sha512",
-        category="Productivity",
-        tags=["notes", "markdown", "sync"],
-    ),
-    "freetube": AppInfo(
-        name="FreeTube",
-        description="An open source desktop YouTube player built with privacy in mind",
-        owner="FreeTubeApp",
-        repo="FreeTube",
-        category="Media",
-        tags=["video", "youtube", "privacy"],
-    ),
-    "zettlr": AppInfo(
-        name="Zettlr",
-        description="A markdown editor for writing academic texts and taking notes",
-        owner="Zettlr",
-        repo="Zettlr",
-        sha_name="SHA256SUMS.txt",
-        hash_type="sha256",
-        category="Productivity",
-        tags=["markdown", "academic", "notes"],
-    ),
-    "superproductivity": AppInfo(
-        name="Super Productivity",
-        description="To-do list & time tracker & kanban board & calendar all in one app",
-        owner="johannesjo",
-        repo="super-productivity",
-        sha_name="latest-linux.yml",
-        hash_type="sha512",
-        category="Productivity",
-        tags=["todo", "time-tracking", "productivity"],
-    ),
-    "appflowy": AppInfo(
-        name="AppFlowy",
-        description="Open-source alternative to Notion",
-        owner="AppFlowy-IO",
-        repo="AppFlowy",
-        category="Productivity",
-        tags=["notes", "organization", "notion-alternative"],
-    ),
-    "siyuan": AppInfo(
-        name="SiYuan",
-        description="A local-first personal knowledge management system (opt-out google telemetry, can be disabled)",
-        owner="siyuan-note",
-        repo="siyuan",
-        sha_name="SHA256SUMS.txt",
-        hash_type="sha256",
-        category="Productivity",
-        tags=["notes", "knowledge-base"],
-    ),
-    "standardnotes": AppInfo(
-        name="Standard Notes",
-        description="A simple and private notes app",
-        owner="standardnotes",
-        repo="app",
-        app_display_name="standardnotes",  # Use this instead of repo for file names
-        sha_name="SHA256SUMS",
-        hash_type="sha256",
-        category="Productivity",
-        tags=["notes", "privacy", "encryption"],
-    ),
-    "qownnotes": AppInfo(
-        name="QOwnNotes",
-        description="Plain-text file notepad with markdown support and ownCloud & nextcloud and git integration",
-        owner="pbek",
-        repo="QOwnNotes",
-        sha_name="QOwnNotes-x86_64-Qt6.AppImage.sha256sum",
-        hash_type="sha256",
-        category="Productivity",
-        tags=["notes", "markdown", "owncloud"],
-    ),
-    "zen-browser": AppInfo(
-        name="Zen Browser",
-        description="A content-focused browser for distraction-free browsing",
-        owner="zen-browser",
-        repo="desktop",
-        app_display_name="zen-browser",
-        sha_name="extracted_checksum",  # Special marker to use release description for verification
-        hash_type="sha256",
-        category="Productivity",
-        tags=["browser", "focus", "distraction-free", "privacy"],
-    ),
-    # Add more applications as needed
-}
-
-
-def get_app_info(app_display_name: str) -> Optional[AppInfo]:
-    """Get information about an application by its ID.
+def initialize_definitions_path(path: Path) -> None:
+    """Initialize the path to application definitions.
 
     Args:
-        app_display_name: The application identifier (case-insensitive)
+        path: Path to directory containing JSON app definitions
+    """
+    global DEFINITIONS_PATH
+    DEFINITIONS_PATH = path
+    logger.info(f"Initialized app definitions path: {path}")
+
+def get_all_apps() -> Dict[str, AppInfo]:
+    """Get all available app definitions.
+
+    Returns:
+        Dict mapping lowercase repo names to AppInfo objects
+    """
+    if not DEFINITIONS_PATH:
+        logger.error("App definitions path not initialized")
+        return {}
+
+    apps: Dict[str, AppInfo] = {}
+    try:
+        for json_file in DEFINITIONS_PATH.glob("*.json"):
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    app_info = AppInfo(
+                        owner=data["owner"],
+                        repo=data["repo"],
+                        app_display_name=data["app_display_name"],
+                        description=data["description"],
+                        category=data["category"],
+                        tags=data["tags"],
+                        hash_type=data["hash_type"],
+                        appimage_name_template=data["appimage_name_template"],
+                        sha_name=data["sha_name"],
+                        preferred_characteristic_suffixes=data["preferred_characteristic_suffixes"],
+                        icon_info=data.get("icon_info"),
+                        icon_file_name=data.get("icon_file_name"),
+                        icon_repo_path=data.get("icon_repo_path")
+                    )
+                    apps[app_info.repo.lower()] = app_info
+            except Exception as e:
+                logger.error(f"Error loading app definition from {json_file}: {e}")
+                continue
+
+    except Exception as e:
+        logger.error(f"Error scanning app definitions directory: {e}")
+
+    return apps
+
+def load_app_definition(repo_name: str) -> Optional[AppInfo]:
+    """Load application definition from JSON file.
+
+    Args:
+        repo_name: Repository name (case-insensitive)
 
     Returns:
         AppInfo object if found, None otherwise
-
     """
-    return APP_CATALOG.get(app_display_name.lower())
-
-
-def find_app_by_owner_repo(owner: str, repo: str) -> Optional[AppInfo]:
-    """Find an application in the catalog by owner and repo.
-
-    Args:
-        owner: Repository owner
-        repo: Repository name
-
-    Returns:
-        AppInfo object if found, None otherwise
-
-    """
-    # Convert to lowercase for case-insensitive comparison
-    owner_lower = owner.lower()
-    repo_lower = repo.lower()
-
-    # Search through the catalog for a matching app
-    for app in APP_CATALOG.values():
-        if app.owner.lower() == owner_lower and app.repo.lower() == repo_lower:
-            return app
-
-    # No match found
-    return None
-
-
-def get_app_display_name_for_owner_repo(owner: str, repo: str) -> str:
-    """Get the app_display_name for a given owner/repo combination.
-
-    This helps ensure we always use the correct app_display_name from
-    the catalog for naming purposes, even when only owner/repo is available.
-
-    Args:
-        owner: Repository owner
-        repo: Repository name
-
-    Returns:
-        The app_display_name from the catalog if found, otherwise defaults to repo name
-
-    """
-    app_info = find_app_by_owner_repo(owner, repo)
-    if app_info and app_info.app_display_name:
-        logger.debug(
-            f"Found app_display_name '{app_info.app_display_name}' in catalog for {owner}/{repo}"
-        )
-        return app_info.app_display_name
-
-    # Default to repo name if not found in catalog
-    logger.debug(f"No app_display_name found in catalog for {owner}/{repo}, using repo name")
-    return repo
-
-
-def get_all_apps() -> List[AppInfo]:
-    """Get a list of all applications in the catalog.
-
-    Returns:
-        List of AppInfo objects
-
-    """
-    return list(APP_CATALOG.values())
-
-
-def get_apps_by_category(category: str) -> List[AppInfo]:
-    """Get applications filtered by category.
-
-    Args:
-        category: Category name to filter by
-
-    Returns:
-        List of AppInfo objects in the specified category
-
-    """
-    return [app for app in APP_CATALOG.values() if app.category.lower() == category.lower()]
-
-
-def get_apps_by_tag(tag: str) -> List[AppInfo]:
-    """Get applications filtered by tag.
-
-    Args:
-        tag: Tag to filter by
-
-    Returns:
-        List of AppInfo objects with the specified tag
-
-    """
-    return [
-        app
-        for app in APP_CATALOG.values()
-        if app.tags and tag.lower() in [t.lower() for t in app.tags]
-    ]
-
-
-def search_apps(query: str) -> List[AppInfo]:
-    """Search for applications by name, description, or tags.
-
-    Args:
-        query: Search query string
-
-    Returns:
-        List of matching AppInfo objects
-
-    """
-    query = query.lower()
-    results = []
-
-    for app in APP_CATALOG.values():
-        if (
-            query in app.name.lower()
-            or query in app.description.lower()
-            or (app.tags and any(query in tag.lower() for tag in app.tags))
-        ):
-            results.append(app)
-
-    return results
-
-
-def get_categories() -> List[str]:
-    """Get a list of all categories in the catalog.
-
-    Returns:
-        List of category names
-
-    """
-    return sorted({app.category for app in APP_CATALOG.values()})
-
-
-def sync_with_icon_paths():
-    """Ensure all apps in the catalog have corresponding entries in ICON_PATHS.
-
-    This is a utility function for development/maintenance.
-    """
-    missing_icons = []
-
-    for app_display_name, app_info in APP_CATALOG.items():
-        repo_key = f"{app_info.owner}/{app_info.repo}".lower()
-        repo_only_key = app_info.repo.lower()
-
-        if repo_key not in ICON_PATHS and repo_only_key not in ICON_PATHS:
-            missing_icons.append((app_display_name, repo_key))
-
-    if missing_icons:
-        logger.warning(f"Missing icon paths for {len(missing_icons)} apps:")
-        for app_display_name, repo_key in missing_icons:
-            logger.warning(f"  - {app_display_name} ({repo_key})")
-
-
-def find_app_by_name_in_filename(filename: str) -> Optional[AppInfo]:
-    """Find app information based on the AppImage filename.
-
-    This function tries to match the filename with entries in the app catalog,
-    which is particularly useful when verifying AppImages with extracted checksums.
-
-    Args:
-        filename: The AppImage filename (with or without path)
-
-    Returns:
-        AppInfo object if found, None otherwise
-
-    """
-    if not filename:
-        logger.error("Empty filename provided to find_app_by_name_in_filename")
+    if not DEFINITIONS_PATH:
+        logger.error("App definitions path not initialized")
         return None
 
-    # Extract just the basename without path
-    basename = os.path.basename(filename).lower()
-    logger.debug(f"Looking for app match for filename: {basename}")
+    # Convert repo name to lowercase for case-insensitive matching
+    repo_name = repo_name.lower()
 
-    # Extract the first part before hyphen (likely the app name)
-    name_part = basename.split("-")[0].lower()
+    # Handle owner/repo format
+    if "/" in repo_name:
+        repo_name = repo_name.split("/")[1]
 
-    # First, direct match against app_display_name in the catalog
-    for app_id, app_info in APP_CATALOG.items():
-        if app_id.lower() == name_part:
-            logger.debug(f"Found direct app_id match: {app_id}")
-            return app_info
+    # Try to find and load the JSON file
+    try:
+        json_path = DEFINITIONS_PATH / f"{repo_name.capitalize()}.json"
+        if not json_path.exists():
+            json_path = DEFINITIONS_PATH / f"{repo_name}.json"
+            if not json_path.exists():
+                logger.debug(f"No app definition found for {repo_name}")
+                return None
 
-        # Check if app_display_name matches the first part of the filename
-        if hasattr(app_info, "app_display_name") and app_info.app_display_name:
-            if app_info.app_display_name.lower() == name_part:
-                logger.debug(f"Found display name match: {app_info.app_display_name}")
-                return app_info
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
 
-        # Check if repo name matches the first part of the filename
-        if app_info.repo.lower() == name_part:
-            logger.debug(f"Found repo name match: {app_info.repo}")
-            return app_info
+        # Create AppInfo object from JSON data
+        return AppInfo(
+            owner=data["owner"],
+            repo=data["repo"],
+            app_display_name=data["app_display_name"],
+            description=data["description"],
+            category=data["category"],
+            tags=data["tags"],
+            hash_type=data["hash_type"],
+            appimage_name_template=data["appimage_name_template"],
+            sha_name=data["sha_name"],
+            preferred_characteristic_suffixes=data["preferred_characteristic_suffixes"],
+            icon_info=data.get("icon_info"),
+            icon_file_name=data.get("icon_file_name"),
+            icon_repo_path=data.get("icon_repo_path")
+        )
 
-    # Special hard-coded fallbacks for known cases
-    if "zen" in basename.lower():
-        logger.info("Detected Zen Browser AppImage")
-        return APP_CATALOG.get("zen-browser")
+    except Exception as e:
+        logger.error(f"Error loading app definition for {repo_name}: {e}")
+        return None
 
-    logger.warning(f"Could not find app information for filename: {basename}")
-    return None
+def get_app_display_name_for_owner_repo(owner: str, repo: str) -> str:
+    """Get app display name for owner/repo combination.
+
+    Args:
+        owner: Repository owner/organization
+        repo: Repository name
+
+    Returns:
+        Display name from app definition or repo name as fallback
+    """
+    app_info = load_app_definition(repo)
+    return app_info.app_display_name if app_info else repo

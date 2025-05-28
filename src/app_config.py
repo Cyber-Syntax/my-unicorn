@@ -10,16 +10,16 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 # Local imports
+from src.app_catalog import load_app_definition
 from src.utils.desktop_entry import DesktopEntryManager
 
 # Configure module logger
 logger = logging.getLogger(__name__)
 
 # Constants
-DEFAULT_HASH_TYPE = "sha256"
 DEFAULT_CONFIG_PATH = "~/.config/myunicorn/apps/"
 DESKTOP_ENTRY_DIR = "~/.local/share/applications"
 ICON_BASE_DIR = "~/.local/share/icons/myunicorn"
@@ -35,53 +35,113 @@ class AppConfigManager:
 
     This class handles operations related to application configuration including
     creating desktop files, managing versions, and storing app-specific settings.
+
+    Note: Static app metadata (owner, repo, sha_name, etc.) is now loaded from
+    JSON app definitions. Only user-specific data is stored in config files.
     """
 
-    owner: Optional[str] = None
-    repo: Optional[str] = None
-    app_display_name: Optional[str] = None
+    # Core user-specific fields (stored in config files)
     version: Optional[str] = None
-    sha_name: Optional[str] = None
-    hash_type: str = DEFAULT_HASH_TYPE
     appimage_name: Optional[str] = None
-    arch_keyword: Optional[str] = None
+
+    # Configuration management
     config_folder: Path = field(default_factory=lambda: Path(DEFAULT_CONFIG_PATH).expanduser())
+
+    # App identification (set when loading config)
+    app_name: Optional[str] = field(init=False, default=None)
 
     # These fields are calculated in __post_init__ and not directly initialized
     config_file_name: Optional[str] = field(init=False, default=None)
     config_file: Optional[Path] = field(init=False, default=None)
 
     def __post_init__(self) -> None:
-        """Post-initialization to handle derived attributes.
-
-        Sets up app_display_name based on repo if not provided and calculates config paths.
-        Also ensures the configuration directory exists.
-        """
-        # Set app_display_name to repo if not provided and repo exists
-        if self.app_display_name is None and self.repo is not None:
-            self.app_display_name = self.repo
-
-        # Set config_file_name based on app_display_name
-        self.config_file_name = f"{self.app_display_name}.json" if self.app_display_name else None
-
-        # Set config_file path
-        self.config_file = (
-            self.config_folder / self.config_file_name if self.config_file_name else None
-        )
-
+        """Post-initialization to handle derived attributes."""
         # Ensure the configuration directory exists
         self.config_folder.mkdir(parents=True, exist_ok=True)
+
+    def set_app_name(self, app_name: str) -> None:
+        """Set the app name and update derived paths.
+
+        Args:
+            app_name: Name of the application (used for config file naming)
+        """
+        self.app_name = app_name
+        self.config_file_name = f"{app_name}.json"
+        self.config_file = self.config_folder / self.config_file_name
+
+    def get_app_info(self):
+        """Get app info from JSON definition.
+
+        Returns:
+            AppInfo object if found, None otherwise
+        """
+        if not self.app_name:
+            logger.warning("Cannot get app info: app_name not set")
+            return None
+        return load_app_definition(self.app_name)
+
+    @property
+    def owner(self) -> Optional[str]:
+        """Get owner from app definition."""
+        app_info = self.get_app_info()
+        return app_info.owner if app_info else None
+
+    @property
+    def repo(self) -> Optional[str]:
+        """Get repo from app definition."""
+        app_info = self.get_app_info()
+        return app_info.repo if app_info else None
+
+    @property
+    def app_display_name(self) -> Optional[str]:
+        """Get display name from app definition."""
+        app_info = self.get_app_info()
+        return app_info.app_display_name if app_info else self.app_name
+
+    @property
+    def sha_name(self) -> Optional[str]:
+        """Get SHA name from app definition."""
+        app_info = self.get_app_info()
+        return app_info.sha_name if app_info else None
+
+    @property
+    def hash_type(self) -> str:
+        """Get hash type from app definition."""
+        app_info = self.get_app_info()
+        return app_info.hash_type if app_info else "sha256"
+
+    @property
+    def preferred_characteristic_suffixes(self) -> List[str]:
+        """Get preferred characteristic suffixes from app definition."""
+        app_info = self.get_app_info()
+        return app_info.preferred_characteristic_suffixes if app_info else []
+
+    @property
+    def icon_info(self) -> Optional[str]:
+        """Get icon info from app definition."""
+        app_info = self.get_app_info()
+        return app_info.icon_info if app_info else None
+
+    @property
+    def icon_file_name(self) -> Optional[str]:
+        """Get icon file name from app definition."""
+        app_info = self.get_app_info()
+        return app_info.icon_file_name if app_info else None
+
+    @property
+    def icon_repo_path(self) -> Optional[str]:
+        """Get icon repo path from app definition."""
+        app_info = self.get_app_info()
+        return app_info.icon_repo_path if app_info else None
 
     def update_version(
         self, new_version: Optional[str] = None, new_appimage_name: Optional[str] = None
     ) -> None:
         """Update the configuration file with the new version and AppImage name.
-        If new_version or new_appimage_name is provided, update the instance variables accordingly.
 
         Args:
             new_version: New version to update to
             new_appimage_name: New AppImage filename
-
         """
         try:
             if new_version is not None:
@@ -89,14 +149,17 @@ class AppConfigManager:
             if new_appimage_name is not None:
                 self.appimage_name = new_appimage_name
 
-            self.config_file = self.config_folder / f"{self.app_display_name}.json"
+            if not self.config_file:
+                logger.error("Config file path is not set")
+                return
+
             config_data: Dict[str, Any] = {}
 
             if self.config_file.exists():
                 with self.config_file.open("r", encoding="utf-8") as file:
                     config_data = json.load(file)
 
-            # Update version and AppImage information in the configuration data.
+            # Update only user-specific information in the configuration data
             config_data["version"] = self.version
             config_data["appimage_name"] = self.appimage_name
 
@@ -110,7 +173,7 @@ class AppConfigManager:
             logger.error(f"An error occurred while updating version: {e}")
 
     def create_desktop_file(
-        self, appimage_path: str, icon_path: Optional[str] = None
+        self, appimage_path: Union[str, Path], icon_path: Optional[Union[str, Path]] = None
     ) -> Tuple[bool, str]:
         """Create or update a desktop entry file for the AppImage.
 
@@ -120,7 +183,6 @@ class AppConfigManager:
 
         Returns:
             Tuple[bool, str]: Success status and path to desktop file or error message
-
         """
         try:
             if not self.app_display_name:
@@ -128,17 +190,23 @@ class AppConfigManager:
 
             # Convert paths to Path objects if they're strings
             if isinstance(appimage_path, str):
-                appimage_path = Path(appimage_path)
+                appimage_path_obj = Path(appimage_path)
+            else:
+                appimage_path_obj = appimage_path
 
             if icon_path and isinstance(icon_path, str):
-                icon_path = Path(icon_path)
+                icon_path_obj = Path(icon_path)
+            elif icon_path:
+                icon_path_obj = icon_path
+            else:
+                icon_path_obj = None
 
             # Use the DesktopEntryManager to handle desktop entry operations
             desktop_manager = DesktopEntryManager()
             return desktop_manager.create_or_update_desktop_entry(
                 app_display_name=self.app_display_name,
-                appimage_path=appimage_path,
-                icon_path=icon_path,
+                appimage_path=appimage_path_obj,
+                icon_path=icon_path_obj,
             )
 
         except Exception as e:
@@ -154,7 +222,6 @@ class AppConfigManager:
 
         Raises:
             FileNotFoundError: If the configuration folder doesn't exist
-
         """
         try:
             self.config_folder.mkdir(parents=True, exist_ok=True)
@@ -171,7 +238,6 @@ class AppConfigManager:
 
         Returns:
             bool: True if save successful, False otherwise
-
         """
         if not self.config_file:
             logger.error("Config file path is not set")
@@ -202,7 +268,6 @@ class AppConfigManager:
 
         Returns:
             bool: True if commit successful, False otherwise
-
         """
         if not self.config_file:
             logger.error("Config file path is not set")
@@ -236,7 +301,6 @@ class AppConfigManager:
 
         Returns:
             List[str] or None: List of selected JSON files or None if no selection made
-
         """
         try:
             json_files = self.list_json_files()
@@ -282,27 +346,20 @@ class AppConfigManager:
 
         Raises:
             ValueError: If JSON parsing fails
-
         """
         config_file_path = self.config_folder / config_file_name
         if config_file_path.is_file():
             try:
                 with config_file_path.open("r", encoding="utf-8") as file:
                     config = json.load(file)
-                    # Update instance variables with the loaded config
-                    self.owner = config.get("owner", self.owner)
-                    self.repo = config.get("repo", self.repo)
-                    self.app_display_name = config.get(
-                        "app_display_name", self.app_display_name or self.repo
-                    )
-                    self.version = config.get("version", self.version)
-                    self.sha_name = config.get("sha_name", self.sha_name)
-                    self.hash_type = config.get("hash_type", self.hash_type)
-                    self.appimage_name = config.get("appimage_name", self.appimage_name)
-                    self.arch_keyword = config.get("arch_keyword", self.arch_keyword)
 
-                    # Update derived fields
-                    self.__post_init__()
+                    # Extract app name from filename and set it
+                    app_name = Path(config_file_name).stem
+                    self.set_app_name(app_name)
+
+                    # Update instance variables with the loaded user-specific config
+                    self.version = config.get("version", self.version)
+                    self.appimage_name = config.get("appimage_name", self.appimage_name)
 
                     logger.info(f"Successfully loaded configuration from {config_file_name}")
                     return config
@@ -321,7 +378,6 @@ class AppConfigManager:
 
         Returns:
             bool: True if config was successfully reloaded, False otherwise
-
         """
         logger.info("Explicitly reloading app configuration from disk")
         if self.config_file_name is None:
@@ -376,7 +432,6 @@ class AppConfigManager:
 
         Returns:
             Selected file name or None if cancelled
-
         """
         while True:
             file_choice = input("Select an application (number) or cancel: ")
@@ -401,32 +456,28 @@ class AppConfigManager:
 
         Args:
             app_name: Name of the application
-
         """
         print("\n" + "=" * 60)
         print(f"Configuration for: {app_name}")
         print("-" * 60)
-        print(f"Owner: {self.owner or 'Not set'}")
-        print(f"Repository: {self.repo or 'Not set'}")
-        print(f"Version: {self.version or 'Not set'}")
-        print(f"SHA Name: {self.sha_name or 'Auto-detect'}")
-        print(f"Hash Type: {self.hash_type or 'sha256'}")
-        print(f"AppImage Name: {self.appimage_name or 'Not set'}")
-        print(f"Architecture Keyword: {self.arch_keyword or 'Not set'}")
+        print("Static Information (from app definition):")
+        print(f"  Owner: {self.owner or 'Not found'}")
+        print(f"  Repository: {self.repo or 'Not found'}")
+        print(f"  SHA Name: {self.sha_name or 'Not found'}")
+        print(f"  Hash Type: {self.hash_type}")
+        print(f"  Preferred Suffixes: {self.preferred_characteristic_suffixes}")
+        print(f"  Icon Info: {self.icon_info or 'Not found'}")
+        print("-" * 60)
+        print("User-specific Information (editable):")
+        print(f"  Version: {self.version or 'Not set'}")
+        print(f"  AppImage Name: {self.appimage_name or 'Not set'}")
         print("=" * 60)
 
         print("\nConfiguration options:")
         print("-" * 60)
-        print("Repository Settings:")
-        print("1. Owner")
-        print("2. Repository")
-        print("3. Version")
-        print("4. SHA Name")
-        print("\nAppImage Settings:")
-        print("5. Hash Type")
-        print("6. AppImage Name")
-        print("7. Architecture Keyword")
-        print("8. Exit")
+        print("1. Version")
+        print("2. AppImage Name")
+        print("3. Exit")
         print("-" * 60)
 
     def _handle_config_customization(self, app_name: str) -> None:
@@ -434,29 +485,23 @@ class AppConfigManager:
 
         Args:
             app_name: Name of the application
-
         """
         while True:
-            choice = input("Enter your choice (1-8): ")
-            if choice.isdigit() and 1 <= int(choice) <= 8:
+            choice = input("Enter your choice (1-3): ")
+            if choice.isdigit() and 1 <= int(choice) <= 3:
                 break
             else:
-                logger.warning("Invalid choice, please enter a number between 1 and 8.")
-                print("Invalid choice, please enter a number between 1 and 8.")
+                logger.warning("Invalid choice, please enter a number between 1 and 3.")
+                print("Invalid choice, please enter a number between 1 and 3.")
 
-        if choice == "8":
+        if choice == "3":
             logger.info("User exited configuration customization without changes")
             print("Exiting without changes.")
             return
 
         config_dict = {
-            "owner": self.owner,
-            "repo": self.repo,
             "version": self.version,
-            "sha_name": self.sha_name,
-            "hash_type": self.hash_type,
             "appimage_name": self.appimage_name,
-            "arch_keyword": self.arch_keyword,
         }
         key = list(config_dict.keys())[int(choice) - 1]
         new_value = input(f"Enter the new value for {key}: ")
@@ -468,41 +513,12 @@ class AppConfigManager:
         print("=" * 60)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert the instance variables to a dictionary.
+        """Convert the user-specific configuration to a dictionary.
 
         Returns:
-            Dict[str, Any]: Dictionary representation of app configuration
-
+            Dict[str, Any]: Dictionary representation of user-specific app configuration
         """
-        # Use self.repo as fallback for app_display_name if it's None
-        app_display_name = self.app_display_name if self.app_display_name is not None else self.repo
-
         return {
-            "owner": self.owner,
-            "repo": self.repo,
-            "app_display_name": app_display_name,
             "version": self.version,
-            "sha_name": self.sha_name,
-            "hash_type": self.hash_type,
             "appimage_name": self.appimage_name,
-            "arch_keyword": self.arch_keyword,
         }
-
-    def ask_sha_hash(self) -> Tuple[Optional[str], str]:
-        """Set up app-specific configuration interactively.
-
-        Returns:
-            Tuple[Optional[str], str]: The hash file name and hash type
-
-        """
-        logger.info("Setting up app-specific configuration")
-        self.sha_name = (
-            input("Enter the SHA file name (Leave blank for auto detect): ").strip() or None
-        )
-        self.hash_type = (
-            input("Enter the hash type (Leave blank for auto detect): ").strip()
-            or DEFAULT_HASH_TYPE
-        )
-
-        logger.info(f"SHA file name: {self.sha_name}, hash type: {self.hash_type}")
-        return self.sha_name, self.hash_type

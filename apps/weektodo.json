@@ -1,0 +1,15 @@
+{
+    "owner": "weekToDo",
+    "repo": "weekToDo",
+    "app_display_name": "WeekToDo",
+    "description": "A simple weekly planner focused on privacy",
+    "category": "Productivity",
+    "tags": ["todo", "planner", "privacy"],
+    "hash_type": "sha256",
+    "appimage_name_template": "WeekToDo-{latest_version}.AppImage",
+    "sha_name": "SHA256SUMS.txt",
+    "preferred_characteristic_suffixes": [""],
+    "icon_info": "https://raw.githubusercontent.com/weekToDo/weekToDo/master/public/icon.png",
+    "icon_file_name": "weektodo_icon.png",
+    "icon_repo_path": "public/icon.png"
+}

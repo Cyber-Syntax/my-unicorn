@@ -1,9 +1,4 @@
 {
-    "owner": "AppFlowy-IO",
-    "repo": "AppFlowy",
-    "version": "0.8.9",
-    "sha_name": "no_sha_file",
-    "hash_type": "no_hash",
-    "appimage_name": "AppFlowy-0.8.9-linux-x86_64.AppImage",
-    "arch_keyword": "-x86_64.appimage"
+    "version": "0.9.2",
+    "appimage_name": "AppFlowy-0.9.2-linux-x86_64.AppImage"
 }

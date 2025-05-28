@@ -2,198 +2,244 @@
 """AppImage selection logic module.
 
 This module provides functionality for selecting appropriate AppImage assets
-from GitHub releases based on system architecture.
+from GitHub releases based on system architecture and app characteristics.
 """
 
 import logging
 import re
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from src.utils import arch_utils, ui_utils
+from src.app_catalog import AppInfo
+from src.utils import arch_utils
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class AssetSelectionResult:
+    """Result of AppImage asset selection.
+
+    Attributes:
+        asset: Selected GitHub release asset
+        characteristic_suffix: The suffix that matched this asset
+    """
+    asset: Dict
+    characteristic_suffix: str
 
 
 class AppImageSelector:
     """Handles selection of appropriate AppImage assets."""
 
-    def __init__(self, arch_keyword: Optional[str] = None):
-        """Initialize AppImage selector.
+    def __init__(self) -> None:
+        """Initialize the selector."""
+        self._logger = logging.getLogger(__name__)
 
-        Args:
-            arch_keyword: Previously saved architecture keyword for matching
-
-        """
-        self.arch_keyword = arch_keyword
-        self.arch_keywords = arch_utils.get_arch_keywords(arch_keyword)
-
-    def find_appimage_asset(self, assets: List[Dict]) -> Optional[Dict]:
-        """Find and select appropriate AppImage asset based on system architecture.
+    def find_appimage_asset(
+        self,
+        assets: List[Dict],
+        definitive_app_info: Optional[AppInfo] = None,
+        user_local_config_data: Optional[Dict] = None,
+        release_is_prerelease: bool = False
+    ) -> Optional[AssetSelectionResult]:
+        """Find and select appropriate AppImage asset based on app metadata and system architecture.
 
         Args:
             assets: List of release assets from GitHub API
+            definitive_app_info: Base app metadata from repository JSON (optional)
+            user_local_config_data: User's local config data (optional)
+            release_is_prerelease: Whether this is a pre-release
 
         Returns:
-            dict: Selected AppImage asset or None if not found
-
+            AssetSelectionResult if an appropriate asset is found, None otherwise
         """
-        current_arch = arch_utils.get_current_arch()
-        logger.info(f"Current arch_keyword: {self.arch_keyword}")
-        logger.info(f"Current system architecture: {current_arch}")
+        self._logger.info("Starting AppImage selection process")
 
-        filtered_appimages = self._filter_compatible_appimages(assets, current_arch)
-        if not filtered_appimages:
-            raise ValueError("No AppImage files found in release")
+        # 1. Determine system architecture
+        system_cpu_arch = arch_utils.get_current_arch()
+        self._logger.info(f"System CPU architecture: {system_cpu_arch}")
 
-        logger.info(f"Found {len(filtered_appimages)} potentially compatible AppImages")
-
-        # Try different selection strategies in order of preference
-        selected_asset = (
-            self._try_exact_arch_keyword_match(filtered_appimages)
-            or self._try_arch_specific_match(filtered_appimages, current_arch)
-            or self._try_generic_linux_match(filtered_appimages)
-            or self._handle_single_appimage(filtered_appimages)
+        # 2. Determine target characteristic suffix list with priority
+        target_suffixes = self._determine_target_suffixes(
+            definitive_app_info,
+            user_local_config_data
         )
+        self._logger.info(f"Target characteristic suffixes: {target_suffixes}")
 
-        if selected_asset:
-            return selected_asset
-
-        # Fallback to user selection
-        logger.info("No automatic match found, requesting user selection")
-        return self._prompt_user_selection(filtered_appimages)
-
-    def _filter_compatible_appimages(self, assets: List[Dict], current_arch: str) -> List[Dict]:
-        """Filter AppImages by removing incompatible architectures."""
-        appimages = [a for a in assets if a["name"].lower().endswith(".appimage")]
-        incompatible_archs = arch_utils.get_incompatible_archs(current_arch)
-        logger.info(f"Filtering out incompatible architectures: {incompatible_archs}")
-
-        compatible_appimages = [
-            appimage
-            for appimage in appimages
-            if not any(arch in appimage["name"].lower() for arch in incompatible_archs)
+        # Filter AppImage assets
+        appimage_assets = [
+            asset for asset in assets
+            if asset["name"].lower().endswith(".appimage")
         ]
 
-        return compatible_appimages if compatible_appimages else appimages
-
-    def _try_exact_arch_keyword_match(self, appimages: List[Dict]) -> Optional[Dict]:
-        """Try to match based on previously saved arch_keyword."""
-        if not self.arch_keyword:
+        if not appimage_assets:
+            self._logger.warning("No AppImage assets found in release")
             return None
 
-        pattern = re.compile(re.escape(self.arch_keyword.strip().lower()) + r"\Z")
-        logger.info(f"Trying to find match with arch keyword: {self.arch_keyword}")
+        self._logger.info(f"Available AppImage assets: {[asset['name'] for asset in appimage_assets]}")
 
-        for asset in appimages:
-            asset_name = asset["name"].strip().lower()
-            logger.info(f"Checking asset: {asset_name}")
-            if pattern.search(asset_name):
-                logger.info(f"Found exact arch keyword match: {asset['name']}")
-                return asset
-        return None
+        # 3. Try each suffix in priority order
+        selected = self._try_suffix_based_selection(
+            appimage_assets,
+            target_suffixes,
+            system_cpu_arch,
+            release_is_prerelease
+        )
+        if selected:
+            return selected
 
-    def _try_arch_specific_match(self, appimages: List[Dict], current_arch: str) -> Optional[Dict]:
-        """Try to match based on current system architecture."""
-        # Look for exact architecture match first
-        for asset in appimages:
-            if current_arch in asset["name"].lower():
-                logger.info(f"Found exact architecture match: {asset['name']}")
-                return asset
-
-        # Then try architecture keywords
-        candidates = [
-            asset
-            for asset in appimages
-            if any(kw in asset["name"].lower() for kw in self.arch_keywords)
-        ]
-
-        if len(candidates) == 1:
-            return candidates[0]
-        elif candidates:
-            logger.info(f"Found {len(candidates)} architecture-matched AppImages")
-            return self._prompt_user_selection(candidates, "architecture-matched AppImages")
-
-        return None
-
-    def _try_generic_linux_match(self, appimages: List[Dict]) -> Optional[Dict]:
-        """Try to find generic Linux builds without specific architecture."""
-        generic_linux_builds = [
-            asset
-            for asset in appimages
-            if "linux" in asset["name"].lower()
-            and not any(
-                arch in asset["name"].lower()
-                for arch in [
-                    "arm",
-                    "arm64",
-                    "aarch64",
-                    "armhf",
-                    "arm32",
-                    "x86_64",
-                    "amd64",
-                    "i686",
-                    "i386",
-                ]
+        # 4. Fallback to generic matching if no suffix match
+        self._logger.info("No suffix match found, trying generic selection")
+        generic_asset = self._try_generic_selection(
+            appimage_assets,
+            system_cpu_arch,
+            release_is_prerelease
+        )
+        if generic_asset:
+            return AssetSelectionResult(
+                asset=generic_asset,
+                characteristic_suffix=""
             )
-        ]
 
-        if len(generic_linux_builds) == 1:
-            logger.info(f"Found generic Linux build: {generic_linux_builds[0]['name']}")
-            return generic_linux_builds[0]
-        elif generic_linux_builds:
-            logger.info(f"Found {len(generic_linux_builds)} generic Linux builds")
-            return self._prompt_user_selection(generic_linux_builds, "generic Linux builds")
+        self._logger.warning("No suitable AppImage asset found")
+        return None
+
+    def _determine_target_suffixes(
+        self,
+        definitive_app_info: Optional[AppInfo],
+        user_local_config_data: Optional[Dict]
+    ) -> List[str]:
+        """Determine the prioritized list of characteristic suffixes to try.
+
+        Priority order:
+        1. User's explicit override from local config
+        2. Currently installed suffix from local config
+        3. Preferred suffixes from definitive app info
+        """
+        suffixes = []
+
+        if user_local_config_data:
+            # Check for user override
+            if override := user_local_config_data.get("user_preferred_characteristic_suffix_override"):
+                suffixes.append(override)
+
+            # Check currently installed suffix
+            if installed := user_local_config_data.get("installed_characteristic_suffix"):
+                if installed not in suffixes:
+                    suffixes.append(installed)
+
+        # Add preferred suffixes from definitive info if available
+        if definitive_app_info and definitive_app_info.preferred_characteristic_suffixes:
+            for suffix in definitive_app_info.preferred_characteristic_suffixes:
+                if suffix not in suffixes:
+                    suffixes.append(suffix)
+
+        return suffixes
+
+    def _try_suffix_based_selection(
+        self,
+        assets: List[Dict],
+        target_suffixes: List[str],
+        system_cpu_arch: str,
+        is_prerelease: bool
+    ) -> Optional[AssetSelectionResult]:
+        """Try to select an asset based on characteristic suffixes."""
+        for suffix in target_suffixes:
+            self._logger.info(f"Trying suffix: '{suffix}'")
+
+            # Skip suffix if not compatible with system architecture
+            if not arch_utils.is_keyword_compatible_with_arch(suffix, system_cpu_arch):
+                self._logger.debug(f"Suffix '{suffix}' not compatible with {system_cpu_arch}")
+                continue
+
+            # Find assets matching this suffix
+            matching_assets = []
+            for asset in assets:
+                asset_name = asset["name"].lower()
+                suffix_lower = suffix.lower()
+
+                # Check if this asset matches the suffix
+                if self._asset_matches_suffix(asset_name, suffix_lower):
+                    self._logger.info(f"Asset '{asset['name']}' matched suffix '{suffix}'")
+                    matching_assets.append(asset)
+
+            if matching_assets:
+                # Filter by architecture compatibility first
+                compatible_assets = []
+                for asset in matching_assets:
+                    asset_name = asset["name"].lower()
+                    if arch_utils.is_keyword_compatible_with_arch(asset_name, system_cpu_arch):
+                        compatible_assets.append(asset)
+                    else:
+                        self._logger.debug(f"Asset '{asset['name']}' filtered out due to architecture incompatibility")
+
+                if compatible_assets:
+                    # Sort by name to ensure consistent selection
+                    compatible_assets.sort(key=lambda x: x["name"])
+                    self._logger.info(f"Found {len(compatible_assets)} architecture-compatible assets matching suffix '{suffix}': {[a['name'] for a in compatible_assets]}")
+
+                    # Return first compatible asset
+                    selected_asset = compatible_assets[0]
+                    self._logger.info(f"Selected asset: {selected_asset['name']}")
+                    return AssetSelectionResult(
+                        asset=selected_asset,
+                        characteristic_suffix=suffix
+                    )
+                else:
+                    self._logger.debug(f"No architecture-compatible assets found for suffix '{suffix}'")
+            else:
+                self._logger.debug(f"No assets found matching suffix '{suffix}'")
 
         return None
 
-    def _handle_single_appimage(self, appimages: List[Dict]) -> Optional[Dict]:
-        """Handle case where only one AppImage is available."""
-        if len(appimages) == 1:
-            return appimages[0]
-        return None
-
-    def _prompt_user_selection(
-        self, appimages: List[Dict], description: str = "AppImages"
-    ) -> Optional[Dict]:
-        """Prompt user to select from available AppImages."""
-        print(f"Please select from available {description}:")
-        selected_asset = None
-
-        def select_callback(asset):
-            nonlocal selected_asset
-            selected_asset = asset
-
-        ui_utils.select_from_list(appimages, "Select AppImage", callback=select_callback)
-        return selected_asset
-
-    def extract_arch_keyword_from_name(self, filename: str) -> str:
-        """Extract architecture keyword from filename.
+    def _asset_matches_suffix(self, asset_name: str, suffix: str) -> bool:
+        """Check if an asset name matches a characteristic suffix.
 
         Args:
-            filename: AppImage filename
+            asset_name: Lowercase asset name
+            suffix: Lowercase suffix to match
 
         Returns:
-            str: Extracted architecture keyword
-
+            True if the asset matches the suffix
         """
-        lower_name = filename.lower()
+        # Try exact pattern matching first - suffix should appear before .appimage
+        # Pattern: anything-{suffix}.appimage
+        pattern = rf"-{re.escape(suffix)}\.appimage$"
+        if re.search(pattern, asset_name):
+            return True
 
-        # Define architecture patterns in order of preference
-        arch_patterns = [
-            (r"(-arm64[^.]*\.appimage)$", "arm64"),
-            (r"(-aarch64[^.]*\.appimage)$", "aarch64"),
-            (r"(-amd64[^.]*\.appimage)$", "amd64"),
-            (r"(-x86_64[^.]*\.appimage)$", "x86_64"),
-            (r"(-x86[^.]*\.appimage)$", "x86"),
-            (r"(-i686[^.]*\.appimage)$", "i686"),
-            (r"(-i386[^.]*\.appimage)$", "i386"),
-            (r"(-linux(?:64)?\.appimage)$", "linux"),
-        ]
+        # For simple suffixes like "linux", also try without dash
+        # Pattern: anything{suffix}.appimage
+        if not suffix.startswith('-'):
+            pattern_no_dash = rf"{re.escape(suffix)}\.appimage$"
+            if re.search(pattern_no_dash, asset_name):
+                return True
 
-        for pattern, _ in arch_patterns:
-            match = re.search(pattern, lower_name)
-            if match:
-                return match.group(1)
+        # Fallback to simple substring matching
+        if suffix in asset_name:
+            return True
 
-        # Fallback to generic AppImage extension
-        return ".appimage"
+        return False
+
+    def _try_generic_selection(
+        self,
+        assets: List[Dict],
+        system_cpu_arch: str,
+        is_prerelease: bool
+    ) -> Optional[Dict]:
+        """Try to select an asset without specific characteristic suffix."""
+        # Filter to only architecture-compatible assets
+        compatible_assets = []
+
+        for asset in assets:
+            name = asset["name"].lower()
+            is_compatible = arch_utils.is_keyword_compatible_with_arch(name, system_cpu_arch)
+            if is_compatible:
+                compatible_assets.append(asset)
+
+        if not compatible_assets:
+            return None
+
+        # Sort by name for consistent selection
+        compatible_assets.sort(key=lambda x: x["name"])
+        return compatible_assets[0]

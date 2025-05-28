@@ -1,0 +1,15 @@
+{
+    "owner": "obsidianmd",
+    "repo": "obsidian-releases",
+    "app_display_name": "Obsidian",
+    "description": "A powerful knowledge base that works on local Markdown files",
+    "category": "Productivity",
+    "tags": ["markdown", "knowledge-base", "local-files"],
+    "hash_type": "sha256",
+    "appimage_name_template": "{app_display_name_safe}-{latest_version}.AppImage",
+    "sha_name": "SHA256SUMS.txt",
+    "preferred_characteristic_suffixes": [""],
+    "icon_info": "https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/images/obsidian.png",
+    "icon_file_name": "obsidian_icon.png",
+    "icon_repo_path": "images/obsidian.png"
+}

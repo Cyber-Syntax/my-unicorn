@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import threading # Added for cancel_event
 import time
 from typing import Dict, Optional, Set
 
@@ -9,6 +10,12 @@ import requests
 from .api import GitHubAPI
 from .global_config import GlobalConfigManager
 from .progress_manager import BasicMultiAppProgress
+
+
+# Custom exception for download cancellation
+class DownloadCancelledError(Exception):
+    """Custom exception for when a download is cancelled."""
+    pass
 
 
 class DownloadManager:
@@ -20,6 +27,7 @@ class DownloadManager:
         is_async_mode: Whether the download is happening in an async context
         app_index: Index of the app in a multi-app update (1-based)
         total_apps: Total number of apps being updated
+        cancel_event: Optional threading.Event to signal download cancellation.
 
     """
 
@@ -31,19 +39,27 @@ class DownloadManager:
     # Use GlobalConfigManager for configuration
     _global_config: Optional[GlobalConfigManager] = None
 
-    def __init__(self, github_api: "GitHubAPI", app_index: int = 0, total_apps: int = 0) -> None:
+    def __init__(
+        self,
+        github_api: "GitHubAPI",
+        app_index: int = 0,
+        total_apps: int = 0,
+        cancel_event: Optional[threading.Event] = None,
+    ) -> None:
         """Initialize the download manager with GitHub API instance.
 
         Args:
             github_api: GitHub API instance containing release information
             app_index: Index of the app in a multi-app update (1-based)
             total_apps: Total number of apps being updated
+            cancel_event: Optional threading.Event to signal download cancellation.
 
         """
         self.github_api = github_api
         self._logger = logging.getLogger(__name__)
         self.app_index = app_index
         self.total_apps = total_apps
+        self.cancel_event = cancel_event
 
         # Initialize global config if not already set
         if DownloadManager._global_config is None:
@@ -295,6 +311,15 @@ class DownloadManager:
         with open(file_path, "wb") as f:
             # Process each chunk from the response
             for chunk in response.iter_content(chunk_size=chunk_size):
+                if self.cancel_event and self.cancel_event.is_set():
+                    self._logger.info(f"Download of {os.path.basename(file_path)} cancelled by user.")
+                    # response.close() # Ensure connection is closed
+                    # f.close() # Ensure file is closed before attempting to remove
+                    # No, file is closed by with statement exit.
+                    # We need to ensure the file is closed before removing.
+                    # The 'with open' handles closing on break/return/exception.
+                    raise DownloadCancelledError(f"Download of {os.path.basename(file_path)} cancelled.")
+
                 if chunk:
                     f.write(chunk)
                     downloaded_size += len(chunk)
@@ -304,7 +329,8 @@ class DownloadManager:
                         # Important: Use direct method call for testability
                         progress.update(task_id, completed=downloaded_size)
 
-        # Make the AppImage executable
+        # Make the AppImage executable only if download wasn't cancelled
+        # (If cancelled, this part is skipped due to exception)
         os.chmod(file_path, os.stat(file_path).st_mode | 0o111)
 
         # Final update to mark task as completed
@@ -386,11 +412,22 @@ class DownloadManager:
             error_msg = f"Network error while downloading {filename}: {e!s}"
             self._logger.error(error_msg)
             print(f"{prefix}✗ Download failed: {error_msg}")
-            self._cleanup_progress_task()
+            self._cleanup_progress_task() # Ensure progress task is cleaned up
             raise RuntimeError(error_msg)
 
-        except Exception:
-            self._cleanup_progress_task()
+        except DownloadCancelledError: # Catch our custom error
+            self._logger.info(f"Download of {filename} was cancelled. Cleaning up partial file.")
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                    self._logger.info(f"Successfully removed partial download: {file_path}")
+                except OSError as e_remove:
+                    self._logger.error(f"Error removing partial download {file_path}: {e_remove}")
+            self._cleanup_progress_task() # Ensure progress task is cleaned up
+            raise # Re-raise for the caller to handle
+
+        except Exception: # General exceptions
+            self._cleanup_progress_task() # Ensure progress task is cleaned up
             raise  # Re-raise the original exception
 
     def verify_download(self, downloaded_file: str) -> bool:

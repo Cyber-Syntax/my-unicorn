@@ -1,6 +1,39 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.10.0-alpha
+### BREAKING CHANGES
+This release add new app catalog feature to use a new format. The new format is as follows to `apps/<app_id>.json`:
+```json
+{
+    "owner": "zen-browser",
+    "repo": "desktop",
+    "app_display_name": "Zen Browser",
+    "description": "A content-focused browser for distraction-free browsing",
+    "category": "Productivity",
+    "tags": ["browser", "focus", "distraction-free", "privacy"],
+    "hash_type": "sha256",
+    "appimage_name_template": "zen-{characteristic_suffix}.AppImage",
+    "sha_name": "extracted_checksum",
+    "preferred_characteristic_suffixes": ["x86_64", "amd64"],
+    "icon_info": "https://raw.githubusercontent.com/zen-browser/desktop/main/docs/assets/zen-black.svg",
+    "icon_file_name": "zen_browser_icon.png",
+    "icon_repo_path": "docs/assets/zen-black.svg"
+}
+```
+That example is for the Zen Browser appimage. That json file contains all the correct information about the appimage 
+
+User specific configurations are still used but with minor changes:
+```json
+{
+    "version": "1.12.8b",
+    "appimage_name": "zen-x86_64.AppImage"
+}
+```
+This variables are used for comparing versions and handling the appimage exact name for file operations. The `appimage_name` is now used to store the exact name of the appimage file, which is derived from the `appimage_name_template` in the app config
+
+This change is not backward compatible, so you will need to update your existing app configs to the new format. You can use the `choice migrate` command to help with this migration
+
 ## v0.9.2-alpha
 ### BREAKING CHANGES
 Update your config files with choice 8. This release includes refactoring of the code to improve readability and maintainability. I refactored the variable names to be more readable and meaningful.

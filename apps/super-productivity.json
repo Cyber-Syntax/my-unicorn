@@ -1,0 +1,15 @@
+{
+    "owner": "johannesjo",
+    "repo": "super-productivity",
+    "app_display_name": "Super Productivity",
+    "description": "To-do list & time tracker & kanban board & calendar all in one app",
+    "category": "Productivity",
+    "tags": ["todo", "time-tracking", "productivity", "kanban"],
+    "hash_type": "sha512",
+    "appimage_name_template": "superProductivity-{characteristic_suffix}.AppImage",
+    "sha_name": "latest-linux.yml",
+    "preferred_characteristic_suffixes": ["x86_64", "amd64"],
+    "icon_info": "https://raw.githubusercontent.com/johannesjo/super-productivity/master/src/assets/icons/favicon-192x192.png",
+    "icon_file_name": "superproductivity_icon.png",
+    "icon_repo_path": "src/assets/icons/favicon-192x192.png"
+}

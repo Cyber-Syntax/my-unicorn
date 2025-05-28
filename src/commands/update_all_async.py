@@ -19,10 +19,13 @@ import logging
 import time
 from typing import Any, Dict, List, Set, Tuple
 
+from src.api.github_api import GitHubAPI
+from src.api.sha_manager import SHAManager
 from src.app_config import AppConfigManager
 from src.auth_manager import GitHubAuthManager
 from src.commands.update_base import BaseUpdateCommand
 from src.global_config import GlobalConfigManager
+from src.utils import ui_utils # Added import for ui_utils
 
 
 class UpdateAsyncCommand(BaseUpdateCommand):
@@ -65,10 +68,17 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                 return
 
             # Check current rate limits before any API operations
-            remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+            raw_remaining, raw_limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+            try:
+                remaining = int(raw_remaining)
+                limit = int(raw_limit)
+            except (ValueError, TypeError):
+                logging.error(f"Could not parse rate limit values: remaining={raw_remaining}, limit={raw_limit}")
+                print("Error: Could not determine API rate limits. Cannot proceed.")
+                return
 
             # Show a warning if rate limits are low but don't prevent user from proceeding
-            if remaining < 10:  # Low threshold for warning
+            if remaining < 10:  # Now an int comparison
                 print("\n--- GitHub API Rate Limit Warning ---")
                 print(f"⚠️ Low API requests remaining: {remaining}/{limit}")
                 if reset_time:
@@ -174,10 +184,19 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             return updatable_apps
 
         # Check current rate limits before making API calls
-        remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+        raw_remaining, raw_limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+
+        # Parse rate limit values
+        try:
+            remaining = int(raw_remaining)
+            limit = int(raw_limit)
+        except (ValueError, TypeError):
+            logging.error(f"Could not parse rate limit values: remaining={raw_remaining}, limit={raw_limit}")
+            print("Error: Could not determine API rate limits. Cannot proceed.")
+            return []
 
         # If we have fewer requests than selected files, warn the user
-        if remaining < len(selected_files):
+        if remaining < len(selected_files):  # Now an int comparison
             print("\n--- GitHub API Rate Limit Warning ---")
             print("⚠️ Not enough API requests to check all selected apps.")
             print(f"Rate limit status: {remaining}/{limit} requests remaining")
@@ -339,7 +358,13 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             - str: Status message explaining the rate limit situation
         """
         # Get current rate limit info
-        remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+        raw_remaining, raw_limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+        try:
+            remaining = int(raw_remaining)
+            limit = int(raw_limit)
+        except (ValueError, TypeError):
+            logging.error(f"Could not parse rate limit values: remaining={raw_remaining}, limit={raw_limit}")
+            return False, [], "Error: Could not determine API rate limits."
 
         # For each app, we need approximately:
         # - 1 API call to fetch releases
@@ -441,6 +466,9 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
+            # Set the main event loop in ui_utils
+            ui_utils.set_main_event_loop(loop)
+
             # Define the async update wrapper
             async def update_app_async(
                 app_data: Dict[str, Any], idx: int
@@ -466,6 +494,30 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                     print(f"[{idx}/{total_apps}] Starting update for {app_name}...")
 
                     try:
+                        # Initialize GitHub API and SHAManager for async operation
+                        app_config = AppConfigManager()
+                        app_config.load_appimage_config(app_data["config_file"])
+                        github_api = GitHubAPI(
+                            owner=str(app_config.owner),
+                            repo=str(app_config.repo),
+                            sha_name=app_config.sha_name if app_config.sha_name else "sha256",
+                            hash_type=app_config.hash_type if app_config.hash_type else "sha256",
+                        )
+
+                        # Get latest version info
+                        update_available, version_info = github_api.check_latest_version(app_config.version)
+                        if not update_available:
+                            return False, {"status": "no_update", "message": "No update available"}
+
+                        # If update is available, create SHA manager in async mode
+                        sha_manager = SHAManager(
+                            github_api.owner,
+                            github_api.repo,
+                            github_api.sha_name,
+                            github_api.appimage_name,
+                            is_batch=True
+                        )
+
                         # Call the existing update logic in a thread executor to make it non-blocking
                         # Pass app index and total apps count to the update method
                         result = await loop.run_in_executor(
@@ -635,7 +687,13 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         """Display GitHub API rate limit information after updates using standard print statements."""
         try:
             # Use the cached rate limit info to avoid unnecessary API calls
-            remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+            raw_remaining, raw_limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+            try:
+                remaining = int(raw_remaining)
+                limit = int(raw_limit)
+            except (ValueError, TypeError):
+                logging.debug("Could not parse rate limit values for display")
+                return
 
             print("\n--- GitHub API Rate Limits ---")
             print(

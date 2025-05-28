@@ -1,0 +1,15 @@
+{
+    "owner": "Zettlr",
+    "repo": "Zettlr",
+    "app_display_name": "Zettlr",
+    "description": "A markdown editor for writing academic texts and taking notes",
+    "category": "Productivity",
+    "tags": ["markdown", "academic", "notes", "writing"],
+    "hash_type": "sha256",
+    "appimage_name_template": "{app_display_name_safe}-{latest_version}-{characteristic_suffix}.AppImage",
+    "sha_name": "SHA256SUMS.txt",
+    "preferred_characteristic_suffixes": ["x86_64", "amd64"],
+    "icon_info": "https://raw.githubusercontent.com/Zettlr/Zettlr/master/resources/icons/png/256x256.png",
+    "icon_file_name": "zettlr_icon.png",
+    "icon_repo_path": "resources/icons/png/512x512.png"
+}

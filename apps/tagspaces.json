@@ -1,0 +1,15 @@
+{
+    "owner": "tagspaces",
+    "repo": "tagspaces",
+    "app_display_name": "TagSpaces",
+    "description": "A free and open-source personal data manager with tagging support",
+    "category": "Productivity",
+    "tags": ["file-manager", "tagging", "local-files"],
+    "hash_type": "sha256",
+    "appimage_name_template": "{repo_name}-{latest_version}-{characteristic_suffix}.AppImage",
+    "sha_name": "SHA256SUMS.txt",
+    "preferred_characteristic_suffixes": ["linux-x86_64", "x86_64", "amd64"],
+    "icon_info": "https://raw.githubusercontent.com/tagspaces/tagspaces/master/app/assets/icons/512x512.png",
+    "icon_file_name": "tagspaces_icon.png",
+    "icon_repo_path": "app/assets/icons/512x512.png"
+}

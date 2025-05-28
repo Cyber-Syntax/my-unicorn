@@ -1,0 +1,15 @@
+{
+    "owner": "laurent22",
+    "repo": "joplin",
+    "app_display_name": "Joplin",
+    "description": "A note-taking and to-do application with synchronization capabilities",
+    "category": "Productivity",
+    "tags": ["notes", "markdown", "sync"],
+    "hash_type": "sha512",
+    "appimage_name_template": "{app_display_name_safe}-{latest_version}.AppImage",
+    "sha_name": "latest-linux.yml",
+    "preferred_characteristic_suffixes": [""],
+    "icon_info": "https://raw.githubusercontent.com/laurent22/joplin/dev/Assets/LinuxIcons/256x256.png",
+    "icon_file_name": "joplin_icon.png",
+    "icon_repo_path": "Assets/LinuxIcons/256x256.png"
+}

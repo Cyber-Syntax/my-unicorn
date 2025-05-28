@@ -1,9 +1,0 @@
-{
-    "owner": "standardnotes",
-    "repo": "app",
-    "version": "3.195.13",
-    "sha_name": "SHA256SUMS",
-    "hash_type": "sha256",
-    "appimage_name": "standard-notes-3.195.13-linux-x86_64.AppImage",
-    "arch_keyword": "-x86_64.appimage"
-}

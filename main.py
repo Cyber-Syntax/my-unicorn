@@ -11,8 +11,9 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from types import TracebackType
-from typing import Optional
+from typing import Optional, Union
 
+from src.app_catalog import initialize_definitions_path
 from src.app_config import AppConfigManager
 from src.auth_manager import GitHubAuthManager
 
@@ -67,11 +68,13 @@ def display_github_api_status() -> None:
         print("\n--- GitHub API Status ---")
 
         if is_authenticated:
+            # Convert remaining to int for comparison
+            remaining_int = int(remaining) if remaining else 0
             print(f"GitHub API Status: {remaining} of {limit} requests remaining")
             print("Authentication: ✅ Authenticated")
             print(f"Reset Time: {reset_time}")
 
-            if remaining < LOW_API_REQUESTS_THRESHOLD:
+            if remaining_int < LOW_API_REQUESTS_THRESHOLD:
                 print("Warning: ⚠️ Low API requests remaining!")
         else:
             print(f"GitHub API Status: {remaining} of 60 requests remaining")
@@ -191,9 +194,28 @@ def setup_commands(invoker: CommandInvoker) -> None:
     invoker.register_command(9, DeleteBackupsCommand())
 
 
+def initialize_app_definitions() -> None:
+    """Initialize the path to application definition JSONs.
+
+    This sets up the apps/ directory path relative to the application root.
+    """
+    app_root = Path(__file__).parent
+    apps_dir = app_root / "apps"
+
+    if not apps_dir.exists():
+        logging.info("Creating apps directory for JSON definitions")
+        apps_dir.mkdir(exist_ok=True)
+
+    logging.info(f"Initializing app definitions path: {apps_dir}")
+    initialize_definitions_path(apps_dir)
+
+
 def main() -> None:
     """Main function to initialize and run the application."""
     configure_logging()
+
+    # Initialize app definitions path
+    initialize_app_definitions()
 
     # Config Initialize, global config auto loads the config file
     # Commands create the config file if it doesn't exist

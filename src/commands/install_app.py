@@ -7,16 +7,10 @@ by name, without requiring the user to enter URLs.
 
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Dict, Optional, Tuple, cast
 
 from src.api.github_api import GitHubAPI
-from src.app_catalog import (
-    AppInfo,
-    get_all_apps,
-    get_apps_by_category,
-    get_categories,
-    search_apps,
-)
+from src.app_catalog import AppInfo, get_all_apps
 from src.app_config import AppConfigManager
 from src.commands.base import Command
 from src.download import DownloadManager
@@ -50,9 +44,7 @@ class InstallAppCommand(Command):
         while True:
             print("\nHow would you like to browse applications?")
             print("1. View all applications")
-            print("2. Browse by category")
-            print("3. Search by name or keyword")
-            print("4. Return to main menu")
+            print("2. Return to main menu")
 
             try:
                 choice = int(input("\nEnter your choice: "))
@@ -60,10 +52,6 @@ class InstallAppCommand(Command):
                 if choice == 1:
                     self._display_all_apps()
                 elif choice == 2:
-                    self._browse_by_category()
-                elif choice == 3:
-                    self._search_apps()
-                elif choice == 4:
                     return
                 else:
                     print("Invalid choice. Please try again.")
@@ -76,50 +64,7 @@ class InstallAppCommand(Command):
     def _display_all_apps(self) -> None:
         """Display and allow selection from all applications."""
         apps = get_all_apps()
-        self._display_app_list(apps)
-
-    def _browse_by_category(self) -> None:
-        """Browse applications by category."""
-        categories = get_categories()
-
-        print("\n=== Application Categories ===")
-        for idx, category in enumerate(categories, 1):
-            print(f"{idx}. {category}")
-
-        try:
-            choice = int(input("\nSelect a category (0 to go back): "))
-            if choice == 0:
-                return
-
-            if 1 <= choice <= len(categories):
-                category = categories[choice - 1]
-                apps = get_apps_by_category(category)
-                print(f"\n=== Applications in {category} ===")
-                self._display_app_list(apps)
-            else:
-                print("Invalid choice.")
-        except ValueError:
-            print("Please enter a number.")
-        except KeyboardInterrupt:
-            print("\nOperation cancelled.")
-
-    def _search_apps(self) -> None:
-        """Search for applications by name or keyword."""
-        try:
-            query = input("\nEnter search term: ")
-            if not query:
-                return
-
-            results = search_apps(query)
-
-            if not results:
-                print(f"No applications found matching '{query}'.")
-                return
-
-            print(f"\n=== Search Results for '{query}' ===")
-            self._display_app_list(results)
-        except KeyboardInterrupt:
-            print("\nSearch cancelled.")
+        self._display_app_list(list(apps.values()))
 
     def _display_app_list(self, apps: List[AppInfo]) -> None:
         """Display a list of applications and allow user to select one for installation.
@@ -129,15 +74,15 @@ class InstallAppCommand(Command):
 
         """
         if not apps:
-            print("No applications available in this category.")
+            print("No applications available.")
             return
 
-        # Sort apps alphabetically by name
-        apps = sorted(apps, key=lambda app: app.name)
+        # Sort apps alphabetically by app_display_name
+        apps = sorted(apps, key=lambda app: app.app_display_name)
 
         print(f"\nFound {len(apps)} applications:")
         for idx, app in enumerate(apps, 1):
-            print(f"{idx}. {app.name} - {app.description}")
+            print(f"{idx}. {app.app_display_name} - {app.description}")
 
         try:
             choice = int(input("\nSelect an application to install (0 to go back): "))
@@ -161,8 +106,8 @@ class InstallAppCommand(Command):
             app_info: AppInfo object for the selected application
 
         """
-        print(f"\n=== Install {app_info.name} ===")
-        print(f"Name: {app_info.name}")
+        print(f"\n=== Install {app_info.app_display_name} ===")
+        print(f"Name: {app_info.app_display_name}")
         print(f"Description: {app_info.description}")
         print(f"Repository: {app_info.owner}/{app_info.repo}")
         print(f"Category: {app_info.category}")
@@ -175,7 +120,7 @@ class InstallAppCommand(Command):
                 print("Installation cancelled.")
                 return
 
-            print(f"\nInstalling {app_info.name}...")
+            print(f"\nInstalling {app_info.app_display_name}...")
             self._install_app(app_info)
         except KeyboardInterrupt:
             print("\nInstallation cancelled.")
@@ -186,7 +131,7 @@ class InstallAppCommand(Command):
         app_config = AppConfigManager(
             owner=app_info.owner,
             repo=app_info.repo,
-            app_display_name=app_info.app_display_name,  # Pass the app_display_name from catalog
+            app_display_name=app_info.app_display_name,
         )
 
         # Initialize GitHubAPI with parameters based on app catalog information
@@ -196,7 +141,7 @@ class InstallAppCommand(Command):
                 owner=app_info.owner,
                 repo=app_info.repo,
                 sha_name=app_info.sha_name,
-                hash_type=app_info.hash_type,
+                hash_type=app_info.hash_type or "sha256",
                 arch_keyword=None,  # Enable architecture auto-detection
             )
             self._logger.debug(f"Using SHA file from app catalog: {app_info.sha_name}")
@@ -212,7 +157,7 @@ class InstallAppCommand(Command):
             self._logger.debug("Using automatic SHA file detection")
 
         # Get release data to allow API's auto-detection to work
-        success, response = api.get_response()
+        success, response = api.check_latest_version(version_check_only=True)
         if not success:
             print(f"Error: {response}")
             return
@@ -225,6 +170,7 @@ class InstallAppCommand(Command):
 
         # Track verification success across attempts
         verification_success = False
+        downloaded_file_path: Optional[str] = None
 
         # Try up to MAX_ATTEMPTS times to download and verify
         for attempt in range(1, self.MAX_ATTEMPTS + 1):
@@ -236,60 +182,56 @@ class InstallAppCommand(Command):
                 app_config.appimage_name = api.appimage_name
                 app_config.arch_keyword = api.arch_keyword
                 app_config.sha_name = api.sha_name
-                app_config.hash_type = api.hash_type
+                app_config.hash_type = api.hash_type or "sha256"
 
                 # Ensure config is saved (temporarily) before download
                 app_config.temp_save_config()
 
-                # Log config paths for debugging
-                self._logger.debug(f"Config folder: {app_config.config_folder}")
-                self._logger.debug(f"Config file: {app_config.config_file}")
-
                 # Download the AppImage
-                print(f"Downloading {api.appimage_name}...")
-                download = DownloadManager(api)
-                downloaded_file_path = (
-                    download.download()
-                )  # Capture the full path to the downloaded file
+                if api.appimage_name:
+                    print(f"Downloading {api.appimage_name}...")
+                    download = DownloadManager(api)
+                    downloaded_file_path = download.download()
 
-                # Handle verification based on SHA file availability
-                if api.sha_name == "no_sha_file":
-                    logging.info("Skipping verification due to no_sha_file setting.")
-                    print("Skipping verification (no SHA file specified).")
-                    verification_success = True
-                    break
-                else:
-                    # Perform verification with cleanup on failure
-                    print("Verifying download integrity...")
-                    verification_manager = VerificationManager(
-                        sha_name=api.sha_name,
-                        sha_url=api.sha_url,
-                        appimage_name=api.appimage_name,
-                        hash_type=api.hash_type,
-                    )
+                    if not downloaded_file_path:
+                        raise ValueError("Download failed: No file path returned")
 
-                    # Set the full path to the downloaded file
-                    verification_manager.set_appimage_path(downloaded_file_path)
-
-                    is_valid = verification_manager.verify_appimage(cleanup_on_failure=True)
-
-                    if is_valid:
+                    # Handle verification based on SHA file availability
+                    if api.sha_name == "no_sha_file":
+                        logging.info("Skipping verification due to no_sha_file setting.")
+                        print("Skipping verification (no SHA file specified).")
                         verification_success = True
-                        print("Verification successful!")
                         break
-                    # Verification failed
-                    elif attempt == self.MAX_ATTEMPTS:
-                        print(
-                            f"Verification failed. Maximum retry attempts ({self.MAX_ATTEMPTS}) reached."
-                        )
-                        return
                     else:
-                        print(f"Verification failed. Attempt {attempt} of {self.MAX_ATTEMPTS}.")
-                        retry = input("Retry download? (y/N): ").strip().lower()
-                        if retry != "y":
-                            print("Installation cancelled.")
+                        # Perform verification with cleanup on failure
+                        print("Verifying download integrity...")
+                        verification_manager = VerificationManager(
+                            sha_name=api.sha_name or "no_sha_file",
+                            sha_url=api.sha_url or "",
+                            appimage_name=api.appimage_name,
+                            hash_type=api.hash_type or "sha256",
+                        )
+
+                        # Set the full path to the downloaded file
+                        verification_manager.set_appimage_path(downloaded_file_path)
+                        is_valid = verification_manager.verify_appimage(cleanup_on_failure=True)
+
+                        if is_valid:
+                            verification_success = True
+                            print("Verification successful!")
+                            break
+                        # Verification failed
+                        elif attempt == self.MAX_ATTEMPTS:
+                            print(
+                                f"Verification failed. Maximum retry attempts ({self.MAX_ATTEMPTS}) reached."
+                            )
                             return
-                            # Continue to next attempt
+                        else:
+                            print(f"Verification failed. Attempt {attempt} of {self.MAX_ATTEMPTS}.")
+                            retry = input("Retry download? (y/N): ").strip().lower()
+                            if retry != "y":
+                                print("Installation cancelled.")
+                                return
 
             except Exception as e:
                 logging.error(f"Download attempt {attempt} failed: {e!s}", exc_info=True)
@@ -306,7 +248,7 @@ class InstallAppCommand(Command):
                         return
 
         # If verification wasn't successful after all attempts, exit
-        if not verification_success:
+        if not verification_success or not downloaded_file_path or not api.appimage_name:
             return
 
         # Handle file operations
@@ -316,46 +258,49 @@ class InstallAppCommand(Command):
             owner=api.owner,
             version=api.version,
             sha_name=api.sha_name,
-            config_file=self.global_config.config_file,
-            app_storage_path=self.global_config.expanded_app_storage_path,
-            app_backup_storage_path=self.global_config.expanded_app_backup_storage_path,
-            config_folder=app_config.config_folder,
+            config_file=str(self.global_config.config_file),
+            app_storage_path=Path(self.global_config.expanded_app_storage_path),
+            app_backup_storage_path=Path(self.global_config.expanded_app_backup_storage_path),
+            config_folder=str(app_config.config_folder) if app_config.config_folder else None,
             config_file_name=app_config.config_file_name,
             batch_mode=self.global_config.batch_mode,
             keep_backup=self.global_config.keep_backup,
             max_backups=self.global_config.max_backups,
-            app_display_name=app_info.app_display_name,  # Pass app_display_name from app_info to FileHandler
+            app_display_name=app_info.app_display_name,
         )
 
         # Download app icon if possible
         icon_manager = IconManager()
-        # First get the app_display_name (if available from app_config) or let the fallback handle it
-        app_display_name = (
-            app_config.app_display_name
-            if hasattr(app_config, "app_display_name") and app_config.app_display_name
-            else None
+        icon_success, icon_path = icon_manager.ensure_app_icon(
+            api.owner,
+            api.repo,
+            app_display_name=app_info.app_display_name
         )
-        icon_manager.ensure_app_icon(api.owner, api.repo, app_display_name=app_display_name)
 
         # Perform file operations
         print("Finalizing installation...")
-        success = file_handler.handle_appimage_operations(github_api=api)
+        success = file_handler.handle_appimage_operations(
+            github_api=api,
+            icon_path=icon_path if icon_success else None
+        )
 
         if success:
             # Save the configuration only if all previous steps succeed
             app_config.save_config()
 
             # Display success message with paths
-            print(f"\n✅ {app_info.name} successfully installed!")
+            print(f"\n✅ {app_info.app_display_name} successfully installed!")
 
             # Show config file location
-            config_path = Path(app_config.config_file)
-            print(f"Config file created at: {config_path}")
+            if app_config.config_file:
+                config_path = Path(app_config.config_file)
+                print(f"Config file created at: {config_path}")
 
             # Show location of executable
-            app_path = Path(self.global_config.expanded_app_storage_path) / api.appimage_name
-            print(f"Application installed to: {app_path}")
-            print("You can run it from the command line or create a desktop shortcut.")
+            if api.appimage_name:
+                app_path = Path(self.global_config.expanded_app_storage_path) / api.appimage_name
+                print(f"Application installed to: {app_path}")
+                print("You can run it from the command line or create a desktop shortcut.")
         else:
             print("Error during file operations. Installation failed.")
             return
