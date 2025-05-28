@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.10.4-alpha
+### Changed
+Fixes github action duplicate commits in release notes. This release will make it workflow to show only PR commits in the release notes. 
+
 ## v0.10.3-alpha
 ### Changed
 Fix WeekToDo app 404 error. Also, added a output fix for the appimage who haven't provided by their developers in previous PR(forget to update changelog). This wouldn't require any changes to your existing configuration files.
