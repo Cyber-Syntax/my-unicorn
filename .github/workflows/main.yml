@@ -128,10 +128,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create zip archive
-        if: steps.check_release.outputs.exists == 'false'
-        run: zip -r my-unicorn-${{ steps.changelog.outputs.version }}.zip ./ -x "*.git*" ".github/*"
-
       - name: Create GitHub Release
         if: steps.check_release.outputs.exists == 'false'
         uses: softprops/action-gh-release@v1
@@ -141,6 +137,5 @@ jobs:
           body: ${{ steps.changelog.outputs.notes }}
           draft: false
           prerelease: ${{ contains(steps.changelog.outputs.version, '-') }}
-          files: my-unicorn-${{ steps.changelog.outputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
