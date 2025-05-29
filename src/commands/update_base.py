@@ -9,7 +9,8 @@ synchronous and asynchronous update capabilities.
 import asyncio
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple
+import time
+from typing import Any
 
 from src.api.github_api import GitHubAPI
 from src.app_catalog import load_app_definition
@@ -65,16 +66,175 @@ class BaseUpdateCommand(Command):
         """Abstract execute method to be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement execute()")
 
+    async def _update_apps_async(
+        self, apps_to_update: list[dict[str, Any]]
+    ) -> tuple[int, int, dict[str, dict[str, Any]]]:
+        """Update multiple apps concurrently using asyncio.
+
+        This method provides the core async update functionality that can be used
+        by any subclass. It handles concurrency control, progress tracking, and
+        error handling consistently across all async update operations.
+
+        Args:
+            apps_to_update: List of app information dictionaries to update
+
+        Returns:
+            Tuple containing:
+            - int: Number of successfully updated apps
+            - int: Number of failed updates
+            - Dict[str, Dict[str, Any]]: Dictionary mapping app names to their results
+
+        """
+        total_apps = len(apps_to_update)
+        success_count = 0
+        failure_count = 0
+        results = {}
+
+        try:
+            self._logger.info(f"Beginning asynchronous update of {total_apps} AppImages")
+
+            # Create tasks for all apps
+            tasks = []
+            for idx, app_data in enumerate(apps_to_update, 1):
+                task = self._update_single_app_async(app_data, idx, total_apps)
+                tasks.append(task)
+
+            # Run all tasks concurrently
+            update_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Process results
+            for i, result in enumerate(update_results):
+                app_name = apps_to_update[i]["name"]
+
+                if isinstance(result, tuple) and len(result) == 2:
+                    success, result_data = result
+                    results[app_name] = result_data
+
+                    if success:
+                        success_count += 1
+                    else:
+                        failure_count += 1
+                elif isinstance(result, Exception):
+                    # Handle exceptions that escaped the task
+                    failure_count += 1
+                    error_msg = str(result)
+                    self._logger.error(f"Update of {app_name} failed with exception: {error_msg}")
+                    results[app_name] = {"status": "exception", "message": error_msg, "elapsed": 0}
+                else:
+                    # Handle unexpected result format
+                    failure_count += 1
+                    self._logger.error(f"Unexpected result format for {app_name}: {result}")
+                    results[app_name] = {
+                        "status": "error",
+                        "message": "Unexpected result format",
+                        "elapsed": 0,
+                    }
+
+        except Exception as e:
+            self._logger.error(f"Error in async update process: {e!s}", exc_info=True)
+
+        return success_count, failure_count, results
+
+    async def _update_single_app_async(
+        self, app_data: dict[str, Any], app_index: int, total_apps: int
+    ) -> tuple[bool, dict[str, Any]]:
+        """Update a single app asynchronously with concurrency control.
+
+        This method handles the async wrapper around the core update logic,
+        providing consistent behavior for all async update operations.
+
+        Args:
+            app_data: Dictionary with app information
+            app_index: Index of app being processed (1-based)
+            total_apps: Total number of apps being updated
+
+        Returns:
+            Tuple containing:
+            - bool: True if update was successful, False otherwise
+            - Dict[str, Any]: Result information including status, message, and elapsed time
+
+        """
+        app_name = app_data["name"]
+
+        # Acquire semaphore to limit concurrency
+        async with self.semaphore:
+            start_time = time.time()
+
+            try:
+                self._logger.info(f"[{app_index}/{total_apps}] Starting update for {app_name}")
+
+                # Create separate config managers for this app to avoid conflicts
+                app_config = AppConfigManager()
+                global_config = GlobalConfigManager()
+                global_config.load_config()
+
+                # Call the existing update logic in a thread executor to make it non-blocking
+                result = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: self._perform_app_update_core(
+                        app_data=app_data,
+                        app_config=app_config,
+                        global_config=global_config,
+                        is_async=True,
+                        is_batch=True,
+                        app_index=app_index,
+                        total_apps=total_apps,
+                    ),
+                )
+
+                # Calculate elapsed time
+                elapsed_time = time.time() - start_time
+
+                if result[0]:  # result is (success, result_data)
+                    self._logger.info(
+                        f"[{app_index}/{total_apps}] ✓ Successfully updated {app_name} ({elapsed_time:.1f}s)"
+                    )
+                    result_appimage_name = result[1].get("appimage_name") if result[1] else None
+                    result_sha_name = result[1].get("sha_name") if result[1] else None
+                    return True, {
+                        "status": "success",
+                        "message": f"Updated to {app_data['latest']}",
+                        "elapsed": elapsed_time,
+                        "appimage_name": result_appimage_name,
+                        "sha_name": result_sha_name,
+                    }
+                else:
+                    self._logger.warning(
+                        f"[{app_index}/{total_apps}] ✗ Failed to update {app_name} ({elapsed_time:.1f}s)"
+                    )
+                    result_appimage_name = result[1].get("appimage_name") if result[1] else None
+                    result_sha_name = result[1].get("sha_name") if result[1] else None
+                    return False, {
+                        "status": "failed",
+                        "message": result[1].get("error", "Update failed")
+                        if result[1]
+                        else "Update failed",
+                        "elapsed": elapsed_time,
+                        "appimage_name": result_appimage_name,
+                        "sha_name": result_sha_name,
+                    }
+
+            except Exception as e:
+                error_message = str(e)
+                elapsed_time = time.time() - start_time
+                self._logger.error(f"Error updating {app_name}: {error_message}", exc_info=True)
+
+                return False, {
+                    "status": "error",
+                    "message": error_message,
+                    "elapsed": elapsed_time,
+                }
+
     def _perform_app_update_core(
         self,
-        app_data: Dict[str, Any],
+        app_data: dict[str, Any],
         app_config: AppConfigManager,
         global_config: GlobalConfigManager,
         is_async: bool = False,
         is_batch: bool = False,
         app_index: int = 0,
         total_apps: int = 0,
-    ) -> Tuple[bool, Optional[Dict[str, Any]]]:  # pylint: disable=method-hidden
+    ) -> tuple[bool, dict[str, Any] | None]:  # pylint: disable=method-hidden
         """Core method to update a single AppImage with consistent error handling.
 
         This contains the shared update logic used by both async and sync update
@@ -122,7 +282,11 @@ class BaseUpdateCommand(Command):
         )
 
         current_version = app_config.version or ""
-        update_available, version_info = github_api.check_latest_version(current_version)
+
+        # First check for updates with version_check_only=True to avoid unnecessary SHA processing
+        update_available, version_info = github_api.check_latest_version(
+            current_version, version_check_only=True, is_batch=is_batch
+        )
 
         if "error" in version_info:
             error_msg = f"Error checking latest version from GitHub API: {version_info['error']}"
@@ -135,6 +299,15 @@ class BaseUpdateCommand(Command):
             )
             return False, {"status": "no_update"}
 
+        # Now that we know an update is available, do a full release processing to get SHA info
+        self._logger.debug(f"Update available for {app_data['name']}, processing full release info including SHA")
+        full_success, full_release_data = github_api.get_latest_release(version_check_only=False, is_batch=is_batch)
+
+        if not full_success:
+            error_msg = f"Error getting full release data from GitHub API: {full_release_data}"
+            self._logger.error(error_msg)
+            return False, {"error": error_msg}
+
         # Download and verify AppImage
         try:
             # Download AppImage
@@ -144,14 +317,20 @@ class BaseUpdateCommand(Command):
             )
             downloaded_file_path = download_manager.download()
 
+            # Determine per-file cleanup behavior: skip interactive prompts in batch or async
+            cleanup = False if is_batch else True
             # Verify the download
             verification_result, verification_skipped = self._verify_appimage(
-                github_api, downloaded_file_path, cleanup_on_failure=True
+                github_api, downloaded_file_path, cleanup_on_failure=cleanup
             )
             if not verification_result:
                 error_msg = f"Verification failed for {app_data['name']}."
                 self._logger.warning(error_msg)
-                return False, {"error": error_msg}
+                return False, {
+                    "error": error_msg,
+                    "appimage_name": github_api.appimage_name,
+                    "sha_name": github_api.sha_name,
+                }
 
             # Handle file operations
             file_handler = self._create_file_handler(github_api, app_config, global_config)
@@ -180,7 +359,10 @@ class BaseUpdateCommand(Command):
                         "(verification skipped - no hash file provided by developer)"
                     )
                 else:
-                    success_msg = f"Successfully updated and verified {app_data['name']} to version {github_api.version}"
+                    success_msg = (
+                        f"Successfully updated and verified {app_data['name']} "
+                        f"to version {github_api.version}"
+                    )
 
                 self._logger.info(success_msg)
                 print(success_msg)
@@ -189,23 +371,35 @@ class BaseUpdateCommand(Command):
                     "message": success_msg,
                     "new_version": github_api.version,
                     "verification_skipped": verification_skipped,
+                    "appimage_name": github_api.appimage_name,
+                    "sha_name": github_api.sha_name,
                 }
             else:
                 error_msg = f"Failed to perform file operations for {app_data['name']}"
                 self._logger.error(error_msg)
-                return False, {"error": error_msg}
+                return False, {
+                    "error": error_msg,
+                    "appimage_name": github_api.appimage_name,
+                    "sha_name": github_api.sha_name,
+                }
 
         except Exception as e:
             error_msg = f"Error updating {app_data['name']}: {e!s}"
             self._logger.error(error_msg)
-            return False, {"error": error_msg}
+            # Include appimage_name and sha_name if github_api was created successfully
+            result = {"error": error_msg}
+            if "github_api" in locals() and github_api.appimage_name:
+                result["appimage_name"] = github_api.appimage_name
+                if github_api.sha_name:
+                    result["sha_name"] = github_api.sha_name
+            return False, result
 
     def _update_single_app(
         self,
-        app_data: Dict[str, Any],
+        app_data: dict[str, Any],
         is_batch: bool = False,
-        app_config: Optional[AppConfigManager] = None,
-        global_config: Optional[GlobalConfigManager] = None,
+        app_config: AppConfigManager | None = None,
+        global_config: GlobalConfigManager | None = None,
     ) -> bool:
         """Update a single AppImage with error handling."""
         # Use provided config managers or instance variables
@@ -285,9 +479,9 @@ class BaseUpdateCommand(Command):
     def _verify_appimage(
         self,
         github_api: GitHubAPI,
-        downloaded_file_path: Optional[str] = None,
+        downloaded_file_path: str | None = None,
         cleanup_on_failure: bool = True,
-    ) -> Tuple[bool, bool]:
+    ) -> tuple[bool, bool]:
         """Verify the downloaded AppImage using the SHA file.
 
         Args:
@@ -386,7 +580,7 @@ class BaseUpdateCommand(Command):
             print("\nRetry cancelled by user (Ctrl+C)")
             return False
 
-    def _display_update_list(self, updatable_apps: List[Dict[str, Any]]) -> None:
+    def _display_update_list(self, updatable_apps: list[dict[str, Any]]) -> None:
         """Display list of apps to update."""
         print(f"\nFound {len(updatable_apps)} apps to update:")
         for idx, app in enumerate(updatable_apps, 1):
@@ -396,7 +590,7 @@ class BaseUpdateCommand(Command):
 
     def _check_single_app_version(
         self, app_config: AppConfigManager, config_file: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Check version for single AppImage."""
         # Extract app name from config file
         app_name = os.path.splitext(config_file)[0]
