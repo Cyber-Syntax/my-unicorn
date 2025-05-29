@@ -71,23 +71,34 @@ jobs:
             fi
           }
 
+          # Get ALL conventional commits (ignore PR reference requirement)
           if [ -z "$PREVIOUS_TAG" ]; then
-            # If no previous tag exists, get all commits
-            COMMIT_DATA=$(git log --pretty=format:"%H|%s|%ae" | grep -E "\|(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)")
+            COMMIT_DATA=$(git log --pretty=format:"%H|%ae" --grep="^\(feat\|fix\|docs\|style\|refactor\|perf\|test\|build\|ci\|chore\|revert\)")
           else
-            # Get commits between previous tag and HEAD
-            COMMIT_DATA=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"%H|%s|%ae" | grep -E "\|(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)")
+            COMMIT_DATA=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"%H|%ae" --grep="^\(feat\|fix\|docs\|style\|refactor\|perf\|test\|build\|ci\|chore\|revert\)")
           fi
 
-          # Filter to only include PR commits - those containing (#number) but exclude duplicate Fixes #number entries
-          FILTERED_COMMIT_DATA=$(echo "$COMMIT_DATA" | grep -E "\(#[0-9]+\)" || echo "")
-
+          # Process ALL matching commits
           COMMITS=""
-          while IFS='|' read -r hash message email; do
+          while IFS='|' read -r hash email; do
             [ -z "$hash" ] && continue
+            # Get full commit message for PR detection
+            message=$(git show -s --format=%B $hash)
+
+            # Extract username
             username=$(get_github_username "$email" "$hash")
-            COMMITS="${COMMITS}  - $message (@$username)\n"
-          done <<< "$FILTERED_COMMIT_DATA"
+
+            # Check for ANY PR reference (#number)
+            if [[ "$message" =~ \#([0-9]+) ]]; then
+              pr_num="(#${BASH_REMATCH[1]})"
+            else
+              pr_num=""
+            fi
+
+            # Extract first line of commit message
+            subject=$(echo "$message" | head -1)
+            COMMITS="${COMMITS}  - ${subject} ${pr_num} (@$username)\n"
+          done <<< "$COMMIT_DATA"
 
           # Combine CHANGELOG notes with commit messages
           FULL_NOTES="${NOTES}\n\n### Commits\n${COMMITS}"
