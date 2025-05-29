@@ -90,7 +90,7 @@ class TestGitHubAPIDirect:
             assert success is True
             assert data == mock_release_data # get_latest_release returns the raw data on success
             github_api_instance._release_fetcher.get_latest_release_data.assert_called_once_with(github_api_instance._headers)
-            mock_process_release.assert_called_once_with(mock_release_data)
+            mock_process_release.assert_called_once_with(mock_release_data, version_check_only=False, is_batch=False)
 
     def test_get_latest_release_fetch_fails(
         self, github_api_instance: GitHubAPI
@@ -314,12 +314,17 @@ class TestGitHubAPIDirect:
             mock_sham_class.return_value = mock_sham_instance # Configure the class mock to return our instance
 
             # Configure AppImageSelector mock
+            from src.api.selector import AssetSelectionResult
             appimage_filename_for_test = "app-x86_64.AppImage"
-            mock_ais_instance.find_appimage_asset.return_value = {
+            asset_dict = {
                 "name": appimage_filename_for_test,
                 "browser_download_url": "url1",
                 "size": 12345 # AppImageAsset.from_github_asset uses .get("size")
             }
+            mock_ais_instance.find_appimage_asset.return_value = AssetSelectionResult(
+                asset=asset_dict,
+                characteristic_suffix=""
+            )
 
             # Configure SHAManager mock attributes that GitHubAPI will read
             sha_name_for_test = "sha.txt"

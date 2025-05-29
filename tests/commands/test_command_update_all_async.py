@@ -99,7 +99,7 @@ async def test_update_single_app_async_success(monkeypatch, cmd):
     # Stub core update to return success
     monkeypatch.setattr(cmd, "_perform_app_update_core", lambda **kwargs: (True, {}))
     app_data = {"name": "app1", "latest": "2.0"}
-    success = await cmd._update_single_app_async(app_data, is_batch=True, app_index=1, total_apps=1)
+    success, result = await cmd._update_single_app_async(app_data, app_index=1, total_apps=1)
     assert success is True
 
 
@@ -108,7 +108,5 @@ async def test_update_single_app_async_failure(monkeypatch, cmd):
     # Stub core update to return failure
     monkeypatch.setattr(cmd, "_perform_app_update_core", lambda **kwargs: (False, {}))
     app_data = {"name": "app1", "latest": "2.0"}
-    success = await cmd._update_single_app_async(
-        app_data, is_batch=False, app_index=1, total_apps=1
-    )
+    success, result = await cmd._update_single_app_async(app_data, app_index=1, total_apps=1)
     assert success is False
