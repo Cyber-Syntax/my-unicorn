@@ -6,7 +6,6 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import requests
 import yaml
@@ -34,12 +33,12 @@ class VerificationManager:
     before they are moved to their final installation location.
     """
 
-    sha_name: Optional[str] = None
-    sha_url: Optional[str] = None
-    appimage_name: Optional[str] = None  # Original filename from GitHub
+    sha_name: str | None = None
+    sha_url: str | None = None
+    appimage_name: str | None = None  # Original filename from GitHub
     hash_type: str = "sha256"
-    appimage_path: Optional[str] = None  # Full path to the AppImage file for verification
-    direct_expected_hash: Optional[str] = None  # For hashes extracted from release body
+    appimage_path: str | None = None  # Full path to the AppImage file for verification
+    direct_expected_hash: str | None = None  # For hashes extracted from release body
 
     def __post_init__(self) -> None:
         """Initialize and validate the verification manager."""
@@ -50,6 +49,15 @@ class VerificationManager:
 
             downloads_dir = GlobalConfigManager().expanded_app_download_path
             self.appimage_path = str(Path(downloads_dir) / self.appimage_name)
+
+        # Initialize sha_name with full path if only filename is provided
+        if self.sha_name and not os.path.isabs(self.sha_name):
+            # Only construct path if sha_name is not already a full path and is not a special value
+            if self.sha_name not in ("no_sha_file", "extracted_checksum"):
+                from src.global_config import GlobalConfigManager
+
+                downloads_dir = GlobalConfigManager().expanded_app_download_path
+                self.sha_name = str(Path(downloads_dir) / self.sha_name)
 
         # Convert hash_type to lowercase for consistent comparisons
         if self.hash_type:
@@ -534,17 +542,46 @@ class VerificationManager:
             bool: True if cleanup succeeded or file didn't exist, False otherwise
 
         """
+        from src.utils.cleanup_utils import remove_single_file
+
         if not self.sha_name or not os.path.exists(self.sha_name):
             logging.debug(f"No SHA file to clean up: {self.sha_name}")
             return True
 
-        try:
-            os.remove(self.sha_name)
-            logging.info(f"Removed verification file: {self.sha_name}")
-            return True
-        except OSError as e:
-            logging.warning(f"Failed to remove verification file: {e!s}")
-            return False
+        return remove_single_file(self.sha_name, verbose=False)
+
+    def cleanup_batch_failed_files(
+        self,
+        app_name: str,
+        appimage_name: str | None = None,
+        sha_name: str | None = None,
+        ask_confirmation: bool = True,
+    ) -> list[str]:
+        """Clean up AppImage and SHA files for batch operations when update fails.
+
+        This method is designed for use by update commands when multiple apps
+        are being processed and individual verification failures need cleanup.
+
+        Args:
+            app_name: Name of the app to clean up files for
+            appimage_name: Exact AppImage filename if known, otherwise use patterns
+            sha_name: Exact SHA filename if known, otherwise use patterns
+            ask_confirmation: Whether to ask user for confirmation before removal
+
+        Returns:
+            List of file paths that were successfully removed
+
+        """
+        from src.utils.cleanup_utils import cleanup_failed_verification_files
+
+        # Use the unified cleanup function
+        return cleanup_failed_verification_files(
+            app_name=app_name,
+            appimage_name=appimage_name,
+            sha_name=sha_name,
+            ask_confirmation=ask_confirmation,
+            verbose=True
+        )
 
     def _log_comparison(self, actual: str, expected: str):
         """Format and log hash comparison results.
@@ -581,61 +618,11 @@ class VerificationManager:
             bool: True if cleanup succeeded or was declined, False on error
 
         """
-        try:
-            if not os.path.exists(filepath):
-                logging.info(f"File not found, nothing to clean up: {filepath}")
-                return True
+        from src.utils.cleanup_utils import cleanup_single_failed_file
 
-            # Ask user for confirmation before removing the file
-            confirmation = self._get_user_confirmation(filepath)
-            if not confirmation:
-                logging.info(
-                    f"User chose to keep the file despite verification failure: {filepath}"
-                )
-                print(f"File kept: {filepath}")
-                print(
-                    "Note: You may want to investigate this verification failure or report it as an issue."
-                )
-                return True
-
-            os.remove(filepath)
-            logging.info(f"Cleaned up failed verification file: {filepath}")
-            print(f"Removed failed file: {filepath}")
-            return True
-
-        except Exception as e:
-            logging.error(f"Failed to remove file after verification failure: {e!s}")
-            print(f"Warning: Could not remove failed file: {filepath}")
-            return False
-
-    def _get_user_confirmation(self, filepath: str) -> bool:
-        """Ask the user for confirmation before removing a file that failed verification.
-
-        Args:
-            filepath: Path to the file that failed verification
-
-        Returns:
-            bool: True if user confirms removal, False otherwise
-
-        """
-        filename = os.path.basename(filepath)
-
-        print("\n" + "=" * 70)
-        print(f"WARNING: The file '{filename}' failed verification.")
-        print("This could indicate tampering or download corruption.")
-        print("You have two options:")
-        print("  1. Remove the file (recommended for security)")
-        print("  2. Keep the file (if you want to manually verify or report an issue)")
-        print("=" * 70)
-
-        while True:
-            try:
-                response = input("\nRemove the file? [y/N]: ").strip().lower()
-                if response in ("y", "yes"):
-                    return True
-                if response in ("", "n", "no"):
-                    return False
-                print("Please answer 'y' for yes or 'n' for no.")
-            except KeyboardInterrupt:
-                print("\nOperation cancelled by user.")
-                return False
+        # Use the unified cleanup function
+        return cleanup_single_failed_file(
+            filepath=filepath,
+            ask_confirmation=True,
+            verbose=True
+        )

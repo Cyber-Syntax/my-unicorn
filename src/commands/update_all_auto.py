@@ -9,8 +9,7 @@ asynchronous updates for improved performance.
 import asyncio
 import logging
 import os
-import time
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from src.auth_manager import GitHubAuthManager
 from src.commands.update_base import BaseUpdateCommand
@@ -111,11 +110,12 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             print("\nOperation cancelled by user (Ctrl+C)")
             return
 
-    def _find_all_updatable_apps(self) -> List[Dict[str, Any]]:
+    def _find_all_updatable_apps(self) -> list[dict[str, Any]]:
         """Find all AppImages that have updates available.
 
         Returns:
             List[Dict[str, Any]]: List of updatable app information dictionaries
+
         """
         updatable_apps = []
 
@@ -162,22 +162,24 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
         return updatable_apps
 
-    def _list_all_config_files(self) -> List[str]:
+    def _list_all_config_files(self) -> list[str]:
         """Get a list of all AppImage configuration files.
 
         Returns:
             List[str]: List of configuration filenames
+
         """
         return self.app_config.list_json_files()
 
     def _handle_interactive_update(
-        self, updatable_apps: List[Dict[str, Any]], use_async: bool = False
+        self, updatable_apps: list[dict[str, Any]], use_async: bool = False
     ) -> None:
         """Handle interactive mode where user selects which apps to update.
 
         Args:
             updatable_apps: List of updatable app information dictionaries
             use_async: Whether to use async update mode
+
         """
         # Ask user which apps to update
         print("\nEnter the numbers of the AppImages you want to update (comma-separated):")
@@ -230,11 +232,12 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             print("\nSelection cancelled by user (Ctrl+C)")
             return
 
-    def _update_apps_async_wrapper(self, apps_to_update: List[Dict[str, Any]]) -> None:
+    def _update_apps_async_wrapper(self, apps_to_update: list[dict[str, Any]]) -> None:
         """Wrapper to call the async update method from a synchronous context.
 
         Args:
             apps_to_update: List of app information dictionaries to update
+
         """
         try:
             # Create a new event loop if needed
@@ -267,7 +270,11 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             print(f"\nError in update process: {e!s}")
 
     def _display_async_results(
-        self, success_count: int, failure_count: int, results: Dict[str, Dict[str, Any]], total_apps: int
+        self,
+        success_count: int,
+        failure_count: int,
+        results: dict[str, dict[str, Any]],
+        total_apps: int,
     ) -> None:
         """Display the results of async update operation.
 
@@ -276,6 +283,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             failure_count: Number of failed updates
             results: Dictionary mapping app names to their result data
             total_apps: Total number of apps processed
+
         """
         print("\n=== Update Summary ===")
         print(f"Total apps processed: {success_count + failure_count}/{total_apps}")
@@ -292,14 +300,32 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
         print("\nUpdate process completed!")
 
+        # Prompt to remove downloaded files for failed updates in batch
+        if failure_count > 0:
+            failed_apps = [name for name, res in results.items() if res.get("status") != "success"]
+
+            from src.utils.cleanup_utils import cleanup_batch_failed_updates
+
+            try:
+                # Use the unified batch cleanup function
+                cleanup_batch_failed_updates(
+                    failed_apps=failed_apps,
+                    results=results,
+                    ask_confirmation=True,
+                    verbose=True
+                )
+            except KeyboardInterrupt:
+                print("\nCleanup cancelled.")
+
         # Display updated rate limit information after updates
         self._display_rate_limit_info()
 
-    def _update_apps(self, apps_to_update: List[Dict[str, Any]]) -> None:
+    def _update_apps(self, apps_to_update: list[dict[str, Any]]) -> None:
         """Update multiple apps synchronously.
 
         Args:
             apps_to_update: List of app information dictionaries to update
+
         """
         success_count = 0
         failure_count = 0
@@ -327,11 +353,12 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         # Display updated rate limit information after updates
         self._display_rate_limit_info()
 
-    def _display_update_list(self, updatable_apps: List[Dict[str, Any]]) -> None:
+    def _display_update_list(self, updatable_apps: list[dict[str, Any]]) -> None:
         """Display a list of updatable apps with standard print statements.
 
         Args:
             updatable_apps: List of updatable app information dictionaries
+
         """
         print(f"\nFound {len(updatable_apps)} apps to update:")
         print("-" * 60)

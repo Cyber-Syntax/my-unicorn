@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file.
 
 ## v0.10.6-alpha
 ### Changed
-Fixes the issue with asyncio event loop in the app. 
+Fixes the issue with asyncio event loop in the app and cleanup the failed appimage files. 
 
 ## v0.10.5-alpha
 ### Changed

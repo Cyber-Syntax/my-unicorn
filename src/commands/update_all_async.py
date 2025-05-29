@@ -16,7 +16,7 @@ Key features:
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from src.auth_manager import GitHubAuthManager
 from src.commands.update_base import BaseUpdateCommand
@@ -32,6 +32,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
 
     Attributes:
         _logger (logging.Logger): Logger instance for this class
+
     """
 
     def __init__(self) -> None:
@@ -63,12 +64,18 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                 return
 
             # Check current rate limits before any API operations
-            raw_remaining, raw_limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+            raw_remaining, raw_limit, reset_time, is_authenticated = (
+                GitHubAuthManager.get_rate_limit_info()
+            )
             try:
                 remaining = int(raw_remaining)
                 limit = int(raw_limit)
             except (ValueError, TypeError):
-                self._logger.error("Could not parse rate limit values: remaining=%s, limit=%s", raw_remaining, raw_limit)
+                self._logger.error(
+                    "Could not parse rate limit values: remaining=%s, limit=%s",
+                    raw_remaining,
+                    raw_limit,
+                )
                 print("Error: Could not determine API rate limits. Cannot proceed.")
                 return
 
@@ -159,7 +166,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             print(f"\nUnexpected error: {e!s}")
             return
 
-    def _find_updatable_apps(self) -> List[Dict[str, Any]]:
+    def _find_updatable_apps(self) -> list[dict[str, Any]]:
         """Find applications that can be updated through user selection.
 
         This method handles rate limits during the scanning process by:
@@ -169,6 +176,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
 
         Returns:
             List[Dict[str, Any]]: A list of updatable application information dictionaries
+
         """
         updatable_apps = []
 
@@ -179,14 +187,20 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             return updatable_apps
 
         # Check current rate limits before making API calls
-        raw_remaining, raw_limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+        raw_remaining, raw_limit, reset_time, is_authenticated = (
+            GitHubAuthManager.get_rate_limit_info()
+        )
 
         # Parse rate limit values
         try:
             remaining = int(raw_remaining)
             limit = int(raw_limit)
         except (ValueError, TypeError):
-            self._logger.error("Could not parse rate limit values: remaining=%s, limit=%s", raw_remaining, raw_limit)
+            self._logger.error(
+                "Could not parse rate limit values: remaining=%s, limit=%s",
+                raw_remaining,
+                raw_limit,
+            )
             print("Error: Could not determine API rate limits. Cannot proceed.")
             return []
 
@@ -300,7 +314,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
 
         return updatable_apps
 
-    def _confirm_updates(self, updatable: List[Dict[str, Any]]) -> bool:
+    def _confirm_updates(self, updatable: list[dict[str, Any]]) -> bool:
         """Handle user confirmation based on batch mode.
 
         Args:
@@ -308,6 +322,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
 
         Returns:
             bool: True if updates are confirmed, False otherwise
+
         """
         if self.global_config.batch_mode:
             self._logger.info("Batch mode: Auto-confirming updates")
@@ -333,8 +348,8 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             return False
 
     def _check_rate_limits(
-        self, apps: List[Dict[str, Any]]
-    ) -> Tuple[bool, List[Dict[str, Any]], str]:
+        self, apps: list[dict[str, Any]]
+    ) -> tuple[bool, list[dict[str, Any]], str]:
         """Check if we have enough API rate limits for the selected apps.
 
         This method:
@@ -351,14 +366,21 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             - bool: True if we can proceed with all apps, False if partial/no update needed
             - List[Dict[str, Any]]: Filtered list of apps that can be processed
             - str: Status message explaining the rate limit situation
+
         """
         # Get current rate limit info
-        raw_remaining, raw_limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+        raw_remaining, raw_limit, reset_time, is_authenticated = (
+            GitHubAuthManager.get_rate_limit_info()
+        )
         try:
             remaining = int(raw_remaining)
             limit = int(raw_limit)
         except (ValueError, TypeError):
-            self._logger.error("Could not parse rate limit values: remaining=%s, limit=%s", raw_remaining, raw_limit)
+            self._logger.error(
+                "Could not parse rate limit values: remaining=%s, limit=%s",
+                raw_remaining,
+                raw_limit,
+            )
             return False, [], "Error: Could not determine API rate limits."
 
         # For each app, we need approximately:
@@ -420,7 +442,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
 
         return False, filtered_apps, status
 
-    def _perform_async_updates(self, apps_to_update: List[Dict[str, Any]]) -> None:
+    def _perform_async_updates(self, apps_to_update: list[dict[str, Any]]) -> None:
         """Perform async updates using the base class functionality.
 
         This method sets up the event loop and calls the base class async update
@@ -428,6 +450,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
 
         Args:
             apps_to_update: List of app information dictionaries to update
+
         """
         try:
             print(
@@ -459,12 +482,30 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             if failure_count > 0:
                 print(f"Failed updates: {failure_count}")
 
-                # List failed updates - results format is Dict[str, Dict[str, Any]]
+                # List failed updates
+                failed_apps = []
                 for app_name, result in results.items():
                     if result.get("status") != "success":
-                        print(f"  - {app_name}: {result.get('message', 'Unknown error')}")
+                        message = result.get("message", "Unknown error")
+                        print(f"  - {app_name}: {message}")
+                        failed_apps.append(app_name)
 
             print("\nUpdate process completed!")
+
+            # Batch prompt to remove downloaded files for failed updates
+            if failure_count > 0 and failed_apps:
+                from src.utils.cleanup_utils import cleanup_batch_failed_updates
+
+                try:
+                    # Use the unified batch cleanup function
+                    cleanup_batch_failed_updates(
+                        failed_apps=failed_apps,
+                        results=results,
+                        ask_confirmation=True,
+                        verbose=True
+                    )
+                except KeyboardInterrupt:
+                    print("\nCleanup cancelled.")
 
             # Display updated rate limit information after updates
             self._display_rate_limit_info()
@@ -474,13 +515,13 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         except Exception as e:
             print(f"\nError in update process: {e!s}")
 
-
-
     def _display_rate_limit_info(self) -> None:
         """Display GitHub API rate limit information after updates using standard print statements."""
         try:
             # Use the cached rate limit info to avoid unnecessary API calls
-            raw_remaining, raw_limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+            raw_remaining, raw_limit, reset_time, is_authenticated = (
+                GitHubAuthManager.get_rate_limit_info()
+            )
             try:
                 remaining = int(raw_remaining)
                 limit = int(raw_limit)

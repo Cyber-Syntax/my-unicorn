@@ -262,7 +262,7 @@ wheels = [
 
 [[package]]
 name = "my-unicorn"
-version = "0.10.5a0"
+version = "0.10.6a0"
 source = { editable = "." }
 dependencies = [
     { name = "babel" },
