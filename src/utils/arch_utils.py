@@ -63,11 +63,6 @@ def get_incompatible_archs(current_arch: str) -> List[str]:
             "armv6",
             "i686",
             "i386",
-            "win",
-            "windows",
-            "darwin",
-            "mac",
-            "osx",
         ],
         # On ARM, filter out x86_64 and other incompatible architectures
         "aarch64": [
@@ -75,35 +70,20 @@ def get_incompatible_archs(current_arch: str) -> List[str]:
             "amd64",
             "i686",
             "i386",
-            "win",
-            "windows",
-            "darwin",
-            "mac",
-            "osx",
         ],
-        "arm64": ["x86_64", "amd64", "i686", "i386", "win", "windows", "darwin", "mac", "osx"],
+        "arm64": ["x86_64", "amd64", "i686", "i386"],
         # On 32-bit x86, filter out 64-bit and ARM
         "i686": [
             "x86_64",
             "amd64",
             "arm64",
             "aarch64",
-            "win",
-            "windows",
-            "darwin",
-            "mac",
-            "osx",
         ],
         "i386": [
             "x86_64",
             "amd64",
             "arm64",
             "aarch64",
-            "win",
-            "windows",
-            "darwin",
-            "mac",
-            "osx",
         ],
     }
 
