@@ -301,8 +301,12 @@ class BaseUpdateCommand(Command):
             return False, {"status": "no_update"}
 
         # Now that we know an update is available, do a full release processing to get SHA info
-        self._logger.debug(f"Update available for {app_data['name']}, processing full release info including SHA")
-        full_success, full_release_data = github_api.get_latest_release(version_check_only=False, is_batch=is_batch)
+        self._logger.debug(
+            f"Update available for {app_data['name']}, processing full release info including SHA"
+        )
+        full_success, full_release_data = github_api.get_latest_release(
+            version_check_only=False, is_batch=is_batch
+        )
 
         if not full_success:
             error_msg = f"Error getting full release data from GitHub API: {full_release_data}"
@@ -341,7 +345,7 @@ class BaseUpdateCommand(Command):
 
             icon_manager = IconManager()
             icon_success, icon_path = icon_manager.ensure_app_icon(
-                github_api.owner, github_api.repo, app_display_name=app_config.app_display_name
+                github_api.owner, github_api.repo, app_rename=app_config.app_rename
             )
 
             # Perform file operations and update config
@@ -544,7 +548,7 @@ class BaseUpdateCommand(Command):
             "repo": github_api.repo,
             "owner": github_api.owner,
             "version": github_api.version,
-            "app_display_name": app_config.app_display_name,
+            "app_rename": app_config.app_rename,
         }
 
         for param, value in required_fh_params.items():
@@ -569,7 +573,7 @@ class BaseUpdateCommand(Command):
             batch_mode=global_config.batch_mode,
             keep_backup=global_config.keep_backup,
             max_backups=global_config.max_backups,
-            app_display_name=str(app_config.app_display_name),
+            app_rename=str(app_config.app_rename),
         )
 
     def _should_retry_download(self, attempt: int, max_attempts: int) -> bool:
@@ -655,6 +659,7 @@ class BaseUpdateCommand(Command):
             - bool: Whether we can proceed with updates
             - List[Dict[str, Any]]: Filtered list of apps (may be reduced)
             - str: Message describing the rate limit status
+
         """
         try:
             # Get current rate limit info
@@ -714,7 +719,9 @@ class BaseUpdateCommand(Command):
                 print(f"Remaining requests: {remaining}/{limit} (unauthenticated)")
                 if remaining < 15:  # Warning threshold for unauthenticated users
                     print("⚠️ Low on unauthenticated requests!")
-                    print("Tip: Add a GitHub token using option 6 in the main menu to increase rate limits (5000/hour).")
+                    print(
+                        "Tip: Add a GitHub token using option 6 in the main menu to increase rate limits (5000/hour)."
+                    )
 
             print(f"Resets at: {reset_time}")
 

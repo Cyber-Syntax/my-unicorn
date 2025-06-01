@@ -1,7 +1,7 @@
 {
     "owner": "manuelernestog",
     "repo": "weekToDo",
-    "app_display_name": "WeekToDo",
+    "app_rename": "weekToDo",
     "description": "A simple weekly planner focused on privacy",
     "category": "Productivity",
     "tags": ["todo", "planner", "privacy"],

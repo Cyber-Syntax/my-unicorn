@@ -7,7 +7,6 @@ by name, without requiring the user to enter URLs.
 
 import logging
 from pathlib import Path
-from typing import List, Optional
 
 from src.api.github_api import GitHubAPI
 from src.app_catalog import AppInfo, get_all_apps
@@ -66,7 +65,7 @@ class InstallAppCommand(Command):
         apps = get_all_apps()
         self._display_app_list(list(apps.values()))
 
-    def _display_app_list(self, apps: List[AppInfo]) -> None:
+    def _display_app_list(self, apps: list[AppInfo]) -> None:
         """Display a list of applications and allow user to select one for installation.
 
         Args:
@@ -77,12 +76,12 @@ class InstallAppCommand(Command):
             print("No applications available.")
             return
 
-        # Sort apps alphabetically by app_display_name
-        apps = sorted(apps, key=lambda app: app.app_display_name)
+        # Sort apps alphabetically by app_rename
+        apps = sorted(apps, key=lambda app: app.app_rename)
 
         print(f"\nFound {len(apps)} applications:")
         for idx, app in enumerate(apps, 1):
-            print(f"{idx}. {app.app_display_name} - {app.description}")
+            print(f"{idx}. {app.app_rename} - {app.description}")
 
         try:
             choice = int(input("\nSelect an application to install (0 to go back): "))
@@ -106,8 +105,8 @@ class InstallAppCommand(Command):
             app_info: AppInfo object for the selected application
 
         """
-        print(f"\n=== Install {app_info.app_display_name} ===")
-        print(f"Name: {app_info.app_display_name}")
+        print(f"\n=== Install {app_info.app_rename} ===")
+        print(f"Name: {app_info.app_rename}")
         print(f"Description: {app_info.description}")
         print(f"Repository: {app_info.owner}/{app_info.repo}")
         print(f"Category: {app_info.category}")
@@ -120,7 +119,7 @@ class InstallAppCommand(Command):
                 print("Installation cancelled.")
                 return
 
-            print(f"\nInstalling {app_info.app_display_name}...")
+            print(f"\nInstalling {app_info.app_rename}...")
             self._install_app(app_info)
         except KeyboardInterrupt:
             print("\nInstallation cancelled.")
@@ -131,7 +130,7 @@ class InstallAppCommand(Command):
         app_config = AppConfigManager(
             owner=app_info.owner,
             repo=app_info.repo,
-            app_display_name=app_info.app_display_name,
+            app_rename=app_info.app_rename,
         )
 
         # Initialize GitHubAPI with parameters based on app catalog information
@@ -171,7 +170,7 @@ class InstallAppCommand(Command):
         # Track verification success and skip status across attempts
         verification_success = False
         verification_skipped = False  # New flag to track if verification was skipped
-        downloaded_file_path: Optional[str] = None
+        downloaded_file_path: str | None = None
 
         # Try up to MAX_ATTEMPTS times to download and verify
         for attempt in range(1, self.MAX_ATTEMPTS + 1):
@@ -268,13 +267,13 @@ class InstallAppCommand(Command):
             batch_mode=self.global_config.batch_mode,
             keep_backup=self.global_config.keep_backup,
             max_backups=self.global_config.max_backups,
-            app_display_name=app_info.app_display_name,
+            app_rename=app_info.app_rename,
         )
 
         # Download app icon if possible
         icon_manager = IconManager()
         icon_success, icon_path = icon_manager.ensure_app_icon(
-            api.owner, api.repo, app_display_name=app_info.app_display_name
+            api.owner, api.repo, app_rename=app_info.app_rename
         )
 
         # Perform file operations
@@ -289,11 +288,11 @@ class InstallAppCommand(Command):
 
             # Display success message with paths
             if verification_skipped:
-                print(f"\n✅ {app_info.app_display_name} successfully installed!")
+                print(f"\n✅ {app_info.app_rename} successfully installed!")
                 print("⚠️ Note: AppImage was not verified because developers did not provide")
                 print("   a SHA file for this AppImage.")
             else:
-                print(f"\n✅ {app_info.app_display_name} successfully installed and verified!")
+                print(f"\n✅ {app_info.app_rename} successfully installed and verified!")
 
             # Show config file location
             if app_config.config_file:

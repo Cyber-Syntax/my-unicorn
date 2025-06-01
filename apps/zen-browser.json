@@ -1,7 +1,7 @@
 {
     "owner": "zen-browser",
     "repo": "desktop",
-    "app_display_name": "Zen Browser",
+    "app_rename": "zen-browser",
     "description": "A content-focused browser for distraction-free browsing",
     "category": "Productivity",
     "tags": ["browser", "focus", "distraction-free", "privacy"],

@@ -130,7 +130,7 @@ class TestAppConfigManager(unittest.TestCase):
         # Assert
         self.assertEqual(config_dict["owner"], "test_owner")
         self.assertEqual(config_dict["repo"], "test_repo")
-        self.assertEqual(config_dict["app_display_name"], "test_repo")
+        self.assertEqual(config_dict["app_rename"], "test_repo")
         self.assertEqual(config_dict["version"], "1.0.0")
         self.assertEqual(config_dict["sha_name"], "test_sha.txt")
         self.assertEqual(config_dict["hash_type"], "sha256")

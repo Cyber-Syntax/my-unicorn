@@ -7,7 +7,6 @@ import asyncio
 import logging
 import re  # For hash validation
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from src.api.sha_asset_finder import SHAAssetFinder
 from src.utils import sha_utils, ui_utils
@@ -24,7 +23,7 @@ class SHAManager:
         owner: str,
         repo: str,
         sha_name: str,
-        appimage_name: Optional[str] = None,
+        appimage_name: str | None = None,
         is_batch: bool = False,
     ):
         """Initialize the SHAManager.
@@ -44,7 +43,7 @@ class SHAManager:
         self.is_batch = is_batch  # Store the flag
         self.sha_url = None
         self.hash_type = None
-        self.extracted_hash_from_body: Optional[str] = None  # For hash from release body
+        self.extracted_hash_from_body: str | None = None  # For hash from release body
 
     def _try_extract_sha_from_release_body(self) -> bool:
         """Tries to extract the SHA256 checksum for the current AppImage
@@ -121,7 +120,7 @@ class SHAManager:
 
         return False
 
-    def find_sha_asset(self, assets: List[Dict]) -> None:
+    def find_sha_asset(self, assets: list[dict]) -> None:
         """Find and select appropriate SHA file for verification.
 
         Args:
@@ -144,7 +143,7 @@ class SHAManager:
         app_info = AppInfo(
             owner=self.owner,
             repo=self.repo,
-            app_display_name=self.repo,
+            app_rename=self.repo,
             description="",
             category="",
             tags=[],
@@ -175,7 +174,7 @@ class SHAManager:
                 )
                 self._handle_sha_fallback(assets)  # Proceed to manual fallback
 
-    def _select_sha_asset(self, asset: Dict) -> None:
+    def _select_sha_asset(self, asset: dict) -> None:
         """Select a SHA asset and set instance attributes.
 
         Args:
@@ -194,7 +193,7 @@ class SHAManager:
 
         logger.info(f"Selected SHA file: {self.sha_name} (hash type: {self.hash_type})")
 
-    def _handle_sha_fallback(self, assets: List[Dict]) -> None:
+    def _handle_sha_fallback(self, assets: list[dict]) -> None:
         """Handle fallback when SHA file couldn't be automatically determined.
 
         Args:
@@ -203,7 +202,7 @@ class SHAManager:
         """
         return self._handle_sha_fallback_sync(assets)
 
-    async def _handle_sha_fallback_async(self, assets: List[Dict]) -> None:
+    async def _handle_sha_fallback_async(self, assets: list[dict]) -> None:
         """Async version of SHA fallback handler.
 
         Args:
@@ -237,7 +236,7 @@ class SHAManager:
             logger.info("SHA fallback cancelled by user")
             raise
 
-    def _handle_sha_fallback_sync(self, assets: List[Dict]) -> None:
+    def _handle_sha_fallback_sync(self, assets: list[dict]) -> None:
         """Synchronous version of SHA fallback handler.
 
         Args:

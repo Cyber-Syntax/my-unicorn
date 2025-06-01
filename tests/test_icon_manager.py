@@ -115,11 +115,11 @@ app_config_mod.AppConfigManager = DummyAppConfigManager
 src.app_config = app_config_mod
 sys.modules["src.app_config"] = app_config_mod
 
-# Create src.app_catalog with get_app_display_name_for_owner_repo
+# Create src.app_catalog with get_app_rename_for_owner_repo
 app_catalog_mod = types.ModuleType("src.app_catalog")
-app_catalog_mod.get_app_display_name_for_owner_repo = (
+app_catalog_mod.get_app_rename_for_owner_repo = (
     lambda owner, repo: repo
-)  # Simply return repo as app_display_name
+)  # Simply return repo as app_rename
 app_catalog_mod.AppInfo = types.SimpleNamespace  # Add AppInfo class placeholder
 src.app_catalog = app_catalog_mod
 sys.modules["src.app_catalog"] = app_catalog_mod
@@ -406,7 +406,7 @@ def test_ensure_app_icon_download(monkeypatch, icon_manager):
 
 def test_ensure_app_icon_no_config(monkeypatch, icon_manager):
     # No existing, find_icon returns None
-    monkeypatch.setattr(IconManager, "get_icon_path", lambda self, app_display_name, repo: None)
+    monkeypatch.setattr(IconManager, "get_icon_path", lambda self, app_rename, repo: None)
     monkeypatch.setattr(IconManager, "find_icon", lambda self, owner, repo, headers: None)
 
     success, msg = icon_manager.ensure_app_icon("owner", "repo")

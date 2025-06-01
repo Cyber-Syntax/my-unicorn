@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 import stat
 from pathlib import Path
-from typing import Optional
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -32,7 +31,7 @@ class DesktopEntryManager:
         # Create a desktop entry for an AppImage
         desktop_manager = DesktopEntryManager()
         result = desktop_manager.create_or_update_desktop_entry(
-            app_display_name="MyApp",
+            app_rename="MyApp",
             appimage_path="/path/to/MyApp.AppImage",
             icon_path="/path/to/MyApp/icon.png"
         )
@@ -161,9 +160,9 @@ class DesktopEntryManager:
 
     def create_or_update_desktop_entry(
         self,
-        app_display_name: str,
+        app_rename: str,
         appimage_path: str | Path,
-        icon_path: Optional[str | Path] = None,
+        icon_path: str | Path | None = None,
     ) -> tuple[bool, str]:
         """Create or update a desktop entry file for an AppImage.
 
@@ -171,7 +170,7 @@ class DesktopEntryManager:
         Avoids unnecessary writes by comparing content with existing file.
 
         Args:
-            app_display_name: Unique identifier for the application
+            app_rename: Unique identifier for the application
             appimage_path: Path to the AppImage executable
             icon_path: Optional path to the application icon
 
@@ -182,7 +181,7 @@ class DesktopEntryManager:
 
         """
         try:
-            if not app_display_name:
+            if not app_rename:
                 return False, "Application identifier cannot be empty"
 
             # Convert paths to Path objects if they're strings
@@ -193,7 +192,7 @@ class DesktopEntryManager:
                 icon_path = Path(icon_path)
 
             # Create desktop file path
-            desktop_file = f"{app_display_name.lower()}.desktop"
+            desktop_file = f"{app_rename.lower()}.desktop"
             desktop_path = self.desktop_dir / desktop_file
 
             logger.info(f"Processing desktop entry at {desktop_path}")
@@ -204,11 +203,11 @@ class DesktopEntryManager:
             # Create new desktop entry content
             new_entries = {
                 "Type": "Application",
-                "Name": app_display_name,  # Use app_display_name for display name
+                "Name": app_rename,  # Use app_rename for display name
                 "Exec": str(appimage_path),  # Use full path to AppImage
                 "Terminal": "false",
                 "Categories": DEFAULT_CATEGORIES,
-                "Comment": f"AppImage for {app_display_name}",
+                "Comment": f"AppImage for {app_rename}",
             }
 
             # Add icon if available

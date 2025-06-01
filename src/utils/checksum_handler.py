@@ -8,7 +8,7 @@ strategies, including extracting checksums from GitHub release descriptions.
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any
 
 # Import from the new checksums package
 from src.utils.checksums import handle_release_description_verification
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def verify_with_strategy(
-    app_info: Dict[str, Any], appimage_path: str, cleanup_on_failure: bool = False
+    app_info: dict[str, Any], appimage_path: str, cleanup_on_failure: bool = False
 ) -> bool:
     """Verify an AppImage using the appropriate checksum strategy.
 
@@ -73,8 +73,8 @@ def verify_with_strategy(
 
 
 def verify_downloaded_appimage(
-    app_info: Dict[str, Any], app_display_name: str, downloads_dir: Path
-) -> Tuple[bool, str]:
+    app_info: dict[str, Any], app_rename: str, downloads_dir: Path
+) -> tuple[bool, str]:
     """Verify a downloaded AppImage based on app catalog information.
 
     This function handles the complete verification process including special
@@ -82,7 +82,7 @@ def verify_downloaded_appimage(
 
     Args:
         app_info: Application information from the catalog
-        app_display_name: Display name of the application
+        app_rename: Display name of the application
         downloads_dir: Directory where the AppImage was downloaded
 
     Returns:
@@ -91,9 +91,9 @@ def verify_downloaded_appimage(
     """
     try:
         # Find the downloaded AppImage file
-        appimage_files = list(downloads_dir.glob(f"{app_display_name}-*.AppImage"))
+        appimage_files = list(downloads_dir.glob(f"{app_rename}-*.AppImage"))
         if not appimage_files:
-            error_msg = f"No AppImage found for {app_display_name} in {downloads_dir}"
+            error_msg = f"No AppImage found for {app_rename} in {downloads_dir}"
             logger.error(error_msg)
             return False, error_msg
 

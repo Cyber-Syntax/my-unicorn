@@ -10,7 +10,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 # Local imports
 from src.app_catalog import load_app_definition
@@ -41,18 +41,18 @@ class AppConfigManager:
     """
 
     # Core user-specific fields (stored in config files)
-    version: Optional[str] = None
-    appimage_name: Optional[str] = None
+    version: str | None = None
+    appimage_name: str | None = None
 
     # Configuration management
     config_folder: Path = field(default_factory=lambda: Path(DEFAULT_CONFIG_PATH).expanduser())
 
     # App identification (set when loading config)
-    app_name: Optional[str] = field(init=False, default=None)
+    app_name: str | None = field(init=False, default=None)
 
     # These fields are calculated in __post_init__ and not directly initialized
-    config_file_name: Optional[str] = field(init=False, default=None)
-    config_file: Optional[Path] = field(init=False, default=None)
+    config_file_name: str | None = field(init=False, default=None)
+    config_file: Path | None = field(init=False, default=None)
 
     def __post_init__(self) -> None:
         """Post-initialization to handle derived attributes."""
@@ -64,6 +64,7 @@ class AppConfigManager:
 
         Args:
             app_name: Name of the application (used for config file naming)
+
         """
         self.app_name = app_name
         self.config_file_name = f"{app_name}.json"
@@ -74,6 +75,7 @@ class AppConfigManager:
 
         Returns:
             AppInfo object if found, None otherwise
+
         """
         if not self.app_name:
             logger.warning("Cannot get app info: app_name not set")
@@ -81,25 +83,25 @@ class AppConfigManager:
         return load_app_definition(self.app_name)
 
     @property
-    def owner(self) -> Optional[str]:
+    def owner(self) -> str | None:
         """Get owner from app definition."""
         app_info = self.get_app_info()
         return app_info.owner if app_info else None
 
     @property
-    def repo(self) -> Optional[str]:
+    def repo(self) -> str | None:
         """Get repo from app definition."""
         app_info = self.get_app_info()
         return app_info.repo if app_info else None
 
     @property
-    def app_display_name(self) -> Optional[str]:
+    def app_rename(self) -> str | None:
         """Get display name from app definition."""
         app_info = self.get_app_info()
-        return app_info.app_display_name if app_info else self.app_name
+        return app_info.app_rename if app_info else self.app_name
 
     @property
-    def sha_name(self) -> Optional[str]:
+    def sha_name(self) -> str | None:
         """Get SHA name from app definition."""
         app_info = self.get_app_info()
         return app_info.sha_name if app_info else None
@@ -111,37 +113,38 @@ class AppConfigManager:
         return app_info.hash_type if app_info else "sha256"
 
     @property
-    def preferred_characteristic_suffixes(self) -> List[str]:
+    def preferred_characteristic_suffixes(self) -> list[str]:
         """Get preferred characteristic suffixes from app definition."""
         app_info = self.get_app_info()
         return app_info.preferred_characteristic_suffixes if app_info else []
 
     @property
-    def icon_info(self) -> Optional[str]:
+    def icon_info(self) -> str | None:
         """Get icon info from app definition."""
         app_info = self.get_app_info()
         return app_info.icon_info if app_info else None
 
     @property
-    def icon_file_name(self) -> Optional[str]:
+    def icon_file_name(self) -> str | None:
         """Get icon file name from app definition."""
         app_info = self.get_app_info()
         return app_info.icon_file_name if app_info else None
 
     @property
-    def icon_repo_path(self) -> Optional[str]:
+    def icon_repo_path(self) -> str | None:
         """Get icon repo path from app definition."""
         app_info = self.get_app_info()
         return app_info.icon_repo_path if app_info else None
 
     def update_version(
-        self, new_version: Optional[str] = None, new_appimage_name: Optional[str] = None
+        self, new_version: str | None = None, new_appimage_name: str | None = None
     ) -> None:
         """Update the configuration file with the new version and AppImage name.
 
         Args:
             new_version: New version to update to
             new_appimage_name: New AppImage filename
+
         """
         try:
             if new_version is not None:
@@ -153,7 +156,7 @@ class AppConfigManager:
                 logger.error("Config file path is not set")
                 return
 
-            config_data: Dict[str, Any] = {}
+            config_data: dict[str, Any] = {}
 
             if self.config_file.exists():
                 with self.config_file.open("r", encoding="utf-8") as file:
@@ -173,8 +176,8 @@ class AppConfigManager:
             logger.error(f"An error occurred while updating version: {e}")
 
     def create_desktop_file(
-        self, appimage_path: Union[str, Path], icon_path: Optional[Union[str, Path]] = None
-    ) -> Tuple[bool, str]:
+        self, appimage_path: str | Path, icon_path: str | Path | None = None
+    ) -> tuple[bool, str]:
         """Create or update a desktop entry file for the AppImage.
 
         Args:
@@ -183,9 +186,10 @@ class AppConfigManager:
 
         Returns:
             Tuple[bool, str]: Success status and path to desktop file or error message
+
         """
         try:
-            if not self.app_display_name:
+            if not self.app_rename:
                 return False, "Application identifier not available"
 
             # Convert paths to Path objects if they're strings
@@ -204,7 +208,7 @@ class AppConfigManager:
             # Use the DesktopEntryManager to handle desktop entry operations
             desktop_manager = DesktopEntryManager()
             return desktop_manager.create_or_update_desktop_entry(
-                app_display_name=self.app_display_name,
+                app_rename=self.app_rename,
                 appimage_path=appimage_path_obj,
                 icon_path=icon_path_obj,
             )
@@ -214,7 +218,7 @@ class AppConfigManager:
             logger.error(error_msg)
             return False, error_msg
 
-    def list_json_files(self) -> List[str]:
+    def list_json_files(self) -> list[str]:
         """List JSON files in the configuration directory.
 
         Returns:
@@ -222,6 +226,7 @@ class AppConfigManager:
 
         Raises:
             FileNotFoundError: If the configuration folder doesn't exist
+
         """
         try:
             self.config_folder.mkdir(parents=True, exist_ok=True)
@@ -238,6 +243,7 @@ class AppConfigManager:
 
         Returns:
             bool: True if save successful, False otherwise
+
         """
         if not self.config_file:
             logger.error("Config file path is not set")
@@ -268,6 +274,7 @@ class AppConfigManager:
 
         Returns:
             bool: True if commit successful, False otherwise
+
         """
         if not self.config_file:
             logger.error("Config file path is not set")
@@ -294,13 +301,14 @@ class AppConfigManager:
                     logger.warning(f"Failed to clean up temporary file: {cleanup_error}")
             return False
 
-    def select_files(self) -> Optional[List[str]]:
+    def select_files(self) -> list[str] | None:
         """List available JSON configuration files and allow the user to select multiple.
 
         Shows application names without the .json extension for better readability.
 
         Returns:
             List[str] or None: List of selected JSON files or None if no selection made
+
         """
         try:
             json_files = self.list_json_files()
@@ -335,7 +343,7 @@ class AppConfigManager:
             print("\nSelection cancelled.")
             return None
 
-    def load_appimage_config(self, config_file_name: str) -> Optional[Dict[str, Any]]:
+    def load_appimage_config(self, config_file_name: str) -> dict[str, Any] | None:
         """Load a specific AppImage configuration file.
 
         Args:
@@ -346,6 +354,7 @@ class AppConfigManager:
 
         Raises:
             ValueError: If JSON parsing fails
+
         """
         config_file_path = self.config_folder / config_file_name
         if config_file_path.is_file():
@@ -378,6 +387,7 @@ class AppConfigManager:
 
         Returns:
             bool: True if config was successfully reloaded, False otherwise
+
         """
         logger.info("Explicitly reloading app configuration from disk")
         if self.config_file_name is None:
@@ -424,7 +434,7 @@ class AppConfigManager:
         self._display_config_info(app_name)
         self._handle_config_customization(app_name)
 
-    def _get_user_selection(self, json_files: List[str]) -> Optional[str]:
+    def _get_user_selection(self, json_files: list[str]) -> str | None:
         """Get user's file selection.
 
         Args:
@@ -432,6 +442,7 @@ class AppConfigManager:
 
         Returns:
             Selected file name or None if cancelled
+
         """
         while True:
             file_choice = input("Select an application (number) or cancel: ")
@@ -456,6 +467,7 @@ class AppConfigManager:
 
         Args:
             app_name: Name of the application
+
         """
         print("\n" + "=" * 60)
         print(f"Configuration for: {app_name}")
@@ -485,6 +497,7 @@ class AppConfigManager:
 
         Args:
             app_name: Name of the application
+
         """
         while True:
             choice = input("Enter your choice (1-3): ")
@@ -512,11 +525,12 @@ class AppConfigManager:
         print(f"\033[42m{key.capitalize()} updated successfully in {app_name}\033[0m")
         print("=" * 60)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the user-specific configuration to a dictionary.
 
         Returns:
             Dict[str, Any]: Dictionary representation of user-specific app configuration
+
         """
         return {
             "version": self.version,
