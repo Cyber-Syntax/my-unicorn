@@ -362,7 +362,7 @@ class TestBaseUpdateCommand:
         mock_app_info = AppInfo(
             owner="test",
             repo="test-app",
-            app_display_name="Test App",
+            app_rename="Test App",
             description="Test description",
             category="Test",
             tags=["test"],
@@ -410,7 +410,7 @@ class TestBaseUpdateCommand:
         mock_app_info = AppInfo(
             owner="test",
             repo="test-app",
-            app_display_name="Test App",
+            app_rename="Test App",
             description="Test description",
             category="Test",
             tags=["test"],
@@ -453,7 +453,7 @@ class TestBaseUpdateCommand:
         mock_app_info = AppInfo(
             owner="test",
             repo="test-app",
-            app_display_name="Test App",
+            app_rename="Test App",
             description="Test description",
             category="Test",
             tags=["test"],
@@ -831,7 +831,7 @@ class TestBaseUpdateCommand:
         mock_app_info = AppInfo(
             owner="test",
             repo="test-app",
-            app_display_name="Test App",
+            app_rename="Test App",
             description="Test description",
             category="Test",
             tags=["test"],
@@ -914,7 +914,7 @@ class TestBaseUpdateCommand:
         mock_app_info = AppInfo(
             owner="test",
             repo="test-app",
-            app_display_name="Test App",
+            app_rename="Test App",
             description="Test description",
             category="Test",
             tags=["test"],

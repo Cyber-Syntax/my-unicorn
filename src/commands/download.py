@@ -142,13 +142,13 @@ class DownloadCommand(Command):
 
         # Download app icon if possible
         icon_manager = IconManager()
-        # First get the app_display_name (if available from app_config) or let the fallback handle it
-        app_display_name = (
-            app_config.app_display_name
-            if hasattr(app_config, "app_display_name") and app_config.app_display_name
+        # First get the app_rename (if available from app_config) or let the fallback handle it
+        app_rename = (
+            app_config.app_rename
+            if hasattr(app_config, "app_rename") and app_config.app_rename
             else None
         )
-        icon_manager.ensure_app_icon(api.owner, api.repo, app_display_name=app_display_name)
+        icon_manager.ensure_app_icon(api.owner, api.repo, app_rename=app_rename)
 
         # Check if the file operations were successful
         success = file_handler.handle_appimage_operations()

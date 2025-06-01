@@ -7,11 +7,15 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-DEFINITIONS_PATH: Optional[Path] = None
+# Constants
+MIN_WORD_LENGTH = 2
+
+# Module-level variable to store the path to app definitions
+_definitions_path: Path | None = None
+
 
 @dataclass
 class AppInfo:
@@ -20,7 +24,7 @@ class AppInfo:
     Attributes:
         owner: Repository owner/organization
         repo: Repository name
-        app_display_name: Display name for the application
+        app_rename: Display name for the application
         description: Description of the application
         category: Application category
         tags: List of tags describing the application
@@ -31,51 +35,57 @@ class AppInfo:
         icon_info: Direct URL to icon file
         icon_file_name: Preferred filename for saving the icon
         icon_repo_path: Repository path to icon file (fallback if icon_info not available)
+
     """
+
     owner: str
     repo: str
-    app_display_name: str
+    app_rename: str
     description: str
     category: str
-    tags: List[str]
+    tags: list[str]
     hash_type: str
     appimage_name_template: str
     sha_name: str
-    preferred_characteristic_suffixes: List[str]
-    icon_info: Optional[str]
-    icon_file_name: Optional[str]
-    icon_repo_path: Optional[str]
+    preferred_characteristic_suffixes: list[str]
+    icon_info: str | None
+    icon_file_name: str | None
+    icon_repo_path: str | None
+
 
 def initialize_definitions_path(path: Path) -> None:
     """Initialize the path to application definitions.
 
     Args:
         path: Path to directory containing JSON app definitions
-    """
-    global DEFINITIONS_PATH
-    DEFINITIONS_PATH = path
-    logger.info(f"Initialized app definitions path: {path}")
 
-def get_all_apps() -> Dict[str, AppInfo]:
+    """
+    # Use globals() to avoid global statement
+    globals()["_definitions_path"] = path
+    logger.info("Initialized app definitions path: %s", path)
+
+
+def get_all_apps() -> dict[str, AppInfo]:
     """Get all available app definitions.
 
     Returns:
         Dict mapping lowercase repo names to AppInfo objects
+
     """
-    if not DEFINITIONS_PATH:
+    if not _definitions_path:
         logger.error("App definitions path not initialized")
         return {}
 
-    apps: Dict[str, AppInfo] = {}
+    apps: dict[str, AppInfo] = {}
     try:
-        for json_file in DEFINITIONS_PATH.glob("*.json"):
+        for json_file in _definitions_path.glob("*.json"):
             try:
-                with open(json_file, 'r', encoding='utf-8') as f:
+                with open(json_file, encoding="utf-8") as f:
                     data = json.load(f)
                     app_info = AppInfo(
                         owner=data["owner"],
                         repo=data["repo"],
-                        app_display_name=data["app_display_name"],
+                        app_rename=data["app_rename"],
                         description=data["description"],
                         category=data["category"],
                         tags=data["tags"],
@@ -85,19 +95,20 @@ def get_all_apps() -> Dict[str, AppInfo]:
                         preferred_characteristic_suffixes=data["preferred_characteristic_suffixes"],
                         icon_info=data.get("icon_info"),
                         icon_file_name=data.get("icon_file_name"),
-                        icon_repo_path=data.get("icon_repo_path")
+                        icon_repo_path=data.get("icon_repo_path"),
                     )
                     apps[app_info.repo.lower()] = app_info
-            except Exception as e:
-                logger.error(f"Error loading app definition from {json_file}: {e}")
+            except (KeyError, json.JSONDecodeError) as e:
+                logger.error("Error loading app definition from %s: %s", json_file, e)
                 continue
 
-    except Exception as e:
-        logger.error(f"Error scanning app definitions directory: {e}")
+    except OSError as e:
+        logger.error("Error scanning app definitions directory: %s", e)
 
     return apps
 
-def load_app_definition(repo_name: str) -> Optional[AppInfo]:
+
+def load_app_definition(repo_name: str) -> AppInfo | None:
     """Load application definition from JSON file.
 
     Args:
@@ -105,8 +116,9 @@ def load_app_definition(repo_name: str) -> Optional[AppInfo]:
 
     Returns:
         AppInfo object if found, None otherwise
+
     """
-    if not DEFINITIONS_PATH:
+    if not _definitions_path:
         logger.error("App definitions path not initialized")
         return None
 
@@ -119,21 +131,21 @@ def load_app_definition(repo_name: str) -> Optional[AppInfo]:
 
     # Try to find and load the JSON file
     try:
-        json_path = DEFINITIONS_PATH / f"{repo_name.capitalize()}.json"
+        json_path = _definitions_path / f"{repo_name.capitalize()}.json"
         if not json_path.exists():
-            json_path = DEFINITIONS_PATH / f"{repo_name}.json"
+            json_path = _definitions_path / f"{repo_name}.json"
             if not json_path.exists():
-                logger.debug(f"No app definition found for {repo_name}")
+                logger.debug("No app definition found for %s", repo_name)
                 return None
 
-        with open(json_path, 'r', encoding='utf-8') as f:
+        with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         # Create AppInfo object from JSON data
         return AppInfo(
             owner=data["owner"],
             repo=data["repo"],
-            app_display_name=data["app_display_name"],
+            app_rename=data["app_rename"],
             description=data["description"],
             category=data["category"],
             tags=data["tags"],
@@ -143,22 +155,136 @@ def load_app_definition(repo_name: str) -> Optional[AppInfo]:
             preferred_characteristic_suffixes=data["preferred_characteristic_suffixes"],
             icon_info=data.get("icon_info"),
             icon_file_name=data.get("icon_file_name"),
-            icon_repo_path=data.get("icon_repo_path")
+            icon_repo_path=data.get("icon_repo_path"),
         )
 
-    except Exception as e:
-        logger.error(f"Error loading app definition for {repo_name}: {e}")
+    except (OSError, KeyError, json.JSONDecodeError) as e:
+        logger.error("Error loading app definition for %s: %s", repo_name, e)
         return None
 
-def get_app_display_name_for_owner_repo(owner: str, repo: str) -> str:
-    """Get app display name for owner/repo combination.
+
+def get_app_rename_for_owner_repo(repo: str) -> str:
+    """Get app display name for repo.
 
     Args:
-        owner: Repository owner/organization
         repo: Repository name
 
     Returns:
         Display name from app definition or repo name as fallback
+
     """
     app_info = load_app_definition(repo)
-    return app_info.app_display_name if app_info else repo
+    return app_info.app_rename if app_info else repo
+
+
+def _try_direct_repo_match(name_part: str, all_apps: dict[str, AppInfo]) -> AppInfo | None:
+    """Try to find direct repository name match."""
+    for _repo_name, app_info in all_apps.items():
+        if app_info.repo.lower() == name_part:
+            return app_info
+    return None
+
+
+def _try_display_name_match(name_part: str, all_apps: dict[str, AppInfo]) -> AppInfo | None:
+    """Try to find app display name match."""
+    for _repo_name, app_info in all_apps.items():
+        display_name_normalized = app_info.app_rename.lower().replace(" ", "").replace("-", "")
+        name_part_normalized = name_part.replace(" ", "").replace("-", "")
+
+        if display_name_normalized == name_part_normalized:
+            return app_info
+    return None
+
+
+def _try_repo_substring_match(basename: str, all_apps: dict[str, AppInfo]) -> AppInfo | None:
+    """Try to find repository substring match."""
+    for _repo_name, app_info in all_apps.items():
+        if app_info.repo.lower() in basename:
+            return app_info
+    return None
+
+
+def _try_display_name_substring_match(
+    basename: str, all_apps: dict[str, AppInfo]
+) -> AppInfo | None:
+    """Try to find display name substring match."""
+    for _repo_name, app_info in all_apps.items():
+        display_name_parts = app_info.app_rename.lower().split()
+        if any(part in basename for part in display_name_parts if len(part) > MIN_WORD_LENGTH):
+            return app_info
+    return None
+
+
+def _try_special_case_match(basename: str) -> AppInfo | None:
+    """Try to find special case pattern match."""
+    special_cases = {
+        "zen": "zen-browser",
+        "freetube": "freetube",
+        "obsidian": "obsidian",
+        "joplin": "joplin",
+    }
+
+    for pattern, repo_name in special_cases.items():
+        if pattern in basename.lower():
+            app_info = load_app_definition(repo_name)
+            if app_info:
+                return app_info
+    return None
+
+
+def find_app_by_name_in_filename(filename: str) -> AppInfo | None:
+    """Find app information based on the AppImage filename.
+
+    This function tries to match the filename with entries in the app catalog,
+    which is particularly useful when verifying AppImages with extracted checksums.
+
+    Args:
+        filename: The AppImage filename (with or without path)
+
+    Returns:
+        AppInfo object if found, None otherwise
+
+    """
+    if not filename:
+        logger.error("Empty filename provided to find_app_by_name_in_filename")
+        return None
+
+    # Remove .AppImage extension and convert to lowercase for matching
+    base_filename = filename.lower()
+    if base_filename.endswith(".appimage"):
+        base_filename = base_filename.removesuffix(".appimage")
+
+    # Extract just the basename without path
+    basename = Path(base_filename).name
+    logger.debug("Looking for app match for filename: %s", basename)
+
+    # Get all apps from the JSON-based catalog
+    all_apps = get_all_apps()
+    if not all_apps:
+        logger.warning("No apps found in catalog")
+        return None
+
+    # Extract the first part before hyphen or version number (likely the app name)
+    name_part = basename.split("-")[0].lower()
+
+    # Define matching strategies in order of preference
+    matching_strategies = [
+        ("direct repo match", lambda: _try_direct_repo_match(name_part, all_apps)),
+        ("display name match", lambda: _try_display_name_match(name_part, all_apps)),
+        ("repo substring match", lambda: _try_repo_substring_match(basename, all_apps)),
+        (
+            "display name substring match",
+            lambda: _try_display_name_substring_match(basename, all_apps),
+        ),
+        ("special case match", lambda: _try_special_case_match(basename)),
+    ]
+
+    # Try each strategy until one succeeds
+    for strategy_name, strategy_func in matching_strategies:
+        result = strategy_func()
+        if result:
+            logger.info("Found %s for '%s': %s", strategy_name, filename, result.repo)
+            return result
+
+    logger.warning("No app catalog match found for filename: %s", filename)
+    return None

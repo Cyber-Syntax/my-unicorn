@@ -1,7 +1,7 @@
 {
     "owner": "tagspaces",
     "repo": "tagspaces",
-    "app_display_name": "TagSpaces",
+    "app_rename": "tagspaces",
     "description": "A free and open-source personal data manager with tagging support",
     "category": "Productivity",
     "tags": ["file-manager", "tagging", "local-files"],

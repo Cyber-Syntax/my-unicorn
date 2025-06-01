@@ -32,7 +32,7 @@ def app_info_fixture() -> AppInfo:
     return AppInfo(
         owner="testowner",
         repo="testrepo",
-        app_display_name="Test App",
+        app_rename="Test App",
         description="A test application",
         category="Test",
         tags=["test", "sample"],

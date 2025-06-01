@@ -1,6 +1,6 @@
 [project]
 name = 'my-unicorn'
-version = '0.10.6-alpha'
+version = '0.10.7-alpha'
 description = 'It downloads/updates appimages via GitHub API. It also validates the appimage with SHA256 and SHA512.'
 requires-python = ">= 3.12"
 dependencies = [

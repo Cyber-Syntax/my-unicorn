@@ -1,7 +1,7 @@
 {
     "owner": "johannesjo",
     "repo": "super-productivity",
-    "app_display_name": "Super Productivity",
+    "app_rename": "super-productivity",
     "description": "To-do list & time tracker & kanban board & calendar all in one app",
     "category": "Productivity",
     "tags": ["todo", "time-tracking", "productivity", "kanban"],

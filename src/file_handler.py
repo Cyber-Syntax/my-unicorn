@@ -12,7 +12,6 @@ import stat
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 # Local imports
 from src.api.github_api import GitHubAPI
@@ -49,18 +48,18 @@ class FileHandler:
 
     appimage_name: str  # Original downloaded filename from GitHub
     repo: str
-    owner: Optional[str] = None
-    version: Optional[str] = None
-    sha_name: Optional[str] = None
-    config_file: Optional[str] = None
-    app_storage_path: Optional[Path] = None  # Final installation directory
-    app_backup_storage_path: Optional[Path] = None  # Backup directory
-    config_folder: Optional[str] = None
-    config_file_name: Optional[str] = None
+    owner: str | None = None
+    version: str | None = None
+    sha_name: str | None = None
+    config_file: str | None = None
+    app_storage_path: Path | None = None  # Final installation directory
+    app_backup_storage_path: Path | None = None  # Backup directory
+    config_folder: str | None = None
+    config_file_name: str | None = None
     batch_mode: bool = False
     keep_backup: bool = True
     max_backups: int = 3
-    app_display_name: Optional[str] = None
+    app_rename: str | None = None
 
     def __post_init__(self) -> None:
         """Post-initialization processing.
@@ -77,9 +76,9 @@ class FileHandler:
         if not self.repo:
             raise ValueError("Repository name cannot be empty")
 
-        # Use app_display_name if provided, otherwise fallback to repo
-        if not self.app_display_name:
-            self.app_display_name = self.repo
+        # Use app_rename if provided, otherwise fallback to repo
+        if not self.app_rename:
+            self.app_rename = self.repo
 
         # Convert paths to Path objects
         if self.app_storage_path and isinstance(self.app_storage_path, str):
@@ -103,18 +102,18 @@ class FileHandler:
 
     @property
     def installed_filename(self) -> str:
-        """Filename for the installed AppImage based on app_display_name.
+        """Filename for the installed AppImage based on app_rename.
 
         Returns:
             str: Filename with .AppImage extension
 
         """
-        if not self.app_display_name.lower().endswith(APPIMAGE_EXTENSION.lower()):
-            return f"{self.app_display_name}{APPIMAGE_EXTENSION}"
-        return self.app_display_name
+        if not self.app_rename.lower().endswith(APPIMAGE_EXTENSION.lower()):
+            return f"{self.app_rename}{APPIMAGE_EXTENSION}"
+        return self.app_rename
 
     @property
-    def installed_path(self) -> Optional[Path]:
+    def installed_path(self) -> Path | None:
         """Path where the AppImage is/will be installed.
 
         Returns:
@@ -126,7 +125,7 @@ class FileHandler:
         return self.app_storage_path / self.installed_filename
 
     def handle_appimage_operations(
-        self, github_api: Optional[GitHubAPI] = None, icon_path: Optional[str] = None
+        self, github_api: GitHubAPI | None = None, icon_path: str | None = None
     ) -> bool:
         """Perform all required file operations for an AppImage.
 
@@ -195,7 +194,7 @@ class FileHandler:
                 return True
 
             # Get app name for grouping backups by app
-            app_base_name = self.app_display_name.lower()
+            app_base_name = self.app_rename.lower()
 
             # Create a unique backup name with timestamp
             timestamp = time.strftime("%Y%m%d-%H%M%S")
@@ -344,7 +343,7 @@ class FileHandler:
             logger.error(f"Failed to set executable permissions: {e!s}")
             return False
 
-    def _create_desktop_entry(self, icon_path: Optional[str] = None) -> bool:
+    def _create_desktop_entry(self, icon_path: str | None = None) -> bool:
         """Create or update .desktop file for easy launching of the AppImage.
 
         Creates a standard conformant desktop entry file in the user's
@@ -367,12 +366,12 @@ class FileHandler:
             # Get icon path if not provided
             if not icon_path:
                 icon_manager = IconManager()
-                icon_path = icon_manager.get_icon_path(self.app_display_name, self.repo)
+                icon_path = icon_manager.get_icon_path(self.app_rename, self.repo)
 
             # Use the DesktopEntryManager to handle desktop entry operations
             desktop_manager = DesktopEntryManager()
             success, message = desktop_manager.create_or_update_desktop_entry(
-                app_display_name=self.app_display_name,
+                app_rename=self.app_rename,
                 appimage_path=self.installed_path,
                 icon_path=icon_path,
             )
