@@ -15,6 +15,7 @@ from typing import Any
 from src.api.github_api import GitHubAPI
 from src.app_catalog import load_app_definition
 from src.app_config import AppConfigManager
+from src.auth_manager import GitHubAuthManager
 from src.commands.base import Command
 from src.download import DownloadManager
 from src.file_handler import FileHandler
@@ -300,8 +301,12 @@ class BaseUpdateCommand(Command):
             return False, {"status": "no_update"}
 
         # Now that we know an update is available, do a full release processing to get SHA info
-        self._logger.debug(f"Update available for {app_data['name']}, processing full release info including SHA")
-        full_success, full_release_data = github_api.get_latest_release(version_check_only=False, is_batch=is_batch)
+        self._logger.debug(
+            f"Update available for {app_data['name']}, processing full release info including SHA"
+        )
+        full_success, full_release_data = github_api.get_latest_release(
+            version_check_only=False, is_batch=is_batch
+        )
 
         if not full_success:
             error_msg = f"Error getting full release data from GitHub API: {full_release_data}"
@@ -340,7 +345,7 @@ class BaseUpdateCommand(Command):
 
             icon_manager = IconManager()
             icon_success, icon_path = icon_manager.ensure_app_icon(
-                github_api.owner, github_api.repo, app_display_name=app_config.app_display_name
+                github_api.owner, github_api.repo, app_rename=app_config.app_rename
             )
 
             # Perform file operations and update config
@@ -543,7 +548,7 @@ class BaseUpdateCommand(Command):
             "repo": github_api.repo,
             "owner": github_api.owner,
             "version": github_api.version,
-            "app_display_name": app_config.app_display_name,
+            "app_rename": app_config.app_rename,
         }
 
         for param, value in required_fh_params.items():
@@ -568,7 +573,7 @@ class BaseUpdateCommand(Command):
             batch_mode=global_config.batch_mode,
             keep_backup=global_config.keep_backup,
             max_backups=global_config.max_backups,
-            app_display_name=str(app_config.app_display_name),
+            app_rename=str(app_config.app_rename),
         )
 
     def _should_retry_download(self, attempt: int, max_attempts: int) -> bool:
@@ -640,3 +645,86 @@ class BaseUpdateCommand(Command):
                 "latest": latest_version,
             }
         return None
+
+    def _check_rate_limits(
+        self, apps_to_update: list[dict[str, Any]]
+    ) -> tuple[bool, list[dict[str, Any]], str]:
+        """Check if we have sufficient GitHub API rate limits for updates.
+
+        Args:
+            apps_to_update: List of apps to update
+
+        Returns:
+            Tuple containing:
+            - bool: Whether we can proceed with updates
+            - List[Dict[str, Any]]: Filtered list of apps (may be reduced)
+            - str: Message describing the rate limit status
+
+        """
+        try:
+            # Get current rate limit info
+            remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+
+            # Ensure remaining is an integer
+            remaining = int(remaining) if remaining is not None else 0
+
+            # Calculate requests needed (estimate 3 per app: version check, release info, icon check)
+            requests_per_app = 3
+            total_requests_needed = len(apps_to_update) * requests_per_app
+
+            # Check if we have enough requests for all apps
+            if remaining >= total_requests_needed:
+                message = f"Rate limit status: {remaining}/{limit} requests remaining. Sufficient for all {len(apps_to_update)} apps."
+                return True, apps_to_update, message
+
+            # Not enough for all apps - see how many we can process
+            apps_we_can_process = max(0, remaining // requests_per_app)
+
+            if apps_we_can_process == 0:
+                message = (
+                    f"ERROR: Not enough API requests remaining ({remaining}/{limit}). "
+                    f"Minimum requests required: {requests_per_app}. "
+                    f"Rate limit resets at: {reset_time}"
+                )
+                return False, [], message
+
+            # We can process some apps but not all
+            filtered_apps = apps_to_update[:apps_we_can_process]
+            message = (
+                f"WARNING: Not enough API requests for all updates. "
+                f"Can process {apps_we_can_process} out of {len(apps_to_update)} apps. "
+                f"Remaining requests: {remaining}/{limit}"
+            )
+            return False, filtered_apps, message
+
+        except Exception as e:
+            self._logger.error(f"Error checking rate limits: {e}")
+            message = f"Error checking rate limits: {e}. Proceeding with caution."
+            return True, apps_to_update, message
+
+    def _display_rate_limit_info(self) -> None:
+        """Display current GitHub API rate limit information."""
+        try:
+            remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+
+            # Ensure remaining is an integer
+            remaining = int(remaining) if remaining is not None else 0
+
+            print("\n--- GitHub API Rate Limits ---")
+            if is_authenticated:
+                print(f"Remaining requests: {remaining}/{limit}")
+                if remaining < 100:  # Warning threshold for authenticated users
+                    print("⚠️ Running low on API requests!")
+            else:
+                print(f"Remaining requests: {remaining}/{limit} (unauthenticated)")
+                if remaining < 15:  # Warning threshold for unauthenticated users
+                    print("⚠️ Low on unauthenticated requests!")
+                    print(
+                        "Tip: Add a GitHub token using option 6 in the main menu to increase rate limits (5000/hour)."
+                    )
+
+            print(f"Resets at: {reset_time}")
+
+        except Exception as e:
+            self._logger.error(f"Error displaying rate limit info: {e}")
+            print(f"Error retrieving rate limit information: {e}")

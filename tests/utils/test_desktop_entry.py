@@ -261,17 +261,17 @@ Key=Value
                     mock_error.assert_called_once()
                     assert not temp_path.exists()  # Temp file should be cleaned up
 
-    def test_create_or_update_desktop_entry_empty_app_display_name(
+    def test_create_or_update_desktop_entry_empty_app_rename(
         self, desktop_manager: DesktopEntryManager
     ) -> None:
-        """Test create_or_update_desktop_entry with empty app_display_name.
+        """Test create_or_update_desktop_entry with empty app_rename.
 
         Args:
             desktop_manager: DesktopEntryManager instance
 
         """
         success, message = desktop_manager.create_or_update_desktop_entry(
-            app_display_name="", appimage_path="/path/to/app.AppImage"
+            app_rename="", appimage_path="/path/to/app.AppImage"
         )
 
         assert success is False
@@ -287,15 +287,15 @@ Key=Value
             temp_dir: Path to the temporary directory
 
         """
-        app_display_name = "TestApp"
+        app_rename = "TestApp"
         appimage_path = "/path/to/TestApp.AppImage"
         icon_path = "/path/to/icon.png"
 
-        desktop_path = temp_dir / f"{app_display_name.lower()}.desktop"
+        desktop_path = temp_dir / f"{app_rename.lower()}.desktop"
 
         with patch("logging.Logger.info") as mock_info:
             success, message = desktop_manager.create_or_update_desktop_entry(
-                app_display_name=app_display_name, appimage_path=appimage_path, icon_path=icon_path
+                app_rename=app_rename, appimage_path=appimage_path, icon_path=icon_path
             )
 
             assert success is True
@@ -311,11 +311,11 @@ Key=Value
                 content = f.read()
                 assert f"[{DESKTOP_FILE_SECTION}]" in content
                 assert "Type=Application" in content
-                assert f"Name={app_display_name}" in content
+                assert f"Name={app_rename}" in content
                 assert f"Exec={appimage_path}" in content
                 assert "Terminal=false" in content
                 assert f"Categories={DEFAULT_CATEGORIES}" in content
-                assert f"Comment=AppImage for {app_display_name}" in content
+                assert f"Comment=AppImage for {app_rename}" in content
                 assert f"Icon={icon_path}" in content
 
     def test_create_or_update_desktop_entry_update(
@@ -328,26 +328,26 @@ Key=Value
             temp_dir: Path to the temporary directory
 
         """
-        app_display_name = "TestApp"
+        app_rename = "TestApp"
         old_appimage_path = "/path/to/TestApp.AppImage"
         new_appimage_path = "/path/to/updated/TestApp.AppImage"
 
         # Create existing desktop file
-        desktop_path = temp_dir / f"{app_display_name.lower()}.desktop"
+        desktop_path = temp_dir / f"{app_rename.lower()}.desktop"
         with open(desktop_path, "w", encoding="utf-8") as f:
             f.write(f"""[Desktop Entry]
 Type=Application
-Name={app_display_name}
+Name={app_rename}
 Exec={old_appimage_path}
 Terminal=false
 Categories={DEFAULT_CATEGORIES}
-Comment=AppImage for {app_display_name}
+Comment=AppImage for {app_rename}
 CustomKey=CustomValue
 """)
 
         # Update the desktop file
         success, message = desktop_manager.create_or_update_desktop_entry(
-            app_display_name=app_display_name, appimage_path=new_appimage_path
+            app_rename=app_rename, appimage_path=new_appimage_path
         )
 
         assert success is True
@@ -369,19 +369,19 @@ CustomKey=CustomValue
             temp_dir: Path to the temporary directory
 
         """
-        app_display_name = "TestApp"
+        app_rename = "TestApp"
         appimage_path = "/path/to/TestApp.AppImage"
 
         # Create existing desktop file
-        desktop_path = temp_dir / f"{app_display_name.lower()}.desktop"
+        desktop_path = temp_dir / f"{app_rename.lower()}.desktop"
         with open(desktop_path, "w", encoding="utf-8") as f:
             f.write(f"""[Desktop Entry]
 Type=Application
-Name={app_display_name}
+Name={app_rename}
 Exec={appimage_path}
 Terminal=false
 Categories={DEFAULT_CATEGORIES}
-Comment=AppImage for {app_display_name}
+Comment=AppImage for {app_rename}
 """)
 
         # Try to update with same values
@@ -389,7 +389,7 @@ Comment=AppImage for {app_display_name}
             desktop_manager, "write_desktop_file", wraps=desktop_manager.write_desktop_file
         ) as mock_write:
             success, message = desktop_manager.create_or_update_desktop_entry(
-                app_display_name=app_display_name, appimage_path=appimage_path
+                app_rename=app_rename, appimage_path=appimage_path
             )
 
             assert success is True
@@ -407,14 +407,14 @@ Comment=AppImage for {app_display_name}
             desktop_manager: DesktopEntryManager instance
 
         """
-        app_display_name = "TestApp"
+        app_rename = "TestApp"
         appimage_path = Path("/path/to/TestApp.AppImage")
         icon_path = Path("/path/to/icon.png")
 
         with patch.object(desktop_manager, "write_desktop_file", return_value=True) as mock_write:
             with patch.object(desktop_manager, "read_desktop_file", return_value={}):
                 success, _ = desktop_manager.create_or_update_desktop_entry(
-                    app_display_name=app_display_name,
+                    app_rename=app_rename,
                     appimage_path=appimage_path,
                     icon_path=icon_path,
                 )
@@ -439,12 +439,12 @@ Comment=AppImage for {app_display_name}
             temp_dir: Path to the temporary directory
 
         """
-        app_display_name = "TestApp"
+        app_rename = "TestApp"
         appimage_path = "/path/to/TestApp.AppImage"
 
         with patch("logging.Logger.info") as mock_info:
             success, _ = desktop_manager.create_or_update_desktop_entry(
-                app_display_name=app_display_name, appimage_path=appimage_path
+                app_rename=app_rename, appimage_path=appimage_path
             )
 
             assert success is True
@@ -461,12 +461,12 @@ Comment=AppImage for {app_display_name}
             desktop_manager: DesktopEntryManager instance
 
         """
-        app_display_name = "TestApp"
+        app_rename = "TestApp"
         appimage_path = "/path/to/TestApp.AppImage"
 
         with patch.object(desktop_manager, "write_desktop_file", return_value=False):
             success, message = desktop_manager.create_or_update_desktop_entry(
-                app_display_name=app_display_name, appimage_path=appimage_path
+                app_rename=app_rename, appimage_path=appimage_path
             )
 
             assert success is False
@@ -481,13 +481,13 @@ Comment=AppImage for {app_display_name}
             desktop_manager: DesktopEntryManager instance
 
         """
-        app_display_name = "TestApp"
+        app_rename = "TestApp"
         appimage_path = "/path/to/TestApp.AppImage"
 
         with patch.object(desktop_manager, "read_desktop_file", side_effect=OSError("Test error")):
             with patch("logging.Logger.error") as mock_error:
                 success, message = desktop_manager.create_or_update_desktop_entry(
-                    app_display_name=app_display_name, appimage_path=appimage_path
+                    app_rename=app_rename, appimage_path=appimage_path
                 )
 
                 assert success is False
@@ -503,7 +503,7 @@ Comment=AppImage for {app_display_name}
             desktop_manager: DesktopEntryManager instance
 
         """
-        app_display_name = "TestApp"
+        app_rename = "TestApp"
         appimage_path = "/path/to/TestApp.AppImage"
 
         with patch.object(
@@ -511,7 +511,7 @@ Comment=AppImage for {app_display_name}
         ):
             with patch("logging.Logger.error") as mock_error:
                 success, message = desktop_manager.create_or_update_desktop_entry(
-                    app_display_name=app_display_name, appimage_path=appimage_path
+                    app_rename=app_rename, appimage_path=appimage_path
                 )
 
                 assert success is False

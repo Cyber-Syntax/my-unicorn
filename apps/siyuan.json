@@ -1,7 +1,7 @@
 {
     "owner": "siyuan-note",
     "repo": "siyuan",
-    "app_display_name": "SiYuan",
+    "app_rename": "siyuan",
     "description": "A local-first personal knowledge management system (opt-out google telemetry, can be disabled)",
     "category": "Productivity",
     "tags": ["notes", "knowledge-base", "markdown"],

@@ -1,7 +1,7 @@
 {
     "owner": "standardnotes",
     "repo": "app",
-    "app_display_name": "Standard Notes",
+    "app_rename": "standardnotes",
     "description": "A simple and private notes app",
     "category": "Productivity",
     "tags": ["notes", "privacy", "encryption"],

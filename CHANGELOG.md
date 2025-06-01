@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.10.7-alpha
+### Fixed
+Zen Browser verification issue with the appimage. This release will not affect existing functionality, but it will fix the issue with the Zen Browser appimage verification.
+
 ## v0.10.6-alpha
 ### Changed
 Fixes the issue with asyncio event loop in the app and cleanup the failed appimage files. 

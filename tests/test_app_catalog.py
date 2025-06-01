@@ -97,7 +97,7 @@ def test_app_catalog_contains_entries() -> None:
     assert "freetube" in APP_CATALOG
 
     # Check that app entries have expected structure
-    for app_display_name, app_info in APP_CATALOG.items():
+    for app_rename, app_info in APP_CATALOG.items():
         assert isinstance(app_info, AppInfo)
         assert app_info.name
         assert app_info.description

@@ -7,7 +7,6 @@ installing AppImages from the app catalog.
 
 import sys
 from pathlib import Path
-from typing import Dict
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -31,19 +30,24 @@ def app_info_fixture() -> AppInfo:
 
     """
     return AppInfo(
-        name="Test App",
-        description="A test application",
         owner="testowner",
         repo="testrepo",
-        sha_name="test.sha256",
-        hash_type="sha256",
+        app_rename="Test App",
+        description="A test application",
         category="Test",
         tags=["test", "sample"],
+        hash_type="sha256",
+        appimage_name_template="testapp-{arch}.AppImage",
+        sha_name="test.sha256",
+        preferred_characteristic_suffixes=["x86_64", "amd64"],
+        icon_info=None,
+        icon_file_name=None,
+        icon_repo_path=None,
     )
 
 
 @pytest.fixture
-def install_test_data() -> Dict[str, str]:
+def install_test_data() -> dict[str, str]:
     """Provide common test data for install app command tests.
 
     Returns:
@@ -65,7 +69,7 @@ def install_test_data() -> Dict[str, str]:
 
 @pytest.fixture
 def mocked_app_config(
-    monkeypatch: pytest.MonkeyPatch, install_test_data: Dict[str, str]
+    monkeypatch: pytest.MonkeyPatch, install_test_data: dict[str, str]
 ) -> MagicMock:
     """Mock the AppConfigManager class.
 
@@ -94,7 +98,7 @@ def mocked_app_config(
 
 
 @pytest.fixture
-def mocked_api(monkeypatch: pytest.MonkeyPatch, install_test_data: Dict[str, str]) -> MagicMock:
+def mocked_api(monkeypatch: pytest.MonkeyPatch, install_test_data: dict[str, str]) -> MagicMock:
     """Mock the GitHubAPI class.
 
     Args:
@@ -116,6 +120,7 @@ def mocked_api(monkeypatch: pytest.MonkeyPatch, install_test_data: Dict[str, str
     mock.arch_keyword = None
     mock.appimage_url = install_test_data["appimage_url"]
     mock.get_response.return_value = (True, "Success")  # Success response
+    mock.check_latest_version.return_value = (True, "Success")  # Success response for version check
 
     api_class_mock = MagicMock(return_value=mock)
     monkeypatch.setattr("src.commands.install_app.GitHubAPI", api_class_mock)
@@ -124,7 +129,7 @@ def mocked_api(monkeypatch: pytest.MonkeyPatch, install_test_data: Dict[str, str
 
 @pytest.fixture
 def mocked_download_manager(
-    monkeypatch: pytest.MonkeyPatch, install_test_data: Dict[str, str]
+    monkeypatch: pytest.MonkeyPatch, install_test_data: dict[str, str]
 ) -> MagicMock:
     """Mock the DownloadManager class.
 
@@ -242,7 +247,7 @@ def mocked_icon_manager(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
     """
     mock = MagicMock()
-    mock.ensure_app_icon.return_value = None
+    mock.ensure_app_icon.return_value = (True, "/tmp/icon.png")  # Success with icon path
 
     icon_manager_class_mock = MagicMock(return_value=mock)
     monkeypatch.setattr("src.commands.install_app.IconManager", icon_manager_class_mock)
@@ -252,7 +257,7 @@ def mocked_icon_manager(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 @pytest.fixture
 def mocked_app_catalog_functions(
     monkeypatch: pytest.MonkeyPatch, app_info_fixture: AppInfo
-) -> Dict[str, MagicMock]:
+) -> dict[str, MagicMock]:
     """Mock the app catalog functions.
 
     Args:
@@ -324,7 +329,7 @@ def test_install_app_direct_install(
     cmd._install_app(app_info_fixture)
 
     # Check correct flow - GitHub API initialized
-    assert mocked_api.get_response.called
+    assert mocked_api.check_latest_version.called
 
     # App config updated correctly
     assert mocked_app_config.temp_save_config.called
@@ -471,7 +476,7 @@ def test_install_app_api_failure(
 
     """
     # Set API to fail
-    mocked_api.get_response.return_value = (False, "API Error")
+    mocked_api.check_latest_version.return_value = (False, "API Error")
 
     # Setup mock inputs
     mock_input.side_effect = ["y"]  # Confirm install
@@ -481,7 +486,7 @@ def test_install_app_api_failure(
     cmd._install_app(app_info_fixture)
 
     # API call should occur but fail
-    assert mocked_api.get_response.called
+    assert mocked_api.check_latest_version.called
 
     # Subsequent operations should not occur after API failure
     assert not mocked_download_manager.download.called

@@ -1,7 +1,7 @@
 {
     "owner": "pbek",
     "repo": "QOwnNotes",
-    "app_display_name": "QOwnNotes",
+    "app_rename": "QOwnNotes",
     "description": "Plain-text file notepad with markdown support and ownCloud & nextcloud and git integration",
     "category": "Productivity",
     "tags": ["notes", "markdown", "owncloud"],

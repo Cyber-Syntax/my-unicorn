@@ -8,7 +8,7 @@ application icons from GitHub repositories or direct URLs using app definitions.
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import requests
 
@@ -25,8 +25,8 @@ class IconManager:
         """Initialize the icon manager."""
 
     def find_icon(
-        self, owner: str, repo: str, headers: Optional[Dict[str, str]] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, owner: str, repo: str, headers: dict[str, str] | None = None
+    ) -> dict[str, Any] | None:
         """Find an icon for a given repository.
 
         First tries to use the repository path from app definition,
@@ -113,8 +113,8 @@ class IconManager:
         return "image/png"  # Default
 
     def _check_icon_path(
-        self, owner: str, repo: str, path: str, headers: Dict[str, str]
-    ) -> Optional[Dict[str, Any]]:
+        self, owner: str, repo: str, path: str, headers: dict[str, str]
+    ) -> dict[str, Any] | None:
         """Check if an icon exists at a specific path in the repository.
 
         Args:
@@ -164,7 +164,7 @@ class IconManager:
             logger.debug(f"Error checking icon path {path}: {e!s}")
             return None
 
-    def _format_icon_info(self, content: Dict[str, Any]) -> Dict[str, Any]:
+    def _format_icon_info(self, content: dict[str, Any]) -> dict[str, Any]:
         """Format icon file information.
 
         Args:
@@ -190,7 +190,7 @@ class IconManager:
             "size": content.get("size", 0),
         }
 
-    def download_icon(self, icon_info: Dict[str, Any], destination_dir: str) -> Tuple[bool, str]:
+    def download_icon(self, icon_info: dict[str, Any], destination_dir: str) -> tuple[bool, str]:
         """Download an icon file to the specified destination.
 
         Args:
@@ -274,9 +274,9 @@ class IconManager:
         self,
         owner: str,
         repo: str,
-        app_display_name: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Tuple[bool, Optional[str]]:
+        app_rename: str | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[bool, str | None]:
         """Ensure an icon exists for the specified app, downloading if necessary.
 
         First checks if an icon already exists in expected locations.
@@ -285,7 +285,7 @@ class IconManager:
         Args:
             owner: Repository owner
             repo: Repository name (original case preserved)
-            app_display_name: Optional app identifier for naming (defaults to lookup or repo name)
+            app_rename: Optional app identifier for naming (defaults to lookup or repo name)
             headers: Optional authentication headers
 
         Returns:
@@ -293,30 +293,30 @@ class IconManager:
 
         """
         try:
-            # If app_display_name not provided, try to load from app definition
-            if app_display_name is None:
+            # If app_rename not provided, try to load from app definition
+            if app_rename is None:
                 app_info = load_app_definition(repo.lower())
-                if app_info and app_info.app_display_name:
-                    app_display_name = app_info.app_display_name
-                    logger.debug(f"Using app_display_name from JSON: {app_display_name}")
+                if app_info and app_info.app_rename:
+                    app_rename = app_info.app_rename
+                    logger.debug(f"Using app_rename from JSON: {app_rename}")
                 else:
                     # Use repo name as fallback
-                    app_display_name = repo
-                    logger.debug(f"Using repo name as app_display_name: {app_display_name}")
+                    app_rename = repo
+                    logger.debug(f"Using repo name as app_rename: {app_rename}")
 
             logger.info(
-                f"Using app_display_name '{app_display_name}' for icon folder (owner={owner}, repo={repo})"
+                f"Using app_rename '{app_rename}' for icon folder (owner={owner}, repo={repo})"
             )
 
             # Check if icon already exists
             icon_base_dir = Path("~/.local/share/icons/myunicorn").expanduser()
 
             # Always use lowercase app name for consistency in storage
-            app_name_lower = app_display_name.lower()
+            app_name_lower = app_rename.lower()
             app_icon_dir = icon_base_dir / app_name_lower
 
             # For backward compatibility, also check the original case directory
-            app_icon_dir_original = icon_base_dir / app_display_name
+            app_icon_dir_original = icon_base_dir / app_rename
 
             # Get the preferred filename from app definition
             app_info = load_app_definition(repo.lower())
@@ -356,7 +356,7 @@ class IconManager:
             if not icon_info:
                 message = (
                     f"No icon configuration found for {owner}/{repo}. "
-                    f"Desktop entry will use the app name ('{app_display_name}') which may work with "
+                    f"Desktop entry will use the app name ('{app_rename}') which may work with "
                     f"system icon themes like Papirus or Adwaita."
                 )
                 logger.info(message)
@@ -378,13 +378,13 @@ class IconManager:
             logger.error(f"Failed to ensure app icon: {e!s}")
             return False, f"Error: {e!s}"
 
-    def get_icon_path(self, app_display_name: str, repo: Optional[str] = None) -> Optional[str]:
+    def get_icon_path(self, app_rename: str, repo: str | None = None) -> str | None:
         """Get the path to an existing icon for an app.
 
         Checks common locations for existing icons before attempting to download.
 
         Args:
-            app_display_name: The display name of the app
+            app_rename: The display name of the app
             repo: Optional repository name (lowercase) to load app definition
 
         Returns:
@@ -395,11 +395,11 @@ class IconManager:
         icon_base_dir = Path("~/.local/share/icons/myunicorn").expanduser()
 
         # Try with lowercase app name for consistency
-        app_name_lower = app_display_name.lower()
+        app_name_lower = app_rename.lower()
         app_icon_dir_lower = icon_base_dir / app_name_lower
 
         # For backward compatibility, also check the original case directory
-        app_icon_dir_original = icon_base_dir / app_display_name
+        app_icon_dir_original = icon_base_dir / app_rename
 
         # Check if we can get preferred filename from app definition
         preferred_filename = None
@@ -432,5 +432,5 @@ class IconManager:
                 logger.debug(f"Found existing icon at {icon_path}")
                 return str(icon_path)
 
-        logger.debug(f"No existing icon found for {app_display_name}")
+        logger.debug(f"No existing icon found for {app_rename}")
         return None

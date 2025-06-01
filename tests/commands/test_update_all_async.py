@@ -52,7 +52,6 @@ def update_command():
 
     """
     cmd = UpdateAsyncCommand()
-    cmd.console = MagicMock()
     cmd.max_concurrent_updates = 2
     return cmd
 
@@ -91,13 +90,6 @@ def mock_app_configs() -> List[Dict[str, Any]]:
             "latest": "4.1.0",
         },
     ]
-
-
-def test_init(update_command: UpdateAsyncCommand) -> None:
-    """Test initialization of the command."""
-    assert update_command.max_concurrent_updates == 2
-    assert update_command.semaphore is None
-
 
 @pytest.mark.parametrize(
     "remaining,limit,expected_proceed,expected_count",
@@ -159,11 +151,14 @@ async def test_update_single_app_async_success(monkeypatch, update_command):
 
     # Call the method
     result = await update_command._update_single_app_async(
-        app_data, is_batch=True, app_index=1, total_apps=1
+        app_data, app_index=1, total_apps=1
     )
 
-    # Verify success
-    assert result is True
+    # Verify success - should return a tuple (bool, dict)
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    assert result[0] is True  # Success boolean
+    assert isinstance(result[1], dict)  # Result dictionary
 
 
 @pytest.mark.asyncio
@@ -182,11 +177,14 @@ async def test_update_single_app_async_failure(monkeypatch, update_command):
 
     # Call the method
     result = await update_command._update_single_app_async(
-        app_data, is_batch=True, app_index=1, total_apps=4
+        app_data, app_index=1, total_apps=4
     )
 
-    # Verify failure
-    assert result is False
+    # Verify failure - should return a tuple (bool, dict)
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    assert result[0] is False  # Failure boolean
+    assert isinstance(result[1], dict)  # Result dictionary
 
 
 @pytest.mark.asyncio
@@ -209,50 +207,40 @@ async def test_update_single_app_async_exception(monkeypatch, update_command):
 
     # Call the method and expect it to handle the exception
     result = await update_command._update_single_app_async(
-        app_data, is_batch=True, app_index=1, total_apps=4
+        app_data, app_index=1, total_apps=4
     )
 
-    # Verify failure due to exception
-    assert result is False
+    # Verify failure due to exception - should return a tuple (bool, dict)
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    assert result[0] is False  # Failure boolean
+    assert isinstance(result[1], dict)  # Result dictionary
 
 
 @pytest.mark.asyncio
 async def test_update_apps_async(monkeypatch, update_command, mock_app_configs):
     """Test the async update of multiple apps."""
-    # Setup mocks for async operations
-    mock_semaphore = AsyncMock()
-    update_command.semaphore = mock_semaphore
-
     # Mock the single app update to return success/failure based on app index
-    async def mock_update_single(app_data, is_batch, app_index, total_apps):
+    async def mock_update_single(app_data, app_index, total_apps):
         # Make app1 and app3 succeed, app2 and app4 fail
-        return app_index % 2 == 1  # Odd indices succeed
+        if app_index % 2 == 1:  # Odd indices succeed
+            return True, {"status": "success", "message": f"Updated {app_data['name']}", "elapsed": 1.0}
+        else:
+            return False, {"status": "failed", "message": f"Failed to update {app_data['name']}", "elapsed": 1.0}
 
     # Apply mocks
     monkeypatch.setattr(update_command, "_update_single_app_async", mock_update_single)
-    monkeypatch.setattr(update_command, "_display_rate_limit_info", MagicMock())
 
-    # Create a mock for asyncio.gather to return predetermined results
-    mock_results = [
-        (True, {"status": "success", "message": "Updated app1", "elapsed": 1.0}),
-        (False, {"status": "failed", "message": "Failed to update app2", "elapsed": 1.0}),
-        (True, {"status": "success", "message": "Updated app3", "elapsed": 1.0}),
-        (False, {"status": "failed", "message": "Failed to update app4", "elapsed": 1.0}),
-    ]
+    # Call the method and await the result
+    success_count, failure_count, results = await update_command._update_apps_async(mock_app_configs)
 
-    # Setup mock gather
-    async def mock_gather(*args):
-        return mock_results
+    # Verify results
+    assert success_count == 2  # app1 and app3 (indices 1 and 3)
+    assert failure_count == 2  # app2 and app4 (indices 2 and 4)
+    assert len(results) == 4
 
-    # Setup mock event loop
-    mock_loop = MagicMock()
-    mock_loop.run_until_complete = lambda x: asyncio.run(mock_gather())
-
-    # Apply mocks
-    monkeypatch.setattr(asyncio, "get_event_loop", lambda: mock_loop)
-
-    # Call the method
-    update_command._update_apps_async(mock_app_configs)
-
-    # Verify rate limits were displayed
-    update_command._display_rate_limit_info.assert_called_once()
+    # Check specific results
+    assert results["app1"]["status"] == "success"
+    assert results["app2"]["status"] == "failed"
+    assert results["app3"]["status"] == "success"
+    assert results["app4"]["status"] == "failed"

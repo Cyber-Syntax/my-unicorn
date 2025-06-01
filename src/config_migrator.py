@@ -5,7 +5,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from src.app_config import AppConfigManager
 from src.global_config import GlobalConfigManager
@@ -19,7 +19,7 @@ class ConfigMigrator:
     @staticmethod
     def check_and_migrate_global_config(
         delete_unused: bool = False, require_confirmation: bool = True
-    ) -> Tuple[bool, List[str], List[str]]:
+    ) -> tuple[bool, list[str], list[str]]:
         """Check global configuration for missing or unused keys and migrate if needed.
 
         Args:
@@ -157,7 +157,7 @@ class ConfigMigrator:
 
     @staticmethod
     def _get_confirmation_for_app(
-        app_name: str, unused_keys: List[str], app_dict: Dict[str, Any]
+        app_name: str, unused_keys: list[str], app_dict: dict[str, Any]
     ) -> bool:
         """Get user confirmation for deleting unused keys for a specific app.
 
@@ -184,7 +184,7 @@ class ConfigMigrator:
     @staticmethod
     def check_and_migrate_app_configs(
         delete_unused: bool = False, require_confirmation: bool = True
-    ) -> Tuple[int, Dict[str, List[str]], Dict[str, List[str]]]:
+    ) -> tuple[int, dict[str, list[str]], dict[str, list[str]]]:
         """Check all app configuration files for missing or unused keys and migrate if needed.
 
         Args:
@@ -235,17 +235,15 @@ class ConfigMigrator:
                     user_app_dict = json.loads(file_content)
                     logger.debug(f"App '{app_name}' config keys: {list(user_app_dict.keys())}")
 
-                    # Special handling for app_display_name being null
+                    # Special handling for app_rename being null
                     if (
-                        "app_display_name" in user_app_dict
-                        and user_app_dict["app_display_name"] is None
+                        "app_rename" in user_app_dict
+                        and user_app_dict["app_rename"] is None
                         and "repo" in user_app_dict
                         and user_app_dict["repo"]
                     ):
-                        logger.info(
-                            f"Fixing null app_display_name for app '{app_name}' using repo value"
-                        )
-                        user_app_dict["app_display_name"] = user_app_dict["repo"]
+                        logger.info(f"Fixing null app_rename for app '{app_name}' using repo value")
+                        user_app_dict["app_rename"] = user_app_dict["repo"]
                         has_changes = True  # Mark that this config needs to be saved
                     else:
                         has_changes = False
@@ -323,7 +321,7 @@ class ConfigMigrator:
     @staticmethod
     def run_full_migration(
         delete_unused: bool = False, require_confirmation: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run a complete migration of global and app configurations.
 
         Args:
