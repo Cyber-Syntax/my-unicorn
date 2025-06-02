@@ -211,6 +211,7 @@ class InstallAppCommand(Command):
                             sha_url=api.sha_url or "",
                             appimage_name=api.appimage_name,
                             hash_type=api.hash_type or "sha256",
+                            asset_digest=api.asset_digest,
                         )
 
                         # Set the full path to the downloaded file

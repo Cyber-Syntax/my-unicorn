@@ -22,6 +22,7 @@ SUPPORTED_HASH_TYPES = [
     "sha512",
     "no_hash",
     "extracted_checksum",
+    "asset_digest",  # Added digest-based verification
 ]  # Removed "from_release_description"
 
 
@@ -39,6 +40,7 @@ class VerificationManager:
     hash_type: str = "sha256"
     appimage_path: str | None = None  # Full path to the AppImage file for verification
     direct_expected_hash: str | None = None  # For hashes extracted from release body
+    asset_digest: str | None = None  # For GitHub API asset digest verification
 
     def __post_init__(self) -> None:
         """Initialize and validate the verification manager."""
@@ -88,6 +90,7 @@ class VerificationManager:
         # "extracted_checksum" can now mean direct hash or legacy path, both might have non-standard hash_type initially
         if (
             self.hash_type == "no_hash"
+            or self.hash_type == "asset_digest"
             or self.sha_name == "extracted_checksum"
             or self.sha_name == "no_sha_file"
         ):
@@ -107,6 +110,10 @@ class VerificationManager:
 
         """
         try:
+            # Handle asset digest verification first
+            if self.hash_type == "asset_digest":
+                return self._verify_with_asset_digest(cleanup_on_failure)
+
             # Handle "extracted_checksum":
             # 1. If direct_expected_hash is provided, use it.
             # 2. Else, fall back to the legacy path (verify_with_release_checksums).
@@ -238,6 +245,76 @@ class VerificationManager:
         except Exception as e:
             logging.error(f"Unexpected error during verification: {e!s}")
             if cleanup_on_failure and self.appimage_path:
+                self._cleanup_failed_file(self.appimage_path)
+            return False
+
+    def _verify_with_asset_digest(self, cleanup_on_failure: bool = False) -> bool:
+        """Verify AppImage using GitHub API asset digest.
+
+        Args:
+            cleanup_on_failure: Whether to cleanup on failure
+
+        Returns:
+            bool: True if verification passes, False otherwise
+        """
+        if not self.asset_digest:
+            logging.error("Asset digest not provided for digest-based verification")
+            return False
+
+        if not self.appimage_path:
+            logging.error(f"AppImage path not set for digest verification of {self.appimage_name}")
+            return False
+
+        if not os.path.exists(self.appimage_path):
+            logging.error(f"AppImage file not found for digest verification: {self.appimage_path}")
+            if cleanup_on_failure:
+                self._cleanup_failed_file(self.appimage_path)
+            return False
+
+        # Parse digest format: "sha256:hash_value" or "sha512:hash_value"
+        try:
+            digest_type, digest_hash = self.asset_digest.split(":", 1)
+        except ValueError:
+            logging.error(f"Invalid digest format: {self.asset_digest}")
+            if cleanup_on_failure:
+                self._cleanup_failed_file(self.appimage_path)
+            return False
+
+        # Verify digest type is supported
+        if digest_type not in hashlib.algorithms_available:
+            logging.error(f"Digest type {digest_type} not available in this system")
+            if cleanup_on_failure:
+                self._cleanup_failed_file(self.appimage_path)
+            return False
+
+        # Calculate hash and compare
+        logging.info(f"Verifying {self.appimage_name} using asset digest ({digest_type})")
+        
+        try:
+            hash_func = hashlib.new(digest_type)
+            with open(self.appimage_path, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_func.update(chunk)
+            
+            actual_hash = hash_func.hexdigest().lower()
+            expected_hash = digest_hash.lower()
+            
+            self._log_comparison(actual_hash, expected_hash)
+            
+            if actual_hash == expected_hash:
+                print(f"{STATUS_SUCCESS}Digest verification passed for {self.appimage_name}")
+                logging.info(f"Digest verification successful for {self.appimage_name}")
+                return True
+            else:
+                print(f"{STATUS_FAIL}Digest verification failed for {self.appimage_name}")
+                logging.error(f"Digest verification failed for {self.appimage_name}")
+                if cleanup_on_failure:
+                    self._cleanup_failed_file(self.appimage_path)
+                return False
+                
+        except Exception as e:
+            logging.error(f"Error during digest verification: {e}")
+            if cleanup_on_failure:
                 self._cleanup_failed_file(self.appimage_path)
             return False
 

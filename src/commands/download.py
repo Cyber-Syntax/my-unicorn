@@ -82,6 +82,7 @@ class DownloadCommand(Command):
                         sha_url=api.sha_url,
                         appimage_name=api.appimage_name,  # Keep the original filename for logging
                         hash_type=api.hash_type,
+                        asset_digest=api.asset_digest,
                     )
 
                     # Set the full path to the downloaded file

@@ -491,5 +491,6 @@ class DownloadManager:
             appimage_path=downloaded_file,
             hash_type=self.github_api.hash_type if self.github_api.hash_type is not None else "sha256",
             direct_expected_hash=direct_hash_to_pass,
+            asset_digest=self.github_api.asset_digest,
         )
         return verifier.verify_appimage(cleanup_on_failure=True)
