@@ -521,6 +521,7 @@ class BaseUpdateCommand(Command):
             sha_url=github_api.sha_url,
             appimage_name=str(github_api.appimage_name),
             hash_type=github_api.hash_type or "sha256",
+            asset_digest=github_api.asset_digest,
         )
 
         # Set downloaded file path for verification

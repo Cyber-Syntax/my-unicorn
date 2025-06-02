@@ -114,6 +114,7 @@ class ReleaseInfo:
     is_prerelease: bool = False
     published_at: Optional[str] = None
     extracted_hash_from_body: Optional[str] = None # For hash extracted from release body
+    asset_digest: Optional[str] = None # For GitHub API asset digest verification
     raw_assets: List[Dict[str, Any]] = field(default_factory=list) # Added for storing all assets
 
     @classmethod
@@ -138,6 +139,7 @@ class ReleaseInfo:
             sha_url=asset_info.get("sha_url"),
             hash_type=asset_info.get("hash_type"),
             extracted_hash_from_body=asset_info.get("extracted_hash_from_body"), # Get new field
+            asset_digest=asset_info.get("asset_digest"), # Get asset digest field
             arch_keyword=asset_info.get("arch_keyword"),
             release_notes=release_data.get("body", ""),
             release_url=release_data.get("html_url", ""),

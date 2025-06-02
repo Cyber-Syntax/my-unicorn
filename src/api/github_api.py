@@ -44,6 +44,7 @@ class GitHubAPI:
         self.appimage_url: Optional[str] = None
         self.sha_url: Optional[str] = None
         self.extracted_hash_from_body: Optional[str] = None  # To store hash from release body
+        self.asset_digest: Optional[str] = None  # To store GitHub API asset digest
         self._headers = GitHubAuthManager.get_auth_headers()
         self._icon_manager = IconManager()
         self._release_fetcher = ReleaseManager(owner, repo)
@@ -205,11 +206,13 @@ class GitHubAPI:
             self.sha_url = sha_mgr.sha_url
             self.hash_type = sha_mgr.hash_type
             self.extracted_hash_from_body = sha_mgr.extracted_hash_from_body
+            self.asset_digest = sha_mgr.asset_digest
         else:
             self.sha_name = None
             self.sha_url = None
             self.hash_type = None
             self.extracted_hash_from_body = None
+            self.asset_digest = None
 
         asset_info_dict = {
             "owner": self.owner,
@@ -221,6 +224,7 @@ class GitHubAPI:
             "sha_url": self.sha_url,
             "hash_type": self.hash_type,
             "extracted_hash_from_body": self.extracted_hash_from_body,
+            "asset_digest": self.asset_digest,
             "arch_keyword": self._arch_keyword,
         }
 
