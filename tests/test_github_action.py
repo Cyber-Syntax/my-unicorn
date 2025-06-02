@@ -275,21 +275,21 @@ class GitHubActionTester:
         # Fallback: use part before @
         return email.split("@")[0]
 
-    def _get_commits_with_usernames(self, previous_tag: str) -> List[str]:
-        """Get commits with GitHub usernames.
+    def _get_commits_with_usernames(self, previous_tag: str) -> Dict[str, List[str]]:
+        """Get commits with GitHub usernames, categorized by type.
 
         Args:
             previous_tag: Previous git tag for range calculation.
 
         Returns:
-            List of formatted commit strings with usernames.
+            Dictionary with categorized commit lists.
 
         """
         # Determine git log range
         git_range = f"{previous_tag}..HEAD" if previous_tag else ""
 
-        # Get commit data
-        cmd = ["git", "log", "--pretty=format:%H|%s|%ae"]
+        # Get commit data with --no-merges to avoid duplicates
+        cmd = ["git", "log", "--pretty=format:%H|%ae|%s", "--no-merges"]
         if git_range:
             cmd.append(git_range)
 
@@ -300,24 +300,64 @@ class GitHubActionTester:
             commit_lines = result.stdout.strip().split("\n")
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             logger.error("Failed to get git commit data: %s", e)
-            return []
+            return {"features": [], "bugfixes": [], "other": []}
 
-        commits = []
-        conventional_pattern = r"\|(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)"
+        # Initialize categorized lists
+        features = []
+        bugfixes = []
+        other_commits = []
+
+        # Pattern for conventional commits
+        conventional_pattern = re.compile(r"^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?:")
 
         for line in commit_lines:
             if not line.strip():
                 continue
 
-            if re.search(conventional_pattern, line):
-                parts = line.split("|", 2)
-                if len(parts) == EXPECTED_PARTS:
-                    commit_hash, message, email = parts
-                    username = self._get_github_username(email, commit_hash)
-                    commits.append(f"  - {message} (@{username})")
+            parts = line.split("|", 2)
+            if len(parts) == EXPECTED_PARTS:
+                commit_hash, email, subject = parts
+                
+                # Only process conventional commits
+                if not conventional_pattern.match(subject):
+                    continue
+                
+                username = self._get_github_username(email, commit_hash)
+                
+                # Get full commit message to check for PR references
+                try:
+                    pr_result = subprocess.run(
+                        ["git", "show", "-s", "--format=%B", commit_hash],
+                        capture_output=True, text=True, check=True, timeout=API_TIMEOUT
+                    )
+                    full_message = pr_result.stdout.strip()
+                    
+                    # Check for PR reference
+                    pr_match = re.search(r"#(\d+)", full_message)
+                    pr_num = f" (#{pr_match.group(1)})" if pr_match else ""
+                    
+                except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                    pr_num = ""
+                
+                formatted_commit = f"  - {subject}{pr_num} (@{username})"
+                
+                # Categorize based on conventional commit type
+                if re.match(r"^feat(\(.+\))?:", subject):
+                    features.append(formatted_commit)
+                elif re.match(r"^fix(\(.+\))?:", subject):
+                    bugfixes.append(formatted_commit)
+                else:
+                    other_commits.append(formatted_commit)
 
-        logger.info("Found %d conventional commits", len(commits))
-        return commits
+        total_commits = len(features) + len(bugfixes) + len(other_commits)
+        logger.info("Found %d conventional commits (Features: %d, Bug Fixes: %d, Other: %d)", 
+                   total_commits, len(features), len(bugfixes), len(other_commits))
+        
+        return {
+            "features": features,
+            "bugfixes": bugfixes,
+            "other": other_commits
+        }
 
     def _create_release_notes(self) -> Tuple[str, str]:
         """Create full release notes combining CHANGELOG and commits.
@@ -329,12 +369,21 @@ class GitHubActionTester:
         version = self._extract_version_from_changelog()
         changelog_notes = self._extract_notes_from_changelog(version)
         previous_tag = self._get_previous_tag()
-        commits = self._get_commits_with_usernames(previous_tag)
+        commits_dict = self._get_commits_with_usernames(previous_tag)
+
+        # Build categorized commits section
+        commits_section = ""
+        if commits_dict["features"]:
+            commits_section += "#### 🚀 Features\n" + "\n".join(commits_dict["features"]) + "\n\n"
+        if commits_dict["bugfixes"]:
+            commits_section += "#### 🐛 Bug Fixes\n" + "\n".join(commits_dict["bugfixes"]) + "\n\n"
+        if commits_dict["other"]:
+            commits_section += "#### 📝 Other Commits\n" + "\n".join(commits_dict["other"]) + "\n\n"
 
         # Combine notes
         full_notes = changelog_notes
-        if commits:
-            full_notes += "\n\n### Commits\n" + "\n".join(commits)
+        if commits_section:
+            full_notes += "\n\n### Commits\n" + commits_section.rstrip()
 
         return version, full_notes
 
@@ -361,8 +410,9 @@ class GitHubActionTester:
         logger.info("Previous tag: %s", previous_tag or "None")
 
         # Test commit extraction
-        commits = self._get_commits_with_usernames(previous_tag)
-        logger.info("Found %d conventional commits", len(commits))
+        commits_dict = self._get_commits_with_usernames(previous_tag)
+        total_commits = len(commits_dict["features"]) + len(commits_dict["bugfixes"]) + len(commits_dict["other"])
+        logger.info("Found %d conventional commits", total_commits)
 
         # Test full release notes
         version, full_notes = self._create_release_notes()
@@ -371,7 +421,7 @@ class GitHubActionTester:
             "version": version,
             "previous_tag": previous_tag,
             "changelog_notes": changelog_notes,
-            "commits": commits,
+            "commits": commits_dict,
             "full_notes": full_notes,
         }
 
@@ -406,7 +456,11 @@ def _display_results_summary(results: Dict[str, Any]) -> None:
     """
     logger.info("Test completed successfully!")
     logger.info("Version: %s", results["version"])
-    logger.info("Commits found: %d", len(results["commits"]))
+    
+    commits = results["commits"]
+    total_commits = len(commits["features"]) + len(commits["bugfixes"]) + len(commits["other"])
+    logger.info("Commits found: %d (Features: %d, Bug Fixes: %d, Other: %d)", 
+               total_commits, len(commits["features"]), len(commits["bugfixes"]), len(commits["other"]))
 
     # Show preview
     logger.info("Release Notes Preview:")

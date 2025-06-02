@@ -71,17 +71,22 @@ jobs:
             fi
           }
 
-          # Get ALL conventional commits (ignore PR reference requirement)
+          # Get ALL conventional commits, excluding merge commits to avoid duplicates
           if [ -z "$PREVIOUS_TAG" ]; then
-            COMMIT_DATA=$(git log --pretty=format:"%H|%ae" --grep="^\(feat\|fix\|docs\|style\|refactor\|perf\|test\|build\|ci\|chore\|revert\)")
+            COMMIT_DATA=$(git log --pretty=format:"%H|%ae|%s" --no-merges --grep="^\(feat\|fix\|docs\|style\|refactor\|perf\|test\|build\|ci\|chore\|revert\)")
           else
-            COMMIT_DATA=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"%H|%ae" --grep="^\(feat\|fix\|docs\|style\|refactor\|perf\|test\|build\|ci\|chore\|revert\)")
+            COMMIT_DATA=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"%H|%ae|%s" --no-merges --grep="^\(feat\|fix\|docs\|style\|refactor\|perf\|test\|build\|ci\|chore\|revert\)")
           fi
 
-          # Process ALL matching commits
-          COMMITS=""
-          while IFS='|' read -r hash email; do
+          # Initialize categorized commit arrays
+          FEATURES=""
+          BUGFIXES=""
+          OTHER_COMMITS=""
+
+          # Process ALL matching commits and categorize them
+          while IFS='|' read -r hash email subject; do
             [ -z "$hash" ] && continue
+            
             # Get full commit message for PR detection
             message=$(git show -s --format=%B $hash)
 
@@ -90,18 +95,39 @@ jobs:
 
             # Check for ANY PR reference (#number)
             if [[ "$message" =~ \#([0-9]+) ]]; then
-              pr_num="(#${BASH_REMATCH[1]})"
+              pr_num=" (#${BASH_REMATCH[1]})"
             else
               pr_num=""
             fi
 
-            # Extract first line of commit message
-            subject=$(echo "$message" | head -1)
-            COMMITS="${COMMITS}  - ${subject} ${pr_num} (@$username)\n"
+            # Categorize based on conventional commit type
+            if [[ "$subject" =~ ^feat(\(.+\))?:* ]]; then
+              FEATURES="${FEATURES}  - ${subject}${pr_num} (@$username)\n"
+            elif [[ "$subject" =~ ^fix(\(.+\))?:* ]]; then
+              BUGFIXES="${BUGFIXES}  - ${subject}${pr_num} (@$username)\n"
+            else
+              OTHER_COMMITS="${OTHER_COMMITS}  - ${subject}${pr_num} (@$username)\n"
+            fi
           done <<< "$COMMIT_DATA"
 
-          # Combine CHANGELOG notes with commit messages
-          FULL_NOTES="${NOTES}\n\n### Commits\n${COMMITS}"
+          # Build categorized commits section
+          COMMITS=""
+          if [ -n "$FEATURES" ]; then
+            COMMITS="${COMMITS}#### 🚀 Features\n${FEATURES}\n"
+          fi
+          if [ -n "$BUGFIXES" ]; then
+            COMMITS="${COMMITS}#### 🐛 Bug Fixes\n${BUGFIXES}\n"
+          fi
+          if [ -n "$OTHER_COMMITS" ]; then
+            COMMITS="${COMMITS}#### 📝 Other Commits\n${OTHER_COMMITS}\n"
+          fi
+
+          # Combine CHANGELOG notes with categorized commit messages
+          if [ -n "$COMMITS" ]; then
+            FULL_NOTES="${NOTES}\n\n### Commits\n${COMMITS}"
+          else
+            FULL_NOTES="${NOTES}"
+          fi
 
           # Save notes to output with correct GitHub multiline syntax
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
