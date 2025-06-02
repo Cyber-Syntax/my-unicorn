@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.10.8-alpha
+### Changed
+Implements GitHub API asset digest-based verification as the highest priority verification method, falling back to existing SHA file and release body extraction methods when digest is unavailable.
+
+This release will not affect existing functionality, but it will fix the issue with the Zen Browser appimage verification.
+
+Also, QOwnNotes migrate the verification method to the new GitHub API asset digest-based verification method and I can confirm that is also working for the QOwnNotes appimage.
+
 ## v0.10.7-alpha
 ### Fixed
 Zen Browser verification issue with the appimage. This release will not affect existing functionality, but it will fix the issue with the Zen Browser appimage verification.
