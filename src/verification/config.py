@@ -1,0 +1,147 @@
+"""Configuration and validation for AppImage verification.
+
+This module handles the configuration and validation logic for verification
+parameters, including path resolution and hash type validation.
+"""
+
+import hashlib
+import logging
+import os
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Self
+
+
+# Supported hash types
+SUPPORTED_HASH_TYPES = [
+    "sha256",
+    "sha512",
+    "no_hash",
+    "extracted_checksum",
+    "asset_digest",
+]
+
+
+@dataclass
+class VerificationConfig:
+    """Configuration for AppImage verification operations.
+    
+    This class handles initialization and validation of verification parameters,
+    including path resolution and hash type validation.
+    """
+    
+    sha_name: str | None = None
+    sha_url: str | None = None
+    appimage_name: str | None = None
+    hash_type: str = "sha256"
+    appimage_path: str | None = None
+    direct_expected_hash: str | None = None
+    asset_digest: str | None = None
+    use_asset_digest: bool = False
+
+    def __post_init__(self) -> None:
+        """Initialize and validate the configuration."""
+        self._resolve_appimage_path()
+        self._resolve_sha_path()
+        self._normalize_hash_type()
+        self._set_asset_digest_flag()
+        self._validate_hash_type()
+
+    def _resolve_appimage_path(self) -> None:
+        """Resolve the AppImage path if not explicitly set."""
+        if self.appimage_path is None and self.appimage_name is not None:
+            from src.global_config import GlobalConfigManager
+            
+            downloads_dir = GlobalConfigManager().expanded_app_download_path
+            self.appimage_path = str(Path(downloads_dir) / self.appimage_name)
+
+    def _resolve_sha_path(self) -> None:
+        """Resolve the SHA file path and make it app-specific."""
+        if not self.sha_name or os.path.isabs(self.sha_name):
+            return
+            
+        # Skip resolution for special values
+        if self.sha_name in ("extracted_checksum", "asset_digest"):
+            return
+            
+        from src.global_config import GlobalConfigManager
+        
+        downloads_dir = GlobalConfigManager().expanded_app_download_path
+        sha_basename = Path(self.sha_name).name
+        sha_stem = Path(self.sha_name).stem
+        sha_suffix = Path(self.sha_name).suffix
+        app_specific_sha_name = f"{self.appimage_name}_{sha_stem}{sha_suffix}"
+        self.sha_name = str(Path(downloads_dir) / app_specific_sha_name)
+
+    def _normalize_hash_type(self) -> None:
+        """Normalize hash type to lowercase."""
+        if self.hash_type:
+            self.hash_type = self.hash_type.lower()
+
+    def _set_asset_digest_flag(self) -> None:
+        """Set asset digest flag if hash type is asset_digest."""
+        if self.hash_type == "asset_digest":
+            self.use_asset_digest = True
+
+    def _validate_hash_type(self) -> None:
+        """Validate that the hash type is supported and available."""
+        if self.hash_type not in SUPPORTED_HASH_TYPES:
+            raise ValueError(
+                f"Unsupported hash type: {self.hash_type}. "
+                f"Supported types are: {', '.join(SUPPORTED_HASH_TYPES)}"
+            )
+
+        # Skip hashlib validation for special verification types
+        if self._is_special_hash_type():
+            return
+
+        if self.hash_type not in hashlib.algorithms_available:
+            raise ValueError(
+                f"Hash type {self.hash_type} not available in this system"
+            )
+
+    def _is_special_hash_type(self) -> bool:
+        """Check if this is a special hash type that doesn't use hashlib."""
+        return (
+            self.hash_type == "no_hash"
+            or self.hash_type == "asset_digest"
+            or self.sha_name == "extracted_checksum"
+            or self.sha_name == "no_sha_file"
+        )
+
+    def set_appimage_path(self, full_path: str) -> None:
+        """Set the full path to the AppImage file for verification.
+
+        Args:
+            full_path: The complete path to the AppImage file
+        """
+        self.appimage_path = full_path
+        logging.info(f"Set AppImage path for verification: {full_path}")
+
+    def is_verification_skipped(self) -> bool:
+        """Check if verification should be skipped."""
+        return (
+            self.hash_type == "no_hash"
+            or not self.sha_name
+            or self.sha_name == self.appimage_name
+        )
+
+    def is_asset_digest_verification(self) -> bool:
+        """Check if this is asset digest verification."""
+        return self.hash_type == "asset_digest" or self.use_asset_digest
+
+    def is_extracted_checksum_verification(self) -> bool:
+        """Check if this is extracted checksum verification."""
+        return self.sha_name == "extracted_checksum"
+
+    def has_direct_hash(self) -> bool:
+        """Check if a direct hash is available for verification."""
+        return self.direct_expected_hash is not None
+
+    def validate_for_verification(self) -> None:
+        """Validate that all required fields are set for verification."""
+        if not self.appimage_path:
+            raise ValueError(f"AppImage path not set for {self.appimage_name}")
+            
+        if not os.path.exists(self.appimage_path):
+            raise FileNotFoundError(f"AppImage file not found: {self.appimage_path}")
