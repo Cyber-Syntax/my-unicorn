@@ -183,30 +183,32 @@ class InstallAppCommand(Command):
                 # Ensure config is saved (temporarily) before download
                 app_config.temp_save_config()
 
-                # Download the AppImage
+                # Download the AppImage or get existing file
                 if api.appimage_name:
-                    print(f"Downloading {api.appimage_name}...")
                     download = DownloadManager(api)
-                    downloaded_file_path = download.download()
+                    downloaded_file_path, was_existing_file = download.download()
 
                     if not downloaded_file_path:
                         raise ValueError("Download failed: No file path returned")
 
-                    # Handle verification based on skip_verification flag or if already verified
+                    if was_existing_file:
+                        print(f"Found existing file: {api.appimage_name}")
+                    else:
+                        print(f"✓ Downloaded {api.appimage_name}")
+
+                    # Handle verification based on skip_verification flag
                     if app_config.skip_verification or api.skip_verification:
                         logging.info("Skipping verification due to skip_verification setting.")
                         print("Skipping verification (verification disabled for this app).")
                         verification_success = True
                         verification_skipped = True  # Set the flag that verification was skipped
                         break
-                    elif download.file_already_verified:
-                        logging.info("Skipping verification - file was already verified during download check.")
-                        print("Note: File was already verified")
-                        verification_success = True
-                        break
                     else:
-                        # Perform verification with cleanup on failure
-                        print("Verifying download integrity...")
+                        # Single verification point for both existing and downloaded files
+                        if was_existing_file:
+                            print("Verifying existing file...")
+                        else:
+                            print("Verifying download integrity...")
                         
                         # Debug logging for API values
                         logging.debug(f"API values before VerificationManager creation:")
