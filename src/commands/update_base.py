@@ -649,7 +649,7 @@ class BaseUpdateCommand(Command):
             arch_keyword=None,  # Use app definition's preferred_characteristic_suffixes
         )
 
-        update_available, version_info = github_api.check_latest_version(current_version)
+        update_available, version_info = github_api.check_latest_version(current_version, version_check_only=True)
         latest_version = version_info.get("latest_version") if update_available else None
 
         if "error" in version_info:

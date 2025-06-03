@@ -148,18 +148,10 @@ class InstallAppCommand(Command):
         else:
             self._logger.debug("Using automatic SHA file detection")
 
-        # Get release data to allow API's auto-detection to work
-        update_available, response = api.check_latest_version(version_check_only=True)
-        
-        # Check if there was an error in the response
-        if isinstance(response, dict) and "error" in response:
-            print(f"Error: {response['error']}")
-            return
-
-        # Now do full processing including SHA/asset digest detection
-        success, full_response = api.get_latest_release(version_check_only=False)
+        # Get release data with full processing including SHA/asset digest detection
+        success, full_response = api.get_latest_release()
         if not success:
-            print(f"Error during full processing: {full_response}")
+            print(f"Error during processing: {full_response}")
             return
 
         # Log what was detected by the API

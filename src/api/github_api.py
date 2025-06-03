@@ -105,14 +105,7 @@ class GitHubAPI:
         if not raw_tag:
             raise ValueError("Release data missing tag_name")
 
-        assets = release_data.get("assets", [])
-        if not assets:
-            logger.warning(
-                f"No assets found in release data for tag {raw_tag}. Cannot select AppImage."
-            )
-
         is_beta = release_data.get("prerelease", False)
-
         normalized_version = extract_version(raw_tag, is_beta)
 
         # For zen-browser, if the raw_tag matches X.Y.Z[letter], use the raw_tag (cleaned of 'v')
@@ -131,6 +124,49 @@ class GitHubAPI:
                 normalized_version = potential_zen_version
             elif raw_tag.lstrip("vV") != normalized_version:
                 pass
+
+        if not normalized_version:
+            raise ValueError(f"Could not determine version from tag: '{raw_tag}'")
+
+        self.version = normalized_version
+
+        # If this is only a version check, skip all asset processing to optimize performance
+        if version_check_only:
+            logger.debug(f"Version check only mode - skipping asset processing for {self.owner}/{self.repo}")
+            # Clear asset-related attributes for version-only checks
+            self.appimage_name = None
+            self.appimage_url = None
+            self.sha_name = None
+            self.sha_url = None
+            self.hash_type = None
+            self.extracted_hash_from_body = None
+            self.asset_digest = None
+            
+            # Create minimal asset info dict for version-only release info
+            asset_info_dict = {
+                "owner": self.owner,
+                "repo": self.repo,
+                "version": self.version,
+                "appimage_name": None,
+                "appimage_url": None,
+                "sha_name": None,
+                "sha_url": None,
+                "hash_type": None,
+                "extracted_hash_from_body": None,
+                "asset_digest": None,
+                "arch_keyword": self._arch_keyword,
+            }
+
+            self._release_info = ReleaseInfo.from_release_data(release_data, asset_info_dict)
+            logger.info(f"Successfully processed version-only release {self.version} for {self.owner}/{self.repo}")
+            return
+
+        # Full processing for installation/download
+        assets = release_data.get("assets", [])
+        if not assets:
+            logger.warning(
+                f"No assets found in release data for tag {raw_tag}. Cannot select AppImage."
+            )
 
         # Load app info if not already loaded
         if self._app_info is None:
@@ -179,13 +215,7 @@ class GitHubAPI:
 
         if not normalized_version and self.appimage_name:
             normalized_version = extract_version_from_filename(self.appimage_name)
-
-        if not normalized_version:
-            raise ValueError(
-                f"Could not determine version from tag: '{raw_tag}' or filename: '{self.appimage_name}'"
-            )
-
-        self.version = normalized_version
+            self.version = normalized_version
 
         if self.appimage_name:
             extracted_arch = get_arch_from_filename(self.appimage_name)
@@ -199,8 +229,8 @@ class GitHubAPI:
                     f"Could not extract architecture from AppImage filename: {self.appimage_name}. Current arch_keyword '{self._arch_keyword}' remains."
                 )
 
-        if self.appimage_name and not version_check_only:
-            logger.debug(f"Processing SHA for {self.appimage_name}, version_check_only={version_check_only}")
+        if self.appimage_name:
+            logger.debug(f"Processing SHA for {self.appimage_name}")
             logger.debug(f"App info available: {self._app_info is not None}")
             if self._app_info:
                 logger.debug(f"App skip_verification: {getattr(self._app_info, 'skip_verification', False)}")
