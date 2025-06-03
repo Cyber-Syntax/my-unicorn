@@ -49,7 +49,14 @@ class GitHubAPI:
         self._icon_manager = IconManager()
         self._release_fetcher = ReleaseManager(owner, repo)
         self._release_info: Optional[ReleaseInfo] = None
-        self._app_info: Optional[AppInfo] = None
+        
+        # Load app info from catalog to get beta preference and other settings
+        self._app_info: Optional[AppInfo] = find_app_by_owner_repo(owner, repo)
+        if self._app_info:
+            logger.debug(f"Loaded app info for {owner}/{repo}, beta={self._app_info.beta}")
+        else:
+            logger.debug(f"No app info found for {owner}/{repo} in catalog")
+        
         self._selector = AppImageSelector()  # Create selector once and reuse
         logger.debug(f"API initialized for {owner}/{repo}")
 
@@ -63,8 +70,15 @@ class GitHubAPI:
         return self._app_info and getattr(self._app_info, 'skip_verification', False)
 
     def get_latest_release(self, version_check_only: bool = False, is_batch: bool = False) -> Tuple[bool, Union[Dict[str, Any], str]]:
-        """Fetch latest stable or fallback to beta release using ReleaseManager, then process it."""
-        success, raw_data_or_error = self._release_fetcher.get_latest_release_data(self._headers)
+        """Fetch latest stable or beta release based on app configuration using ReleaseManager, then process it."""
+        # Check if app prefers beta releases from catalog configuration
+        prefer_beta = self._app_info.beta if self._app_info else False
+        
+        if prefer_beta:
+            logger.debug(f"App {self.owner}/{self.repo} configured for beta releases, fetching directly")
+            success, raw_data_or_error = self._release_fetcher.get_latest_beta_release_data(self._headers)
+        else:
+            success, raw_data_or_error = self._release_fetcher.get_latest_release_data(self._headers)
 
         if not success:
             if (

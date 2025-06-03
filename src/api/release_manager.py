@@ -97,3 +97,18 @@ class ReleaseManager:
             )
             logger.error(error_msg)
             return False, error_msg
+
+    def get_latest_beta_release_data(self, headers: Dict) -> Tuple[bool, Union[Dict[str, Any], str]]:
+        """Get the latest beta/pre-release data directly (bypassing stable release check).
+
+        This method fetches all releases and returns the latest one, which may be a beta.
+        This is more efficient for repositories that primarily use beta releases.
+
+        Args:
+            headers: Authentication headers to be used for the request.
+
+        Returns:
+            tuple: (Success flag, Raw release JSON data or error message string)
+        """
+        logger.debug(f"Fetching latest beta release directly for {self.owner}/{self.repo}")
+        return self._fetch_all_releases_data(headers)

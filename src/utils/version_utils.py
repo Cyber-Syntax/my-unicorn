@@ -150,12 +150,24 @@ def repo_uses_beta(repo_name: str) -> bool:
     Returns:
         bool: True if the repository typically uses beta releases
     """
-    # List of repos that are known to use beta releases
+    # Import here to avoid circular imports
+    from src.app_catalog import get_all_apps
+    
+    # Get all apps from catalog
+    all_apps = get_all_apps()
+    
+    # Look for the repo in the catalog
+    for app_info in all_apps.values():
+        if app_info.repo.lower() == repo_name.lower():
+            if app_info.beta:
+                logger.info(f"Repository {repo_name} is configured to use beta releases")
+                return True
+            break
+    
+    # Fallback to hardcoded list for backward compatibility
     beta_repos = ["FreeTube"]
-
-    # Check if the repo is in the list
     if repo_name in beta_repos:
-        logger.info(f"Repository {repo_name} is configured to use beta releases")
+        logger.info(f"Repository {repo_name} is configured to use beta releases (fallback)")
         return True
 
     return False

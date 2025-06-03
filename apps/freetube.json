@@ -8,6 +8,7 @@
     "appimage_name_template": "{repo_name}-{latest_version}-{characteristic_suffix}.AppImage",
     "preferred_characteristic_suffixes": ["amd64", "x86_64"],
     "skip_verification": true,
+    "beta": true,
     "icon_info": "https://raw.githubusercontent.com/FreeTubeApp/FreeTube/development/_icons/icon.svg",
     "icon_file_name": "freetube_icon.svg",
     "icon_repo_path": "_icons/icon.svg"
