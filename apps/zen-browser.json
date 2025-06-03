@@ -5,10 +5,9 @@
     "description": "A content-focused browser for distraction-free browsing",
     "category": "Productivity",
     "tags": ["browser", "focus", "distraction-free", "privacy"],
-    "hash_type": "sha256",
     "appimage_name_template": "zen-{characteristic_suffix}.AppImage",
-    "sha_name": "extracted_checksum",
     "preferred_characteristic_suffixes": ["x86_64", "amd64"],
+    "use_asset_digest": true,
     "icon_info": "https://raw.githubusercontent.com/zen-browser/desktop/main/docs/assets/zen-black.svg",
     "icon_file_name": "zen_browser_icon.png",
     "icon_repo_path": "docs/assets/zen-black.svg"

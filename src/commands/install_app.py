@@ -127,38 +127,39 @@ class InstallAppCommand(Command):
     def _install_app(self, app_info: AppInfo) -> None:
         """Download and install the application with verification."""
         # Create a properly initialized app config manager for this app
-        app_config = AppConfigManager(
+        app_config = AppConfigManager()
+        app_config.set_app_name(app_info.repo)
+
+        # Initialize GitHubAPI with proper parameters
+        # Use auto-detection when no specific values are provided
+        sha_name_param = app_info.sha_name if app_info.sha_name else "auto"
+        hash_type_param = app_info.hash_type if app_info.hash_type else "auto"
+        
+        api = GitHubAPI(
             owner=app_info.owner,
             repo=app_info.repo,
-            app_rename=app_info.app_rename,
+            sha_name=sha_name_param,
+            hash_type=hash_type_param,
+            arch_keyword=None,  # Enable architecture auto-detection
         )
-
-        # Initialize GitHubAPI with parameters based on app catalog information
-        if app_info.sha_name != "no_sha_file":
-            # Use the SHA file and hash type from app catalog directly (trusted source)
-            api = GitHubAPI(
-                owner=app_info.owner,
-                repo=app_info.repo,
-                sha_name=app_info.sha_name,
-                hash_type=app_info.hash_type or "sha256",
-                arch_keyword=None,  # Enable architecture auto-detection
-            )
+        
+        if app_info.sha_name:
             self._logger.debug(f"Using SHA file from app catalog: {app_info.sha_name}")
         else:
-            # No SHA file in catalog, let API auto-detect
-            api = GitHubAPI(
-                owner=app_info.owner,
-                repo=app_info.repo,
-                sha_name="auto",  # Use "auto" to enable automatic SHA detection
-                hash_type="auto",  # Use "auto" to enable automatic hash type detection
-                arch_keyword=None,  # Enable architecture auto-detection
-            )
             self._logger.debug("Using automatic SHA file detection")
 
         # Get release data to allow API's auto-detection to work
-        success, response = api.check_latest_version(version_check_only=True)
+        update_available, response = api.check_latest_version(version_check_only=True)
+        
+        # Check if there was an error in the response
+        if isinstance(response, dict) and "error" in response:
+            print(f"Error: {response['error']}")
+            return
+
+        # Now do full processing including SHA/asset digest detection
+        success, full_response = api.get_latest_release(version_check_only=False)
         if not success:
-            print(f"Error: {response}")
+            print(f"Error during full processing: {full_response}")
             return
 
         # Log what was detected by the API
@@ -175,42 +176,52 @@ class InstallAppCommand(Command):
         # Try up to MAX_ATTEMPTS times to download and verify
         for attempt in range(1, self.MAX_ATTEMPTS + 1):
             try:
-                # Update app config with all API data
-                app_config.owner = api.owner
-                app_config.repo = api.repo
+                # Update app config with user-specific data (version and appimage_name are stored in config)
                 app_config.version = api.version
                 app_config.appimage_name = api.appimage_name
-                app_config.arch_keyword = api.arch_keyword
-                app_config.sha_name = api.sha_name
-                app_config.hash_type = api.hash_type or "sha256"
 
                 # Ensure config is saved (temporarily) before download
                 app_config.temp_save_config()
 
-                # Download the AppImage
+                # Download the AppImage or get existing file
                 if api.appimage_name:
-                    print(f"Downloading {api.appimage_name}...")
                     download = DownloadManager(api)
-                    downloaded_file_path = download.download()
+                    downloaded_file_path, was_existing_file = download.download()
 
                     if not downloaded_file_path:
                         raise ValueError("Download failed: No file path returned")
 
-                    # Handle verification based on SHA file availability
-                    if api.sha_name == "no_sha_file":
-                        logging.info("Skipping verification due to no_sha_file setting.")
-                        print("Skipping verification (no SHA file specified).")
+                    if was_existing_file:
+                        print(f"Found existing file: {api.appimage_name}")
+                    else:
+                        print(f"✓ Downloaded {api.appimage_name}")
+
+                    # Handle verification based on skip_verification flag
+                    if app_config.skip_verification or api.skip_verification:
+                        logging.info("Skipping verification due to skip_verification setting.")
+                        print("Skipping verification (verification disabled for this app).")
                         verification_success = True
                         verification_skipped = True  # Set the flag that verification was skipped
                         break
                     else:
-                        # Perform verification with cleanup on failure
-                        print("Verifying download integrity...")
+                        # Single verification point for both existing and downloaded files
+                        if was_existing_file:
+                            print("Verifying existing file...")
+                        else:
+                            print("Verifying download integrity...")
+                        
+                        # Debug logging for API values
+                        logging.debug(f"API values before VerificationManager creation:")
+                        logging.debug(f"  api.sha_name: {api.sha_name}")
+                        logging.debug(f"  api.hash_type: {api.hash_type}")
+                        logging.debug(f"  api.asset_digest: {api.asset_digest}")
+                        logging.debug(f"  api.skip_verification: {api.skip_verification}")
+                        
                         verification_manager = VerificationManager(
-                            sha_name=api.sha_name or "no_sha_file",
-                            sha_url=api.sha_url or "",
+                            sha_name=api.sha_name,
+                            sha_url=api.sha_url,
                             appimage_name=api.appimage_name,
-                            hash_type=api.hash_type or "sha256",
+                            hash_type=api.hash_type,
                             asset_digest=api.asset_digest,
                         )
 

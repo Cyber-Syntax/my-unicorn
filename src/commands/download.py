@@ -23,9 +23,19 @@ class DownloadCommand(Command):
         # 2. Get the owner and repo from ParseURL instance
         owner, repo = parser.owner, parser.repo
 
-        # Get hash_type and sha_name from user
-        app_config = AppConfigManager(owner=owner, repo=repo)
-        sha_name, hash_type = app_config.ask_sha_hash()  # Returns sha_name and hash_type
+        # Initialize AppConfigManager and set app name
+        app_config = AppConfigManager()
+        app_config.set_app_name(repo)
+        
+        # Get app info from catalog to get hash_type and sha_name
+        app_info = app_config.get_app_info()
+        if app_info:
+            sha_name = app_info.sha_name or "auto"
+            hash_type = app_info.hash_type or "auto"
+        else:
+            # Fallback if app not in catalog
+            sha_name = "auto"
+            hash_type = "auto"
 
         # 3. Initialize the GitHubAPI with the parsed owner and repo
         api = GitHubAPI(
@@ -46,36 +56,38 @@ class DownloadCommand(Command):
                 # Get release data from GitHub API
                 api.get_response()
 
-                # Add these lines to sync ALL fields
-                app_config.owner = api.owner  # Explicitly set owner/repo
-                app_config.repo = api.repo  # (even if from parser)
+                # Update user-specific fields (version and appimage_name are stored in config)
                 app_config.version = api.version
                 app_config.appimage_name = api.appimage_name
-                app_config.arch_keyword = api.arch_keyword
-                app_config.sha_name = api.sha_name
-                app_config.hash_type = api.hash_type
 
                 # Save temporary configuration
                 app_config.temp_save_config()
 
-                # 4. Use DownloadManager to download the AppImage
-                print(f"Downloading {api.appimage_name}...")
+                # 4. Use DownloadManager to download the AppImage or get existing file
                 download = DownloadManager(api)
-                downloaded_file_path = (
-                    download.download()
-                )  # Capture the full path to the downloaded file
+                downloaded_file_path, was_existing_file = download.download()
+                
+                if was_existing_file:
+                    print(f"Found existing file: {api.appimage_name}")
+                else:
+                    print(f"✓ Downloaded {api.appimage_name}")
 
                 global_config = GlobalConfigManager()
                 global_config.load_config()
 
-                # Handle verification based on SHA file availability
-                if api.sha_name == "no_sha_file":
-                    logging.info("Skipping verification due to no_sha_file.")
-                    print("Note: Verification skipped - no hash file provided by the developer")
+                # Handle verification based on skip_verification flag
+                if app_config.skip_verification or api.skip_verification:
+                    logging.info("Skipping verification due to skip_verification setting.")
+                    print("Note: Verification skipped - verification disabled for this app")
                     verification_success = True
                     verification_skipped = True  # Set the flag that verification was skipped
                     break
                 else:
+                    # Single verification point for both existing and downloaded files
+                    if was_existing_file:
+                        print("Verifying existing file...")
+                    else:
+                        print("Verifying download integrity...")
                     # Perform verification with cleanup on failure
                     verification_manager = VerificationManager(
                         sha_name=api.sha_name,
@@ -143,12 +155,8 @@ class DownloadCommand(Command):
 
         # Download app icon if possible
         icon_manager = IconManager()
-        # First get the app_rename (if available from app_config) or let the fallback handle it
-        app_rename = (
-            app_config.app_rename
-            if hasattr(app_config, "app_rename") and app_config.app_rename
-            else None
-        )
+        # Get the app_rename from catalog info
+        app_rename = app_config.app_rename if app_info else None
         icon_manager.ensure_app_icon(api.owner, api.repo, app_rename=app_rename)
 
         # Check if the file operations were successful

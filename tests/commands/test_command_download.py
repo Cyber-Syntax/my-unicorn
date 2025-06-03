@@ -323,7 +323,7 @@ def test_download_command_verification_failure(
     mocked_app_config.save_config.assert_not_called()
 
 
-def test_download_command_no_sha_file(
+def test_download_command_skip_verification(
     mocked_parser: MagicMock,
     mocked_app_config: MagicMock,
     mocked_api: MagicMock,
@@ -351,8 +351,9 @@ def test_download_command_no_sha_file(
         download_test_data: Test data dictionary
 
     """
-    # Set sha_name to "no_sha_file" to trigger the skip verification path
-    mocked_api.sha_name = "no_sha_file"
+    # Set skip_verification to trigger the skip verification path
+    mocked_api.skip_verification = True
+    mocked_api.sha_name = None
 
     # Create and execute the command
     cmd = DownloadCommand()

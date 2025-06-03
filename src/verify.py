@@ -22,9 +22,10 @@ SUPPORTED_HASH_TYPES = [
     "sha512",
     "no_hash",
     "extracted_checksum",
-    "asset_digest",  # Added digest-based verification
-]  # Removed "from_release_description"
+    "asset_digest",
+]
 
+from src.app_catalog import AppInfo
 
 @dataclass
 class VerificationManager:
@@ -41,6 +42,8 @@ class VerificationManager:
     appimage_path: str | None = None  # Full path to the AppImage file for verification
     direct_expected_hash: str | None = None  # For hashes extracted from release body
     asset_digest: str | None = None  # For GitHub API asset digest verification
+    use_asset_digest: bool = False # Use asset digest for verification
+
 
     def __post_init__(self) -> None:
         """Initialize and validate the verification manager."""
@@ -55,15 +58,24 @@ class VerificationManager:
         # Initialize sha_name with full path if only filename is provided
         if self.sha_name and not os.path.isabs(self.sha_name):
             # Only construct path if sha_name is not already a full path and is not a special value
-            if self.sha_name not in ("no_sha_file", "extracted_checksum"):
+            if self.sha_name not in ("extracted_checksum", "asset_digest"):
                 from src.global_config import GlobalConfigManager
 
                 downloads_dir = GlobalConfigManager().expanded_app_download_path
-                self.sha_name = str(Path(downloads_dir) / self.sha_name)
+                # Make SHA file app-specific to prevent concurrent download conflicts
+                sha_basename = Path(self.sha_name).name
+                sha_stem = Path(self.sha_name).stem
+                sha_suffix = Path(self.sha_name).suffix
+                app_specific_sha_name = f"{self.appimage_name}_{sha_stem}{sha_suffix}"
+                self.sha_name = str(Path(downloads_dir) / app_specific_sha_name)
 
         # Convert hash_type to lowercase for consistent comparisons
         if self.hash_type:
             self.hash_type = self.hash_type.lower()
+
+        # Automatically set use_asset_digest if hash_type is "asset_digest"
+        if self.hash_type == "asset_digest":
+            self.use_asset_digest = True
 
         # Validate the hash type
         self._validate_hash_type()
@@ -110,8 +122,16 @@ class VerificationManager:
 
         """
         try:
+            # Skip verification if hash_type is no_hash (skip verification case)
+            if self.hash_type == "no_hash":
+                logging.info("Verification skipped - verification disabled")
+                print("Note: Verification skipped - verification disabled")
+                return True
+                
+            from app_catalog import AppInfo
             # Handle asset digest verification first
-            if self.hash_type == "asset_digest":
+            if self.hash_type == "asset_digest" or self.use_asset_digest:
+                print("Using asset digest for verification")
                 return self._verify_with_asset_digest(cleanup_on_failure)
 
             # Handle "extracted_checksum":
@@ -581,7 +601,6 @@ class VerificationManager:
 
         try:
             # self.hash_type should be a valid algorithm string here,
-            # or "no_hash" (which shouldn't reach _compare_hashes if logic is correct)
             # or "from_release_description" (where hash_type is set to sha256 by SHAManager)
             # or "extracted_checksum" (where hash_type might be sha256)
             # The _validate_hash_type and the new check in verify_appimage for "from_release_description"

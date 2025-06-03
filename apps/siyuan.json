@@ -5,10 +5,10 @@
     "description": "A local-first personal knowledge management system (opt-out google telemetry, can be disabled)",
     "category": "Productivity",
     "tags": ["notes", "knowledge-base", "markdown"],
-    "hash_type": "sha256",
     "appimage_name_template": "{repo_name}-{latest_version}-{characteristic_suffix}.AppImage",
-    "sha_name": "SHA256SUMS.txt",
     "preferred_characteristic_suffixes": ["linux"],
+    "hash_type": "sha256",
+    "sha_name": "SHA256SUMS.txt",
     "icon_info": "https://raw.githubusercontent.com/siyuan-note/siyuan/master/app/src/assets/icon.png",
     "icon_file_name": "siyuan_icon.png",
     "icon_repo_path": "app/src/assets/icon.png"

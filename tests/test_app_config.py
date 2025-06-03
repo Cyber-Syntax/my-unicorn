@@ -60,7 +60,8 @@ class TestAppConfigManager(unittest.TestCase):
     def test_load_nonexistent_config(self):
         """Test loading a configuration file that doesn't exist."""
         # Arrange
-        config = AppConfigManager(repo="nonexistent_repo", config_folder=self.test_dir_path)
+        config = AppConfigManager(config_folder=self.test_dir_path)
+        config.set_app_name("nonexistent_repo")
 
         # Act
         result = config.load_appimage_config("nonexistent.json")
@@ -87,7 +88,8 @@ class TestAppConfigManager(unittest.TestCase):
 
         # Assert
         # Reload to verify changes were saved
-        config_new = AppConfigManager(repo="test_repo", config_folder=self.test_dir_path)
+        config_new = AppConfigManager(config_folder=self.test_dir_path)
+        config_new.set_app_name("test_repo")
         config_data = config_new.load_appimage_config("test_repo.json")
 
         self.assertEqual(config_new.version, "2.0.0")
@@ -96,8 +98,10 @@ class TestAppConfigManager(unittest.TestCase):
     def test_list_json_files(self):
         """Test listing JSON files in configuration directory."""
         # Arrange - Create multiple config files
-        config1 = AppConfigManager(repo="app1", config_folder=self.test_dir_path)
-        config2 = AppConfigManager(repo="app2", config_folder=self.test_dir_path)
+        config1 = AppConfigManager(config_folder=self.test_dir_path)
+        config1.set_app_name("app1")
+        config2 = AppConfigManager(config_folder=self.test_dir_path)
+        config2.set_app_name("app2")
 
         config1.save_config()
         config2.save_config()

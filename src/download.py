@@ -161,11 +161,12 @@ class DownloadManager:
                 cls._global_progress = None
                 cls._active_tasks = set()
 
-    def download(self) -> str:
-        """Download the AppImage from the GitHub release.
+    def download(self) -> tuple[str, bool]:
+        """Download the AppImage from the GitHub release or return existing file.
 
         Returns:
-            str: The full path to the downloaded AppImage file
+            tuple: (file_path, was_existing_file) where was_existing_file is True if 
+                   file already existed, False if newly downloaded
 
         Raises:
             ValueError: If AppImage URL or name is not available
@@ -180,6 +181,15 @@ class DownloadManager:
             self._logger.error(error_msg)
             raise ValueError(error_msg)
 
+        # Check if file already exists in Downloads directory
+        downloads_dir = self.get_downloads_dir()
+        existing_file_path = os.path.join(downloads_dir, appimage_name)
+        
+        if os.path.exists(existing_file_path):
+            self._logger.info(f"File already exists in Downloads: {appimage_name}")
+            print(f"Found existing file: {appimage_name}")
+            return existing_file_path, True  # True = was existing file
+
         try:
             # Set up request headers
             headers = {"User-Agent": "AppImage-Updater/1.0", "Accept": "application/octet-stream"}
@@ -192,7 +202,7 @@ class DownloadManager:
                 appimage_url, appimage_name, headers, prefix
             )
 
-            return download_path
+            return download_path, False  # False = newly downloaded
 
         except OSError as e:
             error_msg = f"File system error while downloading {appimage_name}: {e!s}"
@@ -202,6 +212,8 @@ class DownloadManager:
             error_msg = f"Unexpected error downloading {appimage_name}: {e!s}"
             self._logger.error(error_msg)
             raise RuntimeError(error_msg)
+
+
 
     def _get_file_size(self, url: str, headers: Dict[str, str]) -> int:
         """Get the file size by making a HEAD request.
@@ -447,8 +459,8 @@ class DownloadManager:
         logging.info("Verifying download integrity...")
 
         # Skip verification if hash verification is disabled
-        if self.github_api.hash_type == "no_hash" or not self.github_api.sha_name:
-            logging.info("Skipping verification as requested (no hash provided)")
+        if self.github_api.skip_verification or not self.github_api.sha_name:
+            logging.info("Skipping verification as requested (verification disabled or no hash provided)")
             return True
 
         from src.verify import VerificationManager # Import once at the top of the relevant scope

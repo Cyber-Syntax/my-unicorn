@@ -30,25 +30,36 @@ class SHAAssetFinder:
             assets: List of release assets from GitHub API
 
         Returns:
-            dict: Selected SHA asset if found, None otherwise
+            dict: Selected SHA asset if found, None otherwise. For asset digest,
+            returns a special dict with asset digest information.
 
         """
         logger.info(f"Looking for SHA file matching: {selected_appimage_name}")
         logger.info(f"Using SHA name from definitive info: {definitive_app_info.sha_name}")
 
-        # Skip SHA search if no_sha_file is specified
-        if definitive_app_info.sha_name == "no_sha_file":
-            logger.info("Skipping SHA file search as 'no_sha_file' is specified")
+        # Skip SHA search if verification is disabled
+        if definitive_app_info.skip_verification:
+            logger.info("Skipping SHA file search as verification is disabled")
             return None
 
-        # 1. Try exact match from definitive app info
-        if definitive_app_info.sha_name != "no_sha_file":
+        # Priority 1: Check if app uses asset digest verification
+        if definitive_app_info.use_asset_digest:
+            logger.info(f"App {selected_appimage_name} prefers asset digest verification")
+            asset_digest_info = self._try_extract_asset_digest(selected_appimage_name, assets)
+            if asset_digest_info:
+                logger.info(f"Successfully found asset digest for {selected_appimage_name}")
+                return asset_digest_info
+            else:
+                logger.warning(f"Asset digest not available for {selected_appimage_name}, falling back to SHA files")
+
+        # Priority 2: Try exact match from definitive app info
+        if definitive_app_info.sha_name:
             for asset in assets:
                 if asset["name"].lower() == definitive_app_info.sha_name.lower():
                     logger.info(f"Found exact SHA name match: {asset['name']}")
                     return asset
 
-        # 2. Look for SHA files that might contain our AppImage's hash
+        # Priority 3: Look for SHA files that might contain our AppImage's hash
         sha_assets = self._filter_sha_assets(assets)
         if not sha_assets:
             logger.warning("No SHA files found in release assets")
@@ -68,6 +79,43 @@ class SHAAssetFinder:
         # Fallback to a generic SHA file if available
         logger.info("Using first available SHA file as fallback")
         return sha_assets[0]
+
+    def _try_extract_asset_digest(self, appimage_name: str, assets: List[Dict]) -> Optional[Dict]:
+        """Try to extract asset digest information from GitHub API asset metadata.
+
+        Args:
+            appimage_name: Name of the AppImage file
+            assets: List of release assets from GitHub API
+
+        Returns:
+            dict: Special asset info with digest data if found, None otherwise
+        """
+        # Look for the AppImage asset that matches our selected file
+        for asset in assets:
+            if asset.get("name") == appimage_name and asset.get("digest"):
+                digest = asset["digest"]
+                logger.info(f"Found asset digest for {appimage_name}: {digest}")
+                
+                # Validate digest format (should be like "sha256:hash_value")
+                if ":" in digest:
+                    digest_type, digest_hash = digest.split(":", 1)
+                    if digest_type in ["sha256", "sha512"] and len(digest_hash) > 0:
+                        # Return a special asset dict that indicates asset digest usage
+                        return {
+                            "name": "asset_digest",
+                            "browser_download_url": None,
+                            "digest": digest,
+                            "hash_type": "asset_digest",
+                            "asset_digest_hash": digest_hash,
+                            "asset_digest_type": digest_type
+                        }
+                    else:
+                        logger.warning(f"Invalid digest format or unsupported type: {digest}")
+                else:
+                    logger.warning(f"Invalid digest format (missing colon): {digest}")
+
+        logger.debug(f"No asset digest found for {appimage_name} in assets")
+        return None
 
     def _filter_sha_assets(self, assets: List[Dict]) -> List[Dict]:
         """Filter release assets to only SHA/checksum files."""

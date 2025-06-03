@@ -11,7 +11,7 @@ import logging
 import os
 from typing import List
 
-from src.commands.command import Command
+from src.commands.base import Command
 from src.global_config import GlobalConfigManager
 
 

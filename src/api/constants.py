@@ -6,7 +6,7 @@ from typing import Final, List, Tuple
 DEFAULT_TIMEOUT: Final[int] = 30
 DEFAULT_PER_PAGE: Final[int] = 100
 APPIMAGE_EXTENSION: Final[str] = ".appimage"
-SHA_TYPE_OPTIONS: Final[List[str]] = ["sha256", "sha512", "no_sha_file"]
+SHA_TYPE_OPTIONS: Final[List[str]] = ["sha256", "sha512"]
 
 # HTTP Status Codes
 HTTP_OK = 200
@@ -19,7 +19,6 @@ MAX_RETRIES: Final[int] = 3
 RETRY_DELAY: Final[int] = 2
 
 ### SHA asset constants
-NO_SHA_FILE_CONFIG = "no_sha_file"
 SHA_EXTENSIONS: Final[Tuple[str, str]] = (".sha256", ".sha512")
 PLATFORM_INDICATORS = ["mac", "windows", "win"]
 PYTEST_ENV_VAR = "PYTEST_CURRENT_TEST"

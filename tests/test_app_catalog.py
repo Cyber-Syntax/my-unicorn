@@ -82,8 +82,8 @@ def test_app_info_init() -> None:
     )
 
     assert app_info.name == "Test App"
-    assert app_info.sha_name == "no_sha_file"  # Default value
-    assert app_info.hash_type == "sha256"  # Default value
+    assert app_info.sha_name is None  # Default value
+    assert app_info.hash_type is None  # Default value
     assert app_info.category == "Other"  # Default value
     assert app_info.tags == []  # Default empty list
 

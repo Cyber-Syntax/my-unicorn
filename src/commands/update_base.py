@@ -274,11 +274,15 @@ class BaseUpdateCommand(Command):
         app_config.load_appimage_config(app_data["config_file"])
 
         # Initialize GitHub API using app definition data
+        # For use_asset_digest apps, use auto detection instead of None values
+        sha_name_param = app_info.sha_name if app_info.sha_name else "auto"
+        hash_type_param = app_info.hash_type if app_info.hash_type else "auto"
+        
         github_api = GitHubAPI(
             owner=app_info.owner,
             repo=app_info.repo,
-            sha_name=app_info.sha_name,
-            hash_type=app_info.hash_type,
+            sha_name=sha_name_param,
+            hash_type=hash_type_param,
             arch_keyword=None,  # Use app definition's preferred_characteristic_suffixes
         )
 
@@ -315,16 +319,25 @@ class BaseUpdateCommand(Command):
 
         # Download and verify AppImage
         try:
-            # Download AppImage
-            print(f"\nDownloading {github_api.appimage_name}...")
+            # Download AppImage or get existing file
             download_manager = DownloadManager(
                 github_api, app_index=app_index, total_apps=total_apps
             )
-            downloaded_file_path = download_manager.download()
+            downloaded_file_path, was_existing_file = download_manager.download()
+            
+            if was_existing_file:
+                print(f"\nFound existing file: {github_api.appimage_name}")
+            else:
+                print(f"\n✓ Downloaded {github_api.appimage_name}")
 
             # Determine per-file cleanup behavior: skip interactive prompts in batch or async
             cleanup = False if is_batch else True
-            # Verify the download
+            # Single verification point for both existing and downloaded files
+            if was_existing_file:
+                print("Verifying existing file...")
+            else:
+                print("Verifying download integrity...")
+            
             verification_result, verification_skipped = self._verify_appimage(
                 github_api, downloaded_file_path, cleanup_on_failure=cleanup
             )
@@ -502,12 +515,18 @@ class BaseUpdateCommand(Command):
         """
         verification_skipped = False
 
-        if github_api.sha_name == "no_sha_file":
-            self._logger.info("Skipping verification - no hash file provided by the developer")
-            print("Note: Verification skipped - no hash file provided by the developer")
+        # Check if verification should be skipped based on app configuration
+        if github_api.skip_verification:
+            self._logger.info("Skipping verification - verification disabled for this app")
+            print("Note: Verification skipped - verification disabled for this app")
             verification_skipped = True
-            # Return verification_skipped=True instead of verification_success=True
-            # This better reflects that verification didn't actually succeed but was skipped
+            return True, verification_skipped
+
+        # Check if we have no SHA information at all (fallback case)
+        if not github_api.sha_name and not github_api.asset_digest:
+            self._logger.info("Skipping verification - no verification method available")
+            print("Note: Verification skipped - no verification method available")
+            verification_skipped = True
             return True, verification_skipped
 
         # Ensure critical VerificationManager parameters are not None
@@ -618,11 +637,15 @@ class BaseUpdateCommand(Command):
         current_version = app_config.version
 
         # Initialize GitHub API using app definition data
+        # For use_asset_digest apps, use auto detection instead of None values
+        sha_name_param = app_info.sha_name if app_info.sha_name else "auto"
+        hash_type_param = app_info.hash_type if app_info.hash_type else "auto"
+        
         github_api = GitHubAPI(
             owner=app_info.owner,
             repo=app_info.repo,
-            sha_name=app_info.sha_name,
-            hash_type=app_info.hash_type,
+            sha_name=sha_name_param,
+            hash_type=hash_type_param,
             arch_keyword=None,  # Use app definition's preferred_characteristic_suffixes
         )
 

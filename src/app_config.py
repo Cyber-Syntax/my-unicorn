@@ -101,16 +101,42 @@ class AppConfigManager:
         return app_info.app_rename if app_info else self.app_name
 
     @property
+    def skip_verification(self) -> bool:
+        """Get skip verification flag from app definition."""
+        app_info = self.get_app_info()
+        return app_info.skip_verification if app_info else False
+
+    @property
+    def use_asset_digest(self) -> bool:
+        """Get use asset digest flag from app definition."""
+        app_info = self.get_app_info()
+        return app_info.use_asset_digest if app_info else False
+
+    @property
+    def use_github_release_desc(self) -> bool:
+        """Get use_github_release_desc flag from app definition."""
+        app_info = self.get_app_info()
+        return app_info.use_github_release_desc if app_info else False
+
+    @property
     def sha_name(self) -> str | None:
         """Get SHA name from app definition."""
         app_info = self.get_app_info()
+        if app_info and app_info.use_asset_digest:
+            return "asset_digest"
+        if app_info and app_info.use_github_release_desc:
+            return "extracted_checksum"
         return app_info.sha_name if app_info else None
 
     @property
-    def hash_type(self) -> str:
+    def hash_type(self) -> str | None:
         """Get hash type from app definition."""
         app_info = self.get_app_info()
-        return app_info.hash_type if app_info else "sha256"
+        if app_info and app_info.use_asset_digest:
+            return "asset_digest"
+        if app_info and app_info.use_github_release_desc:
+            return "extracted_checksum"
+        return app_info.hash_type if app_info else None
 
     @property
     def preferred_characteristic_suffixes(self) -> list[str]:
