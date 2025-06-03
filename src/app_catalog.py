@@ -28,10 +28,12 @@ class AppInfo:
         description: Description of the application
         category: Application category
         tags: List of tags describing the application
-        hash_type: Type of hash used for verification (e.g., "sha256")
         appimage_name_template: Template for AppImage filename
-        sha_name: Name of SHA file or "no_sha_file"
         preferred_characteristic_suffixes: List of characteristic suffixes in order of preference
+        skip_verification: Whether to skip hash verification for this app
+        use_asset_digest: Whether to use GitHub's asset digest for verification instead of SHA files
+        hash_type: Type of hash used for verification (e.g., "sha256") - optional if skip_verification is True
+        sha_name: Name of SHA file - optional if skip_verification or use_asset_digest is True
         icon_info: Direct URL to icon file
         icon_file_name: Preferred filename for saving the icon
         icon_repo_path: Repository path to icon file (fallback if icon_info not available)
@@ -44,13 +46,15 @@ class AppInfo:
     description: str
     category: str
     tags: list[str]
-    hash_type: str
     appimage_name_template: str
-    sha_name: str
     preferred_characteristic_suffixes: list[str]
-    icon_info: str | None
-    icon_file_name: str | None
-    icon_repo_path: str | None
+    skip_verification: bool = False
+    use_asset_digest: bool = False
+    hash_type: str | None = None
+    sha_name: str | None = None
+    icon_info: str | None = None
+    icon_file_name: str | None = None
+    icon_repo_path: str | None = None
 
 
 def initialize_definitions_path(path: Path) -> None:
@@ -89,10 +93,12 @@ def get_all_apps() -> dict[str, AppInfo]:
                         description=data["description"],
                         category=data["category"],
                         tags=data["tags"],
-                        hash_type=data["hash_type"],
                         appimage_name_template=data["appimage_name_template"],
-                        sha_name=data["sha_name"],
                         preferred_characteristic_suffixes=data["preferred_characteristic_suffixes"],
+                        skip_verification=data.get("skip_verification", False),
+                        use_asset_digest=data.get("use_asset_digest", False),
+                        hash_type=data.get("hash_type"),
+                        sha_name=data.get("sha_name"),
                         icon_info=data.get("icon_info"),
                         icon_file_name=data.get("icon_file_name"),
                         icon_repo_path=data.get("icon_repo_path"),
@@ -106,6 +112,26 @@ def get_all_apps() -> dict[str, AppInfo]:
         logger.error("Error scanning app definitions directory: %s", e)
 
     return apps
+
+
+def find_app_by_owner_repo(owner: str, repo: str) -> AppInfo | None:
+    """Find app definition by exact owner/repo match.
+
+    Args:
+        owner: Repository owner/organization
+        repo: Repository name
+
+    Returns:
+        AppInfo object if found, None otherwise
+
+    """
+    all_apps = get_all_apps()
+    
+    for app_info in all_apps.values():
+        if app_info.owner.lower() == owner.lower() and app_info.repo.lower() == repo.lower():
+            return app_info
+    
+    return None
 
 
 def load_app_definition(repo_name: str) -> AppInfo | None:
@@ -149,10 +175,12 @@ def load_app_definition(repo_name: str) -> AppInfo | None:
             description=data["description"],
             category=data["category"],
             tags=data["tags"],
-            hash_type=data["hash_type"],
             appimage_name_template=data["appimage_name_template"],
-            sha_name=data["sha_name"],
             preferred_characteristic_suffixes=data["preferred_characteristic_suffixes"],
+            skip_verification=data.get("skip_verification", False),
+            use_asset_digest=data.get("use_asset_digest", False),
+            hash_type=data.get("hash_type"),
+            sha_name=data.get("sha_name"),
             icon_info=data.get("icon_info"),
             icon_file_name=data.get("icon_file_name"),
             icon_repo_path=data.get("icon_repo_path"),

@@ -263,12 +263,14 @@ class TestBaseUpdateCommand:
                 is_batch=True,
             )
 
-    def test_verify_appimage_with_no_sha(
+    def test_verify_appimage_with_skip_verification(
         self, base_update_command: BaseUpdateCommand, mock_github_api: MagicMock
     ) -> None:
-        """Test that verification is skipped for beta versions with no SHA file."""
-        # Set up the SHA name to indicate no SHA file
-        mock_github_api.sha_name = "no_sha_file"
+        """Test that verification is skipped when skip_verification is enabled."""
+        # Set up the API to skip verification
+        mock_github_api.skip_verification = True
+        mock_github_api.sha_name = None
+        mock_github_api.hash_type = None
 
         # Call the method
         result_valid, result_skipped = base_update_command._verify_appimage(mock_github_api)
@@ -277,7 +279,7 @@ class TestBaseUpdateCommand:
         assert result_valid is True
         assert result_skipped is True
         base_update_command._logger.info.assert_called_with(
-            "Skipping verification - no hash file provided by the developer"
+            "Skipping verification - verification disabled for this app"
         )
 
     @patch("src.commands.update_base.VerificationManager")

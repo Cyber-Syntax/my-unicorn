@@ -120,7 +120,15 @@ def mocked_api(monkeypatch: pytest.MonkeyPatch, install_test_data: dict[str, str
     mock.arch_keyword = None
     mock.appimage_url = install_test_data["appimage_url"]
     mock.get_response.return_value = (True, "Success")  # Success response
-    mock.check_latest_version.return_value = (True, "Success")  # Success response for version check
+    mock.check_latest_version.return_value = (False, {
+        "current_version": None,
+        "latest_version": install_test_data["version"],
+        "release_notes": "Test release notes",
+        "release_url": "https://github.com/test/test/releases/tag/v1.0.0",
+        "compatible_assets": [],
+        "is_prerelease": False,
+        "published_at": "2023-01-01T00:00:00Z",
+    })  # Proper response format
 
     api_class_mock = MagicMock(return_value=mock)
     monkeypatch.setattr("src.commands.install_app.GitHubAPI", api_class_mock)
@@ -353,7 +361,7 @@ def test_install_app_direct_install(
 
 @patch("builtins.input")
 @patch("builtins.print")
-def test_install_app_no_sha_file(
+def test_install_app_skip_verification(
     mock_print: MagicMock,
     mock_input: MagicMock,
     mocked_app_config: MagicMock,
@@ -380,11 +388,13 @@ def test_install_app_no_sha_file(
         app_info_fixture: Sample app info
 
     """
-    # Modify the app_info to have no SHA file
-    app_info_fixture.sha_name = "no_sha_file"
+    # Modify the app_info to skip verification
+    app_info_fixture.skip_verification = True
 
-    # Set the API mock to return no SHA file as well
-    mocked_api.sha_name = "no_sha_file"
+    # Set the API mock to skip verification as well
+    mocked_api.skip_verification = True
+    mocked_api.sha_name = None
+    mocked_api.hash_type = None
 
     # Setup mock inputs
     mock_input.side_effect = ["y"]  # Confirm install
@@ -475,8 +485,8 @@ def test_install_app_api_failure(
         app_info_fixture: Sample app info
 
     """
-    # Set API to fail
-    mocked_api.check_latest_version.return_value = (False, "API Error")
+    # Set API to fail with proper error response format
+    mocked_api.check_latest_version.return_value = (False, {"error": "API Error"})
 
     # Setup mock inputs
     mock_input.side_effect = ["y"]  # Confirm install

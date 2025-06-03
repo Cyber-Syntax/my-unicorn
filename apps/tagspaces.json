@@ -5,10 +5,10 @@
     "description": "A free and open-source personal data manager with tagging support",
     "category": "Productivity",
     "tags": ["file-manager", "tagging", "local-files"],
-    "hash_type": "sha256",
     "appimage_name_template": "{repo_name}-{latest_version}-{characteristic_suffix}.AppImage",
-    "sha_name": "SHA256SUMS.txt",
     "preferred_characteristic_suffixes": ["linux-x86_64", "x86_64", "amd64"],
+    "hash_type": "sha256",
+    "sha_name": "SHA256SUMS.txt",
     "icon_info": "https://raw.githubusercontent.com/tagspaces/tagspaces/master/assets/icon.png",
     "icon_file_name": "tagspaces_icon.png",
     "icon_repo_path": "assets/icon.png"

@@ -7,7 +7,7 @@ Consolidated GitHubAPI class with full release, asset, and SHA handling.
 import logging
 from typing import Any, Dict, Optional, Tuple, Union
 
-from src.app_catalog import AppInfo, load_app_definition
+from src.app_catalog import load_app_definition, find_app_by_owner_repo
 from src.auth_manager import GitHubAuthManager
 from src.icon_manager import IconManager
 from src.utils import arch_utils
@@ -56,6 +56,11 @@ class GitHubAPI:
     @property
     def arch_keyword(self) -> Optional[str]:
         return self._arch_keyword
+
+    @property
+    def skip_verification(self) -> bool:
+        """Check if verification should be skipped for this app."""
+        return self._app_info and getattr(self._app_info, 'skip_verification', False)
 
     def get_latest_release(self, version_check_only: bool = False, is_batch: bool = False) -> Tuple[bool, Union[Dict[str, Any], str]]:
         """Fetch latest stable or fallback to beta release using ReleaseManager, then process it."""
@@ -129,7 +134,11 @@ class GitHubAPI:
 
         # Load app info if not already loaded
         if self._app_info is None:
-            self._app_info = load_app_definition(self.repo)
+            # First try finding by exact owner/repo match
+            self._app_info = find_app_by_owner_repo(self.owner, self.repo)
+            # Fall back to repo name lookup if not found
+            if self._app_info is None:
+                self._app_info = load_app_definition(self.repo)
 
         # Create config dict for selection - use app definition for preferred characteristic suffixes
         if self._app_info:
@@ -191,22 +200,45 @@ class GitHubAPI:
                 )
 
         if self.appimage_name and not version_check_only:
-            # Use SHA name from app definition if available, otherwise use provided sha_name
-            if self._app_info and self._app_info.sha_name:
-                initial_sha_name_hint = self._app_info.sha_name
-                logger.debug(f"Using SHA name from app definition: {initial_sha_name_hint}")
-            else:
-                initial_sha_name_hint = self.sha_name or "sha256"
-                logger.debug(f"Using fallback SHA name: {initial_sha_name_hint}")
+            logger.debug(f"Processing SHA for {self.appimage_name}, version_check_only={version_check_only}")
+            logger.debug(f"App info available: {self._app_info is not None}")
+            if self._app_info:
+                logger.debug(f"App skip_verification: {getattr(self._app_info, 'skip_verification', False)}")
+                logger.debug(f"App use_asset_digest: {getattr(self._app_info, 'use_asset_digest', False)}")
+            
+            # Check if verification should be skipped for this app
+            if self._app_info and getattr(self._app_info, 'skip_verification', False):
+                logger.info(f"Skipping SHA search for {self.appimage_name} - verification disabled for this app")
+                self.sha_name = None
+                self.sha_url = None
+                self.hash_type = None
+                self.extracted_hash_from_body = None
+                self.asset_digest = None
 
-            sha_mgr = SHAManager(self.owner, self.repo, initial_sha_name_hint, self.appimage_name, is_batch=is_batch)
-            sha_mgr.find_sha_asset(assets)
-            # Update instance attributes with results from SHAManager
-            self.sha_name = sha_mgr.sha_name
-            self.sha_url = sha_mgr.sha_url
-            self.hash_type = sha_mgr.hash_type
-            self.extracted_hash_from_body = sha_mgr.extracted_hash_from_body
-            self.asset_digest = sha_mgr.asset_digest
+            else:
+                logger.debug(f"Proceeding with SHA processing for {self.appimage_name}")
+                # Use SHA name from app definition if available, otherwise use provided sha_name
+                if self._app_info and self._app_info.sha_name:
+                    initial_sha_name_hint = self._app_info.sha_name
+                    logger.debug(f"Using SHA name from app definition: {initial_sha_name_hint}")
+                else:
+                    initial_sha_name_hint = self.sha_name or "sha256"
+                    logger.debug(f"Using fallback SHA name: {initial_sha_name_hint}")
+
+                logger.debug(f"Creating SHAManager with app_info: {self._app_info}")
+                sha_mgr = SHAManager(self.owner, self.repo, initial_sha_name_hint, self.appimage_name, is_batch=is_batch, app_info=self._app_info)
+                sha_mgr.find_sha_asset(assets)
+                
+                logger.debug(f"SHAManager results - hash_type: {sha_mgr.hash_type}, sha_name: {sha_mgr.sha_name}, asset_digest: {sha_mgr.asset_digest}")
+                
+                # Update instance attributes with results from SHAManager
+                self.sha_name = sha_mgr.sha_name
+                self.sha_url = sha_mgr.sha_url
+                self.hash_type = sha_mgr.hash_type
+                self.extracted_hash_from_body = sha_mgr.extracted_hash_from_body
+                self.asset_digest = sha_mgr.asset_digest
+                
+                logger.debug(f"GitHub API updated - hash_type: {self.hash_type}, sha_name: {self.sha_name}, asset_digest: {self.asset_digest}")
         else:
             self.sha_name = None
             self.sha_url = None

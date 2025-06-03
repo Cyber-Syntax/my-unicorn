@@ -25,6 +25,7 @@ class SHAManager:
         sha_name: str,
         appimage_name: str | None = None,
         is_batch: bool = False,
+        app_info=None,
     ):
         """Initialize the SHAManager.
 
@@ -34,6 +35,7 @@ class SHAManager:
             sha_name: Name of the SHA algorithm used in the release assets
             appimage_name: Name of the selected AppImage
             is_batch: True if running in a non-interactive batch mode
+            app_info: AppInfo object containing app-specific settings
 
         """
         self.owner = owner
@@ -45,6 +47,8 @@ class SHAManager:
         self.hash_type = None
         self.extracted_hash_from_body: str | None = None  # For hash from release body
         self.asset_digest: str | None = None  # For GitHub API asset digest verification
+        self._app_info = app_info
+        self.skip_verification: bool = app_info.skip_verification if app_info else False
 
     def _try_extract_sha_from_release_body(self) -> bool:
         """Tries to extract the SHA256 checksum for the current AppImage
@@ -128,59 +132,47 @@ class SHAManager:
             assets: List of release assets from GitHub API
 
         """
-        if self.sha_name == "no_sha_file":
+        if self.skip_verification:
             logger.info("Skipping SHA verification per configuration")
-            # Skip the entire SHA search process when no_sha_file is specified
-            self.hash_type = "no_hash"  # Set hash_type to no_hash to skip verification
+            # Skip the entire SHA search process when skip_verification is enabled
             return
 
         if not self.appimage_name:
             logger.error("Cannot find SHA asset: AppImage name not set")
             return
 
-        # Create a minimal AppInfo object for SHA finding
-        from src.app_catalog import AppInfo
+        # Priority 1: Asset digest verification is handled by SHAAssetFinder
+        # No need for separate check here - let SHAAssetFinder handle it
 
-        app_info = AppInfo(
-            owner=self.owner,
-            repo=self.repo,
-            app_rename=self.repo,
-            description="",
-            category="",
-            tags=[],
-            hash_type="sha256",
-            appimage_name_template="",
-            sha_name=self.sha_name,
-            preferred_characteristic_suffixes=[],
-            icon_info=None,
-            icon_file_name=None,
-            icon_repo_path=None,
-        )
-
-        # First priority: Try to use asset digest if available
-        if self._try_extract_digest_from_assets(assets):
-            logger.info(f"Using asset digest verification for {self.appimage_name}")
+        # Priority 2: Try to extract from release body description
+        if self._try_extract_sha_from_release_body():
+            logger.info(f"Successfully extracted SHA for {self.appimage_name} from release description")
             return
 
-        # Second priority: Try to find SHA asset file
+        # Priority 3: Try to find SHA asset file using SHAAssetFinder
         finder = SHAAssetFinder()
-        sha_asset = finder.find_best_match(self.appimage_name, app_info, assets)
+        sha_asset = finder.find_best_match(self.appimage_name, self._app_info, assets)
 
         if sha_asset:
-            self._select_sha_asset(sha_asset)
-        else:
-            logger.info(f"No SHA asset file found for {self.appimage_name} via SHAAssetFinder.")
-            # Third priority: Try to extract from release body
-            if self._try_extract_sha_from_release_body():
-                logger.info(
-                    f"Successfully used SHA extracted for {self.appimage_name} from release description."
-                )
-                return  # SHA found from body, no need for further file-based fallback
+            logger.debug(f"SHAAssetFinder returned: {sha_asset}")
+            # Check if this is a special asset digest response
+            if sha_asset.get("hash_type") == "asset_digest":
+                self.hash_type = "asset_digest"
+                self.sha_name = "asset_digest"
+                self.sha_url = None
+                self.asset_digest = sha_asset["digest"]
+                logger.info(f"Successfully assigned asset digest verification for {self.appimage_name}")
+                logger.debug(f"Asset digest: {self.asset_digest}")
+                logger.debug(f"Hash type: {self.hash_type}")
+                logger.debug(f"SHA name: {self.sha_name}")
             else:
-                logger.warning(
-                    f"Could not extract SHA for {self.appimage_name} from release description."
-                )
-                self._handle_sha_fallback(assets)  # Proceed to manual fallback
+                self._select_sha_asset(sha_asset)
+                logger.info(f"Found SHA file for {self.appimage_name}: {sha_asset['name']}")
+            return
+
+        # Priority 4: Manual fallback - ask user
+        logger.warning(f"No automatic verification method found for {self.appimage_name}")
+        self._handle_sha_fallback(assets)
 
     def _select_sha_asset(self, asset: dict) -> None:
         """Select a SHA asset and set instance attributes.
@@ -200,42 +192,6 @@ class SHAManager:
             self.hash_type = ui_utils.get_user_input("Enter hash type", default="sha256")
 
         logger.info(f"Selected SHA file: {self.sha_name} (hash type: {self.hash_type})")
-
-    def _try_extract_digest_from_assets(self, assets: list[dict]) -> bool:
-        """Try to extract digest information from GitHub API asset metadata.
-
-        Args:
-            assets: List of release assets from GitHub API
-
-        Returns:
-            True if digest was successfully extracted, False otherwise
-        """
-        if not self.appimage_name:
-            return False
-
-        # Look for the AppImage asset that matches our selected file
-        for asset in assets:
-            if asset.get("name") == self.appimage_name and asset.get("digest"):
-                digest = asset["digest"]
-                logger.info(f"Found asset digest for {self.appimage_name}: {digest}")
-                
-                # Validate digest format (should be like "sha256:hash_value")
-                if ":" in digest:
-                    digest_type, digest_hash = digest.split(":", 1)
-                    if digest_type in ["sha256", "sha512"] and len(digest_hash) > 0:
-                        self.asset_digest = digest
-                        self.hash_type = "asset_digest"
-                        self.sha_name = "asset_digest"
-                        self.sha_url = None
-                        logger.info(f"Using asset digest verification for {self.appimage_name}")
-                        return True
-                    else:
-                        logger.warning(f"Invalid digest format or unsupported type: {digest}")
-                else:
-                    logger.warning(f"Invalid digest format (missing colon): {digest}")
-
-        logger.debug(f"No digest found for {self.appimage_name} in assets")
-        return False
 
     def _handle_sha_fallback(self, assets: list[dict]) -> None:
         """Handle fallback when SHA file couldn't be automatically determined.
@@ -274,11 +230,14 @@ class SHAManager:
             else:
                 self.sha_name = "no_sha_file"
                 self.hash_type = "no_hash"
+                self.skip_verification = True
                 logger.info("User chose to skip SHA verification")
 
         except KeyboardInterrupt:
             logger.info("SHA fallback cancelled by user")
             raise
+
+
 
     def _handle_sha_fallback_sync(self, assets: list[dict]) -> None:
         """Synchronous version of SHA fallback handler.
@@ -305,6 +264,7 @@ class SHAManager:
             else:
                 self.sha_name = "no_sha_file"
                 self.hash_type = "no_hash"
+                self.skip_verification = True
                 logger.info("User chose to skip SHA verification")
 
         except KeyboardInterrupt:

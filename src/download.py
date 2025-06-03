@@ -28,6 +28,7 @@ class DownloadManager:
         app_index: Index of the app in a multi-app update (1-based)
         total_apps: Total number of apps being updated
         cancel_event: Optional threading.Event to signal download cancellation.
+        file_already_verified: Flag indicating if the file was already verified (skips double verification)
 
     """
 
@@ -71,6 +72,9 @@ class DownloadManager:
 
         # Store task ID for this download instance
         self._progress_task_id: Optional[int] = None
+        
+        # Flag to track if file was already verified
+        self.file_already_verified: bool = False
 
     def _detect_async_mode(self) -> bool:
         """Detect if we're running in an async context.
@@ -180,6 +184,28 @@ class DownloadManager:
             self._logger.error(error_msg)
             raise ValueError(error_msg)
 
+        # Check if file already exists in Downloads directory
+        downloads_dir = self.get_downloads_dir()
+        existing_file_path = os.path.join(downloads_dir, appimage_name)
+        
+        if os.path.exists(existing_file_path):
+            self._logger.info(f"File already exists in Downloads: {appimage_name}")
+            print(f"Found existing file: {appimage_name}")
+            
+            # Verify the existing file
+            if self._verify_existing_file(existing_file_path):
+                print(f"✓ Existing file verified: {appimage_name}")
+                self.file_already_verified = True  # Mark as already verified
+                return existing_file_path
+            else:
+                print(f"⚠️ Existing file failed verification, re-downloading: {appimage_name}")
+                # Remove the corrupted file and proceed with download
+                try:
+                    os.remove(existing_file_path)
+                    self._logger.info(f"Removed corrupted file: {existing_file_path}")
+                except OSError as e:
+                    self._logger.warning(f"Could not remove corrupted file {existing_file_path}: {e}")
+
         try:
             # Set up request headers
             headers = {"User-Agent": "AppImage-Updater/1.0", "Accept": "application/octet-stream"}
@@ -202,6 +228,57 @@ class DownloadManager:
             error_msg = f"Unexpected error downloading {appimage_name}: {e!s}"
             self._logger.error(error_msg)
             raise RuntimeError(error_msg)
+
+    def _verify_existing_file(self, file_path: str) -> bool:
+        """Verify an existing file without re-downloading.
+
+        Args:
+            file_path: Path to the existing file
+
+        Returns:
+            bool: True if verification passes or is skipped, False if verification fails
+
+        """
+        try:
+            # Skip verification if disabled
+            if self.github_api.skip_verification:
+                self._logger.info("Skipping verification for existing file (verification disabled)")
+                return True
+
+            # Check if we have verification method available
+            if not self.github_api.sha_name and not self.github_api.asset_digest:
+                self._logger.info("No verification method available for existing file")
+                return True
+
+            print("Verifying existing file...")
+            
+            from src.verify import VerificationManager
+            
+            # Create verification manager for the existing file
+            verification_manager = VerificationManager(
+                sha_name=self.github_api.sha_name,
+                sha_url=self.github_api.sha_url,
+                appimage_name=self.github_api.appimage_name,
+                hash_type=self.github_api.hash_type,
+                appimage_path=file_path,  # Set the path to existing file
+                direct_expected_hash=self.github_api.extracted_hash_from_body,
+                asset_digest=self.github_api.asset_digest,
+                use_asset_digest=self.github_api._app_info and getattr(self.github_api._app_info, 'use_asset_digest', False)
+            )
+
+            # Verify the existing file
+            is_valid = verification_manager.verify_appimage(cleanup_on_failure=False)
+            
+            if is_valid:
+                self._logger.info(f"Existing file verification successful: {file_path}")
+                return True
+            else:
+                self._logger.warning(f"Existing file verification failed: {file_path}")
+                return False
+                
+        except Exception as e:
+            self._logger.warning(f"Error verifying existing file {file_path}: {e}")
+            return False
 
     def _get_file_size(self, url: str, headers: Dict[str, str]) -> int:
         """Get the file size by making a HEAD request.
@@ -447,8 +524,8 @@ class DownloadManager:
         logging.info("Verifying download integrity...")
 
         # Skip verification if hash verification is disabled
-        if self.github_api.hash_type == "no_hash" or not self.github_api.sha_name:
-            logging.info("Skipping verification as requested (no hash provided)")
+        if self.github_api.skip_verification or not self.github_api.sha_name:
+            logging.info("Skipping verification as requested (verification disabled or no hash provided)")
             return True
 
         from src.verify import VerificationManager # Import once at the top of the relevant scope
