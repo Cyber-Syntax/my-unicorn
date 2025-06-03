@@ -330,7 +330,7 @@ class BaseUpdateCommand(Command):
             cleanup = False if is_batch else True
             # Verify the download
             verification_result, verification_skipped = self._verify_appimage(
-                github_api, downloaded_file_path, cleanup_on_failure=cleanup
+                github_api, downloaded_file_path, cleanup_on_failure=cleanup, download_manager=download_manager
             )
             if not verification_result:
                 error_msg = f"Verification failed for {app_data['name']}."
@@ -490,6 +490,7 @@ class BaseUpdateCommand(Command):
         github_api: GitHubAPI,
         downloaded_file_path: str | None = None,
         cleanup_on_failure: bool = True,
+        download_manager=None,
     ) -> tuple[bool, bool]:
         """Verify the downloaded AppImage using the SHA file.
 
@@ -505,6 +506,12 @@ class BaseUpdateCommand(Command):
 
         """
         verification_skipped = False
+
+        # Check if file was already verified during download
+        if download_manager and getattr(download_manager, 'file_already_verified', False):
+            self._logger.info("Skipping verification - file was already verified during download check.")
+            print("Note: File was already verified")
+            return True, False
 
         # Check if verification should be skipped based on app configuration
         if github_api.skip_verification:
