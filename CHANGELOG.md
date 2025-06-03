@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.10.10-alpha
+### Changed
+Fixes the performance issues with the api usage and refactoring with the verification module. This release will not affect existing functionality.
+
 ## v0.10.9-alpha
 ### Changed
 This release will not affect existing functionality, but it will fix the issue with the app_catalog module.

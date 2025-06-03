@@ -4,6 +4,7 @@ This module provides functionality for computing file hashes and comparing
 them with expected values using memory-efficient chunked reading.
 """
 
+import fcntl
 import hashlib
 import logging
 import os
@@ -60,8 +61,19 @@ class HashCalculator:
             chunk_size = 65536  # 64KB chunks for better performance
             
             with open(filepath, "rb") as f:
-                for chunk in iter(lambda: f.read(chunk_size), b""):
-                    hash_func.update(chunk)
+                try:
+                    # Acquire shared lock to prevent writing while reading
+                    fcntl.flock(f.fileno(), fcntl.LOCK_SH)
+                    
+                    for chunk in iter(lambda: f.read(chunk_size), b""):
+                        hash_func.update(chunk)
+                        
+                except (OSError, IOError) as lock_error:
+                    # If locking fails, proceed without lock but log warning
+                    logging.warning(f"Could not acquire file lock for {filepath}: {lock_error}")
+                    f.seek(0)  # Reset file position
+                    for chunk in iter(lambda: f.read(chunk_size), b""):
+                        hash_func.update(chunk)
                     
             return hash_func.hexdigest().lower()
             
