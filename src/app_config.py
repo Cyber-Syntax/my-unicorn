@@ -113,11 +113,19 @@ class AppConfigManager:
         return app_info.use_asset_digest if app_info else False
 
     @property
+    def use_github_release_desc(self) -> bool:
+        """Get use_github_release_desc flag from app definition."""
+        app_info = self.get_app_info()
+        return app_info.use_github_release_desc if app_info else False
+
+    @property
     def sha_name(self) -> str | None:
         """Get SHA name from app definition."""
         app_info = self.get_app_info()
         if app_info and app_info.use_asset_digest:
             return "asset_digest"
+        if app_info and app_info.use_github_release_desc:
+            return "extracted_checksum"
         return app_info.sha_name if app_info else None
 
     @property
@@ -126,6 +134,8 @@ class AppConfigManager:
         app_info = self.get_app_info()
         if app_info and app_info.use_asset_digest:
             return "asset_digest"
+        if app_info and app_info.use_github_release_desc:
+            return "extracted_checksum"
         return app_info.hash_type if app_info else None
 
     @property

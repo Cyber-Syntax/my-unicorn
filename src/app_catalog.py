@@ -32,6 +32,7 @@ class AppInfo:
         preferred_characteristic_suffixes: List of characteristic suffixes in order of preference
         skip_verification: Whether to skip hash verification for this app
         use_asset_digest: Whether to use GitHub's asset digest for verification instead of SHA files
+        use_github_release_desc: Whether to use GitHub release description for checksum extraction
         hash_type: Type of hash used for verification (e.g., "sha256") - optional if skip_verification is True
         sha_name: Name of SHA file - optional if skip_verification or use_asset_digest is True
         icon_info: Direct URL to icon file
@@ -50,6 +51,7 @@ class AppInfo:
     preferred_characteristic_suffixes: list[str]
     skip_verification: bool = False
     use_asset_digest: bool = False
+    use_github_release_desc: bool = False
     hash_type: str | None = None
     sha_name: str | None = None
     icon_info: str | None = None
@@ -97,6 +99,7 @@ def get_all_apps() -> dict[str, AppInfo]:
                         preferred_characteristic_suffixes=data["preferred_characteristic_suffixes"],
                         skip_verification=data.get("skip_verification", False),
                         use_asset_digest=data.get("use_asset_digest", False),
+                        use_github_release_desc=data.get("use_github_release_desc", False),
                         hash_type=data.get("hash_type"),
                         sha_name=data.get("sha_name"),
                         icon_info=data.get("icon_info"),
@@ -179,6 +182,7 @@ def load_app_definition(repo_name: str) -> AppInfo | None:
             preferred_characteristic_suffixes=data["preferred_characteristic_suffixes"],
             skip_verification=data.get("skip_verification", False),
             use_asset_digest=data.get("use_asset_digest", False),
+            use_github_release_desc=data.get("use_github_release_desc", False),
             hash_type=data.get("hash_type"),
             sha_name=data.get("sha_name"),
             icon_info=data.get("icon_info"),

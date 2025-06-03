@@ -7,7 +7,7 @@ Consolidated GitHubAPI class with full release, asset, and SHA handling.
 import logging
 from typing import Any, Dict, Optional, Tuple, Union
 
-from src.app_catalog import load_app_definition, find_app_by_owner_repo
+from src.app_catalog import load_app_definition, find_app_by_owner_repo, AppInfo
 from src.auth_manager import GitHubAuthManager
 from src.icon_manager import IconManager
 from src.utils import arch_utils
@@ -205,6 +205,7 @@ class GitHubAPI:
             if self._app_info:
                 logger.debug(f"App skip_verification: {getattr(self._app_info, 'skip_verification', False)}")
                 logger.debug(f"App use_asset_digest: {getattr(self._app_info, 'use_asset_digest', False)}")
+                logger.debug(f"App use_github_release_desc: {getattr(self._app_info, 'use_github_release_desc', False)}")
             
             # Check if verification should be skipped for this app
             if self._app_info and getattr(self._app_info, 'skip_verification', False):

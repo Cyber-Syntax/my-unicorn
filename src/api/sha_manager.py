@@ -145,9 +145,10 @@ class SHAManager:
         # No need for separate check here - let SHAAssetFinder handle it
 
         # Priority 2: Try to extract from release body description
-        if self._try_extract_sha_from_release_body():
-            logger.info(f"Successfully extracted SHA for {self.appimage_name} from release description")
-            return
+        if self._app_info and getattr(self._app_info, "use_github_release_desc", False):
+            if self._try_extract_sha_from_release_body():
+                logger.info(f"Successfully extracted SHA for {self.appimage_name} from release description")
+                return
 
         # Priority 3: Try to find SHA asset file using SHAAssetFinder
         finder = SHAAssetFinder()
