@@ -13,6 +13,7 @@ from typing import Self
 
 
 # Supported hash types
+# TODO: delete non hash types here, create different logic for them
 SUPPORTED_HASH_TYPES = [
     "sha256",
     "sha512",
@@ -79,7 +80,7 @@ class VerificationConfig:
             self.hash_type = self.hash_type.lower()
 
     def _set_asset_digest_flag(self) -> None:
-        """Set asset digest flag if hash type is asset_digest."""
+        """set asset digest flag if hash type is asset_digest."""
         if self.hash_type == "asset_digest":
             self.use_asset_digest = True
 
@@ -108,13 +109,13 @@ class VerificationConfig:
         )
 
     def set_appimage_path(self, full_path: str) -> None:
-        """Set the full path to the AppImage file for verification.
+        """set the full path to the AppImage file for verification.
 
         Args:
             full_path: The complete path to the AppImage file
         """
         self.appimage_path = full_path
-        logging.info(f"Set AppImage path for verification: {full_path}")
+        logging.info(f"set AppImage path for verification: {full_path}")
 
     def is_verification_skipped(self) -> bool:
         """Check if verification should be skipped."""

@@ -285,7 +285,7 @@ classDiagram
         }
         class ArchExtractionUtils {
             <<src/utils/arch_extraction.py>>
-            +get_arch_from_filename(filename): str
+            +extract_arch_from_filename(filename): str
             +get_current_system_arch(): str
         }
         class DesktopEntryUtils {

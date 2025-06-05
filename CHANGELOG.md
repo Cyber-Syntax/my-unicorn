@@ -2,8 +2,9 @@
 All notable changes to this project will be documented in this file.
 
 ## v0.10.10-alpha
-### Changed
-Fixes the performance issue and concurrent issues. Refactor verify module...
+### BREAKING CHANGES
+Fixes the performance issue and concurrent issues. After this release we are no longer
+support python 3.11 and lower. This release completely switches to python 3.12 and higher.
 
 ## v0.10.9-alpha
 ### Changed

@@ -51,7 +51,7 @@ def install_test_data() -> dict[str, str]:
     """Provide common test data for install app command tests.
 
     Returns:
-        Dict[str, str]: Dictionary containing test values
+        tuple[str, str]: Dictionary containing test values
 
     """
     return {
@@ -276,7 +276,7 @@ def mocked_app_catalog_functions(
         app_info_fixture: Sample app info
 
     Returns:
-        Dict[str, MagicMock]: Dictionary of mocked functions
+        tuple[str, MagicMock]: Dictionary of mocked functions
 
     """
     # Create mock functions for all app catalog functions
@@ -394,7 +394,7 @@ def test_install_app_skip_verification(
     # Modify the app_info to skip verification
     app_info_fixture.skip_verification = True
 
-    # Set the API mock to skip verification as well
+    # set the API mock to skip verification as well
     mocked_api.skip_verification = True
     mocked_api.sha_name = None
     mocked_api.hash_type = None
@@ -488,7 +488,7 @@ def test_install_app_api_failure(
         app_info_fixture: Sample app info
 
     """
-    # Set API to fail with proper error response format
+    # set API to fail with proper error response format
     mocked_api.check_latest_version.return_value = (False, {"error": "API Error"})
 
     # Setup mock inputs

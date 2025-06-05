@@ -1,17 +1,29 @@
-"""Architecture utilities for identifying system CPU architecture and compatibility."""
+"""Architecture utilities for system compatibility checking.
 
-import platform
+This module provides utilities for:
+- Detecting system CPU architecture
+- Validating architecture compatibility
+- Mapping between different architecture naming schemes
+- Filtering incompatible architectures
+"""
+
 import logging
-from typing import List
+import platform
 
 logger = logging.getLogger(__name__)
 
 
 def get_current_arch() -> str:
-    """Returns system CPU architecture.
+    """Get current system CPU architecture.
+
+    Detects and normalizes the current system's CPU architecture name.
 
     Returns:
-        str: CPU architecture (e.g., "x86_64", "arm64", "aarch64")
+        str: Normalized CPU architecture identifier (e.g., "x86_64", "arm64")
+
+    Example:
+        >>> get_current_arch()
+        'x86_64'
     """
     machine = platform.machine().lower()
 
@@ -21,14 +33,21 @@ def get_current_arch() -> str:
     return arch_map.get(machine, machine)
 
 
-def get_compatible_arch_strings(cpu_arch: str) -> List[str]:
-    """Returns list of equivalent architecture strings.
+def get_compatible_arch_strings(cpu_arch: str) -> list[str]:
+    """Get equivalent architecture strings for a CPU architecture.
+    
+    Maps architecture identifiers to their common alternative names used by
+    different systems, distributions and package formats.
 
     Args:
-        cpu_arch: Base architecture string (e.g., "x86_64")
+        cpu_arch: Base architecture identifier (e.g., "x86_64", "aarch64")
 
     Returns:
-        List of compatible architecture strings
+        list[str]: List of equivalent architecture strings
+
+    Example:
+        >>> get_compatible_arch_strings("x86_64")
+        ['x86_64', 'amd64']
     """
     compatibility_map = {
         "x86_64": ["x86_64", "amd64"],
@@ -40,14 +59,21 @@ def get_compatible_arch_strings(cpu_arch: str) -> List[str]:
     return compatibility_map.get(cpu_arch.lower(), [cpu_arch.lower()])
 
 
-def get_incompatible_archs(current_arch: str) -> List[str]:
-    """Get a list of architecture keywords that are incompatible with the current architecture.
+def get_incompatible_archs(current_arch: str) -> list[str]:
+    """Get architecture strings incompatible with specified architecture.
+
+    Provides a list of architecture identifiers that are known to be incompatible
+    with the given architecture, used for filtering out incompatible AppImages.
 
     Args:
-        current_arch: Current system architecture
+        current_arch: Base architecture to check incompatibilities against
 
     Returns:
-        list: List of incompatible architecture keywords to filter out
+        list[str]: List of incompatible architecture identifiers
+
+    Example:
+        >>> get_incompatible_archs("x86_64")
+        ['arm64', 'aarch64', 'armhf', 'arm32', 'armv7', 'armv6', 'i686', 'i386']
     """
     # Define incompatible architectures based on current architecture
     incompatible_map = {
@@ -90,16 +116,19 @@ def get_incompatible_archs(current_arch: str) -> List[str]:
 
 
 def is_keyword_compatible_with_arch(keyword: str, system_cpu_arch: str) -> bool:
-    """Checks if a filename keyword/suffix is compatible with system CPU architecture.
+    """Check if a filename component is compatible with system architecture.
+
+    Analyzes filename components using pattern matching to determine if they
+    indicate architecture compatibility or incompatibility with the system.
 
     Args:
-        keyword: Filename keyword or suffix to check
-        system_cpu_arch: System CPU architecture to check against
+        keyword: String to analyze for architecture indicators
+        system_cpu_arch: Current system CPU architecture identifier
 
     Returns:
-        bool: True if compatible, False otherwise
+        bool: True if compatible or neutral, False if incompatible
 
-    Example:
+    Examples:
         >>> is_keyword_compatible_with_arch("x86_64-Qt6", "x86_64")
         True
         >>> is_keyword_compatible_with_arch("arm64", "x86_64")
@@ -112,16 +141,15 @@ def is_keyword_compatible_with_arch(keyword: str, system_cpu_arch: str) -> bool:
     keyword = keyword.lower()
     system_cpu_arch = system_cpu_arch.lower()
 
-    # Get incompatible architectures for the current system
+    # Get list of architectures incompatible with current system
     incompatible_archs = get_incompatible_archs(system_cpu_arch)
 
-    # Check if any incompatible architecture is present in the keyword
+    # Check each potential incompatible architecture
     for arch in incompatible_archs:
-        # Use more specific pattern matching to avoid false positives
-        # Look for architecture strings that are either:
-        # 1. Standalone words (surrounded by non-alphanumeric chars)
-        # 2. At word boundaries
-        # 3. Part of architecture-specific patterns
+        # Match architecture strings that are:
+        # 1. Complete words (bounded by non-alphanumeric chars)
+        # 2. Word boundaries or separator-bounded
+        # 3. Architecture-specific filename patterns
 
         # Create patterns that match complete architecture identifiers
         patterns = [

@@ -128,7 +128,7 @@ class TestChecksumVerification:
         self, mock_verify, mock_extractor_class
     ):
         """Test successful verification using release description."""
-        # Set up the mocks
+        # set up the mocks
         mock_extractor_instance = MagicMock()
         mock_extractor_class.return_value = mock_extractor_instance
         mock_extractor_instance.write_checksums_file.return_value = "/tmp/checksums.txt"
@@ -152,7 +152,7 @@ class TestChecksumVerification:
         self, mock_verify, mock_extractor_class
     ):
         """Test verification failure using release description."""
-        # Set up the mocks
+        # set up the mocks
         mock_extractor_instance = MagicMock()
         mock_extractor_class.return_value = mock_extractor_instance
         mock_extractor_instance.write_checksums_file.return_value = "/tmp/checksums.txt"
@@ -176,7 +176,7 @@ class TestChecksumVerification:
     @patch("src.utils.checksums.extractor.ReleaseChecksumExtractor")
     def test_handle_release_description_verification_fetch_error(self, mock_extractor_class):
         """Test handling fetch error in release description verification."""
-        # Set up the mocks to simulate a fetch error
+        # set up the mocks to simulate a fetch error
         mock_extractor_instance = MagicMock()
         mock_extractor_class.return_value = mock_extractor_instance
         mock_extractor_instance.fetch_release_description.side_effect = Exception("Network error")

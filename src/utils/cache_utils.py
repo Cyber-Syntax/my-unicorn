@@ -9,7 +9,7 @@ import json
 import logging
 import os
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -29,8 +29,8 @@ def ensure_directory_exists(directory_path: str) -> str:
 
 
 def load_json_cache(
-    cache_file_path: str, ttl_seconds: int = 3600, hard_refresh_seconds: Optional[int] = None
-) -> Dict[str, Any]:
+    cache_file_path: str, ttl_seconds: int = 3600, hard_refresh_seconds: tuple[str, str] | None = None
+) -> tuple[str, Any]:
     """Load cached data from a JSON file with TTL validation.
 
     Args:
@@ -39,7 +39,7 @@ def load_json_cache(
         hard_refresh_seconds: Optional longer TTL for stale data
 
     Returns:
-        Dict[str, Any]: Cache data or empty dict if invalid/expired
+        tuple[str, Any]: Cache data or empty dict if invalid/expired
     """
     try:
         if os.path.exists(cache_file_path):
@@ -70,7 +70,7 @@ def load_json_cache(
         return {}
 
 
-def save_json_cache(cache_file_path: str, data: Dict[str, Any]) -> bool:
+def save_json_cache(cache_file_path: str, data: tuple[str, Any]) -> bool:
     """Save data to a JSON cache file with atomic updates.
 
     Args:
@@ -93,7 +93,7 @@ def save_json_cache(cache_file_path: str, data: Dict[str, Any]) -> bool:
         with open(temp_file, "w") as f:
             json.dump(data, f)
 
-        # Set permissions before atomic replace
+        # set permissions before atomic replace
         os.chmod(temp_file, 0o600)
 
         # Atomic replace

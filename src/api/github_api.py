@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """GitHub API handler module.
 
-Consolidated GitHubAPI class with full release, asset, and SHA handling.
+This module provides the primary interface for interacting with GitHub's API to handle releases, 
+assets, and SHA verification. It consolidates all GitHub-related operations into a single class 
+for consistent access patterns.
 """
 
 import logging
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any
 
-from src.app_catalog import load_app_definition, find_app_by_owner_repo, AppInfo
+from src.app_catalog import AppInfo, find_app_by_owner_repo, load_app_definition
 from src.auth_manager import GitHubAuthManager
 from src.icon_manager import IconManager
 from src.utils import arch_utils
-from src.utils.arch_extraction import get_arch_from_filename
+from src.utils.arch_extraction import extract_arch_from_filename
 from src.utils.version_utils import extract_version, extract_version_from_filename
 
 from .assets import AppImageAsset, ReleaseInfo
@@ -30,28 +32,37 @@ class GitHubAPI:
         self,
         owner: str,
         repo: str,
-        sha_name: str = "sha256",  # Suffix hint for SHA file, e.g., "sha256", "sha512.txt"
-        hash_type: str = "sha256",  # Default hash algorithm if not determinable
-        arch_keyword: Optional[str] = None,  # Legacy parameter, kept for compatibility
+        sha_name: str,
+        hash_type: str,
+        arch_keyword: str | None = None,
     ):
+        """Initialize GitHub API handler.
+        
+        Args:
+            owner: Repository owner/organization name
+            repo: Repository name
+            sha_name: Name of SHA file for verification
+            hash_type: Type of hash to use (sha256, sha512)
+            arch_keyword: Optional architecture keyword for filtering
+        """
         self.owner = owner
         self.repo = repo
-        self.sha_name: Optional[str] = sha_name  # Can be updated by SHAManager
-        self.hash_type: Optional[str] = hash_type  # Can be updated by SHAManager
-        self._arch_keyword = arch_keyword  # Legacy field
-        self.version: Optional[str] = None
-        self.appimage_name: Optional[str] = None
-        self.appimage_url: Optional[str] = None
-        self.sha_url: Optional[str] = None
-        self.extracted_hash_from_body: Optional[str] = None  # To store hash from release body
-        self.asset_digest: Optional[str] = None  # To store GitHub API asset digest
+        self.sha_name: str | None = sha_name  # Can be updated by SHAManager
+        self.hash_type: str | None = hash_type  # Can be updated by SHAManager
+        self._arch_keyword = arch_keyword
+        self.version: str = None
+        self.appimage_name: str = None
+        self.appimage_url: str = None
+        self.sha_url: str | None = None
+        self.extracted_hash_from_body: str | None = None
+        self.asset_digest: str | None = None
         self._headers = GitHubAuthManager.get_auth_headers()
         self._icon_manager = IconManager()
         self._release_fetcher = ReleaseManager(owner, repo)
-        self._release_info: Optional[ReleaseInfo] = None
+        self._release_info: ReleaseInfo | None = None
 
         # Load app info from catalog to get beta preference and other settings
-        self._app_info: Optional[AppInfo] = find_app_by_owner_repo(owner, repo)
+        self._app_info: AppInfo | None = find_app_by_owner_repo(owner, repo)
         if self._app_info:
             logger.debug(f"Loaded app info for {owner}/{repo}, beta={self._app_info.beta}")
         else:
@@ -61,7 +72,8 @@ class GitHubAPI:
         logger.debug(f"API initialized for {owner}/{repo}")
 
     @property
-    def arch_keyword(self) -> Optional[str]:
+    def arch_keyword(self) -> str | None:
+        """Get the architecture keyword for this API instance."""
         return self._arch_keyword
 
     @property
@@ -71,8 +83,20 @@ class GitHubAPI:
 
     def get_latest_release(
         self, version_check_only: bool = False, is_batch: bool = False
-    ) -> Tuple[bool, Union[Dict[str, Any], str]]:
-        """Fetch latest stable or beta release based on app configuration using ReleaseManager, then process it."""
+    ) -> tuple[bool, dict[str, Any], str]:
+        """Fetch latest stable or beta release based on app configuration.
+        
+        Uses ReleaseManager to fetch the appropriate release version (stable or beta) based on the
+        app's configuration in the catalog.
+        Processes the release data and extracts relevant information.
+
+        Args:
+            version_check_only: If True, only check version without downloading assets
+            is_batch: Whether this is part of a batch operation
+            
+        Returns:
+            Tuple containing (success flag, release data or error message, additional info)
+        """
         # Check if app prefers beta releases from catalog configuration
         prefer_beta = self._app_info.beta if self._app_info else False
 
@@ -84,6 +108,7 @@ class GitHubAPI:
                 self._headers
             )
         else:
+            # Fetch stable release for non-beta apps
             success, raw_data_or_error = self._release_fetcher.get_latest_release_data(
                 self._headers
             )
@@ -102,12 +127,13 @@ class GitHubAPI:
             return False, raw_data_or_error
 
         if not isinstance(raw_data_or_error, dict):
-            logger.error(
-                f"Type mismatch: Expected dict from ReleaseManager on success, got {type(raw_data_or_error)}"
+            error_msg = (
+                f"Type mismatch: Expected dict from ReleaseManager, got {type(raw_data_or_error)}"
             )
-            return False, "Internal error: Unexpected data type from release fetcher."
+            logger.error(error_msg)
+            return False, {}, "Internal error: Unexpected data type from release fetcher"
 
-        raw_release_json: Dict[str, Any] = raw_data_or_error
+        raw_release_json: dict[str, Any] = raw_data_or_error
         try:
             self._process_release(
                 raw_release_json, version_check_only=version_check_only, is_batch=is_batch
@@ -120,9 +146,25 @@ class GitHubAPI:
             return False, f"Failed to process release data: {e}"
 
     def _process_release(
-        self, release_data: Dict[str, Any], version_check_only: bool = False, is_batch: bool = False
+        self,
+        release_data: dict[str, Any],
+        version_check_only: bool = False,
+        is_batch: bool = False
     ) -> None:
-        """Populate version, assets, and release info using normalized version."""
+        """Process release data and populate instance attributes.
+
+        Extracts version information, release details, and asset metadata from GitHub release data.
+        Updates instance attributes with normalized version strings and architecture-specific assets
+        For zen-browser, handles special version format including letter suffixes (e.g., 1.2.3b).
+
+        Args:
+            release_data: Raw release data dictionary from GitHub API response
+            version_check_only: If True, only process version without downloading assets
+            is_batch: Whether this operation is part of a batch update
+
+        Raises:
+            ValueError: If required release data is missing or tag format is invalid
+        """
         logger.debug(
             f"Processing release in github_api.py: {release_data.get('tag_name', 'Unknown tag')}, version_check_only: {version_check_only}, is_batch: {is_batch}"
         )
@@ -134,32 +176,31 @@ class GitHubAPI:
         is_beta = release_data.get("prerelease", False)
         normalized_version = extract_version(raw_tag, is_beta)
 
-        # For zen-browser, if the raw_tag matches X.Y.Z[letter], use the raw_tag (cleaned of 'v')
-        # as the canonical version, overriding the potentially stripped version from extract_version.
+        # Handle zen-browser's special version format (X.Y.Z[letter])
         if self.owner == "zen-browser" and self.repo == "desktop":
             import re
-
+            
             zen_tag_pattern = re.compile(r"^v?(\d+\.\d+\.\d+)([a-zA-Z])$")
             match = zen_tag_pattern.match(raw_tag)
             if match:
-                potential_zen_version = f"{match.group(1)}{match.group(2)}"
+                version_base, letter_suffix = match.group(1), match.group(2)
+                potential_zen_version = f"{version_base}{letter_suffix}"
                 if normalized_version != potential_zen_version:
                     logger.info(
-                        f"For zen-browser, overriding extracted version '{normalized_version}' with specific tag format '{potential_zen_version}' from raw tag '{raw_tag}'."
+                        f"zen-browser: using version format {potential_zen_version} "
+                        f"instead of {normalized_version} from tag {raw_tag}"
                     )
-                normalized_version = potential_zen_version
-            elif raw_tag.lstrip("vV") != normalized_version:
-                pass
+                    normalized_version = potential_zen_version
 
         if not normalized_version:
             raise ValueError(f"Could not determine version from tag: '{raw_tag}'")
 
         self.version = normalized_version
 
-        # If this is only a version check, skip all asset processing to optimize performance
+        # Skip asset processing for version-only checks to optimize performance
         if version_check_only:
             logger.debug(
-                f"Version check only mode - skipping asset processing for {self.owner}/{self.repo}"
+                f"Version check only: skipping asset processing for {self.owner}/{self.repo}"
             )
             # Clear asset-related attributes for version-only checks
             self.appimage_name = None
@@ -183,7 +224,7 @@ class GitHubAPI:
                 "extracted_hash_from_body": None,
                 "asset_digest": None,
                 "arch_keyword": self._arch_keyword,
-            }
+            }  # Minimal info for version-only checks
 
             self._release_info = ReleaseInfo.from_release_data(release_data, asset_info_dict)
             logger.info(
@@ -191,29 +232,31 @@ class GitHubAPI:
             )
             return
 
-        # Full processing for installation/download
-        assets = release_data.get("assets", [])
+        # Process assets for installation/download
+        assets: list[dict[str, Any]] = release_data.get("assets", [])
         if not assets:
             logger.warning(
-                f"No assets found in release data for tag {raw_tag}. Cannot select AppImage."
+                f"No assets found in release {raw_tag} for {self.owner}/{self.repo}"
             )
 
-        # Load app info if not already loaded
+        # Ensure app info is loaded for asset selection
         if self._app_info is None:
-            # First try finding by exact owner/repo match
+            # Try exact owner/repo match first
             self._app_info = find_app_by_owner_repo(self.owner, self.repo)
-            # Fall back to repo name lookup if not found
             if self._app_info is None:
+                # Fall back to repo name lookup
                 self._app_info = load_app_definition(self.repo)
+                logger.debug(f"Loaded app info via repo name for {self.repo}")
 
         # Create config dict for selection - use app definition for preferred characteristic suffixes
         if self._app_info:
-            # Use the preferred characteristic suffixes from app definition
+            # Use app definition's preferred characteristic suffixes
             user_local_config_data = {
-                "installed_characteristic_suffix": None  # Let selector choose based on app definition
+                "installed_characteristic_suffix": None  # Let app definition guide selection
             }
             logger.debug(
-                f"Using app definition for {self.repo} with preferred suffixes: {self._app_info.preferred_characteristic_suffixes}"
+                f"Using preferred suffixes for {self.repo}: "
+                f"{self._app_info.preferred_characteristic_suffixes}"
             )
         else:
             # Fallback to legacy arch_keyword if no app definition found
@@ -241,22 +284,26 @@ class GitHubAPI:
             else:
                 suffixes_info = f"with arch_keyword '{self._arch_keyword}'"
 
-            logger.error(
-                f"No compatible AppImage asset found for {self.owner}/{self.repo} {suffixes_info} in release '{raw_tag}'"
+            error_msg = (
+                f"No compatible AppImage asset found for {self.owner}/{self.repo} "
+                f"{suffixes_info} in release '{raw_tag}'"
             )
-            raise ValueError("No compatible AppImage asset found in release")
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         appimage_asset_obj = AppImageAsset.from_github_asset(selected_asset_result.asset)
         self.appimage_name = appimage_asset_obj.name
         self.appimage_url = appimage_asset_obj.browser_download_url
         logger.info(f"Selected AppImage: {self.appimage_name}")
 
+        # Try extracting version from filename if not found in tag
         if not normalized_version and self.appimage_name:
-            normalized_version = extract_version_from_filename(self.appimage_name)
-            self.version = normalized_version
+            if extracted_version := extract_version_from_filename(self.appimage_name):
+                logger.debug(f"Using version from filename: {extracted_version}")
+                self.version = normalized_version = extracted_version
 
         if self.appimage_name:
-            extracted_arch = get_arch_from_filename(self.appimage_name)
+            extracted_arch = extract_arch_from_filename(self.appimage_name)
             if extracted_arch:
                 logger.info(
                     f"Extracted architecture keyword from AppImage filename: {extracted_arch}"
@@ -264,22 +311,20 @@ class GitHubAPI:
                 self._arch_keyword = extracted_arch
             else:
                 logger.warning(
-                    f"Could not extract architecture from AppImage filename: {self.appimage_name}. Current arch_keyword '{self._arch_keyword}' remains."
+                    f"No architecture found in {self.appimage_name}, keeping {self._arch_keyword}"
                 )
 
         if self.appimage_name:
-            logger.debug(f"Processing SHA for {self.appimage_name}")
-            logger.debug(f"App info available: {self._app_info is not None}")
+            logger.debug(f"Processing SHA verification for {self.appimage_name}")
             if self._app_info:
-                logger.debug(
-                    f"App skip_verification: {getattr(self._app_info, 'skip_verification', False)}"
-                )
-                logger.debug(
-                    f"App use_asset_digest: {getattr(self._app_info, 'use_asset_digest', False)}"
-                )
-                logger.debug(
-                    f"App use_github_release_desc: {getattr(self._app_info, 'use_github_release_desc', False)}"
-                )
+                # Log verification settings from app info
+                app_settings = {
+                    "skip_verification": self._app_info.skip_verification,
+                    "use_asset_digest": self._app_info.use_asset_digest,
+                    "use_github_release_desc": self._app_info.use_github_release_desc,
+                }
+                for setting, value in app_settings.items():
+                    logger.debug(f"{setting}: {value}")
 
             # Check if verification should be skipped for this app
             if self._app_info and getattr(self._app_info, "skip_verification", False):
@@ -357,10 +402,10 @@ class GitHubAPI:
 
     def check_latest_version(
         self,
-        current_version: Optional[str] = None,
+        current_version: str | None = None,
         version_check_only: bool = False,
         is_batch: bool = False,
-    ) -> Tuple[bool, Dict[str, Any]]:
+    ) -> tuple[bool, dict[str, Any]]:
         """Check and return structured update info."""
         ok, data = self.get_latest_release(version_check_only=version_check_only, is_batch=is_batch)
 
@@ -373,7 +418,7 @@ class GitHubAPI:
             )
             return False, {"error": "Internal error: Unexpected data type from release fetch."}
 
-        latest_release_data: Dict[str, Any] = data
+        latest_release_data: dict[str, Any] = data
         raw_github_tag = latest_release_data.get("tag_name", "")
 
         if not raw_github_tag:
@@ -418,7 +463,7 @@ class GitHubAPI:
             "published_at": self._release_info.published_at,
         }
 
-    def find_app_icon(self) -> Optional[Dict[str, Any]]:
+    def find_app_icon(self) -> dict[str, Any] | None:
         try:
             icon_info = self._icon_manager.find_icon(self.owner, self.repo, headers=self._headers)
             if icon_info:

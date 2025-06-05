@@ -6,7 +6,6 @@ Tests for version utility functions.
 This module contains tests for the version utility functions in src/utils/version_utils.py.
 """
 
-from typing import List, Optional
 
 import pytest
 

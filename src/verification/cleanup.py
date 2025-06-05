@@ -71,7 +71,7 @@ class VerificationCleanup:
             ask_confirmation: Whether to ask user for confirmation before removal
 
         Returns:
-            List of file paths that were successfully removed
+            list of file paths that were successfully removed
         """
         return cleanup_failed_verification_files(
             app_name=app_name,

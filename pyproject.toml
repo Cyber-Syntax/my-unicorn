@@ -114,7 +114,7 @@ line-ending = "auto"
 # to be opt-out in the future.
 docstring-code-format = false
 
-# Set the line length limit used when formatting code snippets in
+# set the line length limit used when formatting code snippets in
 # docstrings.
 #
 # This only has an effect when the `docstring-code-format` setting is

@@ -1,6 +1,6 @@
 """Tests for the GitHubAPI class, focusing on its direct responsibilities and orchestration."""
 
-from typing import Any, Dict, Union  # Added Union
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,7 +9,7 @@ import requests  # Keep for now, might be needed for some exception tests if not
 from src.api.github_api import GitHubAPI
 from src.api.assets import ReleaseInfo  # Added import for type hint
 from src.utils import version_utils  # Added import
-from src.utils import arch_extraction  # Added import for get_arch_from_filename
+from src.utils import arch_extraction  # Added import for extract_arch_from_filename
 # ReleaseManager might be needed for type hinting if we mock its instance
 # from src.api.release_manager import ReleaseManager
 
@@ -87,7 +87,7 @@ class TestGitHubAPIDirect:
     def test_get_latest_release_success(
         self,
         github_api_instance: GitHubAPI,
-        mock_release_data: Dict[str, Any],  # mock_release_data from conftest
+        mock_release_data: tuple[str, Any],  # mock_release_data from conftest
     ) -> None:
         """Test successful fetch and processing of the latest release."""
         # Configure the mock ReleaseManager's method
@@ -144,7 +144,7 @@ class TestGitHubAPIDirect:
                 mock_process_release.assert_not_called()
 
     def test_get_latest_release_processing_error(
-        self, github_api_instance: GitHubAPI, mock_release_data: Dict[str, Any]
+        self, github_api_instance: GitHubAPI, mock_release_data: tuple[str, Any]
     ) -> None:
         """Test an error during the _process_release stage."""
         github_api_instance._release_fetcher.get_latest_release_data.return_value = (
@@ -163,7 +163,7 @@ class TestGitHubAPIDirect:
             mock_process_release.assert_called_once_with(mock_release_data)
 
     def test_check_latest_version_success_update_available(
-        self, github_api_instance: GitHubAPI, mock_release_data: Dict[str, Any]
+        self, github_api_instance: GitHubAPI, mock_release_data: tuple[str, Any]
     ) -> None:
         """Test successful version check with update available."""
         # Mock get_latest_release to simulate successful fetch and processing
@@ -211,7 +211,7 @@ class TestGitHubAPIDirect:
                     mock_rp_class.return_value = mock_rp_instance
 
                     # Mock compare_versions to indicate an update is available
-                    # It should return: (bool, Dict[str, str])
+                    # It should return: (bool, tuple[str, str])
                     mock_compare_versions_dict = {
                         "current_version": "v1.0.0",
                         "latest_version": mock_release_data["tag_name"],
@@ -242,7 +242,7 @@ class TestGitHubAPIDirect:
                     )
 
     def test_check_latest_version_success_no_update(
-        self, github_api_instance: GitHubAPI, mock_release_data: Dict[str, Any]
+        self, github_api_instance: GitHubAPI, mock_release_data: tuple[str, Any]
     ) -> None:
         """Test successful version check with no update available."""
         with patch.object(
@@ -252,7 +252,7 @@ class TestGitHubAPIDirect:
                 mock_rp_instance = MagicMock()
                 mock_rp_class.return_value = mock_rp_instance
                 # Mock compare_versions to indicate no update
-                # It should return: (bool, Dict[str, str])
+                # It should return: (bool, tuple[str, str])
                 mock_compare_versions_dict_no_update = {
                     "current_version": mock_release_data["tag_name"],
                     "latest_version": mock_release_data["tag_name"],
@@ -300,7 +300,7 @@ class TestGitHubAPIDirect:
             assert info["error"] == "API fetch error"
 
     def test_check_latest_version_processing_failed(
-        self, github_api_instance: GitHubAPI, mock_release_data: Dict[str, Any]
+        self, github_api_instance: GitHubAPI, mock_release_data: tuple[str, Any]
     ) -> None:
         """Test version check when get_latest_release succeeds but subsequent processing (e.g. in ReleaseProcessor) fails."""
         # This simulates get_latest_release succeeding, but an issue occurring within check_latest_version's use of ReleaseProcessor
@@ -363,7 +363,7 @@ class TestGitHubAPIDirect:
     def test_process_release_success(
         self,
         github_api_instance: GitHubAPI,
-        mock_release_data: Dict[str, Any],
+        mock_release_data: tuple[str, Any],
         mock_release_info_fixture: ReleaseInfo,  # mock_release_info_fixture is not used for comparison now
     ) -> None:
         """Test successful processing of release data by _process_release.
@@ -419,7 +419,7 @@ class TestGitHubAPIDirect:
 
             # Determine expected arch_keyword as _process_release would
             expected_arch_keyword = (
-                arch_extraction.get_arch_from_filename(appimage_filename_for_test)
+                arch_extraction.extract_arch_from_filename(appimage_filename_for_test)
                 if appimage_filename_for_test
                 else None
             )
@@ -459,7 +459,7 @@ class TestGitHubAPIDirect:
             github_api_instance._process_release(incomplete_data)
 
     def test_process_release_no_appimage_found(
-        self, github_api_instance: GitHubAPI, mock_release_data: Dict[str, Any]
+        self, github_api_instance: GitHubAPI, mock_release_data: tuple[str, Any]
     ) -> None:
         """Test _process_release when AppImageSelector finds no AppImage."""
         with (

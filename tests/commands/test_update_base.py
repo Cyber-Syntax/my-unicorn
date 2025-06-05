@@ -267,7 +267,7 @@ class TestBaseUpdateCommand:
         self, base_update_command: BaseUpdateCommand, mock_github_api: MagicMock
     ) -> None:
         """Test that verification is skipped when skip_verification is enabled."""
-        # Set up the API to skip verification
+        # set up the API to skip verification
         mock_github_api.skip_verification = True
         mock_github_api.sha_name = None
         mock_github_api.hash_type = None

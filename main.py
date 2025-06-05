@@ -11,7 +11,6 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from types import TracebackType
-from typing import Optional
 
 from src.app_catalog import initialize_definitions_path
 from src.app_config import AppConfigManager
@@ -38,7 +37,7 @@ EXIT_FAILURE = 1
 
 
 def custom_excepthook(
-    exc_type: type[BaseException], exc_value: BaseException, exc_traceback: Optional[TracebackType]
+    exc_type: type[BaseException], exc_value: BaseException, exc_traceback: TracebackType | None
 ) -> None:
     """Custom excepthook to log uncaught exceptions.
 

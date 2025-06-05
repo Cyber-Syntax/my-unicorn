@@ -6,7 +6,7 @@ updating multiple AppImages concurrently using async I/O operations.
 """
 
 import asyncio
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -57,11 +57,11 @@ def update_command():
 
 
 @pytest.fixture
-def mock_app_configs() -> List[Dict[str, Any]]:
+def mock_app_configs() -> list[tuple[str, Any]]:
     """Create mock app configurations for testing.
 
     Returns:
-        List[Dict[str, Any]]: List of app config dictionaries
+        list[tuple[str, Any]]: list of app config dictionaries
 
     """
     return [

@@ -7,7 +7,7 @@ This module contains tests for the datetime utility functions in src/utils/datet
 """
 
 from datetime import datetime
-from typing import Any, Optional, Union
+from typing import Any
 
 import pytest
 
@@ -105,11 +105,10 @@ class TestParseTimestamp:
         @pytest.mark.skipif(not HYPOTHESIS_AVAILABLE, reason="Hypothesis not installed")
         @given(st.integers(min_value=0, max_value=2147483647))  # Valid Unix timestamps
         def test_parse_property_valid_int_timestamp(self, timestamp: int) -> None:
-            """
-            Property test for parsing valid integer timestamps.
-
+            """Test property: any valid Unix timestamp parses to a datetime.
+        
             Args:
-                timestamp: Random valid Unix timestamp
+                timestamp: Random valid Unix timestamp in range [0, 2^31)
             """
             result = parse_timestamp(timestamp)
             assert isinstance(result, datetime)
@@ -119,11 +118,10 @@ class TestParseTimestamp:
         @pytest.mark.skipif(not HYPOTHESIS_AVAILABLE, reason="Hypothesis not installed")
         @given(st.text())
         def test_parse_property_random_strings(self, random_string: str) -> None:
-            """
-            Property test for parsing random strings.
-
+            """Test property: any string either parses to datetime or returns None.
+        
             Args:
-                random_string: Random string
+                random_string: Random string to attempt parsing
             """
             # For random strings, should either parse correctly or return None
             result = parse_timestamp(random_string)
@@ -151,8 +149,8 @@ class TestFormatTimestamp:
         assert len(result) > 0
 
     def test_format_none(self) -> None:
-        """Test formatting None values."""
-        result = format_timestamp(None)
+        """Test formatting None input returns None."""
+        result = format_timestamp(None)  # type: ignore
         assert result is None
 
     def test_format_invalid_timestamp(self) -> None:

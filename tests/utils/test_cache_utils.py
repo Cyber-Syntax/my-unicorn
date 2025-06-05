@@ -11,7 +11,7 @@ import os
 import tempfile
 import time
 from pathlib import Path
-from typing import Dict, Any, Callable
+from typing import Any, Callable
 
 import pytest
 from pytest import fixture
@@ -48,12 +48,12 @@ def temp_cache_file() -> str:
 
 
 @fixture
-def sample_cache_data() -> Dict[str, Any]:
+def sample_cache_data() -> tuple[str, Any]:
     """
     Create sample cache data for testing.
 
     Returns:
-        Dict[str, Any]: Sample cache data
+        tuple[str, Any]: Sample cache data
     """
     return {
         "timestamp": time.time(),
@@ -107,7 +107,7 @@ class TestLoadJsonCache:
     """Tests for load_json_cache function."""
 
     def test_load_valid_cache(
-        self, temp_cache_file: str, sample_cache_data: Dict[str, Any]
+        self, temp_cache_file: str, sample_cache_data: tuple[str, Any]
     ) -> None:
         """
         Test loading a valid cache file.
@@ -200,7 +200,7 @@ class TestLoadJsonCache:
 class TestSaveJsonCache:
     """Tests for save_json_cache function."""
 
-    def test_save_new_cache(self, temp_dir: str, sample_cache_data: Dict[str, Any]) -> None:
+    def test_save_new_cache(self, temp_dir: str, sample_cache_data: tuple[str, Any]) -> None:
         """
         Test saving to a new cache file.
 
@@ -246,7 +246,7 @@ class TestSaveJsonCache:
         assert time.time() - saved_data["timestamp"] < 1
 
     def test_save_to_nonexistent_directory(
-        self, temp_dir: str, sample_cache_data: Dict[str, Any]
+        self, temp_dir: str, sample_cache_data: tuple[str, Any]
     ) -> None:
         """
         Test saving to a file in a non-existent directory.

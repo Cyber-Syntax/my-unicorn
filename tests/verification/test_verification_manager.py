@@ -17,7 +17,7 @@ class TestVerificationManager(unittest.TestCase):
     """Test the main VerificationManager functionality."""
 
     def setUp(self) -> None:
-        """Set up test fixtures."""
+        """set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.test_appimage = os.path.join(self.temp_dir, "test.AppImage")
         self.test_sha = os.path.join(self.temp_dir, "test.sha256")

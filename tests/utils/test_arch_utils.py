@@ -7,7 +7,6 @@ This module contains tests for the architecture utility functions in src/utils/a
 """
 
 import platform
-from typing import Dict, List, Optional
 from unittest.mock import patch, MagicMock
 
 import pytest

@@ -5,7 +5,6 @@ import os
 import tempfile
 import threading  # Added for cancel_event
 import time
-from typing import Dict, Optional, Set
 
 import requests
 
@@ -35,27 +34,27 @@ class DownloadManager:
     """
 
     # Class variables for shared progress tracking
-    _global_progress: Optional[BasicMultiAppProgress] = None
-    _active_tasks: Set[int] = set()
+    _global_progress: BasicMultiAppProgress | None = None
+    _active_tasks: set[int] = set()
     _lock = asyncio.Lock() if hasattr(asyncio, "Lock") else None
 
     # Use GlobalConfigManager for configuration
-    _global_config: Optional[GlobalConfigManager] = None
+    _global_config: GlobalConfigManager | None = None
 
     # Class-level file locks to prevent concurrent access to same files
-    _file_locks: Dict[str, threading.Lock] = {}
+    _file_locks: tuple[str, threading.Lock] = {}
     _locks_lock = threading.Lock()  # Protects the _file_locks dictionary
 
     # Class-level progress task sharing for same files
-    _progress_tasks: Dict[str, int] = {}  # Maps file paths to task IDs
-    _progress_locks: Dict[str, threading.Lock] = {}  # Locks for progress task access
+    _progress_tasks: tuple[str, int] = {}  # Maps file paths to task IDs
+    _progress_locks: tuple[str, threading.Lock] = {}  # Locks for progress task access
 
     def __init__(
         self,
         github_api: "GitHubAPI",
         app_index: int = 0,
         total_apps: int = 0,
-        cancel_event: Optional[threading.Event] = None,
+        cancel_event: threading.Event | None = None,
     ) -> None:
         """Initialize the download manager with GitHub API instance.
 
@@ -81,7 +80,7 @@ class DownloadManager:
         self.is_async_mode = self._detect_async_mode()
 
         # Store task ID for this download instance
-        self._progress_task_id: Optional[int] = None
+        self._progress_task_id: int | None = None
 
     def _detect_async_mode(self) -> bool:
         """Detect if we're running in an async context.
@@ -227,7 +226,7 @@ class DownloadManager:
                 self._logger.error(error_msg)
                 raise RuntimeError(error_msg)
 
-    def _get_file_size(self, url: str, headers: Dict[str, str]) -> int:
+    def _get_file_size(self, url: str, headers: tuple[str, str]) -> int:
         """Get the file size by making a HEAD request.
 
         Args:
@@ -246,8 +245,8 @@ class DownloadManager:
         response.raise_for_status()
         return int(response.headers.get("content-length", 0))
 
-    def _setup_progress_task(self, filename: str, total_size: int, prefix: str) -> Optional[int]:
-        """Set up a progress tracking task.
+    def _setup_progress_task(self, filename: str, total_size: int, prefix: str) -> int | None:
+        """set up a progress tracking task.
 
         Args:
             filename: Name of the file being downloaded
@@ -300,8 +299,8 @@ class DownloadManager:
         self,
         url: str,
         file_path: str,
-        headers: Dict[str, str],
-        task_id: Optional[int],
+        headers: tuple[str, str],
+        task_id: int | None,
         total_size: int,
     ) -> float:
         """Perform the actual file download with progress updates.
@@ -390,7 +389,7 @@ class DownloadManager:
         self,
         url: str,
         filename: str,
-        headers: Dict[str, str],
+        headers: tuple[str, str],
         prefix: str = "",
     ) -> str:
         """Download with a progress bar display.
@@ -416,7 +415,7 @@ class DownloadManager:
             downloads_dir = self.get_downloads_dir()
             file_path = os.path.join(downloads_dir, filename)
 
-            # Set up progress tracking
+            # set up progress tracking
             task_id = self._setup_progress_task(filename, total_size, prefix)
 
             # Perform the download
@@ -488,9 +487,9 @@ class DownloadManager:
         # VerificationManager will internally decide whether to use direct_expected_hash
         # or fall back to legacy "extracted_checksum" logic, or parse a SHA file.
 
-        direct_hash_to_pass: Optional[str] = None
-        sha_name_to_pass: Optional[str] = self.github_api.sha_name
-        sha_url_to_pass: Optional[str] = self.github_api.sha_url
+        direct_hash_to_pass: str | None = None
+        sha_name_to_pass: str | None = self.github_api.sha_name
+        sha_url_to_pass: str | None = self.github_api.sha_url
 
         if self.github_api.sha_name == "extracted_checksum":
             logging.info(f"Processing 'extracted_checksum' for {self.github_api.appimage_name}.")
@@ -560,7 +559,7 @@ class DownloadManager:
             progress_manager: Progress manager instance
 
         Returns:
-            Tuple of (task_id, is_owner) where is_owner indicates if this thread should update progress
+            tuple of (task_id, is_owner) where is_owner indicates if this thread should update progress
         """
         with cls._locks_lock:
             # Get or create progress lock for this file
@@ -707,7 +706,7 @@ class DownloadManager:
             final_path: Final path where the file should be placed
 
         Returns:
-            Tuple of (file_path, was_existing_file)
+            tuple of (file_path, was_existing_file)
         """
         downloads_dir = os.path.dirname(final_path)
 
@@ -718,7 +717,7 @@ class DownloadManager:
             temp_path = temp_file.name
 
         try:
-            # Set up request headers
+            # set up request headers
             headers = {"User-Agent": "AppImage-Updater/1.0", "Accept": "application/octet-stream"}
 
             # Create a progress prefix if this is part of a multi-app update
@@ -818,7 +817,7 @@ class DownloadManager:
             timeout: Maximum time to wait in seconds
 
         Returns:
-            Tuple of (file_path, was_existing_file)
+            tuple of (file_path, was_existing_file)
         """
         start_time = time.time()
         check_interval = 2  # Check every 2 seconds

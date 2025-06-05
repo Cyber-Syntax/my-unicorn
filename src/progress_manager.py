@@ -10,7 +10,8 @@ import threading
 import time
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Dict, Generic, List, Optional, TypeVar
+
+from typing import Any, Generic, TypeVar
 
 # Type variable for item IDs
 T = TypeVar("T")
@@ -30,14 +31,15 @@ class BasicMultiAppProgress:
             expand: Whether to expand the progress bar
             transient: Whether to hide completed tasks
         """
-        self.tasks: Dict[int, Dict[str, Any]] = {}  # Dictionary to store tasks
+        # TODO: remove any and specify the type of tasks
+        self.tasks: dict[int, dict[str, Any]] = {}  # dictionary to store tasks
         self.task_counter: int = 0  # Counter for task IDs
         self.active: bool = False  # Whether the progress display is active
         # Options similar to the original class
         self.expand = expand
         self.transient = transient
         # Store start times for speed calculation
-        self.start_times: Dict[int, float] = {}
+        self.start_times: dict[int, float] = {}
         # Track the number of lines used in last render
         self.last_render_lines: int = 0
 
@@ -255,7 +257,7 @@ class BasicMultiAppProgress:
 
         sys.stdout.flush()
 
-    def _render_task(self, task_id: int, task: Dict[str, Any]) -> int:
+    def _render_task(self, task_id: int, task: dict[str, Any]) -> int:
         """Render a single task's progress bar.
 
         Args:
@@ -314,11 +316,11 @@ class BasicProgressBar:
         self.status = ""
         self.visible = True
 
-    def update(self, completed: Optional[int] = None, advance: int = 0, status: str = ""):
+    def update(self, completed: int | None = None, advance: int = 0, status: str = ""):
         """Update the progress bar.
 
         Args:
-            completed: Set absolute completion value
+            completed: set absolute completion value
             advance: Increment completion by this amount
             status: Status message to display
         """
@@ -363,7 +365,7 @@ class ProgressManager:
 
     def __init__(self):
         """Initialize the progress manager."""
-        self.progress_bars: Dict[int, BasicProgressBar] = {}
+        self.progress_bars: dict[int, BasicProgressBar] = {}
         self.next_id = 0
         self.active = False
         self.last_render_lines = 0
@@ -497,10 +499,10 @@ class DynamicProgressManager(Generic[T]):
         self.progress = ProgressManager()
 
         # Task mapping
-        self.task_map: Dict[T, Dict[str, Any]] = {}
+        self.task_map: dict[T, dict[str, Any]] = {}
 
         # Overall stats
-        self.task_stats: Dict[str, Any] = {
+        self.task_stats: dict[str, Any] = {
             "start_time": None,
             "items": 0,
             "completed": 0,
@@ -508,7 +510,7 @@ class DynamicProgressManager(Generic[T]):
         }
 
         # Download tracking
-        self._download_in_progress: Dict[T, bool] = {}
+        self._download_in_progress: dict[T, bool] = {}
 
         # Reference counting for nested progress
         self._user_count = 0
@@ -573,13 +575,13 @@ class DynamicProgressManager(Generic[T]):
                     self.task_map.clear()
                     self._download_in_progress.clear()
 
-    def add_item(self, item_id: T, name: str, steps: List[str] = None) -> None:
+    def add_item(self, item_id: T, name: str, steps: list[str] = None) -> None:
         """Add an item to track in the progress display.
 
         Args:
             item_id: Unique identifier for the item
             name: Display name for the item
-            steps: List of step names for this item
+            steps: list of step names for this item
         """
         if steps is None:
             steps = []

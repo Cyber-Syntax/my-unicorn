@@ -1,14 +1,16 @@
 """Asset digest verification for GitHub API assets.
 
-This module handles verification of AppImages using GitHub API asset digests,
-which provide cryptographic verification of downloaded assets.
+This module handles verification of AppImages using GitHub API asset digests, which provide 
+cryptographic verification of downloaded assets. It implements secure hash comparison and streaming
+file verification to ensure data integrity.
 """
 
 import hashlib
 import logging
 import os
-from typing import Tuple
+from pathlib import Path
 
+logger = logging.getLogger(__name__)
 from src.verification.hash_calculator import HashCalculator
 
 
@@ -20,20 +22,26 @@ class AssetDigestVerifier:
         pass
 
     def verify_asset_digest(
-        self, appimage_path: str, asset_digest: str, appimage_name: str | None = None
+        self, 
+        appimage_path: str, 
+        asset_digest: str, 
+        appimage_name: str | None = None
     ) -> bool:
         """Verify AppImage using GitHub API asset digest.
 
+        Verifies an AppImage file against its GitHub API asset digest using secure hash comparison.
+        The digest must be in the format "algorithm:hash" where algorithm is a supported hash type.
+
         Args:
             appimage_path: Path to the AppImage file
-            asset_digest: Asset digest in format "algorithm:hash"
-            appimage_name: Name of the AppImage for logging (optional)
+            asset_digest: Asset digest string in format "algorithm:hash"
+            appimage_name: Optional name of the AppImage for logging purposes
 
         Returns:
             True if verification passes, False otherwise
 
         Raises:
-            ValueError: If digest format is invalid
+            ValueError: If digest format is invalid or hash type not supported
             OSError: If file operations fail
         """
         if not asset_digest:
@@ -72,17 +80,20 @@ class AssetDigestVerifier:
             logging.error(f"Error during digest verification: {e}")
             raise
 
-    def _parse_digest(self, asset_digest: str) -> Tuple[str, str]:
+    def _parse_digest(self, asset_digest: str) -> tuple[str, str]:
         """Parse asset digest into algorithm and hash components.
+
+        Splits the asset digest string into its algorithm and hash components.
+        Expected format is "algorithm:hash" (e.g., "sha256:1234abcd...").
 
         Args:
             asset_digest: Digest string in format "algorithm:hash"
 
         Returns:
-            Tuple of (algorithm, hash)
+            tuple containing (algorithm, hash)
 
         Raises:
-            ValueError: If digest format is invalid
+            ValueError: If digest format is invalid or missing components
         """
         try:
             digest_type, digest_hash = asset_digest.split(":", 1)
@@ -98,14 +109,17 @@ class AssetDigestVerifier:
         actual_hash: str,
         expected_hash: str,
     ) -> None:
-        """Log the verification result with appropriate status.
+        """Log the verification result with appropriate status and details.
+
+        Logs the verification outcome with full hash details and a visual status indicator.
+        Success/failure is indicated by a checkmark/cross symbol and appropriate log level.
 
         Args:
             is_valid: Whether verification passed
-            appimage_name: Name of the AppImage
-            digest_type: Hash algorithm used
-            actual_hash: Calculated hash
-            expected_hash: Expected hash from digest
+            appimage_name: Name of the AppImage being verified
+            digest_type: Hash algorithm used (e.g., sha256)
+            actual_hash: Calculated hash of the file
+            expected_hash: Expected hash from the asset digest
         """
         status_symbol = "✓" if is_valid else "✗"
         status_text = "passed" if is_valid else "failed"

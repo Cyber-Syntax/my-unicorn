@@ -1,25 +1,29 @@
 #!/usr/bin/env python3
 """Version utilities.
 
-This module provides functions for parsing and comparing version strings.
+This module provides functions for parsing, comparing, and validating version strings 
+used in AppImage releases. It handles different version formats and normalizes them 
+for consistent comparison.
 """
 
 import logging
 import re
-from typing import Optional
+from packaging.version import parse as parse_version
 
-# Configure module logger
 logger = logging.getLogger(__name__)
 
 
-def normalize_version_for_comparison(version: Optional[str]) -> str:
+def normalize_version_for_comparison(version: str | None) -> str:
     """Normalize version string for consistent comparison.
 
+    Strips version prefixes like 'v' and standardizes special formats like
+    Standard Notes versioning scheme for consistent comparison.
+
     Args:
-        version: Version string to normalize
+        version: Version string to normalize, or None
 
     Returns:
-        str: Normalized version string
+        str: Normalized version string, empty string if input is None
     """
     if not version:
         return ""
@@ -57,15 +61,20 @@ def extract_base_version(version: str) -> str:
     return version
 
 
-def extract_version(tag: str, is_beta: bool = False) -> Optional[str]:
+def extract_version(tag: str, is_beta: bool = False) -> str | None:
     """Extract semantic version from tag string.
 
+    Handles various version formats including:
+    - Standard semantic versions (X.Y.Z)
+    - Standard Notes format (@standardnotes/desktop@X.Y.Z)
+    - Beta versions with suffixes
+    
     Args:
         tag: Version tag to extract from
         is_beta: Whether this is a beta version
 
     Returns:
-        str or None: Extracted version or None if not found
+        str | None: Extracted version string if found, None if no version found
     """
     # Handle Standard Notes format: @standardnotes/desktop@3.195.13
     std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", tag)
@@ -91,14 +100,14 @@ def extract_version(tag: str, is_beta: bool = False) -> Optional[str]:
     return alt_match.group(1) if alt_match else None
 
 
-def extract_version_from_filename(filename: str) -> Optional[str]:
+def extract_version_from_filename(filename: str) -> str | None:
     """Extract version from AppImage filename.
 
     Args:
         filename: AppImage filename
 
     Returns:
-        str or None: Extracted version or None if not found
+        str | None: Extracted version string if found, None if not found
     """
     if not filename:
         return None

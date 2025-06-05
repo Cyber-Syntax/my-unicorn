@@ -9,7 +9,6 @@ import shutil
 import stat
 import time
 from pathlib import Path
-from typing import Dict
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -42,14 +41,14 @@ def mock_global_config(monkeypatch, temp_dirs):
 
 
 @pytest.fixture
-def temp_dirs(tmp_path: Path) -> Dict[str, Path]:
+def temp_dirs(tmp_path: Path) -> tuple[str, Path]:
     """Create temporary directories for testing.
 
     Args:
         tmp_path: Pytest temporary directory fixture
 
     Returns:
-        Dict[str, Path]: Dictionary of test directories
+        tuple[str, Path]: Dictionary of test directories
 
     """
     app_dir = tmp_path / "apps"
@@ -63,7 +62,7 @@ def temp_dirs(tmp_path: Path) -> Dict[str, Path]:
 
 
 @pytest.fixture
-def file_handler(temp_dirs: Dict[str, Path]) -> FileHandler:
+def file_handler(temp_dirs: tuple[str, Path]) -> FileHandler:
     """Create a FileHandler instance for testing.
 
     Args:
@@ -88,7 +87,7 @@ def file_handler(temp_dirs: Dict[str, Path]) -> FileHandler:
 
 
 @pytest.fixture
-def mock_appimage(temp_dirs: Dict[str, Path]) -> Path:
+def mock_appimage(temp_dirs: tuple[str, Path]) -> Path:
     """Create a mock AppImage file for testing.
 
     Args:
@@ -159,7 +158,7 @@ class TestFileHandler:
         assert file_handler.app_backup_storage_path.exists()
 
     def test_backup_appimage(
-        self, file_handler: FileHandler, mock_appimage: Path, temp_dirs: Dict[str, Path]
+        self, file_handler: FileHandler, mock_appimage: Path, temp_dirs: tuple[str, Path]
     ) -> None:
         """Test AppImage backup functionality.
 
@@ -190,7 +189,7 @@ class TestFileHandler:
         assert len(list(temp_dirs["backup_dir"].glob("*.AppImage"))) == 1
 
     def test_cleanup_old_backups(
-        self, file_handler: FileHandler, temp_dirs: Dict[str, Path]
+        self, file_handler: FileHandler, temp_dirs: tuple[str, Path]
     ) -> None:
         """Test cleanup of old backup files.
 
@@ -221,7 +220,7 @@ class TestFileHandler:
         for backup_file in backup_files:
             assert backup_file.name.startswith("test-app_")
 
-    def test_move_appimage(self, file_handler: FileHandler, temp_dirs: Dict[str, Path]) -> None:
+    def test_move_appimage(self, file_handler: FileHandler, temp_dirs: tuple[str, Path]) -> None:
         """Test moving an AppImage file from downloads to the app directory.
 
         Args:
@@ -252,7 +251,7 @@ class TestFileHandler:
             assert file_handler.installed_path.read_bytes() == b"DownloadedAppImageContent"
 
     def test_move_appimage_source_not_found(
-        self, file_handler: FileHandler, temp_dirs: Dict[str, Path]
+        self, file_handler: FileHandler, temp_dirs: tuple[str, Path]
     ) -> None:
         """Test moving an AppImage file when the source file doesn't exist.
 
@@ -303,7 +302,7 @@ class TestFileHandler:
         self,
         file_handler: FileHandler,
         mock_appimage: Path,
-        temp_dirs: Dict[str, Path],
+        temp_dirs: tuple[str, Path],
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test the main handle_appimage_operations method.

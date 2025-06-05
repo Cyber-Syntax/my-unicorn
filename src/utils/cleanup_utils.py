@@ -122,7 +122,7 @@ def cleanup_app_files(
         ask_confirmation: Whether to ask user for confirmation before removal
 
     Returns:
-        List of file paths that were successfully removed
+        list of file paths that were successfully removed
 
     """
     if ask_confirmation:
@@ -163,7 +163,7 @@ def remove_files_by_exact_names(
         verbose: Whether to print cleanup messages
 
     Returns:
-        List of file paths that were successfully removed
+        list of file paths that were successfully removed
 
     """
     removed_files = []
@@ -205,7 +205,7 @@ def cleanup_failed_verification_files(
         verbose: Whether to print cleanup messages
 
     Returns:
-        List of file paths that were successfully removed
+        list of file paths that were successfully removed
     """
     from src.global_config import GlobalConfigManager
 
@@ -298,7 +298,7 @@ def cleanup_batch_failed_updates(
     update commands when multiple apps fail and need cleanup.
 
     Args:
-        failed_apps: List of app names that failed update
+        failed_apps: list of app names that failed update
         results: Dictionary mapping app names to their result data
         ask_confirmation: Whether to ask user for confirmation before removal
         verbose: Whether to print cleanup messages

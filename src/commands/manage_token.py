@@ -7,7 +7,6 @@ allowing users to view, add, update, and remove tokens securely.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
 
 from src.auth_manager import GitHubAuthManager
 from src.commands.base import Command
@@ -138,11 +137,11 @@ class ManageTokenCommand(Command):
         print("\nSecure Storage: ✅ Enabled")
         print("Token Security: ✅ Protected")
 
-    def _get_token_expiration_days(self) -> Optional[int]:
+    def _get_token_expiration_days(self) -> int | None:
         """Prompt user for token expiration period.
 
         Returns:
-            Optional[int]: Number of days until token expiration or None if cancelled
+            int | None: Number of days until token expiration or None if cancelled
         """
         print("\nToken Expiration:")
         print("1. 30 days (recommended for regular tokens)")

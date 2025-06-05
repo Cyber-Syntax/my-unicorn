@@ -152,7 +152,7 @@ class TestGitHubAuthManager:
 
     def test_clear_cached_headers(self, reset_class_state):
         """Test clearing cached headers."""
-        # Setup - Set some cached data
+        # Setup - set some cached data
         GitHubAuthManager._cached_headers = {"test": "header"}
         GitHubAuthManager._last_token = SAFE_MOCK_TOKEN
         GitHubAuthManager._last_token_check = time.time()
@@ -509,7 +509,7 @@ class TestGitHubAuthManager:
         mock_clear_session = MagicMock()
         monkeypatch.setattr(SessionPool, "clear_session", mock_clear_session)
 
-        # Set up initial state - ensure cached headers exist
+        # set up initial state - ensure cached headers exist
         GitHubAuthManager._cached_headers = {"Authorization": f"Bearer {SAFE_MOCK_TOKEN}"}
 
         # Execute
@@ -981,7 +981,7 @@ class TestSessionPool:
         SessionPool._sessions["idle-key"] = idle_session
         SessionPool._last_used["idle-key"] = now - 600  # 10 minutes ago (> _max_idle_time)
 
-        # Set a shorter idle time for testing
+        # set a shorter idle time for testing
         old_idle_time = SessionPool._max_idle_time
         SessionPool._max_idle_time = 300  # 5 minutes
 

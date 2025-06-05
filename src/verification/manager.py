@@ -76,7 +76,7 @@ class VerificationManager:
         self.use_asset_digest = self.config.use_asset_digest
 
     def set_appimage_path(self, full_path: str) -> None:
-        """Set the full path to the AppImage file for verification.
+        """set the full path to the AppImage file for verification.
 
         Args:
             full_path: The complete path to the AppImage file
@@ -288,7 +288,7 @@ class VerificationManager:
             ask_confirmation: Whether to ask user for confirmation before removal
 
         Returns:
-            List of file paths that were successfully removed
+            list of file paths that were successfully removed
 
         """
         return self.cleanup.cleanup_batch_failed_files(

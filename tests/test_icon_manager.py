@@ -349,7 +349,7 @@ def test_find_icon_exact_and_paths(monkeypatch, icon_manager):
     # Apply our test method directly to the instance
     icon_manager.find_icon = test_find_icon
 
-    # Set up the test configuration
+    # set up the test configuration
     test_config = {"exact_path": "exact.png", "filename": "pref.png", "paths": ["a.png", "b.png"]}
     monkeypatch.setattr(icon_paths_mod, "get_icon_paths", lambda key: test_config)
 

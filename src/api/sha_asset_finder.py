@@ -6,7 +6,6 @@ for an AppImage from GitHub release assets.
 
 import logging
 import re
-from typing import Dict, List, Optional
 
 from src.app_catalog import AppInfo
 
@@ -20,14 +19,14 @@ class SHAAssetFinder:
         self,
         selected_appimage_name: str,
         definitive_app_info: AppInfo,
-        assets: List[Dict],
-    ) -> Optional[Dict]:
+        assets: list[dict],
+    ) -> dict | None:
         """Find the best matching SHA asset for an AppImage.
 
         Args:
             selected_appimage_name: Name of the AppImage file to find SHA for
             definitive_app_info: Base app metadata from repository JSON
-            assets: List of release assets from GitHub API
+            assets: list of release assets from GitHub API
 
         Returns:
             dict: Selected SHA asset if found, None otherwise. For asset digest,
@@ -82,12 +81,12 @@ class SHAAssetFinder:
         logger.info("Using first available SHA file as fallback")
         return sha_assets[0]
 
-    def _try_extract_asset_digest(self, appimage_name: str, assets: List[Dict]) -> Optional[Dict]:
+    def _try_extract_asset_digest(self, appimage_name: str, assets: list[dict]) -> dict | None:
         """Try to extract asset digest information from GitHub API asset metadata.
 
         Args:
             appimage_name: Name of the AppImage file
-            assets: List of release assets from GitHub API
+            assets: list of release assets from GitHub API
 
         Returns:
             dict: Special asset info with digest data if found, None otherwise
@@ -119,7 +118,7 @@ class SHAAssetFinder:
         logger.debug(f"No asset digest found for {appimage_name} in assets")
         return None
 
-    def _filter_sha_assets(self, assets: List[Dict]) -> List[Dict]:
+    def _filter_sha_assets(self, assets: list[dict]) -> list[dict]:
         """Filter release assets to only SHA/checksum files."""
         sha_patterns = [
             r"\.sha\d+$",

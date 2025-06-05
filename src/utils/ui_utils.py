@@ -5,7 +5,7 @@ This module provides functions for user interface interactions.
 """
 
 import logging
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 import asyncio
 import threading
 import concurrent.futures
@@ -14,7 +14,7 @@ import concurrent.futures
 logger = logging.getLogger(__name__)
 
 # Global variable to store the main event loop
-_main_event_loop: Optional[asyncio.AbstractEventLoop] = None
+_main_event_loop: asyncio.AbstractEventLoop | None = None
 
 
 def set_main_event_loop(loop: asyncio.AbstractEventLoop) -> None:
@@ -25,15 +25,15 @@ def set_main_event_loop(loop: asyncio.AbstractEventLoop) -> None:
 
 
 def select_from_list(
-    items: List[Dict[str, Any]],
+    items: list[tuple[str, Any]],
     prompt: str,
     display_key: str = "name",
-    callback: Optional[Callable] = None,
-) -> Dict[str, Any]:
+    callback: Callable | None = None,
+) -> tuple[str, Any]:
     """Prompt user to select an item from a list.
 
     Args:
-        items: List of items to choose from
+        items: list of items to choose from
         prompt: Prompt message for the user
         display_key: Key to use for displaying items
         callback: Optional callback function to call with selected item
@@ -65,7 +65,7 @@ def select_from_list(
         print("Invalid input, try again")
 
 
-def _actual_input_logic(prompt_str: str, default_val: Optional[str]) -> str:
+def _actual_input_logic(prompt_str: str, default_val: str | None) -> str:
     """The core input logic, to be run in the main thread."""
     # This internal function encapsulates the original logic of get_user_input
     # It also needs to handle KeyboardInterrupt if it's the one directly calling input()
@@ -82,7 +82,7 @@ def _actual_input_logic(prompt_str: str, default_val: Optional[str]) -> str:
         raise
 
 
-def get_user_input(prompt: str, default: Optional[str] = None) -> str:
+def get_user_input(prompt: str, default: str | None = None) -> str:
     """Get user input with an optional default value.
     Handles being called from a worker thread by delegating to the main asyncio loop.
     """

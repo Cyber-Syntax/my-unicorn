@@ -11,7 +11,7 @@ import os
 import sys
 import io
 import asyncio
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Any
 from unittest.mock import patch, MagicMock, call, PropertyMock
 
 import pytest
@@ -74,11 +74,11 @@ class TestUpdateAllAutoCommand:
         return mock
 
     @pytest.fixture
-    def updatable_apps(self) -> List[Dict[str, Any]]:
+    def updatable_apps(self) -> list[tuple[str, Any]]:
         """Create sample data for updatable apps.
 
         Returns:
-            List[Dict[str, Any]]: List of updatable app information dictionaries
+            list[tuple[str, Any]]: list of updatable app information dictionaries
         """
         return [
             {
@@ -102,11 +102,11 @@ class TestUpdateAllAutoCommand:
         ]
 
     @pytest.fixture
-    def mock_rate_limit_info(self) -> Tuple:
+    def mock_rate_limit_info(self) -> tuple:
         """Mock data for GitHub API rate limit information.
 
         Returns:
-            Tuple: (remaining, limit, reset_time, is_authenticated)
+            tuple: (remaining, limit, reset_time, is_authenticated)
         """
         return (100, 5000, "2025-04-27 10:00:00", True)
 
@@ -161,7 +161,7 @@ class TestUpdateAllAutoCommand:
         command._list_all_config_files = MagicMock(
             return_value=["app1.json", "app2.json", "app3.json"]
         )
-        # Set rate limit to be lower than needed
+        # set rate limit to be lower than needed
         mock_auth_manager.get_rate_limit_info.return_value = (2, 5000, "2025-04-27 10:00:00", True)
 
         # Execute
@@ -212,7 +212,7 @@ class TestUpdateAllAutoCommand:
         mock_auth_manager: MagicMock,
         mock_stdout: io.StringIO,
         command: UpdateAllAutoCommand,
-        updatable_apps: List[Dict[str, Any]],
+        updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test execute method in batch mode with updates available.
 
@@ -233,7 +233,7 @@ class TestUpdateAllAutoCommand:
         command._find_all_updatable_apps = MagicMock(return_value=updatable_apps)
         command._display_update_list = MagicMock()
         command._update_apps_async_wrapper = MagicMock()
-        # Set batch mode to True
+        # set batch mode to True
         command.global_config.batch_mode = True
 
         # Execute
@@ -251,7 +251,7 @@ class TestUpdateAllAutoCommand:
         mock_auth_manager: MagicMock,
         mock_stdout: io.StringIO,
         command: UpdateAllAutoCommand,
-        updatable_apps: List[Dict[str, Any]],
+        updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test execute method in interactive mode with updates available.
 
@@ -272,7 +272,7 @@ class TestUpdateAllAutoCommand:
         command._find_all_updatable_apps = MagicMock(return_value=updatable_apps)
         command._display_update_list = MagicMock()
         command._handle_interactive_update = MagicMock()
-        # Set batch mode to False
+        # set batch mode to False
         command.global_config.batch_mode = False
 
         # Execute
@@ -390,7 +390,7 @@ class TestUpdateAllAutoCommand:
         mock_input: MagicMock,
         mock_stdout: io.StringIO,
         command: UpdateAllAutoCommand,
-        updatable_apps: List[Dict[str, Any]],
+        updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _handle_interactive_update when user cancels.
 
@@ -415,7 +415,7 @@ class TestUpdateAllAutoCommand:
         mock_input: MagicMock,
         mock_stdout: io.StringIO,
         command: UpdateAllAutoCommand,
-        updatable_apps: List[Dict[str, Any]],
+        updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _handle_interactive_update when user selects all apps.
 
@@ -447,7 +447,7 @@ class TestUpdateAllAutoCommand:
         mock_input: MagicMock,
         mock_stdout: io.StringIO,
         command: UpdateAllAutoCommand,
-        updatable_apps: List[Dict[str, Any]],
+        updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _handle_interactive_update when user selects specific apps.
 
@@ -487,7 +487,7 @@ class TestUpdateAllAutoCommand:
         mock_input: MagicMock,
         mock_stdout: io.StringIO,
         command: UpdateAllAutoCommand,
-        updatable_apps: List[Dict[str, Any]],
+        updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _handle_interactive_update with invalid user input.
 
@@ -512,7 +512,7 @@ class TestUpdateAllAutoCommand:
         mock_input: MagicMock,
         mock_stdout: io.StringIO,
         command: UpdateAllAutoCommand,
-        updatable_apps: List[Dict[str, Any]],
+        updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _handle_interactive_update with out-of-range indices.
 
@@ -535,7 +535,7 @@ class TestUpdateAllAutoCommand:
         self,
         mock_stdout: io.StringIO,
         command: UpdateAllAutoCommand,
-        updatable_apps: List[Dict[str, Any]],
+        updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _update_apps_async_wrapper for async updates.
 
@@ -576,7 +576,7 @@ class TestUpdateAllAutoCommand:
         self,
         mock_stdout: io.StringIO,
         command: UpdateAllAutoCommand,
-        updatable_apps: List[Dict[str, Any]],
+        updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _display_update_list method shows apps correctly.
 
@@ -605,7 +605,7 @@ class TestUpdateAllAutoCommand:
         mock_auth_manager: MagicMock,
         mock_stdout: io.StringIO,
         command: UpdateAllAutoCommand,
-        mock_rate_limit_info: Tuple,
+        mock_rate_limit_info: tuple,
     ) -> None:
         """Test _display_rate_limit_info shows rate limit info.
 

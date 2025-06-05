@@ -27,9 +27,9 @@ class AppInfo:
         app_rename: Display name for the application
         description: Description of the application
         category: Application category
-        tags: List of tags describing the application
+        tags: list of tags describing the application
         appimage_name_template: Template for AppImage filename
-        preferred_characteristic_suffixes: List of characteristic suffixes in order of preference
+        preferred_characteristic_suffixes: list of characteristic suffixes in order of preference
         skip_verification: Whether to skip hash verification for this app
         use_asset_digest: Whether to use GitHub's asset digest for verification instead of SHA files
         use_github_release_desc: Whether to use GitHub release description for checksum extraction
@@ -77,7 +77,7 @@ def get_all_apps() -> dict[str, AppInfo]:
     """Get all available app definitions.
 
     Returns:
-        Dict mapping lowercase repo names to AppInfo objects
+        tuple mapping lowercase repo names to AppInfo objects
 
     """
     if not _definitions_path:

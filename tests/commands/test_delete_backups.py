@@ -59,7 +59,7 @@ def mock_file_operations() -> Generator[None, None, None]:
         patch("logging.error") as mock_log_error,
         patch("logging.warning") as mock_log_warning,
     ):
-        # Set default return values
+        # set default return values
         mock_exists.return_value = True
         mock_isfile.return_value = True
 
@@ -591,7 +591,7 @@ def test_delete_old_backups_predefined_date(
         patch("os.remove") as mock_remove,
         patch("logging.info") as mock_log_info,
     ):
-        # Set up datetime mock
+        # set up datetime mock
         mock_datetime.now.return_value = today
         mock_datetime.timedelta = datetime.timedelta
         mock_datetime.strptime = datetime.datetime.strptime
@@ -600,7 +600,7 @@ def test_delete_old_backups_predefined_date(
         mock_files = ["app1-1.0.0.appimage", "app1-2.0.0.appimage"]
         mock_listdir.return_value = mock_files
 
-        # Set up file modification times
+        # set up file modification times
         # First file is older than a week, second file is newer
         mock_getmtime.side_effect = [
             (week_ago - datetime.timedelta(days=1)).timestamp(),  # Older than a week
@@ -661,11 +661,11 @@ def test_delete_old_backups_custom_date(
         patch("os.remove") as mock_remove,
         patch("logging.info") as mock_log_info,
     ):
-        # Set up mock_datetime with real methods where needed
+        # set up mock_datetime with real methods where needed
         mock_datetime.strptime.return_value = datetime.datetime(2023, 1, 1)
         mock_datetime.now.return_value = datetime.datetime(2023, 6, 1)
 
-        # Important: Set cutoff_timestamp explicitly rather than depending on MagicMock objects
+        # Important: set cutoff_timestamp explicitly rather than depending on MagicMock objects
         cutoff_date = mock_datetime.strptime.return_value
         # Make the cutoff_timestamp a concrete value
         mock_datetime.configure_mock(
@@ -676,7 +676,7 @@ def test_delete_old_backups_custom_date(
         mock_files = ["app1-1.0.0.appimage", "app1-2.0.0.appimage"]
         mock_listdir.return_value = mock_files
 
-        # Set up file modification times with concrete values
+        # set up file modification times with concrete values
         mock_getmtime.side_effect = [old_timestamp, new_timestamp]
 
         # Mock user input to select custom date and confirm
@@ -814,7 +814,7 @@ def test_cleanup_to_max_backups_success(
         monkeypatch: Pytest monkeypatch fixture for patching functions.
 
     """
-    # Set max_backups to 2 for this test
+    # set max_backups to 2 for this test
     mock_global_config.max_backups = 2
 
     # Sample file data

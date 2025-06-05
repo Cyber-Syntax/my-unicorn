@@ -6,8 +6,8 @@ This module handles the processing of GitHub release data into structured format
 
 import logging
 import re  # Import the 're' module
-from typing import Any, Dict, List, Optional, Tuple, Union
-from packaging.version import parse as parse_version_string  # Added import
+from typing import Any
+from packaging.version import parse as parse_version_string
 
 from src.api.assets import ReleaseInfo  # Corrected import path
 from src.utils import arch_utils, version_utils
@@ -23,7 +23,7 @@ class ReleaseProcessor:
     architecture compatibility.
     """
 
-    def __init__(self, owner: str, repo: str, arch_keyword: Optional[str] = None):
+    def __init__(self, owner: str, repo: str, arch_keyword: str | None = None):
         """Initialize the ReleaseProcessor.
 
         Args:
@@ -38,7 +38,7 @@ class ReleaseProcessor:
 
     def compare_versions(
         self, current_version: str, latest_version: str
-    ) -> Tuple[bool, Dict[str, str]]:
+    ) -> tuple[bool, tuple[str, str]]:
         """Compare two version strings to determine if an update is available.
 
         Args:
@@ -46,7 +46,7 @@ class ReleaseProcessor:
             latest_version: Latest version string from GitHub
 
         Returns:
-            Tuple containing update available flag and version information
+            tuple containing update available flag and version information
 
         """
         # Normalize original versions first (e.g., remove 'v' prefix)
@@ -196,16 +196,16 @@ class ReleaseProcessor:
         }
 
     def filter_compatible_assets(
-        self, assets: List[Dict], arch_keywords: Optional[List[str]] = None
-    ) -> List[Dict]:
+        self, assets: list[dict[str, Any]], arch_keywords: list[str] | None = None
+    ) -> list[dict]:
         """Filter assets based on architecture compatibility.
 
         Args:
-            assets: List of asset dictionaries from GitHub
-            arch_keywords: List of architecture keywords to filter by
+            assets: list of asset dictionaries from GitHub
+            arch_keywords: list of architecture keywords to filter by
 
         Returns:
-            List of compatible assets
+            list of compatible assets
 
         """
         if not arch_keywords:
@@ -221,8 +221,8 @@ class ReleaseProcessor:
         return compatible_assets
 
     def process_release_data(
-        self, release_data: Dict, asset_info: Dict, is_beta: bool = False
-    ) -> Optional[ReleaseInfo]:
+        self, release_data: tuple, asset_info: tuple, is_beta: bool = False
+    ) -> ReleaseInfo | None:
         """Process raw release data into a structured ReleaseInfo object.
 
         Args:
@@ -248,9 +248,9 @@ class ReleaseProcessor:
         update_available: bool,
         current_version: str,
         release_info: ReleaseInfo,
-        compatible_assets: List[Dict],
-    ) -> Dict[
-        str, Union[bool, Optional[str], Optional[List[Dict[Any, Any]]], Optional[Dict[Any, Any]]]
+        compatible_assets: list[dict],
+    ) -> dict[
+        str, bool | str | None | list[tuple[Any, Any]] | None | tuple[Any, Any] | None
     ]:
         """Create a standardized response for update checks.
 
@@ -258,7 +258,7 @@ class ReleaseProcessor:
             update_available: Whether an update is available
             current_version: Current version string
             release_info: Processed ReleaseInfo object
-            compatible_assets: List of compatible assets
+            compatible_assets: list of compatible assets
 
         Returns:
             Dictionary with update information

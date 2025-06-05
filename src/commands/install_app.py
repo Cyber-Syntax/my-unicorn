@@ -69,7 +69,7 @@ class InstallAppCommand(Command):
         """Display a list of applications and allow user to select one for installation.
 
         Args:
-            apps: List of AppInfo objects to display
+            apps: list of AppInfo objects to display
 
         """
         if not apps:
@@ -193,7 +193,7 @@ class InstallAppCommand(Command):
                         logging.info("Skipping verification due to skip_verification setting.")
                         print("Skipping verification (verification disabled for this app).")
                         verification_success = True
-                        verification_skipped = True  # Set the flag that verification was skipped
+                        verification_skipped = True  # set the flag that verification was skipped
                         break
                     else:
                         # Single verification point for both existing and downloaded files
@@ -217,7 +217,7 @@ class InstallAppCommand(Command):
                             asset_digest=api.asset_digest,
                         )
 
-                        # Set the full path to the downloaded file
+                        # set the full path to the downloaded file
                         verification_manager.set_appimage_path(downloaded_file_path)
                         is_valid = verification_manager.verify_appimage(cleanup_on_failure=True)
 

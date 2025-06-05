@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Architecture utilities for asset selection.
 
-This module provides functions for extracting and identifying architecture
-information from filenames.
+This module provides functions for extracting and identifying architecture information from 
+filenames to ensure proper AppImage compatibility.
 """
 
 import re
-from typing import List, Optional
 
 # Constants for architecture identification
 ARCH_KEYWORDS = {
@@ -44,7 +43,7 @@ ALL_ARCH_MARKERS = [
 ]
 
 
-def get_arch_from_filename(filename: str) -> Optional[str]:
+def extract_arch_from_filename(filename: str) -> str | None:
     """Extract architecture keyword from an AppImage filename.
     Iterates through known architecture keywords and their markers.
     Uses regex to ensure the marker is a distinct word or segment in the filename.
@@ -53,7 +52,7 @@ def get_arch_from_filename(filename: str) -> Optional[str]:
         filename: The AppImage filename to extract from
 
     Returns:
-        Optional[str]: The extracted canonical architecture keyword (e.g., "x86_64") or None.
+        str | None: The extracted canonical architecture keyword (e.g., "x86_64") or None
     """
     if not filename:
         return None
@@ -84,7 +83,7 @@ def get_arch_from_filename(filename: str) -> Optional[str]:
     return None  # No specific architecture keyword found
 
 
-# The following functions are now effectively replaced or made redundant by the new get_arch_from_filename.
+# The following functions are now effectively replaced or made redundant by the new extract_arch_from_filename.
 # They are kept here but marked as deprecated to avoid breaking other parts of the codebase
 # that might still be calling them directly, though they should be updated.
 
@@ -93,7 +92,7 @@ def extract_arch_keyword(filename: str) -> str:
     """
     DEPRECATED: Original function to extract architecture keyword.
     This function returned parts of the filename rather than a canonical keyword.
-    Use get_arch_from_filename for canonical keywords.
+    Use extract_arch_from_filename for canonical keywords.
     """
     lower_name = filename.lower()
     # Original ARCH_PATTERNS were (regex_str_to_extract_part, label_that_was_ignored)
@@ -105,11 +104,11 @@ def extract_arch_keyword(filename: str) -> str:
     return ".appimage"  # Fallback
 
 
-def extract_arch_from_dash(filename: str) -> Optional[str]:
+def extract_arch_from_dash(filename: str) -> str | None:
     """
     DEPRECATED: Original function for more 'advanced' extraction.
     This function also returned parts of the filename.
-    Use get_arch_from_filename for canonical keywords.
+    Use extract_arch_from_filename for canonical keywords.
     """
     lower_name = filename.lower()
     # This logic is complex and returns parts of the filename.
@@ -130,7 +129,7 @@ def extract_arch_from_dash(filename: str) -> Optional[str]:
     return None
 
 
-def is_compatible_with_architecture(filename: str, incompatible_archs: List[str]) -> bool:
+def is_compatible_with_architecture(filename: str, incompatible_archs: list[str]) -> bool:
     """Check if a filename is compatible with the current architecture."""
     lower_name = filename.lower()
     return not any(arch in lower_name for arch in incompatible_archs)
@@ -140,13 +139,13 @@ def is_generic_linux_build(filename: str) -> bool:
     """Check if a filename represents a generic Linux build."""
     lower_name = filename.lower()
     # Check if "linux" is in the name and no specific architecture markers are present.
-    # This requires get_arch_from_filename to be robust.
-    # If get_arch_from_filename returns None, and "linux" is in name, it might be generic.
+    # This requires extract_arch_from_filename to be robust.
+    # If extract_arch_from_filename returns None, and "linux" is in name, it might be generic.
     # However, ALL_ARCH_MARKERS might be too broad if not used with care.
-    # A simpler check: if "linux" is present and get_arch_from_filename(filename) is None.
+    # A simpler check: if "linux" is present and extract_arch_from_filename(filename) is None.
     if "linux" in lower_name:
         if (
-            get_arch_from_filename(filename) is None
-        ):  # Check if our new function finds a specific arch
+            extract_arch_from_filename(filename) is None
+        ):  # Check if our function finds a specific arch
             return True
     return False

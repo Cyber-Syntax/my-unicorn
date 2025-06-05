@@ -4,8 +4,8 @@
 This module defines data structures for GitHub release assets.
 """
 
-from dataclasses import dataclass, field  # Added field
-from typing import Dict, List, Optional, Any  # Added Any
+from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -24,11 +24,11 @@ class AppImageAsset:
 
     name: str
     browser_download_url: str
-    size: Optional[int] = None
-    content_type: Optional[str] = None
+    size: int | None = None
+    content_type: str | None = None
 
     @classmethod
-    def from_github_asset(cls, asset: Dict) -> "AppImageAsset":
+    def from_github_asset(cls, asset: dict) -> "AppImageAsset":
         """Create an AppImageAsset from a GitHub API asset dictionary.
 
         Args:
@@ -53,10 +53,10 @@ class SHAAsset:
     name: str
     browser_download_url: str
     hash_type: str
-    size: Optional[int] = None
+    size: int | None = None
 
     @classmethod
-    def from_github_asset(cls, asset: Dict, hash_type: str = "sha256") -> "SHAAsset":
+    def from_github_asset(cls, asset: dict, hash_type: str = "sha256") -> "SHAAsset":
         """Create a SHAAsset from a GitHub API asset dictionary.
 
         Args:
@@ -80,8 +80,8 @@ class ArchitectureInfo:
     """Represents architecture information for asset selection."""
 
     name: str
-    keywords: List[str]
-    incompatible_archs: List[str]
+    keywords: list[str]
+    incompatible_archs: list[str]
 
     @classmethod
     def from_current_system(cls) -> "ArchitectureInfo":
@@ -110,20 +110,20 @@ class ReleaseInfo:
     version: str
     appimage_name: str
     appimage_url: str
-    sha_name: Optional[str] = None
-    sha_url: Optional[str] = None
-    hash_type: Optional[str] = None
-    arch_keyword: Optional[str] = None
-    release_notes: Optional[str] = None
-    release_url: Optional[str] = None
+    sha_name: str | None = None
+    sha_url: str | None = None
+    hash_type: str | None = None
+    arch_keyword: str | None = None
+    release_notes: str | None = None
+    release_url: str | None = None
     is_prerelease: bool = False
-    published_at: Optional[str] = None
-    extracted_hash_from_body: Optional[str] = None  # For hash extracted from release body
-    asset_digest: Optional[str] = None  # For GitHub API asset digest verification
-    raw_assets: List[Dict[str, Any]] = field(default_factory=list)  # Added for storing all assets
+    published_at: str | None = None
+    extracted_hash_from_body: str | None = None  # For hash extracted from release body
+    asset_digest: str | None = None  # For GitHub API asset digest verification
+    raw_assets: list[dict[str, Any]] = field(default_factory=list)  # Added for storing all assets
 
     @classmethod
-    def from_release_data(cls, release_data: Dict, asset_info: Dict) -> "ReleaseInfo":
+    def from_release_data(cls, release_data: dict, asset_info: dict) -> "ReleaseInfo":
         """Create a ReleaseInfo from GitHub release data and processed asset information.
 
         Args:

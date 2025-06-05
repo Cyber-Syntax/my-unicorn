@@ -11,7 +11,7 @@ import os
 import time
 from datetime import datetime
 from threading import Lock
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any
 
 import requests
 
@@ -39,18 +39,18 @@ class GitHubAuthManager:
     All methods are static to allow easy usage across different modules.
     """
 
-    _cached_headers: Optional[Dict[str, str]] = None
-    _last_token: Optional[str] = None
+    _cached_headers: tuple[str, str] | None = None
+    _last_token: str | None = None
     _last_token_check: float = 0
     _token_check_interval: int = 300  # Check token validity every 5 minutes
     _cached_headers_expiration: float = 0  # Timestamp when cached headers expire
     _audit_enabled: bool = True  # Enable audit logging by default
-    _rate_limit_cache: Dict[str, Any] = {}
+    _rate_limit_cache: dict[str, Any] = {}
     _rate_limit_cache_time: float = 0
     _request_count_since_cache: int = 0  # Counter for API requests since last cache refresh
 
     @classmethod
-    def get_auth_headers(cls, force_refresh: bool = False) -> Dict[str, str]:
+    def get_auth_headers(cls, force_refresh: bool = False) -> dict | None:
         """Get authentication headers for GitHub API requests.
 
         Returns properly formatted headers with Bearer authentication if a token
@@ -165,7 +165,7 @@ class GitHubAuthManager:
         next_hour_timestamp = get_next_hour_timestamp()
         next_hour = datetime.fromtimestamp(next_hour_timestamp)
 
-        # Set default unauthenticated rate limits
+        # set default unauthenticated rate limits
         cache_data = {
             "remaining": 50,  # Start a bit below max to be conservative
             "limit": 60,  # Unauthenticated limit is 60 per hour
@@ -246,7 +246,7 @@ class GitHubAuthManager:
         return os.path.join(ensure_directory_exists(CACHE_DIR), "rate_limit_cache.json")
 
     @classmethod
-    def _load_rate_limit_cache(cls) -> Dict[str, Any]:
+    def _load_rate_limit_cache(cls) -> tuple[str, Any]:
         """Load rate limit information from cache.
 
         Returns:
@@ -260,7 +260,7 @@ class GitHubAuthManager:
         )
 
     @classmethod
-    def _save_rate_limit_cache(cls, data: Dict[str, Any]) -> bool:
+    def _save_rate_limit_cache(cls, data: tuple[str, Any]) -> bool:
         """Save rate limit information to cache.
 
         Args:
@@ -305,8 +305,8 @@ class GitHubAuthManager:
             logger.debug(f"Updated cached rate limit: {new_remaining} (-{decrement}) remaining")
 
     @classmethod
-    def _extract_rate_limit_from_headers(cls, headers: Dict[str, str]) -> None:
-        """Extract rate limit information from response headers.
+    def _extract_rate_limit_from_headers(cls, headers: dict[str, Any]) -> None:
+        """Extract and cache rate limit information from response headers.
 
         Args:
             headers: Response headers from GitHub API request
@@ -348,9 +348,9 @@ class GitHubAuthManager:
     def _core_rate_limit_data(
         cls,
         use_cache: bool = True,
-        custom_headers: Optional[Dict[str, str]] = None,
+        custom_headers: tuple[str, str] | None = None,
         return_dict: bool = False,
-    ) -> Union[Tuple[int, int, str, bool], Dict[str, Any]]:
+    ) -> tuple[int, int, str, bool] | dict[str, Any]:
         """Core implementation for rate limit data retrieval.
 
         This method handles both cached and live rate limit information.
@@ -361,7 +361,7 @@ class GitHubAuthManager:
             return_dict: If True, returns complete data dictionary
 
         Returns:
-            Tuple or Dict: Rate limit information
+            tuple or tuple: Rate limit information
 
         """
         # Check memory cache if using cache
@@ -570,8 +570,8 @@ class GitHubAuthManager:
 
     @classmethod
     def get_rate_limit_info(
-        cls, custom_headers: Optional[Dict[str, str]] = None, return_dict: bool = False
-    ) -> Union[Tuple[int, int, str, bool], Dict[str, Any]]:
+        cls, custom_headers: tuple[str, str] | None = None, return_dict: bool = False
+    ) -> tuple[int, int, str, bool] | dict[str, Any]:
         """Get the current GitHub API rate limit information.
 
         Uses a local cache to avoid frequent API calls.
@@ -590,7 +590,7 @@ class GitHubAuthManager:
         )
 
     @classmethod
-    def get_estimated_rate_limit_info(cls) -> Union[Tuple[int, int, str, bool], Dict[str, Any]]:
+    def get_estimated_rate_limit_info(cls) -> tuple[int, int, str, bool] | tuple[str, Any]:
         """Get estimated GitHub API rate limit information based only on cached data.
 
         This method is optimized for startup performance and never makes API calls.
@@ -628,7 +628,7 @@ class GitHubAuthManager:
                     "%Y-%m-%d %H:%M:%S"
                 )
 
-                # Set defaults based on authentication status
+                # set defaults based on authentication status
                 if is_authenticated:
                     logger.debug("No cache found, using default authenticated values")
                     return (
@@ -717,7 +717,7 @@ class GitHubAuthManager:
         method: str,
         url: str,
         retry_auth: bool = True,
-        audit_action: Optional[str] = None,
+        audit_action: str | None = None,
         **kwargs,
     ) -> requests.Response:
         """Make an authenticated request to GitHub API with session reuse.
@@ -805,12 +805,21 @@ class GitHubAuthManager:
         logger.info(f"Authentication audit logging {'enabled' if enabled else 'disabled'}")
 
     @classmethod
-    def get_token_info(cls) -> Dict[str, Any]:
+    def get_token_info(cls) -> dict[str, Any]:
         """Get information about the current token.
 
-        Returns:
-            Dict with token information including expiration status
+        Retrieves metadata about the stored GitHub token including validity,
+        expiration, scopes, and usage information.
 
+        Returns:
+            dict[str, Any]: Token information including:
+                - token_exists: bool
+                - token_valid: bool
+                - is_expired: bool
+                - expiration_date: str | None
+                - days_until_rotation: int | None 
+                - created_at: str | None
+                - last_used_at: str | None
         """
         logger.debug("Getting token information and status")
         token_metadata = SecureTokenManager.get_token_metadata()
@@ -865,18 +874,22 @@ class GitHubAuthManager:
 
     @classmethod
     def get_live_rate_limit_info(
-        cls, custom_headers: Optional[Dict[str, str]] = None
-    ) -> Dict[str, Any]:
-        """Get the current GitHub API rate limit information directly from the API without using cache.
+        cls, custom_headers: tuple[str, str] | None = None
+    ) -> tuple[str, Any]:
+        """Get current GitHub API rate limit information directly from the API.
 
-        This method is used when the user explicitly wants to check the current rate limits.
+        Makes a real-time API call to GitHub to get rate limit status,
+        bypassing any cached information.
 
         Args:
-            custom_headers: Optional custom headers for rate limit check
+            custom_headers: Authentication headers to use, None to use default token
 
         Returns:
-            Dict[str, Any]: Complete rate limit information dictionary
-
+            tuple[str, Any]: Rate limit info containing:
+                - remaining: Current remaining requests
+                - limit: Total request limit
+                - reset_formatted: Human readable reset time
+                - is_authenticated: Whether request was authenticated
         """
         logger.info("Checking live rate limit information from GitHub API")
 
@@ -920,8 +933,8 @@ class GitHubAuthManager:
 
     @classmethod
     def validate_token(
-        cls, custom_headers: Optional[Dict[str, str]] = None
-    ) -> Tuple[bool, Dict[str, Any]]:
+        cls, custom_headers: tuple[str, str] | None = None
+    ) -> tuple[bool, dict[str, Any]]:
         """Validate a GitHub token by making a test request and analyzing the response.
 
         Args:
@@ -1025,13 +1038,13 @@ class GitHubAuthManager:
 class SessionPool:
     """Manages reusable HTTP sessions with authentication."""
 
-    _sessions: Dict[str, requests.Session] = {}
+    _sessions: dict[str, requests.Session] = {}
     _lock = Lock()
-    _last_used: Dict[str, float] = {}
+    _last_used: dict[str, float] = {}
     _max_idle_time: int = 300  # 5 minutes
 
     @classmethod
-    def get_session(cls, token_key: Optional[str] = None) -> requests.Session:
+    def get_session(cls, token_key: str | None = None) -> requests.Session:
         """Get or create a session with the current auth token.
 
         Args:
@@ -1066,7 +1079,7 @@ class SessionPool:
                 timeout=(10, 30),  # (connect timeout, read timeout)
             )
 
-            # Store in pool and return
+            # Store session in pool and return
             cls._sessions[key] = session
             cls._last_used[key] = time.time()
             return session
@@ -1092,12 +1105,14 @@ class SessionPool:
                 del cls._last_used[key]
 
     @classmethod
-    def clear_session(cls, token_key: Optional[str] = None) -> None:
+    def clear_session(cls, token_key: str | None = None) -> None:
         """Close and remove a session when token changes.
 
-        Args:
-            token_key: Optional unique identifier for the token
+        Properly closes and cleans up session resources for the specified token.
+        If no token key is provided, clears the unauthenticated session.
 
+        Args:
+            token_key: Token identifier to clear session for, None for unauthenticated
         """
         key = str(token_key or "unauthenticated")
 

@@ -1,33 +1,36 @@
 #!/usr/bin/env python3
 """Date and time utility functions.
 
-This module provides common functionality for handling date and time operations,
-particularly parsing timestamps from various formats into datetime objects.
+This module provides functionality for handling date and time operations. It includes utilities for:
+- Parsing timestamps from various formats (ISO strings, Unix timestamps, datetime objects)
+- Converting timestamps to standardized string formats
+- Calculating time-based values for rate limiting
 """
 
 import logging
-from datetime import datetime
-from typing import Optional, Union
+from datetime import datetime, UTC
 
-# Configure module logger
 logger = logging.getLogger(__name__)
 
 
-def parse_timestamp(timestamp_value: Union[str, float, datetime, None]) -> Optional[datetime]:
+def parse_timestamp(timestamp_value: str | float | datetime | None) -> datetime | None:
     """Parse timestamp from various formats into datetime object.
 
-    Handles different input formats including:
-    - ISO format strings (e.g. "2023-01-01T12:00:00")
-    - Unix timestamps as integers or floats
-    - Unix timestamps as strings
-    - datetime objects (returned as-is)
+    Converts timestamps from multiple formats into standard datetime objects.
 
     Args:
-        timestamp_value: Timestamp in various formats
+        timestamp_value: Input timestamp in one of:
+            - ISO format string ("2023-01-01T12:00:00Z")
+            - Unix timestamp (float/int)
+            - Unix timestamp string
+            - datetime object
+            - None
 
     Returns:
-        datetime: Parsed datetime object or None if parsing fails
+        datetime | None: Parsed UTC datetime object if successful, None if parsing fails
 
+    Raises:
+        No exceptions - returns None for any parsing failures
     """
     if timestamp_value is None:
         return None
@@ -61,19 +64,28 @@ def parse_timestamp(timestamp_value: Union[str, float, datetime, None]) -> Optio
     logger.debug(f"Unsupported timestamp type: {type(timestamp_value)}")
     return None
 
-
+            
 def format_timestamp(
-    timestamp_value: Union[str, float, None], format_str: str = "%Y-%m-%d %H:%M:%S"
-) -> Optional[str]:
+    timestamp_value: str | float | datetime,
+    format_str: str = "%Y-%m-%d %H:%M:%S"
+) -> str | None:
     """Parse a timestamp and format it as a string.
 
     Args:
-        timestamp_value: Timestamp in various formats
-        format_str: Format string for the output
+        timestamp_value: Input timestamp in one of:
+            - ISO format string
+            - Unix timestamp
+            - datetime object
+        format_str: strftime format string (default: "%Y-%m-%d %H:%M:%S")
 
     Returns:
-        str: Formatted timestamp string or None if parsing fails
+        str | None: Formatted timestamp string if successful, None if parsing fails
 
+    Examples:
+        >>> format_timestamp("2023-01-01T12:00:00Z")
+        '2023-01-01 12:00:00'
+        >>> format_timestamp(1672574400)
+        '2023-01-01 12:00:00'
     """
     dt = parse_timestamp(timestamp_value)
     if dt:
@@ -84,11 +96,16 @@ def format_timestamp(
 def get_next_hour_timestamp() -> int:
     """Get the Unix timestamp for the beginning of the next hour.
 
-    Useful for GitHub API rate limit calculations which reset hourly.
+    Calculates the timestamp for the start of the next hour, used primarily
+    for GitHub API rate limit reset timing.
 
     Returns:
-        int: Unix timestamp for the beginning of the next hour
+        int: Unix timestamp (seconds since epoch) for the start of next hour
 
+    Example:
+        >>> current = 1672574400  # 2023-01-01 12:30:00
+        >>> get_next_hour_timestamp()
+        1672578000  # 2023-01-01 13:00:00
     """
     current_time = int(datetime.now().timestamp())
     return (current_time // 3600 + 1) * 3600

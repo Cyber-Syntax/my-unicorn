@@ -8,7 +8,6 @@ from GitHub releases based on system architecture and app characteristics.
 import logging
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 from src.app_catalog import AppInfo
 from src.utils import arch_utils
@@ -25,7 +24,7 @@ class AssetSelectionResult:
         characteristic_suffix: The suffix that matched this asset
     """
 
-    asset: Dict
+    asset: tuple
     characteristic_suffix: str
 
 
@@ -38,15 +37,15 @@ class AppImageSelector:
 
     def find_appimage_asset(
         self,
-        assets: List[Dict],
-        definitive_app_info: Optional[AppInfo] = None,
-        user_local_config_data: Optional[Dict] = None,
+        assets: list[dict],
+        definitive_app_info: AppInfo = None,
+        user_local_config_data: dict | None = None,
         release_is_prerelease: bool = False,
-    ) -> Optional[AssetSelectionResult]:
+    ) -> AssetSelectionResult:
         """Find and select appropriate AppImage asset based on app metadata and system architecture.
 
         Args:
-            assets: List of release assets from GitHub API
+            assets: list of release assets from GitHub API
             definitive_app_info: Base app metadata from repository JSON (optional)
             user_local_config_data: User's local config data (optional)
             release_is_prerelease: Whether this is a pre-release
@@ -96,8 +95,8 @@ class AppImageSelector:
         return None
 
     def _determine_target_suffixes(
-        self, definitive_app_info: Optional[AppInfo], user_local_config_data: Optional[Dict]
-    ) -> List[str]:
+        self, definitive_app_info: AppInfo | None, user_local_config_data: dict | None
+    ) -> list[str]:
         """Determine the prioritized list of characteristic suffixes to try.
 
         Priority order:
@@ -129,11 +128,11 @@ class AppImageSelector:
 
     def _try_suffix_based_selection(
         self,
-        assets: List[Dict],
-        target_suffixes: List[str],
+        assets: list[dict],
+        target_suffixes: list[str],
         system_cpu_arch: str,
         is_prerelease: bool,
-    ) -> Optional[AssetSelectionResult]:
+    ) -> AssetSelectionResult | None:
         """Try to select an asset based on characteristic suffixes."""
         for suffix in target_suffixes:
             self._logger.info(f"Trying suffix: '{suffix}'")
@@ -216,8 +215,8 @@ class AppImageSelector:
         return False
 
     def _try_generic_selection(
-        self, assets: List[Dict], system_cpu_arch: str, is_prerelease: bool
-    ) -> Optional[Dict]:
+        self, assets: list[dict], system_cpu_arch: str, is_prerelease: bool
+    ) -> dict | None:
         """Try to select an asset without specific characteristic suffix."""
         # Filter to only architecture-compatible assets
         compatible_assets = []

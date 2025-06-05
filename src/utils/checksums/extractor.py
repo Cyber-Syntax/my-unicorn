@@ -7,7 +7,6 @@ release notes rather than as separate files.
 
 import logging
 from pathlib import Path
-from typing import List, Optional
 
 from requests.exceptions import RequestException
 
@@ -30,10 +29,10 @@ class ReleaseChecksumExtractor:
         """
         self.owner = owner
         self.repo = repo
-        self.release_description: Optional[str] = None
+        self.release_description: str | None = None
         self._headers = GitHubAuthManager.get_auth_headers()
 
-    def fetch_release_description(self) -> Optional[str]:
+    def fetch_release_description(self) -> str | None:
         """Fetch the latest release description from GitHub API.
 
         Returns:
@@ -76,14 +75,14 @@ class ReleaseChecksumExtractor:
             logger.error(f"Network error fetching release: {e}")
             raise
 
-    def extract_checksums(self, target_filename: Optional[str] = None) -> List[str]:
+    def extract_checksums(self, target_filename: str | None = None) -> list[str]:
         """Extract checksum lines from the release description.
 
         Args:
             target_filename: Optional filename to filter checksums for
 
         Returns:
-            List of checksum lines in "hash filename" format
+            list of checksum lines in "hash filename" format
 
         Raises:
             ValueError: If no checksums found or description unavailable

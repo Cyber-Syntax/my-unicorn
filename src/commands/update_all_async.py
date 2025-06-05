@@ -175,7 +175,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         3. Allowing users to make informed decisions about which apps to update
 
         Returns:
-            List[Dict[str, Any]]: A list of updatable application information dictionaries
+            list[tuple[str, Any]]: A list of updatable application information dictionaries
 
         """
         updatable_apps = []
@@ -318,7 +318,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         """Handle user confirmation based on batch mode.
 
         Args:
-            updatable: List of updatable app information dictionaries
+            updatable: list of updatable app information dictionaries
 
         Returns:
             bool: True if updates are confirmed, False otherwise
@@ -359,12 +359,12 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         4. If not, filters to apps that can be processed within limits
 
         Args:
-            apps: List of app information dictionaries
+            apps: list of app information dictionaries
 
         Returns:
-            Tuple containing:
+            tuple containing:
             - bool: True if we can proceed with all apps, False if partial/no update needed
-            - List[Dict[str, Any]]: Filtered list of apps that can be processed
+            - list[tuple[str, Any]]: Filtered list of apps that can be processed
             - str: Status message explaining the rate limit situation
 
         """
@@ -449,7 +449,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         method, then displays the results in a format suitable for this command.
 
         Args:
-            apps_to_update: List of app information dictionaries to update
+            apps_to_update: list of app information dictionaries to update
 
         """
         try:
@@ -464,7 +464,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
-            # Set the main event loop in ui_utils
+            # set the main event loop in ui_utils
             ui_utils.set_main_event_loop(loop)
 
             print("Asynchronous update started")
@@ -482,7 +482,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             if failure_count > 0:
                 print(f"Failed updates: {failure_count}")
 
-                # List failed updates
+                # list failed updates
                 failed_apps = []
                 for app_name, result in results.items():
                     if result.get("status") != "success":

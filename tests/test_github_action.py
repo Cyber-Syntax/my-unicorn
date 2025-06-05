@@ -19,7 +19,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 # Third-party imports
 import requests
@@ -47,11 +47,11 @@ logger = logging.getLogger(__name__)
 class GitHubActionTester:
     """Test class for GitHub Actions release workflow."""
 
-    def __init__(self, github_token: Optional[str] = None) -> None:
-        """Initialize the tester with optional GitHub token.
+    def __init__(self, github_token: str | None = None) -> None:
+        """Initialize the tester with GitHub token.
 
         Args:
-            github_token: Optional GitHub API token for username resolution.
+            github_token: GitHub API token for username resolution, or None to use environment.
 
         """
         self.github_token = github_token or os.getenv("GITHUB_TOKEN")
@@ -175,7 +175,7 @@ class GitHubActionTester:
             logger.info("No previous git tag found")
             return ""
 
-    def _extract_username_from_noreply_email(self, email: str) -> Optional[str]:
+    def _extract_username_from_noreply_email(self, email: str) -> str | None:
         """Extract username from GitHub noreply email pattern.
 
         Args:
@@ -188,7 +188,7 @@ class GitHubActionTester:
         noreply_match = re.match(r"(?:[0-9]+\+)?([^@]+)@users\.noreply\.github\.com", email)
         return noreply_match.group(1) if noreply_match else None
 
-    def _get_user_from_commit_api(self, commit_hash: str) -> Optional[str]:
+    def _get_user_from_commit_api(self, commit_hash: str) -> str | None:
         """Get username from GitHub commit API.
 
         Args:
@@ -216,7 +216,7 @@ class GitHubActionTester:
 
         return None
 
-    def _search_user_by_email(self, email: str) -> Optional[str]:
+    def _search_user_by_email(self, email: str) -> str | None:
         """Search for GitHub user by email address.
 
         Args:
@@ -275,7 +275,7 @@ class GitHubActionTester:
         # Fallback: use part before @
         return email.split("@")[0]
 
-    def _get_commits_with_usernames(self, previous_tag: str) -> Dict[str, List[str]]:
+    def _get_commits_with_usernames(self, previous_tag: str) -> tuple[str, list[str]]:
         """Get commits with GitHub usernames, categorized by type.
 
         Args:
@@ -365,11 +365,11 @@ class GitHubActionTester:
 
         return {"features": features, "bugfixes": bugfixes, "other": other_commits}
 
-    def _create_release_notes(self) -> Tuple[str, str]:
+    def _create_release_notes(self) -> tuple[str, str]:
         """Create full release notes combining CHANGELOG and commits.
 
         Returns:
-            Tuple of (version, full_notes).
+            tuple of (version, full_notes).
 
         """
         version = self._extract_version_from_changelog()
@@ -393,7 +393,7 @@ class GitHubActionTester:
 
         return version, full_notes
 
-    def test_workflow(self) -> Dict[str, Any]:
+    def test_workflow(self) -> tuple[str, Any]:
         """Test the complete workflow logic.
 
         Returns:
@@ -436,7 +436,7 @@ class GitHubActionTester:
         }
 
 
-def _write_test_results_to_file(results: Dict[str, Any], output_path: Path) -> None:
+def _write_test_results_to_file(results: tuple[str, Any], output_path: Path) -> None:
     """Write test results to markdown file.
 
     Args:
@@ -457,7 +457,7 @@ def _write_test_results_to_file(results: Dict[str, Any], output_path: Path) -> N
         logger.error("Failed to write results file: %s", e)
 
 
-def _display_results_summary(results: Dict[str, Any]) -> None:
+def _display_results_summary(results: tuple[str, Any]) -> None:
     """Display a summary of test results.
 
     Args:

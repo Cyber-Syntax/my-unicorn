@@ -129,7 +129,7 @@ class SHAManager:
         """Find and select appropriate SHA file for verification.
 
         Args:
-            assets: List of release assets from GitHub API
+            assets: list of release assets from GitHub API
 
         """
         if self.skip_verification:
@@ -202,7 +202,7 @@ class SHAManager:
         """Handle fallback when SHA file couldn't be automatically determined.
 
         Args:
-            assets: List of release assets from GitHub API
+            assets: list of release assets from GitHub API
 
         """
         return self._handle_sha_fallback_sync(assets)
@@ -211,7 +211,7 @@ class SHAManager:
         """Async version of SHA fallback handler.
 
         Args:
-            assets: List of release assets from GitHub API
+            assets: list of release assets from GitHub API
 
         """
         logger.warning("Could not find SHA file automatically")
@@ -246,7 +246,7 @@ class SHAManager:
         """Synchronous version of SHA fallback handler.
 
         Args:
-            assets: List of release assets from GitHub API
+            assets: list of release assets from GitHub API
 
         """
         logger.warning("Could not find SHA file automatically")

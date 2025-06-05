@@ -6,7 +6,6 @@ Tests for SHA utility functions.
 This module contains tests for the SHA utility functions in src/utils/sha_utils.py.
 """
 
-from typing import List, Optional
 
 import pytest
 

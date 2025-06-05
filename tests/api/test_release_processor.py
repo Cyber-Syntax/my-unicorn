@@ -1,7 +1,7 @@
 """Tests for the ReleaseProcessor class."""
 
 from unittest.mock import MagicMock, patch
-from typing import Dict, Any, List, Optional
+from typing import Any
 import pytest
 
 from src.api.release_processor import ReleaseProcessor
@@ -16,7 +16,7 @@ from src.utils import version_utils  # For direct call in one test if needed
 
 
 @pytest.fixture
-def release_processor_instance(mock_platform_info: Dict[str, str]) -> ReleaseProcessor:
+def release_processor_instance(mock_platform_info: tuple[str, str]) -> ReleaseProcessor:
     """Provides a ReleaseProcessor instance for testing."""
     # ReleaseProcessor __init__ takes owner, repo, arch_keyword
     # arch_keyword can be derived from mock_platform_info for consistency
@@ -72,7 +72,7 @@ class TestReleaseProcessorLogic:
     ):
         """Test version comparison logic."""
         original_repo = release_processor_instance.repo
-        release_processor_instance.repo = repo_name  # Set repo for version_utils.repo_uses_beta
+        release_processor_instance.repo = repo_name  # set repo for version_utils.repo_uses_beta
 
         # Call compare_versions with positional arguments as per its signature
         update_available, versions_dict = release_processor_instance.compare_versions(
@@ -87,7 +87,7 @@ class TestReleaseProcessorLogic:
         release_processor_instance.repo = original_repo  # Reset repo
 
     def test_process_release_data(  # Was test_populate_release_info
-        self, release_processor_instance: ReleaseProcessor, mock_release_data: Dict[str, Any]
+        self, release_processor_instance: ReleaseProcessor, mock_release_data: tuple[str, Any]
     ):
         """Test processing of raw release data into ReleaseInfo."""
         processed_asset_info = {
@@ -175,8 +175,8 @@ class TestReleaseProcessorLogic:
     def test_filter_compatible_assets(
         self,
         release_processor_instance: ReleaseProcessor,
-        mock_release_data: Dict[str, Any],
-        mock_platform_info: Dict[str, str],
+        mock_release_data: tuple[str, Any],
+        mock_platform_info: tuple[str, str],
     ):
         """Test filtering of compatible assets."""
         raw_assets_list = mock_release_data["assets"]

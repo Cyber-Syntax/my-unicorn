@@ -7,7 +7,6 @@ downloading AppImages from GitHub releases.
 
 import sys
 from pathlib import Path
-from typing import Dict
 from unittest.mock import MagicMock
 
 import pytest
@@ -22,11 +21,11 @@ from src.commands.download import DownloadCommand
 
 
 @pytest.fixture
-def download_test_data() -> Dict[str, str]:
+def download_test_data() -> tuple[str, str]:
     """Provide common test data for download command tests.
 
     Returns:
-        Dict[str, str]: Dictionary containing test values
+        tuple[str, str]: Dictionary containing test values
 
     """
     return {
@@ -42,7 +41,7 @@ def download_test_data() -> Dict[str, str]:
 
 
 @pytest.fixture
-def mocked_parser(monkeypatch: pytest.MonkeyPatch, download_test_data: Dict[str, str]) -> MagicMock:
+def mocked_parser(monkeypatch: pytest.MonkeyPatch, download_test_data: tuple[str, str]) -> MagicMock:
     """Mock the ParseURL class.
 
     Args:
@@ -66,7 +65,7 @@ def mocked_parser(monkeypatch: pytest.MonkeyPatch, download_test_data: Dict[str,
 
 @pytest.fixture
 def mocked_app_config(
-    monkeypatch: pytest.MonkeyPatch, download_test_data: Dict[str, str]
+    monkeypatch: pytest.MonkeyPatch, download_test_data: tuple[str, str]
 ) -> MagicMock:
     """Mock the AppConfigManager class.
 
@@ -92,7 +91,7 @@ def mocked_app_config(
 
 
 @pytest.fixture
-def mocked_api(monkeypatch: pytest.MonkeyPatch, download_test_data: Dict[str, str]) -> MagicMock:
+def mocked_api(monkeypatch: pytest.MonkeyPatch, download_test_data: tuple[str, str]) -> MagicMock:
     """Mock the GitHubAPI class.
 
     Args:
@@ -332,7 +331,7 @@ def test_download_command_skip_verification(
     mocked_verifier: MagicMock,
     mocked_file_handler: MagicMock,
     mocked_icon_manager: MagicMock,
-    download_test_data: Dict[str, str],
+    download_test_data: tuple[str, str],
 ) -> None:
     """Test download command behavior when no SHA file is available.
 
@@ -351,7 +350,7 @@ def test_download_command_skip_verification(
         download_test_data: Test data dictionary
 
     """
-    # Set skip_verification to trigger the skip verification path
+    # set skip_verification to trigger the skip verification path
     mocked_api.skip_verification = True
     mocked_api.sha_name = None
 

@@ -149,7 +149,7 @@ class FileHandler:
             if not self._move_appimage():
                 return False
 
-            # Set executable permissions
+            # set executable permissions
             if not self._set_executable_permission():
                 return False
 
@@ -323,7 +323,7 @@ class FileHandler:
             return False
 
     def _set_executable_permission(self) -> bool:
-        """Set executable permissions on the AppImage.
+        """set executable permissions on the AppImage.
 
         Returns:
             bool: True if permissions were set successfully, False otherwise
@@ -336,7 +336,7 @@ class FileHandler:
 
             # Make the AppImage executable (add +x to current permissions)
             self.installed_path.chmod(self.installed_path.stat().st_mode | DESKTOP_ENTRY_FILE_MODE)
-            logger.info(f"Set executable permissions on {self.installed_path}")
+            logger.info(f"set executable permissions on {self.installed_path}")
             return True
 
         except Exception as e:

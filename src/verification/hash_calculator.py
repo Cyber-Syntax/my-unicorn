@@ -1,27 +1,31 @@
 """Hash calculation and comparison for AppImage verification.
 
-This module provides functionality for computing file hashes and comparing
-them with expected values using memory-efficient chunked reading.
+This module provides secure, memory-efficient hash calculation and verification utilities for AppImage 
+files. It implements chunked file reading and file locking to ensure data integrity during hash 
+computation.
 """
 
 import fcntl
 import hashlib
 import logging
 import os
-from typing import BinaryIO
+from pathlib import Path
 
 
 class HashCalculator:
     """Handles hash computation and comparison for file verification."""
 
     def __init__(self, hash_type: str) -> None:
-        """Initialize the hash calculator.
+        """Initialize the hash calculator with specified algorithm.
+
+        Creates a hash calculator instance configured to use the specified hash algorithm.
+        Validates that the requested algorithm is available on the system.
 
         Args:
-            hash_type: The hash algorithm to use (e.g., 'sha256', 'sha512')
+            hash_type: Hash algorithm to use (e.g., 'sha256', 'sha512')
 
         Raises:
-            ValueError: If hash type is not available in the system
+            ValueError: If specified hash algorithm is not available on the system
         """
         self.hash_type = hash_type.lower()
 
@@ -36,18 +40,23 @@ class HashCalculator:
         """Check if this is a special hash type that doesn't use hashlib."""
         return self.hash_type in ("no_hash", "asset_digest", "extracted_checksum")
 
-    def calculate_file_hash(self, filepath: str) -> str:
-        """Calculate hash of a file using memory-efficient chunked reading.
+    def calculate_file_hash(self, filepath: str | Path) -> str:
+        """Calculate file hash using memory-efficient chunked reading.
 
         Args:
-            filepath: Path to the file to hash
+            filepath: Path to file to hash (str or Path object)
 
         Returns:
-            The calculated hash as a lowercase hexadecimal string
+            Calculated hash as lowercase hexadecimal string
 
         Raises:
-            OSError: If file cannot be read
-            ValueError: If hash calculation fails
+            OSError: If file cannot be opened or read
+            ValueError: If hash calculation fails for any reason
+
+        Example:
+            >>> calc = HashCalculator('sha256')
+            >>> calc.calculate_file_hash('myfile.AppImage')
+            '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92'
         """
         if self._is_special_hash_type():
             logging.warning(
@@ -96,7 +105,7 @@ class HashCalculator:
         """
         return actual_hash.lower() == expected_hash.lower()
 
-    def verify_file_hash(self, filepath: str, expected_hash: str) -> bool:
+    def verify_file_hash(self, filepath: str | Path, expected_hash: str) -> bool:
         """Calculate file hash and compare with expected value.
 
         Args:
