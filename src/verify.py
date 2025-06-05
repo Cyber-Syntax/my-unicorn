@@ -11,9 +11,4 @@ from src.verification import VerificationManager
 from src.verification.config import SUPPORTED_HASH_TYPES
 from src.verification.logger import STATUS_SUCCESS, STATUS_FAIL
 
-__all__ = [
-    "VerificationManager",
-    "SUPPORTED_HASH_TYPES", 
-    "STATUS_SUCCESS",
-    "STATUS_FAIL"
-]
+__all__ = ["VerificationManager", "SUPPORTED_HASH_TYPES", "STATUS_SUCCESS", "STATUS_FAIL"]

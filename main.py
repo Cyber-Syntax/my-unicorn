@@ -4,12 +4,10 @@
 This module configures logging, loads configuration files, and executes commands.
 """
 
-# Standard library imports
 import gettext
 import logging
-import os  # Add os import
-import sys
 import os
+import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from types import TracebackType
@@ -19,7 +17,6 @@ from src.app_catalog import initialize_definitions_path
 from src.app_config import AppConfigManager
 from src.auth_manager import GitHubAuthManager
 
-# Local imports
 from src.commands.customize_app_config import CustomizeAppConfigCommand
 from src.commands.customize_global_config import CustomizeGlobalConfigCommand
 from src.commands.delete_backups import DeleteBackupsCommand

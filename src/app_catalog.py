@@ -132,11 +132,11 @@ def find_app_by_owner_repo(owner: str, repo: str) -> AppInfo | None:
 
     """
     all_apps = get_all_apps()
-    
+
     for app_info in all_apps.values():
         if app_info.owner.lower() == owner.lower() and app_info.repo.lower() == repo.lower():
             return app_info
-    
+
     return None
 
 
