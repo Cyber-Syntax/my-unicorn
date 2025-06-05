@@ -50,7 +50,9 @@ class SHAAssetFinder:
                 logger.info(f"Successfully found asset digest for {selected_appimage_name}")
                 return asset_digest_info
             else:
-                logger.warning(f"Asset digest not available for {selected_appimage_name}, falling back to SHA files")
+                logger.warning(
+                    f"Asset digest not available for {selected_appimage_name}, falling back to SHA files"
+                )
 
         # Priority 2: Try exact match from definitive app info
         if definitive_app_info.sha_name:
@@ -95,7 +97,7 @@ class SHAAssetFinder:
             if asset.get("name") == appimage_name and asset.get("digest"):
                 digest = asset["digest"]
                 logger.info(f"Found asset digest for {appimage_name}: {digest}")
-                
+
                 # Validate digest format (should be like "sha256:hash_value")
                 if ":" in digest:
                     digest_type, digest_hash = digest.split(":", 1)
@@ -107,7 +109,7 @@ class SHAAssetFinder:
                             "digest": digest,
                             "hash_type": "asset_digest",
                             "asset_digest_hash": digest_hash,
-                            "asset_digest_type": digest_type
+                            "asset_digest_type": digest_type,
                         }
                     else:
                         logger.warning(f"Invalid digest format or unsupported type: {digest}")

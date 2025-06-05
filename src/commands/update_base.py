@@ -277,7 +277,7 @@ class BaseUpdateCommand(Command):
         # For use_asset_digest apps, use auto detection instead of None values
         sha_name_param = app_info.sha_name if app_info.sha_name else "auto"
         hash_type_param = app_info.hash_type if app_info.hash_type else "auto"
-        
+
         github_api = GitHubAPI(
             owner=app_info.owner,
             repo=app_info.repo,
@@ -324,7 +324,7 @@ class BaseUpdateCommand(Command):
                 github_api, app_index=app_index, total_apps=total_apps
             )
             downloaded_file_path, was_existing_file = download_manager.download()
-            
+
             if was_existing_file:
                 print(f"\nFound existing file: {github_api.appimage_name}")
             else:
@@ -337,7 +337,7 @@ class BaseUpdateCommand(Command):
                 print("Verifying existing file...")
             else:
                 print("Verifying download integrity...")
-            
+
             verification_result, verification_skipped = self._verify_appimage(
                 github_api, downloaded_file_path, cleanup_on_failure=cleanup
             )
@@ -640,7 +640,7 @@ class BaseUpdateCommand(Command):
         # For use_asset_digest apps, use auto detection instead of None values
         sha_name_param = app_info.sha_name if app_info.sha_name else "auto"
         hash_type_param = app_info.hash_type if app_info.hash_type else "auto"
-        
+
         github_api = GitHubAPI(
             owner=app_info.owner,
             repo=app_info.repo,
@@ -649,7 +649,9 @@ class BaseUpdateCommand(Command):
             arch_keyword=None,  # Use app definition's preferred_characteristic_suffixes
         )
 
-        update_available, version_info = github_api.check_latest_version(current_version, version_check_only=True)
+        update_available, version_info = github_api.check_latest_version(
+            current_version, version_check_only=True
+        )
         latest_version = version_info.get("latest_version") if update_available else None
 
         if "error" in version_info:

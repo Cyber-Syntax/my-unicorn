@@ -44,7 +44,7 @@ class VerificationManager:
             appimage_path=self.appimage_path,
             direct_expected_hash=self.direct_expected_hash,
             asset_digest=self.asset_digest,
-            use_asset_digest=self.use_asset_digest
+            use_asset_digest=self.use_asset_digest,
         )
 
         # Update our attributes from the validated config
@@ -53,11 +53,13 @@ class VerificationManager:
         # Initialize components
         self.logger = VerificationLogger()
         self.cleanup = VerificationCleanup()
-        
+
         # Use appropriate hash type for HashCalculator
         # For asset_digest, we'll use sha256 as default since the actual algorithm
         # is determined from the digest string itself
-        calculator_hash_type = "sha256" if self.config.hash_type == "asset_digest" else self.config.hash_type
+        calculator_hash_type = (
+            "sha256" if self.config.hash_type == "asset_digest" else self.config.hash_type
+        )
         self.hash_calculator = HashCalculator(calculator_hash_type)
         self.sha_manager = ShaFileManager(self.config.hash_type)
         self.asset_verifier = AssetDigestVerifier()
@@ -95,8 +97,7 @@ class VerificationManager:
         """
         try:
             self.logger.log_verification_start(
-                self.config.appimage_name or "Unknown",
-                self.config.hash_type
+                self.config.appimage_name or "Unknown", self.config.hash_type
             )
 
             # Check if verification should be skipped
@@ -131,9 +132,7 @@ class VerificationManager:
                 return False
 
             result = self.asset_verifier.verify_asset_digest(
-                self.config.appimage_path,
-                self.config.asset_digest,
-                self.config.appimage_name
+                self.config.appimage_path, self.config.asset_digest, self.config.appimage_name
             )
 
             if not result and cleanup_on_failure:
@@ -165,8 +164,7 @@ class VerificationManager:
             )
 
             result = self.hash_calculator.verify_file_hash(
-                self.config.appimage_path,
-                self.config.direct_expected_hash
+                self.config.appimage_path, self.config.direct_expected_hash
             )
 
             actual_hash = self.hash_calculator.calculate_file_hash(self.config.appimage_path)
@@ -176,7 +174,7 @@ class VerificationManager:
                 self.config.hash_type,
                 actual_hash,
                 self.config.direct_expected_hash,
-                result
+                result,
             )
 
             if not result and cleanup_on_failure:
@@ -195,7 +193,7 @@ class VerificationManager:
         try:
             from src.app_catalog import find_app_by_name_in_filename
             from src.utils.checksums import verify_with_release_checksums
-            
+
             self.logger.log_info("Using GitHub release description for verification")
 
             if not self.config.appimage_name:
@@ -234,7 +232,11 @@ class VerificationManager:
                 return True
 
             # Download SHA file if needed
-            if self.config.sha_url and self.config.sha_name and not os.path.exists(self.config.sha_name):
+            if (
+                self.config.sha_url
+                and self.config.sha_name
+                and not os.path.exists(self.config.sha_name)
+            ):
                 self.sha_manager.download_sha_file(self.config.sha_url, self.config.sha_name)
 
             # Verify SHA file exists
@@ -244,8 +246,7 @@ class VerificationManager:
 
             # Parse SHA file and extract expected hash
             expected_hash = self.sha_manager.parse_sha_file(
-                self.config.sha_name,
-                self.config.appimage_name
+                self.config.sha_name, self.config.appimage_name
             )
 
             # Calculate actual hash and compare
@@ -254,11 +255,7 @@ class VerificationManager:
 
             # Log comparison results
             self.logger.log_hash_comparison(
-                self.config.appimage_name,
-                self.config.hash_type,
-                actual_hash,
-                expected_hash,
-                result
+                self.config.appimage_name, self.config.hash_type, actual_hash, expected_hash, result
             )
 
             # Cleanup SHA file after verification

@@ -120,15 +120,18 @@ def mocked_api(monkeypatch: pytest.MonkeyPatch, install_test_data: dict[str, str
     mock.arch_keyword = None
     mock.appimage_url = install_test_data["appimage_url"]
     mock.get_response.return_value = (True, "Success")  # Success response
-    mock.check_latest_version.return_value = (False, {
-        "current_version": None,
-        "latest_version": install_test_data["version"],
-        "release_notes": "Test release notes",
-        "release_url": "https://github.com/test/test/releases/tag/v1.0.0",
-        "compatible_assets": [],
-        "is_prerelease": False,
-        "published_at": "2023-01-01T00:00:00Z",
-    })  # Proper response format
+    mock.check_latest_version.return_value = (
+        False,
+        {
+            "current_version": None,
+            "latest_version": install_test_data["version"],
+            "release_notes": "Test release notes",
+            "release_url": "https://github.com/test/test/releases/tag/v1.0.0",
+            "compatible_assets": [],
+            "is_prerelease": False,
+            "published_at": "2023-01-01T00:00:00Z",
+        },
+    )  # Proper response format
 
     api_class_mock = MagicMock(return_value=mock)
     monkeypatch.setattr("src.commands.install_app.GitHubAPI", api_class_mock)

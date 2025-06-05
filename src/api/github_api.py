@@ -49,14 +49,14 @@ class GitHubAPI:
         self._icon_manager = IconManager()
         self._release_fetcher = ReleaseManager(owner, repo)
         self._release_info: Optional[ReleaseInfo] = None
-        
+
         # Load app info from catalog to get beta preference and other settings
         self._app_info: Optional[AppInfo] = find_app_by_owner_repo(owner, repo)
         if self._app_info:
             logger.debug(f"Loaded app info for {owner}/{repo}, beta={self._app_info.beta}")
         else:
             logger.debug(f"No app info found for {owner}/{repo} in catalog")
-        
+
         self._selector = AppImageSelector()  # Create selector once and reuse
         logger.debug(f"API initialized for {owner}/{repo}")
 
@@ -67,18 +67,26 @@ class GitHubAPI:
     @property
     def skip_verification(self) -> bool:
         """Check if verification should be skipped for this app."""
-        return self._app_info and getattr(self._app_info, 'skip_verification', False)
+        return self._app_info and getattr(self._app_info, "skip_verification", False)
 
-    def get_latest_release(self, version_check_only: bool = False, is_batch: bool = False) -> Tuple[bool, Union[Dict[str, Any], str]]:
+    def get_latest_release(
+        self, version_check_only: bool = False, is_batch: bool = False
+    ) -> Tuple[bool, Union[Dict[str, Any], str]]:
         """Fetch latest stable or beta release based on app configuration using ReleaseManager, then process it."""
         # Check if app prefers beta releases from catalog configuration
         prefer_beta = self._app_info.beta if self._app_info else False
-        
+
         if prefer_beta:
-            logger.debug(f"App {self.owner}/{self.repo} configured for beta releases, fetching directly")
-            success, raw_data_or_error = self._release_fetcher.get_latest_beta_release_data(self._headers)
+            logger.debug(
+                f"App {self.owner}/{self.repo} configured for beta releases, fetching directly"
+            )
+            success, raw_data_or_error = self._release_fetcher.get_latest_beta_release_data(
+                self._headers
+            )
         else:
-            success, raw_data_or_error = self._release_fetcher.get_latest_release_data(self._headers)
+            success, raw_data_or_error = self._release_fetcher.get_latest_release_data(
+                self._headers
+            )
 
         if not success:
             if (
@@ -101,7 +109,9 @@ class GitHubAPI:
 
         raw_release_json: Dict[str, Any] = raw_data_or_error
         try:
-            self._process_release(raw_release_json, version_check_only=version_check_only, is_batch=is_batch)
+            self._process_release(
+                raw_release_json, version_check_only=version_check_only, is_batch=is_batch
+            )
             return True, raw_release_json
         except ValueError as e:
             logger.error(
@@ -109,7 +119,9 @@ class GitHubAPI:
             )
             return False, f"Failed to process release data: {e}"
 
-    def _process_release(self, release_data: Dict[str, Any], version_check_only: bool = False, is_batch: bool = False) -> None:
+    def _process_release(
+        self, release_data: Dict[str, Any], version_check_only: bool = False, is_batch: bool = False
+    ) -> None:
         """Populate version, assets, and release info using normalized version."""
         logger.debug(
             f"Processing release in github_api.py: {release_data.get('tag_name', 'Unknown tag')}, version_check_only: {version_check_only}, is_batch: {is_batch}"
@@ -146,7 +158,9 @@ class GitHubAPI:
 
         # If this is only a version check, skip all asset processing to optimize performance
         if version_check_only:
-            logger.debug(f"Version check only mode - skipping asset processing for {self.owner}/{self.repo}")
+            logger.debug(
+                f"Version check only mode - skipping asset processing for {self.owner}/{self.repo}"
+            )
             # Clear asset-related attributes for version-only checks
             self.appimage_name = None
             self.appimage_url = None
@@ -155,7 +169,7 @@ class GitHubAPI:
             self.hash_type = None
             self.extracted_hash_from_body = None
             self.asset_digest = None
-            
+
             # Create minimal asset info dict for version-only release info
             asset_info_dict = {
                 "owner": self.owner,
@@ -172,7 +186,9 @@ class GitHubAPI:
             }
 
             self._release_info = ReleaseInfo.from_release_data(release_data, asset_info_dict)
-            logger.info(f"Successfully processed version-only release {self.version} for {self.owner}/{self.repo}")
+            logger.info(
+                f"Successfully processed version-only release {self.version} for {self.owner}/{self.repo}"
+            )
             return
 
         # Full processing for installation/download
@@ -196,24 +212,32 @@ class GitHubAPI:
             user_local_config_data = {
                 "installed_characteristic_suffix": None  # Let selector choose based on app definition
             }
-            logger.debug(f"Using app definition for {self.repo} with preferred suffixes: {self._app_info.preferred_characteristic_suffixes}")
+            logger.debug(
+                f"Using app definition for {self.repo} with preferred suffixes: {self._app_info.preferred_characteristic_suffixes}"
+            )
         else:
             # Fallback to legacy arch_keyword if no app definition found
-            user_local_config_data = {
-                "installed_characteristic_suffix": self._arch_keyword
-            } if self._arch_keyword else None
-            logger.warning(f"No app definition found for {self.repo}, using legacy arch_keyword: {self._arch_keyword}")
+            user_local_config_data = (
+                {"installed_characteristic_suffix": self._arch_keyword}
+                if self._arch_keyword
+                else None
+            )
+            logger.warning(
+                f"No app definition found for {self.repo}, using legacy arch_keyword: {self._arch_keyword}"
+            )
 
         # Use the pre-initialized selector
         selected_asset_result = self._selector.find_appimage_asset(
             assets=assets,
             definitive_app_info=self._app_info,
-            user_local_config_data=user_local_config_data
+            user_local_config_data=user_local_config_data,
         )
 
         if not selected_asset_result:
             if self._app_info:
-                suffixes_info = f"with preferred suffixes {self._app_info.preferred_characteristic_suffixes}"
+                suffixes_info = (
+                    f"with preferred suffixes {self._app_info.preferred_characteristic_suffixes}"
+                )
             else:
                 suffixes_info = f"with arch_keyword '{self._arch_keyword}'"
 
@@ -247,13 +271,21 @@ class GitHubAPI:
             logger.debug(f"Processing SHA for {self.appimage_name}")
             logger.debug(f"App info available: {self._app_info is not None}")
             if self._app_info:
-                logger.debug(f"App skip_verification: {getattr(self._app_info, 'skip_verification', False)}")
-                logger.debug(f"App use_asset_digest: {getattr(self._app_info, 'use_asset_digest', False)}")
-                logger.debug(f"App use_github_release_desc: {getattr(self._app_info, 'use_github_release_desc', False)}")
-            
+                logger.debug(
+                    f"App skip_verification: {getattr(self._app_info, 'skip_verification', False)}"
+                )
+                logger.debug(
+                    f"App use_asset_digest: {getattr(self._app_info, 'use_asset_digest', False)}"
+                )
+                logger.debug(
+                    f"App use_github_release_desc: {getattr(self._app_info, 'use_github_release_desc', False)}"
+                )
+
             # Check if verification should be skipped for this app
-            if self._app_info and getattr(self._app_info, 'skip_verification', False):
-                logger.info(f"Skipping SHA search for {self.appimage_name} - verification disabled for this app")
+            if self._app_info and getattr(self._app_info, "skip_verification", False):
+                logger.info(
+                    f"Skipping SHA search for {self.appimage_name} - verification disabled for this app"
+                )
                 self.sha_name = None
                 self.sha_url = None
                 self.hash_type = None
@@ -271,19 +303,30 @@ class GitHubAPI:
                     logger.debug(f"Using fallback SHA name: {initial_sha_name_hint}")
 
                 logger.debug(f"Creating SHAManager with app_info: {self._app_info}")
-                sha_mgr = SHAManager(self.owner, self.repo, initial_sha_name_hint, self.appimage_name, is_batch=is_batch, app_info=self._app_info)
+                sha_mgr = SHAManager(
+                    self.owner,
+                    self.repo,
+                    initial_sha_name_hint,
+                    self.appimage_name,
+                    is_batch=is_batch,
+                    app_info=self._app_info,
+                )
                 sha_mgr.find_sha_asset(assets)
-                
-                logger.debug(f"SHAManager results - hash_type: {sha_mgr.hash_type}, sha_name: {sha_mgr.sha_name}, asset_digest: {sha_mgr.asset_digest}")
-                
+
+                logger.debug(
+                    f"SHAManager results - hash_type: {sha_mgr.hash_type}, sha_name: {sha_mgr.sha_name}, asset_digest: {sha_mgr.asset_digest}"
+                )
+
                 # Update instance attributes with results from SHAManager
                 self.sha_name = sha_mgr.sha_name
                 self.sha_url = sha_mgr.sha_url
                 self.hash_type = sha_mgr.hash_type
                 self.extracted_hash_from_body = sha_mgr.extracted_hash_from_body
                 self.asset_digest = sha_mgr.asset_digest
-                
-                logger.debug(f"GitHub API updated - hash_type: {self.hash_type}, sha_name: {self.sha_name}, asset_digest: {self.asset_digest}")
+
+                logger.debug(
+                    f"GitHub API updated - hash_type: {self.hash_type}, sha_name: {self.sha_name}, asset_digest: {self.asset_digest}"
+                )
         else:
             self.sha_name = None
             self.sha_url = None
@@ -313,7 +356,10 @@ class GitHubAPI:
         )
 
     def check_latest_version(
-        self, current_version: Optional[str] = None, version_check_only: bool = False, is_batch: bool = False
+        self,
+        current_version: Optional[str] = None,
+        version_check_only: bool = False,
+        is_batch: bool = False,
     ) -> Tuple[bool, Dict[str, Any]]:
         """Check and return structured update info."""
         ok, data = self.get_latest_release(version_check_only=version_check_only, is_batch=is_batch)
@@ -357,7 +403,8 @@ class GitHubAPI:
 
         assets_from_release = latest_release_data.get("assets", [])
         compatible_assets = [
-            asset for asset in assets_from_release
+            asset
+            for asset in assets_from_release
             if self._arch_keyword is None or self._arch_keyword in asset["name"].lower()
         ]
 

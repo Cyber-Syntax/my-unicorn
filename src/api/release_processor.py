@@ -5,11 +5,11 @@ This module handles the processing of GitHub release data into structured format
 """
 
 import logging
-import re # Import the 're' module
+import re  # Import the 're' module
 from typing import Any, Dict, List, Optional, Tuple, Union
-from packaging.version import parse as parse_version_string # Added import
+from packaging.version import parse as parse_version_string  # Added import
 
-from src.api.assets import ReleaseInfo # Corrected import path
+from src.api.assets import ReleaseInfo  # Corrected import path
 from src.utils import arch_utils, version_utils
 
 logger = logging.getLogger(__name__)
@@ -59,22 +59,26 @@ class ReleaseProcessor:
         latest_for_comparison = latest_normalized_initial
 
         if self.owner == "zen-browser" and self.repo == "desktop":
-            zen_pattern_strip = re.compile(r"^(\d+\.\d+\.\d+)([a-zA-Z])$") # Matches X.Y.Z[letter]
+            zen_pattern_strip = re.compile(r"^(\d+\.\d+\.\d+)([a-zA-Z])$")  # Matches X.Y.Z[letter]
 
             current_match_strip = zen_pattern_strip.match(current_for_comparison)
             if current_match_strip:
                 base_current = current_match_strip.group(1)
-                logger.debug(f"Zen-browser: stripping suffix for comparison. Current '{current_for_comparison}' -> '{base_current}'")
+                logger.debug(
+                    f"Zen-browser: stripping suffix for comparison. Current '{current_for_comparison}' -> '{base_current}'"
+                )
                 current_for_comparison = base_current
 
             latest_match_strip = zen_pattern_strip.match(latest_for_comparison)
             if latest_match_strip:
                 base_latest = latest_match_strip.group(1)
-                logger.debug(f"Zen-browser: stripping suffix for comparison. Latest '{latest_for_comparison}' -> '{base_latest}'")
+                logger.debug(
+                    f"Zen-browser: stripping suffix for comparison. Latest '{latest_for_comparison}' -> '{base_latest}'"
+                )
                 latest_for_comparison = base_latest
 
         # These strings (potentially with suffixes stripped for zen-browser) are used for base version comparison
-        current_parseable_str = current_for_comparison # Corrected typo
+        current_parseable_str = current_for_comparison  # Corrected typo
         latest_parseable_str = latest_for_comparison
 
         # However, for the actual parsing by packaging.version to check is_prerelease flags etc.,
@@ -88,19 +92,22 @@ class ReleaseProcessor:
         current_full_parseable_str = current_normalized_initial
         latest_full_parseable_str = latest_normalized_initial
 
-
-        logger.debug(f"Base versions for comparison: Current base '{current_parseable_str}' vs Latest base '{latest_parseable_str}'")
-        logger.debug(f"Full versions for parsing: Current full '{current_full_parseable_str}' vs Latest full '{latest_full_parseable_str}'")
+        logger.debug(
+            f"Base versions for comparison: Current base '{current_parseable_str}' vs Latest base '{latest_parseable_str}'"
+        )
+        logger.debug(
+            f"Full versions for parsing: Current full '{current_full_parseable_str}' vs Latest full '{latest_full_parseable_str}'"
+        )
 
         update_available = False
 
-        if not current_parseable_str: # Use the correct variable name
+        if not current_parseable_str:  # Use the correct variable name
             # No current version installed, so any latest version is technically not an "update"
             # in the sense of replacing something. However, if latest_parseable_str exists,
             # it implies a version is available for new install.
             # For the purpose of "update_available" flag, if no current version, no update is "pending".
             pass
-        elif not latest_parseable_str: # Use the correct variable name
+        elif not latest_parseable_str:  # Use the correct variable name
             # No latest version found online, so no update available.
             pass
         else:
@@ -110,9 +117,10 @@ class ReleaseProcessor:
                 parsed_latest_full_version = parse_version_string(latest_full_parseable_str)
 
                 # Parse the (potentially stripped for zen-browser) versions for base comparison
-                parsed_current_base_for_compare = parse_version_string(current_parseable_str) # current_parseable_str was latest_for_comparison, fixed
+                parsed_current_base_for_compare = parse_version_string(
+                    current_parseable_str
+                )  # current_parseable_str was latest_for_comparison, fixed
                 parsed_latest_base_for_compare = parse_version_string(latest_parseable_str)
-
 
                 # For zen-browser, we want to accept these suffixed versions as updates
                 # if their base versions are equivalent or newer.
@@ -127,7 +135,6 @@ class ReleaseProcessor:
                 if self.owner == "zen-browser" and self.repo == "desktop":
                     # For zen-browser, consider these transformed versions as primary for update checks
                     repo_accepts_prerelease_like_updates = True
-
 
                 if repo_accepts_prerelease_like_updates:
                     # If repo accepts pre-releases (or it's zen-browser where we force this path),
@@ -153,32 +160,39 @@ class ReleaseProcessor:
                                 # If current is 1.12.28a and latest is 1.12.28b, it's an update.
                                 # If current is 1.12.28b and latest is 1.12.28b, it's not.
                                 update_available = True
-                    elif parsed_latest_full_version > parsed_current_full_version: # Standard logic for beta-accepting repos
+                    elif (
+                        parsed_latest_full_version > parsed_current_full_version
+                    ):  # Standard logic for beta-accepting repos
                         update_available = True
-                else: # Standard logic for non-beta repos
+                else:  # Standard logic for non-beta repos
                     if parsed_latest_full_version > parsed_current_full_version:
                         if parsed_latest_full_version.is_prerelease:
                             if not parsed_current_full_version.is_prerelease:
-                                if parse_version_string(parsed_latest_full_version.base_version) > parsed_current_full_version:
+                                if (
+                                    parse_version_string(parsed_latest_full_version.base_version)
+                                    > parsed_current_full_version
+                                ):
                                     update_available = True
-                            else: # Both are pre-releases
+                            else:  # Both are pre-releases
                                 update_available = True
-                        else: # Latest is stable
+                        else:  # Latest is stable
                             update_available = True
             except Exception as e:
                 # Log with the strings that were attempted to be parsed by packaging.version
-                logger.error(f"Error parsing versions for comparison (current_full='{current_full_parseable_str}', latest_full='{latest_full_parseable_str}'): {e}")
+                logger.error(
+                    f"Error parsing versions for comparison (current_full='{current_full_parseable_str}', latest_full='{latest_full_parseable_str}'): {e}"
+                )
                 # Keep update_available = False on error, or handle as appropriate
 
-        if update_available: # Log only if an update is actually flagged
+        if update_available:  # Log only if an update is actually flagged
             # Log with original latest_version (e.g., 1.12.28b), not the transformed one
             logger.info(f"Update available: {current_version} → {latest_version}")
 
         return update_available, {
             "current_version": current_version,
-            "latest_version": latest_version, # This is the raw tag like "1.12.28b"
-            "current_normalized": current_full_parseable_str, # What was parsed by packaging.version
-            "latest_normalized": latest_full_parseable_str,   # What was parsed by packaging.version
+            "latest_version": latest_version,  # This is the raw tag like "1.12.28b"
+            "current_normalized": current_full_parseable_str,  # What was parsed by packaging.version
+            "latest_normalized": latest_full_parseable_str,  # What was parsed by packaging.version
         }
 
     def filter_compatible_assets(

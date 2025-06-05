@@ -502,7 +502,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                         failed_apps=failed_apps,
                         results=results,
                         ask_confirmation=True,
-                        verbose=True
+                        verbose=True,
                     )
                 except KeyboardInterrupt:
                     print("\nCleanup cancelled.")

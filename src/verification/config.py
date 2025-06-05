@@ -25,11 +25,11 @@ SUPPORTED_HASH_TYPES = [
 @dataclass
 class VerificationConfig:
     """Configuration for AppImage verification operations.
-    
+
     This class handles initialization and validation of verification parameters,
     including path resolution and hash type validation.
     """
-    
+
     sha_name: str | None = None
     sha_url: str | None = None
     appimage_name: str | None = None
@@ -51,7 +51,7 @@ class VerificationConfig:
         """Resolve the AppImage path if not explicitly set."""
         if self.appimage_path is None and self.appimage_name is not None:
             from src.global_config import GlobalConfigManager
-            
+
             downloads_dir = GlobalConfigManager().expanded_app_download_path
             self.appimage_path = str(Path(downloads_dir) / self.appimage_name)
 
@@ -59,13 +59,13 @@ class VerificationConfig:
         """Resolve the SHA file path and make it app-specific."""
         if not self.sha_name or os.path.isabs(self.sha_name):
             return
-            
+
         # Skip resolution for special values
         if self.sha_name in ("extracted_checksum", "asset_digest"):
             return
-            
+
         from src.global_config import GlobalConfigManager
-        
+
         downloads_dir = GlobalConfigManager().expanded_app_download_path
         sha_basename = Path(self.sha_name).name
         sha_stem = Path(self.sha_name).stem
@@ -96,9 +96,7 @@ class VerificationConfig:
             return
 
         if self.hash_type not in hashlib.algorithms_available:
-            raise ValueError(
-                f"Hash type {self.hash_type} not available in this system"
-            )
+            raise ValueError(f"Hash type {self.hash_type} not available in this system")
 
     def _is_special_hash_type(self) -> bool:
         """Check if this is a special hash type that doesn't use hashlib."""
@@ -121,9 +119,7 @@ class VerificationConfig:
     def is_verification_skipped(self) -> bool:
         """Check if verification should be skipped."""
         return (
-            self.hash_type == "no_hash"
-            or not self.sha_name
-            or self.sha_name == self.appimage_name
+            self.hash_type == "no_hash" or not self.sha_name or self.sha_name == self.appimage_name
         )
 
     def is_asset_digest_verification(self) -> bool:
@@ -142,6 +138,6 @@ class VerificationConfig:
         """Validate that all required fields are set for verification."""
         if not self.appimage_path:
             raise ValueError(f"AppImage path not set for {self.appimage_name}")
-            
+
         if not os.path.exists(self.appimage_path):
             raise FileNotFoundError(f"AppImage file not found: {self.appimage_path}")

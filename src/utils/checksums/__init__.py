@@ -36,10 +36,11 @@ from src.utils.checksums.storage import save_checksums_file
 from src.utils.checksums.verification import (
     get_repo_info_for_appimage,
     handle_release_description_verification,
-    verify_with_release_checksums
+    verify_with_release_checksums,
 )
 
 logger = logging.getLogger(__name__)
+
 
 # For backward compatibility with code using the old extract_checksums.py module
 def extract_checksums(owner: str, repo: str, appimage_name: Optional[str] = None) -> List[str]:
@@ -89,14 +90,15 @@ def extract_checksums_to_file(
         logger.exception(f"Error extracting checksums: {e}")
         return None
 
+
 # Export public API
 __all__ = [
-    'extract_checksums',
-    'save_checksums_file',
-    'verify_with_release_checksums',
-    'extract_checksums_to_file',
-    'handle_release_description_verification',
-    'get_repo_info_for_appimage',
-    'ReleaseChecksumExtractor',
-    'parse_checksums_from_description',
+    "extract_checksums",
+    "save_checksums_file",
+    "verify_with_release_checksums",
+    "extract_checksums_to_file",
+    "handle_release_description_verification",
+    "get_repo_info_for_appimage",
+    "ReleaseChecksumExtractor",
+    "parse_checksums_from_description",
 ]

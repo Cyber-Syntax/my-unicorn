@@ -6,7 +6,7 @@ and extracted checksums.
 
 Example:
     from src.verification import VerificationManager
-    
+
     manager = VerificationManager(
         appimage_name="app.AppImage",
         hash_type="sha256",

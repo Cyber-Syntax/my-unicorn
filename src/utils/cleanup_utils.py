@@ -190,7 +190,7 @@ def cleanup_failed_verification_files(
     appimage_name: str | None = None,
     sha_name: str | None = None,
     ask_confirmation: bool = True,
-    verbose: bool = True
+    verbose: bool = True,
 ) -> list[str]:
     """Unified cleanup function for files that failed verification.
 
@@ -239,9 +239,7 @@ def cleanup_failed_verification_files(
 
 
 def cleanup_single_failed_file(
-    filepath: str,
-    ask_confirmation: bool = True,
-    verbose: bool = True
+    filepath: str, ask_confirmation: bool = True, verbose: bool = True
 ) -> bool:
     """Unified cleanup function for a single file that failed verification.
 
@@ -263,10 +261,14 @@ def cleanup_single_failed_file(
         # Ask user for confirmation if requested
         if ask_confirmation:
             if not get_user_single_file_confirmation(filepath):
-                logger.info("User chose to keep the file despite verification failure: %s", filepath)
+                logger.info(
+                    "User chose to keep the file despite verification failure: %s", filepath
+                )
                 if verbose:
                     print(f"File kept: {filepath}")
-                    print("Note: You may want to investigate this verification failure or report it as an issue.")
+                    print(
+                        "Note: You may want to investigate this verification failure or report it as an issue."
+                    )
                 return True
 
         # Remove the file
@@ -288,7 +290,7 @@ def cleanup_batch_failed_updates(
     failed_apps: list[str],
     results: dict[str, dict[str, Any]],
     ask_confirmation: bool = True,
-    verbose: bool = True
+    verbose: bool = True,
 ) -> int:
     """Unified cleanup function for batch operations with failed updates.
 
@@ -316,6 +318,7 @@ def cleanup_batch_failed_updates(
             sha_name = app_result.get("sha_name")
 
             from src.global_config import GlobalConfigManager
+
             downloads_dir = GlobalConfigManager().expanded_app_download_path
 
             if appimage_name and os.path.exists(os.path.join(downloads_dir, appimage_name)):
@@ -351,7 +354,7 @@ def cleanup_batch_failed_updates(
             appimage_name=appimage_name,
             sha_name=sha_name,
             ask_confirmation=False,  # Already confirmed for the batch
-            verbose=verbose
+            verbose=verbose,
         )
 
         if removed_files:

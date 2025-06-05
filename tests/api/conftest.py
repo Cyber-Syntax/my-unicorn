@@ -110,7 +110,7 @@ def mock_platform_info() -> Dict[str, str]:
 
 
 @pytest.fixture
-def mock_release_info_fixture() -> "ReleaseInfo": # Renamed to avoid conflict if used directly
+def mock_release_info_fixture() -> "ReleaseInfo":  # Renamed to avoid conflict if used directly
     """Create a mock ReleaseInfo dataclass instance for testing.
 
     Returns:

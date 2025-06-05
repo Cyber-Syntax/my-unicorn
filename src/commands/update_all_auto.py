@@ -309,10 +309,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             try:
                 # Use the unified batch cleanup function
                 cleanup_batch_failed_updates(
-                    failed_apps=failed_apps,
-                    results=results,
-                    ask_confirmation=True,
-                    verbose=True
+                    failed_apps=failed_apps, results=results, ask_confirmation=True, verbose=True
                 )
             except KeyboardInterrupt:
                 print("\nCleanup cancelled.")

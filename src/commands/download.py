@@ -26,7 +26,7 @@ class DownloadCommand(Command):
         # Initialize AppConfigManager and set app name
         app_config = AppConfigManager()
         app_config.set_app_name(repo)
-        
+
         # Get app info from catalog to get hash_type and sha_name
         app_info = app_config.get_app_info()
         if app_info:
@@ -66,7 +66,7 @@ class DownloadCommand(Command):
                 # 4. Use DownloadManager to download the AppImage or get existing file
                 download = DownloadManager(api)
                 downloaded_file_path, was_existing_file = download.download()
-                
+
                 if was_existing_file:
                     print(f"Found existing file: {api.appimage_name}")
                 else:

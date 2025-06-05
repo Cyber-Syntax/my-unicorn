@@ -152,10 +152,10 @@ def repo_uses_beta(repo_name: str) -> bool:
     """
     # Import here to avoid circular imports
     from src.app_catalog import get_all_apps
-    
+
     # Get all apps from catalog
     all_apps = get_all_apps()
-    
+
     # Look for the repo in the catalog
     for app_info in all_apps.values():
         if app_info.repo.lower() == repo_name.lower():
@@ -163,7 +163,7 @@ def repo_uses_beta(repo_name: str) -> bool:
                 logger.info(f"Repository {repo_name} is configured to use beta releases")
                 return True
             break
-    
+
     # Fallback to hardcoded list for backward compatibility
     beta_repos = ["FreeTube"]
     if repo_name in beta_repos:

@@ -58,35 +58,59 @@ bcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab *zen-aarch64.A
     def test_parse_checksums_standard_format(self):
         """Test parsing checksums from standard GitHub release description format."""
         checksums = parse_checksums_from_description(self.SAMPLE_RELEASE_DESC)
-        
+
         assert len(checksums) == 2
-        assert "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890  zen-x86_64.AppImage" in checksums
-        assert "bcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab  zen-aarch64.AppImage" in checksums
+        assert (
+            "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890  zen-x86_64.AppImage"
+            in checksums
+        )
+        assert (
+            "bcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab  zen-aarch64.AppImage"
+            in checksums
+        )
 
     def test_parse_checksums_github_header_format(self):
         """Test parsing checksums from GitHub header style format."""
         checksums = parse_checksums_from_description(self.GITHUB_STYLE_RELEASE_DESC)
-        
+
         assert len(checksums) == 2
-        assert "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890  zen-x86_64.AppImage" in checksums
-        assert "bcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab  zen-aarch64.AppImage" in checksums
+        assert (
+            "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890  zen-x86_64.AppImage"
+            in checksums
+        )
+        assert (
+            "bcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab  zen-aarch64.AppImage"
+            in checksums
+        )
 
     def test_parse_checksums_alternate_format(self):
         """Test parsing checksums from alternate format with filename first."""
         checksums = parse_checksums_from_description(self.ALTERNATE_FORMAT_DESC)
-        
+
         assert len(checksums) == 2
         # The parser should normalize all checksums to the standard format
-        assert "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890  zen-x86_64.AppImage" in checksums
-        assert "bcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab  zen-aarch64.AppImage" in checksums
+        assert (
+            "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890  zen-x86_64.AppImage"
+            in checksums
+        )
+        assert (
+            "bcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab  zen-aarch64.AppImage"
+            in checksums
+        )
 
     def test_parse_checksums_with_stars(self):
         """Test parsing checksums with star notation (*filename)."""
         checksums = parse_checksums_from_description(self.STAR_FORMAT_DESC)
-        
+
         assert len(checksums) == 2
-        assert "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890  zen-x86_64.AppImage" in checksums
-        assert "bcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab  zen-aarch64.AppImage" in checksums
+        assert (
+            "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890  zen-x86_64.AppImage"
+            in checksums
+        )
+        assert (
+            "bcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab  zen-aarch64.AppImage"
+            in checksums
+        )
 
     def test_parse_empty_description(self):
         """Test parsing an empty description."""

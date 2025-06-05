@@ -134,7 +134,7 @@ class InstallAppCommand(Command):
         # Use auto-detection when no specific values are provided
         sha_name_param = app_info.sha_name if app_info.sha_name else "auto"
         hash_type_param = app_info.hash_type if app_info.hash_type else "auto"
-        
+
         api = GitHubAPI(
             owner=app_info.owner,
             repo=app_info.repo,
@@ -142,7 +142,7 @@ class InstallAppCommand(Command):
             hash_type=hash_type_param,
             arch_keyword=None,  # Enable architecture auto-detection
         )
-        
+
         if app_info.sha_name:
             self._logger.debug(f"Using SHA file from app catalog: {app_info.sha_name}")
         else:
@@ -201,14 +201,14 @@ class InstallAppCommand(Command):
                             print("Verifying existing file...")
                         else:
                             print("Verifying download integrity...")
-                        
+
                         # Debug logging for API values
                         logging.debug(f"API values before VerificationManager creation:")
                         logging.debug(f"  api.sha_name: {api.sha_name}")
                         logging.debug(f"  api.hash_type: {api.hash_type}")
                         logging.debug(f"  api.asset_digest: {api.asset_digest}")
                         logging.debug(f"  api.skip_verification: {api.skip_verification}")
-                        
+
                         verification_manager = VerificationManager(
                             sha_name=api.sha_name,
                             sha_url=api.sha_url,

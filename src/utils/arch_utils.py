@@ -6,6 +6,7 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
+
 def get_current_arch() -> str:
     """Returns system CPU architecture.
 
@@ -15,14 +16,10 @@ def get_current_arch() -> str:
     machine = platform.machine().lower()
 
     # Map common architecture names to standardized ones
-    arch_map = {
-        'x86_64': 'x86_64',
-        'amd64': 'x86_64',
-        'arm64': 'arm64',
-        'aarch64': 'arm64'
-    }
+    arch_map = {"x86_64": "x86_64", "amd64": "x86_64", "arm64": "arm64", "aarch64": "arm64"}
 
     return arch_map.get(machine, machine)
+
 
 def get_compatible_arch_strings(cpu_arch: str) -> List[str]:
     """Returns list of equivalent architecture strings.
@@ -34,13 +31,14 @@ def get_compatible_arch_strings(cpu_arch: str) -> List[str]:
         List of compatible architecture strings
     """
     compatibility_map = {
-        'x86_64': ['x86_64', 'amd64'],
-        'arm64': ['arm64', 'aarch64'],
-        'i386': ['i386', 'x86'],
-        'i686': ['i686', 'x86']
+        "x86_64": ["x86_64", "amd64"],
+        "arm64": ["arm64", "aarch64"],
+        "i386": ["i386", "x86"],
+        "i686": ["i686", "x86"],
     }
 
     return compatibility_map.get(cpu_arch.lower(), [cpu_arch.lower()])
+
 
 def get_incompatible_archs(current_arch: str) -> List[str]:
     """Get a list of architecture keywords that are incompatible with the current architecture.
@@ -90,6 +88,7 @@ def get_incompatible_archs(current_arch: str) -> List[str]:
     # Return incompatible architectures or empty list if not defined
     return incompatible_map.get(current_arch, [])
 
+
 def is_keyword_compatible_with_arch(keyword: str, system_cpu_arch: str) -> bool:
     """Checks if a filename keyword/suffix is compatible with system CPU architecture.
 
@@ -126,17 +125,19 @@ def is_keyword_compatible_with_arch(keyword: str, system_cpu_arch: str) -> bool:
 
         # Create patterns that match complete architecture identifiers
         patterns = [
-            rf'\b{re.escape(arch)}\b',  # Complete word boundaries
-            rf'[-_]{re.escape(arch)}[-_]',  # Surrounded by separators
-            rf'[-_]{re.escape(arch)}$',  # At end with separator
-            rf'^{re.escape(arch)}[-_]',  # At start with separator
+            rf"\b{re.escape(arch)}\b",  # Complete word boundaries
+            rf"[-_]{re.escape(arch)}[-_]",  # Surrounded by separators
+            rf"[-_]{re.escape(arch)}$",  # At end with separator
+            rf"^{re.escape(arch)}[-_]",  # At start with separator
         ]
 
         # Only match if it's a meaningful architecture occurrence
         for pattern in patterns:
             if re.search(pattern, keyword):
-                logger.debug(f"Found incompatible architecture '{arch}' in keyword '{keyword}' "
-                            f"for system architecture '{system_cpu_arch}'")
+                logger.debug(
+                    f"Found incompatible architecture '{arch}' in keyword '{keyword}' "
+                    f"for system architecture '{system_cpu_arch}'"
+                )
                 return False
 
     # If we found no incompatible architectures, the keyword is compatible

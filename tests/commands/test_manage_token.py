@@ -356,11 +356,10 @@ class TestManageTokenCommand:
     ):
         """Test adding token to GNOME keyring."""
         # Setup
-        with patch.object(
-            command, "_get_token_expiration_days", return_value=30
-        ) as mock_get_days, patch.object(
-            command, "_validate_token", return_value=True
-        ) as mock_validate:
+        with (
+            patch.object(command, "_get_token_expiration_days", return_value=30) as mock_get_days,
+            patch.object(command, "_validate_token", return_value=True) as mock_validate,
+        ):
             # Execute
             command._save_to_keyring()
 

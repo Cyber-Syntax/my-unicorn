@@ -75,16 +75,19 @@ def get_arch_from_filename(filename: str) -> Optional[str]:
             # (?=$|[\W_]|\.appimage) ensures end of string, non-word char, or .appimage after.
             # Simpler regex: look for marker surrounded by non-alphanumeric chars or start/end of string.
             # The re.escape(marker) is important if markers contain special regex characters.
-            pattern = re.compile(rf"(?:^|[^a-zA-Z0-9])({re.escape(marker)})(?:$|[^a-zA-Z0-9])", re.IGNORECASE)
+            pattern = re.compile(
+                rf"(?:^|[^a-zA-Z0-9])({re.escape(marker)})(?:$|[^a-zA-Z0-9])", re.IGNORECASE
+            )
             if pattern.search(lower_name):
                 return canonical_arch  # Return the canonical keyword
 
-    return None # No specific architecture keyword found
+    return None  # No specific architecture keyword found
 
 
 # The following functions are now effectively replaced or made redundant by the new get_arch_from_filename.
 # They are kept here but marked as deprecated to avoid breaking other parts of the codebase
 # that might still be calling them directly, though they should be updated.
+
 
 def extract_arch_keyword(filename: str) -> str:
     """
@@ -99,7 +102,7 @@ def extract_arch_keyword(filename: str) -> str:
         match = re.search(pattern_str, lower_name)
         if match:
             return match.group(1)
-    return ".appimage" # Fallback
+    return ".appimage"  # Fallback
 
 
 def extract_arch_from_dash(filename: str) -> Optional[str]:
@@ -110,7 +113,7 @@ def extract_arch_from_dash(filename: str) -> Optional[str]:
     """
     lower_name = filename.lower()
     # This logic is complex and returns parts of the filename.
-    for key in ["arm64", "aarch64", "amd64", "x86_64", "x86", "i686", "i386"]: # Original keys
+    for key in ["arm64", "aarch64", "amd64", "x86_64", "x86", "i686", "i386"]:  # Original keys
         if key in lower_name:
             pos = lower_name.find(key)
             if pos >= 0:
@@ -119,7 +122,7 @@ def extract_arch_from_dash(filename: str) -> Optional[str]:
                     suffix = lower_name[dash_pos:]
                     if suffix.endswith(".appimage"):
                         suffix = suffix[:-9]
-                    return f"{suffix}.appimage" # Example: "-x86_64.appimage"
+                    return f"{suffix}.appimage"  # Example: "-x86_64.appimage"
     # Fallback
     match = re.search(r"(-linux(?:64)?\.appimage)$", lower_name)
     if match:
@@ -142,6 +145,8 @@ def is_generic_linux_build(filename: str) -> bool:
     # However, ALL_ARCH_MARKERS might be too broad if not used with care.
     # A simpler check: if "linux" is present and get_arch_from_filename(filename) is None.
     if "linux" in lower_name:
-        if get_arch_from_filename(filename) is None: # Check if our new function finds a specific arch
+        if (
+            get_arch_from_filename(filename) is None
+        ):  # Check if our new function finds a specific arch
             return True
     return False

@@ -24,6 +24,7 @@ class AssetSelectionResult:
         asset: Selected GitHub release asset
         characteristic_suffix: The suffix that matched this asset
     """
+
     asset: Dict
     characteristic_suffix: str
 
@@ -40,7 +41,7 @@ class AppImageSelector:
         assets: List[Dict],
         definitive_app_info: Optional[AppInfo] = None,
         user_local_config_data: Optional[Dict] = None,
-        release_is_prerelease: bool = False
+        release_is_prerelease: bool = False,
     ) -> Optional[AssetSelectionResult]:
         """Find and select appropriate AppImage asset based on app metadata and system architecture.
 
@@ -61,29 +62,24 @@ class AppImageSelector:
 
         # 2. Determine target characteristic suffix list with priority
         target_suffixes = self._determine_target_suffixes(
-            definitive_app_info,
-            user_local_config_data
+            definitive_app_info, user_local_config_data
         )
         self._logger.info(f"Target characteristic suffixes: {target_suffixes}")
 
         # Filter AppImage assets
-        appimage_assets = [
-            asset for asset in assets
-            if asset["name"].lower().endswith(".appimage")
-        ]
+        appimage_assets = [asset for asset in assets if asset["name"].lower().endswith(".appimage")]
 
         if not appimage_assets:
             self._logger.warning("No AppImage assets found in release")
             return None
 
-        self._logger.info(f"Available AppImage assets: {[asset['name'] for asset in appimage_assets]}")
+        self._logger.info(
+            f"Available AppImage assets: {[asset['name'] for asset in appimage_assets]}"
+        )
 
         # 3. Try each suffix in priority order
         selected = self._try_suffix_based_selection(
-            appimage_assets,
-            target_suffixes,
-            system_cpu_arch,
-            release_is_prerelease
+            appimage_assets, target_suffixes, system_cpu_arch, release_is_prerelease
         )
         if selected:
             return selected
@@ -91,23 +87,16 @@ class AppImageSelector:
         # 4. Fallback to generic matching if no suffix match
         self._logger.info("No suffix match found, trying generic selection")
         generic_asset = self._try_generic_selection(
-            appimage_assets,
-            system_cpu_arch,
-            release_is_prerelease
+            appimage_assets, system_cpu_arch, release_is_prerelease
         )
         if generic_asset:
-            return AssetSelectionResult(
-                asset=generic_asset,
-                characteristic_suffix=""
-            )
+            return AssetSelectionResult(asset=generic_asset, characteristic_suffix="")
 
         self._logger.warning("No suitable AppImage asset found")
         return None
 
     def _determine_target_suffixes(
-        self,
-        definitive_app_info: Optional[AppInfo],
-        user_local_config_data: Optional[Dict]
+        self, definitive_app_info: Optional[AppInfo], user_local_config_data: Optional[Dict]
     ) -> List[str]:
         """Determine the prioritized list of characteristic suffixes to try.
 
@@ -120,7 +109,9 @@ class AppImageSelector:
 
         if user_local_config_data:
             # Check for user override
-            if override := user_local_config_data.get("user_preferred_characteristic_suffix_override"):
+            if override := user_local_config_data.get(
+                "user_preferred_characteristic_suffix_override"
+            ):
                 suffixes.append(override)
 
             # Check currently installed suffix
@@ -141,7 +132,7 @@ class AppImageSelector:
         assets: List[Dict],
         target_suffixes: List[str],
         system_cpu_arch: str,
-        is_prerelease: bool
+        is_prerelease: bool,
     ) -> Optional[AssetSelectionResult]:
         """Try to select an asset based on characteristic suffixes."""
         for suffix in target_suffixes:
@@ -171,22 +162,25 @@ class AppImageSelector:
                     if arch_utils.is_keyword_compatible_with_arch(asset_name, system_cpu_arch):
                         compatible_assets.append(asset)
                     else:
-                        self._logger.debug(f"Asset '{asset['name']}' filtered out due to architecture incompatibility")
+                        self._logger.debug(
+                            f"Asset '{asset['name']}' filtered out due to architecture incompatibility"
+                        )
 
                 if compatible_assets:
                     # Sort by name to ensure consistent selection
                     compatible_assets.sort(key=lambda x: x["name"])
-                    self._logger.info(f"Found {len(compatible_assets)} architecture-compatible assets matching suffix '{suffix}': {[a['name'] for a in compatible_assets]}")
+                    self._logger.info(
+                        f"Found {len(compatible_assets)} architecture-compatible assets matching suffix '{suffix}': {[a['name'] for a in compatible_assets]}"
+                    )
 
                     # Return first compatible asset
                     selected_asset = compatible_assets[0]
                     self._logger.info(f"Selected asset: {selected_asset['name']}")
-                    return AssetSelectionResult(
-                        asset=selected_asset,
-                        characteristic_suffix=suffix
-                    )
+                    return AssetSelectionResult(asset=selected_asset, characteristic_suffix=suffix)
                 else:
-                    self._logger.debug(f"No architecture-compatible assets found for suffix '{suffix}'")
+                    self._logger.debug(
+                        f"No architecture-compatible assets found for suffix '{suffix}'"
+                    )
             else:
                 self._logger.debug(f"No assets found matching suffix '{suffix}'")
 
@@ -210,7 +204,7 @@ class AppImageSelector:
 
         # For simple suffixes like "linux", also try without dash
         # Pattern: anything{suffix}.appimage
-        if not suffix.startswith('-'):
+        if not suffix.startswith("-"):
             pattern_no_dash = rf"{re.escape(suffix)}\.appimage$"
             if re.search(pattern_no_dash, asset_name):
                 return True
@@ -222,10 +216,7 @@ class AppImageSelector:
         return False
 
     def _try_generic_selection(
-        self,
-        assets: List[Dict],
-        system_cpu_arch: str,
-        is_prerelease: bool
+        self, assets: List[Dict], system_cpu_arch: str, is_prerelease: bool
     ) -> Optional[Dict]:
         """Try to select an asset without specific characteristic suffix."""
         # Filter to only architecture-compatible assets

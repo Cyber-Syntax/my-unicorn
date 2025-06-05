@@ -51,7 +51,7 @@ cdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc  zen-x86_64.Ap
         mock_get.return_value = mock_response
 
         result = extractor.fetch_release_description()
-        
+
         assert result == self.SAMPLE_RELEASE_DESC
         assert extractor.release_description == self.SAMPLE_RELEASE_DESC
         mock_get.assert_called_once()
@@ -66,7 +66,7 @@ cdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc  zen-x86_64.Ap
 
         with pytest.raises(requests.exceptions.HTTPError):
             extractor.fetch_release_description()
-        
+
         assert extractor.release_description is None
         mock_get.assert_called_once()
 
@@ -77,7 +77,7 @@ cdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc  zen-x86_64.Ap
 
         with pytest.raises(requests.exceptions.ConnectionError):
             extractor.fetch_release_description()
-        
+
         assert extractor.release_description is None
         mock_get.assert_called_once()
 
@@ -91,28 +91,34 @@ cdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc  zen-x86_64.Ap
         mock_parse.return_value = expected_checksums
 
         checksums = extractor._parse_checksums_from_description()
-        
+
         assert checksums == expected_checksums
         mock_parse.assert_called_once_with(self.SAMPLE_RELEASE_DESC)
 
     def test_extract_checksums_with_target_file(self, extractor):
         """Test extracting checksums for a specific target file."""
         checksums = extractor.extract_checksums("zen-x86_64.AppImage")
-        
+
         assert len(checksums) == 1
-        assert "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890  zen-x86_64.AppImage" in checksums
+        assert (
+            "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890  zen-x86_64.AppImage"
+            in checksums
+        )
 
     def test_extract_checksums_case_insensitive(self, extractor):
         """Test extracting checksums is case-insensitive."""
         checksums = extractor.extract_checksums("ZEN-X86_64.AppImage")
-        
+
         assert len(checksums) == 1
-        assert "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890  zen-x86_64.AppImage" in checksums
+        assert (
+            "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890  zen-x86_64.AppImage"
+            in checksums
+        )
 
     def test_extract_checksums_no_match(self, extractor):
         """Test extracting checksums for a file that doesn't match."""
         checksums = extractor.extract_checksums("nonexistent.AppImage")
-        
+
         # Should return all checksums if no match
         assert len(checksums) == 3
 
@@ -120,14 +126,14 @@ cdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc  zen-x86_64.Ap
         """Test extracting checksums with no release description."""
         extractor = ReleaseChecksumExtractor("owner", "repo")
         # No description set
-        
+
         checksums = extractor.extract_checksums("zen-x86_64.AppImage")
         assert len(checksums) == 0
 
     def test_extract_checksums_empty_description(self, extractor):
         """Test extracting checksums with empty release description."""
         extractor.release_description = ""
-        
+
         checksums = extractor.extract_checksums("zen-x86_64.AppImage")
         assert len(checksums) == 0
 
@@ -135,10 +141,10 @@ cdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc  zen-x86_64.Ap
     def test_write_checksums_file_default_path(self, mock_mktemp, extractor):
         """Test writing checksums to a default temporary file path."""
         mock_mktemp.return_value = "/tmp/test_checksums.txt"
-        
+
         with patch("builtins.open", MagicMock()) as mock_open:
             file_path = extractor.write_checksums_file("zen-x86_64.AppImage")
-            
+
             assert file_path == "/tmp/test_checksums.txt"
             mock_open.assert_called_once_with("/tmp/test_checksums.txt", "w", encoding="utf-8")
             mock_open.return_value.__enter__.return_value.write.assert_called_once()
@@ -146,10 +152,10 @@ cdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc  zen-x86_64.Ap
     def test_write_checksums_file_specific_path(self, extractor):
         """Test writing checksums to a specified file path."""
         specific_path = "/tmp/specific_checksums.txt"
-        
+
         with patch("builtins.open", MagicMock()) as mock_open:
             file_path = extractor.write_checksums_file("zen-x86_64.AppImage", specific_path)
-            
+
             assert file_path == specific_path
             mock_open.assert_called_once_with(specific_path, "w", encoding="utf-8")
             mock_open.return_value.__enter__.return_value.write.assert_called_once()
@@ -158,7 +164,7 @@ cdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc  zen-x86_64.Ap
         """Test handling permission error when writing checksums file."""
         with patch("builtins.open", MagicMock()) as mock_open:
             mock_open.side_effect = PermissionError("Permission denied")
-            
+
             with pytest.raises(PermissionError):
                 extractor.write_checksums_file("zen-x86_64.AppImage", "/root/test.txt")
 
@@ -166,7 +172,7 @@ cdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc  zen-x86_64.Ap
         """Test writing checksums file when no matching checksums are found."""
         with patch("builtins.open", MagicMock()) as mock_open:
             file_path = extractor.write_checksums_file("nonexistent.file", "/tmp/test.txt")
-            
+
             # Should still create the file with all available checksums
             assert file_path == "/tmp/test.txt"
             mock_open.assert_called_once()
