@@ -10,7 +10,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from src.api.github_api import GitHubAPI
-from src.commands.download import DownloadCommand
+from src.commands.install_url import DownloadCommand
 
 
 class TestIntegrationDownloadFlow(unittest.TestCase):

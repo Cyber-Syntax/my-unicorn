@@ -19,8 +19,8 @@ from src.auth_manager import GitHubAuthManager
 from src.commands.customize_app_config import CustomizeAppConfigCommand
 from src.commands.customize_global_config import CustomizeGlobalConfigCommand
 from src.commands.delete_backups import DeleteBackupsCommand
-from src.commands.download import DownloadCommand
-from src.commands.install_app import InstallAppCommand
+from src.commands.install_url import DownloadCommand
+from src.commands.install_catalog import InstallAppCommand
 from src.commands.invoker import CommandInvoker
 from src.commands.manage_token import ManageTokenCommand
 from src.commands.migrate_config import MigrateConfigCommand

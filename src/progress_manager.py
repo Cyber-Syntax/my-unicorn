@@ -13,8 +13,7 @@ from datetime import datetime
 
 from typing import Any, Generic, TypeVar
 
-# Type variable for item IDs
-T = TypeVar("T")
+
 
 
 class BasicMultiAppProgress:
@@ -30,6 +29,7 @@ class BasicMultiAppProgress:
         Args:
             expand: Whether to expand the progress bar
             transient: Whether to hide completed tasks
+
         """
         # TODO: remove any and specify the type of tasks
         self.tasks: dict[int, dict[str, Any]] = {}  # dictionary to store tasks
@@ -64,6 +64,7 @@ class BasicMultiAppProgress:
 
         Returns:
             int: Task ID for the new task
+
         """
         task_id = self.task_counter
         self.task_counter += 1
@@ -92,6 +93,7 @@ class BasicMultiAppProgress:
         Args:
             task_id: ID of the task to update
             **kwargs: Attributes to update
+
         """
         if task_id not in self.tasks:
             return
@@ -484,6 +486,8 @@ class ProgressManager:
                 sys.stdout.write("\033[K")  # Clear to the end of line
             sys.stdout.flush()
 
+# Type variable for item IDs
+T = TypeVar("T")
 
 class DynamicProgressManager(Generic[T]):
     """Manages dynamic progress display for concurrent operations.

@@ -74,7 +74,7 @@ classDiagram
     Commands.UpdateAppCommand --> FileHandler
     Commands.UpdateAppCommand --> AppCatalog
 
-    ICommand <|-- Commands.DownloadNewAppCommand
+    ICommand <|-- commands.install_urlNewAppCommand
     ICommand <|-- Commands.ManageTokenCommand
     Commands.ManageTokenCommand --> AuthManager
     ICommand <|-- Commands.CreateAppConfigCommand
