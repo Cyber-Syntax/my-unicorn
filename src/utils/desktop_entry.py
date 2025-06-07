@@ -131,7 +131,7 @@ class DesktopEntryManager:
                     if key not in new_entries:
                         f.write(f"{key}={value}\n")
 
-            # Set proper executable permissions
+            # set proper executable permissions
             temp_path.chmod(temp_path.stat().st_mode | DESKTOP_ENTRY_FILE_MODE)
 
             # Replace original file with temp file (atomic operation)
@@ -175,7 +175,7 @@ class DesktopEntryManager:
             icon_path: Optional path to the application icon
 
         Returns:
-            Tuple of (success, message)
+            tuple of (success, message)
                 - success: True if desktop entry was created/updated/unchanged
                 - message: Path to desktop file or error message
 

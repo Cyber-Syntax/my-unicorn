@@ -27,12 +27,13 @@ class AppInfo:
         app_rename: Display name for the application
         description: Description of the application
         category: Application category
-        tags: List of tags describing the application
+        tags: list of tags describing the application
         appimage_name_template: Template for AppImage filename
-        preferred_characteristic_suffixes: List of characteristic suffixes in order of preference
+        preferred_characteristic_suffixes: list of characteristic suffixes in order of preference
         skip_verification: Whether to skip hash verification for this app
         use_asset_digest: Whether to use GitHub's asset digest for verification instead of SHA files
         use_github_release_desc: Whether to use GitHub release description for checksum extraction
+        beta: Whether this app should prefer beta/pre-release versions
         hash_type: Type of hash used for verification (e.g., "sha256") - optional if skip_verification is True
         sha_name: Name of SHA file - optional if skip_verification or use_asset_digest is True
         icon_info: Direct URL to icon file
@@ -52,6 +53,7 @@ class AppInfo:
     skip_verification: bool = False
     use_asset_digest: bool = False
     use_github_release_desc: bool = False
+    beta: bool = False
     hash_type: str | None = None
     sha_name: str | None = None
     icon_info: str | None = None
@@ -75,7 +77,7 @@ def get_all_apps() -> dict[str, AppInfo]:
     """Get all available app definitions.
 
     Returns:
-        Dict mapping lowercase repo names to AppInfo objects
+        tuple mapping lowercase repo names to AppInfo objects
 
     """
     if not _definitions_path:
@@ -100,6 +102,7 @@ def get_all_apps() -> dict[str, AppInfo]:
                         skip_verification=data.get("skip_verification", False),
                         use_asset_digest=data.get("use_asset_digest", False),
                         use_github_release_desc=data.get("use_github_release_desc", False),
+                        beta=data.get("beta", False),
                         hash_type=data.get("hash_type"),
                         sha_name=data.get("sha_name"),
                         icon_info=data.get("icon_info"),
@@ -129,11 +132,11 @@ def find_app_by_owner_repo(owner: str, repo: str) -> AppInfo | None:
 
     """
     all_apps = get_all_apps()
-    
+
     for app_info in all_apps.values():
         if app_info.owner.lower() == owner.lower() and app_info.repo.lower() == repo.lower():
             return app_info
-    
+
     return None
 
 
@@ -183,6 +186,7 @@ def load_app_definition(repo_name: str) -> AppInfo | None:
             skip_verification=data.get("skip_verification", False),
             use_asset_digest=data.get("use_asset_digest", False),
             use_github_release_desc=data.get("use_github_release_desc", False),
+            beta=data.get("beta", False),
             hash_type=data.get("hash_type"),
             sha_name=data.get("sha_name"),
             icon_info=data.get("icon_info"),

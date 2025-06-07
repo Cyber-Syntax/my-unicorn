@@ -69,7 +69,7 @@ class InstallAppCommand(Command):
         """Display a list of applications and allow user to select one for installation.
 
         Args:
-            apps: List of AppInfo objects to display
+            apps: list of AppInfo objects to display
 
         """
         if not apps:
@@ -134,7 +134,7 @@ class InstallAppCommand(Command):
         # Use auto-detection when no specific values are provided
         sha_name_param = app_info.sha_name if app_info.sha_name else "auto"
         hash_type_param = app_info.hash_type if app_info.hash_type else "auto"
-        
+
         api = GitHubAPI(
             owner=app_info.owner,
             repo=app_info.repo,
@@ -142,24 +142,16 @@ class InstallAppCommand(Command):
             hash_type=hash_type_param,
             arch_keyword=None,  # Enable architecture auto-detection
         )
-        
+
         if app_info.sha_name:
             self._logger.debug(f"Using SHA file from app catalog: {app_info.sha_name}")
         else:
             self._logger.debug("Using automatic SHA file detection")
 
-        # Get release data to allow API's auto-detection to work
-        update_available, response = api.check_latest_version(version_check_only=True)
-        
-        # Check if there was an error in the response
-        if isinstance(response, dict) and "error" in response:
-            print(f"Error: {response['error']}")
-            return
-
-        # Now do full processing including SHA/asset digest detection
-        success, full_response = api.get_latest_release(version_check_only=False)
+        # Get release data with full processing including SHA/asset digest detection
+        success, full_response = api.get_latest_release()
         if not success:
-            print(f"Error during full processing: {full_response}")
+            print(f"Error during processing: {full_response}")
             return
 
         # Log what was detected by the API
@@ -201,7 +193,7 @@ class InstallAppCommand(Command):
                         logging.info("Skipping verification due to skip_verification setting.")
                         print("Skipping verification (verification disabled for this app).")
                         verification_success = True
-                        verification_skipped = True  # Set the flag that verification was skipped
+                        verification_skipped = True  # set the flag that verification was skipped
                         break
                     else:
                         # Single verification point for both existing and downloaded files
@@ -209,14 +201,14 @@ class InstallAppCommand(Command):
                             print("Verifying existing file...")
                         else:
                             print("Verifying download integrity...")
-                        
+
                         # Debug logging for API values
                         logging.debug(f"API values before VerificationManager creation:")
                         logging.debug(f"  api.sha_name: {api.sha_name}")
                         logging.debug(f"  api.hash_type: {api.hash_type}")
                         logging.debug(f"  api.asset_digest: {api.asset_digest}")
                         logging.debug(f"  api.skip_verification: {api.skip_verification}")
-                        
+
                         verification_manager = VerificationManager(
                             sha_name=api.sha_name,
                             sha_url=api.sha_url,
@@ -225,7 +217,7 @@ class InstallAppCommand(Command):
                             asset_digest=api.asset_digest,
                         )
 
-                        # Set the full path to the downloaded file
+                        # set the full path to the downloaded file
                         verification_manager.set_appimage_path(downloaded_file_path)
                         is_valid = verification_manager.verify_appimage(cleanup_on_failure=True)
 

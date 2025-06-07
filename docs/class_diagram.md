@@ -74,7 +74,7 @@ classDiagram
     Commands.UpdateAppCommand --> FileHandler
     Commands.UpdateAppCommand --> AppCatalog
 
-    ICommand <|-- Commands.DownloadNewAppCommand
+    ICommand <|-- commands.install_urlNewAppCommand
     ICommand <|-- Commands.ManageTokenCommand
     Commands.ManageTokenCommand --> AuthManager
     ICommand <|-- Commands.CreateAppConfigCommand
@@ -285,7 +285,7 @@ classDiagram
         }
         class ArchExtractionUtils {
             <<src/utils/arch_extraction.py>>
-            +get_arch_from_filename(filename): str
+            +extract_arch_from_filename(filename): str
             +get_current_system_arch(): str
         }
         class DesktopEntryUtils {

@@ -6,7 +6,6 @@ for an AppImage from GitHub release assets.
 
 import logging
 import re
-from typing import Dict, List, Optional
 
 from src.app_catalog import AppInfo
 
@@ -20,13 +19,13 @@ class SHAAssetFinder:
         self,
         selected_appimage_name: str,
         definitive_app_info: AppInfo,
-        assets: List[Dict],
-    ) -> Optional[Dict]:
-        """Find the best matching SHA asset for an AppImage.
+        assets: list[dict],
+    ) -> dict | None:
+        """Find the best SHA asset match for the selected AppImage.
 
         Args:
-            selected_appimage_name: Name of the AppImage file to find SHA for
-            definitive_app_info: Base app metadata from repository JSON
+            selected_appimage_name: Name of the selected AppImage file
+            definitive_app_info: App information from catalog (can be None for URL-based installs)
             assets: List of release assets from GitHub API
 
         Returns:
@@ -35,29 +34,38 @@ class SHAAssetFinder:
 
         """
         logger.info(f"Looking for SHA file matching: {selected_appimage_name}")
-        logger.info(f"Using SHA name from definitive info: {definitive_app_info.sha_name}")
+        
+        # Handle case where definitive_app_info is None (URL-based installs)
+        if definitive_app_info is None:
+            logger.info("No app definition found - using automatic SHA detection")
+        else:
+            logger.info(f"Using SHA name from definitive info: {definitive_app_info.sha_name}")
 
-        # Skip SHA search if verification is disabled
-        if definitive_app_info.skip_verification:
-            logger.info("Skipping SHA file search as verification is disabled")
-            return None
+            # Skip SHA search if verification is disabled
+            if definitive_app_info.skip_verification:
+                logger.info("Skipping SHA file search as verification is disabled")
+                return None
 
-        # Priority 1: Check if app uses asset digest verification
-        if definitive_app_info.use_asset_digest:
-            logger.info(f"App {selected_appimage_name} prefers asset digest verification")
-            asset_digest_info = self._try_extract_asset_digest(selected_appimage_name, assets)
-            if asset_digest_info:
-                logger.info(f"Successfully found asset digest for {selected_appimage_name}")
-                return asset_digest_info
-            else:
-                logger.warning(f"Asset digest not available for {selected_appimage_name}, falling back to SHA files")
+            # Priority 1: Check if app uses asset digest verification
+            if definitive_app_info.use_asset_digest:
+                logger.info(f"App {selected_appimage_name} prefers asset digest verification")
+                asset_digest_info = self._try_extract_asset_digest(selected_appimage_name, assets)
+                if asset_digest_info:
+                    logger.info(f"Successfully found asset digest for {selected_appimage_name}")
+                    return asset_digest_info
+                else:
+                    logger.warning(
+                        f"Asset digest not available for {selected_appimage_name}, falling back to SHA files"
+                    )
 
-        # Priority 2: Try exact match from definitive app info
-        if definitive_app_info.sha_name:
-            for asset in assets:
-                if asset["name"].lower() == definitive_app_info.sha_name.lower():
-                    logger.info(f"Found exact SHA name match: {asset['name']}")
-                    return asset
+            # Priority 2: Try exact match from definitive app info
+            if definitive_app_info.sha_name:
+                for asset in assets:
+                    if asset["name"].lower() == definitive_app_info.sha_name.lower():
+                        logger.info(f"Found exact SHA name match: {asset['name']}")
+                        return asset
+
+        # Priority 3: Try pattern matching (for both catalog and URL-based installs)
 
         # Priority 3: Look for SHA files that might contain our AppImage's hash
         sha_assets = self._filter_sha_assets(assets)
@@ -80,12 +88,12 @@ class SHAAssetFinder:
         logger.info("Using first available SHA file as fallback")
         return sha_assets[0]
 
-    def _try_extract_asset_digest(self, appimage_name: str, assets: List[Dict]) -> Optional[Dict]:
+    def _try_extract_asset_digest(self, appimage_name: str, assets: list[dict]) -> dict | None:
         """Try to extract asset digest information from GitHub API asset metadata.
 
         Args:
             appimage_name: Name of the AppImage file
-            assets: List of release assets from GitHub API
+            assets: list of release assets from GitHub API
 
         Returns:
             dict: Special asset info with digest data if found, None otherwise
@@ -95,7 +103,7 @@ class SHAAssetFinder:
             if asset.get("name") == appimage_name and asset.get("digest"):
                 digest = asset["digest"]
                 logger.info(f"Found asset digest for {appimage_name}: {digest}")
-                
+
                 # Validate digest format (should be like "sha256:hash_value")
                 if ":" in digest:
                     digest_type, digest_hash = digest.split(":", 1)
@@ -107,7 +115,7 @@ class SHAAssetFinder:
                             "digest": digest,
                             "hash_type": "asset_digest",
                             "asset_digest_hash": digest_hash,
-                            "asset_digest_type": digest_type
+                            "asset_digest_type": digest_type,
                         }
                     else:
                         logger.warning(f"Invalid digest format or unsupported type: {digest}")
@@ -117,7 +125,7 @@ class SHAAssetFinder:
         logger.debug(f"No asset digest found for {appimage_name} in assets")
         return None
 
-    def _filter_sha_assets(self, assets: List[Dict]) -> List[Dict]:
+    def _filter_sha_assets(self, assets: list[dict]) -> list[dict]:
         """Filter release assets to only SHA/checksum files."""
         sha_patterns = [
             r"\.sha\d+$",

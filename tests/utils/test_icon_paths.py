@@ -6,7 +6,7 @@ Tests for icon path utility functions.
 This module contains tests for the icon path utility functions in src/utils/icon_paths.py.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 import os
 import sys
 from pathlib import Path
@@ -23,7 +23,7 @@ from src.utils.icon_paths import get_icon_paths, get_icon_path, get_icon_filenam
 
 
 # Use a function to access ICON_PATHS to avoid direct import issues in global test runs
-def get_icon_paths_map() -> Dict[str, Any]:
+def get_icon_paths_map() -> tuple[str, Any]:
     """Get the ICON_PATHS dictionary from the module."""
     return src.utils.icon_paths.ICON_PATHS
 

@@ -5,7 +5,7 @@ This module provides functions for user interface interactions.
 """
 
 import logging
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 import asyncio
 import threading
 import concurrent.futures
@@ -14,7 +14,8 @@ import concurrent.futures
 logger = logging.getLogger(__name__)
 
 # Global variable to store the main event loop
-_main_event_loop: Optional[asyncio.AbstractEventLoop] = None
+_main_event_loop: asyncio.AbstractEventLoop | None = None
+
 
 def set_main_event_loop(loop: asyncio.AbstractEventLoop) -> None:
     """Sets the main asyncio event loop for ui_utils to use."""
@@ -24,15 +25,15 @@ def set_main_event_loop(loop: asyncio.AbstractEventLoop) -> None:
 
 
 def select_from_list(
-    items: List[Dict[str, Any]],
+    items: list[tuple[str, Any]],
     prompt: str,
     display_key: str = "name",
-    callback: Optional[Callable] = None,
-) -> Dict[str, Any]:
+    callback: Callable | None = None,
+) -> tuple[str, Any]:
     """Prompt user to select an item from a list.
 
     Args:
-        items: List of items to choose from
+        items: list of items to choose from
         prompt: Prompt message for the user
         display_key: Key to use for displaying items
         callback: Optional callback function to call with selected item
@@ -52,7 +53,7 @@ def select_from_list(
     while True:
         # Use the thread-safe get_user_input instead of direct input()
         choice_prompt = f"{prompt} (1-{len(items)})"
-        choice = get_user_input(choice_prompt) # No default needed here, validation handles empty
+        choice = get_user_input(choice_prompt)  # No default needed here, validation handles empty
 
         if choice.isdigit() and 1 <= int(choice) <= len(items):
             selected = items[int(choice) - 1]
@@ -64,7 +65,7 @@ def select_from_list(
         print("Invalid input, try again")
 
 
-def _actual_input_logic(prompt_str: str, default_val: Optional[str]) -> str:
+def _actual_input_logic(prompt_str: str, default_val: str | None) -> str:
     """The core input logic, to be run in the main thread."""
     # This internal function encapsulates the original logic of get_user_input
     # It also needs to handle KeyboardInterrupt if it's the one directly calling input()
@@ -77,11 +78,11 @@ def _actual_input_logic(prompt_str: str, default_val: Optional[str]) -> str:
         # This will be caught by the main get_user_input if called directly,
         # or by the future.set_exception if called via call_soon_threadsafe.
         logger.info("User cancelled input (Ctrl+C) during actual input operation")
-        print("\nInput cancelled.") # Provide immediate feedback
+        print("\nInput cancelled.")  # Provide immediate feedback
         raise
 
 
-def get_user_input(prompt: str, default: Optional[str] = None) -> str:
+def get_user_input(prompt: str, default: str | None = None) -> str:
     """Get user input with an optional default value.
     Handles being called from a worker thread by delegating to the main asyncio loop.
     """
@@ -108,7 +109,7 @@ def get_user_input(prompt: str, default: Optional[str] = None) -> str:
                     f"Globally set loop was: {_main_event_loop}. Falling back to direct input."
                 )
                 # Fallback to direct input if asyncio context is not available
-                return _actual_input_logic(prompt, default) # Pass original prompt and default
+                return _actual_input_logic(prompt, default)  # Pass original prompt and default
 
         if target_loop and target_loop.is_running():
             try:
@@ -117,7 +118,9 @@ def get_user_input(prompt: str, default: Optional[str] = None) -> str:
                 def do_input_in_main_thread():
                     try:
                         # Pass the already formatted prompt string
-                        result = _actual_input_logic(prompt, default) # Pass original prompt and default
+                        result = _actual_input_logic(
+                            prompt, default
+                        )  # Pass original prompt and default
                         future.set_result(result)
                     except KeyboardInterrupt as e:
                         future.set_exception(e)
@@ -127,7 +130,7 @@ def get_user_input(prompt: str, default: Optional[str] = None) -> str:
                 target_loop.call_soon_threadsafe(do_input_in_main_thread)
 
                 try:
-                    return future.result() # This will block the worker thread
+                    return future.result()  # This will block the worker thread
                 except KeyboardInterrupt:
                     # This KI is from future.result() if main thread raised it and set it on future
                     # The _actual_input_logic already prints "Input cancelled."
@@ -135,19 +138,22 @@ def get_user_input(prompt: str, default: Optional[str] = None) -> str:
                     raise
                 except Exception as e:
                     logger.error(f"Error getting input via main thread: {e}")
-                    raise # Re-raise to make it visible
-            except Exception as e_outer: # Catch other errors during loop interaction
-                logger.error(f"Outer error interacting with event loop for input: {e_outer}. Falling back.")
+                    raise  # Re-raise to make it visible
+            except Exception as e_outer:  # Catch other errors during loop interaction
+                logger.error(
+                    f"Outer error interacting with event loop for input: {e_outer}. Falling back."
+                )
                 # Fallback to direct input
                 return _actual_input_logic(prompt, default)
         else:
-            logger.warning("No valid running event loop found for input delegation. Falling back to direct input.")
+            logger.warning(
+                "No valid running event loop found for input delegation. Falling back to direct input."
+            )
             # Fallback to direct input
             return _actual_input_logic(prompt, default)
 
-
     # Direct input if in main thread (initial check passed)
-    return _actual_input_logic(prompt, default) # Pass original prompt and default
+    return _actual_input_logic(prompt, default)  # Pass original prompt and default
 
 
 def confirm_action(prompt: str, default: bool = False) -> bool:

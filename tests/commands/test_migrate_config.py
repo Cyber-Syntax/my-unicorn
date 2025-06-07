@@ -17,7 +17,7 @@ class TestMigrateConfigCommand(unittest.TestCase):
     """Test cases for the MigrateConfigCommand class."""
 
     def setUp(self):
-        """Set up test fixtures."""
+        """set up test fixtures."""
         self.config_path = os.path.expanduser("~/.config/myunicorn/settings.json")
 
         # Mock config data

@@ -49,14 +49,17 @@ def mock_file_operations() -> Generator[None, None, None]:
         None: This fixture doesn't yield a value, it just sets up mocks.
 
     """
-    with patch("os.path.exists") as mock_exists, patch("os.listdir") as mock_listdir, patch(
-        "os.remove"
-    ) as mock_remove, patch("os.path.isfile") as mock_isfile, patch(
-        "os.path.getmtime"
-    ) as mock_getmtime, patch("logging.info") as mock_log_info, patch(
-        "logging.error"
-    ) as mock_log_error, patch("logging.warning") as mock_log_warning:
-        # Set default return values
+    with (
+        patch("os.path.exists") as mock_exists,
+        patch("os.listdir") as mock_listdir,
+        patch("os.remove") as mock_remove,
+        patch("os.path.isfile") as mock_isfile,
+        patch("os.path.getmtime") as mock_getmtime,
+        patch("logging.info") as mock_log_info,
+        patch("logging.error") as mock_log_error,
+        patch("logging.warning") as mock_log_warning,
+    ):
+        # set default return values
         mock_exists.return_value = True
         mock_isfile.return_value = True
 
@@ -237,9 +240,13 @@ def test_delete_all_backups_success(
 
     """
     # Mock path operations
-    with patch("os.path.exists", return_value=True), patch("os.listdir") as mock_listdir, patch(
-        "os.path.isfile", return_value=True
-    ), patch("os.remove") as mock_remove, patch("logging.info") as mock_log_info:
+    with (
+        patch("os.path.exists", return_value=True),
+        patch("os.listdir") as mock_listdir,
+        patch("os.path.isfile", return_value=True),
+        patch("os.remove") as mock_remove,
+        patch("logging.info") as mock_log_info,
+    ):
         # Sample backup files
         mock_files = ["app1-1.0.0.appimage", "app2-1.0.0.appimage", "not_an_appimage.txt"]
         mock_listdir.return_value = mock_files
@@ -280,9 +287,12 @@ def test_delete_all_backups_no_files(
 
     """
     # Mock path operations
-    with patch("os.path.exists", return_value=True), patch(
-        "os.listdir", return_value=["not_an_appimage.txt"]
-    ), patch("os.path.isfile", return_value=True), patch("os.remove") as mock_remove:
+    with (
+        patch("os.path.exists", return_value=True),
+        patch("os.listdir", return_value=["not_an_appimage.txt"]),
+        patch("os.path.isfile", return_value=True),
+        patch("os.remove") as mock_remove,
+    ):
         # Mock user input to confirm
         monkeypatch.setattr("builtins.input", lambda _: "yes")
 
@@ -347,8 +357,9 @@ def test_delete_app_backups_no_apps_found(
 
     """
     # Mock _get_available_apps to return empty list
-    with patch.object(delete_command, "_get_available_apps", return_value=[]), patch(
-        "os.path.exists", return_value=True
+    with (
+        patch.object(delete_command, "_get_available_apps", return_value=[]),
+        patch("os.path.exists", return_value=True),
     ):
         # Mock print to capture output
         printed_messages = []
@@ -377,8 +388,9 @@ def test_delete_app_backups_invalid_selection(
 
     """
     # Mock _get_available_apps to return some apps
-    with patch.object(delete_command, "_get_available_apps", return_value=["app1", "app2"]), patch(
-        "os.path.exists", return_value=True
+    with (
+        patch.object(delete_command, "_get_available_apps", return_value=["app1", "app2"]),
+        patch("os.path.exists", return_value=True),
     ):
         # Mock user input for invalid selection
         inputs = ["10"]  # Out of range
@@ -411,9 +423,11 @@ def test_delete_app_backups_cancelled(
 
     """
     # Mock _get_available_apps to return some apps
-    with patch.object(delete_command, "_get_available_apps", return_value=["app1", "app2"]), patch(
-        "os.path.exists", return_value=True
-    ), patch("os.remove") as mock_remove:
+    with (
+        patch.object(delete_command, "_get_available_apps", return_value=["app1", "app2"]),
+        patch("os.path.exists", return_value=True),
+        patch("os.remove") as mock_remove,
+    ):
         # Mock user input to select app1 but cancel the operation
         inputs = ["1", "no"]
         monkeypatch.setattr("builtins.input", lambda _: inputs.pop(0) if inputs else "")
@@ -456,11 +470,14 @@ def test_delete_app_backups_success(
     ]
 
     # Mock operations
-    with patch.object(delete_command, "_get_available_apps", return_value=["app1", "app2"]), patch(
-        "os.path.exists", return_value=True
-    ), patch("os.listdir", return_value=mock_files), patch(
-        "os.path.isfile", return_value=True
-    ), patch("os.remove") as mock_remove, patch("logging.info") as mock_log_info:
+    with (
+        patch.object(delete_command, "_get_available_apps", return_value=["app1", "app2"]),
+        patch("os.path.exists", return_value=True),
+        patch("os.listdir", return_value=mock_files),
+        patch("os.path.isfile", return_value=True),
+        patch("os.remove") as mock_remove,
+        patch("logging.info") as mock_log_info,
+    ):
         # Mock user input to select app1 and confirm
         inputs = ["1", "yes"]
         monkeypatch.setattr("builtins.input", lambda _: inputs.pop(0) if inputs else "")
@@ -565,12 +582,16 @@ def test_delete_old_backups_predefined_date(
     week_ago = today - datetime.timedelta(days=7)
 
     # Mock datetime.now to return a fixed date for testing
-    with patch("datetime.datetime") as mock_datetime, patch(
-        "os.path.exists", return_value=True
-    ), patch("os.listdir") as mock_listdir, patch("os.path.isfile", return_value=True), patch(
-        "os.path.getmtime"
-    ) as mock_getmtime, patch("os.remove") as mock_remove, patch("logging.info") as mock_log_info:
-        # Set up datetime mock
+    with (
+        patch("datetime.datetime") as mock_datetime,
+        patch("os.path.exists", return_value=True),
+        patch("os.listdir") as mock_listdir,
+        patch("os.path.isfile", return_value=True),
+        patch("os.path.getmtime") as mock_getmtime,
+        patch("os.remove") as mock_remove,
+        patch("logging.info") as mock_log_info,
+    ):
+        # set up datetime mock
         mock_datetime.now.return_value = today
         mock_datetime.timedelta = datetime.timedelta
         mock_datetime.strptime = datetime.datetime.strptime
@@ -579,7 +600,7 @@ def test_delete_old_backups_predefined_date(
         mock_files = ["app1-1.0.0.appimage", "app1-2.0.0.appimage"]
         mock_listdir.return_value = mock_files
 
-        # Set up file modification times
+        # set up file modification times
         # First file is older than a week, second file is newer
         mock_getmtime.side_effect = [
             (week_ago - datetime.timedelta(days=1)).timestamp(),  # Older than a week
@@ -631,16 +652,20 @@ def test_delete_old_backups_custom_date(
     cutoff_timestamp = datetime.datetime(2023, 1, 1).timestamp()
 
     # Mock datetime and file operations
-    with patch("datetime.datetime") as mock_datetime, patch(
-        "os.path.exists", return_value=True
-    ), patch("os.listdir") as mock_listdir, patch("os.path.isfile", return_value=True), patch(
-        "os.path.getmtime"
-    ) as mock_getmtime, patch("os.remove") as mock_remove, patch("logging.info") as mock_log_info:
-        # Set up mock_datetime with real methods where needed
+    with (
+        patch("datetime.datetime") as mock_datetime,
+        patch("os.path.exists", return_value=True),
+        patch("os.listdir") as mock_listdir,
+        patch("os.path.isfile", return_value=True),
+        patch("os.path.getmtime") as mock_getmtime,
+        patch("os.remove") as mock_remove,
+        patch("logging.info") as mock_log_info,
+    ):
+        # set up mock_datetime with real methods where needed
         mock_datetime.strptime.return_value = datetime.datetime(2023, 1, 1)
         mock_datetime.now.return_value = datetime.datetime(2023, 6, 1)
 
-        # Important: Set cutoff_timestamp explicitly rather than depending on MagicMock objects
+        # Important: set cutoff_timestamp explicitly rather than depending on MagicMock objects
         cutoff_date = mock_datetime.strptime.return_value
         # Make the cutoff_timestamp a concrete value
         mock_datetime.configure_mock(
@@ -651,7 +676,7 @@ def test_delete_old_backups_custom_date(
         mock_files = ["app1-1.0.0.appimage", "app1-2.0.0.appimage"]
         mock_listdir.return_value = mock_files
 
-        # Set up file modification times with concrete values
+        # set up file modification times with concrete values
         mock_getmtime.side_effect = [old_timestamp, new_timestamp]
 
         # Mock user input to select custom date and confirm
@@ -756,8 +781,9 @@ def test_cleanup_to_max_backups_no_apps(
 
     """
     # Mock path operations and _get_available_apps
-    with patch("os.path.exists", return_value=True), patch.object(
-        delete_command, "_get_available_apps", return_value=[]
+    with (
+        patch("os.path.exists", return_value=True),
+        patch.object(delete_command, "_get_available_apps", return_value=[]),
     ):
         # Mock user input to confirm
         monkeypatch.setattr("builtins.input", lambda _: "yes")
@@ -788,7 +814,7 @@ def test_cleanup_to_max_backups_success(
         monkeypatch: Pytest monkeypatch fixture for patching functions.
 
     """
-    # Set max_backups to 2 for this test
+    # set max_backups to 2 for this test
     mock_global_config.max_backups = 2
 
     # Sample file data
@@ -807,13 +833,15 @@ def test_cleanup_to_max_backups_success(
     all_files = [f[0] for f in app1_files + app2_files]
 
     # Mock operations
-    with patch("os.path.exists", return_value=True), patch.object(
-        delete_command, "_get_available_apps", return_value=["app1", "app2"]
-    ), patch("os.listdir", return_value=all_files), patch(
-        "os.path.isfile", return_value=True
-    ), patch("os.path.getmtime") as mock_getmtime, patch("os.remove") as mock_remove, patch(
-        "logging.info"
-    ) as mock_log_info:
+    with (
+        patch("os.path.exists", return_value=True),
+        patch.object(delete_command, "_get_available_apps", return_value=["app1", "app2"]),
+        patch("os.listdir", return_value=all_files),
+        patch("os.path.isfile", return_value=True),
+        patch("os.path.getmtime") as mock_getmtime,
+        patch("os.remove") as mock_remove,
+        patch("logging.info") as mock_log_info,
+    ):
         # Mock getmtime to return timestamps in order
         mock_getmtime.side_effect = lambda filepath: next(
             t for f, t in app1_files + app2_files if f in filepath
@@ -872,9 +900,10 @@ def test_get_available_apps_error_handling(delete_command: DeleteBackupsCommand)
 
     """
     # Mock operations to raise an error
-    with patch("os.listdir", side_effect=OSError("Test error")), patch(
-        "logging.error"
-    ) as mock_log_error:
+    with (
+        patch("os.listdir", side_effect=OSError("Test error")),
+        patch("logging.error") as mock_log_error,
+    ):
         apps = delete_command._get_available_apps("/mock/dir")
 
         # Assert empty list is returned and error is logged

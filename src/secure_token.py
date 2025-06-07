@@ -14,7 +14,7 @@ import os
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from src.utils.datetime_utils import format_timestamp, parse_timestamp
 
@@ -113,7 +113,7 @@ try:
     except Exception as e:
         logger.debug(f"KDE Wallet not available: {e}")
 
-    # Set overall keyring availability
+    # set overall keyring availability
     KEYRING_AVAILABLE = GNOME_KEYRING_AVAILABLE or KDE_WALLET_AVAILABLE
 
     # If no supported keyring was found but keyring is imported, log more details
@@ -377,7 +377,7 @@ class SecureTokenManager:
         return token
 
     @staticmethod
-    def _update_token_usage_stats(metadata: Dict[str, Any]) -> None:
+    def _update_token_usage_stats(metadata: tuple[str, Any]) -> None:
         """Update token usage statistics in metadata.
 
         Args:
@@ -408,11 +408,11 @@ class SecureTokenManager:
                 logger.debug(f"Could not update token metadata in file: {e}")
 
     @staticmethod
-    def get_token_metadata() -> Dict[str, Any]:
+    def get_token_metadata() -> tuple[str, Any]:
         """Get metadata about the stored token.
 
         Returns:
-            Dict: Token metadata including creation time and expiration
+            tuple: Token metadata including creation time and expiration
         """
         metadata = {}
 
@@ -460,11 +460,11 @@ class SecureTokenManager:
             return True  # Assume expired if there's an error
 
     @staticmethod
-    def get_token_expiration_info() -> Tuple[bool, Optional[str]]:
+    def get_token_expiration_info() -> tuple[bool, str | None]:
         """Get token expiration information.
 
         Returns:
-            Tuple[bool, Optional[str]]: (is_expired, expiration_date_string)
+            tuple[bool, Optional[str]]: (is_expired, expiration_date_string)
         """
         metadata = SecureTokenManager.get_token_metadata()
         if not metadata or "expires_at" not in metadata:
@@ -621,7 +621,7 @@ class SecureTokenManager:
             # Atomic rename for safer file operations
             os.replace(temp_salt_file, SALT_FILE)
 
-            # Set restrictive permissions (only user can read/write)
+            # set restrictive permissions (only user can read/write)
             os.chmod(SALT_FILE, 0o600)
 
             logging.info("Created new salt file with secure permissions")
@@ -681,11 +681,11 @@ class SecureTokenManager:
             return ""
 
     @staticmethod
-    def get_keyring_status() -> Dict[str, bool]:
+    def get_keyring_status() -> tuple[str, bool]:
         """Get the status of available keyring backends.
 
         Returns:
-            Dict[str, bool]: Dictionary with status of keyring backends
+            tuple[str, bool]: Dictionary with status of keyring backends
         """
         return {
             "any_keyring_available": KEYRING_AVAILABLE,
@@ -837,7 +837,7 @@ class SecureTokenManager:
             return False
 
     @staticmethod
-    def audit_log_token_usage(action: str, source_ip: Optional[str] = None) -> None:
+    def audit_log_token_usage(action: str, source_ip: str | None = None) -> None:
         """Log token usage for auditing purposes.
 
         Args:
@@ -861,7 +861,7 @@ class SecureTokenManager:
             with open(audit_log_path, "a") as f:
                 f.write(json.dumps(audit_entry) + "\n")
 
-            # Set proper permissions
+            # set proper permissions
             try:
                 os.chmod(audit_log_path, 0o600)
             except:
@@ -871,11 +871,11 @@ class SecureTokenManager:
             logger.debug(f"Failed to log token usage to audit log: {e}")
 
     @staticmethod
-    def get_audit_logs() -> List[Dict[str, Any]]:
+    def get_audit_logs() -> list[tuple[str, Any]]:
         """Get token usage audit logs.
 
         Returns:
-            List[Dict[str, Any]]: List of audit log entries in reverse chronological order (newest first)
+            list[tuple[str, Any]]: list of audit log entries in reverse chronological order (newest first)
         """
         audit_logs = []
         audit_log_path = CONFIG_DIR / "token_audit.log"
@@ -908,8 +908,8 @@ class SecureTokenManager:
 
     @staticmethod
     def _create_token_metadata(
-        token: str, expires_in_days: int, storage_info: Optional[Dict[str, str]] = None
-    ) -> Dict[str, Any]:
+        token: str, expires_in_days: int, storage_info: tuple[str, str] | None = None
+    ) -> tuple[str, Any]:
         """Create basic token metadata.
 
         Args:
@@ -918,7 +918,7 @@ class SecureTokenManager:
             storage_info: Optional initial storage information
 
         Returns:
-            Dict[str, Any]: Token metadata
+            tuple[str, Any]: Token metadata
         """
         if not token:
             logger.warning("Attempted to create metadata for an empty token")
@@ -948,7 +948,7 @@ class SecureTokenManager:
         return metadata
 
     @staticmethod
-    def _save_to_keyring(token: str, metadata: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
+    def _save_to_keyring(token: str, metadata: tuple[str, Any]) -> tuple[bool, tuple[str, Any]]:
         """Save token to system keyring.
 
         Args:
@@ -956,7 +956,7 @@ class SecureTokenManager:
             metadata: Token metadata
 
         Returns:
-            Tuple[bool, Dict[str, Any]]: (success, updated_metadata)
+            tuple[bool, tuple[str, Any]]: (success, updated_metadata)
         """
         if not KEYRING_AVAILABLE:
             return False, metadata
@@ -998,8 +998,8 @@ class SecureTokenManager:
 
     @staticmethod
     def _save_to_encrypted_file(
-        token: str, metadata: Dict[str, Any]
-    ) -> Tuple[bool, Dict[str, Any]]:
+        token: str, metadata: tuple[str, Any]
+    ) -> tuple[bool, tuple[str, Any]]:
         """Save token to encrypted file.
 
         Args:
@@ -1007,7 +1007,7 @@ class SecureTokenManager:
             metadata: Token metadata
 
         Returns:
-            Tuple[bool, Dict[str, Any]]: (success, updated_metadata)
+            tuple[bool, tuple[str, Any]]: (success, updated_metadata)
         """
         if not CRYPTO_AVAILABLE:
             return False, metadata
@@ -1016,7 +1016,7 @@ class SecureTokenManager:
             # Ensure config directory exists with proper permissions
             os.makedirs(CONFIG_DIR, exist_ok=True)
 
-            # Set secure directory permissions (only user can access)
+            # set secure directory permissions (only user can access)
             try:
                 os.chmod(CONFIG_DIR, 0o700)
             except OSError as e:
@@ -1040,7 +1040,7 @@ class SecureTokenManager:
             with open(temp_token_file, "wb") as f:
                 f.write(encrypted_token)
 
-            # Set secure file permissions before final move
+            # set secure file permissions before final move
             os.chmod(temp_token_file, 0o600)
 
             # Atomically replace the token file
@@ -1051,7 +1051,7 @@ class SecureTokenManager:
             with open(temp_metadata_file, "w") as f:
                 json.dump(metadata, f)
 
-            # Set secure file permissions before final move
+            # set secure file permissions before final move
             os.chmod(temp_metadata_file, 0o600)
 
             # Atomically replace the metadata file
@@ -1078,7 +1078,7 @@ class SecureTokenManager:
         token: str,
         expires_in_days: int = DEFAULT_TOKEN_EXPIRATION_DAYS,
         storage_preference: str = "auto",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: tuple[str, Any] | None = None,
         ask_for_fallback: bool = True,
     ) -> bool:
         """Save a GitHub token securely with expiration metadata.

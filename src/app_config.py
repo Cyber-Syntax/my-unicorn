@@ -60,7 +60,7 @@ class AppConfigManager:
         self.config_folder.mkdir(parents=True, exist_ok=True)
 
     def set_app_name(self, app_name: str) -> None:
-        """Set the app name and update derived paths.
+        """set the app name and update derived paths.
 
         Args:
             app_name: Name of the application (used for config file naming)
@@ -211,7 +211,7 @@ class AppConfigManager:
             icon_path: Optional path to the application icon
 
         Returns:
-            Tuple[bool, str]: Success status and path to desktop file or error message
+            tuple[bool, str]: Success status and path to desktop file or error message
 
         """
         try:
@@ -245,10 +245,10 @@ class AppConfigManager:
             return False, error_msg
 
     def list_json_files(self) -> list[str]:
-        """List JSON files in the configuration directory.
+        """list JSON files in the configuration directory.
 
         Returns:
-            List[str]: List of JSON files in the configuration directory
+            list[str]: list of JSON files in the configuration directory
 
         Raises:
             FileNotFoundError: If the configuration folder doesn't exist
@@ -328,12 +328,12 @@ class AppConfigManager:
             return False
 
     def select_files(self) -> list[str] | None:
-        """List available JSON configuration files and allow the user to select multiple.
+        """list available JSON configuration files and allow the user to select multiple.
 
         Shows application names without the .json extension for better readability.
 
         Returns:
-            List[str] or None: List of selected JSON files or None if no selection made
+            list[str] or None: list of selected JSON files or None if no selection made
 
         """
         try:
@@ -376,7 +376,7 @@ class AppConfigManager:
             config_file_name: Name of the configuration file
 
         Returns:
-            Dict or None: Loaded configuration or None if file not found
+            tuple or None: Loaded configuration or None if file not found
 
         Raises:
             ValueError: If JSON parsing fails
@@ -464,7 +464,7 @@ class AppConfigManager:
         """Get user's file selection.
 
         Args:
-            json_files: List of JSON files to choose from
+            json_files: list of JSON files to choose from
 
         Returns:
             Selected file name or None if cancelled
@@ -555,7 +555,7 @@ class AppConfigManager:
         """Convert the user-specific configuration to a dictionary.
 
         Returns:
-            Dict[str, Any]: Dictionary representation of user-specific app configuration
+            tuple[str, Any]: Dictionary representation of user-specific app configuration
 
         """
         return {

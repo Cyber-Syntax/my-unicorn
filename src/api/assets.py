@@ -4,8 +4,9 @@
 This module defines data structures for GitHub release assets.
 """
 
-from dataclasses import dataclass, field # Added field
-from typing import Dict, List, Optional, Any # Added Any
+from dataclasses import dataclass, field
+from typing import Any
+
 
 @dataclass
 class ReleaseAsset:
@@ -16,17 +17,18 @@ class ReleaseAsset:
     size: int
     content_type: str
 
+
 @dataclass
 class AppImageAsset:
     """Represents an AppImage asset from a GitHub release."""
 
     name: str
     browser_download_url: str
-    size: Optional[int] = None
-    content_type: Optional[str] = None
+    size: int | None = None
+    content_type: str | None = None
 
     @classmethod
-    def from_github_asset(cls, asset: Dict) -> "AppImageAsset":
+    def from_github_asset(cls, asset: dict) -> "AppImageAsset":
         """Create an AppImageAsset from a GitHub API asset dictionary.
 
         Args:
@@ -43,6 +45,7 @@ class AppImageAsset:
             content_type=asset.get("content_type"),
         )
 
+
 @dataclass
 class SHAAsset:
     """Represents a SHA checksum asset from a GitHub release."""
@@ -50,10 +53,10 @@ class SHAAsset:
     name: str
     browser_download_url: str
     hash_type: str
-    size: Optional[int] = None
+    size: int | None = None
 
     @classmethod
-    def from_github_asset(cls, asset: Dict, hash_type: str = "sha256") -> "SHAAsset":
+    def from_github_asset(cls, asset: dict, hash_type: str = "sha256") -> "SHAAsset":
         """Create a SHAAsset from a GitHub API asset dictionary.
 
         Args:
@@ -71,13 +74,14 @@ class SHAAsset:
             size=asset.get("size"),
         )
 
+
 @dataclass
 class ArchitectureInfo:
     """Represents architecture information for asset selection."""
 
     name: str
-    keywords: List[str]
-    incompatible_archs: List[str]
+    keywords: list[str]
+    incompatible_archs: list[str]
 
     @classmethod
     def from_current_system(cls) -> "ArchitectureInfo":
@@ -96,6 +100,7 @@ class ArchitectureInfo:
             incompatible_archs=arch_utils.get_incompatible_archs(current_arch),
         )
 
+
 @dataclass
 class ReleaseInfo:
     """Represents processed GitHub release information."""
@@ -105,20 +110,20 @@ class ReleaseInfo:
     version: str
     appimage_name: str
     appimage_url: str
-    sha_name: Optional[str] = None
-    sha_url: Optional[str] = None
-    hash_type: Optional[str] = None
-    arch_keyword: Optional[str] = None
-    release_notes: Optional[str] = None
-    release_url: Optional[str] = None
+    sha_name: str | None = None
+    sha_url: str | None = None
+    hash_type: str | None = None
+    arch_keyword: str | None = None
+    release_notes: str | None = None
+    release_url: str | None = None
     is_prerelease: bool = False
-    published_at: Optional[str] = None
-    extracted_hash_from_body: Optional[str] = None # For hash extracted from release body
-    asset_digest: Optional[str] = None # For GitHub API asset digest verification
-    raw_assets: List[Dict[str, Any]] = field(default_factory=list) # Added for storing all assets
+    published_at: str | None = None
+    extracted_hash_from_body: str | None = None  # For hash extracted from release body
+    asset_digest: str | None = None  # For GitHub API asset digest verification
+    raw_assets: list[dict[str, Any]] = field(default_factory=list)  # Added for storing all assets
 
     @classmethod
-    def from_release_data(cls, release_data: Dict, asset_info: Dict) -> "ReleaseInfo":
+    def from_release_data(cls, release_data: dict, asset_info: dict) -> "ReleaseInfo":
         """Create a ReleaseInfo from GitHub release data and processed asset information.
 
         Args:
@@ -138,12 +143,12 @@ class ReleaseInfo:
             sha_name=asset_info.get("sha_name"),
             sha_url=asset_info.get("sha_url"),
             hash_type=asset_info.get("hash_type"),
-            extracted_hash_from_body=asset_info.get("extracted_hash_from_body"), # Get new field
-            asset_digest=asset_info.get("asset_digest"), # Get asset digest field
+            extracted_hash_from_body=asset_info.get("extracted_hash_from_body"),  # Get new field
+            asset_digest=asset_info.get("asset_digest"),  # Get asset digest field
             arch_keyword=asset_info.get("arch_keyword"),
             release_notes=release_data.get("body", ""),
             release_url=release_data.get("html_url", ""),
             is_prerelease=release_data.get("prerelease", False),
             published_at=release_data.get("published_at", ""),
-            raw_assets=release_data.get("assets", []), # Populate raw_assets
+            raw_assets=release_data.get("assets", []),  # Populate raw_assets
         )

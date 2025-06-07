@@ -6,7 +6,6 @@ Tests for SHA utility functions.
 This module contains tests for the SHA utility functions in src/utils/sha_utils.py.
 """
 
-from typing import List, Optional
 
 import pytest
 
@@ -49,8 +48,8 @@ class TestIsShaFile:
         """Test edge cases for SHA file detection."""
         assert is_sha_file("app.txt") is False  # No SHA keyword
         assert is_sha_file("checksums") is True  # Contains "checksum"
-        assert is_sha_file("SHA256") is True    # Contains "sha256"
-        assert is_sha_file("SHA512") is True    # Contains "sha512"
+        assert is_sha_file("SHA256") is True  # Contains "sha256"
+        assert is_sha_file("SHA512") is True  # Contains "sha512"
 
 
 class TestDetectHashType:

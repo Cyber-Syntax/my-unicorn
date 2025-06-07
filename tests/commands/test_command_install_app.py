@@ -18,7 +18,7 @@ if str(project_root) not in sys.path:
 
 # Import the modules directly to avoid import issues
 from src.app_catalog import AppInfo
-from src.commands.install_app import InstallAppCommand
+from src.commands.install_catalog import InstallAppCommand
 
 
 @pytest.fixture
@@ -51,7 +51,7 @@ def install_test_data() -> dict[str, str]:
     """Provide common test data for install app command tests.
 
     Returns:
-        Dict[str, str]: Dictionary containing test values
+        tuple[str, str]: Dictionary containing test values
 
     """
     return {
@@ -93,7 +93,7 @@ def mocked_app_config(
     mock.config_file_name = "testrepo.json"
 
     app_config_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_app.AppConfigManager", app_config_class_mock)
+    monkeypatch.setattr("src.commands.install_catalog.AppConfigManager", app_config_class_mock)
     return mock
 
 
@@ -120,18 +120,21 @@ def mocked_api(monkeypatch: pytest.MonkeyPatch, install_test_data: dict[str, str
     mock.arch_keyword = None
     mock.appimage_url = install_test_data["appimage_url"]
     mock.get_response.return_value = (True, "Success")  # Success response
-    mock.check_latest_version.return_value = (False, {
-        "current_version": None,
-        "latest_version": install_test_data["version"],
-        "release_notes": "Test release notes",
-        "release_url": "https://github.com/test/test/releases/tag/v1.0.0",
-        "compatible_assets": [],
-        "is_prerelease": False,
-        "published_at": "2023-01-01T00:00:00Z",
-    })  # Proper response format
+    mock.check_latest_version.return_value = (
+        False,
+        {
+            "current_version": None,
+            "latest_version": install_test_data["version"],
+            "release_notes": "Test release notes",
+            "release_url": "https://github.com/test/test/releases/tag/v1.0.0",
+            "compatible_assets": [],
+            "is_prerelease": False,
+            "published_at": "2023-01-01T00:00:00Z",
+        },
+    )  # Proper response format
 
     api_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_app.GitHubAPI", api_class_mock)
+    monkeypatch.setattr("src.commands.install_catalog.GitHubAPI", api_class_mock)
     return mock
 
 
@@ -153,7 +156,7 @@ def mocked_download_manager(
     mock.download.return_value = install_test_data["downloaded_file_path"]
 
     download_manager_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_app.DownloadManager", download_manager_class_mock)
+    monkeypatch.setattr("src.commands.install_catalog.DownloadManager", download_manager_class_mock)
     return mock
 
 
@@ -177,7 +180,7 @@ def mocked_global_config(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.max_backups = 3
 
     global_config_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_app.GlobalConfigManager", global_config_class_mock)
+    monkeypatch.setattr("src.commands.install_catalog.GlobalConfigManager", global_config_class_mock)
     return mock
 
 
@@ -200,7 +203,7 @@ def mocked_verifier(
     mock.set_appimage_path.return_value = None
 
     verifier_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_app.VerificationManager", verifier_class_mock)
+    monkeypatch.setattr("src.commands.install_catalog.VerificationManager", verifier_class_mock)
     return mock
 
 
@@ -220,7 +223,7 @@ def mocked_verifier_failure(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.set_appimage_path.return_value = None
 
     verifier_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_app.VerificationManager", verifier_class_mock)
+    monkeypatch.setattr("src.commands.install_catalog.VerificationManager", verifier_class_mock)
     return mock
 
 
@@ -239,7 +242,7 @@ def mocked_file_handler(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.handle_appimage_operations.return_value = True
 
     file_handler_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_app.FileHandler", file_handler_class_mock)
+    monkeypatch.setattr("src.commands.install_catalog.FileHandler", file_handler_class_mock)
     return mock
 
 
@@ -258,7 +261,7 @@ def mocked_icon_manager(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.ensure_app_icon.return_value = (True, "/tmp/icon.png")  # Success with icon path
 
     icon_manager_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_app.IconManager", icon_manager_class_mock)
+    monkeypatch.setattr("src.commands.install_catalog.IconManager", icon_manager_class_mock)
     return mock
 
 
@@ -273,7 +276,7 @@ def mocked_app_catalog_functions(
         app_info_fixture: Sample app info
 
     Returns:
-        Dict[str, MagicMock]: Dictionary of mocked functions
+        tuple[str, MagicMock]: Dictionary of mocked functions
 
     """
     # Create mock functions for all app catalog functions
@@ -284,11 +287,11 @@ def mocked_app_catalog_functions(
     mock_get_categories = MagicMock(return_value=["Test", "Productivity"])
 
     # Apply the mocks
-    monkeypatch.setattr("src.commands.install_app.get_app_info", mock_get_app_info)
-    monkeypatch.setattr("src.commands.install_app.get_all_apps", mock_get_all_apps)
-    monkeypatch.setattr("src.commands.install_app.get_apps_by_category", mock_get_apps_by_category)
-    monkeypatch.setattr("src.commands.install_app.search_apps", mock_search_apps)
-    monkeypatch.setattr("src.commands.install_app.get_categories", mock_get_categories)
+    monkeypatch.setattr("src.commands.install_catalog.get_app_info", mock_get_app_info)
+    monkeypatch.setattr("src.commands.install_catalog.get_all_apps", mock_get_all_apps)
+    monkeypatch.setattr("src.commands.install_catalog.get_apps_by_category", mock_get_apps_by_category)
+    monkeypatch.setattr("src.commands.install_catalog.search_apps", mock_search_apps)
+    monkeypatch.setattr("src.commands.install_catalog.get_categories", mock_get_categories)
 
     # Return the mocks for inspection in tests
     return {
@@ -391,7 +394,7 @@ def test_install_app_skip_verification(
     # Modify the app_info to skip verification
     app_info_fixture.skip_verification = True
 
-    # Set the API mock to skip verification as well
+    # set the API mock to skip verification as well
     mocked_api.skip_verification = True
     mocked_api.sha_name = None
     mocked_api.hash_type = None
@@ -485,7 +488,7 @@ def test_install_app_api_failure(
         app_info_fixture: Sample app info
 
     """
-    # Set API to fail with proper error response format
+    # set API to fail with proper error response format
     mocked_api.check_latest_version.return_value = (False, {"error": "API Error"})
 
     # Setup mock inputs

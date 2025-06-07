@@ -289,7 +289,7 @@ class IconManager:
             headers: Optional authentication headers
 
         Returns:
-            Tuple[bool, Optional[str]]: (Success status, Path to icon or status message)
+            tuple[bool, Optional[str]]: (Success status, Path to icon or status message)
 
         """
         try:

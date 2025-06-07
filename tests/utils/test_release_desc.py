@@ -121,7 +121,7 @@ a202066a1a6ec8bd5cb6dbd43a5de3ce87d0a13d83ef748e87c1d3fec80d22e0  windows-arm64.
         mock_fetch.return_value = self.SAMPLE_RELEASE_DESC
 
         with patch("src.utils.checksums.ReleaseChecksumExtractor") as MockParser:
-            # Set up the mock parser instance
+            # set up the mock parser instance
             mock_parser_instance = MagicMock()
             mock_parser_instance.write_checksums_file.return_value = "/tmp/SHA256SUMS.txt"
             MockParser.return_value = mock_parser_instance

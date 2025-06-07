@@ -1,6 +1,6 @@
 [project]
 name = 'my-unicorn'
-version = '0.10.9-alpha'
+version = '0.10.10-alpha'
 description = 'It downloads/updates appimages via GitHub API. It also validates the appimage with SHA256 and SHA512.'
 requires-python = ">= 3.12"
 dependencies = [
@@ -114,7 +114,7 @@ line-ending = "auto"
 # to be opt-out in the future.
 docstring-code-format = false
 
-# Set the line length limit used when formatting code snippets in
+# set the line length limit used when formatting code snippets in
 # docstrings.
 #
 # This only has an effect when the `docstring-code-format` setting is

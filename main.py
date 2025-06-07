@@ -4,27 +4,23 @@
 This module configures logging, loads configuration files, and executes commands.
 """
 
-# Standard library imports
 import gettext
 import logging
-import os  # Add os import
-import sys
 import os
+import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from types import TracebackType
-from typing import Optional
 
 from src.app_catalog import initialize_definitions_path
 from src.app_config import AppConfigManager
 from src.auth_manager import GitHubAuthManager
 
-# Local imports
 from src.commands.customize_app_config import CustomizeAppConfigCommand
 from src.commands.customize_global_config import CustomizeGlobalConfigCommand
 from src.commands.delete_backups import DeleteBackupsCommand
-from src.commands.download import DownloadCommand
-from src.commands.install_app import InstallAppCommand
+from src.commands.install_url import DownloadCommand
+from src.commands.install_catalog import InstallAppCommand
 from src.commands.invoker import CommandInvoker
 from src.commands.manage_token import ManageTokenCommand
 from src.commands.migrate_config import MigrateConfigCommand
@@ -41,7 +37,7 @@ EXIT_FAILURE = 1
 
 
 def custom_excepthook(
-    exc_type: type[BaseException], exc_value: BaseException, exc_traceback: Optional[TracebackType]
+    exc_type: type[BaseException], exc_value: BaseException, exc_traceback: TracebackType | None
 ) -> None:
     """Custom excepthook to log uncaught exceptions.
 

@@ -129,7 +129,7 @@ class SHAManager:
         """Find and select appropriate SHA file for verification.
 
         Args:
-            assets: List of release assets from GitHub API
+            assets: list of release assets from GitHub API
 
         """
         if self.skip_verification:
@@ -147,7 +147,9 @@ class SHAManager:
         # Priority 2: Try to extract from release body description
         if self._app_info and getattr(self._app_info, "use_github_release_desc", False):
             if self._try_extract_sha_from_release_body():
-                logger.info(f"Successfully extracted SHA for {self.appimage_name} from release description")
+                logger.info(
+                    f"Successfully extracted SHA for {self.appimage_name} from release description"
+                )
                 return
 
         # Priority 3: Try to find SHA asset file using SHAAssetFinder
@@ -162,7 +164,9 @@ class SHAManager:
                 self.sha_name = "asset_digest"
                 self.sha_url = None
                 self.asset_digest = sha_asset["digest"]
-                logger.info(f"Successfully assigned asset digest verification for {self.appimage_name}")
+                logger.info(
+                    f"Successfully assigned asset digest verification for {self.appimage_name}"
+                )
                 logger.debug(f"Asset digest: {self.asset_digest}")
                 logger.debug(f"Hash type: {self.hash_type}")
                 logger.debug(f"SHA name: {self.sha_name}")
@@ -198,7 +202,7 @@ class SHAManager:
         """Handle fallback when SHA file couldn't be automatically determined.
 
         Args:
-            assets: List of release assets from GitHub API
+            assets: list of release assets from GitHub API
 
         """
         return self._handle_sha_fallback_sync(assets)
@@ -207,7 +211,7 @@ class SHAManager:
         """Async version of SHA fallback handler.
 
         Args:
-            assets: List of release assets from GitHub API
+            assets: list of release assets from GitHub API
 
         """
         logger.warning("Could not find SHA file automatically")
@@ -238,13 +242,11 @@ class SHAManager:
             logger.info("SHA fallback cancelled by user")
             raise
 
-
-
     def _handle_sha_fallback_sync(self, assets: list[dict]) -> None:
         """Synchronous version of SHA fallback handler.
 
         Args:
-            assets: List of release assets from GitHub API
+            assets: list of release assets from GitHub API
 
         """
         logger.warning("Could not find SHA file automatically")

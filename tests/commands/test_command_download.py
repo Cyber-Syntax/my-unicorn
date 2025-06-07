@@ -7,7 +7,6 @@ downloading AppImages from GitHub releases.
 
 import sys
 from pathlib import Path
-from typing import Dict
 from unittest.mock import MagicMock
 
 import pytest
@@ -18,15 +17,15 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Import the modules directly to avoid import issues
-from src.commands.download import DownloadCommand
+from src.commands.install_url import DownloadCommand
 
 
 @pytest.fixture
-def download_test_data() -> Dict[str, str]:
+def download_test_data() -> tuple[str, str]:
     """Provide common test data for download command tests.
 
     Returns:
-        Dict[str, str]: Dictionary containing test values
+        tuple[str, str]: Dictionary containing test values
 
     """
     return {
@@ -42,7 +41,7 @@ def download_test_data() -> Dict[str, str]:
 
 
 @pytest.fixture
-def mocked_parser(monkeypatch: pytest.MonkeyPatch, download_test_data: Dict[str, str]) -> MagicMock:
+def mocked_parser(monkeypatch: pytest.MonkeyPatch, download_test_data: tuple[str, str]) -> MagicMock:
     """Mock the ParseURL class.
 
     Args:
@@ -60,13 +59,13 @@ def mocked_parser(monkeypatch: pytest.MonkeyPatch, download_test_data: Dict[str,
     mock.ask_url.return_value = None
 
     parser_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.download.ParseURL", parser_class_mock)
+    monkeypatch.setattr("src.commands.install_url.ParseURL", parser_class_mock)
     return mock
 
 
 @pytest.fixture
 def mocked_app_config(
-    monkeypatch: pytest.MonkeyPatch, download_test_data: Dict[str, str]
+    monkeypatch: pytest.MonkeyPatch, download_test_data: tuple[str, str]
 ) -> MagicMock:
     """Mock the AppConfigManager class.
 
@@ -87,12 +86,12 @@ def mocked_app_config(
     mock.config_file_name = "test_config.json"
 
     app_config_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.download.AppConfigManager", app_config_class_mock)
+    monkeypatch.setattr("src.commands.install_url.AppConfigManager", app_config_class_mock)
     return mock
 
 
 @pytest.fixture
-def mocked_api(monkeypatch: pytest.MonkeyPatch, download_test_data: Dict[str, str]) -> MagicMock:
+def mocked_api(monkeypatch: pytest.MonkeyPatch, download_test_data: tuple[str, str]) -> MagicMock:
     """Mock the GitHubAPI class.
 
     Args:
@@ -115,7 +114,7 @@ def mocked_api(monkeypatch: pytest.MonkeyPatch, download_test_data: Dict[str, st
     mock.appimage_url = download_test_data["appimage_url"]
 
     api_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.download.GitHubAPI", api_class_mock)
+    monkeypatch.setattr("src.commands.install_url.GitHubAPI", api_class_mock)
     return mock
 
 
@@ -134,7 +133,7 @@ def mocked_download_manager(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.download.return_value = True
 
     download_manager_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.download.DownloadManager", download_manager_class_mock)
+    monkeypatch.setattr("src.commands.install_url.DownloadManager", download_manager_class_mock)
     return mock
 
 
@@ -180,7 +179,7 @@ def mocked_verifier(
     mock.verify_appimage.return_value = verification_success
 
     verifier_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.download.VerificationManager", verifier_class_mock)
+    monkeypatch.setattr("src.commands.install_url.VerificationManager", verifier_class_mock)
     return mock
 
 
@@ -199,7 +198,7 @@ def mocked_verifier_failure(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.verify_appimage.return_value = False
 
     verifier_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.download.VerificationManager", verifier_class_mock)
+    monkeypatch.setattr("src.commands.install_url.VerificationManager", verifier_class_mock)
     return mock
 
 
@@ -218,7 +217,7 @@ def mocked_file_handler(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.handle_appimage_operations.return_value = True
 
     file_handler_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.download.FileHandler", file_handler_class_mock)
+    monkeypatch.setattr("src.commands.install_url.FileHandler", file_handler_class_mock)
     return mock
 
 
@@ -236,7 +235,7 @@ def mocked_icon_manager(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock = MagicMock()
 
     icon_manager_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.download.IconManager", icon_manager_class_mock)
+    monkeypatch.setattr("src.commands.install_url.IconManager", icon_manager_class_mock)
     return mock
 
 
@@ -332,7 +331,7 @@ def test_download_command_skip_verification(
     mocked_verifier: MagicMock,
     mocked_file_handler: MagicMock,
     mocked_icon_manager: MagicMock,
-    download_test_data: Dict[str, str],
+    download_test_data: tuple[str, str],
 ) -> None:
     """Test download command behavior when no SHA file is available.
 
@@ -351,7 +350,7 @@ def test_download_command_skip_verification(
         download_test_data: Test data dictionary
 
     """
-    # Set skip_verification to trigger the skip verification path
+    # set skip_verification to trigger the skip verification path
     mocked_api.skip_verification = True
     mocked_api.sha_name = None
 

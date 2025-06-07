@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from src.api.github_api import GitHubAPI
 from src.app_config import AppConfigManager
@@ -26,7 +27,7 @@ class DownloadCommand(Command):
         # Initialize AppConfigManager and set app name
         app_config = AppConfigManager()
         app_config.set_app_name(repo)
-        
+
         # Get app info from catalog to get hash_type and sha_name
         app_info = app_config.get_app_info()
         if app_info:
@@ -54,7 +55,18 @@ class DownloadCommand(Command):
         for attempt in range(1, max_attempts + 1):
             try:
                 # Get release data from GitHub API
-                api.get_response()
+                success, full_response = api.get_latest_release()
+                
+                if not success:
+                    print(f"Error during processing: {full_response}")
+                    return
+
+
+
+                # Check if essential attributes are available after API call
+                if not api.appimage_name:
+                    print("Error: Could not find a suitable AppImage file in the release.")
+                    return
 
                 # Update user-specific fields (version and appimage_name are stored in config)
                 app_config.version = api.version
@@ -66,7 +78,7 @@ class DownloadCommand(Command):
                 # 4. Use DownloadManager to download the AppImage or get existing file
                 download = DownloadManager(api)
                 downloaded_file_path, was_existing_file = download.download()
-                
+
                 if was_existing_file:
                     print(f"Found existing file: {api.appimage_name}")
                 else:
@@ -80,14 +92,34 @@ class DownloadCommand(Command):
                     logging.info("Skipping verification due to skip_verification setting.")
                     print("Note: Verification skipped - verification disabled for this app")
                     verification_success = True
-                    verification_skipped = True  # Set the flag that verification was skipped
+                    verification_skipped = True  # set the flag that verification was skipped
                     break
                 else:
+                    # Check if verification data is available and valid
+                    has_sha_data = api.sha_name and api.sha_name != "no_sha_file"
+                    has_asset_digest = api.asset_digest
+                    has_valid_hash_type = api.hash_type and api.hash_type != "no_hash"
+                    
+                    if not has_sha_data and not has_asset_digest:
+                        logging.info("No SHA file or asset digest found - verification cannot be performed.")
+                        print("Note: Verification skipped - no hash file available")
+                        verification_success = True
+                        verification_skipped = True
+                        break
+
                     # Single verification point for both existing and downloaded files
                     if was_existing_file:
                         print("Verifying existing file...")
                     else:
                         print("Verifying download integrity...")
+
+                    # Debug logging for API values
+                    logging.debug(f"API values before VerificationManager creation:")
+                    logging.debug(f"  api.sha_name: {api.sha_name}")
+                    logging.debug(f"  api.hash_type: {api.hash_type}")
+                    logging.debug(f"  api.asset_digest: {api.asset_digest}")
+                    logging.debug(f"  api.skip_verification: {api.skip_verification}")
+
                     # Perform verification with cleanup on failure
                     verification_manager = VerificationManager(
                         sha_name=api.sha_name,
@@ -97,13 +129,18 @@ class DownloadCommand(Command):
                         asset_digest=api.asset_digest,
                     )
 
-                    # Set the full path to the downloaded file
+                    # set the full path to the downloaded file
                     verification_manager.set_appimage_path(downloaded_file_path)
 
                     is_valid = verification_manager.verify_appimage(cleanup_on_failure=True)
 
                     if is_valid:
                         verification_success = True
+                        # Check if verification was actually performed or skipped
+                        if verification_manager.config.is_verification_skipped():
+                            verification_skipped = True
+                        else:
+                            print("✓ Verification successful!")
                         break
                     # Verification failed
                     elif attempt == max_attempts:
@@ -141,45 +178,51 @@ class DownloadCommand(Command):
         file_handler = FileHandler(
             appimage_name=api.appimage_name,
             repo=api.repo,  # Preserve original case of repo name
+            owner=api.owner,
             version=api.version,
             sha_name=api.sha_name,
-            config_file=global_config.config_file,
-            app_storage_path=global_config.expanded_app_storage_path,
-            app_backup_storage_path=global_config.expanded_app_backup_storage_path,
-            config_folder=app_config.config_folder,
+            config_file=str(global_config.config_file),
+            app_storage_path=Path(global_config.expanded_app_storage_path),
+            app_backup_storage_path=Path(global_config.expanded_app_backup_storage_path),
+            config_folder=str(app_config.config_folder) if app_config.config_folder else None,
             config_file_name=app_config.config_file_name,
             batch_mode=global_config.batch_mode,
             keep_backup=global_config.keep_backup,
             max_backups=global_config.max_backups,
+            app_rename=app_config.app_rename if app_info else None,
         )
 
         # Download app icon if possible
         icon_manager = IconManager()
         # Get the app_rename from catalog info
         app_rename = app_config.app_rename if app_info else None
-        icon_manager.ensure_app_icon(api.owner, api.repo, app_rename=app_rename)
+        icon_success, icon_path = icon_manager.ensure_app_icon(api.owner, api.repo, app_rename=app_rename)
 
         # Check if the file operations were successful
-        success = file_handler.handle_appimage_operations()
+        success = file_handler.handle_appimage_operations(
+            github_api=api, icon_path=icon_path if icon_success else None
+        )
         if success:
             # Save the configuration only if all previous steps succeed
             app_config.save_config()
 
-            # Use different log/print messages based on verification status
+            # Display success message with paths
             if verification_skipped:
-                logging.info(
-                    "AppImage downloaded but not verified because developers not provided "
-                    "sha file for this appimage."
-                )
-                print(
-                    "AppImage downloaded but not verified because developers not provided "
-                    "sha file for this appimage."
-                )
+                print(f"\n✅ {api.repo} successfully installed!")
+                print("⚠️  Note: AppImage was not verified (no verification data available)")
             else:
-                logging.info(
-                    "AppImage downloaded and verified successfully and saved in DownloadCommand."
-                )
-                print("AppImage downloaded and verified successfully and saved.")
+                print(f"\n✅ {api.repo} successfully installed and verified!")
+
+            # Show config file location
+            if app_config.config_file:
+                config_path = Path(app_config.config_file)
+                print(f"Config file created at: {config_path}")
+
+            # Show location of executable
+            if api.appimage_name:
+                app_path = Path(global_config.expanded_app_storage_path) / api.appimage_name
+                print(f"Application installed to: {app_path}")
+                print("You can run it from the command line or create a desktop shortcut.")
         else:
-            logging.error("An error occurred during file operations in DownloadCommand.")
-            print("An error occurred during file operations.")
+            print("Error during file operations. Installation failed.")
+            return

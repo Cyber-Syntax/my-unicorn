@@ -1,13 +1,13 @@
 """Verification functions for release description checksums.
 
-This module provides functions to verify files using checksums from GitHub release descriptions.
+This module provides functions to verify files using checksums from GitHub release descriptions and 
+handles secure storage and validation of checksum data for AppImage integrity verification.
 """
 
 import logging
 import os
 import tempfile
 from pathlib import Path
-from typing import Dict, Optional
 
 from src.utils.checksums.extractor import ReleaseChecksumExtractor
 from src.utils.checksums.storage import save_checksums_file
@@ -15,15 +15,17 @@ from src.utils.checksums.storage import save_checksums_file
 logger = logging.getLogger(__name__)
 
 
-def get_repo_info_for_appimage(appimage_path: str) -> Dict[str, str]:
+def get_repo_info_for_appimage(appimage_path: str | Path) -> dict[str, str]:
     """Get owner/repo information for an AppImage from app catalog.
 
+    Attempts to extract repository information by matching the AppImage filename
+    against entries in the app catalog.
+
     Args:
-        appimage_path: Path to the AppImage file
+        appimage_path: Path to the AppImage file (str or Path)
 
     Returns:
-        Dict containing 'owner' and 'repo' keys, or empty dict if not found
-
+        dict[str, str]: Dictionary with 'owner' and 'repo' keys if found, empty dict if not found
     """
     try:
         from src.app_catalog import APP_CATALOG
@@ -46,7 +48,7 @@ def get_repo_info_for_appimage(appimage_path: str) -> Dict[str, str]:
 
 
 def verify_with_release_checksums(
-    owner: str, repo: str, appimage_path: str, cleanup_on_failure: bool = False
+    owner: str, repo: str, appimage_path: str | Path, cleanup_on_failure: bool = False
 ) -> bool:
     """Verify an AppImage using checksums from GitHub release description.
 
@@ -96,22 +98,24 @@ def verify_with_release_checksums(
 
 
 def handle_release_description_verification(
-    appimage_path: str,
-    owner: Optional[str] = None,
-    repo: Optional[str] = None,
+    appimage_path: str | Path,
+    owner: str | None = None,
+    repo: str | None = None,
     cleanup_on_failure: bool = False,
 ) -> bool:
     """Handle verification for apps that use release description for checksums.
 
+    Verifies AppImage integrity using checksums stored in GitHub release descriptions.
+    Can auto-detect repository information if not provided.
+
     Args:
-        appimage_path: Path to the AppImage file to verify
-        owner: Repository owner (optional, will auto-detect if not provided)
-        repo: Repository name (optional, will auto-detect if not provided)
+        appimage_path: Path to the AppImage file to verify (str or Path)
+        owner: Repository owner, auto-detected if None
+        repo: Repository name, auto-detected if None
         cleanup_on_failure: Whether to remove the AppImage if verification fails
 
     Returns:
-        True if verification passed, False otherwise
-
+        bool: True if verification passed, False if failed or error occurred
     """
     try:
         appimage_name = Path(appimage_path).name

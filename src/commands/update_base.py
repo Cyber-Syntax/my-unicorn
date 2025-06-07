@@ -42,7 +42,7 @@ class BaseUpdateCommand(Command):
 
         self.max_concurrent_updates = self.global_config.max_concurrent_updates
         self._logger.debug(
-            f"Set max_concurrent_updates to {self.max_concurrent_updates} from global config"
+            f"set max_concurrent_updates to {self.max_concurrent_updates} from global config"
         )
 
         # Initialize semaphore in __init__
@@ -77,13 +77,13 @@ class BaseUpdateCommand(Command):
         error handling consistently across all async update operations.
 
         Args:
-            apps_to_update: List of app information dictionaries to update
+            apps_to_update: list of app information dictionaries to update
 
         Returns:
-            Tuple containing:
+            tuple containing:
             - int: Number of successfully updated apps
             - int: Number of failed updates
-            - Dict[str, Dict[str, Any]]: Dictionary mapping app names to their results
+            - tuple[str, tuple[str, Any]]: Dictionary mapping app names to their results
 
         """
         total_apps = len(apps_to_update)
@@ -150,9 +150,9 @@ class BaseUpdateCommand(Command):
             total_apps: Total number of apps being updated
 
         Returns:
-            Tuple containing:
+            tuple containing:
             - bool: True if update was successful, False otherwise
-            - Dict[str, Any]: Result information including status, message, and elapsed time
+            - tuple[str, Any]: Result information including status, message, and elapsed time
 
         """
         app_name = app_data["name"]
@@ -252,9 +252,9 @@ class BaseUpdateCommand(Command):
             total_apps: Total number of apps being updated
 
         Returns:
-            Tuple containing:
+            tuple containing:
             - bool: True if update was successful, False otherwise
-            - Optional[Dict[str, Any]]: Additional result data (for async mode)
+            - Optional[tuple[str, Any]]: Additional result data (for async mode)
 
         """
         # Extract app name from config file
@@ -267,7 +267,7 @@ class BaseUpdateCommand(Command):
             self._logger.error(error_msg)
             return False, {"error": error_msg}
 
-        # Set the app name in config manager to enable property access
+        # set the app name in config manager to enable property access
         app_config.set_app_name(app_name)
 
         # Load user config for this app (version, appimage_name)
@@ -277,7 +277,7 @@ class BaseUpdateCommand(Command):
         # For use_asset_digest apps, use auto detection instead of None values
         sha_name_param = app_info.sha_name if app_info.sha_name else "auto"
         hash_type_param = app_info.hash_type if app_info.hash_type else "auto"
-        
+
         github_api = GitHubAPI(
             owner=app_info.owner,
             repo=app_info.repo,
@@ -324,7 +324,7 @@ class BaseUpdateCommand(Command):
                 github_api, app_index=app_index, total_apps=total_apps
             )
             downloaded_file_path, was_existing_file = download_manager.download()
-            
+
             if was_existing_file:
                 print(f"\nFound existing file: {github_api.appimage_name}")
             else:
@@ -337,7 +337,7 @@ class BaseUpdateCommand(Command):
                 print("Verifying existing file...")
             else:
                 print("Verifying download integrity...")
-            
+
             verification_result, verification_skipped = self._verify_appimage(
                 github_api, downloaded_file_path, cleanup_on_failure=cleanup
             )
@@ -508,7 +508,7 @@ class BaseUpdateCommand(Command):
             cleanup_on_failure: Whether to delete the file on verification failure
 
         Returns:
-            Tuple containing:
+            tuple containing:
             - bool: True if verification succeeded or was skipped, False if failed
             - bool: True if verification was skipped, False otherwise
 
@@ -543,7 +543,7 @@ class BaseUpdateCommand(Command):
             asset_digest=github_api.asset_digest,
         )
 
-        # Set downloaded file path for verification
+        # set downloaded file path for verification
         if downloaded_file_path:
             verification_manager.set_appimage_path(downloaded_file_path)
             self._logger.info(f"Using specific file path for verification: {downloaded_file_path}")
@@ -629,7 +629,7 @@ class BaseUpdateCommand(Command):
                 "error": f"No app definition found for {app_name}",
             }
 
-        # Set the app name in config manager to enable property access
+        # set the app name in config manager to enable property access
         app_config.set_app_name(app_name)
 
         # Load user config (version, appimage_name)
@@ -640,7 +640,7 @@ class BaseUpdateCommand(Command):
         # For use_asset_digest apps, use auto detection instead of None values
         sha_name_param = app_info.sha_name if app_info.sha_name else "auto"
         hash_type_param = app_info.hash_type if app_info.hash_type else "auto"
-        
+
         github_api = GitHubAPI(
             owner=app_info.owner,
             repo=app_info.repo,
@@ -649,7 +649,9 @@ class BaseUpdateCommand(Command):
             arch_keyword=None,  # Use app definition's preferred_characteristic_suffixes
         )
 
-        update_available, version_info = github_api.check_latest_version(current_version)
+        update_available, version_info = github_api.check_latest_version(
+            current_version, version_check_only=True
+        )
         latest_version = version_info.get("latest_version") if update_available else None
 
         if "error" in version_info:
@@ -676,12 +678,12 @@ class BaseUpdateCommand(Command):
         """Check if we have sufficient GitHub API rate limits for updates.
 
         Args:
-            apps_to_update: List of apps to update
+            apps_to_update: list of apps to update
 
         Returns:
-            Tuple containing:
+            tuple containing:
             - bool: Whether we can proceed with updates
-            - List[Dict[str, Any]]: Filtered list of apps (may be reduced)
+            - list[tuple[str, Any]]: Filtered list of apps (may be reduced)
             - str: Message describing the rate limit status
 
         """

@@ -1,21 +1,22 @@
 """File storage operations for checksum data.
 
-This module provides functionality to save checksum data to files.
+This module provides functionality to securely store and manage checksum data for AppImage 
+verification. It handles writing checksums to files in a standardized format and ensures proper
+file permissions are set.
 """
 
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
 
-def save_checksums_file(checksums: List[str], output_path: Optional[str] = None) -> str:
+def save_checksums_file(checksums: list[str], output_path: str | None = None) -> str:
     """Save checksums to a SHA256SUMS.txt file.
 
     Args:
-        checksums: List of checksum lines
+        checksums: list of checksum lines
         output_path: Optional path where to save the file (default: temp file)
 
     Returns:

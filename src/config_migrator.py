@@ -27,7 +27,7 @@ class ConfigMigrator:
             require_confirmation: Whether to require user confirmation before deleting.
 
         Returns:
-            Tuple[bool, List[str], List[str]]: (True if migration occurred,
+            tuple[bool, list[str], list[str]]: (True if migration occurred,
                                                list of migrated keys,
                                                list of deleted keys)
 
@@ -192,7 +192,7 @@ class ConfigMigrator:
             require_confirmation: Whether to require user confirmation before deleting.
 
         Returns:
-            Tuple[int, Dict[str, List[str]], Dict[str, List[str]]]:
+            tuple[int, tuple[str, list[str]], tuple[str, list[str]]]:
                 (Migrated config count,
                 dict of app name -> migrated keys,
                 dict of app name -> deleted keys)
@@ -207,7 +207,7 @@ class ConfigMigrator:
         deleted_configs = {}
 
         try:
-            # List all JSON files in the app config directory
+            # list all JSON files in the app config directory
             json_files = app_config.list_json_files()
             logger.debug(f"Found {len(json_files)} app config files: {json_files}")
 
@@ -329,7 +329,7 @@ class ConfigMigrator:
             require_confirmation: Whether to require user confirmation before deleting.
 
         Returns:
-            Dict[str, Any]: Migration results summary
+            tuple[str, Any]: Migration results summary
 
         """
         results = {

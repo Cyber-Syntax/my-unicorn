@@ -144,7 +144,7 @@ EOF
 
 test_update_both_apps() {
     log "=== Testing Both QOwnNotes and Joplin Update Together ==="
-    # Set up outdated versions for both apps
+    # set up outdated versions for both apps
     setup_qownnotes_config "21.8.0" # Old version for QOwnNotes
     setup_joplin_config "2.9.17"    # Old version for Joplin
     run_my_unicorn "3" "all"        # Update all

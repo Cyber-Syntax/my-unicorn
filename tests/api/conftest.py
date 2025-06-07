@@ -1,7 +1,7 @@
 """Configuration and shared fixtures for API tests."""
 
 import pytest
-from typing import Any, Dict, List
+from typing import Any
 
 # It's good practice to keep imports specific to where they are used,
 # but for conftest, direct imports for types used in fixtures are common.
@@ -10,11 +10,11 @@ from src.api.assets import ReleaseInfo
 
 
 @pytest.fixture
-def mock_release_data() -> Dict[str, Any]:
+def mock_release_data() -> tuple[str, Any]:
     """Create sample GitHub release data for testing.
 
     Returns:
-        Dict[str, Any]: Sample GitHub release data
+        tuple[str, Any]: Sample GitHub release data
 
     """
     return {
@@ -46,11 +46,11 @@ def mock_release_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def mock_beta_release_data() -> Dict[str, Any]:
+def mock_beta_release_data() -> tuple[str, Any]:
     """Create sample GitHub beta release data for testing.
 
     Returns:
-        Dict[str, Any]: Sample GitHub beta release data
+        tuple[str, Any]: Sample GitHub beta release data
 
     """
     return {
@@ -83,8 +83,8 @@ def mock_beta_release_data() -> Dict[str, Any]:
 
 @pytest.fixture
 def mock_all_releases_data(
-    mock_release_data: Dict[str, Any], mock_beta_release_data: Dict[str, Any]
-) -> List[Dict[str, Any]]:
+    mock_release_data: tuple[str, Any], mock_beta_release_data: tuple[str, Any]
+) -> list[tuple[str, Any]]:
     """Create a list of all releases (stable and beta) for testing.
 
     Args:
@@ -92,25 +92,25 @@ def mock_all_releases_data(
         mock_beta_release_data: Sample beta release data
 
     Returns:
-        List[Dict[str, Any]]: List of GitHub release data objects
+        list[tuple[str, Any]]: list of GitHub release data objects
 
     """
     return [mock_beta_release_data, mock_release_data]  # Beta is newer, so it comes first
 
 
 @pytest.fixture
-def mock_platform_info() -> Dict[str, str]:
+def mock_platform_info() -> tuple[str, str]:
     """Create mock platform information for testing.
 
     Returns:
-        Dict[str, str]: Mock platform system and machine info
+        tuple[str, str]: Mock platform system and machine info
 
     """
     return {"system": "Linux", "machine": "x86_64"}
 
 
 @pytest.fixture
-def mock_release_info_fixture() -> "ReleaseInfo": # Renamed to avoid conflict if used directly
+def mock_release_info_fixture() -> "ReleaseInfo":  # Renamed to avoid conflict if used directly
     """Create a mock ReleaseInfo dataclass instance for testing.
 
     Returns:

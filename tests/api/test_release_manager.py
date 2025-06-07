@@ -27,7 +27,10 @@ class TestReleaseManager:
         mock_response.json.return_value = mock_release_data
         headers = {"Authorization": "token test_token"}
 
-        with patch("src.auth_manager.GitHubAuthManager.make_authenticated_request", return_value=mock_response) as mock_auth_request:
+        with patch(
+            "src.auth_manager.GitHubAuthManager.make_authenticated_request",
+            return_value=mock_response,
+        ) as mock_auth_request:
             success, data = release_manager_instance.get_latest_release_data(headers=headers)
 
             assert success is True
@@ -51,17 +54,19 @@ class TestReleaseManager:
         mock_response_all_200 = MagicMock()
         mock_response_all_200.status_code = 200
         # mock_all_releases_data is [beta, stable], so [0] is the beta (latest overall)
-        mock_response_all_200.json.return_value = mock_all_releases_data 
+        mock_response_all_200.json.return_value = mock_all_releases_data
         headers = {"Authorization": "token test_token"}
 
         # Simulate 404 for /latest, then 200 for /releases
         mock_auth_request = MagicMock(side_effect=[mock_response_latest_404, mock_response_all_200])
 
-        with patch("src.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request):
+        with patch(
+            "src.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
+        ):
             success, data = release_manager_instance.get_latest_release_data(headers=headers)
 
             assert success is True
-            assert data == mock_all_releases_data[0] # Should be the first item from all releases
+            assert data == mock_all_releases_data[0]  # Should be the first item from all releases
             assert mock_auth_request.call_count == 2
             # Check first call (to /latest)
             mock_auth_request.assert_any_call(
@@ -86,14 +91,18 @@ class TestReleaseManager:
         """Test fallback when /latest is 404 and /releases returns an empty list."""
         mock_response_latest_404 = MagicMock()
         mock_response_latest_404.status_code = 404
-        
+
         mock_response_all_empty = MagicMock()
         mock_response_all_empty.status_code = 200
-        mock_response_all_empty.json.return_value = [] # No releases
+        mock_response_all_empty.json.return_value = []  # No releases
         headers = {"Authorization": "token test_token"}
 
-        mock_auth_request = MagicMock(side_effect=[mock_response_latest_404, mock_response_all_empty])
-        with patch("src.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request):
+        mock_auth_request = MagicMock(
+            side_effect=[mock_response_latest_404, mock_response_all_empty]
+        )
+        with patch(
+            "src.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
+        ):
             success, message = release_manager_instance.get_latest_release_data(headers=headers)
 
             assert success is False
@@ -109,12 +118,15 @@ class TestReleaseManager:
         mock_response_rate_limit.text = "API rate limit exceeded"
         headers = {"Authorization": "token test_token"}
 
-        with patch("src.auth_manager.GitHubAuthManager.make_authenticated_request", return_value=mock_response_rate_limit) as mock_auth_request:
+        with patch(
+            "src.auth_manager.GitHubAuthManager.make_authenticated_request",
+            return_value=mock_response_rate_limit,
+        ) as mock_auth_request:
             success, message = release_manager_instance.get_latest_release_data(headers=headers)
 
             assert success is False
             assert "rate limit exceeded" in str(message).lower()
-            mock_auth_request.assert_called_once() # Should not proceed to fallback
+            mock_auth_request.assert_called_once()  # Should not proceed to fallback
 
     def test_get_latest_release_data_rate_limit_on_fallback(
         self, release_manager_instance: ReleaseManager
@@ -122,20 +134,24 @@ class TestReleaseManager:
         """Test rate limit error during fallback to /releases."""
         mock_response_latest_404 = MagicMock()
         mock_response_latest_404.status_code = 404
-        
+
         mock_response_rate_limit_all = MagicMock()
         mock_response_rate_limit_all.status_code = 403
         mock_response_rate_limit_all.text = "API rate limit exceeded"
         headers = {"Authorization": "token test_token"}
 
-        mock_auth_request = MagicMock(side_effect=[mock_response_latest_404, mock_response_rate_limit_all])
-        with patch("src.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request):
+        mock_auth_request = MagicMock(
+            side_effect=[mock_response_latest_404, mock_response_rate_limit_all]
+        )
+        with patch(
+            "src.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
+        ):
             success, message = release_manager_instance.get_latest_release_data(headers=headers)
 
             assert success is False
             assert "rate limit exceeded" in str(message).lower()
             assert mock_auth_request.call_count == 2
-            
+
     def test_get_latest_release_data_other_error_on_latest(
         self, release_manager_instance: ReleaseManager
     ):
@@ -145,7 +161,10 @@ class TestReleaseManager:
         mock_response_error.text = "Server Error"
         headers = {"Authorization": "token test_token"}
 
-        with patch("src.auth_manager.GitHubAuthManager.make_authenticated_request", return_value=mock_response_error) as mock_auth_request:
+        with patch(
+            "src.auth_manager.GitHubAuthManager.make_authenticated_request",
+            return_value=mock_response_error,
+        ) as mock_auth_request:
             success, message = release_manager_instance.get_latest_release_data(headers=headers)
 
             assert success is False
@@ -159,14 +178,18 @@ class TestReleaseManager:
         """Test other HTTP error during fallback to /releases."""
         mock_response_latest_404 = MagicMock()
         mock_response_latest_404.status_code = 404
-        
+
         mock_response_error_all = MagicMock()
         mock_response_error_all.status_code = 503
         mock_response_error_all.text = "Service Unavailable"
         headers = {"Authorization": "token test_token"}
 
-        mock_auth_request = MagicMock(side_effect=[mock_response_latest_404, mock_response_error_all])
-        with patch("src.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request):
+        mock_auth_request = MagicMock(
+            side_effect=[mock_response_latest_404, mock_response_error_all]
+        )
+        with patch(
+            "src.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
+        ):
             success, message = release_manager_instance.get_latest_release_data(headers=headers)
 
             assert success is False

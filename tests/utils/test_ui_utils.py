@@ -6,7 +6,7 @@ Tests for UI utility functions.
 This module contains tests for the UI utility functions in src/utils/ui_utils.py.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -106,7 +106,7 @@ class TestSelectFromList:
         callback_called = False
         callback_arg = None
 
-        def test_callback(item: Dict[str, Any]) -> None:
+        def test_callback(item: tuple[str, Any]) -> None:
             nonlocal callback_called, callback_arg
             callback_called = True
             callback_arg = item

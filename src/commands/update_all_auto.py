@@ -9,7 +9,7 @@ asynchronous updates for improved performance.
 import asyncio
 import logging
 import os
-from typing import Any
+from typing import Any  # Retained for compatibility with Any type
 
 from src.auth_manager import GitHubAuthManager
 from src.commands.update_base import BaseUpdateCommand
@@ -114,7 +114,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         """Find all AppImages that have updates available.
 
         Returns:
-            List[Dict[str, Any]]: List of updatable app information dictionaries
+            list[tuple[str, Any]]: list of updatable app information dictionaries
 
         """
         updatable_apps = []
@@ -166,7 +166,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         """Get a list of all AppImage configuration files.
 
         Returns:
-            List[str]: List of configuration filenames
+            list[str]: list of configuration filenames
 
         """
         return self.app_config.list_json_files()
@@ -177,7 +177,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         """Handle interactive mode where user selects which apps to update.
 
         Args:
-            updatable_apps: List of updatable app information dictionaries
+            updatable_apps: list of updatable app information dictionaries
             use_async: Whether to use async update mode
 
         """
@@ -236,7 +236,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         """Wrapper to call the async update method from a synchronous context.
 
         Args:
-            apps_to_update: List of app information dictionaries to update
+            apps_to_update: list of app information dictionaries to update
 
         """
         try:
@@ -292,7 +292,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         if failure_count > 0:
             print(f"Failed updates: {failure_count}")
 
-            # List failed updates
+            # list failed updates
             for app_name, result in results.items():
                 if result.get("status") != "success":
                     message = result.get("message", "Unknown error")
@@ -309,10 +309,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             try:
                 # Use the unified batch cleanup function
                 cleanup_batch_failed_updates(
-                    failed_apps=failed_apps,
-                    results=results,
-                    ask_confirmation=True,
-                    verbose=True
+                    failed_apps=failed_apps, results=results, ask_confirmation=True, verbose=True
                 )
             except KeyboardInterrupt:
                 print("\nCleanup cancelled.")
@@ -324,7 +321,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         """Update multiple apps synchronously.
 
         Args:
-            apps_to_update: List of app information dictionaries to update
+            apps_to_update: list of app information dictionaries to update
 
         """
         success_count = 0
@@ -357,7 +354,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         """Display a list of updatable apps with standard print statements.
 
         Args:
-            updatable_apps: List of updatable app information dictionaries
+            updatable_apps: list of updatable app information dictionaries
 
         """
         print(f"\nFound {len(updatable_apps)} apps to update:")

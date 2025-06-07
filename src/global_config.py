@@ -148,7 +148,7 @@ class GlobalConfigManager:
             logging.info("Global configuration setup interrupted by user")
             print("\nConfiguration setup interrupted. Using default values.")
 
-            # Set default values
+            # set default values
             self.app_storage_path = "~/.local/share/myunicorn"
             self.app_backup_storage_path = "~/.local/share/myunicorn/backups"
             self.app_download_path = "~/Downloads"

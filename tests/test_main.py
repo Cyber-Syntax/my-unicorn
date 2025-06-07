@@ -76,7 +76,7 @@ def mock_config_managers(monkeypatch: pytest.MonkeyPatch) -> tuple[MagicMock, Ma
         monkeypatch: Pytest's monkeypatch fixture
 
     Returns:
-        tuple[MagicMock, MagicMock]: Tuple containing mock global and app config managers
+        tuple[MagicMock, MagicMock]: tuple containing mock global and app config managers
     """
     mock_global_config = MagicMock()
     mock_app_config = MagicMock()
@@ -141,7 +141,7 @@ def test_configure_logging(tmp_path: Path) -> None:
     Args:
         tmp_path: Pytest's temporary path fixture
     """
-    # Set up temporary log directory
+    # set up temporary log directory
     log_dir = tmp_path / "logs"
     log_dir.mkdir(exist_ok=True)
 

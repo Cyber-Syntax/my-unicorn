@@ -6,7 +6,7 @@ updating multiple AppImages concurrently using async I/O operations.
 """
 
 import asyncio
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -57,11 +57,11 @@ def update_command():
 
 
 @pytest.fixture
-def mock_app_configs() -> List[Dict[str, Any]]:
+def mock_app_configs() -> list[tuple[str, Any]]:
     """Create mock app configurations for testing.
 
     Returns:
-        List[Dict[str, Any]]: List of app config dictionaries
+        list[tuple[str, Any]]: list of app config dictionaries
 
     """
     return [
@@ -90,6 +90,7 @@ def mock_app_configs() -> List[Dict[str, Any]]:
             "latest": "4.1.0",
         },
     ]
+
 
 @pytest.mark.parametrize(
     "remaining,limit,expected_proceed,expected_count",
@@ -150,9 +151,7 @@ async def test_update_single_app_async_success(monkeypatch, update_command):
     }
 
     # Call the method
-    result = await update_command._update_single_app_async(
-        app_data, app_index=1, total_apps=1
-    )
+    result = await update_command._update_single_app_async(app_data, app_index=1, total_apps=1)
 
     # Verify success - should return a tuple (bool, dict)
     assert isinstance(result, tuple)
@@ -176,9 +175,7 @@ async def test_update_single_app_async_failure(monkeypatch, update_command):
     }
 
     # Call the method
-    result = await update_command._update_single_app_async(
-        app_data, app_index=1, total_apps=4
-    )
+    result = await update_command._update_single_app_async(app_data, app_index=1, total_apps=4)
 
     # Verify failure - should return a tuple (bool, dict)
     assert isinstance(result, tuple)
@@ -206,9 +203,7 @@ async def test_update_single_app_async_exception(monkeypatch, update_command):
     }
 
     # Call the method and expect it to handle the exception
-    result = await update_command._update_single_app_async(
-        app_data, app_index=1, total_apps=4
-    )
+    result = await update_command._update_single_app_async(app_data, app_index=1, total_apps=4)
 
     # Verify failure due to exception - should return a tuple (bool, dict)
     assert isinstance(result, tuple)
@@ -220,19 +215,30 @@ async def test_update_single_app_async_exception(monkeypatch, update_command):
 @pytest.mark.asyncio
 async def test_update_apps_async(monkeypatch, update_command, mock_app_configs):
     """Test the async update of multiple apps."""
+
     # Mock the single app update to return success/failure based on app index
     async def mock_update_single(app_data, app_index, total_apps):
         # Make app1 and app3 succeed, app2 and app4 fail
         if app_index % 2 == 1:  # Odd indices succeed
-            return True, {"status": "success", "message": f"Updated {app_data['name']}", "elapsed": 1.0}
+            return True, {
+                "status": "success",
+                "message": f"Updated {app_data['name']}",
+                "elapsed": 1.0,
+            }
         else:
-            return False, {"status": "failed", "message": f"Failed to update {app_data['name']}", "elapsed": 1.0}
+            return False, {
+                "status": "failed",
+                "message": f"Failed to update {app_data['name']}",
+                "elapsed": 1.0,
+            }
 
     # Apply mocks
     monkeypatch.setattr(update_command, "_update_single_app_async", mock_update_single)
 
     # Call the method and await the result
-    success_count, failure_count, results = await update_command._update_apps_async(mock_app_configs)
+    success_count, failure_count, results = await update_command._update_apps_async(
+        mock_app_configs
+    )
 
     # Verify results
     assert success_count == 2  # app1 and app3 (indices 1 and 3)

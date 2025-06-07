@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.10.10-alpha
+### BREAKING CHANGES
+Fixes the performance issue and concurrent issues. After this release we are no longer
+support python 3.11 and lower. This release completely switches to python 3.12 and higher.
+
 ## v0.10.9-alpha
 ### Changed
 This release will not affect existing functionality, but it will fix the issue with the app_catalog module.

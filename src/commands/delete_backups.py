@@ -9,7 +9,6 @@ number of backups per app.
 
 import logging
 import os
-from typing import List
 
 from src.commands.base import Command
 from src.global_config import GlobalConfigManager
@@ -299,14 +298,14 @@ class DeleteBackupsCommand(Command):
                 f"\nNo backups needed to be removed. All apps already have {max_backups} or fewer backups."
             )
 
-    def _get_available_apps(self, backup_dir: str) -> List[str]:
+    def _get_available_apps(self, backup_dir: str) -> list[str]:
         """Get a list of app names that have backups.
 
         Args:
             backup_dir: Path to backup directory
 
         Returns:
-            List of unique app names extracted from backup filenames
+            list of unique app names extracted from backup filenames
 
         """
         apps = set()

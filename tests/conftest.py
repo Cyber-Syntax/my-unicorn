@@ -3,7 +3,7 @@ import requests_mock
 from httmock import HTTMock, all_requests
 import sys
 import io
-from typing import Dict, Any, Generator
+from typing import Any, Generator
 import time
 import os
 import json
@@ -128,11 +128,11 @@ def cleanup_progress_manager() -> None:
 
 
 @pytest.fixture
-def download_fixture() -> Dict[str, Any]:
+def download_fixture() -> tuple[str, Any]:
     """Create a simulated download for testing progress tracking.
 
     Returns:
-        Dict[str, Any]: Dictionary with download metadata
+        tuple[str, Any]: Dictionary with download metadata
     """
     return {
         "filename": "test_file.AppImage",
