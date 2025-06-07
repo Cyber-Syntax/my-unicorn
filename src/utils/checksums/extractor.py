@@ -16,6 +16,9 @@ from src.utils.checksums.parser import parse_checksums_from_description
 logger = logging.getLogger(__name__)
 
 
+# TODO: Move this to verification folder
+# this is not a basic util anymore
+# fix: duplicate code too
 class ReleaseChecksumExtractor:
     """Extract and process checksums from GitHub release descriptions."""
 
