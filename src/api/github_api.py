@@ -353,7 +353,6 @@ class GitHubAPI:
                     self.repo,
                     initial_sha_name_hint,
                     self.appimage_name,
-                    is_batch=is_batch,
                     app_info=self._app_info,
                 )
                 sha_mgr.find_sha_asset(assets)

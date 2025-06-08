@@ -189,10 +189,9 @@ class VerificationManager:
             return False
 
     def _verify_with_release_checksums(self, cleanup_on_failure: bool) -> bool:
-        """Verify using legacy release checksums method."""
+        """Verify using release description checksums via ReleaseDescVerifier."""
         try:
-            from src.catalog import find_app_by_name_in_filename
-            from src.utils.checksums import verify_with_release_checksums
+            from src.verification.release_desc_verifier import ReleaseDescVerifier
 
             self.logger.log_info("Using GitHub release description for verification")
 
@@ -200,17 +199,10 @@ class VerificationManager:
                 self.logger.log_error("No AppImage name provided, cannot extract checksums")
                 return False
 
-            app_info = find_app_by_name_in_filename(self.config.appimage_name)
-
-            if not app_info:
-                self.logger.log_error(f"Could not find app info for {self.config.appimage_name}")
-                return False
-
             self.config.validate_for_verification()
 
-            return verify_with_release_checksums(
-                owner=app_info.owner,
-                repo=app_info.repo,
+            # Use ReleaseDescVerifier with auto-detection
+            return ReleaseDescVerifier.verify_appimage_standalone(
                 appimage_path=self.config.appimage_path,
                 cleanup_on_failure=cleanup_on_failure,
             )

@@ -1,52 +1,57 @@
-"""GitHub Release Checksums Extraction and Verification.
+"""GitHub Release Checksums Parsing Utilities.
 
-This package provides functionality to extract and verify SHA256 checksums
-from GitHub release descriptions for applications that store their checksums
-in the release notes rather than as separate files.
+This package provides pure utility functions for parsing and extracting SHA256 checksums
+from GitHub release descriptions. All verification logic has been moved to the verification
+module for proper separation of concerns.
 
 Example usage:
-    # Extract checksums for a specific AppImage and save to a file
-    from src.utils.checksums import extract_checksums_to_file
+    # Parse checksums from release description text
+    from src.utils.checksums.parser import parse_checksums_from_description
+    from src.utils.checksums.extractor import extract_checksums_from_text
 
-    sha_file = extract_checksums_to_file(
-        owner="zen-browser",
-        repo="desktop",
-        appimage_name="zen-x86_64.AppImage"
-    )
+    checksums = parse_checksums_from_description(description_text)
+    filtered_checksums = extract_checksums_from_text(description_text, "app.AppImage")
 
-    # Verify an AppImage using checksums from a release description
-    from src.utils.checksums import verify_with_release_checksums
+    # Save checksums to file
+    from src.utils.checksums.storage import save_checksums_file
+    
+    checksums_file = save_checksums_file(checksums, "/path/to/checksums.txt")
 
-    success = verify_with_release_checksums(
-        owner="zen-browser",
-        repo="desktop",
-        appimage_path="/path/to/zen-x86_64.AppImage"
-    )
+    # For verification workflows, use the verification module:
+    from src.verification.release_desc_verifier import ReleaseDescVerifier
+    
+    # Auto-detect repository and verify
+    success = ReleaseDescVerifier.verify_appimage_standalone("/path/to/app.AppImage")
+    
+    # Or with known repository info
+    verifier = ReleaseDescVerifier("owner", "repo")
+    success = verifier.verify_appimage("/path/to/app.AppImage")
 """
 
 import logging
-import tempfile
-from pathlib import Path
-from typing import Any
 
-# Import core functionality from modules
-# Type annotations
-ChecksumList = list[str]
-from src.utils.checksums.extractor import ReleaseChecksumExtractor
+# Import core utility functionality (parsing and extraction only)
+from src.utils.checksums.extractor import (
+    extract_checksums_from_text,
+    filter_checksums_by_filename,
+    validate_checksum_format,
+    extract_hash_and_filename,
+)
 from src.utils.checksums.parser import parse_checksums_from_description
 from src.utils.checksums.storage import save_checksums_file
-from src.utils.checksums.verification import (
-    get_repo_info_for_appimage,
-    handle_release_description_verification,
-    verify_with_release_checksums,
-)
+
+# Type annotations
+ChecksumList = list[str]
 
 logger = logging.getLogger(__name__)
 
 
-# For backward compatibility with code using the old extract_checksums.py module
+# Backward compatibility functions with deprecation warnings
 def extract_checksums(owner: str, repo: str, appimage_name: str | None) -> ChecksumList:
     """Extract checksums from GitHub release description.
+
+    DEPRECATED: This function is deprecated. Use ReleaseDescVerifier from 
+    src.verification.release_desc_verifier for verification workflows.
 
     Args:
         owner: Repository owner/organization
@@ -58,17 +63,37 @@ def extract_checksums(owner: str, repo: str, appimage_name: str | None) -> Check
 
     Raises:
         ValueError: If no checksums found
-
     """
-    logger.info(f"Extracting checksums for {owner}/{repo}")
-    extractor = ReleaseChecksumExtractor(owner=owner, repo=repo)
-    return extractor.extract_checksums(target_filename=appimage_name)
+    logger.warning(
+        "extract_checksums() is deprecated. Use ReleaseDescVerifier from "
+        "src.verification.release_desc_verifier instead."
+    )
+    
+    # Import here to avoid circular dependencies
+    from src.verification.release_desc_verifier import ReleaseDescVerifier
+    
+    verifier = ReleaseDescVerifier(owner=owner, repo=repo)
+    checksums_file = verifier.extract_checksums_to_file(appimage_name)
+    
+    if not checksums_file:
+        raise ValueError("Failed to extract checksums")
+    
+    # Read and return checksums from the file
+    try:
+        with open(checksums_file, "r", encoding="utf-8") as f:
+            return [line.strip() for line in f if line.strip()]
+    except Exception as e:
+        logger.error(f"Failed to read checksums file: {e}")
+        raise ValueError("Failed to read extracted checksums")
 
 
 def extract_checksums_to_file(
-    owner: str, repo: str, appimage_name: str , output_path: str | None = None
+    owner: str, repo: str, appimage_name: str, output_path: str | None = None
 ) -> str | None:
     """Extract checksums for a specific AppImage from GitHub release.
+
+    DEPRECATED: This function is deprecated. Use ReleaseDescVerifier from 
+    src.verification.release_desc_verifier instead.
 
     Args:
         owner: Repository owner/organization
@@ -79,28 +104,39 @@ def extract_checksums_to_file(
     Returns:
         str | None: Path to the created checksums file if successful, None if failed
     """
-    try:
-        logger.info(f"Extracting checksums for {appimage_name} from {owner}/{repo}")
-        extractor = ReleaseChecksumExtractor(owner=owner, repo=repo)
-
-        # Extract checksums
-        checksums = extractor.extract_checksums(target_filename=appimage_name)
-
-        # Save to file
-        return save_checksums_file(checksums, output_path)
-    except Exception as e:
-        logger.exception(f"Error extracting checksums: {e}")
-        return None
+    logger.warning(
+        "extract_checksums_to_file() is deprecated. Use ReleaseDescVerifier from "
+        "src.verification.release_desc_verifier instead."
+    )
+    
+    # Import here to avoid circular dependencies
+    from src.verification.release_desc_verifier import ReleaseDescVerifier
+    
+    verifier = ReleaseDescVerifier(owner=owner, repo=repo)
+    return verifier.extract_checksums_to_file(appimage_name, output_path)
 
 
-# Export public API
+# Legacy imports for backward compatibility (with deprecation warnings)
+from src.utils.checksums.verification import (
+    get_repo_info_for_appimage,
+    verify_with_release_checksums,
+    handle_release_description_verification,
+)
+
+
+# Export public API (only pure utilities, no verification functions)
 __all__ = [
-    "extract_checksums",
-    "save_checksums_file",
-    "verify_with_release_checksums",
-    "extract_checksums_to_file",
-    "handle_release_description_verification",
-    "get_repo_info_for_appimage",
-    "ReleaseChecksumExtractor",
+    # Core parsing and extraction utilities (pure functions)
+    "extract_checksums_from_text",
+    "filter_checksums_by_filename", 
+    "validate_checksum_format",
+    "extract_hash_and_filename",
     "parse_checksums_from_description",
+    "save_checksums_file",
+    # Type annotations
+    "ChecksumList",
+    # Deprecated backward compatibility functions
+    "extract_checksums",
+    "extract_checksums_to_file",
+    "get_repo_info_for_appimage",
 ]
