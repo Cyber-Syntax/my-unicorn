@@ -45,16 +45,16 @@ def is_sha_file(filename: str) -> bool:
     return has_sha_extension or is_txt_with_sha or has_sha_keyword
 
 
-def detect_hash_type(sha_name: str) -> str:
+def detect_checksum_hash_type(checksum_file_name: str) -> str:
     """Detect hash type from SHA filename.
 
     Args:
-        sha_name: SHA filename
+        checksum_file_name: SHA filename
 
     Returns:
         str: Detected hash type ('sha256', 'sha512', etc.)
     """
-    name_lower = sha_name.lower()
+    name_lower = checksum_file_name.lower()
 
     if "sha256" in name_lower:
         return "sha256"

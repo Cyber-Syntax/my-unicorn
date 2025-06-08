@@ -4,8 +4,7 @@
 This module defines data structures for GitHub release assets.
 """
 
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
 
 @dataclass
@@ -52,16 +51,16 @@ class SHAAsset:
 
     name: str
     browser_download_url: str
-    hash_type: str
+    checksum_hash_type: str
     size: int | None = None
 
     @classmethod
-    def from_github_asset(cls, asset: dict, hash_type: str = "sha256") -> "SHAAsset":
+    def from_github_asset(cls, asset: dict, checksum_hash_type: str = "sha256") -> "SHAAsset":
         """Create a SHAAsset from a GitHub API asset dictionary.
 
         Args:
             asset: GitHub API asset information dictionary
-            hash_type: Type of hash algorithm used (sha256, sha512, etc.)
+            checksum_hash_type: Type of hash algorithm used (sha256, sha512, etc.)
 
         Returns:
             SHAAsset: New SHAAsset instance
@@ -70,7 +69,7 @@ class SHAAsset:
         return cls(
             name=asset["name"],
             browser_download_url=asset["browser_download_url"],
-            hash_type=hash_type,
+            checksum_hash_type=checksum_hash_type,
             size=asset.get("size"),
         )
 
@@ -110,16 +109,16 @@ class ReleaseInfo:
     version: str
     appimage_name: str
     app_download_url: str
-    sha_name: str | None = None
-    sha_download_url: str | None = None
-    hash_type: str | None = None
+    checksum_file_name: str | None = None
+    checksum_file_download_url: str | None = None
+    checksum_hash_type: str | None = None
     arch_keyword: str | None = None
     release_notes: str | None = None
     release_url: str | None = None
-    is_prerelease: bool = False
+    prerelease: bool = False
     published_at: str | None = None
-    extracted_hash_from_body: str | None = None  # For hash extracted from release body
-    asset_digest: str | None = None  # For GitHub API asset digest verification
+    extracted_hash_from_body: str | None = None
+    asset_digest: str | None = None
 
     @classmethod
     def from_release_data(cls, release_data: dict, asset_info: dict) -> "ReleaseInfo":
@@ -139,14 +138,14 @@ class ReleaseInfo:
             version=asset_info["version"],
             appimage_name=asset_info["appimage_name"],
             app_download_url=asset_info["app_download_url"],
-            sha_name=asset_info.get("sha_name"),
-            sha_download_url=asset_info.get("sha_download_url"),
-            hash_type=asset_info.get("hash_type"),
-            extracted_hash_from_body=asset_info.get("extracted_hash_from_body"),  # Get new field
-            asset_digest=asset_info.get("asset_digest"),  # Get asset digest field
+            checksum_file_name=asset_info.get("checksum_file_name"),
+            checksum_file_download_url=asset_info.get("checksum_file_download_url"),
+            checksum_hash_type=asset_info.get("checksum_hash_type"),
+            extracted_hash_from_body=asset_info.get("extracted_hash_from_body"),
+            asset_digest=asset_info.get("asset_digest"),
             arch_keyword=asset_info.get("arch_keyword"),
             release_notes=release_data.get("body", ""),
             release_url=release_data.get("html_url", ""),
-            is_prerelease=release_data.get("prerelease", False),
+            prerelease=release_data.get("prerelease", False),
             published_at=release_data.get("published_at", ""),
         )

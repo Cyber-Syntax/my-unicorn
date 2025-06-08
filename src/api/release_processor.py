@@ -81,7 +81,7 @@ class ReleaseProcessor:
         current_parseable_str = current_for_comparison  # Corrected typo
         latest_parseable_str = latest_for_comparison
 
-        # However, for the actual parsing by packaging.version to check is_prerelease flags etc.,
+        # However, for the actual parsing by packaging.version to check prerelease flags etc.,
         # we should use the versions that have NOT been stripped of their suffixes,
         # because "1.12.28b" is a pre-release according to packaging.version.
         # The comparison of base versions (stripped) determines if we *consider* an update.
@@ -129,7 +129,7 @@ class ReleaseProcessor:
                 # So, the existing logic for repo_uses_beta might be okay,
                 # or we might need to ensure zen-browser is treated as "repo_uses_beta=True"
                 # or that the non-beta path correctly handles these post-releases.
-                # Version("1.0.post1").is_prerelease is False.
+                # Version("1.0.post1").prerelease is False.
 
                 repo_accepts_prerelease_like_updates = version_utils.repo_uses_beta(self.repo)
                 if self.owner == "zen-browser" and self.repo == "desktop":
@@ -166,8 +166,8 @@ class ReleaseProcessor:
                         update_available = True
                 else:  # Standard logic for non-beta repos
                     if parsed_latest_full_version > parsed_current_full_version:
-                        if parsed_latest_full_version.is_prerelease:
-                            if not parsed_current_full_version.is_prerelease:
+                        if parsed_latest_full_version.prerelease:
+                            if not parsed_current_full_version.prerelease:
                                 if (
                                     parse_version_string(parsed_latest_full_version.base_version)
                                     > parsed_current_full_version
@@ -271,11 +271,11 @@ class ReleaseProcessor:
             "release_notes": release_info.release_notes,
             "release_url": release_info.release_url,
             "compatible_assets": compatible_assets,
-            "is_prerelease": release_info.is_prerelease,
+            "prerelease": release_info.prerelease,
             "published_at": release_info.published_at,
             "app_download_url": release_info.app_download_url,
             "appimage_name": release_info.appimage_name,
-            "sha_download_url": release_info.sha_download_url,
-            "sha_name": release_info.sha_name,
-            "hash_type": release_info.hash_type,
+            "checksum_file_download_url": release_info.checksum_file_download_url,
+            "checksum_file_name": release_info.checksum_file_name,
+            "checksum_hash_type": release_info.checksum_hash_type,
         }

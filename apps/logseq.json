@@ -7,8 +7,8 @@
     "tags": ["knowledge-base", "markdown", "privacy"],
     "appimage_name_template": "{app_rename_safe}-linux-x64-{latest_version}.AppImage",
     "preferred_characteristic_suffixes": ["linux-x64", "x86_64", "amd64"],
-    "hash_type": "sha256",
-    "sha_name": "SHA256SUMS.txt",
+    "checksum_hash_type": "sha256",
+    "checksum_file_name": "SHA256SUMS.txt",
     "icon_info": "https://raw.githubusercontent.com/logseq/logseq/master/resources/icons/logseq.png",
     "icon_file_name": "logseq_icon.png",
     "icon_repo_path": "resources/icons/logseq.png"

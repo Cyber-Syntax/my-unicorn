@@ -34,8 +34,8 @@ class AppInfo:
         use_asset_digest: Whether to use GitHub's asset digest for verification instead of SHA files
         use_github_release_desc: Whether to use GitHub release description for checksum extraction
         beta: Whether this app should prefer beta/pre-release versions
-        hash_type: Type of hash used for verification (e.g., "sha256") - optional if skip_verification is True
-        sha_name: Name of SHA file - optional if skip_verification or use_asset_digest is True
+        checksum_hash_type: Type of hash used for verification (e.g., "sha256") - optional if skip_verification is True
+        checksum_file_name: Name of SHA file - optional if skip_verification or use_asset_digest is True
         icon_info: Direct URL to icon file
         icon_file_name: Preferred filename for saving the icon
         icon_repo_path: Repository path to icon file (fallback if icon_info not available)
@@ -54,8 +54,8 @@ class AppInfo:
     use_asset_digest: bool = False
     use_github_release_desc: bool = False
     beta: bool = False
-    hash_type: str | None = None
-    sha_name: str | None = None
+    checksum_hash_type: str | None = None
+    checksum_file_name: str | None = None
     icon_info: str | None = None
     icon_file_name: str | None = None
     icon_repo_path: str | None = None
@@ -103,8 +103,8 @@ def get_all_apps() -> dict[str, AppInfo]:
                         use_asset_digest=data.get("use_asset_digest", False),
                         use_github_release_desc=data.get("use_github_release_desc", False),
                         beta=data.get("beta", False),
-                        hash_type=data.get("hash_type"),
-                        sha_name=data.get("sha_name"),
+                        checksum_hash_type=data.get("checksum_hash_type"),
+                        checksum_file_name=data.get("checksum_file_name"),
                         icon_info=data.get("icon_info"),
                         icon_file_name=data.get("icon_file_name"),
                         icon_repo_path=data.get("icon_repo_path"),
@@ -187,8 +187,8 @@ def load_app_definition(repo_name: str) -> AppInfo | None:
             use_asset_digest=data.get("use_asset_digest", False),
             use_github_release_desc=data.get("use_github_release_desc", False),
             beta=data.get("beta", False),
-            hash_type=data.get("hash_type"),
-            sha_name=data.get("sha_name"),
+            checksum_hash_type=data.get("checksum_hash_type"),
+            checksum_file_name=data.get("checksum_file_name"),
             icon_info=data.get("icon_info"),
             icon_file_name=data.get("icon_file_name"),
             icon_repo_path=data.get("icon_repo_path"),

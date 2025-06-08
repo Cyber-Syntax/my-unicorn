@@ -36,9 +36,9 @@ def app_info_fixture() -> AppInfo:
         description="A test application",
         category="Test",
         tags=["test", "sample"],
-        hash_type="sha256",
+        checksum_hash_type="sha256",
         appimage_name_template="testapp-{arch}.AppImage",
-        sha_name="test.sha256",
+        checksum_file_name="test.sha256",
         preferred_characteristic_suffixes=["x86_64", "amd64"],
         icon_info=None,
         icon_file_name=None,
@@ -59,10 +59,10 @@ def install_test_data() -> dict[str, str]:
         "repo": "testrepo",
         "appimage": "test.AppImage",
         "version": "1.0.0",
-        "sha_name": "test.sha256",
-        "sha_download_url": "http://example.com/test.sha256",
+        "checksum_file_name": "test.sha256",
+        "checksum_file_download_url": "http://example.com/test.sha256",
         "app_download_url": "http://example.com/test.AppImage",
-        "hash_type": "sha256",
+        "checksum_hash_type": "sha256",
         "downloaded_file_path": "/tmp/test.AppImage",
     }
 
@@ -86,8 +86,8 @@ def mocked_app_config(
     mock.repo = install_test_data["repo"]
     mock.version = install_test_data["version"]
     mock.appimage_name = install_test_data["appimage"]
-    mock.sha_name = install_test_data["sha_name"]
-    mock.hash_type = install_test_data["hash_type"]
+    mock.checksum_file_name = install_test_data["checksum_file_name"]
+    mock.checksum_hash_type = install_test_data["checksum_hash_type"]
     mock.config_folder = "/tmp/config"
     mock.config_file = "/tmp/config/testrepo.json"
     mock.config_file_name = "testrepo.json"
@@ -114,9 +114,9 @@ def mocked_api(monkeypatch: pytest.MonkeyPatch, install_test_data: dict[str, str
     mock.repo = install_test_data["repo"]
     mock.version = install_test_data["version"]
     mock.appimage_name = install_test_data["appimage"]
-    mock.sha_name = install_test_data["sha_name"]
-    mock.sha_download_url = install_test_data["sha_download_url"]
-    mock.hash_type = install_test_data["hash_type"]
+    mock.checksum_file_name = install_test_data["checksum_file_name"]
+    mock.checksum_file_download_url = install_test_data["checksum_file_download_url"]
+    mock.checksum_hash_type = install_test_data["checksum_hash_type"]
     mock.arch_keyword = None
     mock.app_download_url = install_test_data["app_download_url"]
     mock.get_response.return_value = (True, "Success")  # Success response
@@ -128,7 +128,7 @@ def mocked_api(monkeypatch: pytest.MonkeyPatch, install_test_data: dict[str, str
             "release_notes": "Test release notes",
             "release_url": "https://github.com/test/test/releases/tag/v1.0.0",
             "compatible_assets": [],
-            "is_prerelease": False,
+            "prerelease": False,
             "published_at": "2023-01-01T00:00:00Z",
         },
     )  # Proper response format
@@ -396,8 +396,8 @@ def test_install_app_skip_verification(
 
     # set the API mock to skip verification as well
     mocked_api.skip_verification = True
-    mocked_api.sha_name = None
-    mocked_api.hash_type = None
+    mocked_api.checksum_file_name = None
+    mocked_api.checksum_hash_type = None
 
     # Setup mock inputs
     mock_input.side_effect = ["y"]  # Confirm install

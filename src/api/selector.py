@@ -40,7 +40,7 @@ class AppImageSelector:
         assets: list[dict],
         definitive_app_info: AppInfo = None,
         user_local_config_data: dict | None = None,
-        release_is_prerelease: bool = False,
+        release_prerelease: bool = False,
     ) -> AssetSelectionResult:
         """Find and select appropriate AppImage asset based on app metadata and system architecture.
 
@@ -48,7 +48,7 @@ class AppImageSelector:
             assets: list of release assets from GitHub API
             definitive_app_info: Base app metadata from repository JSON (optional)
             user_local_config_data: User's local config data (optional)
-            release_is_prerelease: Whether this is a pre-release
+            release_prerelease: Whether this is a pre-release
 
         Returns:
             AssetSelectionResult if an appropriate asset is found, None otherwise
@@ -86,7 +86,7 @@ class AppImageSelector:
 
         # 3. Try each suffix in priority order
         selected = self._try_suffix_based_selection(
-            appimage_assets, target_suffixes, system_cpu_arch, release_is_prerelease
+            appimage_assets, target_suffixes, system_cpu_arch, release_prerelease
         )
         if selected:
             return selected
@@ -94,7 +94,7 @@ class AppImageSelector:
         # 4. Fallback to generic matching if no suffix match
         self._logger.info("No suffix match found, trying generic selection")
         generic_asset = self._try_generic_selection(
-            appimage_assets, system_cpu_arch, release_is_prerelease
+            appimage_assets, system_cpu_arch, release_prerelease
         )
         if generic_asset:
             return AssetSelectionResult(asset=generic_asset, characteristic_suffix="")
@@ -139,7 +139,7 @@ class AppImageSelector:
         assets: list[dict],
         target_suffixes: list[str],
         system_cpu_arch: str,
-        is_prerelease: bool,
+        prerelease: bool,
     ) -> AssetSelectionResult | None:
         """Try to select an asset based on characteristic suffixes."""
         for suffix in target_suffixes:
@@ -223,7 +223,7 @@ class AppImageSelector:
         return False
 
     def _try_generic_selection(
-        self, assets: list[dict], system_cpu_arch: str, is_prerelease: bool
+        self, assets: list[dict], system_cpu_arch: str, prerelease: bool
     ) -> dict | None:
         """Try to select an asset without specific characteristic suffix."""
         # Filter to only architecture-compatible assets

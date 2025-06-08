@@ -19,13 +19,13 @@ def mock_release_info():
         version="1.2.3",
         appimage_name="app-x86_64.AppImage",
         app_download_url="https://example.com/app-x86_64.AppImage",
-        sha_name="sha256sums",
-        sha_download_url="https://example.com/sha256sums",
-        hash_type="sha256",
+        checksum_file_name="sha256sums",
+        checksum_file_download_url="https://example.com/sha256sums",
+        checksum_hash_type="sha256",
         arch_keyword="x86_64",
         release_notes="Release notes for version 1.2.3",
         release_url="https://github.com/test-owner/test-repo/releases/tag/v1.2.3",
-        is_prerelease=False,
+        prerelease=False,
         published_at="2023-01-15T12:00:00Z",
     )
 
@@ -75,9 +75,9 @@ def test_release_info_creation(mock_release_data):
         "version": "1.2.3",
         "appimage_name": "app-x86_64.AppImage",
         "app_download_url": "https://example.com/app-x86_64.AppImage",
-        "sha_name": "sha256sums",
-        "sha_download_url": "https://example.com/sha256sums",
-        "hash_type": "sha256",
+        "checksum_file_name": "sha256sums",
+        "checksum_file_download_url": "https://example.com/sha256sums",
+        "checksum_hash_type": "sha256",
         "arch_keyword": "x86_64",
     }
 
@@ -90,13 +90,13 @@ def test_release_info_creation(mock_release_data):
     assert release_info.version == "1.2.3"
     assert release_info.appimage_name == "app-x86_64.AppImage"
     assert release_info.app_download_url == "https://example.com/app-x86_64.AppImage"
-    assert release_info.sha_name == "sha256sums"
-    assert release_info.sha_download_url == "https://example.com/sha256sums"
-    assert release_info.hash_type == "sha256"
+    assert release_info.checksum_file_name == "sha256sums"
+    assert release_info.checksum_file_download_url == "https://example.com/sha256sums"
+    assert release_info.checksum_hash_type == "sha256"
     assert release_info.arch_keyword == "x86_64"
     assert release_info.release_notes == "Release notes for version 1.2.3"
     assert release_info.release_url == "https://github.com/test-owner/test-repo/releases/tag/v1.2.3"
-    assert release_info.is_prerelease is False
+    assert release_info.prerelease is False
     assert release_info.published_at == "2023-01-15T12:00:00Z"
 
 
@@ -163,9 +163,9 @@ def test_release_processor_create_update_response(release_processor, mock_releas
     assert response["release_url"] == "https://github.com/test-owner/test-repo/releases/tag/v1.2.3"
     assert len(response["compatible_assets"]) == 1
     assert response["compatible_assets"][0]["name"] == "app-x86_64.AppImage"
-    assert response["is_prerelease"] is False
+    assert response["prerelease"] is False
     assert response["app_download_url"] == "https://example.com/app-x86_64.AppImage"
-    assert response["sha_download_url"] == "https://example.com/sha256sums"
+    assert response["checksum_file_download_url"] == "https://example.com/sha256sums"
 
 
 def test_github_api_refactored(mock_release_data):
@@ -200,5 +200,5 @@ def test_github_api_refactored(mock_release_data):
                     assert "release_notes" in info
                     assert "release_url" in info
                     assert "compatible_assets" in info
-                    assert "is_prerelease" in info
+                    assert "prerelease" in info
                     assert "published_at" in info

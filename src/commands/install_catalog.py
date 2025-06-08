@@ -132,19 +132,19 @@ class InstallAppCommand(Command):
 
         # Initialize GitHubAPI with proper parameters
         # Use auto-detection when no specific values are provided
-        sha_name_param = app_info.sha_name if app_info.sha_name else "auto"
-        hash_type_param = app_info.hash_type if app_info.hash_type else "auto"
+        checksum_file_name_param = app_info.checksum_file_name if app_info.checksum_file_name else "auto"
+        checksum_hash_type_param = app_info.checksum_hash_type if app_info.checksum_hash_type else "auto"
 
         api = GitHubAPI(
             owner=app_info.owner,
             repo=app_info.repo,
-            sha_name=sha_name_param,
-            hash_type=hash_type_param,
+            checksum_file_name=checksum_file_name_param,
+            checksum_hash_type=checksum_hash_type_param,
             arch_keyword=None,  # Enable architecture auto-detection
         )
 
-        if app_info.sha_name:
-            self._logger.debug(f"Using SHA file from app catalog: {app_info.sha_name}")
+        if app_info.checksum_file_name:
+            self._logger.debug(f"Using SHA file from app catalog: {app_info.checksum_file_name}")
         else:
             self._logger.debug("Using automatic SHA file detection")
 
@@ -157,7 +157,7 @@ class InstallAppCommand(Command):
         # Log what was detected by the API
         self._logger.debug(
             f"API detection results: appimage={api.appimage_name}, "
-            f"sha={api.sha_name}, hash_type={api.hash_type}, arch={api.arch_keyword}"
+            f"sha={api.checksum_file_name}, checksum_hash_type={api.checksum_hash_type}, arch={api.arch_keyword}"
         )
 
         # Track verification success and skip status across attempts
@@ -204,16 +204,16 @@ class InstallAppCommand(Command):
 
                         # Debug logging for API values
                         logging.debug(f"API values before VerificationManager creation:")
-                        logging.debug(f"  api.sha_name: {api.sha_name}")
-                        logging.debug(f"  api.hash_type: {api.hash_type}")
+                        logging.debug(f"  api.checksum_file_name: {api.checksum_file_name}")
+                        logging.debug(f"  api.checksum_hash_type: {api.checksum_hash_type}")
                         logging.debug(f"  api.asset_digest: {api.asset_digest}")
                         logging.debug(f"  api.skip_verification: {api.skip_verification}")
 
                         verification_manager = VerificationManager(
-                            sha_name=api.sha_name,
-                            sha_download_url=api.sha_download_url,
+                            checksum_file_name=api.checksum_file_name,
+                            checksum_file_download_url=api.checksum_file_download_url,
                             appimage_name=api.appimage_name,
-                            hash_type=api.hash_type,
+                            checksum_hash_type=api.checksum_hash_type,
                             asset_digest=api.asset_digest,
                         )
 
@@ -262,7 +262,7 @@ class InstallAppCommand(Command):
             repo=api.repo,
             owner=api.owner,
             version=api.version,
-            sha_name=api.sha_name,
+            checksum_file_name=api.checksum_file_name,
             config_file=str(self.global_config.config_file),
             app_storage_path=Path(self.global_config.expanded_app_storage_path),
             app_backup_storage_path=Path(self.global_config.expanded_app_backup_storage_path),

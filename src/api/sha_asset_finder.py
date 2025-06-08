@@ -39,7 +39,7 @@ class SHAAssetFinder:
         if definitive_app_info is None:
             logger.info("No app definition found - using automatic SHA detection")
         else:
-            logger.info(f"Using SHA name from definitive info: {definitive_app_info.sha_name}")
+            logger.info(f"Using SHA name from definitive info: {definitive_app_info.checksum_file_name}")
 
             # Skip SHA search if verification is disabled
             if definitive_app_info.skip_verification:
@@ -59,9 +59,9 @@ class SHAAssetFinder:
                     )
 
             # Priority 2: Try exact match from definitive app info
-            if definitive_app_info.sha_name:
+            if definitive_app_info.checksum_file_name:
                 for asset in assets:
-                    if asset["name"].lower() == definitive_app_info.sha_name.lower():
+                    if asset["name"].lower() == definitive_app_info.checksum_file_name.lower():
                         logger.info(f"Found exact SHA name match: {asset['name']}")
                         return asset
 
@@ -113,7 +113,7 @@ class SHAAssetFinder:
                             "name": "asset_digest",
                             "browser_download_url": None,
                             "digest": digest,
-                            "hash_type": "asset_digest",
+                            "checksum_hash_type": "asset_digest",
                             "asset_digest_hash": digest_hash,
                             "asset_digest_type": digest_type,
                         }

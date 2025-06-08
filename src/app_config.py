@@ -36,7 +36,7 @@ class AppConfigManager:
     This class handles operations related to application configuration including
     creating desktop files, managing versions, and storing app-specific settings.
 
-    Note: Static app metadata (owner, repo, sha_name, etc.) is now loaded from
+    Note: Static app metadata (owner, repo, checksum_file_name, etc.) is now loaded from
     JSON app definitions. Only user-specific data is stored in config files.
     """
 
@@ -119,24 +119,24 @@ class AppConfigManager:
         return app_info.use_github_release_desc if app_info else False
 
     @property
-    def sha_name(self) -> str | None:
+    def checksum_file_name(self) -> str | None:
         """Get SHA name from app definition."""
         app_info = self.get_app_info()
         if app_info and app_info.use_asset_digest:
             return "asset_digest"
         if app_info and app_info.use_github_release_desc:
             return "extracted_checksum"
-        return app_info.sha_name if app_info else None
+        return app_info.checksum_file_name if app_info else None
 
     @property
-    def hash_type(self) -> str | None:
+    def checksum_hash_type(self) -> str | None:
         """Get hash type from app definition."""
         app_info = self.get_app_info()
         if app_info and app_info.use_asset_digest:
             return "asset_digest"
         if app_info and app_info.use_github_release_desc:
             return "extracted_checksum"
-        return app_info.hash_type if app_info else None
+        return app_info.checksum_hash_type if app_info else None
 
     @property
     def preferred_characteristic_suffixes(self) -> list[str]:
@@ -501,8 +501,8 @@ class AppConfigManager:
         print("Static Information (from app definition):")
         print(f"  Owner: {self.owner or 'Not found'}")
         print(f"  Repository: {self.repo or 'Not found'}")
-        print(f"  SHA Name: {self.sha_name or 'Not found'}")
-        print(f"  Hash Type: {self.hash_type}")
+        print(f"  SHA Name: {self.checksum_file_name or 'Not found'}")
+        print(f"  Hash Type: {self.checksum_hash_type}")
         print(f"  Preferred Suffixes: {self.preferred_characteristic_suffixes}")
         print(f"  Icon Info: {self.icon_info or 'Not found'}")
         print("-" * 60)

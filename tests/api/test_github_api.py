@@ -51,7 +51,7 @@ class TestGitHubAPIDirect:
         """
         assert github_api_instance.owner == "test-owner"
         assert github_api_instance.repo == "test-repo"
-        # sha_name and hash_type are initialized by ReleaseProcessor via _process_release
+        # checksum_file_name and checksum_hash_type are initialized by ReleaseProcessor via _process_release
         # Let's check their state before _process_release is called.
         # These might be better tested after a successful _process_release call.
         # For now, let's assume they are None or default before processing.
@@ -59,8 +59,8 @@ class TestGitHubAPIDirect:
         # Let's defer detailed checks of these to tests that involve _process_release.
 
         assert github_api_instance.version is None
-        # sha_download_url, app_download_url, appimage_name are also set by _process_release
-        assert github_api_instance.sha_download_url is None
+        # checksum_file_download_url, app_download_url, appimage_name are also set by _process_release
+        assert github_api_instance.checksum_file_download_url is None
         assert github_api_instance.app_download_url is None
         assert github_api_instance.appimage_name is None
 
@@ -202,7 +202,7 @@ class TestGitHubAPIDirect:
                 github_api_instance.version = mock_release_data["tag_name"]
                 github_api_instance._release_info = MagicMock()
                 github_api_instance._release_info.version = mock_release_data["tag_name"]
-                github_api_instance._release_info.is_prerelease = mock_release_data["prerelease"]
+                github_api_instance._release_info.prerelease = mock_release_data["prerelease"]
                 # ... other attributes of _release_info if needed by ReleaseProcessor.compare_versions
 
                 # Mock the ReleaseProcessor instance used within check_latest_version
@@ -272,7 +272,7 @@ class TestGitHubAPIDirect:
                 github_api_instance.version = mock_release_data["tag_name"]
                 github_api_instance._release_info = MagicMock()
                 github_api_instance._release_info.version = mock_release_data["tag_name"]
-                github_api_instance._release_info.is_prerelease = mock_release_data["prerelease"]
+                github_api_instance._release_info.prerelease = mock_release_data["prerelease"]
 
                 update_available, info = github_api_instance.check_latest_version(
                     current_version=mock_release_data["tag_name"]
@@ -316,7 +316,7 @@ class TestGitHubAPIDirect:
                 github_api_instance.version = mock_release_data["tag_name"]
                 github_api_instance._release_info = MagicMock()
                 github_api_instance._release_info.version = mock_release_data["tag_name"]
-                github_api_instance._release_info.is_prerelease = mock_release_data["prerelease"]
+                github_api_instance._release_info.prerelease = mock_release_data["prerelease"]
 
                 update_available, info = github_api_instance.check_latest_version(
                     current_version="v1.0.0"
@@ -396,11 +396,11 @@ class TestGitHubAPIDirect:
             )
 
             # Configure SHAManager mock attributes that GitHubAPI will read
-            sha_name_for_test = "sha.txt"
-            sha_download_url_for_test = "url2"
-            mock_sham_instance.sha_name = sha_name_for_test
-            mock_sham_instance.sha_download_url = sha_download_url_for_test
-            mock_sham_instance.hash_type = "sha256"
+            checksum_file_name_for_test = "sha.txt"
+            checksum_file_download_url_for_test = "url2"
+            mock_sham_instance.checksum_file_name = checksum_file_name_for_test
+            mock_sham_instance.checksum_file_download_url = checksum_file_download_url_for_test
+            mock_sham_instance.checksum_hash_type = "sha256"
 
             # Call the method under test
             github_api_instance._process_release(mock_release_data)
@@ -429,9 +429,9 @@ class TestGitHubAPIDirect:
             assert github_api_instance.appimage_name == appimage_filename_for_test
             assert github_api_instance.app_download_url == "url1"
             assert github_api_instance._arch_keyword == expected_arch_keyword
-            assert github_api_instance.sha_name == sha_name_for_test
-            assert github_api_instance.sha_download_url == sha_download_url_for_test
-            assert github_api_instance.hash_type == "sha256"
+            assert github_api_instance.checksum_file_name == checksum_file_name_for_test
+            assert github_api_instance.checksum_file_download_url == checksum_file_download_url_for_test
+            assert github_api_instance.checksum_hash_type == "sha256"
 
             # Construct the expected ReleaseInfo object for comparison
             expected_release_info = ReleaseInfo(
@@ -440,13 +440,13 @@ class TestGitHubAPIDirect:
                 version=expected_version,
                 appimage_name=appimage_filename_for_test,
                 app_download_url="url1",
-                sha_name=sha_name_for_test,
-                sha_download_url=sha_download_url_for_test,
-                hash_type="sha256",
+                checksum_file_name=checksum_file_name_for_test,
+                checksum_file_download_url=checksum_file_download_url_for_test,
+                checksum_hash_type="sha256",
                 arch_keyword=expected_arch_keyword,
                 release_notes=mock_release_data.get("body", ""),
                 release_url=mock_release_data.get("html_url", ""),
-                is_prerelease=is_beta,
+                prerelease=is_beta,
                 published_at=mock_release_data.get("published_at", ""),
                 raw_assets=mock_release_data.get("assets", []),
             )

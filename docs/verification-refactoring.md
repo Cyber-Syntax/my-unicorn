@@ -139,7 +139,7 @@ The refactoring maintains full backwards compatibility:
 
 - The original `src.verify.VerificationManager` import still works
 - All public methods and their signatures remain unchanged
-- Constants like `SUPPORTED_HASH_TYPES`, `STATUS_SUCCESS`, and `STATUS_FAIL` are still available
+- Constants like `SUPPORTED_checksum_hash_typeS`, `STATUS_SUCCESS`, and `STATUS_FAIL` are still available
 - Existing code using the verification system requires no changes
 
 ## Migration Path

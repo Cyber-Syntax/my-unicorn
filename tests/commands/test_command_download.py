@@ -33,10 +33,10 @@ def download_test_data() -> tuple[str, str]:
         "repo": "testrepo",
         "appimage": "test.AppImage",
         "version": "1.0.0",
-        "sha_name": "test.sha256",
-        "sha_download_url": "http://example.com/test.sha256",
+        "checksum_file_name": "test.sha256",
+        "checksum_file_download_url": "http://example.com/test.sha256",
         "app_download_url": "http://example.com/test.AppImage",
-        "hash_type": "sha256",
+        "checksum_hash_type": "sha256",
     }
 
 
@@ -79,8 +79,8 @@ def mocked_app_config(
     """
     mock = MagicMock()
     mock.ask_sha_hash.return_value = (
-        download_test_data["sha_name"],
-        download_test_data["hash_type"],
+        download_test_data["checksum_file_name"],
+        download_test_data["checksum_hash_type"],
     )
     mock.config_folder = "/tmp/config"
     mock.config_file_name = "test_config.json"
@@ -107,9 +107,9 @@ def mocked_api(monkeypatch: pytest.MonkeyPatch, download_test_data: tuple[str, s
     mock.repo = download_test_data["repo"]
     mock.version = download_test_data["version"]
     mock.appimage_name = download_test_data["appimage"]
-    mock.sha_name = download_test_data["sha_name"]
-    mock.sha_download_url = download_test_data["sha_download_url"]
-    mock.hash_type = download_test_data["hash_type"]
+    mock.checksum_file_name = download_test_data["checksum_file_name"]
+    mock.checksum_file_download_url = download_test_data["checksum_file_download_url"]
+    mock.checksum_hash_type = download_test_data["checksum_hash_type"]
     mock.arch_keyword = None
     mock.app_download_url = download_test_data["app_download_url"]
 
@@ -352,7 +352,7 @@ def test_download_command_skip_verification(
     """
     # set skip_verification to trigger the skip verification path
     mocked_api.skip_verification = True
-    mocked_api.sha_name = None
+    mocked_api.checksum_file_name = None
 
     # Create and execute the command
     cmd = DownloadCommand()

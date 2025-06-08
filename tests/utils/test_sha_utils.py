@@ -9,7 +9,7 @@ This module contains tests for the SHA utility functions in src/utils/sha_utils.
 
 import pytest
 
-from src.utils.sha_utils import is_sha_file, detect_hash_type
+from src.utils.sha_utils import is_sha_file, detect_checksum_hash_type
 
 
 class TestIsShaFile:
@@ -53,30 +53,30 @@ class TestIsShaFile:
 
 
 class TestDetectHashType:
-    """Tests for detect_hash_type function."""
+    """Tests for detect_checksum_hash_type function."""
 
     def test_sha256_detection(self) -> None:
         """Test detection of SHA256 hash type."""
-        assert detect_hash_type("app.sha256") == "sha256"
-        assert detect_hash_type("SHA256SUMS") == "sha256"
-        assert detect_hash_type("app-sha256.txt") == "sha256"
-        assert detect_hash_type("checksum-sha256.txt") == "sha256"
+        assert detect_checksum_hash_type("app.sha256") == "sha256"
+        assert detect_checksum_hash_type("SHA256SUMS") == "sha256"
+        assert detect_checksum_hash_type("app-sha256.txt") == "sha256"
+        assert detect_checksum_hash_type("checksum-sha256.txt") == "sha256"
 
     def test_sha512_detection(self) -> None:
         """Test detection of SHA512 hash type."""
-        assert detect_hash_type("app.sha512") == "sha512"
-        assert detect_hash_type("SHA512SUMS") == "sha512"
-        assert detect_hash_type("app-sha512.txt") == "sha512"
-        assert detect_hash_type("checksum-sha512.txt") == "sha512"
+        assert detect_checksum_hash_type("app.sha512") == "sha512"
+        assert detect_checksum_hash_type("SHA512SUMS") == "sha512"
+        assert detect_checksum_hash_type("app-sha512.txt") == "sha512"
+        assert detect_checksum_hash_type("checksum-sha512.txt") == "sha512"
 
     def test_yml_files(self) -> None:
         """Test hash type detection for YAML files."""
-        assert detect_hash_type("latest-linux.yml") == "sha512"
-        assert detect_hash_type("app.yml") == "sha512"
-        assert detect_hash_type("app.yaml") == "sha512"
+        assert detect_checksum_hash_type("latest-linux.yml") == "sha512"
+        assert detect_checksum_hash_type("app.yml") == "sha512"
+        assert detect_checksum_hash_type("app.yaml") == "sha512"
 
     def test_default_fallback(self) -> None:
         """Test default fallback when hash type cannot be determined."""
-        assert detect_hash_type("checksum.txt") == "sha256"
-        assert detect_hash_type("hashes.txt") == "sha256"
-        assert detect_hash_type("unknown.sum") == "sha256"
+        assert detect_checksum_hash_type("checksum.txt") == "sha256"
+        assert detect_checksum_hash_type("hashes.txt") == "sha256"
+        assert detect_checksum_hash_type("unknown.sum") == "sha256"

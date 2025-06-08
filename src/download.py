@@ -474,7 +474,7 @@ class DownloadManager:
         logging.info("Verifying download integrity...")
 
         # Skip verification if hash verification is disabled
-        if self.github_api.skip_verification or not self.github_api.sha_name:
+        if self.github_api.skip_verification or not self.github_api.checksum_file_name:
             logging.info(
                 "Skipping verification as requested (verification disabled or no hash provided)"
             )
@@ -488,20 +488,20 @@ class DownloadManager:
         # or fall back to legacy "extracted_checksum" logic, or parse a SHA file.
 
         direct_hash_to_pass: str | None = None
-        sha_name_to_pass: str | None = self.github_api.sha_name
-        sha_download_url_to_pass: str | None = self.github_api.sha_download_url
+        checksum_file_name_to_pass: str | None = self.github_api.checksum_file_name
+        checksum_file_download_url_to_pass: str | None = self.github_api.checksum_file_download_url
 
-        if self.github_api.sha_name == "extracted_checksum":
+        if self.github_api.checksum_file_name == "extracted_checksum":
             logging.info(f"Processing 'extracted_checksum' for {self.github_api.appimage_name}.")
             # SHAManager should have set extracted_hash_from_body if it successfully parsed one.
-            # It also sets hash_type to "sha256".
+            # It also sets checksum_hash_type to "sha256".
             direct_hash_to_pass = self.github_api.extracted_hash_from_body
             if direct_hash_to_pass:
                 logging.info(
                     "Direct hash found for 'extracted_checksum', will pass to VerificationManager."
                 )
-                # sha_download_url is not needed if direct_hash is used by VerificationManager's "extracted_checksum" path
-                sha_download_url_to_pass = None
+                # checksum_file_download_url is not needed if direct_hash is used by VerificationManager's "extracted_checksum" path
+                checksum_file_download_url_to_pass = None
             else:
                 # If no direct hash, VerificationManager's "extracted_checksum" will use its legacy path
                 logging.info(
@@ -509,21 +509,21 @@ class DownloadManager:
                 )
 
         # For all other cases (actual SHA file names), direct_hash_to_pass remains None.
-        # VerificationManager will download and parse the sha_name file.
+        # VerificationManager will download and parse the checksum_file_name file.
 
         logging.info(
             f"Instantiating VerificationManager for {self.github_api.appimage_name} with: "
-            f"sha_name='{sha_name_to_pass}', hash_type='{self.github_api.hash_type}', "
+            f"checksum_file_name='{checksum_file_name_to_pass}', checksum_hash_type='{self.github_api.checksum_hash_type}', "
             f"direct_hash_provided={direct_hash_to_pass is not None}"
         )
 
         verifier = VerificationManager(
-            sha_name=sha_name_to_pass,
-            sha_download_url=sha_download_url_to_pass,
+            checksum_file_name=checksum_file_name_to_pass,
+            checksum_file_download_url=checksum_file_download_url_to_pass,
             appimage_name=self.github_api.appimage_name,
             appimage_path=downloaded_file,
-            hash_type=self.github_api.hash_type
-            if self.github_api.hash_type is not None
+            checksum_hash_type=self.github_api.checksum_hash_type
+            if self.github_api.checksum_hash_type is not None
             else "sha256",
             direct_expected_hash=direct_hash_to_pass,
             asset_digest=self.github_api.asset_digest,

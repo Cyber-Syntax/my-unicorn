@@ -76,8 +76,8 @@ setup_qownnotes_config() {
     "owner": "pbek",
     "repo": "QOwnNotes",
     "version": "$version",
-    "sha_name": "QOwnNotes-x86_64.AppImage.sha256",
-    "hash_type": "sha256",
+    "checksum_file_name": "QOwnNotes-x86_64.AppImage.sha256",
+    "checksum_hash_type": "sha256",
     "appimage_name": "QOwnNotes-$version-x86_64.AppImage",
     "arch_keyword": "x86_64"
 }
@@ -93,8 +93,8 @@ setup_joplin_config() {
     "owner": "laurent22",
     "repo": "joplin",
     "version": "$version",
-    "sha_name": "latest-linux.yml",
-    "hash_type": "sha512",
+    "checksum_file_name": "latest-linux.yml",
+    "checksum_hash_type": "sha512",
     "appimage_name": "Joplin-$version.AppImage",
     "arch_keyword": ".appimage"
 }

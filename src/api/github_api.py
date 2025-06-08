@@ -32,8 +32,8 @@ class GitHubAPI:
         self,
         owner: str,
         repo: str,
-        sha_name: str,
-        hash_type: str,
+        checksum_file_name: str,
+        checksum_hash_type: str,
         arch_keyword: str | None = None,
     ):
         """Initialize GitHub API handler.
@@ -41,19 +41,19 @@ class GitHubAPI:
         Args:
             owner: Repository owner/organization name
             repo: Repository name
-            sha_name: Name of SHA file for verification
-            hash_type: Type of hash to use (sha256, sha512)
+            checksum_file_name: Name of SHA file for verification
+            checksum_hash_type: Type of hash to use (sha256, sha512)
             arch_keyword: Optional architecture keyword for filtering
         """
         self.owner = owner
         self.repo = repo
-        self.sha_name: str | None = sha_name  # Can be updated by SHAManager
-        self.hash_type: str | None = hash_type  # Can be updated by SHAManager
+        self.checksum_file_name: str | None = checksum_file_name  # Can be updated by SHAManager
+        self.checksum_hash_type: str | None = checksum_hash_type  # Can be updated by SHAManager
         self._arch_keyword = arch_keyword
         self.version: str = None
         self.appimage_name: str = None
         self.app_download_url: str = None
-        self.sha_download_url: str | None = None
+        self.checksum_file_download_url: str | None = None
         self.extracted_hash_from_body: str | None = None
         self.asset_digest: str | None = None
         self._headers = GitHubAuthManager.get_auth_headers()
@@ -205,9 +205,9 @@ class GitHubAPI:
             # Clear asset-related attributes for version-only checks
             self.appimage_name = None
             self.app_download_url = None
-            self.sha_name = None
-            self.sha_download_url = None
-            self.hash_type = None
+            self.checksum_file_name = None
+            self.checksum_file_download_url = None
+            self.checksum_hash_type = None
             self.extracted_hash_from_body = None
             self.asset_digest = None
 
@@ -218,9 +218,9 @@ class GitHubAPI:
                 "version": self.version,
                 "appimage_name": None,
                 "app_download_url": None,
-                "sha_name": None,
-                "sha_download_url": None,
-                "hash_type": None,
+                "checksum_file_name": None,
+                "checksum_file_download_url": None,
+                "checksum_hash_type": None,
                 "extracted_hash_from_body": None,
                 "asset_digest": None,
                 "arch_keyword": self._arch_keyword,
@@ -331,50 +331,50 @@ class GitHubAPI:
                 logger.info(
                     f"Skipping SHA search for {self.appimage_name} - verification disabled for this app"
                 )
-                self.sha_name = None
-                self.sha_download_url = None
-                self.hash_type = None
+                self.checksum_file_name = None
+                self.checksum_file_download_url = None
+                self.checksum_hash_type = None
                 self.extracted_hash_from_body = None
                 self.asset_digest = None
 
             else:
                 logger.debug(f"Proceeding with SHA processing for {self.appimage_name}")
-                # Use SHA name from app definition if available, otherwise use provided sha_name
-                if self._app_info and self._app_info.sha_name:
-                    initial_sha_name_hint = self._app_info.sha_name
-                    logger.debug(f"Using SHA name from app definition: {initial_sha_name_hint}")
+                # Use SHA name from app definition if available, otherwise use provided checksum_file_name
+                if self._app_info and self._app_info.checksum_file_name:
+                    initial_checksum_file_name_hint = self._app_info.checksum_file_name
+                    logger.debug(f"Using SHA name from app definition: {initial_checksum_file_name_hint}")
                 else:
-                    initial_sha_name_hint = self.sha_name or "sha256"
-                    logger.debug(f"Using fallback SHA name: {initial_sha_name_hint}")
+                    initial_checksum_file_name_hint = self.checksum_file_name or "sha256"
+                    logger.debug(f"Using fallback SHA name: {initial_checksum_file_name_hint}")
 
                 logger.debug(f"Creating SHAManager with app_info: {self._app_info}")
                 sha_mgr = SHAManager(
                     self.owner,
                     self.repo,
-                    initial_sha_name_hint,
+                    initial_checksum_file_name_hint,
                     self.appimage_name,
                     app_info=self._app_info,
                 )
                 sha_mgr.find_sha_asset(assets)
 
                 logger.debug(
-                    f"SHAManager results - hash_type: {sha_mgr.hash_type}, sha_name: {sha_mgr.sha_name}, asset_digest: {sha_mgr.asset_digest}"
+                    f"SHAManager results - checksum_hash_type: {sha_mgr.checksum_hash_type}, checksum_file_name: {sha_mgr.checksum_file_name}, asset_digest: {sha_mgr.asset_digest}"
                 )
 
                 # Update instance attributes with results from SHAManager
-                self.sha_name = sha_mgr.sha_name
-                self.sha_download_url = sha_mgr.sha_download_url
-                self.hash_type = sha_mgr.hash_type
+                self.checksum_file_name = sha_mgr.checksum_file_name
+                self.checksum_file_download_url = sha_mgr.checksum_file_download_url
+                self.checksum_hash_type = sha_mgr.checksum_hash_type
                 self.extracted_hash_from_body = sha_mgr.extracted_hash_from_body
                 self.asset_digest = sha_mgr.asset_digest
 
                 logger.debug(
-                    f"GitHub API updated - hash_type: {self.hash_type}, sha_name: {self.sha_name}, asset_digest: {self.asset_digest}"
+                    f"GitHub API updated - checksum_hash_type: {self.checksum_hash_type}, checksum_file_name: {self.checksum_file_name}, asset_digest: {self.asset_digest}"
                 )
         else:
-            self.sha_name = None
-            self.sha_download_url = None
-            self.hash_type = None
+            self.checksum_file_name = None
+            self.checksum_file_download_url = None
+            self.checksum_hash_type = None
             self.extracted_hash_from_body = None
             self.asset_digest = None
 
@@ -384,9 +384,9 @@ class GitHubAPI:
             "version": self.version,
             "appimage_name": self.appimage_name,
             "app_download_url": self.app_download_url,
-            "sha_name": self.sha_name,
-            "sha_download_url": self.sha_download_url,
-            "hash_type": self.hash_type,
+            "checksum_file_name": self.checksum_file_name,
+            "checksum_file_download_url": self.checksum_file_download_url,
+            "checksum_hash_type": self.checksum_hash_type,
             "extracted_hash_from_body": self.extracted_hash_from_body,
             "asset_digest": self.asset_digest,
             "arch_keyword": self._arch_keyword,
@@ -396,7 +396,7 @@ class GitHubAPI:
 
         logger.info(f"Successfully processed release {self.version} for {self.owner}/{self.repo}")
         logger.debug(
-            f"AppImage: {self.appimage_name}, SHA: {self.sha_name or 'Not found'} (Type: {self.hash_type or 'N/A'})"
+            f"AppImage: {self.appimage_name}, SHA: {self.checksum_file_name or 'Not found'} (Type: {self.checksum_hash_type or 'N/A'})"
         )
 
     def check_latest_version(
@@ -458,7 +458,7 @@ class GitHubAPI:
             "release_notes": self._release_info.release_notes,
             "release_url": self._release_info.release_url,
             "compatible_assets": compatible_assets,
-            "is_prerelease": self._release_info.is_prerelease,
+            "prerelease": self._release_info.prerelease,
             "published_at": self._release_info.published_at,
         }
 

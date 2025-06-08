@@ -15,30 +15,30 @@ from pathlib import Path
 class HashCalculator:
     """Handles hash computation and comparison for file verification."""
 
-    def __init__(self, hash_type: str) -> None:
+    def __init__(self, checksum_hash_type: str) -> None:
         """Initialize the hash calculator with specified algorithm.
 
         Creates a hash calculator instance configured to use the specified hash algorithm.
         Validates that the requested algorithm is available on the system.
 
         Args:
-            hash_type: Hash algorithm to use (e.g., 'sha256', 'sha512')
+            checksum_hash_type: Hash algorithm to use (e.g., 'sha256', 'sha512')
 
         Raises:
             ValueError: If specified hash algorithm is not available on the system
         """
-        self.hash_type = hash_type.lower()
+        self.checksum_hash_type = checksum_hash_type.lower()
 
         # Skip validation for special hash types that don't use hashlib
-        if self._is_special_hash_type():
+        if self._is_special_checksum_hash_type():
             return
 
-        if self.hash_type not in hashlib.algorithms_available:
-            raise ValueError(f"Hash type {self.hash_type} not available in this system")
+        if self.checksum_hash_type not in hashlib.algorithms_available:
+            raise ValueError(f"Hash type {self.checksum_hash_type} not available in this system")
 
-    def _is_special_hash_type(self) -> bool:
+    def _is_special_checksum_hash_type(self) -> bool:
         """Check if this is a special hash type that doesn't use hashlib."""
-        return self.hash_type in ("no_hash", "asset_digest", "extracted_checksum")
+        return self.checksum_hash_type in ("no_hash", "asset_digest", "extracted_checksum")
 
     def calculate_file_hash(self, filepath: str | Path) -> str:
         """Calculate file hash using memory-efficient chunked reading.
@@ -58,9 +58,9 @@ class HashCalculator:
             >>> calc.calculate_file_hash('myfile.AppImage')
             '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92'
         """
-        if self._is_special_hash_type():
+        if self._is_special_checksum_hash_type():
             logging.warning(
-                f"Attempted to calculate hash with special hash_type '{self.hash_type}'"
+                f"Attempted to calculate hash with special checksum_hash_type '{self.checksum_hash_type}'"
             )
             return ""
 
@@ -68,7 +68,7 @@ class HashCalculator:
             raise OSError(f"File not found: {filepath}")
 
         try:
-            hash_func = hashlib.new(self.hash_type)
+            hash_func = hashlib.new(self.checksum_hash_type)
             chunk_size = 65536  # 64KB chunks for better performance
 
             with open(filepath, "rb") as f:
@@ -131,7 +131,7 @@ class HashCalculator:
         Returns:
             True if hash format is valid, False otherwise
         """
-        if self._is_special_hash_type():
+        if self._is_special_checksum_hash_type():
             return True
 
         expected_length = self._get_expected_hash_length()
@@ -152,14 +152,14 @@ class HashCalculator:
         Returns:
             Expected hash length in characters
         """
-        if self.hash_type == "sha256":
+        if self.checksum_hash_type == "sha256":
             return 64
-        elif self.hash_type == "sha512":
+        elif self.checksum_hash_type == "sha512":
             return 128
         else:
             # For other hash types, calculate based on digest size
             try:
-                hash_func = hashlib.new(self.hash_type)
+                hash_func = hashlib.new(self.checksum_hash_type)
                 return hash_func.digest_size * 2  # 2 hex chars per byte
             except ValueError:
                 return 0

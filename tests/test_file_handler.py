@@ -77,7 +77,7 @@ def file_handler(temp_dirs: tuple[str, Path]) -> FileHandler:
         repo="test-app",
         owner="test-owner",
         version="1.0.0",
-        sha_name="sha256sums",
+        checksum_file_name="sha256sums",
         app_storage_path=str(temp_dirs["app_dir"]),
         app_backup_storage_path=str(temp_dirs["backup_dir"]),
         config_folder=str(temp_dirs["app_dir"]),
@@ -122,7 +122,7 @@ class TestFileHandler:
         assert file_handler.repo == "test-app"
         assert file_handler.owner == "test-owner"
         assert file_handler.version == "1.0.0"
-        assert file_handler.sha_name == "sha256sums"
+        assert file_handler.checksum_file_name == "sha256sums"
         assert file_handler.batch_mode is True
         assert file_handler.keep_backup is True
         assert file_handler.max_backups == 3

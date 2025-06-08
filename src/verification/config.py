@@ -14,7 +14,7 @@ from typing import Self
 
 # Supported hash types
 # TODO: delete non hash types here, create different logic for them
-SUPPORTED_HASH_TYPES = [
+SUPPORTED_checksum_hash_typeS = [
     "sha256",
     "sha512",
     "no_hash",
@@ -31,10 +31,10 @@ class VerificationConfig:
     including path resolution and hash type validation.
     """
 
-    sha_name: str | None = None
-    sha_download_url: str | None = None
+    checksum_file_name: str | None = None
+    checksum_file_download_url: str | None = None
     appimage_name: str | None = None
-    hash_type: str = "sha256"
+    checksum_hash_type: str = "sha256"
     appimage_path: str | None = None
     direct_expected_hash: str | None = None
     asset_digest: str | None = None
@@ -44,9 +44,9 @@ class VerificationConfig:
         """Initialize and validate the configuration."""
         self._resolve_appimage_path()
         self._resolve_sha_path()
-        self._normalize_hash_type()
+        self._normalize_checksum_hash_type()
         self._set_asset_digest_flag()
-        self._validate_hash_type()
+        self._validate_checksum_hash_type()
 
     def _resolve_appimage_path(self) -> None:
         """Resolve the AppImage path if not explicitly set."""
@@ -58,54 +58,54 @@ class VerificationConfig:
 
     def _resolve_sha_path(self) -> None:
         """Resolve the SHA file path and make it app-specific."""
-        if not self.sha_name or os.path.isabs(self.sha_name):
+        if not self.checksum_file_name or os.path.isabs(self.checksum_file_name):
             return
 
         # Skip resolution for special values
-        if self.sha_name in ("extracted_checksum", "asset_digest"):
+        if self.checksum_file_name in ("extracted_checksum", "asset_digest"):
             return
 
         from src.global_config import GlobalConfigManager
 
         downloads_dir = GlobalConfigManager().expanded_app_download_path
-        sha_basename = Path(self.sha_name).name
-        sha_stem = Path(self.sha_name).stem
-        sha_suffix = Path(self.sha_name).suffix
-        app_specific_sha_name = f"{self.appimage_name}_{sha_stem}{sha_suffix}"
-        self.sha_name = str(Path(downloads_dir) / app_specific_sha_name)
+        sha_basename = Path(self.checksum_file_name).name
+        sha_stem = Path(self.checksum_file_name).stem
+        sha_suffix = Path(self.checksum_file_name).suffix
+        app_specific_checksum_file_name = f"{self.appimage_name}_{sha_stem}{sha_suffix}"
+        self.checksum_file_name = str(Path(downloads_dir) / app_specific_checksum_file_name)
 
-    def _normalize_hash_type(self) -> None:
+    def _normalize_checksum_hash_type(self) -> None:
         """Normalize hash type to lowercase."""
-        if self.hash_type:
-            self.hash_type = self.hash_type.lower()
+        if self.checksum_hash_type:
+            self.checksum_hash_type = self.checksum_hash_type.lower()
 
     def _set_asset_digest_flag(self) -> None:
         """set asset digest flag if hash type is asset_digest."""
-        if self.hash_type == "asset_digest":
+        if self.checksum_hash_type == "asset_digest":
             self.use_asset_digest = True
 
-    def _validate_hash_type(self) -> None:
+    def _validate_checksum_hash_type(self) -> None:
         """Validate that the hash type is supported and available."""
-        if self.hash_type not in SUPPORTED_HASH_TYPES:
+        if self.checksum_hash_type not in SUPPORTED_checksum_hash_typeS:
             raise ValueError(
-                f"Unsupported hash type: {self.hash_type}. "
-                f"Supported types are: {', '.join(SUPPORTED_HASH_TYPES)}"
+                f"Unsupported hash type: {self.checksum_hash_type}. "
+                f"Supported types are: {', '.join(SUPPORTED_checksum_hash_typeS)}"
             )
 
         # Skip hashlib validation for special verification types
-        if self._is_special_hash_type():
+        if self._is_special_checksum_hash_type():
             return
 
-        if self.hash_type not in hashlib.algorithms_available:
-            raise ValueError(f"Hash type {self.hash_type} not available in this system")
+        if self.checksum_hash_type not in hashlib.algorithms_available:
+            raise ValueError(f"Hash type {self.checksum_hash_type} not available in this system")
 
-    def _is_special_hash_type(self) -> bool:
+    def _is_special_checksum_hash_type(self) -> bool:
         """Check if this is a special hash type that doesn't use hashlib."""
         return (
-            self.hash_type == "no_hash"
-            or self.hash_type == "asset_digest"
-            or self.sha_name == "extracted_checksum"
-            or self.sha_name == "no_sha_file"
+            self.checksum_hash_type == "no_hash"
+            or self.checksum_hash_type == "asset_digest"
+            or self.checksum_file_name == "extracted_checksum"
+            or self.checksum_file_name == "no_sha_file"
         )
 
     def set_appimage_path(self, full_path: str) -> None:
@@ -120,16 +120,16 @@ class VerificationConfig:
     def is_verification_skipped(self) -> bool:
         """Check if verification should be skipped."""
         return (
-            self.hash_type == "no_hash" or not self.sha_name or self.sha_name == self.appimage_name
+            self.checksum_hash_type == "no_hash" or not self.checksum_file_name or self.checksum_file_name == self.appimage_name
         )
 
     def is_asset_digest_verification(self) -> bool:
         """Check if this is asset digest verification."""
-        return self.hash_type == "asset_digest" or self.use_asset_digest
+        return self.checksum_hash_type == "asset_digest" or self.use_asset_digest
 
     def is_extracted_checksum_verification(self) -> bool:
         """Check if this is extracted checksum verification."""
-        return self.sha_name == "extracted_checksum"
+        return self.checksum_file_name == "extracted_checksum"
 
     def has_direct_hash(self) -> bool:
         """Check if a direct hash is available for verification."""

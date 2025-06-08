@@ -22,7 +22,7 @@ class SHAManager:
         self,
         owner: str,
         repo: str,
-        sha_name: str,
+        checksum_file_name: str,
         appimage_name: str | None = None,
         app_info=None,
     ):
@@ -31,17 +31,17 @@ class SHAManager:
         Args:
             owner: Repository owner/organization
             repo: Repository name
-            sha_name: Name of the SHA algorithm used in the release assets
+            checksum_file_name: Name of the SHA algorithm used in the release assets
             appimage_name: Name of the selected AppImage
             app_info: AppInfo object containing app-specific settings
 
         """
         self.owner = owner
         self.repo = repo
-        self.sha_name = sha_name
+        self.checksum_file_name = checksum_file_name
         self.appimage_name = appimage_name
-        self.sha_download_url = None
-        self.hash_type = None
+        self.checksum_file_download_url = None
+        self.checksum_hash_type = None
         self.extracted_hash_from_body: str | None = None  # For hash from release body
         self.asset_digest: str | None = None  # For GitHub API asset digest verification
         self._app_info = app_info
@@ -86,10 +86,10 @@ class SHAManager:
                         if len(parts) >= 1:
                             hash_value = parts[0]
                             if self._validate_sha256_hash(hash_value):
-                                self.hash_type = "sha256"
+                                self.checksum_hash_type = "sha256"
                                 self.extracted_hash_from_body = hash_value
-                                self.sha_name = "extracted_checksum"
-                                self.sha_download_url = None
+                                self.checksum_file_name = "extracted_checksum"
+                                self.checksum_file_download_url = None
                                 logger.info(
                                     f"Successfully extracted SHA256 hash '{self.extracted_hash_from_body}' "
                                     f"for {self.appimage_name} from release body."
@@ -165,17 +165,17 @@ class SHAManager:
         if sha_asset:
             logger.debug(f"SHAAssetFinder returned: {sha_asset}")
             # Check if this is a special asset digest response
-            if sha_asset.get("hash_type") == "asset_digest":
-                self.hash_type = "asset_digest"
-                self.sha_name = "asset_digest"
-                self.sha_download_url = None
+            if sha_asset.get("checksum_hash_type") == "asset_digest":
+                self.checksum_hash_type = "asset_digest"
+                self.checksum_file_name = "asset_digest"
+                self.checksum_file_download_url = None
                 self.asset_digest = sha_asset["digest"]
                 logger.info(
                     f"Successfully assigned asset digest verification for {self.appimage_name}"
                 )
                 logger.debug(f"Asset digest: {self.asset_digest}")
-                logger.debug(f"Hash type: {self.hash_type}")
-                logger.debug(f"SHA name: {self.sha_name}")
+                logger.debug(f"Hash type: {self.checksum_hash_type}")
+                logger.debug(f"SHA name: {self.checksum_file_name}")
             else:
                 self._select_sha_asset(sha_asset)
                 logger.info(f"Found SHA file for {self.appimage_name}: {sha_asset['name']}")
@@ -192,17 +192,17 @@ class SHAManager:
             asset: GitHub API asset information dictionary
 
         """
-        detected_hash_type = sha_utils.detect_hash_type(asset["name"])
-        self.hash_type = detected_hash_type or "sha256"
-        self.sha_name = asset["name"]
-        self.sha_download_url = asset["browser_download_url"]
+        detected_checksum_hash_type = sha_utils.detect_checksum_hash_type(asset["name"])
+        self.checksum_hash_type = detected_checksum_hash_type or "sha256"
+        self.checksum_file_name = asset["name"]
+        self.checksum_file_download_url = asset["browser_download_url"]
 
-        if not detected_hash_type:
-            logger.info(f"Could not detect hash type from {self.sha_name}")
+        if not detected_checksum_hash_type:
+            logger.info(f"Could not detect hash type from {self.checksum_file_name}")
             # Always ask for hash type if not detected, regardless of is_batch
-            self.hash_type = ui_utils.get_user_input("Enter hash type", default="sha256")
+            self.checksum_hash_type = ui_utils.get_user_input("Enter hash type", default="sha256")
 
-        logger.info(f"Selected SHA file: {self.sha_name} (hash type: {self.hash_type})")
+        logger.info(f"Selected SHA file: {self.checksum_file_name} (hash type: {self.checksum_hash_type})")
 
     def _handle_sha_fallback(self, assets: list[dict]) -> None:
         """Handle fallback when SHA file couldn't be automatically determined.
@@ -230,17 +230,17 @@ class SHAManager:
             choice = await asyncio.to_thread(ui_utils.get_user_input, "Your choice (1-2)")
 
             if choice == "1":
-                self.sha_name = await asyncio.to_thread(
+                self.checksum_file_name = await asyncio.to_thread(
                     ui_utils.get_user_input, "Enter exact SHA filename"
                 )
                 for asset in assets:
-                    if asset["name"] == self.sha_name:
+                    if asset["name"] == self.checksum_file_name:
                         self._select_sha_asset(asset)
                         return
-                raise ValueError(f"SHA file {self.sha_name} not found")
+                raise ValueError(f"SHA file {self.checksum_file_name} not found")
             else:
-                self.sha_name = "no_sha_file"
-                self.hash_type = "no_hash"
+                self.checksum_file_name = "no_sha_file"
+                self.checksum_hash_type = "no_hash"
                 self.skip_verification = True
                 logger.info("User chose to skip SHA verification")
 
@@ -264,15 +264,15 @@ class SHAManager:
             choice = ui_utils.get_user_input("Your choice (1-2)")
 
             if choice == "1":
-                self.sha_name = ui_utils.get_user_input("Enter exact SHA filename")
+                self.checksum_file_name = ui_utils.get_user_input("Enter exact SHA filename")
                 for asset in assets:
-                    if asset["name"] == self.sha_name:
+                    if asset["name"] == self.checksum_file_name:
                         self._select_sha_asset(asset)
                         return
-                raise ValueError(f"SHA file {self.sha_name} not found")
+                raise ValueError(f"SHA file {self.checksum_file_name} not found")
             else:
-                self.sha_name = "no_sha_file"
-                self.hash_type = "no_hash"
+                self.checksum_file_name = "no_sha_file"
+                self.checksum_hash_type = "no_hash"
                 self.skip_verification = True
                 logger.info("User chose to skip SHA verification")
 

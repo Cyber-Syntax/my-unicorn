@@ -68,10 +68,10 @@ class ReleaseDescVerifier:
 
             # Delegate to existing verification infrastructure
             verifier = VerificationManager(
-                sha_name=temp_sha_file,
+                checksum_file_name=temp_sha_file,
                 appimage_name=actual_appimage_name,
                 appimage_path=str(appimage_path),
-                hash_type="sha256"  # Release descriptions typically use SHA256
+                checksum_hash_type="sha256"  # Release descriptions typically use SHA256
             )
 
             return verifier.verify_appimage(cleanup_on_failure=cleanup_on_failure)

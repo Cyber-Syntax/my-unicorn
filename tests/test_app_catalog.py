@@ -42,8 +42,8 @@ def sample_app_info() -> AppInfo:
         description="A test application",
         owner="testowner",
         repo="testrepo",
-        sha_name="test.sha256",
-        hash_type="sha256",
+        checksum_file_name="test.sha256",
+        checksum_hash_type="sha256",
         category="Test",
         tags=["test", "sample"],
     )
@@ -57,8 +57,8 @@ def test_app_info_init() -> None:
         description="A test application",
         owner="testowner",
         repo="testrepo",
-        sha_name="test.sha256",
-        hash_type="sha256",
+        checksum_file_name="test.sha256",
+        checksum_hash_type="sha256",
         category="Test",
         tags=["test", "sample"],
     )
@@ -67,8 +67,8 @@ def test_app_info_init() -> None:
     assert app_info.description == "A test application"
     assert app_info.owner == "testowner"
     assert app_info.repo == "testrepo"
-    assert app_info.sha_name == "test.sha256"
-    assert app_info.hash_type == "sha256"
+    assert app_info.checksum_file_name == "test.sha256"
+    assert app_info.checksum_hash_type == "sha256"
     assert app_info.category == "Test"
     assert app_info.tags == ["test", "sample"]
 
@@ -81,8 +81,8 @@ def test_app_info_init() -> None:
     )
 
     assert app_info.name == "Test App"
-    assert app_info.sha_name is None  # Default value
-    assert app_info.hash_type is None  # Default value
+    assert app_info.checksum_file_name is None  # Default value
+    assert app_info.checksum_hash_type is None  # Default value
     assert app_info.category == "Other"  # Default value
     assert app_info.tags == []  # Default empty list
 
