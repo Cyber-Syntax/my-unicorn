@@ -52,8 +52,8 @@ class GitHubAPI:
         self._arch_keyword = arch_keyword
         self.version: str = None
         self.appimage_name: str = None
-        self.appimage_url: str = None
-        self.sha_url: str | None = None
+        self.app_download_url: str = None
+        self.sha_download_url: str | None = None
         self.extracted_hash_from_body: str | None = None
         self.asset_digest: str | None = None
         self._headers = GitHubAuthManager.get_auth_headers()
@@ -204,9 +204,9 @@ class GitHubAPI:
             )
             # Clear asset-related attributes for version-only checks
             self.appimage_name = None
-            self.appimage_url = None
+            self.app_download_url = None
             self.sha_name = None
-            self.sha_url = None
+            self.sha_download_url = None
             self.hash_type = None
             self.extracted_hash_from_body = None
             self.asset_digest = None
@@ -217,9 +217,9 @@ class GitHubAPI:
                 "repo": self.repo,
                 "version": self.version,
                 "appimage_name": None,
-                "appimage_url": None,
+                "app_download_url": None,
                 "sha_name": None,
-                "sha_url": None,
+                "sha_download_url": None,
                 "hash_type": None,
                 "extracted_hash_from_body": None,
                 "asset_digest": None,
@@ -293,7 +293,7 @@ class GitHubAPI:
 
         appimage_asset_obj = AppImageAsset.from_github_asset(selected_asset_result.asset)
         self.appimage_name = appimage_asset_obj.name
-        self.appimage_url = appimage_asset_obj.browser_download_url
+        self.app_download_url = appimage_asset_obj.browser_download_url
         logger.info(f"Selected AppImage: {self.appimage_name}")
 
         # Try extracting version from filename if not found in tag
@@ -332,7 +332,7 @@ class GitHubAPI:
                     f"Skipping SHA search for {self.appimage_name} - verification disabled for this app"
                 )
                 self.sha_name = None
-                self.sha_url = None
+                self.sha_download_url = None
                 self.hash_type = None
                 self.extracted_hash_from_body = None
                 self.asset_digest = None
@@ -363,7 +363,7 @@ class GitHubAPI:
 
                 # Update instance attributes with results from SHAManager
                 self.sha_name = sha_mgr.sha_name
-                self.sha_url = sha_mgr.sha_url
+                self.sha_download_url = sha_mgr.sha_download_url
                 self.hash_type = sha_mgr.hash_type
                 self.extracted_hash_from_body = sha_mgr.extracted_hash_from_body
                 self.asset_digest = sha_mgr.asset_digest
@@ -373,7 +373,7 @@ class GitHubAPI:
                 )
         else:
             self.sha_name = None
-            self.sha_url = None
+            self.sha_download_url = None
             self.hash_type = None
             self.extracted_hash_from_body = None
             self.asset_digest = None
@@ -383,9 +383,9 @@ class GitHubAPI:
             "repo": self.repo,
             "version": self.version,
             "appimage_name": self.appimage_name,
-            "appimage_url": self.appimage_url,
+            "app_download_url": self.app_download_url,
             "sha_name": self.sha_name,
-            "sha_url": self.sha_url,
+            "sha_download_url": self.sha_download_url,
             "hash_type": self.hash_type,
             "extracted_hash_from_body": self.extracted_hash_from_body,
             "asset_digest": self.asset_digest,

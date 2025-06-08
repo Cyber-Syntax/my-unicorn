@@ -60,8 +60,8 @@ def install_test_data() -> dict[str, str]:
         "appimage": "test.AppImage",
         "version": "1.0.0",
         "sha_name": "test.sha256",
-        "sha_url": "http://example.com/test.sha256",
-        "appimage_url": "http://example.com/test.AppImage",
+        "sha_download_url": "http://example.com/test.sha256",
+        "app_download_url": "http://example.com/test.AppImage",
         "hash_type": "sha256",
         "downloaded_file_path": "/tmp/test.AppImage",
     }
@@ -115,10 +115,10 @@ def mocked_api(monkeypatch: pytest.MonkeyPatch, install_test_data: dict[str, str
     mock.version = install_test_data["version"]
     mock.appimage_name = install_test_data["appimage"]
     mock.sha_name = install_test_data["sha_name"]
-    mock.sha_url = install_test_data["sha_url"]
+    mock.sha_download_url = install_test_data["sha_download_url"]
     mock.hash_type = install_test_data["hash_type"]
     mock.arch_keyword = None
-    mock.appimage_url = install_test_data["appimage_url"]
+    mock.app_download_url = install_test_data["app_download_url"]
     mock.get_response.return_value = (True, "Success")  # Success response
     mock.check_latest_version.return_value = (
         False,

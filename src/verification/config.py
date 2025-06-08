@@ -32,7 +32,7 @@ class VerificationConfig:
     """
 
     sha_name: str | None = None
-    sha_url: str | None = None
+    sha_download_url: str | None = None
     appimage_name: str | None = None
     hash_type: str = "sha256"
     appimage_path: str | None = None

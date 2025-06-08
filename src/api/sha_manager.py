@@ -40,7 +40,7 @@ class SHAManager:
         self.repo = repo
         self.sha_name = sha_name
         self.appimage_name = appimage_name
-        self.sha_url = None
+        self.sha_download_url = None
         self.hash_type = None
         self.extracted_hash_from_body: str | None = None  # For hash from release body
         self.asset_digest: str | None = None  # For GitHub API asset digest verification
@@ -89,7 +89,7 @@ class SHAManager:
                                 self.hash_type = "sha256"
                                 self.extracted_hash_from_body = hash_value
                                 self.sha_name = "extracted_checksum"
-                                self.sha_url = None
+                                self.sha_download_url = None
                                 logger.info(
                                     f"Successfully extracted SHA256 hash '{self.extracted_hash_from_body}' "
                                     f"for {self.appimage_name} from release body."
@@ -168,7 +168,7 @@ class SHAManager:
             if sha_asset.get("hash_type") == "asset_digest":
                 self.hash_type = "asset_digest"
                 self.sha_name = "asset_digest"
-                self.sha_url = None
+                self.sha_download_url = None
                 self.asset_digest = sha_asset["digest"]
                 logger.info(
                     f"Successfully assigned asset digest verification for {self.appimage_name}"
@@ -195,7 +195,7 @@ class SHAManager:
         detected_hash_type = sha_utils.detect_hash_type(asset["name"])
         self.hash_type = detected_hash_type or "sha256"
         self.sha_name = asset["name"]
-        self.sha_url = asset["browser_download_url"]
+        self.sha_download_url = asset["browser_download_url"]
 
         if not detected_hash_type:
             logger.info(f"Could not detect hash type from {self.sha_name}")

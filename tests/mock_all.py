@@ -62,8 +62,8 @@ class TestIntegrationDownloadFlow(unittest.TestCase):
             )
             api.version = "1.0.0"
             api.appimage_name = "test.AppImage"
-            api.appimage_url = "http://example.com/test.AppImage"
-            api.sha_url = "http://example.com/test.sha256"
+            api.app_download_url = "http://example.com/test.AppImage"
+            api.sha_download_url = "http://example.com/test.sha256"
             api.arch_keyword = None
             # To simulate the flow, we also update attributes on the AppConfig later.
             return {
@@ -74,8 +74,8 @@ class TestIntegrationDownloadFlow(unittest.TestCase):
                 "hash_type": api.hash_type,
                 "appimage_name": api.appimage_name,
                 "arch_keyword": api.arch_keyword,
-                "appimage_url": api.appimage_url,
-                "sha_url": api.sha_url,
+                "app_download_url": api.app_download_url,
+                "sha_download_url": api.sha_download_url,
             }
 
         mock_api_get.side_effect = fake_get_response

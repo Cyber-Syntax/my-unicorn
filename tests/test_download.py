@@ -14,7 +14,7 @@ from src.download import DownloadManager
 def github_api():
     """Minimal stub for GitHubAPI with controlled URL and name."""
     return SimpleNamespace(
-        appimage_url="https://example.com/fake.AppImage", appimage_name="fake.AppImage"
+        app_download_url="https://example.com/fake.AppImage", appimage_name="fake.AppImage"
     )
 
 
@@ -111,12 +111,12 @@ def test_successful_download(
 
 def test_missing_url_or_name_raises(github_api, monkeypatch):
     # No URL
-    bad = SimpleNamespace(appimage_url="", appimage_name="n")
+    bad = SimpleNamespace(app_download_url="", appimage_name="n")
     dm = DownloadManager(bad)
     with pytest.raises(ValueError):
         dm.download()
     # No name
-    bad2 = SimpleNamespace(appimage_url="u", appimage_name=None)
+    bad2 = SimpleNamespace(app_download_url="u", appimage_name=None)
     dm2 = DownloadManager(bad2)
     with pytest.raises(ValueError):
         dm2.download()

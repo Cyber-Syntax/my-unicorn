@@ -67,9 +67,14 @@ class AppImageSelector:
 
         # Filter AppImage assets
         appimage_assets = [
-            asset for asset in assets
+            asset for asset in assets 
             if asset.get("content_type") == "application/vnd.appimage"
         ]
+
+        # Fallback to filename extension if no assets found by content_type
+        if not appimage_assets:
+            self._logger.info("No assets found by content_type, falling back to filename extension")
+            appimage_assets = [asset for asset in assets if asset["name"].lower().endswith(".appimage")]
 
         if not appimage_assets:
             self._logger.warning("No AppImage assets found in release")

@@ -40,7 +40,7 @@ def verify_with_strategy(
 
     # Get verification parameters
     sha_name = app_info.get("sha_name")
-    sha_url = app_info.get("sha_url")
+    sha_download_url = app_info.get("sha_download_url")
     hash_type = app_info.get("hash_type", "sha256")
     appimage_name = os.path.basename(appimage_path)
 
@@ -63,7 +63,7 @@ def verify_with_strategy(
     # Standard verification using SHA file
     verifier = VerificationManager(
         sha_name=sha_name,
-        sha_url=sha_url,
+        sha_download_url=sha_download_url,
         appimage_name=appimage_name,
         appimage_path=appimage_path,
         hash_type=hash_type,

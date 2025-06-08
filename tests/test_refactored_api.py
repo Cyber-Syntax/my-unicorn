@@ -18,9 +18,9 @@ def mock_release_info():
         repo="test-repo",
         version="1.2.3",
         appimage_name="app-x86_64.AppImage",
-        appimage_url="https://example.com/app-x86_64.AppImage",
+        app_download_url="https://example.com/app-x86_64.AppImage",
         sha_name="sha256sums",
-        sha_url="https://example.com/sha256sums",
+        sha_download_url="https://example.com/sha256sums",
         hash_type="sha256",
         arch_keyword="x86_64",
         release_notes="Release notes for version 1.2.3",
@@ -74,9 +74,9 @@ def test_release_info_creation(mock_release_data):
         "repo": "test-repo",
         "version": "1.2.3",
         "appimage_name": "app-x86_64.AppImage",
-        "appimage_url": "https://example.com/app-x86_64.AppImage",
+        "app_download_url": "https://example.com/app-x86_64.AppImage",
         "sha_name": "sha256sums",
-        "sha_url": "https://example.com/sha256sums",
+        "sha_download_url": "https://example.com/sha256sums",
         "hash_type": "sha256",
         "arch_keyword": "x86_64",
     }
@@ -89,9 +89,9 @@ def test_release_info_creation(mock_release_data):
     assert release_info.repo == "test-repo"
     assert release_info.version == "1.2.3"
     assert release_info.appimage_name == "app-x86_64.AppImage"
-    assert release_info.appimage_url == "https://example.com/app-x86_64.AppImage"
+    assert release_info.app_download_url == "https://example.com/app-x86_64.AppImage"
     assert release_info.sha_name == "sha256sums"
-    assert release_info.sha_url == "https://example.com/sha256sums"
+    assert release_info.sha_download_url == "https://example.com/sha256sums"
     assert release_info.hash_type == "sha256"
     assert release_info.arch_keyword == "x86_64"
     assert release_info.release_notes == "Release notes for version 1.2.3"
@@ -164,8 +164,8 @@ def test_release_processor_create_update_response(release_processor, mock_releas
     assert len(response["compatible_assets"]) == 1
     assert response["compatible_assets"][0]["name"] == "app-x86_64.AppImage"
     assert response["is_prerelease"] is False
-    assert response["appimage_url"] == "https://example.com/app-x86_64.AppImage"
-    assert response["sha_url"] == "https://example.com/sha256sums"
+    assert response["app_download_url"] == "https://example.com/app-x86_64.AppImage"
+    assert response["sha_download_url"] == "https://example.com/sha256sums"
 
 
 def test_github_api_refactored(mock_release_data):

@@ -109,9 +109,9 @@ class ReleaseInfo:
     repo: str
     version: str
     appimage_name: str
-    appimage_url: str
+    app_download_url: str
     sha_name: str | None = None
-    sha_url: str | None = None
+    sha_download_url: str | None = None
     hash_type: str | None = None
     arch_keyword: str | None = None
     release_notes: str | None = None
@@ -138,9 +138,9 @@ class ReleaseInfo:
             repo=asset_info["repo"],
             version=asset_info["version"],
             appimage_name=asset_info["appimage_name"],
-            appimage_url=asset_info["appimage_url"],
+            app_download_url=asset_info["app_download_url"],
             sha_name=asset_info.get("sha_name"),
-            sha_url=asset_info.get("sha_url"),
+            sha_download_url=asset_info.get("sha_download_url"),
             hash_type=asset_info.get("hash_type"),
             extracted_hash_from_body=asset_info.get("extracted_hash_from_body"),  # Get new field
             asset_digest=asset_info.get("asset_digest"),  # Get asset digest field

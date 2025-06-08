@@ -26,11 +26,11 @@ class ShaFileManager:
         """
         self.hash_type = hash_type.lower()
 
-    def download_sha_file(self, sha_url: str, sha_path: str) -> None:
+    def download_sha_file(self, sha_download_url: str, sha_path: str) -> None:
         """Download SHA file with proper cleanup and error handling.
 
         Args:
-            sha_url: URL to download the SHA file from
+            sha_download_url: URL to download the SHA file from
             sha_path: Local path where the SHA file should be saved
 
         Raises:
@@ -44,7 +44,7 @@ class ShaFileManager:
                 raise OSError(f"Failed to remove existing SHA file: {e}")
 
         try:
-            response = requests.get(sha_url, timeout=10)
+            response = requests.get(sha_download_url, timeout=10)
             response.raise_for_status()
 
             with open(sha_path, "w", encoding="utf-8") as f:
@@ -52,7 +52,7 @@ class ShaFileManager:
             logging.info(f"Successfully downloaded SHA file: {sha_path}")
 
         except requests.RequestException as e:
-            raise OSError(f"Failed to download SHA file from {sha_url}: {e}")
+            raise OSError(f"Failed to download SHA file from {sha_download_url}: {e}")
         except Exception as e:
             raise OSError(f"Failed to write SHA file to {sha_path}: {e}")
 

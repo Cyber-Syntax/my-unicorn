@@ -183,10 +183,10 @@ class DownloadManager:
             RuntimeError: For network errors, file system errors, or other unexpected issues
 
         """
-        appimage_url = self.github_api.appimage_url
+        app_download_url = self.github_api.app_download_url
         appimage_name = self.github_api.appimage_name
 
-        if not appimage_url or not appimage_name:
+        if not app_download_url or not appimage_name:
             error_msg = "AppImage URL or name is not available. Cannot download."
             self._logger.error(error_msg)
             raise ValueError(error_msg)
@@ -219,7 +219,7 @@ class DownloadManager:
             # Download the file atomically
             try:
                 return self._download_with_atomic_write(
-                    appimage_url, appimage_name, existing_file_path
+                    app_download_url, appimage_name, existing_file_path
                 )
             except Exception as e:
                 error_msg = f"Error downloading {appimage_name}: {e!s}"
@@ -489,7 +489,7 @@ class DownloadManager:
 
         direct_hash_to_pass: str | None = None
         sha_name_to_pass: str | None = self.github_api.sha_name
-        sha_url_to_pass: str | None = self.github_api.sha_url
+        sha_download_url_to_pass: str | None = self.github_api.sha_download_url
 
         if self.github_api.sha_name == "extracted_checksum":
             logging.info(f"Processing 'extracted_checksum' for {self.github_api.appimage_name}.")
@@ -500,8 +500,8 @@ class DownloadManager:
                 logging.info(
                     "Direct hash found for 'extracted_checksum', will pass to VerificationManager."
                 )
-                # sha_url is not needed if direct_hash is used by VerificationManager's "extracted_checksum" path
-                sha_url_to_pass = None
+                # sha_download_url is not needed if direct_hash is used by VerificationManager's "extracted_checksum" path
+                sha_download_url_to_pass = None
             else:
                 # If no direct hash, VerificationManager's "extracted_checksum" will use its legacy path
                 logging.info(
@@ -519,7 +519,7 @@ class DownloadManager:
 
         verifier = VerificationManager(
             sha_name=sha_name_to_pass,
-            sha_url=sha_url_to_pass,
+            sha_download_url=sha_download_url_to_pass,
             appimage_name=self.github_api.appimage_name,
             appimage_path=downloaded_file,
             hash_type=self.github_api.hash_type
@@ -682,7 +682,7 @@ class DownloadManager:
         try:
             headers = {"User-Agent": "AppImage-Updater/1.0"}
             response = requests.head(
-                self.github_api.appimage_url, allow_redirects=True, timeout=10, headers=headers
+                self.github_api.app_download_url, allow_redirects=True, timeout=10, headers=headers
             )
             response.raise_for_status()
 

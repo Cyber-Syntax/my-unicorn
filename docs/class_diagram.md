@@ -167,9 +167,9 @@ classDiagram
             +repo: str
             +version: str
             +appimage_name: str
-            +appimage_url: str
+            +app_download_url: str
             +sha_name: str
-            +sha_url: str
+            +sha_download_url: str
             +hash_type: str
             +arch_keyword: str
             +release_notes: str
@@ -192,7 +192,7 @@ classDiagram
             <<src/api/sha_manager.py>>
             -sha_asset_finder: ShaAssetFinder
             +sha_name: str
-            +sha_url: str
+            +sha_download_url: str
             +hash_type: str
             +find_sha_asset(assets): ShaAsset
             +get_expected_hash(appimage_name): str

@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.11.0-alpha
+### Changed
+Cleaning up the codebase for better readability and maintainability.
+
 ## v0.10.10-alpha
 ### BREAKING CHANGES
 Fixes the performance issue and concurrent issues. After this release we are no longer

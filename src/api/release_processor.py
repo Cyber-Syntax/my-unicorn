@@ -273,9 +273,9 @@ class ReleaseProcessor:
             "compatible_assets": compatible_assets,
             "is_prerelease": release_info.is_prerelease,
             "published_at": release_info.published_at,
-            "appimage_url": release_info.appimage_url,
+            "app_download_url": release_info.app_download_url,
             "appimage_name": release_info.appimage_name,
-            "sha_url": release_info.sha_url,
+            "sha_download_url": release_info.sha_download_url,
             "sha_name": release_info.sha_name,
             "hash_type": release_info.hash_type,
         }

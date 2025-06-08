@@ -34,8 +34,8 @@ def download_test_data() -> tuple[str, str]:
         "appimage": "test.AppImage",
         "version": "1.0.0",
         "sha_name": "test.sha256",
-        "sha_url": "http://example.com/test.sha256",
-        "appimage_url": "http://example.com/test.AppImage",
+        "sha_download_url": "http://example.com/test.sha256",
+        "app_download_url": "http://example.com/test.AppImage",
         "hash_type": "sha256",
     }
 
@@ -108,10 +108,10 @@ def mocked_api(monkeypatch: pytest.MonkeyPatch, download_test_data: tuple[str, s
     mock.version = download_test_data["version"]
     mock.appimage_name = download_test_data["appimage"]
     mock.sha_name = download_test_data["sha_name"]
-    mock.sha_url = download_test_data["sha_url"]
+    mock.sha_download_url = download_test_data["sha_download_url"]
     mock.hash_type = download_test_data["hash_type"]
     mock.arch_keyword = None
-    mock.appimage_url = download_test_data["appimage_url"]
+    mock.app_download_url = download_test_data["app_download_url"]
 
     api_class_mock = MagicMock(return_value=mock)
     monkeypatch.setattr("src.commands.install_url.GitHubAPI", api_class_mock)

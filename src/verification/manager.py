@@ -25,7 +25,7 @@ class VerificationManager:
     """
 
     sha_name: str | None = None
-    sha_url: str | None = None
+    sha_download_url: str | None = None
     appimage_name: str | None = None
     hash_type: str = "sha256"
     appimage_path: str | None = None
@@ -38,7 +38,7 @@ class VerificationManager:
         # Initialize configuration
         self.config = VerificationConfig(
             sha_name=self.sha_name,
-            sha_url=self.sha_url,
+            sha_download_url=self.sha_download_url,
             appimage_name=self.appimage_name,
             hash_type=self.hash_type,
             appimage_path=self.appimage_path,
@@ -67,7 +67,7 @@ class VerificationManager:
     def _sync_from_config(self) -> None:
         """Sync our attributes with the validated configuration."""
         self.sha_name = self.config.sha_name
-        self.sha_url = self.config.sha_url
+        self.sha_download_url = self.config.sha_download_url
         self.appimage_name = self.config.appimage_name
         self.hash_type = self.config.hash_type
         self.appimage_path = self.config.appimage_path
@@ -225,11 +225,11 @@ class VerificationManager:
 
             # Download SHA file if needed
             if (
-                self.config.sha_url
+                self.config.sha_download_url
                 and self.config.sha_name
                 and not os.path.exists(self.config.sha_name)
             ):
-                self.sha_manager.download_sha_file(self.config.sha_url, self.config.sha_name)
+                self.sha_manager.download_sha_file(self.config.sha_download_url, self.config.sha_name)
 
             # Verify SHA file exists
             if not self.config.sha_name or not os.path.exists(self.config.sha_name):

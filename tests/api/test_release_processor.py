@@ -95,9 +95,9 @@ class TestReleaseProcessorLogic:
             "repo": release_processor_instance.repo,
             "version": "1.2.3",
             "appimage_name": "app-x86_64.AppImage",
-            "appimage_url": "https://example.com/app-x86_64.AppImage",
+            "app_download_url": "https://example.com/app-x86_64.AppImage",
             "sha_name": "app-x86_64.AppImage.sha256",
-            "sha_url": "https://example.com/app-x86_64.AppImage.sha256",
+            "sha_download_url": "https://example.com/app-x86_64.AppImage.sha256",
             "hash_type": "sha256",
             "arch_keyword": "x86_64",
         }
@@ -112,9 +112,9 @@ class TestReleaseProcessorLogic:
         assert release_info.version == processed_asset_info["version"]
         # ... (other assertions remain the same)
         assert release_info.appimage_name == processed_asset_info["appimage_name"]
-        assert release_info.appimage_url == processed_asset_info["appimage_url"]
+        assert release_info.app_download_url == processed_asset_info["app_download_url"]
         assert release_info.sha_name == processed_asset_info["sha_name"]
-        assert release_info.sha_url == processed_asset_info["sha_url"]
+        assert release_info.sha_download_url == processed_asset_info["sha_download_url"]
         assert release_info.hash_type == processed_asset_info["hash_type"]
         assert release_info.arch_keyword == processed_asset_info["arch_keyword"]
         assert release_info.release_notes == mock_release_data["body"]
@@ -170,7 +170,7 @@ class TestReleaseProcessorLogic:
         assert response["compatible_assets"] == compatible_assets_list_mock
         # ... assert other fields from mock_release_info_fixture like appimage_name, url etc.
         assert response["appimage_name"] == mock_release_info_fixture.appimage_name
-        assert response["appimage_url"] == mock_release_info_fixture.appimage_url
+        assert response["app_download_url"] == mock_release_info_fixture.app_download_url
 
     def test_filter_compatible_assets(
         self,

@@ -59,9 +59,9 @@ class TestGitHubAPIDirect:
         # Let's defer detailed checks of these to tests that involve _process_release.
 
         assert github_api_instance.version is None
-        # sha_url, appimage_url, appimage_name are also set by _process_release
-        assert github_api_instance.sha_url is None
-        assert github_api_instance.appimage_url is None
+        # sha_download_url, app_download_url, appimage_name are also set by _process_release
+        assert github_api_instance.sha_download_url is None
+        assert github_api_instance.app_download_url is None
         assert github_api_instance.appimage_name is None
 
         assert (
@@ -397,9 +397,9 @@ class TestGitHubAPIDirect:
 
             # Configure SHAManager mock attributes that GitHubAPI will read
             sha_name_for_test = "sha.txt"
-            sha_url_for_test = "url2"
+            sha_download_url_for_test = "url2"
             mock_sham_instance.sha_name = sha_name_for_test
-            mock_sham_instance.sha_url = sha_url_for_test
+            mock_sham_instance.sha_download_url = sha_download_url_for_test
             mock_sham_instance.hash_type = "sha256"
 
             # Call the method under test
@@ -427,10 +427,10 @@ class TestGitHubAPIDirect:
             # Assertions for attributes of github_api_instance
             assert github_api_instance.version == expected_version
             assert github_api_instance.appimage_name == appimage_filename_for_test
-            assert github_api_instance.appimage_url == "url1"
+            assert github_api_instance.app_download_url == "url1"
             assert github_api_instance._arch_keyword == expected_arch_keyword
             assert github_api_instance.sha_name == sha_name_for_test
-            assert github_api_instance.sha_url == sha_url_for_test
+            assert github_api_instance.sha_download_url == sha_download_url_for_test
             assert github_api_instance.hash_type == "sha256"
 
             # Construct the expected ReleaseInfo object for comparison
@@ -439,9 +439,9 @@ class TestGitHubAPIDirect:
                 repo=github_api_instance.repo,
                 version=expected_version,
                 appimage_name=appimage_filename_for_test,
-                appimage_url="url1",
+                app_download_url="url1",
                 sha_name=sha_name_for_test,
-                sha_url=sha_url_for_test,
+                sha_download_url=sha_download_url_for_test,
                 hash_type="sha256",
                 arch_keyword=expected_arch_keyword,
                 release_notes=mock_release_data.get("body", ""),

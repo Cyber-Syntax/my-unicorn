@@ -65,14 +65,14 @@ class TestBaseUpdateCommand:
         """Fixture to create a mocked GitHubAPI instance."""
         mock_api = MagicMock(spec=GitHubAPI)
         mock_api.appimage_name = "test-app-1.1.0.AppImage"
-        mock_api.appimage_url = (
+        mock_api.app_download_url = (
             "https://github.com/test/test-app/releases/download/v1.1.0/test-app-1.1.0.AppImage"
         )
         mock_api.version = "1.1.0"
         mock_api.owner = "test"
         mock_api.repo = "test-app"
         mock_api.sha_name = "test-app-1.1.0.AppImage.sha256"
-        mock_api.sha_url = "https://github.com/test/test-app/releases/download/v1.1.0/test-app-1.1.0.AppImage.sha256"
+        mock_api.sha_download_url = "https://github.com/test/test-app/releases/download/v1.1.0/test-app-1.1.0.AppImage.sha256"
         mock_api.hash_type = "sha256"
 
         # Setup get_latest_release method
@@ -119,7 +119,7 @@ class TestBaseUpdateCommand:
         github_api_instance = mock_github_api.return_value
         github_api_instance.get_latest_release.return_value = (True, {"tag_name": "v1.1.0"})
         github_api_instance.appimage_name = "test-app-1.1.0.AppImage"
-        github_api_instance.appimage_url = (
+        github_api_instance.app_download_url = (
             "https://github.com/test/test-app/releases/download/v1.1.0/test-app-1.1.0.AppImage"
         )
         github_api_instance.version = "1.1.0"
@@ -224,7 +224,7 @@ class TestBaseUpdateCommand:
         github_api_instance = mock_github_api.return_value
         github_api_instance.get_latest_release.return_value = (True, {"tag_name": "v1.1.0"})
         github_api_instance.appimage_name = "test-app-1.1.0.AppImage"
-        github_api_instance.appimage_url = (
+        github_api_instance.app_download_url = (
             "https://github.com/test/test-app/releases/download/v1.1.0/test-app-1.1.0.AppImage"
         )
         github_api_instance.owner = "test"

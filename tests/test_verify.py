@@ -42,7 +42,7 @@ def test_valid_sha256_verification(mock_appimage, tmp_path, patch_requests_get):
     sha_name = str(tmp_path / "appimage.sha256")
     vm = VerificationManager(
         sha_name=sha_name,
-        sha_url="https://example.com/appimage.sha256",
+        sha_download_url="https://example.com/appimage.sha256",
         appimage_name=mock_appimage,
         hash_type="sha256",
     )
@@ -57,7 +57,7 @@ def test_invalid_hash_type():
 
 def test_no_hash_mode_skips_verification(mock_appimage):
     vm = VerificationManager(
-        sha_name=None, sha_url=None, appimage_name=mock_appimage, hash_type="no_hash"
+        sha_name=None, sha_download_url=None, appimage_name=mock_appimage, hash_type="no_hash"
     )
 
     assert vm.verify_appimage() is True
@@ -66,7 +66,7 @@ def test_no_hash_mode_skips_verification(mock_appimage):
 def test_missing_appimage_returns_false(tmp_path):
     vm = VerificationManager(
         sha_name="irrelevant",
-        sha_url="https://example.com/sha256",
+        sha_download_url="https://example.com/sha256",
         appimage_name=str(tmp_path / "nonexistent.AppImage"),
         hash_type="sha256",
     )
@@ -83,7 +83,7 @@ def test_cleanup_on_failure(tmp_path):
 
     vm = VerificationManager(
         sha_name=str(sha_name),
-        sha_url="https://example.com/bad.sha256",
+        sha_download_url="https://example.com/bad.sha256",
         appimage_name=str(bad_appimage),
         hash_type="sha256",
     )
@@ -106,7 +106,7 @@ def test_cleanup_on_failure_user_declines(tmp_path):
 
     vm = VerificationManager(
         sha_name=str(sha_name),
-        sha_url="https://example.com/bad.sha256",
+        sha_download_url="https://example.com/bad.sha256",
         appimage_name=str(bad_appimage),
         hash_type="sha256",
     )
@@ -130,7 +130,7 @@ def mock_yaml_sha_file(tmp_path):
 
 def test_yaml_sha_verification(mock_appimage, mock_yaml_sha_file):
     vm = VerificationManager(
-        sha_name=mock_yaml_sha_file, sha_url="", appimage_name=mock_appimage, hash_type="sha256"
+        sha_name=mock_yaml_sha_file, sha_download_url="", appimage_name=mock_appimage, hash_type="sha256"
     )
     assert vm.verify_appimage() is True
 
@@ -139,7 +139,7 @@ def test_yaml_sha_missing_field(tmp_path, mock_appimage):
     path = tmp_path / "bad.yml"
     path.write_text("sha512: invalid")
     vm = VerificationManager(
-        sha_name=str(path), sha_url="", appimage_name=mock_appimage, hash_type="sha256"
+        sha_name=str(path), sha_download_url="", appimage_name=mock_appimage, hash_type="sha256"
     )
     assert vm.verify_appimage() is False
 
@@ -148,7 +148,7 @@ def test_yaml_sha_bad_base64(tmp_path, mock_appimage):
     path = tmp_path / "corrupt.yml"
     path.write_text("sha256: !!not_base64!!")
     vm = VerificationManager(
-        sha_name=str(path), sha_url="", appimage_name=mock_appimage, hash_type="sha256"
+        sha_name=str(path), sha_download_url="", appimage_name=mock_appimage, hash_type="sha256"
     )
     assert vm.verify_appimage() is False
 
@@ -159,7 +159,7 @@ def test_sha512_file(mock_appimage, tmp_path):
     sha_path.write_text(f"{sha512}  appimage.AppImage\n")
 
     vm = VerificationManager(
-        sha_name=str(sha_path), sha_url="", appimage_name=mock_appimage, hash_type="sha512"
+        sha_name=str(sha_path), sha_download_url="", appimage_name=mock_appimage, hash_type="sha512"
     )
 
     assert vm.verify_appimage() is True
@@ -169,7 +169,7 @@ def test_text_sha_with_invalid_line(tmp_path, mock_appimage):
     sha_path = tmp_path / "mixed.txt"
     sha_path.write_text("invalid_line_without_hash\n")
     vm = VerificationManager(
-        sha_name=str(sha_path), sha_url="", appimage_name=mock_appimage, hash_type="sha256"
+        sha_name=str(sha_path), sha_download_url="", appimage_name=mock_appimage, hash_type="sha256"
     )
 
     assert vm.verify_appimage() is False
@@ -181,7 +181,7 @@ def test_verification_fallback_when_sha_matches_appimage(tmp_path):
 
     vm = VerificationManager(
         sha_name=str(dummy_appimage),
-        sha_url="https://irrelevant.com",
+        sha_download_url="https://irrelevant.com",
         appimage_name=str(dummy_appimage),
         hash_type="sha256",
     )
@@ -193,7 +193,7 @@ def test_cleanup_verification_file(tmp_path):
     sha_path = tmp_path / "temp.sha256"
     sha_path.write_text("dummy")
     vm = VerificationManager(
-        sha_name=str(sha_path), sha_url="", appimage_name="irrelevant", hash_type="no_hash"
+        sha_name=str(sha_path), sha_download_url="", appimage_name="irrelevant", hash_type="no_hash"
     )
     vm._cleanup_verification_file()
     assert not os.path.exists(sha_path)
@@ -201,7 +201,7 @@ def test_cleanup_verification_file(tmp_path):
 
 def test_log_comparison_output(capsys):
     vm = VerificationManager(
-        sha_name="dummy", sha_url="dummy", appimage_name="test.AppImage", hash_type="sha256"
+        sha_name="dummy", sha_download_url="dummy", appimage_name="test.AppImage", hash_type="sha256"
     )
     vm._log_comparison("abc123", "abc456")
     output = capsys.readouterr().out
@@ -211,7 +211,7 @@ def test_log_comparison_output(capsys):
 
 def test_get_user_confirmation(monkeypatch, capsys):
     vm = VerificationManager(
-        sha_name="dummy", sha_url="dummy", appimage_name="test.AppImage", hash_type="sha256"
+        sha_name="dummy", sha_download_url="dummy", appimage_name="test.AppImage", hash_type="sha256"
     )
 
     # Test user confirming removal (answering 'y')
@@ -253,7 +253,7 @@ def test_path_based_sha(mock_appimage, tmp_path):
 
     # Initialize verification manager
     vm = VerificationManager(
-        sha_name=str(sha_path), sha_url="", appimage_name=mock_appimage, hash_type="sha256"
+        sha_name=str(sha_path), sha_download_url="", appimage_name=mock_appimage, hash_type="sha256"
     )
 
     # Verify the file
@@ -277,7 +277,7 @@ def test_path_based_sha_with_multiple_entries(mock_appimage, tmp_path):
 
     # Initialize verification manager
     vm = VerificationManager(
-        sha_name=str(sha_path), sha_url="", appimage_name=mock_appimage, hash_type="sha256"
+        sha_name=str(sha_path), sha_download_url="", appimage_name=mock_appimage, hash_type="sha256"
     )
 
     # Mock the hash comparison to focus on testing the file format parsing,
@@ -301,7 +301,7 @@ def test_path_based_sha_no_match(mock_appimage, tmp_path):
 
     # Initialize verification manager
     vm = VerificationManager(
-        sha_name=str(sha_path), sha_url="", appimage_name=mock_appimage, hash_type="sha256"
+        sha_name=str(sha_path), sha_download_url="", appimage_name=mock_appimage, hash_type="sha256"
     )
 
     # Verification should fail
@@ -319,7 +319,7 @@ def test_common_app_verification_format(mock_appimage, tmp_path):
 
     # Initialize verification manager
     vm = VerificationManager(
-        sha_name=str(sha_path), sha_url="", appimage_name=mock_appimage, hash_type="sha256"
+        sha_name=str(sha_path), sha_download_url="", appimage_name=mock_appimage, hash_type="sha256"
     )
 
     # Verify the file
@@ -343,7 +343,7 @@ def test_tagspace_sha_format(mock_appimage, tmp_path):
 
     # Initialize verification manager
     vm = VerificationManager(
-        sha_name=str(sha_path), sha_url="", appimage_name=mock_appimage, hash_type="sha256"
+        sha_name=str(sha_path), sha_download_url="", appimage_name=mock_appimage, hash_type="sha256"
     )
 
     # Mock the hash comparison to avoid actual hash calculation issues
@@ -391,7 +391,7 @@ def test_superproductivity_yml_format(mock_appimage, tmp_path):
     # Initialize verification manager
     vm = VerificationManager(
         sha_name=str(sha_path),
-        sha_url="",
+        sha_download_url="",
         appimage_name=str(mock_appimage_path),
         hash_type="sha512",
     )
@@ -441,7 +441,7 @@ def test_joplin_yml_format(mock_appimage, tmp_path):
     # Initialize verification manager
     vm = VerificationManager(
         sha_name=str(sha_path),
-        sha_url="",
+        sha_download_url="",
         appimage_name=str(mock_appimage_path),
         hash_type="sha512",
     )
@@ -473,7 +473,7 @@ def test_siyuan_sha_format(mock_appimage, tmp_path):
     # Initialize verification manager
     vm = VerificationManager(
         sha_name=str(sha_path),
-        sha_url="",
+        sha_download_url="",
         appimage_name=str(mock_appimage_path),
         hash_type="sha256",
     )
@@ -500,7 +500,7 @@ def test_qownnotes_sha_format(mock_appimage, tmp_path):
     # Initialize verification manager
     vm = VerificationManager(
         sha_name=str(sha_path),
-        sha_url="",
+        sha_download_url="",
         appimage_name=str(mock_appimage_path),
         hash_type="sha256",
     )
@@ -526,7 +526,7 @@ def test_joplin_sha512_file_format(mock_appimage, tmp_path):
     # Initialize verification manager
     vm = VerificationManager(
         sha_name=str(sha_path),
-        sha_url="",
+        sha_download_url="",
         appimage_name=str(mock_appimage_path),
         hash_type="sha512",
     )

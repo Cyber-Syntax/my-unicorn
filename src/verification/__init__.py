@@ -11,7 +11,7 @@ Example:
     manager = VerificationManager(
         appimage_name="app.AppImage",
         hash_type="sha256",
-        sha_url="https://example.com/checksums.sha256"
+        sha_download_url="https://example.com/checksums.sha256"
     )
     is_valid = manager.verify_appimage()
 

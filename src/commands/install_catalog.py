@@ -211,7 +211,7 @@ class InstallAppCommand(Command):
 
                         verification_manager = VerificationManager(
                             sha_name=api.sha_name,
-                            sha_url=api.sha_url,
+                            sha_download_url=api.sha_download_url,
                             appimage_name=api.appimage_name,
                             hash_type=api.hash_type,
                             asset_digest=api.asset_digest,
