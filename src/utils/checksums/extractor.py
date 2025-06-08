@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # TODO: Move this to verification folder
 # this is not a basic util anymore
 # fix: duplicate code too
+# NOTE: it is even not need to be work with api, api need to send the hash to the verification itself.
 class ReleaseChecksumExtractor:
     """Extract and process checksums from GitHub release descriptions."""
 

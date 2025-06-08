@@ -15,6 +15,7 @@ from src.utils.checksums.storage import save_checksums_file
 logger = logging.getLogger(__name__)
 
 
+#FIX: Outdated old catalog module usage
 def get_repo_info_for_appimage(appimage_path: str | Path) -> dict[str, str]:
     """Get owner/repo information for an AppImage from app catalog.
 
@@ -28,7 +29,7 @@ def get_repo_info_for_appimage(appimage_path: str | Path) -> dict[str, str]:
         dict[str, str]: Dictionary with 'owner' and 'repo' keys if found, empty dict if not found
     """
     try:
-        from src.app_catalog import APP_CATALOG
+        from src.catalog import APP_CATALOG
 
         app_id = Path(appimage_path).stem.split("-")[0].lower()
         logger.info(f"Trying to find repository info for app_id: {app_id}")

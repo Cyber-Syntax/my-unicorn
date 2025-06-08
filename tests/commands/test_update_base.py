@@ -359,7 +359,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test checking version when update is available."""
         # Setup app definition mock
-        from src.app_catalog import AppInfo
+        from src.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -407,7 +407,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test checking version when app is up to date."""
         # Setup app definition mock
-        from src.app_catalog import AppInfo
+        from src.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -450,7 +450,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test checking version when API returns an error."""
         # Setup app definition mock
-        from src.app_catalog import AppInfo
+        from src.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -828,7 +828,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test core app update logic with successful outcome."""
         # Setup app definition mock
-        from src.app_catalog import AppInfo
+        from src.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -911,7 +911,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test core app update logic with API error."""
         # Setup app definition mock
-        from src.app_catalog import AppInfo
+        from src.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",

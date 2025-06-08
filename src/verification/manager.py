@@ -191,7 +191,7 @@ class VerificationManager:
     def _verify_with_release_checksums(self, cleanup_on_failure: bool) -> bool:
         """Verify using legacy release checksums method."""
         try:
-            from src.app_catalog import find_app_by_name_in_filename
+            from src.catalog import find_app_by_name_in_filename
             from src.utils.checksums import verify_with_release_checksums
 
             self.logger.log_info("Using GitHub release description for verification")

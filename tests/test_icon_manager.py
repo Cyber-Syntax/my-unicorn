@@ -115,14 +115,14 @@ app_config_mod.AppConfigManager = DummyAppConfigManager
 src.app_config = app_config_mod
 sys.modules["src.app_config"] = app_config_mod
 
-# Create src.app_catalog with get_app_rename_for_owner_repo
-app_catalog_mod = types.ModuleType("src.app_catalog")
+# Create src.catalog with get_app_rename_for_owner_repo
+app_catalog_mod = types.ModuleType("src.catalog")
 app_catalog_mod.get_app_rename_for_owner_repo = (
     lambda owner, repo: repo
 )  # Simply return repo as app_rename
 app_catalog_mod.AppInfo = types.SimpleNamespace  # Add AppInfo class placeholder
-src.app_catalog = app_catalog_mod
-sys.modules["src.app_catalog"] = app_catalog_mod
+src.catalog = app_catalog_mod
+sys.modules["src.catalog"] = app_catalog_mod
 
 # Override IconManager._check_icon_path to properly track paths
 original_check_icon_path = IconManager._check_icon_path

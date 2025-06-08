@@ -13,7 +13,7 @@ import time
 from typing import Any
 
 from src.api.github_api import GitHubAPI
-from src.app_catalog import load_app_definition
+from src.catalog import load_app_definition
 from src.app_config import AppConfigManager
 from src.auth_manager import GitHubAuthManager
 from src.commands.base import Command

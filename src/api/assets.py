@@ -120,7 +120,6 @@ class ReleaseInfo:
     published_at: str | None = None
     extracted_hash_from_body: str | None = None  # For hash extracted from release body
     asset_digest: str | None = None  # For GitHub API asset digest verification
-    raw_assets: list[dict[str, Any]] = field(default_factory=list)  # Added for storing all assets
 
     @classmethod
     def from_release_data(cls, release_data: dict, asset_info: dict) -> "ReleaseInfo":
@@ -150,5 +149,4 @@ class ReleaseInfo:
             release_url=release_data.get("html_url", ""),
             is_prerelease=release_data.get("prerelease", False),
             published_at=release_data.get("published_at", ""),
-            raw_assets=release_data.get("assets", []),  # Populate raw_assets
         )

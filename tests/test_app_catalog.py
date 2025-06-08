@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Tests for AppCatalog functionality.
 
-This module contains tests for the app_catalog module, which provides
+This module contains tests for the catalog module, which provides
 a database of applications that can be installed by name.
 """
 
@@ -17,8 +17,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Import modules
-from src.app_catalog import (
-    APP_CATALOG,
+from src.catalog import (
     AppInfo,
     get_all_apps,
     get_app_info,
@@ -216,11 +215,11 @@ def test_sync_with_icon_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     # Create a mock logger
     mock_logger = MagicMock()
-    monkeypatch.setattr("src.app_catalog.logger", mock_logger)
+    monkeypatch.setattr("src.catalog.logger", mock_logger)
 
     # Create a mock ICON_PATHS with some missing entries
     mock_icon_paths = {"joplin": {"exact_path": "path/to/icon.png", "filename": "joplin_icon.png"}}
-    monkeypatch.setattr("src.app_catalog.ICON_PATHS", mock_icon_paths)
+    monkeypatch.setattr("src.catalog.ICON_PATHS", mock_icon_paths)
 
     # Run the sync function
     sync_with_icon_paths()

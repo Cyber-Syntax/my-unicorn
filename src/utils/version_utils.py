@@ -160,7 +160,7 @@ def repo_uses_beta(repo_name: str) -> bool:
         bool: True if the repository typically uses beta releases
     """
     # Import here to avoid circular imports
-    from src.app_catalog import get_all_apps
+    from src.catalog import get_all_apps
 
     # Get all apps from catalog
     all_apps = get_all_apps()

@@ -17,7 +17,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Import the modules directly to avoid import issues
-from src.app_catalog import AppInfo
+from src.catalog import AppInfo
 from src.commands.install_catalog import InstallAppCommand
 
 

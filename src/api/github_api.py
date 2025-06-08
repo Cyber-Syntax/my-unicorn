@@ -9,7 +9,7 @@ for consistent access patterns.
 import logging
 from typing import Any
 
-from src.app_catalog import AppInfo, find_app_by_owner_repo, load_app_definition
+from src.catalog import AppInfo, find_app_by_owner_repo, load_app_definition
 from src.auth_manager import GitHubAuthManager
 from src.icon_manager import IconManager
 from src.utils import arch_utils

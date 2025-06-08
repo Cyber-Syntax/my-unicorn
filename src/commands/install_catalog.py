@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 
 from src.api.github_api import GitHubAPI
-from src.app_catalog import AppInfo, get_all_apps
+from src.catalog import AppInfo, get_all_apps
 from src.app_config import AppConfigManager
 from src.commands.base import Command
 from src.download import DownloadManager

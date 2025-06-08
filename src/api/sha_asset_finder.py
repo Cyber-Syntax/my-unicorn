@@ -7,7 +7,7 @@ for an AppImage from GitHub release assets.
 import logging
 import re
 
-from src.app_catalog import AppInfo
+from src.catalog import AppInfo
 
 logger = logging.getLogger(__name__)
 

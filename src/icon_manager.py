@@ -12,7 +12,7 @@ from typing import Any
 
 import requests
 
-from src.app_catalog import load_app_definition
+from src.catalog import load_app_definition
 from src.auth_manager import GitHubAuthManager
 
 logger = logging.getLogger(__name__)

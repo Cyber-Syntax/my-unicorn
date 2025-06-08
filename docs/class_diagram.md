@@ -82,7 +82,7 @@ classDiagram
 
 
     class AppCatalog {
-        <<src/app_catalog.py>>
+        <<src/catalog.py>>
         +app_configs: List_AppConfig
         +load_app_configs()
         +get_app_config(app_name): AppConfig

@@ -8,7 +8,7 @@ support python 3.11 and lower. This release completely switches to python 3.12 a
 
 ## v0.10.9-alpha
 ### Changed
-This release will not affect existing functionality, but it will fix the issue with the app_catalog module.
+This release will not affect existing functionality, but it will fix the issue with the catalog module.
 
 ## v0.10.8-alpha
 ### Changed

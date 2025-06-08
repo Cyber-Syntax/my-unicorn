@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 # Local imports
-from src.app_catalog import load_app_definition
+from src.catalog import load_app_definition
 from src.utils.desktop_entry import DesktopEntryManager
 
 # Configure module logger

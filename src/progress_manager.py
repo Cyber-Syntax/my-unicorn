@@ -11,7 +11,7 @@ import time
 from contextlib import contextmanager
 from datetime import datetime
 
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 
 
@@ -486,10 +486,7 @@ class ProgressManager:
                 sys.stdout.write("\033[K")  # Clear to the end of line
             sys.stdout.flush()
 
-# Type variable for item IDs
-T = TypeVar("T")
-
-class DynamicProgressManager(Generic[T]):
+class DynamicProgressManager[T]:
     """Manages dynamic progress display for concurrent operations.
 
     This class handles progress tracking for multiple concurrent operations

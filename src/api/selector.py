@@ -9,7 +9,7 @@ import logging
 import re
 from dataclasses import dataclass
 
-from src.app_catalog import AppInfo
+from src.catalog import AppInfo
 from src.utils import arch_utils
 
 logger = logging.getLogger(__name__)
