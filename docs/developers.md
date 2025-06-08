@@ -22,8 +22,7 @@ https://api.github.com/repos/zen-browser/desktop/releases/
 "assets": [
   {
     "name": "freetube-0.23.5-amd64.AppImage",
-    // Not implemented yet but this will be used to get the file type in the future
-    // "content_type": "application/vnd.appimage", 
+    "content_type": "application/vnd.appimage", 
     "digest": null,
     "size": 99711480,
     "browser_download_url": "https://github.com/FreeTubeApp/FreeTube/releases/download/v0.23.5-beta/freetube-0.23.5-amd64.AppImage"

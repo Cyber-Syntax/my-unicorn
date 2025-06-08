@@ -66,8 +66,10 @@ class AppImageSelector:
         self._logger.info(f"Target characteristic suffixes: {target_suffixes}")
 
         # Filter AppImage assets
-        #TODO: Use "content_type": "application/vnd.appimage" instead of endswith
-        appimage_assets = [asset for asset in assets if asset["name"].lower().endswith(".appimage")]
+        appimage_assets = [
+            asset for asset in assets
+            if asset.get("content_type") == "application/vnd.appimage"
+        ]
 
         if not appimage_assets:
             self._logger.warning("No AppImage assets found in release")
