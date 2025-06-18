@@ -4,12 +4,14 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-import requests  # Keep for now, might be needed for some exception tests if not fully moved
 
-from src.api.github_api import GitHubAPI
 from src.api.assets import ReleaseInfo  # Added import for type hint
-from src.utils import version_utils  # Added import
-from src.utils import arch_extraction  # Added import for extract_arch_from_filename
+from src.api.github_api import GitHubAPI
+from src.utils import (
+    arch_extraction,  # Added import for extract_arch_from_filename
+    version_utils,  # Added import
+)
+
 # ReleaseManager might be needed for type hinting if we mock its instance
 # from src.api.release_manager import ReleaseManager
 
@@ -20,6 +22,7 @@ def github_api_instance() -> GitHubAPI:
 
     Returns:
         GitHubAPI: A GitHubAPI instance with ReleaseManager mocked.
+
     """
     with patch(
         "src.api.github_api.GitHubAuthManager.get_auth_headers", return_value={"User-Agent": "test"}
@@ -48,6 +51,7 @@ class TestGitHubAPIDirect:
 
         Args:
             github_api_instance: GitHubAPI fixture
+
         """
         assert github_api_instance.owner == "test-owner"
         assert github_api_instance.repo == "test-repo"
@@ -79,6 +83,7 @@ class TestGitHubAPIDirect:
 
         Args:
             github_api_instance: GitHubAPI fixture
+
         """
         assert github_api_instance.arch_keyword is None  # Initially None
         github_api_instance._arch_keyword = "x86_64"  # Simulate it being set
@@ -430,7 +435,10 @@ class TestGitHubAPIDirect:
             assert github_api_instance.app_download_url == "url1"
             assert github_api_instance._arch_keyword == expected_arch_keyword
             assert github_api_instance.checksum_file_name == checksum_file_name_for_test
-            assert github_api_instance.checksum_file_download_url == checksum_file_download_url_for_test
+            assert (
+                github_api_instance.checksum_file_download_url
+                == checksum_file_download_url_for_test
+            )
             assert github_api_instance.checksum_hash_type == "sha256"
 
             # Construct the expected ReleaseInfo object for comparison

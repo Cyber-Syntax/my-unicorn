@@ -146,19 +146,19 @@ classDiagram
             +find_app_icon(): dict
             -_process_release(release_data)
         }
-        
+
         class ReleaseManager {
             <<src/api/release_manager.py>>
             +get_latest_release_data(headers): tuple_bool_dict_or_str
             +get_specific_release_data(tag, headers): tuple_bool_dict_or_str
         }
-        
+
         class ReleaseProcessor {
             <<src/api/release_processor.py>>
             +extract_version_from_tag(tag_name): str
             +select_appimage_asset(assets, arch_keyword): dict
             +populate_release_info(release_data, asset_info): ReleaseInfo
-            +compare_versions(current_version, latest_version, prerelease): tuple
+            +compare_versions(current_version, latest_version): tuple
         }
 
         class ReleaseAssetInfo {
@@ -210,8 +210,8 @@ classDiagram
     API.APIInterface o-- API.ReleaseManager
     API.APIInterface o-- API.IconManager
     API.APIInterface --> API.APIRateLimitHandler
-    API.APIInterface --> Utils.VersionUtils 
-    API.APIInterface --> Utils.ArchExtractionUtils 
+    API.APIInterface --> Utils.VersionUtils
+    API.APIInterface --> Utils.ArchExtractionUtils
     API.ReleaseManager o-- API.ReleaseProcessor
     API.ReleaseProcessor o-- API.ReleaseAssetInfo
     API.ReleaseProcessor o-- API.AppImageAsset
@@ -239,7 +239,7 @@ classDiagram
             -checksum_verifier: ChecksumVerification
             +verify_download(filepath, release_info: ReleaseAssetInfo, downloaded_sha_content: str): bool
         }
-        
+
         class ChecksumVerification {
             <<src/utils/checksums/verification.py>>
             +verify_checksum(filepath, expected_hash, checksum_hash_type): bool

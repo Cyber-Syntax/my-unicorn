@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """GitHub API handler module.
 
-This module provides the primary interface for interacting with GitHub's API to handle releases, 
-assets, and SHA verification. It consolidates all GitHub-related operations into a single class 
+This module provides the primary interface for interacting with GitHub's API to handle releases,
+assets, and SHA verification. It consolidates all GitHub-related operations into a single class
 for consistent access patterns.
 """
 
 import logging
 from typing import Any
 
-from src.catalog import AppInfo, find_app_by_owner_repo, load_app_definition
 from src.auth_manager import GitHubAuthManager
+from src.catalog import AppInfo, find_app_by_owner_repo, load_app_definition
 from src.icon_manager import IconManager
-from src.utils import arch_utils
 from src.utils.arch_extraction import extract_arch_from_filename
 from src.utils.version_utils import extract_version, extract_version_from_filename
 
@@ -37,13 +36,14 @@ class GitHubAPI:
         arch_keyword: str | None = None,
     ):
         """Initialize GitHub API handler.
-        
+
         Args:
             owner: Repository owner/organization name
             repo: Repository name
             checksum_file_name: Name of SHA file for verification
             checksum_hash_type: Type of hash to use (sha256, sha512)
             arch_keyword: Optional architecture keyword for filtering
+
         """
         self.owner = owner
         self.repo = repo
@@ -85,7 +85,7 @@ class GitHubAPI:
         self, version_check_only: bool = False, is_batch: bool = False
     ) -> tuple[bool, dict[str, Any], str]:
         """Fetch latest stable or beta release based on app configuration.
-        
+
         Uses ReleaseManager to fetch the appropriate release version (stable or beta) based on the
         app's configuration in the catalog.
         Processes the release data and extracts relevant information.
@@ -93,9 +93,10 @@ class GitHubAPI:
         Args:
             version_check_only: If True, only check version without downloading assets
             is_batch: Whether this is part of a batch operation
-            
+
         Returns:
             Tuple containing (success flag, release data or error message, additional info)
+
         """
         # Check if app prefers beta releases from catalog configuration
         prefer_beta = self._app_info.beta if self._app_info else False
@@ -146,10 +147,7 @@ class GitHubAPI:
             return False, f"Failed to process release data: {e}"
 
     def _process_release(
-        self,
-        release_data: dict[str, Any],
-        version_check_only: bool = False,
-        is_batch: bool = False
+        self, release_data: dict[str, Any], version_check_only: bool = False, is_batch: bool = False
     ) -> None:
         """Process release data and populate instance attributes.
 
@@ -164,6 +162,7 @@ class GitHubAPI:
 
         Raises:
             ValueError: If required release data is missing or tag format is invalid
+
         """
         logger.debug(
             f"Processing release in github_api.py: {release_data.get('tag_name', 'Unknown tag')}, version_check_only: {version_check_only}, is_batch: {is_batch}"
@@ -179,7 +178,7 @@ class GitHubAPI:
         # Handle zen-browser's special version format (X.Y.Z[letter])
         if self.owner == "zen-browser" and self.repo == "desktop":
             import re
-            
+
             zen_tag_pattern = re.compile(r"^v?(\d+\.\d+\.\d+)([a-zA-Z])$")
             match = zen_tag_pattern.match(raw_tag)
             if match:
@@ -235,9 +234,7 @@ class GitHubAPI:
         # Process assets for installation/download
         assets: list[dict[str, Any]] = release_data.get("assets", [])
         if not assets:
-            logger.warning(
-                f"No assets found in release {raw_tag} for {self.owner}/{self.repo}"
-            )
+            logger.warning(f"No assets found in release {raw_tag} for {self.owner}/{self.repo}")
 
         # Ensure app info is loaded for asset selection
         if self._app_info is None:
@@ -342,7 +339,9 @@ class GitHubAPI:
                 # Use SHA name from app definition if available, otherwise use provided checksum_file_name
                 if self._app_info and self._app_info.checksum_file_name:
                     initial_checksum_file_name_hint = self._app_info.checksum_file_name
-                    logger.debug(f"Using SHA name from app definition: {initial_checksum_file_name_hint}")
+                    logger.debug(
+                        f"Using SHA name from app definition: {initial_checksum_file_name_hint}"
+                    )
                 else:
                     initial_checksum_file_name_hint = self.checksum_file_name or "sha256"
                     logger.debug(f"Using fallback SHA name: {initial_checksum_file_name_hint}")
