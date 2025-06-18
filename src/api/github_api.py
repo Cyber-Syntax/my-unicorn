@@ -83,7 +83,7 @@ class GitHubAPI:
 
     def get_latest_release(
         self, version_check_only: bool = False, is_batch: bool = False
-    ) -> tuple[bool, dict[str, Any], str]:
+    ) -> tuple[bool, dict[str, Any]] | tuple[bool, str] | tuple[bool, dict[str, Any], str]:
         """Fetch latest stable or beta release based on app configuration.
 
         Uses ReleaseManager to fetch the appropriate release version (stable or beta) based on the

@@ -69,7 +69,7 @@ class BaseUpdateCommand(Command):
 
     async def _update_apps_async(
         self, apps_to_update: list[dict[str, Any]]
-    ) -> tuple[int, int, dict[str, dict[str, Any]]]:
+    ) -> tuple[int, int, dict[str, dict[str, Any]], list[str]]:
         """Update multiple apps concurrently using asyncio.
 
         This method provides the core async update functionality that can be used
@@ -102,6 +102,7 @@ class BaseUpdateCommand(Command):
 
             # Run all tasks concurrently
             update_results = await asyncio.gather(*tasks, return_exceptions=True)
+            self._logger.info("Processing completed. Generating update summary...")
 
             # Process results
             for i, result in enumerate(update_results):
@@ -134,7 +135,31 @@ class BaseUpdateCommand(Command):
         except Exception as e:
             self._logger.error(f"Error in async update process: {e!s}", exc_info=True)
 
-        return success_count, failure_count, results
+        summary_messages = []
+        for app_name, result_data in results.items():
+            if result_data["status"] == "success":
+                # Extract version from message if available
+                message = result_data.get('message', 'unknown')
+                if message.startswith("Updated to "):
+                    version = message.replace("Updated to ", "")
+                else:
+                    version = "unknown version"
+                summary_messages.append(f"✓ Downloaded {result_data.get('appimage_name', app_name)}")
+                summary_messages.append(f"Successfully updated and verified {app_name} to version {version}")
+            elif result_data["status"] == "failed":
+                summary_messages.append(
+                    f"✗ {app_name}: Update failed - {result_data.get('message', 'unknown')}"
+                )
+            elif result_data["status"] == "exception":
+                summary_messages.append(
+                    f"⚠ {app_name}: Exception occurred - {result_data.get('message', 'unknown')}"
+                )
+            else:
+                summary_messages.append(
+                    f"⚠ {app_name}: Unexpected result format - {result_data.get('message', 'unknown')}"
+                )
+        
+        return success_count, failure_count, results, summary_messages
 
     async def _update_single_app_async(
         self, app_data: dict[str, Any], app_index: int, total_apps: int
@@ -308,9 +333,15 @@ class BaseUpdateCommand(Command):
         self._logger.debug(
             f"Update available for {app_data['name']}, processing full release info including SHA"
         )
-        full_success, full_release_data = github_api.get_latest_release(
+        full_result = github_api.get_latest_release(
             version_check_only=False, is_batch=is_batch
         )
+        
+        # Handle variable return values (2 or 3 elements)
+        if len(full_result) == 2:
+            full_success, full_release_data = full_result
+        else:
+            full_success, full_release_data, _ = full_result
 
         if not full_success:
             error_msg = f"Error getting full release data from GitHub API: {full_release_data}"
@@ -325,18 +356,13 @@ class BaseUpdateCommand(Command):
             )
             downloaded_file_path, was_existing_file = download_manager.download()
 
-            if was_existing_file:
-                print(f"\nFound existing file: {github_api.appimage_name}")
-            else:
-                print(f"\n✓ Downloaded {github_api.appimage_name}")
-
+            # Store download/verification status for summary instead of printing immediately
+            download_status = f"Found existing file: {github_api.appimage_name}" if was_existing_file else f"Downloaded {github_api.appimage_name}"
+            
             # Determine per-file cleanup behavior: skip interactive prompts in batch or async
             cleanup = False if is_batch else True
             # Single verification point for both existing and downloaded files
-            if was_existing_file:
-                print("Verifying existing file...")
-            else:
-                print("Verifying download integrity...")
+            verification_status = "Verifying existing file..." if was_existing_file else "Verifying download integrity..."
 
             verification_result, verification_skipped = self._verify_appimage(
                 github_api, downloaded_file_path, cleanup_on_failure=cleanup
@@ -383,7 +409,7 @@ class BaseUpdateCommand(Command):
                     )
 
                 self._logger.info(success_msg)
-                print(success_msg)
+                # Store success message for summary instead of printing immediately
                 return True, {
                     "status": "success",
                     "message": success_msg,

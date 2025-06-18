@@ -470,7 +470,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             print("Asynchronous update started")
 
             # Use the base class async update method
-            success_count, failure_count, results = loop.run_until_complete(
+            success_count, failure_count, results, summary_messages = loop.run_until_complete(
                 super()._update_apps_async(apps_to_update)
             )
 
@@ -479,6 +479,12 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             print(f"Total apps processed: {success_count + failure_count}/{len(apps_to_update)}")
             print(f"Successfully updated: {success_count}")
 
+            # Display detailed summary messages
+            if summary_messages:
+                print("\nDetailed Status:")
+                for message in summary_messages:
+                    print(f"  {message}")
+
             if failure_count > 0:
                 print(f"Failed updates: {failure_count}")
 
@@ -486,8 +492,6 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                 failed_apps = []
                 for app_name, result in results.items():
                     if result.get("status") != "success":
-                        message = result.get("message", "Unknown error")
-                        print(f"  - {app_name}: {message}")
                         failed_apps.append(app_name)
 
             print("\nUpdate process completed!")
