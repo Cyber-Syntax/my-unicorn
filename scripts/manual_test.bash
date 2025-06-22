@@ -73,13 +73,32 @@ setup_qownnotes_config() {
 
     cat >"$CONFIG_DIR/QOwnNotes.json" <<EOF
 {
-    "owner": "pbek",
-    "repo": "QOwnNotes",
     "version": "$version",
-    "checksum_file_name": "QOwnNotes-x86_64.AppImage.sha256",
-    "checksum_hash_type": "sha256",
-    "appimage_name": "QOwnNotes-$version-x86_64.AppImage",
-    "arch_keyword": "x86_64"
+    "appimage_name": "QOwnNotes-$version-x86_64.AppImage"
+}
+EOF
+}
+
+setup_zettlr_config() {
+    local version="$1"
+    log "Setting up Zettlr test config with version $version"
+
+    cat >"$CONFIG_DIR/Zettlr.json" <<EOF
+{
+    "version": "$version",
+    "appimage_name": "Zettlr-$version-x86_64.AppImage"
+}
+EOF
+}
+
+setup_appflowy_config() {
+    local version="$1"
+    log "Setting up AppFlowy test config with version $version"
+
+    cat >"$CONFIG_DIR/AppFlowy.json" <<EOF
+{
+    "version": "$version",
+    "appimage_name": "AppFlowy-$version-linux-x86_64.AppImage"
 }
 EOF
 }
@@ -90,13 +109,8 @@ setup_joplin_config() {
 
     cat >"$CONFIG_DIR/joplin.json" <<EOF
 {
-    "owner": "laurent22",
-    "repo": "joplin",
     "version": "$version",
-    "checksum_file_name": "latest-linux.yml",
-    "checksum_hash_type": "sha512",
-    "appimage_name": "Joplin-$version.AppImage",
-    "arch_keyword": ".appimage"
+    "appimage_name": "Joplin-$version.AppImage"
 }
 EOF
 }
@@ -147,7 +161,17 @@ test_update_both_apps() {
     # set up outdated versions for both apps
     setup_qownnotes_config "21.8.0" # Old version for QOwnNotes
     setup_joplin_config "2.9.17"    # Old version for Joplin
-    run_my_unicorn "3" "all"        # Update all
+    run_my_unicorn "3" "all" "0"       # Update all
+    log "Combined QOwnNotes and Joplin update test completed"
+}
+test_update_four_apps() {
+    log "=== Testing Both QOwnNotes and Joplin Update Together ==="
+    # set up outdated versions for both apps
+    setup_qownnotes_config "0.1.0" # Old version for QOwnNotes
+    setup_joplin_config "0.1.0"    # Old version for Joplin
+    setup_zettlr_config "0.1.0"    # Old version for Zettlr
+    setup_appflowy_config "0.1.0"    # Old version for AppFlowy
+    run_my_unicorn "3" "all" "0"       # Update all
     log "Combined QOwnNotes and Joplin update test completed"
 }
 
@@ -237,7 +261,8 @@ main() {
         echo "4) Fresh install QOwnNotes"
         echo "5) Fresh install Joplin"
         echo "6) Update Both QOwnNotes and Joplin"
-        echo "7) Exit and restore configs"
+        echo "7) Update 4 apps"
+        echo "8) Exit and restore configs"
         echo ""
 
         read -p "Select a test (1-7): " choice
@@ -249,7 +274,8 @@ main() {
             4) test_install_qownnotes ;;
             5) test_install_joplin ;;
             6) test_update_both_apps ;;
-            7)
+            7) test_update_four_apps ;;
+            8)
                 log "Restoring original configurations"
                 restore_app_configs
                 log "Testing completed"

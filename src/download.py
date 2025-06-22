@@ -1,5 +1,4 @@
 import asyncio
-import fcntl
 import logging
 import os
 import tempfile
@@ -9,15 +8,13 @@ import time
 import requests
 
 from .api import GitHubAPI
+from .appimage_progress import AppImageProgressMeter
 from .global_config import GlobalConfigManager
-from .progress_manager import BasicMultiAppProgress
 
 
 # Custom exception for download cancellation
 class DownloadCancelledError(Exception):
     """Custom exception for when a download is cancelled."""
-
-    pass
 
 
 class DownloadManager:
@@ -34,20 +31,15 @@ class DownloadManager:
     """
 
     # Class variables for shared progress tracking
-    _global_progress: BasicMultiAppProgress | None = None
-    _active_tasks: set[int] = set()
-    _lock = asyncio.Lock() if hasattr(asyncio, "Lock") else None
+    _global_progress: AppImageProgressMeter | None = None
+    _active_downloads: set[str] = set()
 
     # Use GlobalConfigManager for configuration
     _global_config: GlobalConfigManager | None = None
 
     # Class-level file locks to prevent concurrent access to same files
-    _file_locks: tuple[str, threading.Lock] = {}
+    _file_locks: dict[str, threading.Lock] = {}
     _locks_lock = threading.Lock()  # Protects the _file_locks dictionary
-
-    # Class-level progress task sharing for same files
-    _progress_tasks: tuple[str, int] = {}  # Maps file paths to task IDs
-    _progress_locks: tuple[str, threading.Lock] = {}  # Locks for progress task access
 
     def __init__(
         self,
@@ -141,21 +133,21 @@ class DownloadManager:
         )
 
     @classmethod
-    def get_or_create_progress(cls) -> BasicMultiAppProgress:
+    def get_or_create_progress(cls, total_downloads: int = 0) -> AppImageProgressMeter:
         """Get or create a shared progress instance for all downloads.
 
+        Args:
+            total_downloads: Expected number of downloads (for initialization)
+
         Returns:
-            BasicMultiAppProgress: The shared progress instance
+            AppImageProgressMeter: The shared progress instance
 
         """
-        # Use the first instance's progress or create a new one
         if cls._global_progress is None:
-            cls._global_progress = BasicMultiAppProgress(
-                expand=True,
-                transient=False,  # Keep all progress bars visible
-            )
-            cls._global_progress.start()
-            cls._active_tasks = set()
+            cls._global_progress = AppImageProgressMeter()
+            if total_downloads > 0:
+                cls._global_progress.start(total_downloads)
+            cls._active_downloads = set()
 
         return cls._global_progress
 
@@ -195,7 +187,7 @@ class DownloadManager:
         existing_file_path = os.path.join(downloads_dir, appimage_name)
 
         # Get or create a lock for this specific file
-        file_lock = self._get_file_lock(existing_file_path)
+        file_lock = self.get_file_lock(existing_file_path)
 
         # Use class-level locking to prevent concurrent operations on same file
         with file_lock:
@@ -216,9 +208,9 @@ class DownloadManager:
                             f"Could not remove corrupted file {existing_file_path}: {e}"
                         )
 
-            # Download the file atomically
+            # Download the file with progress tracking
             try:
-                return self._download_with_atomic_write(
+                return self._download_with_progress_tracking(
                     app_download_url, appimage_name, existing_file_path
                 )
             except Exception as e:
@@ -246,7 +238,7 @@ class DownloadManager:
         return int(response.headers.get("content-length", 0))
 
     def _setup_progress_task(self, filename: str, total_size: int, prefix: str) -> int | None:
-        """set up a progress tracking task.
+        """Set up a progress tracking task.
 
         Args:
             filename: Name of the file being downloaded
@@ -531,105 +523,20 @@ class DownloadManager:
         return verifier.verify_appimage(cleanup_on_failure=True)
 
     @classmethod
-    def _get_file_lock(cls, file_path: str) -> threading.Lock:
-        """Get or create a lock for a specific file path.
+    def get_file_lock(cls, file_path: str) -> threading.Lock:
+        """Get or create a file-specific lock to prevent concurrent downloads.
 
         Args:
-            file_path: The file path to get a lock for
+            file_path: Path to the file
 
         Returns:
             A threading.Lock for the specified file
+
         """
         with cls._locks_lock:
             if file_path not in cls._file_locks:
                 cls._file_locks[file_path] = threading.Lock()
             return cls._file_locks[file_path]
-
-    @classmethod
-    def _get_or_create_progress_task(
-        cls, file_path: str, filename: str, total_size: int, prefix: str, progress_manager
-    ) -> tuple[int, bool]:
-        """Get existing progress task for file or create a new one.
-
-        Args:
-            file_path: Full path to the file
-            filename: Display name for the file
-            total_size: Total file size
-            prefix: Progress display prefix
-            progress_manager: Progress manager instance
-
-        Returns:
-            tuple of (task_id, is_owner) where is_owner indicates if this thread should update progress
-        """
-        with cls._locks_lock:
-            # Get or create progress lock for this file
-            if file_path not in cls._progress_locks:
-                cls._progress_locks[file_path] = threading.Lock()
-            progress_lock = cls._progress_locks[file_path]
-
-        with progress_lock:
-            # Check if we already have a progress task for this file
-            if file_path in cls._progress_tasks:
-                return cls._progress_tasks[file_path], False  # Not the owner
-
-            # Create new progress task
-            task_id = progress_manager.add_task(
-                f"Downloading {filename}",
-                total=total_size,
-                prefix=prefix,
-            )
-
-            cls._progress_tasks[file_path] = task_id
-            return task_id, True  # This thread is the owner
-
-    @classmethod
-    def _update_progress_task(cls, file_path: str, progress_manager, **kwargs) -> None:
-        """Update progress for a file if task exists.
-
-        Args:
-            file_path: Full path to the file
-            progress_manager: Progress manager instance
-            **kwargs: Progress update arguments
-        """
-        with cls._locks_lock:
-            if file_path not in cls._progress_locks:
-                return
-            progress_lock = cls._progress_locks[file_path]
-
-        with progress_lock:
-            if file_path in cls._progress_tasks:
-                task_id = cls._progress_tasks[file_path]
-                progress_manager.update(task_id, **kwargs)
-
-    @classmethod
-    def _cleanup_progress_task(cls, file_path: str, progress_manager) -> None:
-        """Clean up progress task when file download is complete.
-
-        Args:
-            file_path: Full path to the file
-            progress_manager: Progress manager instance
-        """
-        with cls._locks_lock:
-            if file_path not in cls._progress_locks:
-                return
-            progress_lock = cls._progress_locks[file_path]
-
-        with progress_lock:
-            # Remove from shared progress tasks
-            if file_path in cls._progress_tasks:
-                task_id = cls._progress_tasks[file_path]
-                del cls._progress_tasks[file_path]
-
-                # Remove the task from progress manager
-                try:
-                    progress_manager.remove_task(task_id)
-                except Exception:
-                    pass
-
-        # Clean up the progress lock if no longer needed
-        with cls._locks_lock:
-            if file_path in cls._progress_locks:
-                del cls._progress_locks[file_path]
 
     def _verify_existing_file(self, file_path: str) -> bool:
         """Verify that an existing file is complete and valid.
@@ -639,6 +546,7 @@ class DownloadManager:
 
         Returns:
             True if the file appears to be complete, False otherwise
+
         """
         try:
             # Check if file exists and has reasonable size
@@ -678,6 +586,7 @@ class DownloadManager:
 
         Returns:
             Expected file size in bytes, or 0 if unknown
+
         """
         try:
             headers = {"User-Agent": "AppImage-Updater/1.0"}
@@ -695,10 +604,10 @@ class DownloadManager:
 
         return 0
 
-    def _download_with_atomic_write(
+    def _download_with_progress_tracking(
         self, url: str, filename: str, final_path: str
     ) -> tuple[str, bool]:
-        """Download file atomically using a temporary file.
+        """Download file with progress tracking using the new progress manager.
 
         Args:
             url: URL to download from
@@ -707,6 +616,7 @@ class DownloadManager:
 
         Returns:
             tuple of (file_path, was_existing_file)
+
         """
         downloads_dir = os.path.dirname(final_path)
 
@@ -717,15 +627,23 @@ class DownloadManager:
             temp_path = temp_file.name
 
         try:
-            # set up request headers
+            # Set up request headers
             headers = {"User-Agent": "AppImage-Updater/1.0", "Accept": "application/octet-stream"}
 
             # Create a progress prefix if this is part of a multi-app update
             prefix = f"[{self.app_index}/{self.total_apps}] " if self.total_apps > 0 else ""
 
-            # Download to temporary file with shared progress tracking
-            self._download_with_progress_to_file(
-                url, temp_path, filename, headers, prefix, final_path
+            # Get progress manager and set up download tracking
+            progress = self.get_or_create_progress()
+            download_id = self._get_download_id(final_path)
+
+            # Add to active downloads tracking
+            with self._locks_lock:
+                self._active_downloads.add(download_id)
+
+            # Start the download with progress tracking
+            self._download_with_progress(
+                url, temp_path, filename, headers, prefix, download_id, progress
             )
 
             # Make the AppImage executable
@@ -744,12 +662,27 @@ class DownloadManager:
                     os.remove(temp_path)
             except OSError:
                 pass
+            # Mark download as failed in progress manager
+            if "progress" in locals() and "download_id" in locals():
+                progress.complete_download(download_id, success=False, error_msg=str(e))
             raise e
+        finally:
+            # Remove from active downloads tracking
+            with self._locks_lock:
+                if "download_id" in locals():
+                    self._active_downloads.discard(download_id)
 
-    def _download_with_progress_to_file(
-        self, url: str, file_path: str, filename: str, headers: dict, prefix: str, final_path: str
+    def _download_with_progress(
+        self,
+        url: str,
+        file_path: str,
+        filename: str,
+        headers: dict,
+        prefix: str,
+        download_id: str,
+        progress: AppImageProgressMeter,
     ) -> None:
-        """Download a file with progress tracking to a specific path.
+        """Download a file with progress tracking.
 
         Args:
             url: URL to download from
@@ -757,54 +690,35 @@ class DownloadManager:
             filename: Display name for progress
             headers: HTTP headers
             prefix: Progress display prefix
-            final_path: Final destination path (for progress tracking)
+            download_id: Unique download identifier
+            progress: Progress manager instance
+
         """
-        try:
-            response = requests.get(url, stream=True, timeout=30, headers=headers)
-            response.raise_for_status()
+        response = requests.get(url, stream=True, timeout=30, headers=headers)
+        response.raise_for_status()
 
-            total_size = int(response.headers.get("Content-Length", 0))
-            progress = self.get_or_create_progress()
+        total_size = int(response.headers.get("Content-Length", 0))
 
-            # Use shared progress task for this file
-            task_id, is_progress_owner = self._get_or_create_progress_task(
-                final_path, filename, total_size, prefix, progress
-            )
-            downloaded = 0
+        # Add download to progress manager
+        progress.add_download(download_id, filename, total_size, prefix)
 
-            try:
-                with open(file_path, "wb") as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        if chunk:
-                            f.write(chunk)
-                            downloaded += len(chunk)
+        downloaded = 0
 
-                            # Only update progress if this thread is the owner
-                            if is_progress_owner and progress and task_id is not None:
-                                progress.update(task_id, completed=downloaded)
+        with open(file_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
 
-                            # Check for cancellation
-                            if self.cancel_event and self.cancel_event.is_set():
-                                raise DownloadCancelledError("Download cancelled by user")
+                    # Update progress
+                    progress.update_progress(download_id, downloaded)
 
-            finally:
-                # Only clean up progress task if this thread owns it and download is complete
-                if (
-                    is_progress_owner
-                    and task_id is not None
-                    and progress
-                    and downloaded == total_size
-                ):
-                    self._cleanup_progress_task(final_path, progress)
+                    # Check for cancellation
+                    if self.cancel_event and self.cancel_event.is_set():
+                        raise DownloadCancelledError("Download cancelled by user")
 
-            # Only display completion stats if this thread owns the progress
-            if is_progress_owner:
-                self._display_completion_stats(filename, downloaded, time.time(), prefix)
-
-        except requests.exceptions.RequestException as e:
-            error_msg = f"Network error downloading {filename}: {e!s}"
-            self._logger.error(error_msg)
-            raise RuntimeError(error_msg)
+        # Mark download as completed
+        progress.complete_download(download_id, success=True)
 
     def _wait_for_download_completion(
         self, file_path: str, filename: str, timeout: int = 300
@@ -818,6 +732,7 @@ class DownloadManager:
 
         Returns:
             tuple of (file_path, was_existing_file)
+
         """
         start_time = time.time()
         check_interval = 2  # Check every 2 seconds
@@ -841,3 +756,23 @@ class DownloadManager:
         error_msg = f"Timeout waiting for {filename} to be downloaded by another process"
         self._logger.error(error_msg)
         raise RuntimeError(error_msg)
+
+    def _get_download_id(self, file_path: str) -> str:
+        """Generate a unique download ID from file path.
+
+        Args:
+            file_path: Path to the file being downloaded
+
+        Returns:
+            Unique identifier for the download
+
+        """
+        return f"download_{abs(hash(file_path))}"
+
+    @classmethod
+    def stop_progress(cls) -> None:
+        """Stop the global progress manager and clean up."""
+        if cls._global_progress:
+            cls._global_progress.stop()
+            cls._global_progress = None
+            cls._active_downloads.clear()

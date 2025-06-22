@@ -13,9 +13,9 @@ import time
 from typing import Any
 
 from src.api.github_api import GitHubAPI
-from src.catalog import load_app_definition
 from src.app_config import AppConfigManager
 from src.auth_manager import GitHubAuthManager
+from src.catalog import load_app_definition
 from src.commands.base import Command
 from src.download import DownloadManager
 from src.file_handler import FileHandler
@@ -69,7 +69,7 @@ class BaseUpdateCommand(Command):
 
     async def _update_apps_async(
         self, apps_to_update: list[dict[str, Any]]
-    ) -> tuple[int, int, dict[str, dict[str, Any]], list[str]]:
+    ) -> tuple[int, int, dict[str, dict[str, Any]]]:
         """Update multiple apps concurrently using asyncio.
 
         This method provides the core async update functionality that can be used
@@ -83,7 +83,13 @@ class BaseUpdateCommand(Command):
             tuple containing:
             - int: Number of successfully updated apps
             - int: Number of failed updates
-            - tuple[str, tuple[str, Any]]: Dictionary mapping app names to their results
+            - dict[str, dict[str, Any]]: Dictionary mapping app names to their results
+                Each result dict includes:
+                - status: "success", "failed", "exception", or "error"
+                - message: Success/error message
+                - elapsed: Time taken for the operation
+                - download_message: Message about download/existing file (for summary)
+                - verification_message: Message about verification (for summary)
 
         """
         total_apps = len(apps_to_update)
@@ -135,31 +141,7 @@ class BaseUpdateCommand(Command):
         except Exception as e:
             self._logger.error(f"Error in async update process: {e!s}", exc_info=True)
 
-        summary_messages = []
-        for app_name, result_data in results.items():
-            if result_data["status"] == "success":
-                # Extract version from message if available
-                message = result_data.get('message', 'unknown')
-                if message.startswith("Updated to "):
-                    version = message.replace("Updated to ", "")
-                else:
-                    version = "unknown version"
-                summary_messages.append(f"✓ Downloaded {result_data.get('appimage_name', app_name)}")
-                summary_messages.append(f"Successfully updated and verified {app_name} to version {version}")
-            elif result_data["status"] == "failed":
-                summary_messages.append(
-                    f"✗ {app_name}: Update failed - {result_data.get('message', 'unknown')}"
-                )
-            elif result_data["status"] == "exception":
-                summary_messages.append(
-                    f"⚠ {app_name}: Exception occurred - {result_data.get('message', 'unknown')}"
-                )
-            else:
-                summary_messages.append(
-                    f"⚠ {app_name}: Unexpected result format - {result_data.get('message', 'unknown')}"
-                )
-        
-        return success_count, failure_count, results, summary_messages
+        return success_count, failure_count, results
 
     async def _update_single_app_async(
         self, app_data: dict[str, Any], app_index: int, total_apps: int
@@ -216,7 +198,9 @@ class BaseUpdateCommand(Command):
                         f"[{app_index}/{total_apps}] ✓ Successfully updated {app_name} ({elapsed_time:.1f}s)"
                     )
                     result_appimage_name = result[1].get("appimage_name") if result[1] else None
-                    result_checksum_file_name = result[1].get("checksum_file_name") if result[1] else None
+                    result_checksum_file_name = (
+                        result[1].get("checksum_file_name") if result[1] else None
+                    )
                     return True, {
                         "status": "success",
                         "message": f"Updated to {app_data['latest']}",
@@ -229,7 +213,9 @@ class BaseUpdateCommand(Command):
                         f"[{app_index}/{total_apps}] ✗ Failed to update {app_name} ({elapsed_time:.1f}s)"
                     )
                     result_appimage_name = result[1].get("appimage_name") if result[1] else None
-                    result_checksum_file_name = result[1].get("checksum_file_name") if result[1] else None
+                    result_checksum_file_name = (
+                        result[1].get("checksum_file_name") if result[1] else None
+                    )
                     return False, {
                         "status": "failed",
                         "message": result[1].get("error", "Update failed")
@@ -300,8 +286,12 @@ class BaseUpdateCommand(Command):
 
         # Initialize GitHub API using app definition data
         # For use_asset_digest apps, use auto detection instead of None values
-        checksum_file_name_param = app_info.checksum_file_name if app_info.checksum_file_name else "auto"
-        checksum_hash_type_param = app_info.checksum_hash_type if app_info.checksum_hash_type else "auto"
+        checksum_file_name_param = (
+            app_info.checksum_file_name if app_info.checksum_file_name else "auto"
+        )
+        checksum_hash_type_param = (
+            app_info.checksum_hash_type if app_info.checksum_hash_type else "auto"
+        )
 
         github_api = GitHubAPI(
             owner=app_info.owner,
@@ -333,10 +323,8 @@ class BaseUpdateCommand(Command):
         self._logger.debug(
             f"Update available for {app_data['name']}, processing full release info including SHA"
         )
-        full_result = github_api.get_latest_release(
-            version_check_only=False, is_batch=is_batch
-        )
-        
+        full_result = github_api.get_latest_release(version_check_only=False, is_batch=is_batch)
+
         # Handle variable return values (2 or 3 elements)
         if len(full_result) == 2:
             full_success, full_release_data = full_result
@@ -356,13 +344,27 @@ class BaseUpdateCommand(Command):
             )
             downloaded_file_path, was_existing_file = download_manager.download()
 
-            # Store download/verification status for summary instead of printing immediately
-            download_status = f"Found existing file: {github_api.appimage_name}" if was_existing_file else f"Downloaded {github_api.appimage_name}"
-            
+            # Handle download status messages based on context
+            if was_existing_file:
+                download_message = f"Found existing file: {github_api.appimage_name}"
+                if not is_async:
+                    print(f"\n{download_message}")
+            else:
+                download_message = f"✓ Downloaded {github_api.appimage_name}"
+                if not is_async:
+                    print(f"\n{download_message}")
+
             # Determine per-file cleanup behavior: skip interactive prompts in batch or async
             cleanup = False if is_batch else True
-            # Single verification point for both existing and downloaded files
-            verification_status = "Verifying existing file..." if was_existing_file else "Verifying download integrity..."
+
+            # Handle verification status messages
+            if was_existing_file:
+                verification_status_message = "Verifying existing file..."
+            else:
+                verification_status_message = "Verifying download integrity..."
+
+            if not is_async:
+                print(verification_status_message)
 
             verification_result, verification_skipped = self._verify_appimage(
                 github_api, downloaded_file_path, cleanup_on_failure=cleanup
@@ -417,6 +419,9 @@ class BaseUpdateCommand(Command):
                     "verification_skipped": verification_skipped,
                     "appimage_name": github_api.appimage_name,
                     "checksum_file_name": github_api.checksum_file_name,
+                    "download_message": download_message if is_async else "",
+                    "verification_message": verification_status_message if is_async else "",
+                    "success_message": success_msg if is_async else "",
                 }
             else:
                 error_msg = f"Failed to perform file operations for {app_data['name']}"
@@ -436,6 +441,16 @@ class BaseUpdateCommand(Command):
                 result["appimage_name"] = github_api.appimage_name
                 if github_api.checksum_file_name:
                     result["checksum_file_name"] = github_api.checksum_file_name
+            if is_async:
+                result["download_message"] = (
+                    download_message if "download_message" in locals() else ""
+                )
+                result["verification_message"] = (
+                    verification_status_message if "verification_status_message" in locals() else ""
+                )
+            else:
+                result["download_message"] = ""
+                result["verification_message"] = ""
             return False, result
 
     def _update_single_app(
@@ -664,8 +679,12 @@ class BaseUpdateCommand(Command):
 
         # Initialize GitHub API using app definition data
         # For use_asset_digest apps, use auto detection instead of None values
-        checksum_file_name_param = app_info.checksum_file_name if app_info.checksum_file_name else "auto"
-        checksum_hash_type_param = app_info.checksum_hash_type if app_info.checksum_hash_type else "auto"
+        checksum_file_name_param = (
+            app_info.checksum_file_name if app_info.checksum_file_name else "auto"
+        )
+        checksum_hash_type_param = (
+            app_info.checksum_hash_type if app_info.checksum_hash_type else "auto"
+        )
 
         github_api = GitHubAPI(
             owner=app_info.owner,

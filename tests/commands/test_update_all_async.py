@@ -5,10 +5,6 @@ This module contains tests for the UpdateAsyncCommand class that handles
 updating multiple AppImages concurrently using async I/O operations.
 """
 
-import asyncio
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 
 from src.auth_manager import GitHubAuthManager
@@ -236,7 +232,7 @@ async def test_update_apps_async(monkeypatch, update_command, mock_app_configs):
     monkeypatch.setattr(update_command, "_update_single_app_async", mock_update_single)
 
     # Call the method and await the result
-    success_count, failure_count, results, summary_messages = await update_command._update_apps_async(
+    success_count, failure_count, results = await update_command._update_apps_async(
         mock_app_configs
     )
 
@@ -244,7 +240,6 @@ async def test_update_apps_async(monkeypatch, update_command, mock_app_configs):
     assert success_count == 2  # app1 and app3 (indices 1 and 3)
     assert failure_count == 2  # app2 and app4 (indices 2 and 4)
     assert len(results) == 4
-    assert isinstance(summary_messages, list)  # New summary messages
 
     # Check specific results
     assert results["app1"]["status"] == "success"

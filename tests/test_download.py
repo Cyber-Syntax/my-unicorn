@@ -153,32 +153,32 @@ def test_get_network_error(monkeypatch, github_api, fake_head_response):
 def test_progress_cleanup(
     monkeypatch, github_api, fake_head_response, fake_get_response, mock_global_config
 ):
-    # Spy on progress to ensure remove_task is called
+    # Spy on progress to ensure complete_download is called
     calls = {}
 
     class FakeProgress:
         def __init__(self):
             pass
 
-        def start(self):
+        def start(self, total_downloads):
             pass
 
-        def add_task(self, desc, total, prefix, **kw):
+        def add_download(self, download_id, filename, total_size, prefix=""):
             calls["added"] = True
-            return 42
+            return download_id
 
-        def update(self, *a, **k):
-            calls.setdefault("updates", 0)
-            calls["updates"] += 1
+        def update_progress(self, download_id, progress):
+            calls["updates"] = calls.get("updates", 0) + 1
 
-        def remove_task(self, task_id):
-            calls["removed"] = task_id
+        def complete_download(self, download_id, success=True, error_msg=""):
+            calls["completed"] = download_id
 
         def stop(self):
             pass
 
+    # Mock download manager's get_or_create_progress
     monkeypatch.setattr(
-        DownloadManager, "get_or_create_progress", classmethod(lambda cls: FakeProgress())
+        DownloadManager, "get_or_create_progress", classmethod(lambda cls, total=0: FakeProgress())
     )
     monkeypatch.setattr(requests, "head", lambda *a, **k: fake_head_response)
     monkeypatch.setattr(requests, "get", lambda *a, **k: fake_get_response)
@@ -341,51 +341,44 @@ def test_progress_deduplication(
     monkeypatch, github_api, fake_head_response, fake_get_response, mock_global_config
 ):
     """Test that concurrent downloads show only one progress bar per file."""
-    # Track progress task creation calls
+    # Track progress download creation calls
     progress_calls = []
 
     class MockProgress:
         def __init__(self):
-            self.tasks = {}
-            self.task_counter = 0
+            self.downloads = {}
 
-        def add_task(self, description, total, prefix, **kwargs):
-            task_id = self.task_counter
-            self.task_counter += 1
-            self.tasks[task_id] = {
-                "description": description,
-                "total": total,
+        def start(self, total_downloads):
+            progress_calls.append(("start", total_downloads))
+
+        def add_download(self, download_id, filename, total_size, prefix=""):
+            self.downloads[download_id] = {
+                "filename": filename,
+                "total": total_size,
                 "prefix": prefix,
-                "completed": 0,
+                "progress": 0,
             }
-            progress_calls.append(("add_task", description, prefix))
-            print(f"PROGRESS: Created task {task_id}: {description}")
-            return task_id
+            progress_calls.append(("add_download", filename, prefix))
+            print(f"PROGRESS: Created download {download_id}: {filename}")
+            return download_id
 
-        def update(self, task_id, **kwargs):
-            if task_id in self.tasks:
-                for key, value in kwargs.items():
-                    if key == "completed":
-                        self.tasks[task_id]["completed"] = value
-                    elif key == "advance":
-                        self.tasks[task_id]["completed"] += value
-                progress_calls.append(("update", task_id, kwargs))
+        def update_progress(self, download_id, progress):
+            if download_id in self.downloads:
+                self.downloads[download_id]["progress"] = progress
+                progress_calls.append(("update_progress", download_id, progress))
 
-        def remove_task(self, task_id):
-            if task_id in self.tasks:
-                del self.tasks[task_id]
-                progress_calls.append(("remove_task", task_id))
-                print(f"PROGRESS: Removed task {task_id}")
-
-        def start(self):
-            pass
+        def complete_download(self, download_id, success=True, error_msg=""):
+            progress_calls.append(("complete_download", download_id))
+            print(f"PROGRESS: Completed download {download_id}")
 
         def stop(self):
-            pass
+            progress_calls.append(("stop",))
 
     # Mock the progress manager
     mock_progress = MockProgress()
-    monkeypatch.setattr(DownloadManager, "get_or_create_progress", lambda self: mock_progress)
+    monkeypatch.setattr(
+        DownloadManager, "get_or_create_progress", lambda cls, total=0: mock_progress
+    )
 
     # Mock HTTP responses with delay
     def slow_get(*args, **kw):
@@ -427,26 +420,28 @@ def test_progress_deduplication(
     assert len(exceptions) == 0, f"Unexpected exceptions: {exceptions}"
     assert len(results) == 3, "All downloads should complete"
 
-    # Check progress task calls
-    add_task_calls = [call for call in progress_calls if call[0] == "add_task"]
-    remove_task_calls = [call for call in progress_calls if call[0] == "remove_task"]
+    # Check progress download calls
+    add_download_calls = [call for call in progress_calls if call[0] == "add_download"]
+    complete_download_calls = [call for call in progress_calls if call[0] == "complete_download"]
 
     print(f"Progress calls: {progress_calls}")
-    print(f"Add task calls: {len(add_task_calls)}")
-    print(f"Remove task calls: {len(remove_task_calls)}")
+    print(f"Add download calls: {len(add_download_calls)}")
+    print(f"Complete download calls: {len(complete_download_calls)}")
 
-    # Should only have ONE add_task call for the same file
-    assert len(add_task_calls) == 1, f"Expected exactly 1 progress task, got {len(add_task_calls)}"
-
-    # Should have one remove_task call when download completes
-    assert len(remove_task_calls) == 1, (
-        f"Expected exactly 1 task removal, got {len(remove_task_calls)}"
+    # Should only have ONE add_download call for the same file
+    assert len(add_download_calls) == 1, (
+        f"Expected exactly 1 progress download, got {len(add_download_calls)}"
     )
 
-    # Verify the task was for the correct file
-    task_description = add_task_calls[0][1]
-    assert "fake.AppImage" in task_description, (
-        f"Task description should contain filename: {task_description}"
+    # Should have one complete_download call when download completes
+    assert len(complete_download_calls) == 1, (
+        f"Expected exactly 1 download completion, got {len(complete_download_calls)}"
+    )
+
+    # Verify the download was for the correct file
+    download_filename = add_download_calls[0][1]
+    assert "fake.AppImage" in download_filename, (
+        f"Download filename should contain filename: {download_filename}"
     )
 
     # Verify file was created successfully
