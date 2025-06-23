@@ -28,22 +28,22 @@ class DownloadCommand(Command):
         app_config = AppConfigManager()
         app_config.set_app_name(repo)
 
-        # Get app info from catalog to get hash_type and sha_name
+        # Get app info from catalog to get checksum_hash_type and checksum_file_name
         app_info = app_config.get_app_info()
         if app_info:
-            sha_name = app_info.sha_name or "auto"
-            hash_type = app_info.hash_type or "auto"
+            checksum_file_name = app_info.checksum_file_name or "auto"
+            checksum_hash_type = app_info.checksum_hash_type or "auto"
         else:
             # Fallback if app not in catalog
-            sha_name = "auto"
-            hash_type = "auto"
+            checksum_file_name = "auto"
+            checksum_hash_type = "auto"
 
         # 3. Initialize the GitHubAPI with the parsed owner and repo
         api = GitHubAPI(
             owner=owner,
             repo=repo,
-            sha_name=sha_name,
-            hash_type=hash_type,
+            checksum_file_name=checksum_file_name,
+            checksum_hash_type=checksum_hash_type,
             arch_keyword=None,
         )
 
@@ -96,9 +96,9 @@ class DownloadCommand(Command):
                     break
                 else:
                     # Check if verification data is available and valid
-                    has_sha_data = api.sha_name and api.sha_name != "no_sha_file"
+                    has_sha_data = api.checksum_file_name and api.checksum_file_name != "no_sha_file"
                     has_asset_digest = api.asset_digest
-                    has_valid_hash_type = api.hash_type and api.hash_type != "no_hash"
+                    has_valid_checksum_hash_type = api.checksum_hash_type and api.checksum_hash_type != "no_hash"
                     
                     if not has_sha_data and not has_asset_digest:
                         logging.info("No SHA file or asset digest found - verification cannot be performed.")
@@ -115,17 +115,17 @@ class DownloadCommand(Command):
 
                     # Debug logging for API values
                     logging.debug(f"API values before VerificationManager creation:")
-                    logging.debug(f"  api.sha_name: {api.sha_name}")
-                    logging.debug(f"  api.hash_type: {api.hash_type}")
+                    logging.debug(f"  api.checksum_file_name: {api.checksum_file_name}")
+                    logging.debug(f"  api.checksum_hash_type: {api.checksum_hash_type}")
                     logging.debug(f"  api.asset_digest: {api.asset_digest}")
                     logging.debug(f"  api.skip_verification: {api.skip_verification}")
 
                     # Perform verification with cleanup on failure
                     verification_manager = VerificationManager(
-                        sha_name=api.sha_name,
-                        sha_url=api.sha_url,
+                        checksum_file_name=api.checksum_file_name,
+                        checksum_file_download_url=api.checksum_file_download_url,
                         appimage_name=api.appimage_name,  # Keep the original filename for logging
-                        hash_type=api.hash_type,
+                        checksum_hash_type=api.checksum_hash_type,
                         asset_digest=api.asset_digest,
                     )
 
@@ -180,7 +180,7 @@ class DownloadCommand(Command):
             repo=api.repo,  # Preserve original case of repo name
             owner=api.owner,
             version=api.version,
-            sha_name=api.sha_name,
+            checksum_file_name=api.checksum_file_name,
             config_file=str(global_config.config_file),
             app_storage_path=Path(global_config.expanded_app_storage_path),
             app_backup_storage_path=Path(global_config.expanded_app_backup_storage_path),

@@ -7,8 +7,8 @@
     "tags": ["notes", "markdown", "sync"],
     "appimage_name_template": "{app_rename_safe}-{latest_version}.AppImage",
     "preferred_characteristic_suffixes": [""],
-    "hash_type": "sha512",
-    "sha_name": "latest-linux.yml",
+    "checksum_hash_type": "sha512",
+    "checksum_file_name": "latest-linux.yml",
     "icon_info": "https://raw.githubusercontent.com/laurent22/joplin/dev/Assets/LinuxIcons/256x256.png",
     "icon_file_name": "joplin_icon.png",
     "icon_repo_path": "Assets/LinuxIcons/256x256.png"

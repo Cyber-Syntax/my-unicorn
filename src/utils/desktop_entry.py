@@ -19,6 +19,34 @@ DESKTOP_ENTRY_DIR = Path("~/.local/share/applications").expanduser()
 DESKTOP_ENTRY_FILE_MODE = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
 DESKTOP_FILE_SECTION = "Desktop Entry"
 DEFAULT_CATEGORIES = "Utility;"
+BROWSER_CATEGORIES = "Network;WebBrowser;"
+
+# Known browser names (case-insensitive patterns)
+BROWSER_KEYWORDS = {
+    'firefox', 'chrome', 'chromium', 'brave', 'opera', 'edge', 'safari',
+    'zen-browser', 'zen', 'vivaldi', 'waterfox', 'librewolf', 'tor-browser',
+    'tor', 'epiphany', 'konqueror', 'falkon', 'qutebrowser', 'midori',
+    'seamonkey', 'palemoon', 'basilisk', 'icecat', 'iceweasel'
+}
+
+# MIME types for web browsers
+BROWSER_MIME_TYPES = [
+    "text/html",
+    "text/xml",
+    "application/xhtml+xml",
+    "application/xml",
+    "application/rss+xml",
+    "application/rdf+xml",
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "x-scheme-handler/http",
+    "x-scheme-handler/https",
+    "x-scheme-handler/ftp",
+    "x-scheme-handler/chrome",
+    "video/webm",
+    "application/x-xpinstall"
+]
 
 
 class DesktopEntryManager:
@@ -50,6 +78,20 @@ class DesktopEntryManager:
 
         # Ensure desktop directory exists
         self.desktop_dir.mkdir(parents=True, exist_ok=True)
+
+    def is_browser_app(self, app_name: str) -> bool:
+        """Determine if an application is a web browser based on its name.
+        
+        Args:
+            app_name: The application name to check
+            
+        Returns:
+            True if the application appears to be a browser, False otherwise
+        """
+        app_name_lower = app_name.lower()
+        
+        # Check if any browser keyword is contained in the app name
+        return any(keyword in app_name_lower for keyword in BROWSER_KEYWORDS)
 
     def read_desktop_file(self, desktop_path: Path) -> dict[str, str]:
         """Read an existing desktop entry file and parse its contents.
@@ -163,6 +205,7 @@ class DesktopEntryManager:
         app_rename: str,
         appimage_path: str | Path,
         icon_path: str | Path | None = None,
+        is_browser: bool | None = None,
     ) -> tuple[bool, str]:
         """Create or update a desktop entry file for an AppImage.
 
@@ -173,6 +216,7 @@ class DesktopEntryManager:
             app_rename: Unique identifier for the application
             appimage_path: Path to the AppImage executable
             icon_path: Optional path to the application icon
+            is_browser: Optional explicit flag to mark app as browser. If None, auto-detects based on app name.
 
         Returns:
             tuple of (success, message)
@@ -200,15 +244,34 @@ class DesktopEntryManager:
             # Read existing desktop file
             existing_entries = self.read_desktop_file(desktop_path)
 
+            # Determine if this is a browser application
+            if is_browser is None:
+                is_browser = self.is_browser_app(app_rename)
+            
+            if is_browser:
+                logger.info(f"Detected browser application: {app_rename}")
+
+            # Create Exec field - add %u for browsers to handle URLs
+            exec_cmd = str(appimage_path)
+            if is_browser:
+                exec_cmd += " %u"
+                logger.info("Added %u parameter for browser URL handling")
+
             # Create new desktop entry content
             new_entries = {
                 "Type": "Application",
                 "Name": app_rename,  # Use app_rename for display name
-                "Exec": str(appimage_path),  # Use full path to AppImage
+                "Exec": exec_cmd,
                 "Terminal": "false",
-                "Categories": DEFAULT_CATEGORIES,
-                "Comment": f"AppImage for {app_rename}",
+                "Categories": BROWSER_CATEGORIES if is_browser else DEFAULT_CATEGORIES,
+                "Comment": f"{'Web Browser' if is_browser else 'AppImage'} for {app_rename}",
             }
+
+            # Add browser-specific MIME types
+            if is_browser:
+                new_entries["MimeType"] = ";".join(BROWSER_MIME_TYPES) + ";"
+                new_entries["StartupNotify"] = "true"
+                logger.info("Added browser MIME types and startup notification")
 
             # Add icon if available
             if icon_path:

@@ -65,15 +65,15 @@ class TestBaseUpdateCommand:
         """Fixture to create a mocked GitHubAPI instance."""
         mock_api = MagicMock(spec=GitHubAPI)
         mock_api.appimage_name = "test-app-1.1.0.AppImage"
-        mock_api.appimage_url = (
+        mock_api.app_download_url = (
             "https://github.com/test/test-app/releases/download/v1.1.0/test-app-1.1.0.AppImage"
         )
         mock_api.version = "1.1.0"
         mock_api.owner = "test"
         mock_api.repo = "test-app"
-        mock_api.sha_name = "test-app-1.1.0.AppImage.sha256"
-        mock_api.sha_url = "https://github.com/test/test-app/releases/download/v1.1.0/test-app-1.1.0.AppImage.sha256"
-        mock_api.hash_type = "sha256"
+        mock_api.checksum_file_name = "test-app-1.1.0.AppImage.sha256"
+        mock_api.checksum_file_download_url = "https://github.com/test/test-app/releases/download/v1.1.0/test-app-1.1.0.AppImage.sha256"
+        mock_api.checksum_hash_type = "sha256"
 
         # Setup get_latest_release method
         mock_api.get_latest_release.return_value = (True, {"tag_name": "v1.1.0"})
@@ -108,8 +108,8 @@ class TestBaseUpdateCommand:
         mock_app_config = MagicMock(spec=AppConfigManager)
         mock_app_config.owner = "test"
         mock_app_config.repo = "test-app"
-        mock_app_config.sha_name = "test-app.sha256"
-        mock_app_config.hash_type = "sha256"
+        mock_app_config.checksum_file_name = "test-app.sha256"
+        mock_app_config.checksum_hash_type = "sha256"
         mock_app_config.arch_keyword = "x86_64"  # Add arch_keyword attribute
 
         mock_global_config = MagicMock(spec=GlobalConfigManager)
@@ -119,7 +119,7 @@ class TestBaseUpdateCommand:
         github_api_instance = mock_github_api.return_value
         github_api_instance.get_latest_release.return_value = (True, {"tag_name": "v1.1.0"})
         github_api_instance.appimage_name = "test-app-1.1.0.AppImage"
-        github_api_instance.appimage_url = (
+        github_api_instance.app_download_url = (
             "https://github.com/test/test-app/releases/download/v1.1.0/test-app-1.1.0.AppImage"
         )
         github_api_instance.version = "1.1.0"
@@ -213,8 +213,8 @@ class TestBaseUpdateCommand:
         mock_app_config = MagicMock(spec=AppConfigManager)
         mock_app_config.repo = "test-app"
         mock_app_config.owner = "test"
-        mock_app_config.sha_name = "test-app.sha256"
-        mock_app_config.hash_type = "sha256"
+        mock_app_config.checksum_file_name = "test-app.sha256"
+        mock_app_config.checksum_hash_type = "sha256"
         mock_app_config.arch_keyword = "x86_64"
 
         mock_global_config = MagicMock(spec=GlobalConfigManager)
@@ -224,7 +224,7 @@ class TestBaseUpdateCommand:
         github_api_instance = mock_github_api.return_value
         github_api_instance.get_latest_release.return_value = (True, {"tag_name": "v1.1.0"})
         github_api_instance.appimage_name = "test-app-1.1.0.AppImage"
-        github_api_instance.appimage_url = (
+        github_api_instance.app_download_url = (
             "https://github.com/test/test-app/releases/download/v1.1.0/test-app-1.1.0.AppImage"
         )
         github_api_instance.owner = "test"
@@ -269,8 +269,8 @@ class TestBaseUpdateCommand:
         """Test that verification is skipped when skip_verification is enabled."""
         # set up the API to skip verification
         mock_github_api.skip_verification = True
-        mock_github_api.sha_name = None
-        mock_github_api.hash_type = None
+        mock_github_api.checksum_file_name = None
+        mock_github_api.checksum_hash_type = None
 
         # Call the method
         result_valid, result_skipped = base_update_command._verify_appimage(mock_github_api)
@@ -359,7 +359,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test checking version when update is available."""
         # Setup app definition mock
-        from src.app_catalog import AppInfo
+        from src.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -368,9 +368,9 @@ class TestBaseUpdateCommand:
             description="Test description",
             category="Test",
             tags=["test"],
-            hash_type="sha256",
+            checksum_hash_type="sha256",
             appimage_name_template="test-app-{version}.AppImage",
-            sha_name="test-app.sha256",
+            checksum_file_name="test-app.sha256",
             preferred_characteristic_suffixes=["x86_64"],
             icon_info=None,
             icon_file_name=None,
@@ -407,7 +407,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test checking version when app is up to date."""
         # Setup app definition mock
-        from src.app_catalog import AppInfo
+        from src.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -416,9 +416,9 @@ class TestBaseUpdateCommand:
             description="Test description",
             category="Test",
             tags=["test"],
-            hash_type="sha256",
+            checksum_hash_type="sha256",
             appimage_name_template="test-app-{version}.AppImage",
-            sha_name="test-app.sha256",
+            checksum_file_name="test-app.sha256",
             preferred_characteristic_suffixes=["x86_64"],
             icon_info=None,
             icon_file_name=None,
@@ -450,7 +450,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test checking version when API returns an error."""
         # Setup app definition mock
-        from src.app_catalog import AppInfo
+        from src.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -459,9 +459,9 @@ class TestBaseUpdateCommand:
             description="Test description",
             category="Test",
             tags=["test"],
-            hash_type="sha256",
+            checksum_hash_type="sha256",
             appimage_name_template="test-app-{version}.AppImage",
-            sha_name="test-app.sha256",
+            checksum_file_name="test-app.sha256",
             preferred_characteristic_suffixes=["x86_64"],
             icon_info=None,
             icon_file_name=None,
@@ -828,7 +828,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test core app update logic with successful outcome."""
         # Setup app definition mock
-        from src.app_catalog import AppInfo
+        from src.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -837,9 +837,9 @@ class TestBaseUpdateCommand:
             description="Test description",
             category="Test",
             tags=["test"],
-            hash_type="sha256",
+            checksum_hash_type="sha256",
             appimage_name_template="test-app-{version}.AppImage",
-            sha_name="test-app.sha256",
+            checksum_file_name="test-app.sha256",
             preferred_characteristic_suffixes=["x86_64"],
             icon_info=None,
             icon_file_name=None,
@@ -851,8 +851,8 @@ class TestBaseUpdateCommand:
         mock_app_config = MagicMock(spec=AppConfigManager)
         mock_app_config.repo = "test-app"
         mock_app_config.owner = "test"
-        mock_app_config.sha_name = "test-app.sha256"
-        mock_app_config.hash_type = "sha256"
+        mock_app_config.checksum_file_name = "test-app.sha256"
+        mock_app_config.checksum_hash_type = "sha256"
         mock_app_config.arch_keyword = "x86_64"  # Add arch_keyword
 
         mock_global_config = MagicMock(spec=GlobalConfigManager)
@@ -911,7 +911,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test core app update logic with API error."""
         # Setup app definition mock
-        from src.app_catalog import AppInfo
+        from src.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -920,9 +920,9 @@ class TestBaseUpdateCommand:
             description="Test description",
             category="Test",
             tags=["test"],
-            hash_type="sha256",
+            checksum_hash_type="sha256",
             appimage_name_template="test-app-{version}.AppImage",
-            sha_name="test-app.sha256",
+            checksum_file_name="test-app.sha256",
             preferred_characteristic_suffixes=["x86_64"],
             icon_info=None,
             icon_file_name=None,
@@ -934,8 +934,8 @@ class TestBaseUpdateCommand:
         mock_app_config = MagicMock(spec=AppConfigManager)
         mock_app_config.repo = "test-app"
         mock_app_config.owner = "test"
-        mock_app_config.sha_name = "test-app.sha256"
-        mock_app_config.hash_type = "sha256"
+        mock_app_config.checksum_file_name = "test-app.sha256"
+        mock_app_config.checksum_hash_type = "sha256"
         mock_app_config.arch_keyword = "x86_64"  # Add missing arch_keyword
 
         mock_global_config = MagicMock(spec=GlobalConfigManager)

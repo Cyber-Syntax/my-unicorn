@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Tests for AppCatalog functionality.
 
-This module contains tests for the app_catalog module, which provides
+This module contains tests for the catalog module, which provides
 a database of applications that can be installed by name.
 """
 
@@ -17,8 +17,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Import modules
-from src.app_catalog import (
-    APP_CATALOG,
+from src.catalog import (
     AppInfo,
     get_all_apps,
     get_app_info,
@@ -43,8 +42,8 @@ def sample_app_info() -> AppInfo:
         description="A test application",
         owner="testowner",
         repo="testrepo",
-        sha_name="test.sha256",
-        hash_type="sha256",
+        checksum_file_name="test.sha256",
+        checksum_hash_type="sha256",
         category="Test",
         tags=["test", "sample"],
     )
@@ -58,8 +57,8 @@ def test_app_info_init() -> None:
         description="A test application",
         owner="testowner",
         repo="testrepo",
-        sha_name="test.sha256",
-        hash_type="sha256",
+        checksum_file_name="test.sha256",
+        checksum_hash_type="sha256",
         category="Test",
         tags=["test", "sample"],
     )
@@ -68,8 +67,8 @@ def test_app_info_init() -> None:
     assert app_info.description == "A test application"
     assert app_info.owner == "testowner"
     assert app_info.repo == "testrepo"
-    assert app_info.sha_name == "test.sha256"
-    assert app_info.hash_type == "sha256"
+    assert app_info.checksum_file_name == "test.sha256"
+    assert app_info.checksum_hash_type == "sha256"
     assert app_info.category == "Test"
     assert app_info.tags == ["test", "sample"]
 
@@ -82,8 +81,8 @@ def test_app_info_init() -> None:
     )
 
     assert app_info.name == "Test App"
-    assert app_info.sha_name is None  # Default value
-    assert app_info.hash_type is None  # Default value
+    assert app_info.checksum_file_name is None  # Default value
+    assert app_info.checksum_hash_type is None  # Default value
     assert app_info.category == "Other"  # Default value
     assert app_info.tags == []  # Default empty list
 
@@ -216,11 +215,11 @@ def test_sync_with_icon_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     # Create a mock logger
     mock_logger = MagicMock()
-    monkeypatch.setattr("src.app_catalog.logger", mock_logger)
+    monkeypatch.setattr("src.catalog.logger", mock_logger)
 
     # Create a mock ICON_PATHS with some missing entries
     mock_icon_paths = {"joplin": {"exact_path": "path/to/icon.png", "filename": "joplin_icon.png"}}
-    monkeypatch.setattr("src.app_catalog.ICON_PATHS", mock_icon_paths)
+    monkeypatch.setattr("src.catalog.ICON_PATHS", mock_icon_paths)
 
     # Run the sync function
     sync_with_icon_paths()

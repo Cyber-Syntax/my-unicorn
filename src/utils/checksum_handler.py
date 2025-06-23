@@ -39,13 +39,13 @@ def verify_with_strategy(
         return False
 
     # Get verification parameters
-    sha_name = app_info.get("sha_name")
-    sha_url = app_info.get("sha_url")
-    hash_type = app_info.get("hash_type", "sha256")
+    checksum_file_name = app_info.get("checksum_file_name")
+    checksum_file_download_url = app_info.get("checksum_file_download_url")
+    checksum_hash_type = app_info.get("checksum_hash_type", "sha256")
     appimage_name = os.path.basename(appimage_path)
 
     # Handle special case for release description checksums
-    if sha_name == "extracted_checksum":
+    if checksum_file_name == "extracted_checksum":
         logger.info(f"Using GitHub release description for verification of {appimage_name}")
 
         # Get owner/repo from app_info if available
@@ -62,11 +62,11 @@ def verify_with_strategy(
 
     # Standard verification using SHA file
     verifier = VerificationManager(
-        sha_name=sha_name,
-        sha_url=sha_url,
+        checksum_file_name=checksum_file_name,
+        checksum_file_download_url=checksum_file_download_url,
         appimage_name=appimage_name,
         appimage_path=appimage_path,
-        hash_type=hash_type,
+        checksum_hash_type=checksum_hash_type,
     )
 
     return verifier.verify_appimage(cleanup_on_failure=cleanup_on_failure)

@@ -280,20 +280,20 @@ msgid "HTTP error. Check network connection and try again."
 msgstr "HTTP hatası. Ağ bağlantınızı kontrol edin ve tekrar deneyin."
 
 #: src/file_handler.py:43
-msgid "Downloading {sha_name}..."
-msgstr "{sha_name} indiriliyor..."
+msgid "Downloading {checksum_file_name}..."
+msgstr "{checksum_file_name} indiriliyor..."
 
 #: src/file_handler.py:54 src/file_handler.py:71
-msgid "[42mDownloaded {sha_name}[0m"
-msgstr "[42m{sha_name} indirildi[0m"
+msgid "[42mDownloaded {checksum_file_name}[0m"
+msgstr "[42m{checksum_file_name} indirildi[0m"
 
 #: src/file_handler.py:60
-msgid "{sha_name} already exists"
-msgstr "{sha_name} zaten mevcut"
+msgid "{checksum_file_name} already exists"
+msgstr "{checksum_file_name} zaten mevcut"
 
 #: src/file_handler.py:63
-msgid "{sha_name} already exists but it is different from the downloaded one"
-msgstr "{sha_name} zaten mevcut ancak indirilen dosyadan farklı"
+msgid "{checksum_file_name} already exists but it is different from the downloaded one"
+msgstr "{checksum_file_name} zaten mevcut ancak indirilen dosyadan farklı"
 
 #: src/file_handler.py:67
 msgid "Do you want to overwrite it? (y/n): "
@@ -316,16 +316,16 @@ msgid "Do you want to delete the downloaded sha file? (y/n): "
 msgstr "İndirilen sha dosyasını silmek istiyor musunuz? (y/n):"
 
 #: src/file_handler.py:101
-msgid "Deleted {sha_name}"
-msgstr "{sha_name} silindi"
+msgid "Deleted {checksum_file_name}"
+msgstr "{checksum_file_name} silindi"
 
 #: src/file_handler.py:106
 msgid "Do you want to continue without verification? (y/n): "
 msgstr "Doğrulama yapmadan devam etmek istiyor musunuz? (y/n):"
 
 #: src/file_handler.py:118
-msgid "[41;30mError connecting to {sha_url}[0m"
-msgstr "[41;30m{sha_url} adresine bağlanırken hata oluştu[0m"
+msgid "[41;30mError connecting to {checksum_file_download_url}[0m"
+msgstr "[41;30m{checksum_file_download_url} adresine bağlanırken hata oluştu[0m"
 
 #: src/file_handler.py:142
 msgid "Deleted {new_name}"
@@ -376,8 +376,8 @@ msgid "Updating credentials in {repo}.json"
 msgstr "{repo}.json içinde kimlik bilgileri güncelleniyor"
 
 #: src/file_handler.py:244
-msgid "Deleting {sha_name}"
-msgstr "{sha_name} siliniyor"
+msgid "Deleting {checksum_file_name}"
+msgstr "{checksum_file_name} siliniyor"
 
 #: src/file_handler.py:249
 msgid "Do you want to continue? (y/n): "

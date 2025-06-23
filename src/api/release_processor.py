@@ -7,6 +7,7 @@ This module handles the processing of GitHub release data into structured format
 import logging
 import re  # Import the 're' module
 from typing import Any
+
 from packaging.version import parse as parse_version_string
 
 from src.api.assets import ReleaseInfo  # Corrected import path
@@ -81,7 +82,7 @@ class ReleaseProcessor:
         current_parseable_str = current_for_comparison  # Corrected typo
         latest_parseable_str = latest_for_comparison
 
-        # However, for the actual parsing by packaging.version to check is_prerelease flags etc.,
+        # However, for the actual parsing by packaging.version to check prerelease flags etc.,
         # we should use the versions that have NOT been stripped of their suffixes,
         # because "1.12.28b" is a pre-release according to packaging.version.
         # The comparison of base versions (stripped) determines if we *consider* an update.
@@ -122,61 +123,24 @@ class ReleaseProcessor:
                 )  # current_parseable_str was latest_for_comparison, fixed
                 parsed_latest_base_for_compare = parse_version_string(latest_parseable_str)
 
-                # For zen-browser, we want to accept these suffixed versions as updates
-                # if their base versions are equivalent or newer.
-                # The original latest_version (e.g. 1.12.28b) is what we'd update to.
-                # packaging.version("1.12.28b") is a pre-release of 1.12.28.
-                # So, the existing logic for repo_uses_beta might be okay,
-                # or we might need to ensure zen-browser is treated as "repo_uses_beta=True"
-                # or that the non-beta path correctly handles these post-releases.
-                # Version("1.0.post1").is_prerelease is False.
-
-                repo_accepts_prerelease_like_updates = version_utils.repo_uses_beta(self.repo)
+                # zen-browser uses a custom versioning scheme with letter suffixes (e.g. 1.12.28b)
+                # They don't use GitHub's prerelease flag, marking all releases as "latest" with prerelease: false
+                # Historical versions: 1.0.1a (alpha) -> 1.12.28b (current pattern for ~2 years)
+                # The letter suffix could be any letter (a, b, c, etc.) and may change in the future
+                # If they adopt proper semver, they might switch to v1.15.5 format without suffixes
+                # NOTE: While packaging.version treats "1.12.28b" as a prerelease, for zen-browser
+                # this is their standard release format, NOT a prerelease (no beta: true in zen-browser.json)
                 if self.owner == "zen-browser" and self.repo == "desktop":
-                    # For zen-browser, consider these transformed versions as primary for update checks
-                    repo_accepts_prerelease_like_updates = True
-
-                if repo_accepts_prerelease_like_updates:
-                    # If repo accepts pre-releases (or it's zen-browser where we force this path),
-                    # an update is available if the latest full version is strictly newer than the current full version.
-                    # This handles 1.12.28 -> 1.12.28b (since 1.12.28b is parsed as < 1.12.28, this alone isn't enough)
-                    # AND 1.12.28a -> 1.12.28b (correctly)
-                    # AND 1.12.28 -> 1.13.0 (correctly)
-
-                    # For zen-browser, the primary condition is if the base versions are different,
-                    # OR if base versions are same, but the full latest (e.g. 1.12.28b) is different from current full (e.g. 1.12.28 or 1.12.28a)
-                    if self.owner == "zen-browser" and self.repo == "desktop":
-                        if parsed_latest_base_for_compare > parsed_current_base_for_compare:
-                            update_available = True
-                        elif parsed_latest_base_for_compare == parsed_current_base_for_compare:
-                            # Base versions are the same (e.g. both 1.12.28).
-                            # Now check if the full latest version (e.g. 1.12.28b) is different from current full (e.g. 1.12.28 or 1.12.28a)
-                            # We want to update from 1.12.28 to 1.12.28b, or 1.12.28a to 1.12.28b.
-                            # The actual comparison of parsed_latest_full_version > parsed_current_full_version
-                            # might be tricky if 1.12.28b < 1.12.28.
-                            # So, if bases are same, and latest_full is different from current_full, consider it an update.
-                            if latest_full_parseable_str != current_full_parseable_str:
-                                # This ensures if current is 1.12.28 and latest is 1.12.28b, it's an update.
-                                # If current is 1.12.28a and latest is 1.12.28b, it's an update.
-                                # If current is 1.12.28b and latest is 1.12.28b, it's not.
-                                update_available = True
-                    elif (
-                        parsed_latest_full_version > parsed_current_full_version
-                    ):  # Standard logic for beta-accepting repos
+                    # Allow updates if base version is newer OR if same base but different suffix
+                    # Examples: 1.12.28 -> 1.12.28b, 1.12.28a -> 1.12.28b, 1.12.28 -> 1.13.0
+                    if parsed_latest_base_for_compare > parsed_current_base_for_compare or (
+                        parsed_latest_base_for_compare == parsed_current_base_for_compare
+                        and latest_full_parseable_str != current_full_parseable_str
+                    ):
                         update_available = True
-                else:  # Standard logic for non-beta repos
-                    if parsed_latest_full_version > parsed_current_full_version:
-                        if parsed_latest_full_version.is_prerelease:
-                            if not parsed_current_full_version.is_prerelease:
-                                if (
-                                    parse_version_string(parsed_latest_full_version.base_version)
-                                    > parsed_current_full_version
-                                ):
-                                    update_available = True
-                            else:  # Both are pre-releases
-                                update_available = True
-                        else:  # Latest is stable
-                            update_available = True
+                # Standard logic for all other repositories: if latest version is newer, allow update
+                elif parsed_latest_full_version > parsed_current_full_version:
+                    update_available = True
             except Exception as e:
                 # Log with the strings that were attempted to be parsed by packaging.version
                 logger.error(
@@ -249,9 +213,7 @@ class ReleaseProcessor:
         current_version: str,
         release_info: ReleaseInfo,
         compatible_assets: list[dict],
-    ) -> dict[
-        str, bool | str | None | list[tuple[Any, Any]] | None | tuple[Any, Any] | None
-    ]:
+    ) -> dict[str, bool | str | None | list[tuple[Any, Any]] | tuple[Any, Any]]:
         """Create a standardized response for update checks.
 
         Args:
@@ -271,11 +233,11 @@ class ReleaseProcessor:
             "release_notes": release_info.release_notes,
             "release_url": release_info.release_url,
             "compatible_assets": compatible_assets,
-            "is_prerelease": release_info.is_prerelease,
+            "prerelease": release_info.prerelease,
             "published_at": release_info.published_at,
-            "appimage_url": release_info.appimage_url,
+            "app_download_url": release_info.app_download_url,
             "appimage_name": release_info.appimage_name,
-            "sha_url": release_info.sha_url,
-            "sha_name": release_info.sha_name,
-            "hash_type": release_info.hash_type,
+            "checksum_file_download_url": release_info.checksum_file_download_url,
+            "checksum_file_name": release_info.checksum_file_name,
+            "checksum_hash_type": release_info.checksum_hash_type,
         }

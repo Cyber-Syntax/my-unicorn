@@ -82,7 +82,7 @@ classDiagram
 
 
     class AppCatalog {
-        <<src/app_catalog.py>>
+        <<src/catalog.py>>
         +app_configs: List_AppConfig
         +load_app_configs()
         +get_app_config(app_name): AppConfig
@@ -97,8 +97,8 @@ classDiagram
             -owner: str
             -repo: str
             -current_version: str
-            -sha_name_pattern: str
-            -hash_type: str
+            -checksum_file_name_pattern: str
+            -checksum_hash_type: str
             +load(app_name_or_path): AppConfig
             +save()
             +update_version(new_version)
@@ -146,19 +146,19 @@ classDiagram
             +find_app_icon(): dict
             -_process_release(release_data)
         }
-        
+
         class ReleaseManager {
             <<src/api/release_manager.py>>
             +get_latest_release_data(headers): tuple_bool_dict_or_str
             +get_specific_release_data(tag, headers): tuple_bool_dict_or_str
         }
-        
+
         class ReleaseProcessor {
             <<src/api/release_processor.py>>
             +extract_version_from_tag(tag_name): str
             +select_appimage_asset(assets, arch_keyword): dict
             +populate_release_info(release_data, asset_info): ReleaseInfo
-            +compare_versions(current_version, latest_version, is_prerelease): tuple
+            +compare_versions(current_version, latest_version): tuple
         }
 
         class ReleaseAssetInfo {
@@ -167,10 +167,10 @@ classDiagram
             +repo: str
             +version: str
             +appimage_name: str
-            +appimage_url: str
-            +sha_name: str
-            +sha_url: str
-            +hash_type: str
+            +app_download_url: str
+            +checksum_file_name: str
+            +checksum_file_download_url: str
+            +checksum_hash_type: str
             +arch_keyword: str
             +release_notes: str
             +raw_assets: list
@@ -191,16 +191,16 @@ classDiagram
         class ShaManager {
             <<src/api/sha_manager.py>>
             -sha_asset_finder: ShaAssetFinder
-            +sha_name: str
-            +sha_url: str
-            +hash_type: str
+            +checksum_file_name: str
+            +checksum_file_download_url: str
+            +checksum_hash_type: str
             +find_sha_asset(assets): ShaAsset
             +get_expected_hash(appimage_name): str
         }
 
         class ShaAssetFinder {
             <<src/api/sha_asset_finder.py>>
-            +find_asset(assets, appimage_name, sha_name_pattern): dict
+            +find_asset(assets, appimage_name, checksum_file_name_pattern): dict
         }
         class APIRateLimitHandler {
             +handle_rate_limit(response)
@@ -210,8 +210,8 @@ classDiagram
     API.APIInterface o-- API.ReleaseManager
     API.APIInterface o-- API.IconManager
     API.APIInterface --> API.APIRateLimitHandler
-    API.APIInterface --> Utils.VersionUtils 
-    API.APIInterface --> Utils.ArchExtractionUtils 
+    API.APIInterface --> Utils.VersionUtils
+    API.APIInterface --> Utils.ArchExtractionUtils
     API.ReleaseManager o-- API.ReleaseProcessor
     API.ReleaseProcessor o-- API.ReleaseAssetInfo
     API.ReleaseProcessor o-- API.AppImageAsset
@@ -239,15 +239,15 @@ classDiagram
             -checksum_verifier: ChecksumVerification
             +verify_download(filepath, release_info: ReleaseAssetInfo, downloaded_sha_content: str): bool
         }
-        
+
         class ChecksumVerification {
             <<src/utils/checksums/verification.py>>
-            +verify_checksum(filepath, expected_hash, hash_type): bool
-            +calculate_file_hash(filepath, hash_type): str
+            +verify_checksum(filepath, expected_hash, checksum_hash_type): bool
+            +calculate_file_hash(filepath, checksum_hash_type): str
         }
         class ChecksumParser {
             <<src/utils/checksums/parser.py>>
-            +parse_checksum_file_content(content, filename_to_match, hash_type): str
+            +parse_checksum_file_content(content, filename_to_match, checksum_hash_type): str
         }
         class ChecksumExtractor {
             <<src/utils/checksums/extractor.py>>
@@ -280,7 +280,7 @@ classDiagram
             <<src/utils/version_utils.py>>
             +normalize_version(version_str): str
             +compare_versions(v1, v2): int
-            +extract_version(tag_name, is_prerelease): str
+            +extract_version(tag_name, prerelease): str
             +extract_version_from_filename(filename): str
         }
         class ArchExtractionUtils {

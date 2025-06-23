@@ -22,14 +22,14 @@ class VerificationLogger:
         """Initialize the verification logger."""
         pass
 
-    def log_verification_start(self, appimage_name: str, hash_type: str) -> None:
+    def log_verification_start(self, appimage_name: str, checksum_hash_type: str) -> None:
         """Log the start of verification process.
 
         Args:
             appimage_name: Name of the AppImage being verified
-            hash_type: Type of hash being used for verification
+            checksum_hash_type: Type of hash being used for verification
         """
-        logging.info(f"Starting verification of {appimage_name} using {hash_type}")
+        logging.info(f"Starting verification of {appimage_name} using {checksum_hash_type}")
 
     def log_verification_skipped(self, reason: str) -> None:
         """Log and print when verification is skipped.
@@ -44,7 +44,7 @@ class VerificationLogger:
     def log_hash_comparison(
         self,
         appimage_name: str | None,
-        hash_type: str,
+        checksum_hash_type: str,
         actual_hash: str,
         expected_hash: str,
         is_verified: bool,
@@ -53,7 +53,7 @@ class VerificationLogger:
 
         Args:
             appimage_name: Name of the AppImage file
-            hash_type: Hash algorithm used
+            checksum_hash_type: Hash algorithm used
             actual_hash: Calculated hash value
             expected_hash: Expected hash value
             is_verified: Whether verification passed
@@ -64,7 +64,7 @@ class VerificationLogger:
         log_lines = [
             f"{status}{status_text}",
             _("File: {name}").format(name=appimage_name or "Unknown"),
-            _("Algorithm: {type}").format(type=hash_type.upper()),
+            _("Algorithm: {type}").format(type=checksum_hash_type.upper()),
             _("Expected: {hash}").format(hash=expected_hash),
             _("Actual:   {hash}").format(hash=actual_hash),
             "----------------------------------------",

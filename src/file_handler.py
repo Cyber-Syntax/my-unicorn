@@ -50,7 +50,7 @@ class FileHandler:
     repo: str
     owner: str | None = None
     version: str | None = None
-    sha_name: str | None = None
+    checksum_file_name: str | None = None
     config_file: str | None = None
     app_storage_path: Path | None = None  # Final installation directory
     app_backup_storage_path: Path | None = None  # Backup directory

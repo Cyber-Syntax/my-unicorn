@@ -1,21 +1,19 @@
 import time
-import sys
+
 import pytest
 
+from src.appimage_progress import AppImageProgressMeter, format_number
 from src.progress_manager import (
-    BasicMultiAppProgress,
     BasicProgressBar,
-    ProgressManager,
     DynamicProgressManager,
+    ProgressManager,
 )
 
 
 # Fixtures
 @pytest.fixture
 def fixed_time(monkeypatch):
-    """
-    Fixture to monkeypatch time.time() to return a predictable series of values.
-    """
+    """Fixture to monkeypatch time.time() to return a predictable series of values."""
     # Create a mutable list to act as a counter
     times = [1000.0]
 
@@ -31,17 +29,13 @@ def fixed_time(monkeypatch):
 
 @pytest.fixture
 def basic_bar():
-    """
-    Fixture providing a BasicProgressBar with a small total for testing.
-    """
+    """Fixture providing a BasicProgressBar with a small total for testing."""
     return BasicProgressBar(description="Test", total=4)
 
 
 @pytest.fixture
 def progress_mgr():
-    """
-    Fixture providing an active ProgressManager with capture of stdout.
-    """
+    """Fixture providing an active ProgressManager with capture of stdout."""
     mgr = ProgressManager()
     mgr.start()
     yield mgr
@@ -50,9 +44,7 @@ def progress_mgr():
 
 @pytest.fixture
 def dynamic_mgr():
-    """
-    Fixture providing a DynamicProgressManager within a start_progress context.
-    """
+    """Fixture providing a DynamicProgressManager within a start_progress context."""
     mgr = DynamicProgressManager()
     # Enter the context manager manually
     cm = mgr.start_progress(total_items=2, title="UnitTest")
@@ -61,29 +53,64 @@ def dynamic_mgr():
     cm.__exit__(None, None, None)
 
 
-# Tests for BasicMultiAppProgress
+# Tests for AppImageProgressMeter
 
 
-def test_format_size():
-    bmp = BasicMultiAppProgress()
+def test_format_number():
     # Bytes
-    assert bmp._format_size(0) == "0 B"
-    assert bmp._format_size(512) == "512 B"
+    assert format_number(0) == "0 B"
+    assert format_number(512) == "512 B"
     # Kilobytes
-    assert bmp._format_size(2048) == "2.0 KB"
+    assert format_number(2048) == "2.0 KB"
     # Megabytes
-    assert bmp._format_size(5 * 1024 * 1024) == "5.0 MB"
+    assert format_number(5 * 1024 * 1024) == "5.0 MB"
 
 
-def test_format_speed_and_eta(fixed_time):
-    bmp = BasicMultiAppProgress()
-    tid = bmp.add_task("dl", total=100)
-    # Simulate 50 bytes downloaded after 1s
-    bmp.update(tid, completed=50)
-    speed = bmp._format_speed(tid)
-    assert "MB/s" in speed
-    eta = bmp._format_eta(tid)
-    assert eta.endswith("s") or "m" in eta
+def test_appimage_progress_meter_basic():
+    import io
+
+    # Use StringIO to capture output instead of stderr
+    output = io.StringIO()
+    meter = AppImageProgressMeter(fo=output)
+
+    # Test basic functionality
+    meter.start(2)
+
+    # Add downloads
+    download1 = meter.add_download("dl1", "test1.AppImage", 1000, "[1/2] ")
+    download2 = meter.add_download("dl2", "test2.AppImage", 2000, "[2/2] ")
+
+    # Update progress
+    meter.update_progress("dl1", 500)
+    meter.update_progress("dl2", 1000)
+
+    # Complete downloads
+    meter.complete_download("dl1", success=True)
+    meter.complete_download("dl2", success=True)
+
+    # Stop meter
+    meter.stop()
+
+    # Verify downloads were tracked
+    assert len(meter.downloads) == 2
+    assert meter.completed_downloads == 2
+    assert meter.downloads["dl1"]["status"] == "completed"
+    assert meter.downloads["dl2"]["status"] == "completed"
+
+
+def test_appimage_progress_meter_failed_download():
+    import io
+
+    output = io.StringIO()
+    meter = AppImageProgressMeter(fo=output)
+
+    meter.start(1)
+    meter.add_download("fail1", "failed.AppImage", 1000, "[1/1] ")
+    meter.complete_download("fail1", success=False, error_msg="Network error")
+    meter.stop()
+
+    assert meter.downloads["fail1"]["status"] == "failed"
+    assert meter.downloads["fail1"]["error"] == "Network error"
 
 
 # Tests for BasicProgressBar

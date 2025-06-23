@@ -12,7 +12,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from types import TracebackType
 
-from src.app_catalog import initialize_definitions_path
+from src.catalog import initialize_definitions_path
 from src.app_config import AppConfigManager
 from src.auth_manager import GitHubAuthManager
 

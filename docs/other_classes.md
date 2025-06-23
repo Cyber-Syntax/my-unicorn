@@ -46,8 +46,8 @@ namespace Configs {
 	    owner: str = None
 	    repo: str = None
 	    version: str = None
-	    sha_name: str = None
-	    hash_type: str = field(default="sha256")
+	    checksum_file_name: str = None
+	    checksum_hash_type: str = field(default="sha256")
 	    config_file_name: str = field(default=None)
 
 		+get_config_file_path()

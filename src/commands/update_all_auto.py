@@ -13,6 +13,7 @@ from typing import Any  # Retained for compatibility with Any type
 
 from src.auth_manager import GitHubAuthManager
 from src.commands.update_base import BaseUpdateCommand
+from src.download import DownloadManager
 
 
 class UpdateAllAutoCommand(BaseUpdateCommand):
@@ -254,10 +255,16 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                 f"Starting asynchronous update of {len(apps_to_update)} AppImages with concurrency limit {self.max_concurrent_updates}"
             )
 
+            # Initialize progress manager for all downloads
+            DownloadManager.get_or_create_progress(len(apps_to_update))
+
             # Run the async function using the base class method
             success_count, failure_count, results = loop.run_until_complete(
                 self._update_apps_async(apps_to_update)
             )
+
+            # Clean up progress manager after all downloads complete
+            DownloadManager.stop_progress()
 
             # Display results
             self._display_async_results(success_count, failure_count, results, len(apps_to_update))
@@ -289,14 +296,37 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         print(f"Total apps processed: {success_count + failure_count}/{total_apps}")
         print(f"Successfully updated: {success_count}")
 
+        # Show detailed messages for successful updates
+        if success_count > 0:
+            print("\nSuccessful updates:")
+            for app_name, result in results.items():
+                if result.get("status") == "success":
+                    # Show download message
+                    download_msg = result.get("download_message", "")
+                    if download_msg:
+                        print(f"  {download_msg}")
+
+                    # Show verification message
+                    verification_msg = result.get("verification_message", "")
+                    if verification_msg:
+                        print(f"  {verification_msg}")
+
+                    # Show success message
+                    success_msg = result.get("success_message", "")
+                    if success_msg:
+                        print(f"  {success_msg}")
+                    elif result.get("message"):
+                        print(f"  ✓ {app_name} - {result.get('message')}")
+
         if failure_count > 0:
-            print(f"Failed updates: {failure_count}")
+            print(f"\nFailed updates: {failure_count}")
 
             # list failed updates
             for app_name, result in results.items():
                 if result.get("status") != "success":
                     message = result.get("message", "Unknown error")
-                    print(f"  - {app_name}: {message}")
+                    elapsed = result.get("elapsed", 0)
+                    print(f"  ✗ {app_name}: {message} ({elapsed:.1f}s)")
 
         print("\nUpdate process completed!")
 

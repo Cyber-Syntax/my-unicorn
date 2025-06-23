@@ -34,8 +34,8 @@ class TestAppConfigManager(unittest.TestCase):
             owner="test_owner",
             repo="test_repo",  # This will cause the config file to be named "test_repo.json"
             version="1.0.0",
-            sha_name="test_sha.txt",
-            hash_type="sha256",
+            checksum_file_name="test_sha.txt",
+            checksum_hash_type="sha256",
             appimage_name="test-1.0.0.appimage",
             arch_keyword=".appimage",
             config_folder=self.test_dir_path,  # Use Path object instead of string
@@ -52,8 +52,8 @@ class TestAppConfigManager(unittest.TestCase):
             self.assertEqual(data["owner"], "test_owner")
             self.assertEqual(data["repo"], "test_repo")
             self.assertEqual(data["version"], "1.0.0")
-            self.assertEqual(data["sha_name"], "test_sha.txt")
-            self.assertEqual(data["hash_type"], "sha256")
+            self.assertEqual(data["checksum_file_name"], "test_sha.txt")
+            self.assertEqual(data["checksum_hash_type"], "sha256")
             self.assertEqual(data["appimage_name"], "test-1.0.0.appimage")
             self.assertEqual(data["arch_keyword"], ".appimage")
 
@@ -121,8 +121,8 @@ class TestAppConfigManager(unittest.TestCase):
             owner="test_owner",
             repo="test_repo",
             version="1.0.0",
-            sha_name="test_sha.txt",
-            hash_type="sha256",
+            checksum_file_name="test_sha.txt",
+            checksum_hash_type="sha256",
             appimage_name="test-1.0.0.appimage",
             arch_keyword=".appimage",
             config_folder=self.test_dir_path,
@@ -136,8 +136,8 @@ class TestAppConfigManager(unittest.TestCase):
         self.assertEqual(config_dict["repo"], "test_repo")
         self.assertEqual(config_dict["app_rename"], "test_repo")
         self.assertEqual(config_dict["version"], "1.0.0")
-        self.assertEqual(config_dict["sha_name"], "test_sha.txt")
-        self.assertEqual(config_dict["hash_type"], "sha256")
+        self.assertEqual(config_dict["checksum_file_name"], "test_sha.txt")
+        self.assertEqual(config_dict["checksum_hash_type"], "sha256")
         self.assertEqual(config_dict["appimage_name"], "test-1.0.0.appimage")
         self.assertEqual(config_dict["arch_keyword"], ".appimage")
 

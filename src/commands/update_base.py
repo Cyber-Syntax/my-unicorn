@@ -13,9 +13,9 @@ import time
 from typing import Any
 
 from src.api.github_api import GitHubAPI
-from src.app_catalog import load_app_definition
 from src.app_config import AppConfigManager
 from src.auth_manager import GitHubAuthManager
+from src.catalog import load_app_definition
 from src.commands.base import Command
 from src.download import DownloadManager
 from src.file_handler import FileHandler
@@ -83,7 +83,13 @@ class BaseUpdateCommand(Command):
             tuple containing:
             - int: Number of successfully updated apps
             - int: Number of failed updates
-            - tuple[str, tuple[str, Any]]: Dictionary mapping app names to their results
+            - dict[str, dict[str, Any]]: Dictionary mapping app names to their results
+                Each result dict includes:
+                - status: "success", "failed", "exception", or "error"
+                - message: Success/error message
+                - elapsed: Time taken for the operation
+                - download_message: Message about download/existing file (for summary)
+                - verification_message: Message about verification (for summary)
 
         """
         total_apps = len(apps_to_update)
@@ -102,6 +108,7 @@ class BaseUpdateCommand(Command):
 
             # Run all tasks concurrently
             update_results = await asyncio.gather(*tasks, return_exceptions=True)
+            self._logger.info("Processing completed. Generating update summary...")
 
             # Process results
             for i, result in enumerate(update_results):
@@ -191,20 +198,24 @@ class BaseUpdateCommand(Command):
                         f"[{app_index}/{total_apps}] ✓ Successfully updated {app_name} ({elapsed_time:.1f}s)"
                     )
                     result_appimage_name = result[1].get("appimage_name") if result[1] else None
-                    result_sha_name = result[1].get("sha_name") if result[1] else None
+                    result_checksum_file_name = (
+                        result[1].get("checksum_file_name") if result[1] else None
+                    )
                     return True, {
                         "status": "success",
                         "message": f"Updated to {app_data['latest']}",
                         "elapsed": elapsed_time,
                         "appimage_name": result_appimage_name,
-                        "sha_name": result_sha_name,
+                        "checksum_file_name": result_checksum_file_name,
                     }
                 else:
                     self._logger.warning(
                         f"[{app_index}/{total_apps}] ✗ Failed to update {app_name} ({elapsed_time:.1f}s)"
                     )
                     result_appimage_name = result[1].get("appimage_name") if result[1] else None
-                    result_sha_name = result[1].get("sha_name") if result[1] else None
+                    result_checksum_file_name = (
+                        result[1].get("checksum_file_name") if result[1] else None
+                    )
                     return False, {
                         "status": "failed",
                         "message": result[1].get("error", "Update failed")
@@ -212,7 +223,7 @@ class BaseUpdateCommand(Command):
                         else "Update failed",
                         "elapsed": elapsed_time,
                         "appimage_name": result_appimage_name,
-                        "sha_name": result_sha_name,
+                        "checksum_file_name": result_checksum_file_name,
                     }
 
             except Exception as e:
@@ -275,14 +286,18 @@ class BaseUpdateCommand(Command):
 
         # Initialize GitHub API using app definition data
         # For use_asset_digest apps, use auto detection instead of None values
-        sha_name_param = app_info.sha_name if app_info.sha_name else "auto"
-        hash_type_param = app_info.hash_type if app_info.hash_type else "auto"
+        checksum_file_name_param = (
+            app_info.checksum_file_name if app_info.checksum_file_name else "auto"
+        )
+        checksum_hash_type_param = (
+            app_info.checksum_hash_type if app_info.checksum_hash_type else "auto"
+        )
 
         github_api = GitHubAPI(
             owner=app_info.owner,
             repo=app_info.repo,
-            sha_name=sha_name_param,
-            hash_type=hash_type_param,
+            checksum_file_name=checksum_file_name_param,
+            checksum_hash_type=checksum_hash_type_param,
             arch_keyword=None,  # Use app definition's preferred_characteristic_suffixes
         )
 
@@ -308,9 +323,13 @@ class BaseUpdateCommand(Command):
         self._logger.debug(
             f"Update available for {app_data['name']}, processing full release info including SHA"
         )
-        full_success, full_release_data = github_api.get_latest_release(
-            version_check_only=False, is_batch=is_batch
-        )
+        full_result = github_api.get_latest_release(version_check_only=False, is_batch=is_batch)
+
+        # Handle variable return values (2 or 3 elements)
+        if len(full_result) == 2:
+            full_success, full_release_data = full_result
+        else:
+            full_success, full_release_data, _ = full_result
 
         if not full_success:
             error_msg = f"Error getting full release data from GitHub API: {full_release_data}"
@@ -325,18 +344,27 @@ class BaseUpdateCommand(Command):
             )
             downloaded_file_path, was_existing_file = download_manager.download()
 
+            # Handle download status messages based on context
             if was_existing_file:
-                print(f"\nFound existing file: {github_api.appimage_name}")
+                download_message = f"Found existing file: {github_api.appimage_name}"
+                if not is_async:
+                    print(f"\n{download_message}")
             else:
-                print(f"\n✓ Downloaded {github_api.appimage_name}")
+                download_message = f"✓ Downloaded {github_api.appimage_name}"
+                if not is_async:
+                    print(f"\n{download_message}")
 
             # Determine per-file cleanup behavior: skip interactive prompts in batch or async
             cleanup = False if is_batch else True
-            # Single verification point for both existing and downloaded files
+
+            # Handle verification status messages
             if was_existing_file:
-                print("Verifying existing file...")
+                verification_status_message = "Verifying existing file..."
             else:
-                print("Verifying download integrity...")
+                verification_status_message = "Verifying download integrity..."
+
+            if not is_async:
+                print(verification_status_message)
 
             verification_result, verification_skipped = self._verify_appimage(
                 github_api, downloaded_file_path, cleanup_on_failure=cleanup
@@ -347,7 +375,7 @@ class BaseUpdateCommand(Command):
                 return False, {
                     "error": error_msg,
                     "appimage_name": github_api.appimage_name,
-                    "sha_name": github_api.sha_name,
+                    "checksum_file_name": github_api.checksum_file_name,
                 }
 
             # Handle file operations
@@ -383,14 +411,17 @@ class BaseUpdateCommand(Command):
                     )
 
                 self._logger.info(success_msg)
-                print(success_msg)
+                # Store success message for summary instead of printing immediately
                 return True, {
                     "status": "success",
                     "message": success_msg,
                     "new_version": github_api.version,
                     "verification_skipped": verification_skipped,
                     "appimage_name": github_api.appimage_name,
-                    "sha_name": github_api.sha_name,
+                    "checksum_file_name": github_api.checksum_file_name,
+                    "download_message": download_message if is_async else "",
+                    "verification_message": verification_status_message if is_async else "",
+                    "success_message": success_msg if is_async else "",
                 }
             else:
                 error_msg = f"Failed to perform file operations for {app_data['name']}"
@@ -398,18 +429,28 @@ class BaseUpdateCommand(Command):
                 return False, {
                     "error": error_msg,
                     "appimage_name": github_api.appimage_name,
-                    "sha_name": github_api.sha_name,
+                    "checksum_file_name": github_api.checksum_file_name,
                 }
 
         except Exception as e:
             error_msg = f"Error updating {app_data['name']}: {e!s}"
             self._logger.error(error_msg)
-            # Include appimage_name and sha_name if github_api was created successfully
+            # Include appimage_name and checksum_file_name if github_api was created successfully
             result = {"error": error_msg}
             if "github_api" in locals() and github_api.appimage_name:
                 result["appimage_name"] = github_api.appimage_name
-                if github_api.sha_name:
-                    result["sha_name"] = github_api.sha_name
+                if github_api.checksum_file_name:
+                    result["checksum_file_name"] = github_api.checksum_file_name
+            if is_async:
+                result["download_message"] = (
+                    download_message if "download_message" in locals() else ""
+                )
+                result["verification_message"] = (
+                    verification_status_message if "verification_status_message" in locals() else ""
+                )
+            else:
+                result["download_message"] = ""
+                result["verification_message"] = ""
             return False, result
 
     def _update_single_app(
@@ -523,7 +564,7 @@ class BaseUpdateCommand(Command):
             return True, verification_skipped
 
         # Check if we have no SHA information at all (fallback case)
-        if not github_api.sha_name and not github_api.asset_digest:
+        if not github_api.checksum_file_name and not github_api.asset_digest:
             self._logger.info("Skipping verification - no verification method available")
             print("Note: Verification skipped - no verification method available")
             verification_skipped = True
@@ -536,10 +577,10 @@ class BaseUpdateCommand(Command):
             )
 
         verification_manager = VerificationManager(
-            sha_name=github_api.sha_name,
-            sha_url=github_api.sha_url,
+            checksum_file_name=github_api.checksum_file_name,
+            checksum_file_download_url=github_api.checksum_file_download_url,
             appimage_name=str(github_api.appimage_name),
-            hash_type=github_api.hash_type or "sha256",
+            checksum_hash_type=github_api.checksum_hash_type or "sha256",
             asset_digest=github_api.asset_digest,
         )
 
@@ -584,7 +625,7 @@ class BaseUpdateCommand(Command):
             repo=str(github_api.repo),
             owner=str(github_api.owner),
             version=str(github_api.version),
-            sha_name=github_api.sha_name,
+            checksum_file_name=github_api.checksum_file_name,
             config_file=str(global_config.config_file),
             app_storage_path=Path(global_config.expanded_app_storage_path),
             app_backup_storage_path=Path(global_config.expanded_app_backup_storage_path),
@@ -638,14 +679,18 @@ class BaseUpdateCommand(Command):
 
         # Initialize GitHub API using app definition data
         # For use_asset_digest apps, use auto detection instead of None values
-        sha_name_param = app_info.sha_name if app_info.sha_name else "auto"
-        hash_type_param = app_info.hash_type if app_info.hash_type else "auto"
+        checksum_file_name_param = (
+            app_info.checksum_file_name if app_info.checksum_file_name else "auto"
+        )
+        checksum_hash_type_param = (
+            app_info.checksum_hash_type if app_info.checksum_hash_type else "auto"
+        )
 
         github_api = GitHubAPI(
             owner=app_info.owner,
             repo=app_info.repo,
-            sha_name=sha_name_param,
-            hash_type=hash_type_param,
+            checksum_file_name=checksum_file_name_param,
+            checksum_hash_type=checksum_hash_type_param,
             arch_keyword=None,  # Use app definition's preferred_characteristic_suffixes
         )
 

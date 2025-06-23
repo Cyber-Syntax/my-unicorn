@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """GitHub API handler module.
 
-This module provides the primary interface for interacting with GitHub's API to handle releases, 
-assets, and SHA verification. It consolidates all GitHub-related operations into a single class 
+This module provides the primary interface for interacting with GitHub's API to handle releases,
+assets, and SHA verification. It consolidates all GitHub-related operations into a single class
 for consistent access patterns.
 """
 
 import logging
 from typing import Any
 
-from src.app_catalog import AppInfo, find_app_by_owner_repo, load_app_definition
 from src.auth_manager import GitHubAuthManager
+from src.catalog import AppInfo, find_app_by_owner_repo, load_app_definition
 from src.icon_manager import IconManager
-from src.utils import arch_utils
 from src.utils.arch_extraction import extract_arch_from_filename
 from src.utils.version_utils import extract_version, extract_version_from_filename
 
@@ -32,28 +31,29 @@ class GitHubAPI:
         self,
         owner: str,
         repo: str,
-        sha_name: str,
-        hash_type: str,
+        checksum_file_name: str,
+        checksum_hash_type: str,
         arch_keyword: str | None = None,
     ):
         """Initialize GitHub API handler.
-        
+
         Args:
             owner: Repository owner/organization name
             repo: Repository name
-            sha_name: Name of SHA file for verification
-            hash_type: Type of hash to use (sha256, sha512)
+            checksum_file_name: Name of SHA file for verification
+            checksum_hash_type: Type of hash to use (sha256, sha512)
             arch_keyword: Optional architecture keyword for filtering
+
         """
         self.owner = owner
         self.repo = repo
-        self.sha_name: str | None = sha_name  # Can be updated by SHAManager
-        self.hash_type: str | None = hash_type  # Can be updated by SHAManager
+        self.checksum_file_name: str | None = checksum_file_name  # Can be updated by SHAManager
+        self.checksum_hash_type: str | None = checksum_hash_type  # Can be updated by SHAManager
         self._arch_keyword = arch_keyword
         self.version: str = None
         self.appimage_name: str = None
-        self.appimage_url: str = None
-        self.sha_url: str | None = None
+        self.app_download_url: str = None
+        self.checksum_file_download_url: str | None = None
         self.extracted_hash_from_body: str | None = None
         self.asset_digest: str | None = None
         self._headers = GitHubAuthManager.get_auth_headers()
@@ -83,9 +83,9 @@ class GitHubAPI:
 
     def get_latest_release(
         self, version_check_only: bool = False, is_batch: bool = False
-    ) -> tuple[bool, dict[str, Any], str]:
+    ) -> tuple[bool, dict[str, Any]] | tuple[bool, str] | tuple[bool, dict[str, Any], str]:
         """Fetch latest stable or beta release based on app configuration.
-        
+
         Uses ReleaseManager to fetch the appropriate release version (stable or beta) based on the
         app's configuration in the catalog.
         Processes the release data and extracts relevant information.
@@ -93,9 +93,10 @@ class GitHubAPI:
         Args:
             version_check_only: If True, only check version without downloading assets
             is_batch: Whether this is part of a batch operation
-            
+
         Returns:
             Tuple containing (success flag, release data or error message, additional info)
+
         """
         # Check if app prefers beta releases from catalog configuration
         prefer_beta = self._app_info.beta if self._app_info else False
@@ -146,10 +147,7 @@ class GitHubAPI:
             return False, f"Failed to process release data: {e}"
 
     def _process_release(
-        self,
-        release_data: dict[str, Any],
-        version_check_only: bool = False,
-        is_batch: bool = False
+        self, release_data: dict[str, Any], version_check_only: bool = False, is_batch: bool = False
     ) -> None:
         """Process release data and populate instance attributes.
 
@@ -164,6 +162,7 @@ class GitHubAPI:
 
         Raises:
             ValueError: If required release data is missing or tag format is invalid
+
         """
         logger.debug(
             f"Processing release in github_api.py: {release_data.get('tag_name', 'Unknown tag')}, version_check_only: {version_check_only}, is_batch: {is_batch}"
@@ -179,7 +178,7 @@ class GitHubAPI:
         # Handle zen-browser's special version format (X.Y.Z[letter])
         if self.owner == "zen-browser" and self.repo == "desktop":
             import re
-            
+
             zen_tag_pattern = re.compile(r"^v?(\d+\.\d+\.\d+)([a-zA-Z])$")
             match = zen_tag_pattern.match(raw_tag)
             if match:
@@ -204,10 +203,10 @@ class GitHubAPI:
             )
             # Clear asset-related attributes for version-only checks
             self.appimage_name = None
-            self.appimage_url = None
-            self.sha_name = None
-            self.sha_url = None
-            self.hash_type = None
+            self.app_download_url = None
+            self.checksum_file_name = None
+            self.checksum_file_download_url = None
+            self.checksum_hash_type = None
             self.extracted_hash_from_body = None
             self.asset_digest = None
 
@@ -217,10 +216,10 @@ class GitHubAPI:
                 "repo": self.repo,
                 "version": self.version,
                 "appimage_name": None,
-                "appimage_url": None,
-                "sha_name": None,
-                "sha_url": None,
-                "hash_type": None,
+                "app_download_url": None,
+                "checksum_file_name": None,
+                "checksum_file_download_url": None,
+                "checksum_hash_type": None,
                 "extracted_hash_from_body": None,
                 "asset_digest": None,
                 "arch_keyword": self._arch_keyword,
@@ -235,9 +234,7 @@ class GitHubAPI:
         # Process assets for installation/download
         assets: list[dict[str, Any]] = release_data.get("assets", [])
         if not assets:
-            logger.warning(
-                f"No assets found in release {raw_tag} for {self.owner}/{self.repo}"
-            )
+            logger.warning(f"No assets found in release {raw_tag} for {self.owner}/{self.repo}")
 
         # Ensure app info is loaded for asset selection
         if self._app_info is None:
@@ -293,7 +290,7 @@ class GitHubAPI:
 
         appimage_asset_obj = AppImageAsset.from_github_asset(selected_asset_result.asset)
         self.appimage_name = appimage_asset_obj.name
-        self.appimage_url = appimage_asset_obj.browser_download_url
+        self.app_download_url = appimage_asset_obj.browser_download_url
         logger.info(f"Selected AppImage: {self.appimage_name}")
 
         # Try extracting version from filename if not found in tag
@@ -331,51 +328,52 @@ class GitHubAPI:
                 logger.info(
                     f"Skipping SHA search for {self.appimage_name} - verification disabled for this app"
                 )
-                self.sha_name = None
-                self.sha_url = None
-                self.hash_type = None
+                self.checksum_file_name = None
+                self.checksum_file_download_url = None
+                self.checksum_hash_type = None
                 self.extracted_hash_from_body = None
                 self.asset_digest = None
 
             else:
                 logger.debug(f"Proceeding with SHA processing for {self.appimage_name}")
-                # Use SHA name from app definition if available, otherwise use provided sha_name
-                if self._app_info and self._app_info.sha_name:
-                    initial_sha_name_hint = self._app_info.sha_name
-                    logger.debug(f"Using SHA name from app definition: {initial_sha_name_hint}")
+                # Use SHA name from app definition if available, otherwise use provided checksum_file_name
+                if self._app_info and self._app_info.checksum_file_name:
+                    initial_checksum_file_name_hint = self._app_info.checksum_file_name
+                    logger.debug(
+                        f"Using SHA name from app definition: {initial_checksum_file_name_hint}"
+                    )
                 else:
-                    initial_sha_name_hint = self.sha_name or "sha256"
-                    logger.debug(f"Using fallback SHA name: {initial_sha_name_hint}")
+                    initial_checksum_file_name_hint = self.checksum_file_name or "sha256"
+                    logger.debug(f"Using fallback SHA name: {initial_checksum_file_name_hint}")
 
                 logger.debug(f"Creating SHAManager with app_info: {self._app_info}")
                 sha_mgr = SHAManager(
                     self.owner,
                     self.repo,
-                    initial_sha_name_hint,
+                    initial_checksum_file_name_hint,
                     self.appimage_name,
-                    is_batch=is_batch,
                     app_info=self._app_info,
                 )
                 sha_mgr.find_sha_asset(assets)
 
                 logger.debug(
-                    f"SHAManager results - hash_type: {sha_mgr.hash_type}, sha_name: {sha_mgr.sha_name}, asset_digest: {sha_mgr.asset_digest}"
+                    f"SHAManager results - checksum_hash_type: {sha_mgr.checksum_hash_type}, checksum_file_name: {sha_mgr.checksum_file_name}, asset_digest: {sha_mgr.asset_digest}"
                 )
 
                 # Update instance attributes with results from SHAManager
-                self.sha_name = sha_mgr.sha_name
-                self.sha_url = sha_mgr.sha_url
-                self.hash_type = sha_mgr.hash_type
+                self.checksum_file_name = sha_mgr.checksum_file_name
+                self.checksum_file_download_url = sha_mgr.checksum_file_download_url
+                self.checksum_hash_type = sha_mgr.checksum_hash_type
                 self.extracted_hash_from_body = sha_mgr.extracted_hash_from_body
                 self.asset_digest = sha_mgr.asset_digest
 
                 logger.debug(
-                    f"GitHub API updated - hash_type: {self.hash_type}, sha_name: {self.sha_name}, asset_digest: {self.asset_digest}"
+                    f"GitHub API updated - checksum_hash_type: {self.checksum_hash_type}, checksum_file_name: {self.checksum_file_name}, asset_digest: {self.asset_digest}"
                 )
         else:
-            self.sha_name = None
-            self.sha_url = None
-            self.hash_type = None
+            self.checksum_file_name = None
+            self.checksum_file_download_url = None
+            self.checksum_hash_type = None
             self.extracted_hash_from_body = None
             self.asset_digest = None
 
@@ -384,10 +382,10 @@ class GitHubAPI:
             "repo": self.repo,
             "version": self.version,
             "appimage_name": self.appimage_name,
-            "appimage_url": self.appimage_url,
-            "sha_name": self.sha_name,
-            "sha_url": self.sha_url,
-            "hash_type": self.hash_type,
+            "app_download_url": self.app_download_url,
+            "checksum_file_name": self.checksum_file_name,
+            "checksum_file_download_url": self.checksum_file_download_url,
+            "checksum_hash_type": self.checksum_hash_type,
             "extracted_hash_from_body": self.extracted_hash_from_body,
             "asset_digest": self.asset_digest,
             "arch_keyword": self._arch_keyword,
@@ -397,7 +395,7 @@ class GitHubAPI:
 
         logger.info(f"Successfully processed release {self.version} for {self.owner}/{self.repo}")
         logger.debug(
-            f"AppImage: {self.appimage_name}, SHA: {self.sha_name or 'Not found'} (Type: {self.hash_type or 'N/A'})"
+            f"AppImage: {self.appimage_name}, SHA: {self.checksum_file_name or 'Not found'} (Type: {self.checksum_hash_type or 'N/A'})"
         )
 
     def check_latest_version(
@@ -459,7 +457,7 @@ class GitHubAPI:
             "release_notes": self._release_info.release_notes,
             "release_url": self._release_info.release_url,
             "compatible_assets": compatible_assets,
-            "is_prerelease": self._release_info.is_prerelease,
+            "prerelease": self._release_info.prerelease,
             "published_at": self._release_info.published_at,
         }
 

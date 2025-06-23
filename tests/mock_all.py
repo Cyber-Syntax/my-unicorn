@@ -56,26 +56,26 @@ class TestIntegrationDownloadFlow(unittest.TestCase):
             api = GitHubAPI(
                 owner="testowner",
                 repo="testrepo",
-                sha_name="test.sha256",
-                hash_type="sha256",
+                checksum_file_name="test.sha256",
+                checksum_hash_type="sha256",
                 arch_keyword=None,
             )
             api.version = "1.0.0"
             api.appimage_name = "test.AppImage"
-            api.appimage_url = "http://example.com/test.AppImage"
-            api.sha_url = "http://example.com/test.sha256"
+            api.app_download_url = "http://example.com/test.AppImage"
+            api.checksum_file_download_url = "http://example.com/test.sha256"
             api.arch_keyword = None
             # To simulate the flow, we also update attributes on the AppConfig later.
             return {
                 "owner": api.owner,
                 "repo": api.repo,
                 "version": api.version,
-                "sha_name": api.sha_name,
-                "hash_type": api.hash_type,
+                "checksum_file_name": api.checksum_file_name,
+                "checksum_hash_type": api.checksum_hash_type,
                 "appimage_name": api.appimage_name,
                 "arch_keyword": api.arch_keyword,
-                "appimage_url": api.appimage_url,
-                "sha_url": api.sha_url,
+                "app_download_url": api.app_download_url,
+                "checksum_file_download_url": api.checksum_file_download_url,
             }
 
         mock_api_get.side_effect = fake_get_response

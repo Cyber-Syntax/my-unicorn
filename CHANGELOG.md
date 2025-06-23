@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.11.0-alpha
+### Changed
+Cleaning up the codebase for better readability and maintainability.
+
 ## v0.10.10-alpha
 ### BREAKING CHANGES
 Fixes the performance issue and concurrent issues. After this release we are no longer
@@ -8,7 +12,7 @@ support python 3.11 and lower. This release completely switches to python 3.12 a
 
 ## v0.10.9-alpha
 ### Changed
-This release will not affect existing functionality, but it will fix the issue with the app_catalog module.
+This release will not affect existing functionality, but it will fix the issue with the catalog module.
 
 ## v0.10.8-alpha
 ### Changed
@@ -55,9 +59,9 @@ This release add new app catalog feature to use a new format. The new format is 
     "description": "A content-focused browser for distraction-free browsing",
     "category": "Productivity",
     "tags": ["browser", "focus", "distraction-free", "privacy"],
-    "hash_type": "sha256",
+    "checksum_hash_type": "sha256",
     "appimage_name_template": "zen-{characteristic_suffix}.AppImage",
-    "sha_name": "extracted_checksum",
+    "checksum_file_name": "extracted_checksum",
     "preferred_characteristic_suffixes": ["x86_64", "amd64"],
     "icon_info": "https://raw.githubusercontent.com/zen-browser/desktop/main/docs/assets/zen-black.svg",
     "icon_file_name": "zen_browser_icon.png",

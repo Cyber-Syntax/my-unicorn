@@ -5,10 +5,6 @@ This module contains tests for the UpdateAsyncCommand class that handles
 updating multiple AppImages concurrently using async I/O operations.
 """
 
-import asyncio
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 
 from src.auth_manager import GitHubAuthManager
@@ -57,11 +53,11 @@ def update_command():
 
 
 @pytest.fixture
-def mock_app_configs() -> list[tuple[str, Any]]:
+def mock_app_configs() -> list[dict[str, str]]:
     """Create mock app configurations for testing.
 
     Returns:
-        list[tuple[str, Any]]: list of app config dictionaries
+        list[dict[str, str]]: list of app config dictionaries
 
     """
     return [

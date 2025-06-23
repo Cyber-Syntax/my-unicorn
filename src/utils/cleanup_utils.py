@@ -108,7 +108,7 @@ def cleanup_app_files(
     downloads_dir: str,
     verbose: bool = True,
     appimage_name: str | None = None,
-    sha_name: str | None = None,
+    checksum_file_name: str | None = None,
     ask_confirmation: bool = True,
 ) -> list[str]:
     """Clean up AppImage and SHA files using exact filenames.
@@ -118,7 +118,7 @@ def cleanup_app_files(
         downloads_dir: Directory where downloads are stored
         verbose: Whether to print cleanup messages
         appimage_name: Exact AppImage filename to remove
-        sha_name: Exact SHA filename to remove
+        checksum_file_name: Exact SHA filename to remove
         ask_confirmation: Whether to ask user for confirmation before removal
 
     Returns:
@@ -130,7 +130,7 @@ def cleanup_app_files(
         file_count = 0
         if appimage_name and os.path.exists(os.path.join(downloads_dir, appimage_name)):
             file_count += 1
-        if sha_name and os.path.exists(os.path.join(downloads_dir, os.path.basename(sha_name))):
+        if checksum_file_name and os.path.exists(os.path.join(downloads_dir, os.path.basename(checksum_file_name))):
             file_count += 1
 
         if file_count == 0:
@@ -142,13 +142,13 @@ def cleanup_app_files(
             return []
 
     # Remove files without additional confirmation using exact filenames
-    return remove_files_by_exact_names(downloads_dir, appimage_name, sha_name, verbose=verbose)
+    return remove_files_by_exact_names(downloads_dir, appimage_name, checksum_file_name, verbose=verbose)
 
 
 def remove_files_by_exact_names(
     downloads_dir: str,
     appimage_name: str | None = None,
-    sha_name: str | None = None,
+    checksum_file_name: str | None = None,
     verbose: bool = True,
 ) -> list[str]:
     """Remove AppImage and SHA files using exact filenames without user confirmation.
@@ -159,7 +159,7 @@ def remove_files_by_exact_names(
     Args:
         downloads_dir: Directory where downloads are stored
         appimage_name: Exact AppImage filename to remove
-        sha_name: Exact SHA filename to remove
+        checksum_file_name: Exact SHA filename to remove
         verbose: Whether to print cleanup messages
 
     Returns:
@@ -175,9 +175,9 @@ def remove_files_by_exact_names(
             removed_files.append(appimage_file)
 
     # Remove SHA file if provided
-    if sha_name:
+    if checksum_file_name:
         # Extract just the filename from the path if it's a full path
-        sha_filename = os.path.basename(sha_name)
+        sha_filename = os.path.basename(checksum_file_name)
         sha_file = os.path.join(downloads_dir, sha_filename)
         if _remove_file_if_exists(sha_file, verbose, "SHA"):
             removed_files.append(sha_file)
@@ -188,7 +188,7 @@ def remove_files_by_exact_names(
 def cleanup_failed_verification_files(
     app_name: str,
     appimage_name: str | None = None,
-    sha_name: str | None = None,
+    checksum_file_name: str | None = None,
     ask_confirmation: bool = True,
     verbose: bool = True,
 ) -> list[str]:
@@ -200,7 +200,7 @@ def cleanup_failed_verification_files(
     Args:
         app_name: Name of the app for which files failed verification
         appimage_name: Exact AppImage filename to remove (if known)
-        sha_name: Exact SHA filename to remove (if known)
+        checksum_file_name: Exact SHA filename to remove (if known)
         ask_confirmation: Whether to ask user for confirmation before removal
         verbose: Whether to print cleanup messages
 
@@ -213,13 +213,13 @@ def cleanup_failed_verification_files(
 
     # Debug logging for troubleshooting
     logger.debug("cleanup_failed_verification_files called for app: %s", app_name)
-    logger.debug("appimage_name: %s, sha_name: %s", appimage_name, sha_name)
+    logger.debug("appimage_name: %s, checksum_file_name: %s", appimage_name, checksum_file_name)
 
     # Count files that would be removed
     file_count = 0
     if appimage_name and os.path.exists(os.path.join(downloads_dir, appimage_name)):
         file_count += 1
-    if sha_name and os.path.exists(os.path.join(downloads_dir, os.path.basename(sha_name))):
+    if checksum_file_name and os.path.exists(os.path.join(downloads_dir, os.path.basename(checksum_file_name))):
         file_count += 1
 
     if file_count == 0:
@@ -235,7 +235,7 @@ def cleanup_failed_verification_files(
             return []
 
     # Remove files using exact filenames
-    return remove_files_by_exact_names(downloads_dir, appimage_name, sha_name, verbose=verbose)
+    return remove_files_by_exact_names(downloads_dir, appimage_name, checksum_file_name, verbose=verbose)
 
 
 def cleanup_single_failed_file(
@@ -315,7 +315,7 @@ def cleanup_batch_failed_updates(
         for app_name in failed_apps:
             app_result = results.get(app_name, {})
             appimage_name = app_result.get("appimage_name")
-            sha_name = app_result.get("sha_name")
+            checksum_file_name = app_result.get("checksum_file_name")
 
             from src.global_config import GlobalConfigManager
 
@@ -323,7 +323,7 @@ def cleanup_batch_failed_updates(
 
             if appimage_name and os.path.exists(os.path.join(downloads_dir, appimage_name)):
                 total_files += 1
-            if sha_name and os.path.exists(os.path.join(downloads_dir, os.path.basename(sha_name))):
+            if checksum_file_name and os.path.exists(os.path.join(downloads_dir, os.path.basename(checksum_file_name))):
                 total_files += 1
 
         if total_files == 0:
@@ -346,13 +346,13 @@ def cleanup_batch_failed_updates(
     for app_name in failed_apps:
         app_result = results.get(app_name, {})
         appimage_name = app_result.get("appimage_name")
-        sha_name = app_result.get("sha_name")
+        checksum_file_name = app_result.get("checksum_file_name")
 
         # Use our unified cleanup function without asking confirmation again
         removed_files = cleanup_failed_verification_files(
             app_name=app_name,
             appimage_name=appimage_name,
-            sha_name=sha_name,
+            checksum_file_name=checksum_file_name,
             ask_confirmation=False,  # Already confirmed for the batch
             verbose=verbose,
         )

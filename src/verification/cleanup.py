@@ -56,7 +56,7 @@ class VerificationCleanup:
         self,
         app_name: str,
         appimage_name: str | None = None,
-        sha_name: str | None = None,
+        checksum_file_name: str | None = None,
         ask_confirmation: bool = True,
     ) -> list[str]:
         """Clean up AppImage and SHA files for batch operations when update fails.
@@ -67,7 +67,7 @@ class VerificationCleanup:
         Args:
             app_name: Name of the app to clean up files for
             appimage_name: Exact AppImage filename if known, otherwise use patterns
-            sha_name: Exact SHA filename if known, otherwise use patterns
+            checksum_file_name: Exact SHA filename if known, otherwise use patterns
             ask_confirmation: Whether to ask user for confirmation before removal
 
         Returns:
@@ -76,7 +76,7 @@ class VerificationCleanup:
         return cleanup_failed_verification_files(
             app_name=app_name,
             appimage_name=appimage_name,
-            sha_name=sha_name,
+            checksum_file_name=checksum_file_name,
             ask_confirmation=ask_confirmation,
             verbose=True,
         )

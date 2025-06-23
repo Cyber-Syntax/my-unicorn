@@ -1,14 +1,14 @@
 """Tests for the ReleaseProcessor class."""
 
-from unittest.mock import MagicMock, patch
 from typing import Any
+from unittest.mock import patch
+
 import pytest
 
-from src.api.release_processor import ReleaseProcessor
 from src.api.assets import (
     ReleaseInfo,
 )  # AppImageAsset, SHAAsset not directly used in tests after refactor
-from src.utils import version_utils  # For direct call in one test if needed
+from src.api.release_processor import ReleaseProcessor
 
 # Fixtures from conftest.py are available:
 # mock_release_data, mock_beta_release_data, mock_all_releases_data,
@@ -46,18 +46,17 @@ class TestReleaseProcessorLogic:
                 "v1.2.3-beta",
                 "test-repo",
                 True,
-            ),  # Update to prerelease (if repo_uses_beta is false)
+            ),  # Update to newer beta version (1.2.3-beta > 1.0.0)
             (
                 "1.2.3",
                 "v1.2.3-beta",
                 "test-repo",
                 False,
-            ),  # Current stable, latest prerelease (if repo_uses_beta is false)
-            # Beta repo specific logic (e.g., FreeTube)
-            # version_utils.repo_uses_beta will be called internally
+            ),  # Stable 1.2.3 is newer than prerelease 1.2.3-beta
+            # Standard version comparison for all repos (no special beta logic except zen-browser)
             ("0.17.0", "0.17.1-beta", "FreeTube", True),
             ("0.17.1-beta", "0.17.1-beta", "FreeTube", False),  # Exact same beta
-            ("0.17.1", "0.17.1-beta", "FreeTube", False),  # Base same, one is beta
+            ("0.17.1", "0.17.1-beta", "FreeTube", False),  # Stable 0.17.1 > 0.17.1-beta
             ("0.18.0", "0.17.1-beta", "FreeTube", False),
         ],
     )
@@ -68,11 +67,11 @@ class TestReleaseProcessorLogic:
         latest_version: str,  # Renamed from latest_version_tag
         repo_name: str,
         expected_update: bool,
-        # latest_is_prerelease is not used by ReleaseProcessor.compare_versions directly
+        # latest_prerelease is not used by ReleaseProcessor.compare_versions directly
     ):
         """Test version comparison logic."""
         original_repo = release_processor_instance.repo
-        release_processor_instance.repo = repo_name  # set repo for version_utils.repo_uses_beta
+        release_processor_instance.repo = repo_name  # set repo for zen-browser specific logic
 
         # Call compare_versions with positional arguments as per its signature
         update_available, versions_dict = release_processor_instance.compare_versions(
@@ -95,10 +94,10 @@ class TestReleaseProcessorLogic:
             "repo": release_processor_instance.repo,
             "version": "1.2.3",
             "appimage_name": "app-x86_64.AppImage",
-            "appimage_url": "https://example.com/app-x86_64.AppImage",
-            "sha_name": "app-x86_64.AppImage.sha256",
-            "sha_url": "https://example.com/app-x86_64.AppImage.sha256",
-            "hash_type": "sha256",
+            "app_download_url": "https://example.com/app-x86_64.AppImage",
+            "checksum_file_name": "app-x86_64.AppImage.sha256",
+            "checksum_file_download_url": "https://example.com/app-x86_64.AppImage.sha256",
+            "checksum_hash_type": "sha256",
             "arch_keyword": "x86_64",
         }
         # is_beta argument for process_release_data defaults to False, can be tested explicitly if needed
@@ -112,14 +111,17 @@ class TestReleaseProcessorLogic:
         assert release_info.version == processed_asset_info["version"]
         # ... (other assertions remain the same)
         assert release_info.appimage_name == processed_asset_info["appimage_name"]
-        assert release_info.appimage_url == processed_asset_info["appimage_url"]
-        assert release_info.sha_name == processed_asset_info["sha_name"]
-        assert release_info.sha_url == processed_asset_info["sha_url"]
-        assert release_info.hash_type == processed_asset_info["hash_type"]
+        assert release_info.app_download_url == processed_asset_info["app_download_url"]
+        assert release_info.checksum_file_name == processed_asset_info["checksum_file_name"]
+        assert (
+            release_info.checksum_file_download_url
+            == processed_asset_info["checksum_file_download_url"]
+        )
+        assert release_info.checksum_hash_type == processed_asset_info["checksum_hash_type"]
         assert release_info.arch_keyword == processed_asset_info["arch_keyword"]
         assert release_info.release_notes == mock_release_data["body"]
         assert release_info.release_url == mock_release_data["html_url"]
-        assert release_info.is_prerelease == mock_release_data["prerelease"]
+        assert release_info.prerelease == mock_release_data["prerelease"]
         assert release_info.published_at == mock_release_data["published_at"]
         assert release_info.raw_assets == mock_release_data["assets"]
 
@@ -170,7 +172,7 @@ class TestReleaseProcessorLogic:
         assert response["compatible_assets"] == compatible_assets_list_mock
         # ... assert other fields from mock_release_info_fixture like appimage_name, url etc.
         assert response["appimage_name"] == mock_release_info_fixture.appimage_name
-        assert response["appimage_url"] == mock_release_info_fixture.appimage_url
+        assert response["app_download_url"] == mock_release_info_fixture.app_download_url
 
     def test_filter_compatible_assets(
         self,

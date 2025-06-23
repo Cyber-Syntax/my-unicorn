@@ -40,25 +40,25 @@ class TestVerificationManager(unittest.TestCase):
 
     def test_initialization(self) -> None:
         """Test that VerificationManager initializes correctly."""
-        manager = VerificationManager(appimage_name="test.AppImage", hash_type="sha256")
+        manager = VerificationManager(appimage_name="test.AppImage", checksum_hash_type="sha256")
 
         self.assertEqual(manager.appimage_name, "test.AppImage")
-        self.assertEqual(manager.hash_type, "sha256")
+        self.assertEqual(manager.checksum_hash_type, "sha256")
         self.assertIsNotNone(manager.config)
         self.assertIsNotNone(manager.logger)
         self.assertIsNotNone(manager.cleanup)
 
     def test_set_appimage_path(self) -> None:
         """Test setting AppImage path."""
-        manager = VerificationManager(appimage_name="test.AppImage", hash_type="sha256")
+        manager = VerificationManager(appimage_name="test.AppImage", checksum_hash_type="sha256")
 
         manager.set_appimage_path(self.test_appimage)
         self.assertEqual(manager.appimage_path, self.test_appimage)
 
     def test_verification_skipped_no_hash(self) -> None:
-        """Test that verification is skipped when hash_type is no_hash."""
+        """Test that verification is skipped when checksum_hash_type is no_hash."""
         manager = VerificationManager(
-            appimage_name="test.AppImage", hash_type="no_hash", appimage_path=self.test_appimage
+            appimage_name="test.AppImage", checksum_hash_type="no_hash", appimage_path=self.test_appimage
         )
 
         result = manager.verify_appimage()
@@ -71,9 +71,9 @@ class TestVerificationManager(unittest.TestCase):
 
         manager = VerificationManager(
             appimage_name="test.AppImage",
-            hash_type="sha256",
+            checksum_hash_type="sha256",
             appimage_path=self.test_appimage,
-            sha_name="extracted_checksum",
+            checksum_file_name="extracted_checksum",
             direct_expected_hash=self.expected_hash,
         )
 
@@ -88,9 +88,9 @@ class TestVerificationManager(unittest.TestCase):
         wrong_hash = "a" * 64  # Wrong hash
         manager = VerificationManager(
             appimage_name="test.AppImage",
-            hash_type="sha256",
+            checksum_hash_type="sha256",
             appimage_path=self.test_appimage,
-            sha_name="extracted_checksum",
+            checksum_file_name="extracted_checksum",
             direct_expected_hash=wrong_hash,
         )
 
@@ -108,9 +108,9 @@ class TestVerificationManager(unittest.TestCase):
 
         manager = VerificationManager(
             appimage_name="test.AppImage",
-            hash_type="sha256",
+            checksum_hash_type="sha256",
             appimage_path=self.test_appimage,
-            sha_name=self.test_sha,
+            checksum_file_name=self.test_sha,
         )
 
         result = manager.verify_appimage()
@@ -122,7 +122,7 @@ class TestVerificationManager(unittest.TestCase):
 
         manager = VerificationManager(
             appimage_name="test.AppImage",
-            hash_type="asset_digest",
+            checksum_hash_type="asset_digest",
             appimage_path=self.test_appimage,
             asset_digest=asset_digest,
         )
@@ -134,10 +134,10 @@ class TestVerificationManager(unittest.TestCase):
         """Test behavior when AppImage file is missing."""
         manager = VerificationManager(
             appimage_name="missing.AppImage",
-            hash_type="sha256",
+            checksum_hash_type="sha256",
             appimage_path="/nonexistent/path/missing.AppImage",
             direct_expected_hash=self.expected_hash,
-            sha_name="extracted_checksum",
+            checksum_file_name="extracted_checksum",
         )
 
         result = manager.verify_appimage()
@@ -146,16 +146,16 @@ class TestVerificationManager(unittest.TestCase):
     def test_backwards_compatibility(self) -> None:
         """Test that the old interface still works."""
         from src.verify import VerificationManager as OldVerificationManager
-        from src.verify import SUPPORTED_HASH_TYPES, STATUS_SUCCESS, STATUS_FAIL
+        from src.verify import SUPPORTED_checksum_hash_typeS, STATUS_SUCCESS, STATUS_FAIL
 
         # Test that we can still import from the old location
-        manager = OldVerificationManager(appimage_name="test.AppImage", hash_type="sha256")
+        manager = OldVerificationManager(appimage_name="test.AppImage", checksum_hash_type="sha256")
 
         self.assertEqual(manager.appimage_name, "test.AppImage")
-        self.assertEqual(manager.hash_type, "sha256")
+        self.assertEqual(manager.checksum_hash_type, "sha256")
 
         # Test constants are available
-        self.assertIn("sha256", SUPPORTED_HASH_TYPES)
+        self.assertIn("sha256", SUPPORTED_checksum_hash_typeS)
         self.assertEqual(STATUS_SUCCESS, "✓ ")
         self.assertEqual(STATUS_FAIL, "✗ ")
 

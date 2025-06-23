@@ -18,19 +18,19 @@ import yaml
 class ShaFileManager:
     """Manages SHA file operations including downloading and parsing."""
 
-    def __init__(self, hash_type: str) -> None:
+    def __init__(self, checksum_hash_type: str) -> None:
         """Initialize the SHA file manager.
 
         Args:
-            hash_type: The hash algorithm type (e.g., 'sha256', 'sha512')
+            checksum_hash_type: The hash algorithm type (e.g., 'sha256', 'sha512')
         """
-        self.hash_type = hash_type.lower()
+        self.checksum_hash_type = checksum_hash_type.lower()
 
-    def download_sha_file(self, sha_url: str, sha_path: str) -> None:
+    def download_sha_file(self, checksum_file_download_url: str, sha_path: str) -> None:
         """Download SHA file with proper cleanup and error handling.
 
         Args:
-            sha_url: URL to download the SHA file from
+            checksum_file_download_url: URL to download the SHA file from
             sha_path: Local path where the SHA file should be saved
 
         Raises:
@@ -44,7 +44,7 @@ class ShaFileManager:
                 raise OSError(f"Failed to remove existing SHA file: {e}")
 
         try:
-            response = requests.get(sha_url, timeout=10)
+            response = requests.get(checksum_file_download_url, timeout=10)
             response.raise_for_status()
 
             with open(sha_path, "w", encoding="utf-8") as f:
@@ -52,7 +52,7 @@ class ShaFileManager:
             logging.info(f"Successfully downloaded SHA file: {sha_path}")
 
         except requests.RequestException as e:
-            raise OSError(f"Failed to download SHA file from {sha_url}: {e}")
+            raise OSError(f"Failed to download SHA file from {checksum_file_download_url}: {e}")
         except Exception as e:
             raise OSError(f"Failed to write SHA file to {sha_path}: {e}")
 
@@ -115,9 +115,9 @@ class ShaFileManager:
             if not data:
                 raise ValueError("Empty YAML file")
 
-            encoded_hash = data.get(self.hash_type)
+            encoded_hash = data.get(self.checksum_hash_type)
             if not encoded_hash:
-                raise ValueError(f"No {self.hash_type} hash found in YAML")
+                raise ValueError(f"No {self.checksum_hash_type} hash found in YAML")
 
             try:
                 decoded_hash = base64.b64decode(encoded_hash).hex()
@@ -152,12 +152,12 @@ class ShaFileManager:
             hash_value = content.split()[0]
 
             # Validate hash format
-            expected_length = 64 if self.hash_type == "sha256" else 128
+            expected_length = 64 if self.checksum_hash_type == "sha256" else 128
             if len(hash_value) != expected_length:
-                raise ValueError(f"Invalid {self.hash_type} hash length")
+                raise ValueError(f"Invalid {self.checksum_hash_type} hash length")
 
             if not all(c in "0123456789abcdefABCDEF" for c in hash_value):
-                raise ValueError(f"Invalid {self.hash_type} hash format")
+                raise ValueError(f"Invalid {self.checksum_hash_type} hash format")
 
             return hash_value
 
@@ -192,7 +192,7 @@ class ShaFileManager:
             # Try GitHub-style format with headers first
             sha_section_match = re.search(r"##\s+SHA2?56.+", content, re.MULTILINE | re.IGNORECASE)
             if sha_section_match:
-                expected_length = 64 if self.hash_type == "sha256" else 128
+                expected_length = 64 if self.checksum_hash_type == "sha256" else 128
                 hash_pattern = rf"([0-9a-f]{{{expected_length}}})\s+\*?{re.escape(target_name)}"
                 hash_match = re.search(hash_pattern, content, re.MULTILINE | re.IGNORECASE)
                 if hash_match:
@@ -262,7 +262,7 @@ class ShaFileManager:
         Returns:
             Validated hash value or None if invalid
         """
-        expected_length = 64 if self.hash_type == "sha256" else 128
+        expected_length = 64 if self.checksum_hash_type == "sha256" else 128
 
         if len(hash_value) != expected_length:
             logging.warning(f"Hash has wrong length: {len(hash_value)}, expected {expected_length}")
