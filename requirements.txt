@@ -17,4 +17,4 @@ pycparser==2.22
 pyyaml==6.0.2
 requests==2.32.4
 secretstorage==3.3.3
-urllib3==2.4.0
+urllib3==2.5.0
