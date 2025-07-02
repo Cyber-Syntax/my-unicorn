@@ -140,14 +140,17 @@ def get_user_choice() -> int:
         sys.exit(EXIT_SUCCESS)
 
 
+def get_xdg_state_home() -> Path:
+    """Get the XDG state home directory."""
+    xdg_state_home = os.getenv("XDG_STATE_HOME")
+    if not xdg_state_home or not Path(xdg_state_home).is_absolute():
+        return Path.home() / ".local" / "state"
+    return Path(xdg_state_home)
+
+
 def configure_logging() -> None:
     """Configure logging for the application."""
-    # Determine the XDG state directory
-    xdg_state_home = os.getenv("XDG_STATE_HOME")
-    if xdg_state_home:
-        log_dir_base = Path(xdg_state_home)
-    else:
-        log_dir_base = Path.home() / ".local" / "state"
+    log_dir_base = get_xdg_state_home()
 
     log_dir = log_dir_base / "my-unicorn"
     log_dir.mkdir(parents=True, exist_ok=True)  # Use parents=True to create intermediate dirs

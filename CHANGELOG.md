@@ -1,6 +1,8 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.11.1-alpha
+
 ## v0.11.0-alpha
 ### Changed
 Cleaning up the codebase for better readability and maintainability.
