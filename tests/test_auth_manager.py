@@ -18,11 +18,11 @@ if TYPE_CHECKING:
     pass
 
 # Import the module to test
-from src.auth_manager import GitHubAuthManager
+from my_unicorn.auth_manager import GitHubAuthManager
 
 # Disable logging during tests to prevent token exposure
-logging.getLogger("src.auth_manager").setLevel(logging.CRITICAL)
-logging.getLogger("src.secure_token").setLevel(logging.CRITICAL)
+logging.getLogger("my_unicorn.auth_manager").setLevel(logging.CRITICAL)
+logging.getLogger("my_unicorn.secure_token").setLevel(logging.CRITICAL)
 
 # Safe mock token value used throughout tests
 SAFE_MOCK_TOKEN = "test-token-XXXX"
@@ -72,7 +72,7 @@ class TestGitHubAuthManager:
         mock_manager.get_token_expiration_info.return_value = (False, "2099-12-31 23:59:59")
         mock_manager.is_token_expired.return_value = False
         mock_manager.audit_log_token_usage.return_value = None
-        monkeypatch.setattr("src.auth_manager.SecureTokenManager", mock_manager)
+        monkeypatch.setattr("my_unicorn.auth_manager.SecureTokenManager", mock_manager)
         return mock_manager
 
     @pytest.fixture
@@ -94,7 +94,7 @@ class TestGitHubAuthManager:
         mock_requests.request.return_value = mock_response
         mock_requests.RequestException = Exception
 
-        monkeypatch.setattr("src.auth_manager.requests", mock_requests)
+        monkeypatch.setattr("my_unicorn.auth_manager.requests", mock_requests)
         return {"module": mock_requests, "response": mock_response}
 
     @pytest.fixture
@@ -102,7 +102,7 @@ class TestGitHubAuthManager:
         """Create a temporary cache directory for testing."""
         test_cache_dir = tmp_path / "test_cache"
         test_cache_dir.mkdir()
-        monkeypatch.setattr("src.auth_manager.CACHE_DIR", str(test_cache_dir))
+        monkeypatch.setattr("my_unicorn.auth_manager.CACHE_DIR", str(test_cache_dir))
         return test_cache_dir
 
     def test_get_auth_headers_no_token(self, reset_class_state, mock_token_manager):
@@ -242,7 +242,7 @@ class TestGitHubAuthManager:
 
         # Mock ensure_directory_exists function
         mock_ensure_dir = MagicMock(return_value=str(mock_cache_dir))
-        monkeypatch.setattr("src.auth_manager.ensure_directory_exists", mock_ensure_dir)
+        monkeypatch.setattr("my_unicorn.auth_manager.ensure_directory_exists", mock_ensure_dir)
 
         # Execute - call method that uses ensure_directory_exists
         GitHubAuthManager._get_cache_file_path()
@@ -265,8 +265,8 @@ class TestGitHubAuthManager:
         new_callable=mock_open,
         read_data='{"timestamp": 0, "remaining": 4999, "limit": 5000}',
     )
-    @patch("src.auth_manager.os.path.exists")
-    @patch("src.auth_manager.load_json_cache")
+    @patch("my_unicorn.auth_manager.os.path.exists")
+    @patch("my_unicorn.auth_manager.load_json_cache")
     def test_load_rate_limit_cache_exists(
         self, mock_load_cache, mock_exists, mock_file, reset_class_state, mock_cache_dir
     ):
@@ -291,7 +291,7 @@ class TestGitHubAuthManager:
         assert "timestamp" in result
 
         # Use constants directly from the auth_manager module
-        from src.auth_manager import RATE_LIMIT_CACHE_TTL, RATE_LIMIT_HARD_REFRESH
+        from my_unicorn.auth_manager import RATE_LIMIT_CACHE_TTL, RATE_LIMIT_HARD_REFRESH
 
         mock_load_cache.assert_called_once_with(
             GitHubAuthManager._get_cache_file_path(),
@@ -299,7 +299,7 @@ class TestGitHubAuthManager:
             hard_refresh_seconds=RATE_LIMIT_HARD_REFRESH,
         )
 
-    @patch("src.auth_manager.os.path.exists")
+    @patch("my_unicorn.auth_manager.os.path.exists")
     def test_load_rate_limit_cache_not_exists(self, mock_exists, reset_class_state):
         """Test _load_rate_limit_cache returns empty dict when cache doesn't exist."""
         # Setup
@@ -311,7 +311,7 @@ class TestGitHubAuthManager:
         # Verify
         assert result == {}
 
-    @patch("src.auth_manager.save_json_cache")
+    @patch("my_unicorn.auth_manager.save_json_cache")
     def test_save_rate_limit_cache(self, mock_save_cache, reset_class_state, mock_cache_dir):
         """Test _save_rate_limit_cache saves data correctly."""
         # Setup
@@ -381,7 +381,7 @@ class TestGitHubAuthManager:
         GitHubAuthManager._rate_limit_cache_time = old_time
 
         # Mock load_json_cache to return empty dict
-        with patch("src.auth_manager.load_json_cache", return_value={}):
+        with patch("my_unicorn.auth_manager.load_json_cache", return_value={}):
             # Execute
             remaining, limit, reset_formatted, is_authenticated = (
                 GitHubAuthManager.get_rate_limit_info()
@@ -418,7 +418,7 @@ class TestGitHubAuthManager:
         assert "resources" in result
         assert "core" in result["resources"]
 
-    @patch("src.auth_manager.requests.get")
+    @patch("my_unicorn.auth_manager.requests.get")
     def test_get_rate_limit_info_request_error(
         self, mock_get, reset_class_state, mock_token_manager
     ):
@@ -432,7 +432,7 @@ class TestGitHubAuthManager:
         mock_token_manager.get_token.return_value = SAFE_MOCK_TOKEN
 
         # Mock load_json_cache to return empty dict
-        with patch("src.auth_manager.load_json_cache", return_value={}):
+        with patch("my_unicorn.auth_manager.load_json_cache", return_value={}):
             # Execute
             remaining, limit, reset_formatted, is_authenticated = (
                 GitHubAuthManager.get_rate_limit_info()
@@ -464,7 +464,7 @@ class TestGitHubAuthManager:
         mock_token_manager.audit_log_token_usage.reset_mock()
 
         # Mock the SessionPool to return a controlled session
-        from src.auth_manager import SessionPool
+        from my_unicorn.auth_manager import SessionPool
 
         mock_session = MagicMock()
         mock_session.request.return_value = mock_requests["response"]
@@ -498,7 +498,7 @@ class TestGitHubAuthManager:
         mock_success.status_code = 200
 
         # Mock the SessionPool to return a controlled session
-        from src.auth_manager import SessionPool
+        from my_unicorn.auth_manager import SessionPool
 
         # Create a mock session with a request method that fails first, then succeeds
         mock_session = MagicMock()
@@ -535,7 +535,7 @@ class TestGitHubAuthManager:
         # Verify
         assert GitHubAuthManager._audit_enabled is False
 
-    @patch("src.auth_manager.datetime")
+    @patch("my_unicorn.auth_manager.datetime")
     def test_get_token_info(self, mock_datetime, reset_class_state, mock_token_manager):
         """Test get_token_info returns expected token information."""
         # Setup
@@ -619,7 +619,7 @@ class TestGitHubAuthManager:
         assert "user" in token_info["scopes"]
         assert "token_type" in token_info
 
-    @patch("src.auth_manager.requests.get")
+    @patch("my_unicorn.auth_manager.requests.get")
     def test_validate_token_invalid(self, mock_get, reset_class_state):
         """Test validate_token with an invalid token."""
         # Setup
@@ -636,7 +636,7 @@ class TestGitHubAuthManager:
         assert token_info["is_valid"] is False
         assert "error" in token_info
 
-    @patch("src.auth_manager.requests.get")
+    @patch("my_unicorn.auth_manager.requests.get")
     def test_validate_token_rate_limited(self, mock_get, reset_class_state):
         """Test validate_token when rate limited."""
         # Setup
@@ -908,7 +908,7 @@ class TestSessionPool:
     @pytest.fixture(autouse=True)
     def reset_class_state(self):
         """Reset SessionPool class state before each test."""
-        from src.auth_manager import SessionPool
+        from my_unicorn.auth_manager import SessionPool
 
         SessionPool._sessions = {}
         SessionPool._last_used = {}
@@ -920,7 +920,7 @@ class TestSessionPool:
     def test_get_session_new(self, monkeypatch, reset_class_state):
         """Test getting a new session when one doesn't exist."""
         # Import here to use the monkeypatched version
-        from src.auth_manager import GitHubAuthManager, SessionPool
+        from my_unicorn.auth_manager import GitHubAuthManager, SessionPool
 
         # Mock get_auth_headers
         mock_headers = {"Authorization": f"Bearer {SAFE_MOCK_TOKEN}", "User-Agent": "test"}
@@ -929,7 +929,7 @@ class TestSessionPool:
         # Mock requests.Session
         mock_session = MagicMock()
         mock_session_class = MagicMock(return_value=mock_session)
-        monkeypatch.setattr("src.auth_manager.requests.Session", mock_session_class)
+        monkeypatch.setattr("my_unicorn.auth_manager.requests.Session", mock_session_class)
 
         # Test getting a new session
         session = SessionPool.get_session("test-token-key")
@@ -943,7 +943,7 @@ class TestSessionPool:
     def test_get_session_existing(self, monkeypatch, reset_class_state):
         """Test getting an existing session."""
         # Import here to use the monkeypatched version
-        from src.auth_manager import GitHubAuthManager, SessionPool
+        from my_unicorn.auth_manager import GitHubAuthManager, SessionPool
 
         # Create a mock session
         mock_session = MagicMock()
@@ -967,7 +967,7 @@ class TestSessionPool:
     def test_clean_idle_sessions(self, monkeypatch, reset_class_state):
         """Test cleaning idle sessions."""
         # Import here to use the monkeypatched version
-        from src.auth_manager import SessionPool
+        from my_unicorn.auth_manager import SessionPool
 
         # Create mock sessions
         active_session = MagicMock()
@@ -1002,7 +1002,7 @@ class TestSessionPool:
     def test_clear_session(self, reset_class_state):
         """Test explicitly clearing a session."""
         # Import here
-        from src.auth_manager import SessionPool
+        from my_unicorn.auth_manager import SessionPool
 
         # Create mock sessions
         session1 = MagicMock()

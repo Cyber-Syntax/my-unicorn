@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.commands.delete_backups import DeleteBackupsCommand
-from src.global_config import GlobalConfigManager
+from my_unicorn.commands.delete_backups import DeleteBackupsCommand
+from my_unicorn.global_config import GlobalConfigManager
 
 
 @pytest.fixture
@@ -94,7 +94,7 @@ def test_execute_with_invalid_choice(
 
     """
     # Mock GlobalConfigManager
-    with patch("src.commands.delete_backups.GlobalConfigManager", return_value=mock_global_config):
+    with patch("my_unicorn.commands.delete_backups.GlobalConfigManager", return_value=mock_global_config):
         # Mock user input
         monkeypatch.setattr("builtins.input", lambda _: "invalid")
 
@@ -124,7 +124,7 @@ def test_execute_calls_correct_method(
         monkeypatch: Pytest monkeypatch fixture for patching functions.
 
     """
-    with patch("src.commands.delete_backups.GlobalConfigManager", return_value=mock_global_config):
+    with patch("my_unicorn.commands.delete_backups.GlobalConfigManager", return_value=mock_global_config):
         # Create mock methods
         delete_command._delete_all_backups = MagicMock()
         delete_command._delete_app_backups = MagicMock()

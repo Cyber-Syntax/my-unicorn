@@ -13,8 +13,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.file_handler import FileHandler
-from src.global_config import GlobalConfigManager
+from my_unicorn.file_handler import FileHandler
+from my_unicorn.global_config import GlobalConfigManager
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def mock_global_config(monkeypatch, temp_dirs):
     def mock_gc_init():
         return mock_config
 
-    monkeypatch.setattr("src.file_handler.GlobalConfigManager", mock_gc_init)
+    monkeypatch.setattr("my_unicorn.file_handler.GlobalConfigManager", mock_gc_init)
     return mock_config
 
 
@@ -233,7 +233,7 @@ class TestFileHandler:
         downloaded_file.write_bytes(b"DownloadedAppImageContent")
 
         # Patch the GlobalConfigManager class in its own module
-        with patch("src.global_config.GlobalConfigManager") as MockGlobalConfigClass:
+        with patch("my_unicorn.global_config.GlobalConfigManager") as MockGlobalConfigClass:
             # Configure the mock instance that will be returned when the class is instantiated
             mock_gc_instance = MagicMock()
             mock_gc_instance.expanded_app_download_path = str(temp_dirs["downloads_dir"])
@@ -266,7 +266,7 @@ class TestFileHandler:
             downloaded_file.unlink()
 
         # Patch the GlobalConfigManager class
-        with patch("src.global_config.GlobalConfigManager") as MockGlobalConfigClass:
+        with patch("my_unicorn.global_config.GlobalConfigManager") as MockGlobalConfigClass:
             # Configure the mock instance
             mock_gc_instance = MagicMock()
             mock_gc_instance.expanded_app_download_path = str(temp_dirs["downloads_dir"])
@@ -316,7 +316,7 @@ class TestFileHandler:
         """
         # Mock dependencies
         monkeypatch.setattr(
-            "src.file_handler.DESKTOP_ENTRY_DIR",
+            "my_unicorn.file_handler.DESKTOP_ENTRY_DIR",
             Path(file_handler.app_storage_path) / "applications",
         )
 

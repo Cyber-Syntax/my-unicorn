@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from src.utils.checksums.extractor import ReleaseChecksumExtractor
+from my_unicorn.utils.checksums.extractor import ReleaseChecksumExtractor
 
 
 class TestReleaseChecksumExtractor:
@@ -29,7 +29,7 @@ cdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc  zen-x86_64.Ap
     @pytest.fixture
     def extractor(self):
         """Create an extractor with mocked authentication."""
-        with patch("src.auth_manager.GitHubAuthManager.get_auth_headers") as mock_headers:
+        with patch("my_unicorn.auth_manager.GitHubAuthManager.get_auth_headers") as mock_headers:
             mock_headers.return_value = {"Authorization": "Bearer mock_token"}
             extractor = ReleaseChecksumExtractor("zen-browser", "desktop")
             extractor.release_description = self.SAMPLE_RELEASE_DESC
@@ -81,7 +81,7 @@ cdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc  zen-x86_64.Ap
         assert extractor.release_description is None
         mock_get.assert_called_once()
 
-    @patch("src.utils.checksums.parser.parse_checksums_from_description")
+    @patch("my_unicorn.utils.checksums.parser.parse_checksums_from_description")
     def test_parse_checksums_from_description(self, mock_parse, extractor):
         """Test parsing checksums from description."""
         expected_checksums = [

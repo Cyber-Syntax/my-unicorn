@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.utils.checksums.verification import (
+from my_unicorn.utils.checksums.verification import (
     handle_release_description_verification,
     verify_checksum,
     verify_file,
@@ -41,7 +41,7 @@ class TestChecksumVerification:
         file_path, checksums_path, _ = setup_test_file
 
         # Mock the actual checksum calculation to return our fixed value
-        with patch("src.utils.checksums.verification.calculate_file_checksum") as mock_calc:
+        with patch("my_unicorn.utils.checksums.verification.calculate_file_checksum") as mock_calc:
             mock_calc.return_value = self.SAMPLE_CHECKSUM
 
             result = verify_file(file_path, checksums_path)
@@ -54,7 +54,7 @@ class TestChecksumVerification:
         file_path, checksums_path, _ = setup_test_file
 
         # Mock the actual checksum calculation to return a different value
-        with patch("src.utils.checksums.verification.calculate_file_checksum") as mock_calc:
+        with patch("my_unicorn.utils.checksums.verification.calculate_file_checksum") as mock_calc:
             mock_calc.return_value = "different_checksum_value"
 
             result = verify_file(file_path, checksums_path)
@@ -122,8 +122,8 @@ class TestChecksumVerification:
         )
         assert result is False
 
-    @patch("src.utils.checksums.extractor.ReleaseChecksumExtractor")
-    @patch("src.utils.checksums.verification.verify_file")
+    @patch("my_unicorn.utils.checksums.extractor.ReleaseChecksumExtractor")
+    @patch("my_unicorn.utils.checksums.verification.verify_file")
     def test_handle_release_description_verification_success(
         self, mock_verify, mock_extractor_class
     ):
@@ -146,8 +146,8 @@ class TestChecksumVerification:
         mock_extractor_instance.write_checksums_file.assert_called_once()
         mock_verify.assert_called_once_with("/tmp/app.AppImage", "/tmp/checksums.txt")
 
-    @patch("src.utils.checksums.extractor.ReleaseChecksumExtractor")
-    @patch("src.utils.checksums.verification.verify_file")
+    @patch("my_unicorn.utils.checksums.extractor.ReleaseChecksumExtractor")
+    @patch("my_unicorn.utils.checksums.verification.verify_file")
     def test_handle_release_description_verification_failure(
         self, mock_verify, mock_extractor_class
     ):
@@ -173,7 +173,7 @@ class TestChecksumVerification:
             mock_verify.assert_called_once_with("/tmp/app.AppImage", "/tmp/checksums.txt")
             mock_remove.assert_called_once_with("/tmp/checksums.txt")
 
-    @patch("src.utils.checksums.extractor.ReleaseChecksumExtractor")
+    @patch("my_unicorn.utils.checksums.extractor.ReleaseChecksumExtractor")
     def test_handle_release_description_verification_fetch_error(self, mock_extractor_class):
         """Test handling fetch error in release description verification."""
         # set up the mocks to simulate a fetch error

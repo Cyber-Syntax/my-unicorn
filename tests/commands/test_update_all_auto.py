@@ -17,10 +17,10 @@ from unittest.mock import patch, MagicMock, call, PropertyMock
 import pytest
 import pytest_asyncio
 
-from src.commands.update_all_auto import UpdateAllAutoCommand
-from src.auth_manager import GitHubAuthManager
-from src.app_config import AppConfigManager
-from src.global_config import GlobalConfigManager
+from my_unicorn.commands.update_all_auto import UpdateAllAutoCommand
+from my_unicorn.auth_manager import GitHubAuthManager
+from my_unicorn.app_config import AppConfigManager
+from my_unicorn.global_config import GlobalConfigManager
 
 
 class TestUpdateAllAutoCommand:
@@ -111,7 +111,7 @@ class TestUpdateAllAutoCommand:
         return (100, 5000, "2025-04-27 10:00:00", True)
 
     @patch("sys.stdout", new_callable=io.StringIO)
-    @patch("src.commands.update_all_auto.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_all_auto.GitHubAuthManager")
     def test_execute_no_config_files(
         self,
         mock_auth_manager: MagicMock,
@@ -143,7 +143,7 @@ class TestUpdateAllAutoCommand:
         assert "Use the Download option first" in output
 
     @patch("sys.stdout", new_callable=io.StringIO)
-    @patch("src.commands.update_all_auto.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_all_auto.GitHubAuthManager")
     def test_execute_insufficient_rate_limits(
         self,
         mock_auth_manager: MagicMock,
@@ -174,7 +174,7 @@ class TestUpdateAllAutoCommand:
         assert "Minimum requests required: 3" in output
 
     @patch("sys.stdout", new_callable=io.StringIO)
-    @patch("src.commands.update_all_auto.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_all_auto.GitHubAuthManager")
     def test_execute_all_up_to_date(
         self,
         mock_auth_manager: MagicMock,
@@ -206,7 +206,7 @@ class TestUpdateAllAutoCommand:
         assert "All AppImages are up to date" in output
 
     @patch("sys.stdout", new_callable=io.StringIO)
-    @patch("src.commands.update_all_auto.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_all_auto.GitHubAuthManager")
     def test_execute_batch_mode_updates(
         self,
         mock_auth_manager: MagicMock,
@@ -245,7 +245,7 @@ class TestUpdateAllAutoCommand:
         assert "Batch mode enabled" in output
 
     @patch("sys.stdout", new_callable=io.StringIO)
-    @patch("src.commands.update_all_auto.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_all_auto.GitHubAuthManager")
     def test_execute_interactive_mode(
         self,
         mock_auth_manager: MagicMock,
@@ -282,7 +282,7 @@ class TestUpdateAllAutoCommand:
         command._handle_interactive_update.assert_called_once_with(updatable_apps, True)
 
     @patch("sys.stdout", new_callable=io.StringIO)
-    @patch("src.commands.update_all_auto.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_all_auto.GitHubAuthManager")
     def test_execute_keyboard_interrupt(
         self,
         mock_auth_manager: MagicMock,
@@ -599,7 +599,7 @@ class TestUpdateAllAutoCommand:
         assert "3.2.0" in output
 
     @patch("sys.stdout", new_callable=io.StringIO)
-    @patch("src.commands.update_all_auto.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_all_auto.GitHubAuthManager")
     def test_display_rate_limit_info(
         self,
         mock_auth_manager: MagicMock,
@@ -628,7 +628,7 @@ class TestUpdateAllAutoCommand:
         assert "Resets at: 2025-04-27 10:00:00" in output
 
     @patch("sys.stdout", new_callable=io.StringIO)
-    @patch("src.commands.update_all_auto.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_all_auto.GitHubAuthManager")
     def test_display_rate_limit_info_low_requests(
         self,
         mock_auth_manager: MagicMock,

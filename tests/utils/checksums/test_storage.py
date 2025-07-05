@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from src.utils.checksums.storage import save_checksums_file
+from my_unicorn.utils.checksums.storage import save_checksums_file
 
 
 class TestChecksumStorage:

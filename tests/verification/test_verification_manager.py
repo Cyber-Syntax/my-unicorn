@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from src.verification import VerificationManager
+from my_unicorn.verification import VerificationManager
 
 
 class TestVerificationManager(unittest.TestCase):
@@ -64,7 +64,7 @@ class TestVerificationManager(unittest.TestCase):
         result = manager.verify_appimage()
         self.assertTrue(result)
 
-    @patch("src.global_config.GlobalConfigManager")
+    @patch("my_unicorn.global_config.GlobalConfigManager")
     def test_direct_hash_verification(self, mock_config) -> None:
         """Test verification with direct hash."""
         mock_config.return_value.expanded_app_download_path = self.temp_dir
@@ -80,7 +80,7 @@ class TestVerificationManager(unittest.TestCase):
         result = manager.verify_appimage()
         self.assertTrue(result)
 
-    @patch("src.global_config.GlobalConfigManager")
+    @patch("my_unicorn.global_config.GlobalConfigManager")
     def test_direct_hash_verification_failure(self, mock_config) -> None:
         """Test verification failure with wrong direct hash."""
         mock_config.return_value.expanded_app_download_path = self.temp_dir
@@ -97,7 +97,7 @@ class TestVerificationManager(unittest.TestCase):
         result = manager.verify_appimage()
         self.assertFalse(result)
 
-    @patch("src.global_config.GlobalConfigManager")
+    @patch("my_unicorn.global_config.GlobalConfigManager")
     def test_sha_file_verification(self, mock_config) -> None:
         """Test verification with SHA file."""
         mock_config.return_value.expanded_app_download_path = self.temp_dir
@@ -145,8 +145,8 @@ class TestVerificationManager(unittest.TestCase):
 
     def test_backwards_compatibility(self) -> None:
         """Test that the old interface still works."""
-        from src.verify import VerificationManager as OldVerificationManager
-        from src.verify import SUPPORTED_checksum_hash_typeS, STATUS_SUCCESS, STATUS_FAIL
+        from my_unicorn.verify import VerificationManager as OldVerificationManager
+        from my_unicorn.verify import SUPPORTED_checksum_hash_typeS, STATUS_SUCCESS, STATUS_FAIL
 
         # Test that we can still import from the old location
         manager = OldVerificationManager(appimage_name="test.AppImage", checksum_hash_type="sha256")

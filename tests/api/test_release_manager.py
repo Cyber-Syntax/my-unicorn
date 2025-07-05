@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock, patch
 import pytest
 
-from src.api.release_manager import ReleaseManager
+from my_unicorn.api.release_manager import ReleaseManager
 
 # Fixtures like mock_release_data, mock_beta_release_data, mock_all_releases_data
 # are available from tests/api/conftest.py
@@ -28,7 +28,7 @@ class TestReleaseManager:
         headers = {"Authorization": "token test_token"}
 
         with patch(
-            "src.auth_manager.GitHubAuthManager.make_authenticated_request",
+            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request",
             return_value=mock_response,
         ) as mock_auth_request:
             success, data = release_manager_instance.get_latest_release_data(headers=headers)
@@ -61,7 +61,7 @@ class TestReleaseManager:
         mock_auth_request = MagicMock(side_effect=[mock_response_latest_404, mock_response_all_200])
 
         with patch(
-            "src.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
+            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
         ):
             success, data = release_manager_instance.get_latest_release_data(headers=headers)
 
@@ -101,7 +101,7 @@ class TestReleaseManager:
             side_effect=[mock_response_latest_404, mock_response_all_empty]
         )
         with patch(
-            "src.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
+            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
         ):
             success, message = release_manager_instance.get_latest_release_data(headers=headers)
 
@@ -119,7 +119,7 @@ class TestReleaseManager:
         headers = {"Authorization": "token test_token"}
 
         with patch(
-            "src.auth_manager.GitHubAuthManager.make_authenticated_request",
+            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request",
             return_value=mock_response_rate_limit,
         ) as mock_auth_request:
             success, message = release_manager_instance.get_latest_release_data(headers=headers)
@@ -144,7 +144,7 @@ class TestReleaseManager:
             side_effect=[mock_response_latest_404, mock_response_rate_limit_all]
         )
         with patch(
-            "src.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
+            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
         ):
             success, message = release_manager_instance.get_latest_release_data(headers=headers)
 
@@ -162,7 +162,7 @@ class TestReleaseManager:
         headers = {"Authorization": "token test_token"}
 
         with patch(
-            "src.auth_manager.GitHubAuthManager.make_authenticated_request",
+            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request",
             return_value=mock_response_error,
         ) as mock_auth_request:
             success, message = release_manager_instance.get_latest_release_data(headers=headers)
@@ -188,7 +188,7 @@ class TestReleaseManager:
             side_effect=[mock_response_latest_404, mock_response_error_all]
         )
         with patch(
-            "src.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
+            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
         ):
             success, message = release_manager_instance.get_latest_release_data(headers=headers)
 

@@ -16,7 +16,7 @@ from typing import Any, Callable
 import pytest
 from pytest import fixture
 
-from src.utils.cache_utils import ensure_directory_exists, load_json_cache, save_json_cache
+from my_unicorn.utils.cache_utils import ensure_directory_exists, load_json_cache, save_json_cache
 
 
 @fixture

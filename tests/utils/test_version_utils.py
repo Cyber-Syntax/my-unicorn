@@ -9,7 +9,7 @@ This module contains tests for the version utility functions in src/utils/versio
 
 import pytest
 
-from src.utils.version_utils import (
+from my_unicorn.utils.version_utils import (
     normalize_version_for_comparison,
     extract_base_version,
     extract_version,

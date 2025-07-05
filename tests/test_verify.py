@@ -6,7 +6,7 @@ import hashlib
 import os
 import base64
 import yaml
-from src.verify import VerificationManager
+from my_unicorn.verify import VerificationManager
 
 # Mock appimage and SHA content
 APPIMAGE_CONTENT = b"dummy content for hashing"

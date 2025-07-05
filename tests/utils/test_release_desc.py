@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.utils.checksums import (
+from my_unicorn.utils.checksums import (
     ReleaseChecksumExtractor,
     extract_checksums_to_file,
 )
@@ -17,7 +17,7 @@ extract_checksums_for_appimage = extract_checksums_to_file
 
 # Import this from checksums package if it exists, otherwise mock it
 try:
-    from src.utils.checksums import get_checksums_from_release
+    from my_unicorn.utils.checksums import get_checksums_from_release
 except ImportError:
     # Mock function if it's not in the new structure
     def get_checksums_from_release(owner, repo, appimage_name):
@@ -64,7 +64,7 @@ a202066a1a6ec8bd5cb6dbd43a5de3ce87d0a13d83ef748e87c1d3fec80d22e0  windows-arm64.
     @pytest.fixture
     def parser(self):
         """Create a parser with mocked authentication."""
-        with patch("src.auth_manager.GitHubAuthManager.get_auth_headers") as mock_headers:
+        with patch("my_unicorn.auth_manager.GitHubAuthManager.get_auth_headers") as mock_headers:
             mock_headers.return_value = {"Authorization": "Bearer mock_token"}
             parser = ReleaseChecksumExtractor("zen-browser", "desktop")
             parser.release_description = self.SAMPLE_RELEASE_DESC
@@ -114,13 +114,13 @@ a202066a1a6ec8bd5cb6dbd43a5de3ce87d0a13d83ef748e87c1d3fec80d22e0  windows-arm64.
                     in content
                 )
 
-    @patch("src.utils.checksums.ReleaseChecksumExtractor.fetch_release_description")
+    @patch("my_unicorn.utils.checksums.ReleaseChecksumExtractor.fetch_release_description")
     def test_extract_checksums_for_appimage(self, mock_fetch, parser):
         """Test the extract_checksums_for_appimage helper function."""
         # Mock the fetch_release_description method to return True
         mock_fetch.return_value = self.SAMPLE_RELEASE_DESC
 
-        with patch("src.utils.checksums.ReleaseChecksumExtractor") as MockParser:
+        with patch("my_unicorn.utils.checksums.ReleaseChecksumExtractor") as MockParser:
             # set up the mock parser instance
             mock_parser_instance = MagicMock()
             mock_parser_instance.write_checksums_file.return_value = "/tmp/SHA256SUMS.txt"
@@ -136,8 +136,8 @@ a202066a1a6ec8bd5cb6dbd43a5de3ce87d0a13d83ef748e87c1d3fec80d22e0  windows-arm64.
                 "zen-x86_64.AppImage", None
             )
 
-    @patch("src.utils.checksums.ReleaseChecksumExtractor.extract_checksums")
-    @patch("src.utils.checksums.ReleaseChecksumExtractor.fetch_release_description")
+    @patch("my_unicorn.utils.checksums.ReleaseChecksumExtractor.extract_checksums")
+    @patch("my_unicorn.utils.checksums.ReleaseChecksumExtractor.fetch_release_description")
     def test_get_checksums_from_release(self, mock_fetch, mock_extract, parser):
         """Test the get_checksums_from_release function."""
         # Mock the needed methods
@@ -147,7 +147,7 @@ a202066a1a6ec8bd5cb6dbd43a5de3ce87d0a13d83ef748e87c1d3fec80d22e0  windows-arm64.
         ]
 
         # Call the function under test
-        with patch("src.utils.checksums.ReleaseChecksumExtractor") as MockParser:
+        with patch("my_unicorn.utils.checksums.ReleaseChecksumExtractor") as MockParser:
             mock_parser_instance = MagicMock()
             MockParser.return_value = mock_parser_instance
             mock_parser_instance.extract_checksums.return_value = mock_extract.return_value

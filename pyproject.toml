@@ -46,7 +46,7 @@ classifiers = [
 ]
 
 [project.scripts]
-my-unicorn = "src.main:main"
+my-unicorn = "my_unicorn.main:main"
 
 [project.urls]
 repository = "https://github.com/Cyber-Syntax/my-unicorn"
@@ -64,10 +64,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["src*"]
+include = ["my_unicorn*"]
 
 [tool.coverage.paths]
-source = ["src"]
+source = ["my_unicorn"]
 
 [tool.pytest.ini_options]
 minversion = "8.3.4"
@@ -80,12 +80,12 @@ python_classes = "Test*"
 python_functions = "test_*"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-pythonpath = [".", "src"]
+pythonpath = [".", "my_unicorn"]
 
 [tool.ruff]
 include = [
   "pyproject.toml",
-  # "src/**/*.py",
+  # "my_unicorn/**/*.py",
   # "scripts/**/*.py",
   # "commands/**/*.py",
 ]
@@ -199,5 +199,5 @@ ignore = [
 max-line-length = 100
 
 [tool.coverage.run]
-source = ["src"]
+source = ["my_unicorn"]
 omit = ["tests/*", "scripts/*"]

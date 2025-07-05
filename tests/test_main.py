@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Local imports
 import main
-from src.commands.invoker import CommandInvoker
+from my_unicorn.commands.invoker import CommandInvoker
 
 
 @pytest.fixture

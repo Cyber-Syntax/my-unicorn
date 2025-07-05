@@ -17,8 +17,8 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Import the modules directly to avoid import issues
-from src.catalog import AppInfo
-from src.commands.install_catalog import InstallAppCommand
+from my_unicorn.catalog import AppInfo
+from my_unicorn.commands.install_catalog import InstallAppCommand
 
 
 @pytest.fixture
@@ -93,7 +93,7 @@ def mocked_app_config(
     mock.config_file_name = "testrepo.json"
 
     app_config_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_catalog.AppConfigManager", app_config_class_mock)
+    monkeypatch.setattr("my_unicorn.commands.install_catalog.AppConfigManager", app_config_class_mock)
     return mock
 
 
@@ -134,7 +134,7 @@ def mocked_api(monkeypatch: pytest.MonkeyPatch, install_test_data: dict[str, str
     )  # Proper response format
 
     api_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_catalog.GitHubAPI", api_class_mock)
+    monkeypatch.setattr("my_unicorn.commands.install_catalog.GitHubAPI", api_class_mock)
     return mock
 
 
@@ -156,7 +156,7 @@ def mocked_download_manager(
     mock.download.return_value = install_test_data["downloaded_file_path"]
 
     download_manager_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_catalog.DownloadManager", download_manager_class_mock)
+    monkeypatch.setattr("my_unicorn.commands.install_catalog.DownloadManager", download_manager_class_mock)
     return mock
 
 
@@ -180,7 +180,7 @@ def mocked_global_config(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.max_backups = 3
 
     global_config_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_catalog.GlobalConfigManager", global_config_class_mock)
+    monkeypatch.setattr("my_unicorn.commands.install_catalog.GlobalConfigManager", global_config_class_mock)
     return mock
 
 
@@ -203,7 +203,7 @@ def mocked_verifier(
     mock.set_appimage_path.return_value = None
 
     verifier_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_catalog.VerificationManager", verifier_class_mock)
+    monkeypatch.setattr("my_unicorn.commands.install_catalog.VerificationManager", verifier_class_mock)
     return mock
 
 
@@ -223,7 +223,7 @@ def mocked_verifier_failure(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.set_appimage_path.return_value = None
 
     verifier_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_catalog.VerificationManager", verifier_class_mock)
+    monkeypatch.setattr("my_unicorn.commands.install_catalog.VerificationManager", verifier_class_mock)
     return mock
 
 
@@ -242,7 +242,7 @@ def mocked_file_handler(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.handle_appimage_operations.return_value = True
 
     file_handler_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_catalog.FileHandler", file_handler_class_mock)
+    monkeypatch.setattr("my_unicorn.commands.install_catalog.FileHandler", file_handler_class_mock)
     return mock
 
 
@@ -261,7 +261,7 @@ def mocked_icon_manager(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.ensure_app_icon.return_value = (True, "/tmp/icon.png")  # Success with icon path
 
     icon_manager_class_mock = MagicMock(return_value=mock)
-    monkeypatch.setattr("src.commands.install_catalog.IconManager", icon_manager_class_mock)
+    monkeypatch.setattr("my_unicorn.commands.install_catalog.IconManager", icon_manager_class_mock)
     return mock
 
 
@@ -287,11 +287,11 @@ def mocked_app_catalog_functions(
     mock_get_categories = MagicMock(return_value=["Test", "Productivity"])
 
     # Apply the mocks
-    monkeypatch.setattr("src.commands.install_catalog.get_app_info", mock_get_app_info)
-    monkeypatch.setattr("src.commands.install_catalog.get_all_apps", mock_get_all_apps)
-    monkeypatch.setattr("src.commands.install_catalog.get_apps_by_category", mock_get_apps_by_category)
-    monkeypatch.setattr("src.commands.install_catalog.search_apps", mock_search_apps)
-    monkeypatch.setattr("src.commands.install_catalog.get_categories", mock_get_categories)
+    monkeypatch.setattr("my_unicorn.commands.install_catalog.get_app_info", mock_get_app_info)
+    monkeypatch.setattr("my_unicorn.commands.install_catalog.get_all_apps", mock_get_all_apps)
+    monkeypatch.setattr("my_unicorn.commands.install_catalog.get_apps_by_category", mock_get_apps_by_category)
+    monkeypatch.setattr("my_unicorn.commands.install_catalog.search_apps", mock_search_apps)
+    monkeypatch.setattr("my_unicorn.commands.install_catalog.get_categories", mock_get_categories)
 
     # Return the mocks for inspection in tests
     return {

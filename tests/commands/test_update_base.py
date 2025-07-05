@@ -11,11 +11,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.api.github_api import GitHubAPI
-from src.app_config import AppConfigManager
-from src.commands.update_base import BaseUpdateCommand
-from src.file_handler import FileHandler
-from src.global_config import GlobalConfigManager
+from my_unicorn.api.github_api import GitHubAPI
+from my_unicorn.app_config import AppConfigManager
+from my_unicorn.commands.update_base import BaseUpdateCommand
+from my_unicorn.file_handler import FileHandler
+from my_unicorn.global_config import GlobalConfigManager
 
 
 class TestBaseUpdateCommand:
@@ -25,9 +25,9 @@ class TestBaseUpdateCommand:
     def base_update_command(self) -> BaseUpdateCommand:
         """Fixture to create a BaseUpdateCommand instance with mocked dependencies."""
         with (
-            patch("src.commands.update_base.GlobalConfigManager") as mock_global_config,
-            patch("src.commands.update_base.AppConfigManager") as mock_app_config,
-            patch("src.commands.update_base.logging.getLogger") as mock_get_logger,
+            patch("my_unicorn.commands.update_base.GlobalConfigManager") as mock_global_config,
+            patch("my_unicorn.commands.update_base.AppConfigManager") as mock_app_config,
+            patch("my_unicorn.commands.update_base.logging.getLogger") as mock_get_logger,
             patch("os.makedirs") as mock_makedirs,
         ):
             mock_logger = MagicMock()
@@ -90,10 +90,10 @@ class TestBaseUpdateCommand:
 
         assert "Subclasses must implement execute()" in str(excinfo.value)
 
-    @patch("src.commands.update_base.GitHubAPI")
-    @patch("src.commands.update_base.DownloadManager")
-    @patch("src.commands.update_base.VerificationManager")
-    @patch("src.commands.update_base.FileHandler")
+    @patch("my_unicorn.commands.update_base.GitHubAPI")
+    @patch("my_unicorn.commands.update_base.DownloadManager")
+    @patch("my_unicorn.commands.update_base.VerificationManager")
+    @patch("my_unicorn.commands.update_base.FileHandler")
     def test_update_single_app_success(
         self,
         mock_file_handler: MagicMock,
@@ -136,7 +136,7 @@ class TestBaseUpdateCommand:
         with (
             patch.object(base_update_command, "_verify_appimage", return_value=True),
             patch.object(base_update_command, "_perform_app_update_core") as mock_perform_update,
-            patch("src.icon_manager.IconManager"),
+            patch("my_unicorn.icon_manager.IconManager"),
         ):  # Patch the correct module path for IconManager
             # Setup the _perform_app_update_core to return success
             mock_perform_update.return_value = (True, {"status": "success"})
@@ -167,8 +167,8 @@ class TestBaseUpdateCommand:
                     is_batch=False,
                 )
 
-    @patch("src.commands.update_base.GitHubAPI")
-    @patch("src.commands.update_base.DownloadManager")
+    @patch("my_unicorn.commands.update_base.GitHubAPI")
+    @patch("my_unicorn.commands.update_base.DownloadManager")
     def test_update_single_app_api_error(
         self,
         mock_download_manager: MagicMock,
@@ -199,8 +199,8 @@ class TestBaseUpdateCommand:
         mock_download_manager.assert_not_called()
         base_update_command._logger.error.assert_called()
 
-    @patch("src.commands.update_base.GitHubAPI")
-    @patch("src.commands.update_base.DownloadManager")
+    @patch("my_unicorn.commands.update_base.GitHubAPI")
+    @patch("my_unicorn.commands.update_base.DownloadManager")
     def test_update_single_app_verification_failure(
         self,
         mock_download_manager: MagicMock,
@@ -282,7 +282,7 @@ class TestBaseUpdateCommand:
             "Skipping verification - verification disabled for this app"
         )
 
-    @patch("src.commands.update_base.VerificationManager")
+    @patch("my_unicorn.commands.update_base.VerificationManager")
     def test_verify_appimage_with_sha(
         self,
         mock_verification_manager: MagicMock,
@@ -349,8 +349,8 @@ class TestBaseUpdateCommand:
             # Verify logging
             base_update_command._logger.info.assert_called_with("1. test_app (1.0.0 → 1.1.0)")
 
-    @patch("src.commands.update_base.load_app_definition")
-    @patch("src.commands.update_base.GitHubAPI")
+    @patch("my_unicorn.commands.update_base.load_app_definition")
+    @patch("my_unicorn.commands.update_base.GitHubAPI")
     def test_check_single_app_version_update_available(
         self,
         mock_github_api: MagicMock,
@@ -359,7 +359,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test checking version when update is available."""
         # Setup app definition mock
-        from src.catalog import AppInfo
+        from my_unicorn.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -397,8 +397,8 @@ class TestBaseUpdateCommand:
         assert result["latest"] == "1.1.0"
         base_update_command._logger.info.assert_called()
 
-    @patch("src.commands.update_base.load_app_definition")
-    @patch("src.commands.update_base.GitHubAPI")
+    @patch("my_unicorn.commands.update_base.load_app_definition")
+    @patch("my_unicorn.commands.update_base.GitHubAPI")
     def test_check_single_app_version_up_to_date(
         self,
         mock_github_api: MagicMock,
@@ -407,7 +407,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test checking version when app is up to date."""
         # Setup app definition mock
-        from src.catalog import AppInfo
+        from my_unicorn.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -440,8 +440,8 @@ class TestBaseUpdateCommand:
         # Assertions
         assert result is None
 
-    @patch("src.commands.update_base.load_app_definition")
-    @patch("src.commands.update_base.GitHubAPI")
+    @patch("my_unicorn.commands.update_base.load_app_definition")
+    @patch("my_unicorn.commands.update_base.GitHubAPI")
     def test_check_single_app_version_with_error(
         self,
         mock_github_api: MagicMock,
@@ -450,7 +450,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test checking version when API returns an error."""
         # Setup app definition mock
-        from src.catalog import AppInfo
+        from my_unicorn.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -489,8 +489,8 @@ class TestBaseUpdateCommand:
         assert result["name"] == "test_app"
         assert result["error"] == "API rate limit exceeded"
 
-    @patch("src.commands.update_base.GitHubAuthManager")
-    @patch("src.commands.update_base.AppConfigManager")
+    @patch("my_unicorn.commands.update_base.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_base.AppConfigManager")
     def test_check_rate_limits_sufficient(
         self,
         mock_app_config_manager: MagicMock,
@@ -524,8 +524,8 @@ class TestBaseUpdateCommand:
             assert filtered_apps[0] == app_data
             assert "Rate limit status" in message
 
-    @patch("src.commands.update_base.GitHubAuthManager")
-    @patch("src.commands.update_base.AppConfigManager")
+    @patch("my_unicorn.commands.update_base.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_base.AppConfigManager")
     def test_check_rate_limits_insufficient(
         self,
         mock_app_config_manager: MagicMock,
@@ -563,8 +563,8 @@ class TestBaseUpdateCommand:
             assert len(filtered_apps) == 0  # No apps can be updated
             assert "ERROR: Not enough API requests" in message
 
-    @patch("src.commands.update_base.GitHubAuthManager")
-    @patch("src.commands.update_base.AppConfigManager")
+    @patch("my_unicorn.commands.update_base.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_base.AppConfigManager")
     def test_check_rate_limits_partial(
         self,
         mock_app_config_manager: MagicMock,
@@ -606,7 +606,7 @@ class TestBaseUpdateCommand:
             assert filtered_apps[0]["name"] == "app1"
             assert "WARNING: Not enough API requests for all updates" in message
 
-    @patch("src.commands.update_base.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_base.GitHubAuthManager")
     def test_display_rate_limit_info(
         self, mock_github_auth_manager: MagicMock, base_update_command: BaseUpdateCommand
     ) -> None:
@@ -627,7 +627,7 @@ class TestBaseUpdateCommand:
             mock_print.assert_any_call("Remaining requests: 100/5000")
             mock_print.assert_any_call("Resets at: 2023-01-01T00:00:00Z")
 
-    @patch("src.commands.update_base.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_base.GitHubAuthManager")
     def test_display_rate_limit_info_low_authenticated(
         self, mock_github_auth_manager: MagicMock, base_update_command: BaseUpdateCommand
     ) -> None:
@@ -649,7 +649,7 @@ class TestBaseUpdateCommand:
             mock_print.assert_any_call("Resets at: 2023-01-01T00:00:00Z")
             mock_print.assert_any_call("⚠️ Running low on API requests!")
 
-    @patch("src.commands.update_base.GitHubAuthManager")
+    @patch("my_unicorn.commands.update_base.GitHubAuthManager")
     def test_display_rate_limit_info_low_unauthenticated(
         self, mock_github_auth_manager: MagicMock, base_update_command: BaseUpdateCommand
     ) -> None:
@@ -818,7 +818,7 @@ class TestBaseUpdateCommand:
             assert results["test_app_2"]["status"] == "exception"
             assert "Test exception" in results["test_app_2"]["message"]
 
-    @patch("src.commands.update_base.load_app_definition")
+    @patch("my_unicorn.commands.update_base.load_app_definition")
     def test_perform_app_update_core_success(
         self,
         mock_load_app_definition: MagicMock,
@@ -828,7 +828,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test core app update logic with successful outcome."""
         # Setup app definition mock
-        from src.catalog import AppInfo
+        from my_unicorn.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -868,11 +868,11 @@ class TestBaseUpdateCommand:
         mock_github_api.get_latest_release.return_value = (True, {"tag_name": "v1.1.0"})
 
         with (
-            patch("src.commands.update_base.GitHubAPI", return_value=mock_github_api),
-            patch("src.commands.update_base.DownloadManager") as mock_download_manager,
+            patch("my_unicorn.commands.update_base.GitHubAPI", return_value=mock_github_api),
+            patch("my_unicorn.commands.update_base.DownloadManager") as mock_download_manager,
             patch.object(base_update_command, "_verify_appimage", return_value=(True, False)),
             patch.object(base_update_command, "_create_file_handler") as mock_create_file_handler,
-            patch("src.icon_manager.IconManager") as mock_icon_manager_class,
+            patch("my_unicorn.icon_manager.IconManager") as mock_icon_manager_class,
             patch("os.path.exists", return_value=True),
             patch("time.time", side_effect=[100.0, 105.0]),
         ):  # Start and end times
@@ -902,7 +902,7 @@ class TestBaseUpdateCommand:
             mock_download_manager.assert_called_once()
             mock_create_file_handler.assert_called_once()
 
-    @patch("src.commands.update_base.load_app_definition")
+    @patch("my_unicorn.commands.update_base.load_app_definition")
     def test_perform_app_update_core_api_error(
         self,
         mock_load_app_definition: MagicMock,
@@ -911,7 +911,7 @@ class TestBaseUpdateCommand:
     ) -> None:
         """Test core app update logic with API error."""
         # Setup app definition mock
-        from src.catalog import AppInfo
+        from my_unicorn.catalog import AppInfo
 
         mock_app_info = AppInfo(
             owner="test",
@@ -946,7 +946,7 @@ class TestBaseUpdateCommand:
         mock_github_api.check_latest_version.return_value = (False, {"error": error_message})
 
         with (
-            patch("src.commands.update_base.GitHubAPI", return_value=mock_github_api),
+            patch("my_unicorn.commands.update_base.GitHubAPI", return_value=mock_github_api),
             patch("time.time", side_effect=[100.0, 101.0]),
             patch.object(base_update_command, "_logger") as mock_logger,
         ):
@@ -982,7 +982,7 @@ class TestBaseUpdateCommand:
         mock_global_config.keep_backup = True
         mock_global_config.max_backups = 3
 
-        with patch("src.commands.update_base.FileHandler") as mock_file_handler:
+        with patch("my_unicorn.commands.update_base.FileHandler") as mock_file_handler:
             # Call the method
             result = base_update_command._create_file_handler(
                 github_api=mock_github_api,

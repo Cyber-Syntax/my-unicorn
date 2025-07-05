@@ -17,7 +17,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Import modules
-from src.catalog import (
+from my_unicorn.catalog import (
     AppInfo,
     get_all_apps,
     get_app_info,
@@ -215,11 +215,11 @@ def test_sync_with_icon_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     # Create a mock logger
     mock_logger = MagicMock()
-    monkeypatch.setattr("src.catalog.logger", mock_logger)
+    monkeypatch.setattr("my_unicorn.catalog.logger", mock_logger)
 
     # Create a mock ICON_PATHS with some missing entries
     mock_icon_paths = {"joplin": {"exact_path": "path/to/icon.png", "filename": "joplin_icon.png"}}
-    monkeypatch.setattr("src.catalog.ICON_PATHS", mock_icon_paths)
+    monkeypatch.setattr("my_unicorn.catalog.ICON_PATHS", mock_icon_paths)
 
     # Run the sync function
     sync_with_icon_paths()

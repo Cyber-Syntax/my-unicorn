@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 import requests
 
-from src.download import DownloadManager
+from my_unicorn.download import DownloadManager
 
 
 @pytest.fixture

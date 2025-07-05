@@ -5,10 +5,10 @@ from unittest.mock import patch
 
 import pytest
 
-from src.api.assets import (
+from my_unicorn.api.assets import (
     ReleaseInfo,
 )  # AppImageAsset, SHAAsset not directly used in tests after refactor
-from src.api.release_processor import ReleaseProcessor
+from my_unicorn.api.release_processor import ReleaseProcessor
 
 # Fixtures from conftest.py are available:
 # mock_release_data, mock_beta_release_data, mock_all_releases_data,
@@ -192,7 +192,7 @@ class TestReleaseProcessorLogic:
         )
 
         with patch(
-            "src.api.release_processor.arch_utils.get_arch_keywords"
+            "my_unicorn.api.release_processor.arch_utils.get_arch_keywords"
         ) as mock_get_arch_keywords:
             # If arch_utils.get_arch_keywords is called with a non-None arch_keyword (like "x86_64"),
             # it returns a list containing that keyword: `[arch_keyword]`.
@@ -214,7 +214,7 @@ class TestReleaseProcessorLogic:
         specific_arch_keywords_for_test = ["arm64", "aarch64"]
         # Reset mock or use a new one if concerned about call counts across cases
         with patch(
-            "src.api.release_processor.arch_utils.get_arch_keywords"
+            "my_unicorn.api.release_processor.arch_utils.get_arch_keywords"
         ) as mock_get_arch_keywords_case2:
             compatible_arm = release_processor_instance.filter_compatible_assets(
                 raw_assets_list, arch_keywords=specific_arch_keywords_for_test

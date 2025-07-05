@@ -9,7 +9,7 @@ This module contains tests for the SHA utility functions in src/utils/sha_utils.
 
 import pytest
 
-from src.utils.sha_utils import is_sha_file, detect_checksum_hash_type
+from my_unicorn.utils.sha_utils import is_sha_file, detect_checksum_hash_type
 
 
 class TestIsShaFile:

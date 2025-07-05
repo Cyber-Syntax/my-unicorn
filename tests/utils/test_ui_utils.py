@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from src.utils.ui_utils import select_from_list, get_user_input, confirm_action
+from my_unicorn.utils.ui_utils import select_from_list, get_user_input, confirm_action
 
 
 class TestSelectFromList:
