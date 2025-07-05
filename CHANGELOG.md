@@ -2,6 +2,8 @@
 All notable changes to this project will be documented in this file.
 
 ## v0.11.1-alpha
+### Changed
+This release fixed the super-productivity(14.0.3) appimage verification issue. There was a extarnal problem on the app itself while creating the .yml checksum file and it was a problem sometimes happens. Currently, the app is started to provide asset_digest which this fix is add the use_asset_digest method to verify the appimage. This will not affect existing functionality, but it will fix the issue with the super-productivity appimage verification.
 
 ## v0.11.0-alpha
 ### Changed
