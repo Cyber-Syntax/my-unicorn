@@ -1,15 +1,22 @@
 {
-    "owner": "johannesjo",
-    "repo": "super-productivity",
-    "app_rename": "super-productivity",
-    "description": "To-do list & time tracker & kanban board & calendar all in one app",
-    "category": "Productivity",
-    "tags": ["todo", "time-tracking", "productivity", "kanban"],
-    "appimage_name_template": "superProductivity-{characteristic_suffix}.AppImage",
-    "preferred_characteristic_suffixes": ["x86_64", "amd64"],
-    "checksum_hash_type": "sha512",
-    "checksum_file_name": "latest-linux.yml",
-    "icon_info": "https://raw.githubusercontent.com/johannesjo/super-productivity/master/src/assets/icons/favicon-192x192.png",
-    "icon_file_name": "superproductivity_icon.png",
-    "icon_repo_path": "src/assets/icons/favicon-192x192.png"
+  "owner": "johannesjo",
+  "repo": "super-productivity",
+  "app_rename": "super-productivity",
+  "description": "To-do list & time tracker & kanban board & calendar all in one app",
+  "category": "Productivity",
+  "tags": [
+    "todo",
+    "time-tracking",
+    "productivity",
+    "kanban"
+  ],
+  "appimage_name_template": "superProductivity-{characteristic_suffix}.AppImage",
+  "preferred_characteristic_suffixes": [
+    "x86_64",
+    "amd64"
+  ],
+  "use_asset_digest": true,
+  "icon_info": "https://raw.githubusercontent.com/johannesjo/super-productivity/master/src/assets/icons/favicon-192x192.png",
+  "icon_file_name": "superproductivity_icon.png",
+  "icon_repo_path": "src/assets/icons/favicon-192x192.png"
 }
