@@ -15,11 +15,21 @@ from src.verify import VerificationManager
 class DownloadCommand(Command):
     """Command to download the latest release's AppImage."""
 
-    def execute(self):
-        """Execute the download command with improved verification handling."""
-        # 1. Initialize the URL parser
-        parser = ParseURL()
-        parser.ask_url()  # Get owner and repo by asking the user for the URL
+    def __init__(self, url: str = None):
+        """Initialize with optional URL for CLI usage."""
+        self.url = url
+
+    def execute(self) -> None:
+        """Execute the download command."""
+        if self.url:
+            # CLI mode - use provided URL
+            parser = ParseURL(url=self.url)
+            parser._validate_url()
+            parser._parse_owner_repo()
+        else:
+            # Interactive mode - ask for URL
+            parser = ParseURL()
+            parser.ask_url()  # Get owner and repo by asking the user for the URL
 
         # 2. Get the owner and repo from ParseURL instance
         owner, repo = parser.owner, parser.repo
@@ -56,12 +66,10 @@ class DownloadCommand(Command):
             try:
                 # Get release data from GitHub API
                 success, full_response = api.get_latest_release()
-                
+
                 if not success:
                     print(f"Error during processing: {full_response}")
                     return
-
-
 
                 # Check if essential attributes are available after API call
                 if not api.appimage_name:
@@ -96,12 +104,18 @@ class DownloadCommand(Command):
                     break
                 else:
                     # Check if verification data is available and valid
-                    has_sha_data = api.checksum_file_name and api.checksum_file_name != "no_sha_file"
+                    has_sha_data = (
+                        api.checksum_file_name and api.checksum_file_name != "no_sha_file"
+                    )
                     has_asset_digest = api.asset_digest
-                    has_valid_checksum_hash_type = api.checksum_hash_type and api.checksum_hash_type != "no_hash"
-                    
+                    has_valid_checksum_hash_type = (
+                        api.checksum_hash_type and api.checksum_hash_type != "no_hash"
+                    )
+
                     if not has_sha_data and not has_asset_digest:
-                        logging.info("No SHA file or asset digest found - verification cannot be performed.")
+                        logging.info(
+                            "No SHA file or asset digest found - verification cannot be performed."
+                        )
                         print("Note: Verification skipped - no hash file available")
                         verification_success = True
                         verification_skipped = True
@@ -114,7 +128,7 @@ class DownloadCommand(Command):
                         print("Verifying download integrity...")
 
                     # Debug logging for API values
-                    logging.debug(f"API values before VerificationManager creation:")
+                    logging.debug("API values before VerificationManager creation:")
                     logging.debug(f"  api.checksum_file_name: {api.checksum_file_name}")
                     logging.debug(f"  api.checksum_hash_type: {api.checksum_hash_type}")
                     logging.debug(f"  api.asset_digest: {api.asset_digest}")
@@ -196,7 +210,9 @@ class DownloadCommand(Command):
         icon_manager = IconManager()
         # Get the app_rename from catalog info
         app_rename = app_config.app_rename if app_info else None
-        icon_success, icon_path = icon_manager.ensure_app_icon(api.owner, api.repo, app_rename=app_rename)
+        icon_success, icon_path = icon_manager.ensure_app_icon(
+            api.owner, api.repo, app_rename=app_rename
+        )
 
         # Check if the file operations were successful
         success = file_handler.handle_appimage_operations(

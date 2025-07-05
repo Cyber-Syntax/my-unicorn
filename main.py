@@ -4,6 +4,7 @@
 This module configures logging, loads configuration files, and executes commands.
 """
 
+import argparse
 import gettext
 import logging
 import os
@@ -12,15 +13,14 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from types import TracebackType
 
-from src.catalog import initialize_definitions_path
 from src.app_config import AppConfigManager
 from src.auth_manager import GitHubAuthManager
-
+from src.catalog import initialize_definitions_path
 from src.commands.customize_app_config import CustomizeAppConfigCommand
 from src.commands.customize_global_config import CustomizeGlobalConfigCommand
 from src.commands.delete_backups import DeleteBackupsCommand
-from src.commands.install_url import DownloadCommand
 from src.commands.install_catalog import InstallAppCommand
+from src.commands.install_url import DownloadCommand
 from src.commands.invoker import CommandInvoker
 from src.commands.manage_token import ManageTokenCommand
 from src.commands.migrate_config import MigrateConfigCommand
@@ -218,9 +218,114 @@ def initialize_app_definitions() -> None:
     initialize_definitions_path(apps_dir)
 
 
+def create_argument_parser() -> argparse.ArgumentParser:
+    """Create the main argument parser for CLI usage."""
+    parser = argparse.ArgumentParser(
+        description="my-unicorn: AppImage management tool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+%(prog)s # Interactive mode (default)
+%(prog)s download https://github.com/johannesjo/super-productivity # Download AppImage from URL
+%(prog)s install joplin # Install AppImage from catalog
+%(prog)s update --all # Update all AppImages
+%(prog)s update --select joplin,super-productivity # Select AppImages to update
+%(prog)s token --save # Save GitHub token to keyring
+%(prog)s token --remove # Remove GitHub token
+%(prog)s token --check # Check GitHub API rate limits
+%(prog)s migrate --clean # Migrate configuration files
+%(prog)s migrate --force # Migrate configuration without confirmation
+""",
+    )
+
+    # Add subcommands
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Download command
+    download_parser = subparsers.add_parser("download", help="Download AppImage from URL")
+    download_parser.add_argument("url", help="GitHub repository URL")
+
+    # Install command
+    install_parser = subparsers.add_parser("install", help="Install app from catalog")
+    install_parser.add_argument("app_name", nargs="?", help="Application name to install")
+
+    # Update command
+    update_parser = subparsers.add_parser("update", help="Update AppImages")
+    update_group = update_parser.add_mutually_exclusive_group()
+    update_group.add_argument("--all", action="store_true", help="Update all apps")
+    update_group.add_argument("--select", action="store_true", help="Select apps to update")
+
+    # Token command
+    token_parser = subparsers.add_parser("token", help="GitHub token management")
+    token_parser.add_argument("--save", action="store_true", help="Save token to keyring")
+    token_parser.add_argument("--remove", action="store_true", help="Remove token")
+    token_parser.add_argument("--check", action="store_true", help="Check rate limits")
+
+    # Migrate command
+    migrate_parser = subparsers.add_parser("migrate", help="Migrate configuration files")
+    migrate_parser.add_argument("--clean", action="store_true", help="Remove unused settings")
+    migrate_parser.add_argument("--force", action="store_true", help="Remove without confirmation")
+
+    return parser
+
+
+def execute_cli_command(args: argparse.Namespace) -> None:
+    """Execute a CLI command based on parsed arguments."""
+    invoker = CommandInvoker()
+    setup_commands(invoker)
+
+    if args.command == "download":
+        # Set URL and execute download command
+        cmd = DownloadCommand()
+        # You'd need to modify DownloadCommand to accept URL parameter
+        cmd.execute()
+
+    elif args.command == "install":
+        cmd = InstallAppCommand()
+        # You'd need to modify InstallAppCommand to accept app_name parameter
+        cmd.execute()
+
+    elif args.command == "update":
+        if args.all:
+            invoker.execute_command(3)  # UpdateAllAutoCommand
+        elif args.select:
+            invoker.execute_command(4)  # UpdateAsyncCommand
+        else:
+            print("Please specify --all or --select for update command")
+
+    elif args.command == "config":
+        if args.config_type == "app":
+            invoker.execute_command(5)  # CustomizeAppConfigCommand
+        elif args.config_type == "global":
+            invoker.execute_command(6)  # CustomizeGlobalConfigCommand
+        else:
+            print("Please specify 'app' or 'global' for config command")
+
+    elif args.command == "token":
+        cmd = ManageTokenCommand()
+        # You'd need to modify ManageTokenCommand to handle CLI flags
+        cmd.execute()
+
+    elif args.command == "migrate":
+        cmd = MigrateConfigCommand()
+        cli_args = []
+        if args.clean:
+            cli_args.append("--clean")
+        if args.force:
+            cli_args.append("--force")
+        cmd.execute(cli_args)
+
+    elif args.command == "cleanup":
+        invoker.execute_command(9)  # DeleteBackupsCommand
+
+
 def main() -> None:
     """Main function to initialize and run the application."""
     configure_logging()
+
+    # Parse command line arguments
+    parser = create_argument_parser()
+    args = parser.parse_args()
 
     # Initialize app definitions path
     initialize_app_definitions()
@@ -235,18 +340,22 @@ def main() -> None:
     # locale_manager = LocaleManager()
     # locale_manager.load_translations(global_config.locale)
 
-    # Initialize CommandInvoker and register commands
-    invoker = CommandInvoker()
-    setup_commands(invoker)
+    if args.command:
+        # If command line arguments are provided, execute the CLI command
+        execute_cli_command(args)
+    else:
+        # Initialize CommandInvoker and register commands
+        invoker = CommandInvoker()
+        setup_commands(invoker)
 
-    # Main menu loop
-    while True:
-        choice = get_user_choice()
-        if choice == 0:
-            logging.info("User selected to exit application")
-            print("Exiting...")
-            sys.exit(EXIT_SUCCESS)
-        invoker.execute_command(choice)
+        # Main menu loop
+        while True:
+            choice = get_user_choice()
+            if choice == 0:
+                logging.info("User selected to exit application")
+                print("Exiting...")
+                sys.exit(EXIT_SUCCESS)
+            invoker.execute_command(choice)
 
 
 if __name__ == "__main__":
