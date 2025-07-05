@@ -1,0 +1,15 @@
+{
+    "owner": "siyuan-note",
+    "repo": "siyuan",
+    "app_rename": "siyuan",
+    "description": "A local-first personal knowledge management system (opt-out google telemetry, can be disabled)",
+    "category": "Productivity",
+    "tags": ["notes", "knowledge-base", "markdown"],
+    "appimage_name_template": "{repo_name}-{latest_version}-{characteristic_suffix}.AppImage",
+    "preferred_characteristic_suffixes": ["linux"],
+    "checksum_hash_type": "sha256",
+    "checksum_file_name": "SHA256SUMS.txt",
+    "icon_info": "https://raw.githubusercontent.com/siyuan-note/siyuan/master/app/src/assets/icon.png",
+    "icon_file_name": "siyuan_icon.png",
+    "icon_repo_path": "app/src/assets/icon.png"
+}

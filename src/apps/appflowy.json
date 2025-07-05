@@ -1,0 +1,14 @@
+{
+    "owner": "AppFlowy-IO",
+    "repo": "AppFlowy",
+    "app_rename": "AppFlowy",
+    "description": "Open-source alternative to Notion",
+    "category": "Productivity",
+    "tags": ["notes", "organization", "notion-alternative"],
+    "appimage_name_template": "{app_rename_safe}-{latest_version}-linux-{characteristic_suffix}.AppImage",
+    "preferred_characteristic_suffixes": ["x86_64", "amd64"],
+    "skip_verification": true,
+    "icon_info": "https://raw.githubusercontent.com/AppFlowy-IO/AppFlowy/main/frontend/resources/flowy_icons/40x/app_logo.svg",
+    "icon_file_name": "appflowy_icon.svg",
+    "icon_repo_path": "frontend/resources/flowy_icons/40x/app_logo.svg"
+}
