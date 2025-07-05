@@ -56,6 +56,14 @@
     pip install -e .
     ```
 
+### Remove the package:
+
+> This would remove the package if you installed globally
+
+    ```bash
+    pip uninstall my-unicorn
+    ```
+
 ## ** How to use the script **
 
 ### Using as a package:
@@ -93,6 +101,8 @@ my-unicorn token --check # Check GitHub API rate limits
 my-unicorn migrate --clean # Migrate configuration files
 my-unicorn migrate --force # Migrate configuration without confirmation
 ```
+
+#### Remove
 
 ### For using uncompatible apps(Choice 1, installing with URL):
 
