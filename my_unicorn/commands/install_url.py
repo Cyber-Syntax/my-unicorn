@@ -252,7 +252,7 @@ class DownloadCommand(Command):
             batch_mode=global_config.batch_mode,
             keep_backup=global_config.keep_backup,
             max_backups=global_config.max_backups,
-            app_rename=app_config.app_rename if app_info else None,
+            app_rename=app_config.app_rename if app_info and app_config.app_rename else api.repo,
         )
 
         # Download app icon if possible
