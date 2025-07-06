@@ -23,7 +23,6 @@ class ManageTokenCommand(Command):
     - Remove tokens
     - View current API rate limits
     - Manage token expiration
-    - View token audit logs
     """
 
     def __init__(self):
@@ -791,9 +790,6 @@ class ManageTokenCommand(Command):
 
             # Clear any cached authentication headers
             GitHubAuthManager.clear_cached_headers()
-
-            # Enable audit logging for better security tracking
-            GitHubAuthManager.set_audit_enabled(True)
 
             # Show current rate limits with the token
             self.check_rate_limits(token)
