@@ -1,9 +1,17 @@
+"""Download manager for AppImages from GitHub releases.
+
+This module provides the DownloadManager class that handles downloading AppImages
+from GitHub releases with progress tracking, file verification, and concurrent
+download support.
+"""
+
 import asyncio
 import logging
 import os
 import tempfile
 import threading  # Added for cancel_event
 import time
+from typing import ClassVar
 
 import requests
 
@@ -31,14 +39,15 @@ class DownloadManager:
     """
 
     # Class variables for shared progress tracking
-    _global_progress: AppImageProgressMeter | None = None
-    _active_downloads: set[str] = set()
+    _global_progress: ClassVar[AppImageProgressMeter | None] = None
+    _active_downloads: ClassVar[set[str]] = set()
+    _active_tasks: ClassVar[set[str]] = set()  # Changed to str for download IDs
 
     # Use GlobalConfigManager for configuration
-    _global_config: GlobalConfigManager | None = None
+    _global_config: ClassVar[GlobalConfigManager | None] = None
 
     # Class-level file locks to prevent concurrent access to same files
-    _file_locks: dict[str, threading.Lock] = {}
+    _file_locks: ClassVar[dict[str, threading.Lock]] = {}
     _locks_lock = threading.Lock()  # Protects the _file_locks dictionary
 
     def __init__(
@@ -72,7 +81,7 @@ class DownloadManager:
         self.is_async_mode = self._detect_async_mode()
 
         # Store task ID for this download instance
-        self._progress_task_id: int | None = None
+        self._progress_task_id: str | None = None
 
     def _detect_async_mode(self) -> bool:
         """Detect if we're running in an async context.
@@ -163,7 +172,8 @@ class DownloadManager:
                 logging.error(f"Error stopping progress display: {e!s}")
             finally:
                 cls._global_progress = None
-                cls._active_tasks = set()
+                cls._active_tasks.clear()
+                cls._active_downloads.clear()
 
     def download(self) -> tuple[str, bool]:
         """Download the AppImage from the GitHub release or return existing file.
@@ -218,9 +228,9 @@ class DownloadManager:
             except Exception as e:
                 error_msg = f"Error downloading {appimage_name}: {e!s}"
                 self._logger.error(error_msg)
-                raise RuntimeError(error_msg)
+                raise RuntimeError(error_msg) from e
 
-    def _get_file_size(self, url: str, headers: tuple[str, str]) -> int:
+    def _get_file_size(self, url: str, headers: dict[str, str]) -> int:
         """Get the file size by making a HEAD request.
 
         Args:
@@ -239,7 +249,7 @@ class DownloadManager:
         response.raise_for_status()
         return int(response.headers.get("content-length", 0))
 
-    def _setup_progress_task(self, filename: str, total_size: int, prefix: str) -> int | None:
+    def _setup_progress_task(self, filename: str, total_size: int, prefix: str) -> str | None:
         """Set up a progress tracking task.
 
         Args:
@@ -248,22 +258,22 @@ class DownloadManager:
             prefix: Prefix for the progress message
 
         Returns:
-            Optional[int]: ID of the progress task, or None if setup failed
+            Optional[str]: ID of the progress task, or None if setup failed
 
         """
         progress = self.get_or_create_progress()
 
         try:
-            task_id = progress.add_task(
-                f"Downloading {filename}",
-                total=total_size,
-                prefix=prefix,
-            )
+            # Create a unique download ID
+            download_id = f"download_{abs(hash(filename))}"
 
-            # Track this task
-            self._progress_task_id = task_id
-            DownloadManager._active_tasks.add(task_id)
-            return task_id
+            # Add download to progress manager
+            progress.add_download(download_id, filename, total_size, prefix)
+
+            # Track this download
+            self._progress_task_id = download_id
+            DownloadManager._active_tasks.add(download_id)
+            return download_id
 
         except Exception as e:
             self._logger.error(f"Error creating progress task: {e!s}")
@@ -283,9 +293,8 @@ class DownloadManager:
             DownloadManager._active_tasks.remove(self._progress_task_id)
 
         if progress is not None:
-            # Call the remove_task method directly without try/except
-            # This ensures it will work with our test mocks
-            progress.remove_task(self._progress_task_id)
+            # Complete the download task in the progress manager
+            progress.complete_download(self._progress_task_id, success=True)
 
         self._progress_task_id = None
 
@@ -293,8 +302,8 @@ class DownloadManager:
         self,
         url: str,
         file_path: str,
-        headers: tuple[str, str],
-        task_id: int | None,
+        headers: dict[str, str],
+        task_id: str | None,
         total_size: int,
     ) -> float:
         """Perform the actual file download with progress updates.
@@ -347,8 +356,8 @@ class DownloadManager:
 
                     # Always update progress if we have a task_id
                     if task_id is not None and progress is not None:
-                        # Important: Use direct method call for testability
-                        progress.update(task_id, completed=downloaded_size)
+                        # Update progress using the progress manager's API
+                        progress.update_progress(task_id, downloaded_size)
 
         # Make the AppImage executable only if download wasn't cancelled
         # (If cancelled, this part is skipped due to exception)
@@ -356,7 +365,7 @@ class DownloadManager:
 
         # Final update to mark task as completed
         if task_id is not None and progress is not None:
-            progress.update(task_id, completed=total_size)
+            progress.update_progress(task_id, total_size)
 
         return time.time() - start_time
 
@@ -378,78 +387,6 @@ class DownloadManager:
             f"{prefix}✓ Downloaded {filename} "
             f"({self._format_size(total_size)}, {speed_mbps:.1f} MB/s)"
         )
-
-    def _download_with_progress(
-        self,
-        url: str,
-        filename: str,
-        headers: tuple[str, str],
-        prefix: str = "",
-    ) -> str:
-        """Download with a progress bar display.
-
-        Args:
-            url: URL to download from
-            filename: Name of the file
-            headers: HTTP headers for the request
-            prefix: Prefix to add to progress messages
-
-        Returns:
-            str: The full path to the downloaded file
-
-        Raises:
-            RuntimeError: Any error during download
-
-        """
-        try:
-            # Get file size
-            total_size = self._get_file_size(url, headers)
-
-            # Get the downloads directory
-            downloads_dir = self.get_downloads_dir()
-            file_path = os.path.join(downloads_dir, filename)
-
-            # set up progress tracking
-            task_id = self._setup_progress_task(filename, total_size, prefix)
-
-            # Perform the download
-            download_time = self._perform_download(url, file_path, headers, task_id, total_size)
-
-            # Clean up progress tracking
-            self._cleanup_progress_task()
-
-            # Display completion message
-            self._display_completion_stats(filename, total_size, download_time, prefix)
-            self._logger.info(f"Successfully downloaded {file_path}")
-
-            # Check if we should stop progress tracking
-            if self.is_async_mode and self.app_index == self.total_apps:
-                if not DownloadManager._active_tasks:
-                    self.stop_progress()
-
-            return file_path
-
-        except requests.exceptions.RequestException as e:
-            error_msg = f"Network error while downloading {filename}: {e!s}"
-            self._logger.error(error_msg)
-            print(f"{prefix}✗ Download failed: {error_msg}")
-            self._cleanup_progress_task()  # Ensure progress task is cleaned up
-            raise RuntimeError(error_msg)
-
-        except DownloadCancelledError:  # Catch our custom error
-            self._logger.info(f"Download of {filename} was cancelled. Cleaning up partial file.")
-            if os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                    self._logger.info(f"Successfully removed partial download: {file_path}")
-                except OSError as e_remove:
-                    self._logger.error(f"Error removing partial download {file_path}: {e_remove}")
-            self._cleanup_progress_task()  # Ensure progress task is cleaned up
-            raise  # Re-raise for the caller to handle
-
-        except Exception:  # General exceptions
-            self._cleanup_progress_task()  # Ensure progress task is cleaned up
-            raise  # Re-raise the original exception
 
     def verify_download(self, downloaded_file: str) -> bool:
         """Verify the downloaded file using checksums.
@@ -772,11 +709,3 @@ class DownloadManager:
 
         """
         return f"download_{abs(hash(file_path))}"
-
-    @classmethod
-    def stop_progress(cls) -> None:
-        """Stop the global progress manager and clean up."""
-        if cls._global_progress:
-            cls._global_progress.stop()
-            cls._global_progress = None
-            cls._active_downloads.clear()

@@ -84,21 +84,20 @@ class InstallAppCommand(Command):
         """
         apps = get_all_apps()
 
-        # Try to find the app by name (case-insensitive)
-        app_info = None
-        for app in apps.values():
-            if app.app_rename.lower() == app_name.lower() or app.repo.lower() == app_name.lower():
-                app_info = app
-                break
-
-        if not app_info:
-            print(f"Application '{app_name}' not found in catalog.")
-            print("Available applications:")
-            for app in sorted(apps.values(), key=lambda x: x.app_rename):
-                print(f"  - {app.app_rename}")
+        # Simple lowercase matching - check if app_name (lowercase) exists as a key
+        app_name_lower = app_name.lower()
+        
+        if app_name_lower in apps:
+            app_info = apps[app_name_lower]
+            self._confirm_and_install_app(app_info)
             return
 
-        self._confirm_and_install_app(app_info)
+        # If not found, show available apps
+        print(f"Application '{app_name}' not found in catalog.")
+        print("Available applications:")
+        for repo_name, app in sorted(apps.items()):
+            print(f"  - {repo_name} ({app.app_rename})")
+        return
 
     def _display_browse_menu(self) -> None:
         """Display menu for browsing applications."""

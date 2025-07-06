@@ -161,42 +161,13 @@ def load_app_definition(repo_name: str) -> AppInfo | None:
     if "/" in repo_name:
         repo_name = repo_name.split("/")[1]
 
-    # Try to find and load the JSON file
-    try:
-        json_path = _definitions_path / f"{repo_name.capitalize()}.json"
-        if not json_path.exists():
-            json_path = _definitions_path / f"{repo_name}.json"
-            if not json_path.exists():
-                logger.debug("No app definition found for %s", repo_name)
-                return None
+    # Simply check if the app exists in the catalog
+    all_apps = get_all_apps()
+    if repo_name in all_apps:
+        return all_apps[repo_name]
 
-        with open(json_path, encoding="utf-8") as f:
-            data = json.load(f)
-
-        # Create AppInfo object from JSON data
-        return AppInfo(
-            owner=data["owner"],
-            repo=data["repo"],
-            app_rename=data["app_rename"],
-            description=data["description"],
-            category=data["category"],
-            tags=data["tags"],
-            appimage_name_template=data["appimage_name_template"],
-            preferred_characteristic_suffixes=data["preferred_characteristic_suffixes"],
-            skip_verification=data.get("skip_verification", False),
-            use_asset_digest=data.get("use_asset_digest", False),
-            use_github_release_desc=data.get("use_github_release_desc", False),
-            beta=data.get("beta", False),
-            checksum_hash_type=data.get("checksum_hash_type"),
-            checksum_file_name=data.get("checksum_file_name"),
-            icon_info=data.get("icon_info"),
-            icon_file_name=data.get("icon_file_name"),
-            icon_repo_path=data.get("icon_repo_path"),
-        )
-
-    except (OSError, KeyError, json.JSONDecodeError) as e:
-        logger.error("Error loading app definition for %s: %s", repo_name, e)
-        return None
+    logger.debug("No app definition found for %s", repo_name)
+    return None
 
 
 def get_app_rename_for_owner_repo(repo: str) -> str:
