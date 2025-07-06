@@ -239,7 +239,8 @@ Examples:
 %(prog)s catalog # List available AppImages on catalog
 %(prog)s install joplin # Install AppImage from catalog
 %(prog)s update --all # Update all AppImages
-%(prog)s update --select joplin,super-productivity # Select AppImages to update
+%(prog)s update --select joplin,super-productivity # Update specific AppImages by name
+%(prog)s update --select # Interactive selection mode
 %(prog)s token --save # Save GitHub token to keyring
 %(prog)s token --remove # Remove GitHub token
 %(prog)s token --check # Check GitHub API rate limits
@@ -271,7 +272,12 @@ Examples:
     update_parser = subparsers.add_parser("update", help="Update AppImages")
     update_group = update_parser.add_mutually_exclusive_group()
     update_group.add_argument("--all", action="store_true", help="Update all apps")
-    update_group.add_argument("--select", action="store_true", help="Select apps to update")
+    update_group.add_argument(
+        "--select",
+        nargs="?",
+        const=True,
+        help="Select apps to update interactively or provide comma-separated app names (e.g., --select joplin,obsidian)",
+    )
 
     # Token command
     token_parser = subparsers.add_parser("token", help="GitHub token management")
@@ -319,7 +325,14 @@ def execute_cli_command(args: argparse.Namespace) -> None:
         if args.all:
             invoker.execute_command(3)  # UpdateAllAutoCommand
         elif args.select:
-            invoker.execute_command(4)  # UpdateAsyncCommand
+            if args.select is True:
+                # Interactive selection mode
+                invoker.execute_command(4)  # UpdateAsyncCommand
+            else:
+                # Parse comma-separated app names
+                app_names = [name.strip() for name in args.select.split(",")]
+                cmd = UpdateAsyncCommand(app_names=app_names)
+                cmd.execute()
         else:
             print("Please specify --all or --select for update command")
 

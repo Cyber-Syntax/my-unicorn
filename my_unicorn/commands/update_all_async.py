@@ -16,6 +16,7 @@ Key features:
 
 import asyncio
 import logging
+from pathlib import Path
 from typing import Any
 
 from my_unicorn.auth_manager import GitHubAuthManager
@@ -36,11 +37,20 @@ class UpdateAsyncCommand(BaseUpdateCommand):
 
     """
 
-    def __init__(self) -> None:
-        """Initialize with base configuration and async-specific settings."""
+    def __init__(self, app_names: list[str] | None = None) -> None:
+        """Initialize with base configuration and async-specific settings.
+
+        Args:
+            app_names: Optional list of app names to update. If provided, these will be used
+                      instead of interactive selection.
+
+        """
         super().__init__()
         # Logger for this class
         self._logger = logging.getLogger(__name__)
+
+        # Store predefined app names for CLI usage
+        self._predefined_app_names = app_names
 
         # The max_concurrent_updates value is initialized from the global config
         # that was already loaded in BaseUpdateCommand.__post_init__()
@@ -181,8 +191,12 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         """
         updatable_apps = []
 
-        # Let user select which config files to check
-        selected_files = self.app_config.select_files()
+        # Use predefined app names if provided, otherwise use interactive selection
+        if self._predefined_app_names:
+            selected_files = self._select_files_by_names(self._predefined_app_names)
+        else:
+            selected_files = self.app_config.select_files()
+
         if not selected_files:
             print("No configuration files selected or available.")
             return updatable_apps
@@ -314,6 +328,44 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             print(f"Total checked: {checked_count}/{len(selected_files)}")
 
         return updatable_apps
+
+    def _select_files_by_names(self, app_names: list[str]) -> list[str]:
+        """Select configuration files based on provided app names.
+
+        Args:
+            app_names: List of app names to select
+
+        Returns:
+            list[str]: List of JSON configuration file names that match the app names
+
+        """
+        available_files = self.app_config.list_json_files()
+        if not available_files:
+            print("No configuration files found.")
+            return []
+
+        # Create a mapping of lowercase app names to actual file names for case-insensitive matching
+        available_apps_map = {Path(f).stem.lower(): f for f in available_files}
+
+        selected_files = []
+        missing_apps = []
+
+        for app_name in app_names:
+            # Look for matching JSON file (case-insensitive)
+            app_name_lower = app_name.strip().lower()
+            if app_name_lower in available_apps_map:
+                selected_files.append(available_apps_map[app_name_lower])
+            else:
+                missing_apps.append(app_name)
+
+        if missing_apps:
+            print(f"Warning: The following apps were not found: {', '.join(missing_apps)}")
+            print("Available apps:", ", ".join([Path(f).stem for f in available_files]))
+
+        if selected_files:
+            print(f"Selected apps: {', '.join([Path(f).stem for f in selected_files])}")
+
+        return selected_files
 
     def _confirm_updates(self, updatable: list[dict[str, Any]]) -> bool:
         """Handle user confirmation based on batch mode.
