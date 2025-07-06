@@ -30,13 +30,75 @@ class InstallAppCommand(Command):
         self._logger = logging.getLogger(__name__)
         self.global_config = GlobalConfigManager()
         self.global_config.load_config()
+        self._app_name = None
+        self._cli_mode = False
+
+    def set_app_name(self, app_name: str) -> None:
+        """Set the app name for direct installation."""
+        self._app_name = app_name
+        self._cli_mode = True
+
+    def list_apps(self) -> None:
+        """List all available applications in the catalog."""
+        apps = get_all_apps()
+        if not apps:
+            print("No applications available in catalog.")
+            return
+
+        # Sort apps alphabetically by app_rename
+        sorted_apps = sorted(apps.values(), key=lambda app: app.app_rename)
+
+        print(f"\n=== Available Applications ({len(sorted_apps)}) ===")
+        print("-" * 60)
+
+        for app in sorted_apps:
+            print(f"Name: {app.app_rename}")
+            print(f"  Repository: {app.owner}/{app.repo}")
+            print(f"  Description: {app.description}")
+            print(f"  Category: {app.category}")
+            if app.tags:
+                print(f"  Tags: {', '.join(app.tags)}")
+            print()
+
+        print("Usage: python run.py install <app_name>")
+        print("Example: python run.py install joplin")
 
     def execute(self) -> None:
         """Execute the install app command to browse and install applications."""
         print("\n=== Install Application ===")
 
+        # If app name is provided via CLI, install directly
+        if self._app_name:
+            self._install_app_by_name(self._app_name)
+            return
+
         # Show browsing options
         self._display_browse_menu()
+
+    def _install_app_by_name(self, app_name: str) -> None:
+        """Install an application by name directly.
+
+        Args:
+            app_name: Name of the application to install
+
+        """
+        apps = get_all_apps()
+
+        # Try to find the app by name (case-insensitive)
+        app_info = None
+        for app in apps.values():
+            if app.app_rename.lower() == app_name.lower() or app.repo.lower() == app_name.lower():
+                app_info = app
+                break
+
+        if not app_info:
+            print(f"Application '{app_name}' not found in catalog.")
+            print("Available applications:")
+            for app in sorted(apps.values(), key=lambda x: x.app_rename):
+                print(f"  - {app.app_rename}")
+            return
+
+        self._confirm_and_install_app(app_info)
 
     def _display_browse_menu(self) -> None:
         """Display menu for browsing applications."""
@@ -58,7 +120,6 @@ class InstallAppCommand(Command):
                 print("Please enter a number.")
             except KeyboardInterrupt:
                 print("\nOperation cancelled.")
-                return
 
     def _display_all_apps(self) -> None:
         """Display and allow selection from all applications."""
@@ -112,6 +173,12 @@ class InstallAppCommand(Command):
         print(f"Category: {app_info.category}")
         if app_info.tags:
             print(f"Tags: {', '.join(app_info.tags)}")
+
+        # In CLI mode, auto-confirm installation
+        if self._cli_mode:
+            print(f"\nInstalling {app_info.app_rename}...")
+            self._install_app(app_info)
+            return
 
         try:
             confirm = input("\nInstall this application? (y/N): ").strip().lower()

@@ -236,6 +236,7 @@ Examples:
 %(prog)s version --check # Check for updates
 %(prog)s version --update # Update to latest version
 %(prog)s download https://github.com/johannesjo/super-productivity # Download AppImage from URL
+%(prog)s catalog # List available AppImages on catalog
 %(prog)s install joplin # Install AppImage from catalog
 %(prog)s update --all # Update all AppImages
 %(prog)s update --select joplin,super-productivity # Select AppImages to update
@@ -262,6 +263,9 @@ Examples:
     # Install command
     install_parser = subparsers.add_parser("install", help="Install app from catalog")
     install_parser.add_argument("app_name", nargs="?", help="Application name to install")
+    install_parser.add_argument(
+        "catalog", action="store_true", help="List all available applications"
+    )
 
     # Update command
     update_parser = subparsers.add_parser("update", help="Update AppImages")
@@ -301,10 +305,15 @@ def execute_cli_command(args: argparse.Namespace) -> None:
 
     elif args.command == "install":
         cmd = InstallAppCommand()
+        # Handle --catalog option
+        if hasattr(args, "catalog") and args.catalog:
+            cmd.list_apps()
         # Pass app name if provided
-        if hasattr(args, 'app_name') and args.app_name:
+        elif hasattr(args, "app_name") and args.app_name:
             cmd.set_app_name(args.app_name)
-        cmd.execute()
+            cmd.execute()
+        else:
+            cmd.execute()
 
     elif args.command == "update":
         if args.all:
