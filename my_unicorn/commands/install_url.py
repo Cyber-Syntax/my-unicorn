@@ -23,9 +23,13 @@ class DownloadCommand(Command):
         """Execute the download command."""
         if self.url:
             # CLI mode - use provided URL
-            parser = ParseURL(url=self.url)
-            parser._validate_url()
-            parser._parse_owner_repo()
+            try:
+                parser = ParseURL(url=self.url)
+                parser._validate_url()
+                parser._parse_owner_repo()
+            except Exception as e:
+                print(f"Error parsing URL '{self.url}': {e}")
+                return
         else:
             # Interactive mode - ask for URL
             parser = ParseURL()
@@ -61,6 +65,9 @@ class DownloadCommand(Command):
         max_attempts = 3
         verification_success = False
         verification_skipped = False  # New flag to track if verification was skipped
+
+        # Initialize progress bar for single download
+        DownloadManager.get_or_create_progress(1)
 
         for attempt in range(1, max_attempts + 1):
             try:
@@ -186,6 +193,8 @@ class DownloadCommand(Command):
 
         # If verification wasn't successful after all attempts, exit
         if not verification_success:
+            # Clean up progress display
+            DownloadManager.stop_progress()
             return
 
         # Handle file operations
@@ -218,6 +227,10 @@ class DownloadCommand(Command):
         success = file_handler.handle_appimage_operations(
             github_api=api, icon_path=icon_path if icon_success else None
         )
+
+        # Clean up progress display
+        DownloadManager.stop_progress()
+
         if success:
             # Save the configuration only if all previous steps succeed
             app_config.save_config()

@@ -257,7 +257,7 @@ Examples:
 
     # Download command
     download_parser = subparsers.add_parser("download", help="Download AppImage from URL")
-    download_parser.add_argument("url", help="GitHub repository URL")
+    download_parser.add_argument("url", help="GitHub repository URL (required)")
 
     # Install command
     install_parser = subparsers.add_parser("install", help="Install app from catalog")
@@ -296,13 +296,14 @@ def execute_cli_command(args: argparse.Namespace) -> None:
 
     if args.command == "download":
         # Set URL and execute download command
-        cmd = DownloadCommand()
-        # You'd need to modify DownloadCommand to accept URL parameter
+        cmd = DownloadCommand(url=args.url)
         cmd.execute()
 
     elif args.command == "install":
         cmd = InstallAppCommand()
-        # You'd need to modify InstallAppCommand to accept app_name parameter
+        # Pass app name if provided
+        if hasattr(args, 'app_name') and args.app_name:
+            cmd.set_app_name(args.app_name)
         cmd.execute()
 
     elif args.command == "update":

@@ -9,8 +9,8 @@ import logging
 from pathlib import Path
 
 from my_unicorn.api.github_api import GitHubAPI
-from my_unicorn.catalog import AppInfo, get_all_apps
 from my_unicorn.app_config import AppConfigManager
+from my_unicorn.catalog import AppInfo, get_all_apps
 from my_unicorn.commands.base import Command
 from my_unicorn.download import DownloadManager
 from my_unicorn.file_handler import FileHandler
@@ -132,8 +132,12 @@ class InstallAppCommand(Command):
 
         # Initialize GitHubAPI with proper parameters
         # Use auto-detection when no specific values are provided
-        checksum_file_name_param = app_info.checksum_file_name if app_info.checksum_file_name else "auto"
-        checksum_hash_type_param = app_info.checksum_hash_type if app_info.checksum_hash_type else "auto"
+        checksum_file_name_param = (
+            app_info.checksum_file_name if app_info.checksum_file_name else "auto"
+        )
+        checksum_hash_type_param = (
+            app_info.checksum_hash_type if app_info.checksum_hash_type else "auto"
+        )
 
         api = GitHubAPI(
             owner=app_info.owner,
@@ -159,6 +163,9 @@ class InstallAppCommand(Command):
             f"API detection results: appimage={api.appimage_name}, "
             f"sha={api.checksum_file_name}, checksum_hash_type={api.checksum_hash_type}, arch={api.arch_keyword}"
         )
+
+        # Initialize progress bar for single download
+        DownloadManager.get_or_create_progress(1)
 
         # Track verification success and skip status across attempts
         verification_success = False
@@ -203,7 +210,7 @@ class InstallAppCommand(Command):
                             print("Verifying download integrity...")
 
                         # Debug logging for API values
-                        logging.debug(f"API values before VerificationManager creation:")
+                        logging.debug("API values before VerificationManager creation:")
                         logging.debug(f"  api.checksum_file_name: {api.checksum_file_name}")
                         logging.debug(f"  api.checksum_hash_type: {api.checksum_hash_type}")
                         logging.debug(f"  api.asset_digest: {api.asset_digest}")
@@ -254,6 +261,8 @@ class InstallAppCommand(Command):
 
         # If verification wasn't successful after all attempts, exit
         if not verification_success or not downloaded_file_path or not api.appimage_name:
+            # Clean up progress display
+            DownloadManager.stop_progress()
             return
 
         # Handle file operations
@@ -286,6 +295,9 @@ class InstallAppCommand(Command):
             github_api=api, icon_path=icon_path if icon_success else None
         )
 
+        # Clean up progress display
+        DownloadManager.stop_progress()
+
         if success:
             # Save the configuration only if all previous steps succeed
             app_config.save_config()
@@ -310,4 +322,3 @@ class InstallAppCommand(Command):
                 print("You can run it from the command line or create a desktop shortcut.")
         else:
             print("Error during file operations. Installation failed.")
-            return

@@ -8,8 +8,8 @@ import time
 import requests
 
 from .api import GitHubAPI
-from .progress import AppImageProgressMeter
 from .global_config import GlobalConfigManager
+from .progress import AppImageProgressMeter
 
 
 # Custom exception for download cancellation
@@ -145,9 +145,11 @@ class DownloadManager:
         """
         if cls._global_progress is None:
             cls._global_progress = AppImageProgressMeter()
-            if total_downloads > 0:
-                cls._global_progress.start(total_downloads)
             cls._active_downloads = set()
+
+        # Always start the progress display if total_downloads is provided
+        if total_downloads > 0 and not cls._global_progress.active:
+            cls._global_progress.start(total_downloads)
 
         return cls._global_progress
 
@@ -472,7 +474,9 @@ class DownloadManager:
             )
             return True
 
-        from my_unicorn.verify import VerificationManager  # Import once at the top of the relevant scope
+        from my_unicorn.verify import (
+            VerificationManager,  # Import once at the top of the relevant scope
+        )
 
         # Handle "extracted_checksum" (which now implies hash might be directly available)
         # or other standard SHA file scenarios.
