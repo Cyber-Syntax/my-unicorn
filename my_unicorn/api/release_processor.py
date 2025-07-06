@@ -11,7 +11,7 @@ from typing import Any
 from packaging.version import parse as parse_version_string
 
 from my_unicorn.api.assets import ReleaseInfo  # Corrected import path
-from my_unicorn.utils import arch_utils, version_utils
+from my_unicorn.utils import version_utils
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class ReleaseProcessor:
 
     def compare_versions(
         self, current_version: str, latest_version: str
-    ) -> tuple[bool, tuple[str, str]]:
+    ) -> tuple[bool, dict[str, str]]:
         """Compare two version strings to determine if an update is available.
 
         Args:
@@ -141,16 +141,19 @@ class ReleaseProcessor:
                 # Standard logic for all other repositories: if latest version is newer, allow update
                 elif parsed_latest_full_version > parsed_current_full_version:
                     update_available = True
-            except Exception as e:
+            except (ValueError, TypeError) as e:
                 # Log with the strings that were attempted to be parsed by packaging.version
                 logger.error(
-                    f"Error parsing versions for comparison (current_full='{current_full_parseable_str}', latest_full='{latest_full_parseable_str}'): {e}"
+                    "Error parsing versions for comparison (current_full='%s', latest_full='%s'): %s",
+                    current_full_parseable_str,
+                    latest_full_parseable_str,
+                    e,
                 )
                 # Keep update_available = False on error, or handle as appropriate
 
         if update_available:  # Log only if an update is actually flagged
             # Log with original latest_version (e.g., 1.12.28b), not the transformed one
-            logger.info(f"Update available: {current_version} → {latest_version}")
+            logger.info("Update available: %s → %s", current_version, latest_version)
 
         return update_available, {
             "current_version": current_version,
@@ -173,7 +176,8 @@ class ReleaseProcessor:
 
         """
         if not arch_keywords:
-            arch_keywords = arch_utils.get_arch_keywords(self.arch_keyword)
+            # Use a default list instead of calling non-existent method
+            arch_keywords = [self.arch_keyword] if self.arch_keyword else []
 
         compatible_assets = []
         for asset in assets:
@@ -181,18 +185,18 @@ class ReleaseProcessor:
             if any(keyword.lower() in asset_name for keyword in arch_keywords):
                 compatible_assets.append(asset)
 
-        logger.debug(f"Found {len(compatible_assets)} compatible assets out of {len(assets)}")
+        logger.debug("Found %d compatible assets out of %d", len(compatible_assets), len(assets))
         return compatible_assets
 
     def process_release_data(
-        self, release_data: tuple, asset_info: tuple, is_beta: bool = False
+        self, release_data: dict[str, Any], asset_info: dict[str, Any], _is_beta: bool = False
     ) -> ReleaseInfo | None:
         """Process raw release data into a structured ReleaseInfo object.
 
         Args:
             release_data: Raw release data from GitHub API
             asset_info: Processed asset information dictionary
-            is_beta: Whether this is a beta release
+            _is_beta: Whether this is a beta release (unused but kept for interface compatibility)
 
         Returns:
             ReleaseInfo object or None if processing failed
@@ -201,10 +205,10 @@ class ReleaseProcessor:
         try:
             return ReleaseInfo.from_release_data(release_data, asset_info)
         except KeyError as e:
-            logger.error(f"Missing required key in release data: {e}")
+            logger.error("Missing required key in release data: %s", e)
             return None
-        except Exception as e:
-            logger.error(f"Error processing release data: {e}")
+        except (ValueError, TypeError) as e:
+            logger.error("Error processing release data: %s", e)
             return None
 
     def create_update_response(
@@ -213,7 +217,7 @@ class ReleaseProcessor:
         current_version: str,
         release_info: ReleaseInfo,
         compatible_assets: list[dict],
-    ) -> dict[str, bool | str | None | list[tuple[Any, Any]] | tuple[Any, Any]]:
+    ) -> dict[str, Any]:
         """Create a standardized response for update checks.
 
         Args:

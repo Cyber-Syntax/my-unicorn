@@ -84,21 +84,20 @@ class InstallAppCommand(Command):
         """
         apps = get_all_apps()
 
-        # Try to find the app by name (case-insensitive)
-        app_info = None
-        for app in apps.values():
-            if app.app_rename.lower() == app_name.lower() or app.repo.lower() == app_name.lower():
-                app_info = app
-                break
+        # Simple lowercase matching - check if app_name (lowercase) exists as a key
+        app_name_lower = app_name.lower()
 
-        if not app_info:
-            print(f"Application '{app_name}' not found in catalog.")
-            print("Available applications:")
-            for app in sorted(apps.values(), key=lambda x: x.app_rename):
-                print(f"  - {app.app_rename}")
+        if app_name_lower in apps:
+            app_info = apps[app_name_lower]
+            self._confirm_and_install_app(app_info)
             return
 
-        self._confirm_and_install_app(app_info)
+        # If not found, show available apps
+        print(f"Application '{app_name}' not found in catalog.")
+        print("Available applications:")
+        for repo_name, app in sorted(apps.items()):
+            print(f"  - {repo_name} ({app.app_rename})")
+        return
 
     def _display_browse_menu(self) -> None:
         """Display menu for browsing applications."""
@@ -220,9 +219,9 @@ class InstallAppCommand(Command):
             self._logger.debug("Using automatic SHA file detection")
 
         # Get release data with full processing including SHA/asset digest detection
-        success, full_response = api.get_latest_release()
-        if not success:
-            print(f"Error during processing: {full_response}")
+        release_result = api.get_latest_release()
+        if not release_result[0]:
+            print(f"Error during processing: {release_result[1]}")
             return
 
         # Log what was detected by the API
@@ -269,48 +268,48 @@ class InstallAppCommand(Command):
                         verification_success = True
                         verification_skipped = True  # set the flag that verification was skipped
                         break
+
+                    # Single verification point for both existing and downloaded files
+                    if was_existing_file:
+                        print("Verifying existing file...")
                     else:
-                        # Single verification point for both existing and downloaded files
-                        if was_existing_file:
-                            print("Verifying existing file...")
-                        else:
-                            print("Verifying download integrity...")
+                        print("Verifying download integrity...")
 
-                        # Debug logging for API values
-                        logging.debug("API values before VerificationManager creation:")
-                        logging.debug(f"  api.checksum_file_name: {api.checksum_file_name}")
-                        logging.debug(f"  api.checksum_hash_type: {api.checksum_hash_type}")
-                        logging.debug(f"  api.asset_digest: {api.asset_digest}")
-                        logging.debug(f"  api.skip_verification: {api.skip_verification}")
+                    # Debug logging for API values
+                    logging.debug("API values before VerificationManager creation:")
+                    logging.debug(f"  api.checksum_file_name: {api.checksum_file_name}")
+                    logging.debug(f"  api.checksum_hash_type: {api.checksum_hash_type}")
+                    logging.debug(f"  api.asset_digest: {api.asset_digest}")
+                    logging.debug(f"  api.skip_verification: {api.skip_verification}")
 
-                        verification_manager = VerificationManager(
-                            checksum_file_name=api.checksum_file_name,
-                            checksum_file_download_url=api.checksum_file_download_url,
-                            appimage_name=api.appimage_name,
-                            checksum_hash_type=api.checksum_hash_type,
-                            asset_digest=api.asset_digest,
+                    verification_manager = VerificationManager(
+                        checksum_file_name=api.checksum_file_name,
+                        checksum_file_download_url=api.checksum_file_download_url,
+                        appimage_name=api.appimage_name,
+                        checksum_hash_type=api.checksum_hash_type or "sha256",
+                        asset_digest=api.asset_digest,
+                    )
+
+                    # set the full path to the downloaded file
+                    verification_manager.set_appimage_path(downloaded_file_path)
+                    is_valid = verification_manager.verify_appimage(cleanup_on_failure=True)
+
+                    if is_valid:
+                        verification_success = True
+                        print("Verification successful!")
+                        break
+                    # Verification failed
+                    elif attempt == self.MAX_ATTEMPTS:
+                        print(
+                            f"Verification failed. Maximum retry attempts ({self.MAX_ATTEMPTS}) reached."
                         )
-
-                        # set the full path to the downloaded file
-                        verification_manager.set_appimage_path(downloaded_file_path)
-                        is_valid = verification_manager.verify_appimage(cleanup_on_failure=True)
-
-                        if is_valid:
-                            verification_success = True
-                            print("Verification successful!")
-                            break
-                        # Verification failed
-                        elif attempt == self.MAX_ATTEMPTS:
-                            print(
-                                f"Verification failed. Maximum retry attempts ({self.MAX_ATTEMPTS}) reached."
-                            )
+                        return
+                    else:
+                        print(f"Verification failed. Attempt {attempt} of {self.MAX_ATTEMPTS}.")
+                        retry = input("Retry download? (y/N): ").strip().lower()
+                        if retry != "y":
+                            print("Installation cancelled.")
                             return
-                        else:
-                            print(f"Verification failed. Attempt {attempt} of {self.MAX_ATTEMPTS}.")
-                            retry = input("Retry download? (y/N): ").strip().lower()
-                            if retry != "y":
-                                print("Installation cancelled.")
-                                return
 
             except Exception as e:
                 logging.error(f"Download attempt {attempt} failed: {e!s}", exc_info=True)
@@ -359,7 +358,7 @@ class InstallAppCommand(Command):
         # Perform file operations
         print("Finalizing installation...")
         success = file_handler.handle_appimage_operations(
-            github_api=api, icon_path=icon_path if icon_success else None
+            icon_path=icon_path if icon_success else None
         )
 
         # Clean up progress display

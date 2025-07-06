@@ -329,7 +329,7 @@ class AppImageProgressMeter:
         """
         with self.lock:
             return (
-                self.downloads
+                bool(self.downloads)
                 and self.completed_downloads >= len(self.downloads)
                 and all(d["status"] in ["completed", "failed"] for d in self.downloads.values())
             )

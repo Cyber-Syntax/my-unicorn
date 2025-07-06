@@ -268,7 +268,7 @@ Examples:
     install_parser = subparsers.add_parser("install", help="Install app from catalog")
     install_parser.add_argument("app_name", nargs="?", help="Application name to install")
     install_parser.add_argument(
-        "catalog", action="store_true", help="List all available applications"
+        "--catalog", action="store_true", help="List all available applications"
     )
 
     # Update command

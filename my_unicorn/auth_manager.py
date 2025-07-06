@@ -5,7 +5,6 @@ This module provides functionality for handling GitHub API authentication
 with proper Bearer token formatting and reuse.
 """
 
-import functools
 import logging
 import os
 import time
@@ -32,6 +31,9 @@ MAX_AUTH_RETRIES = 2  # Maximum number of retries for failed auth
 RATE_LIMIT_CACHE_TTL = 60 * 60  # 1 hour cache TTL for rate limits - matches GitHub's reset window
 RATE_LIMIT_HARD_REFRESH = 60 * 60 * 2  # Force refresh after 2 hours (safety margin)
 CACHE_DIR = os.path.expanduser("~/.cache/myunicorn")  # Cache directory
+HTTP_OK = 200  # HTTP status code for successful requests
+HTTP_UNAUTHORIZED = 401  # HTTP status code for unauthorized requests
+HTTP_FORBIDDEN = 403  # HTTP status code for forbidden requests
 
 
 class GitHubAuthManager:
@@ -43,7 +45,7 @@ class GitHubAuthManager:
     All methods are static to allow easy usage across different modules.
     """
 
-    _cached_headers: tuple[str, str] | None = None
+    _cached_headers: dict[str, str] | None = None
     _last_token: str | None = None
     _last_token_check: float = 0
     _token_check_interval: int = 300  # Check token validity every 5 minutes
@@ -130,7 +132,7 @@ class GitHubAuthManager:
                     )
                     cls._cached_headers_expiration = time.time() + cache_validity
             except Exception as e:
-                logger.warning(f"Error parsing token expiration info: {e}")
+                logger.warning("Error parsing token expiration info: %s", e)
                 cls._cached_headers_expiration = time.time() + cls._token_check_interval
         else:
             cls._cached_headers_expiration = time.time() + cls._token_check_interval
@@ -232,7 +234,7 @@ class GitHubAuthManager:
             # If token expires in less than threshold days, rotate it
             return days_until_expiration <= TOKEN_REFRESH_THRESHOLD_DAYS
         except Exception as e:
-            logger.warning(f"Error checking token rotation: {e}")
+            logger.warning("Error checking token rotation: %s", e)
             return False
 
     @classmethod
@@ -246,21 +248,23 @@ class GitHubAuthManager:
         return os.path.join(ensure_directory_exists(CACHE_DIR), "rate_limit_cache.json")
 
     @classmethod
-    def _load_rate_limit_cache(cls) -> tuple[str, Any]:
+    def _load_rate_limit_cache(cls) -> dict[str, Any]:
         """Load rate limit information from cache.
 
         Returns:
             dict: Rate limit cache or empty dict if no cache
 
         """
-        return load_json_cache(
+        cache_data = load_json_cache(
             cls._get_cache_file_path(),
             ttl_seconds=RATE_LIMIT_CACHE_TTL,
-            hard_refresh_seconds=RATE_LIMIT_HARD_REFRESH,
+            hard_refresh_seconds=RATE_LIMIT_HARD_REFRESH,  # type: ignore[arg-type]
         )
+        # The cache utility returns a dict despite wrong type annotation
+        return cache_data  # type: ignore[return-value]
 
     @classmethod
-    def _save_rate_limit_cache(cls, data: tuple[str, Any]) -> bool:
+    def _save_rate_limit_cache(cls, data: dict[str, Any]) -> bool:
         """Save rate limit information to cache.
 
         Args:
@@ -274,8 +278,8 @@ class GitHubAuthManager:
         data["request_count"] = cls._request_count_since_cache
         data["cache_ttl"] = RATE_LIMIT_CACHE_TTL
 
-        # Save to file using our cache utility
-        return save_json_cache(cls._get_cache_file_path(), data)
+        # The cache utility expects a dict despite wrong type annotation
+        return save_json_cache(cls._get_cache_file_path(), data)  # type: ignore[arg-type]
 
     @classmethod
     def _update_cached_rate_limit(cls, decrement: int = 1) -> None:
@@ -302,7 +306,7 @@ class GitHubAuthManager:
             if cls._request_count_since_cache % 5 == 0:  # Update file every 5 requests
                 cls._save_rate_limit_cache(cls._rate_limit_cache)
 
-            logger.debug(f"Updated cached rate limit: {new_remaining} (-{decrement}) remaining")
+            logger.debug("Updated cached rate limit: %s (-%s) remaining", new_remaining, decrement)
 
     @classmethod
     def _extract_rate_limit_from_headers(cls, headers: dict[str, Any]) -> None:
@@ -340,15 +344,15 @@ class GitHubAuthManager:
                 cls._rate_limit_cache = cache_data
                 cls._rate_limit_cache_time = time.time()
 
-                logger.debug(f"Updated rate limits from headers: {remaining}/{limit}")
+            logger.debug("Updated rate limits from headers: %s/%s", remaining, limit)
         except Exception as e:
-            logger.debug(f"Failed to extract rate limits from headers: {e}")
+            logger.debug("Failed to extract rate limits from headers: %s", e)
 
     @classmethod
     def _core_rate_limit_data(
         cls,
         use_cache: bool = True,
-        custom_headers: tuple[str, str] | None = None,
+        custom_headers: dict[str, str] | None = None,
         return_dict: bool = False,
     ) -> tuple[int, int, str, bool] | dict[str, Any]:
         """Core implementation for rate limit data retrieval.
@@ -377,7 +381,7 @@ class GitHubAuthManager:
             elif (cache_age < RATE_LIMIT_CACHE_TTL) and cls._rate_limit_cache:
                 logger.debug("Using cached rate limit information")
                 # Include request count in debug info
-                logger.debug(f"API requests since cache refresh: {cls._request_count_since_cache}")
+                logger.debug("API requests since cache refresh: %s", cls._request_count_since_cache)
 
                 # Return the appropriate format
                 if return_dict and "resources" in cls._rate_limit_cache:
@@ -566,7 +570,7 @@ class GitHubAuthManager:
 
     @classmethod
     def get_rate_limit_info(
-        cls, custom_headers: tuple[str, str] | None = None, return_dict: bool = False
+        cls, custom_headers: dict[str, str] | None = None, return_dict: bool = False
     ) -> tuple[int, int, str, bool] | dict[str, Any]:
         """Get the current GitHub API rate limit information.
 
@@ -730,7 +734,8 @@ class GitHubAuthManager:
         """
         # Get token for session key
         token = cls._last_token or SecureTokenManager.get_token(validate_expiration=False)
-        token_key = hash(token) if token else "unauthenticated"
+        # Create a string key for the session pool
+        token_key = str(hash(token)) if token else "unauthenticated"
 
         # Get session from pool
         session = SessionPool.get_session(token_key)
@@ -753,7 +758,7 @@ class GitHubAuthManager:
 
                 # Extract rate limit info from headers instead of separate API calls
                 if response.status_code == 200 and url.startswith("https://api.github.com"):
-                    cls._extract_rate_limit_from_headers(response.headers)
+                    cls._extract_rate_limit_from_headers(dict(response.headers))
 
                 # Handle auth failures
                 if response.status_code in (401, 403) and retries < max_retries:
@@ -763,7 +768,8 @@ class GitHubAuthManager:
 
                     # Get new token and session
                     token = SecureTokenManager.get_token(validate_expiration=True)
-                    token_key = hash(token) if token else "unauthenticated"
+                    # Create a string key for the session pool
+                    token_key = str(hash(token)) if token else "unauthenticated"
                     session = SessionPool.get_session(token_key)
 
                     # Reapply the custom headers if they were provided
@@ -835,16 +841,16 @@ class GitHubAuthManager:
         }
 
         # Add metadata if available
-        if token_metadata:
+        if token_metadata and isinstance(token_metadata, dict):
             if "created_at" in token_metadata:
                 # Use our datetime utility to format the creation date
-                created_at_str = format_timestamp(token_metadata["created_at"])
+                created_at_str = format_timestamp(token_metadata["created_at"])  # type: ignore[arg-type]
                 if created_at_str:
                     result["created_at"] = created_at_str
 
             if "last_used_at" in token_metadata:
                 # Use our datetime utility to format the last used date
-                last_used_str = format_timestamp(token_metadata["last_used_at"])
+                last_used_str = format_timestamp(token_metadata["last_used_at"])  # type: ignore[arg-type]
                 if last_used_str:
                     result["last_used_at"] = last_used_str
 
@@ -855,8 +861,8 @@ class GitHubAuthManager:
 
     @classmethod
     def get_live_rate_limit_info(
-        cls, custom_headers: tuple[str, str] | None = None
-    ) -> tuple[str, Any]:
+        cls, custom_headers: dict[str, str] | None = None
+    ) -> dict[str, Any]:
         """Get current GitHub API rate limit information directly from the API.
 
         Makes a real-time API call to GitHub to get rate limit status,
@@ -890,11 +896,24 @@ class GitHubAuthManager:
             use_cache=False, custom_headers=custom_headers, return_dict=True
         )
 
+        # Ensure result is a dict (should be since we passed return_dict=True)
+        if isinstance(result, tuple):
+            # Convert tuple to dict format for compatibility
+            result = {
+                "remaining": result[0],
+                "limit": result[1],
+                "reset_formatted": result[2],
+                "is_authenticated": result[3],
+                "error": "Failed to get dict format",
+            }
+
         # Log the live check results if it was successful
         if "error" not in result:
             logger.info(
-                f"Live rate limit check results: {result.get('remaining', 'N/A')}/{result.get('limit', 'N/A')} "
-                f"(reset at {result.get('reset_formatted', 'N/A')})"
+                "Live rate limit check results: %s/%s (reset at %s)",
+                result.get("remaining", "N/A"),
+                result.get("limit", "N/A"),
+                result.get("reset_formatted", "N/A"),
             )
 
             # Also update the cache with the fresh data
@@ -907,15 +926,15 @@ class GitHubAuthManager:
 
             # Log cache status after update
             logger.debug(
-                f"Cache updated with fresh data. New timestamp: "
-                f"{datetime.fromtimestamp(cls._rate_limit_cache_time).strftime('%Y-%m-%d %H:%M:%S')}"
+                "Cache updated with fresh data. New timestamp: %s",
+                datetime.fromtimestamp(cls._rate_limit_cache_time).strftime("%Y-%m-%d %H:%M:%S"),
             )
 
         return result
 
     @classmethod
     def validate_token(
-        cls, custom_headers: tuple[str, str] | None = None
+        cls, custom_headers: dict[str, str] | None = None
     ) -> tuple[bool, dict[str, Any]]:
         """Validate a GitHub token by making a test request and analyzing the response.
 
@@ -1050,16 +1069,22 @@ class SessionPool:
                 return cls._sessions[key]
 
             # Create a new session with proper headers
-            logger.debug(f"Creating new session for token key: {key[:8]}...")
+            logger.debug("Creating new session for token key: %s...", key[:8])
             session = requests.Session()
             headers = GitHubAuthManager.get_auth_headers()
-            session.headers.update(headers)
+            if headers:
+                session.headers.update(headers)
 
-            # Set default timeout for all requests
-            session.request = functools.partial(
-                session.request,
-                timeout=(10, 30),  # (connect timeout, read timeout)
-            )
+            # Set default timeout for all requests (use patching approach for session.request)
+            original_request = session.request
+
+            def patched_request(*args, **kwargs):
+                # Set default timeout if not provided
+                if "timeout" not in kwargs:
+                    kwargs["timeout"] = (10, 30)  # (connect timeout, read timeout)
+                return original_request(*args, **kwargs)
+
+            session.request = patched_request
 
             # Store session in pool and return
             cls._sessions[key] = session

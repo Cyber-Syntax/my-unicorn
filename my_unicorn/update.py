@@ -3,9 +3,9 @@
 
 import logging
 import os
+import shutil
 import subprocess
 import sys
-import shutil
 from importlib.metadata import PackageNotFoundError, metadata
 from pathlib import Path
 

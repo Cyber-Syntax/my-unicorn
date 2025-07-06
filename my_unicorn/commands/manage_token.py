@@ -6,11 +6,11 @@ allowing users to view, add, update, and remove tokens securely.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from my_unicorn.auth_manager import GitHubAuthManager
 from my_unicorn.commands.base import Command
-from my_unicorn.secure_token import CONFIG_DIR, TOKEN_FILE, TOKEN_METADATA_FILE, SecureTokenManager
+from my_unicorn.secure_token import SecureTokenManager
 from my_unicorn.utils.datetime_utils import parse_timestamp
 
 
@@ -597,7 +597,7 @@ class ManageTokenCommand(Command):
 
             # Show current rate limits with new token
             print("\nChecking rate limits with new token...")
-            self._check_rate_limits(new_token)
+            self.check_rate_limits(new_token)
         else:
             print("\n❌ Failed to save new token! Rotation aborted.")
             print("   Make sure you have keyring or cryptography modules installed.")
@@ -658,39 +658,18 @@ class ManageTokenCommand(Command):
         else:
             print("❌ GNOME keyring (Seahorse) - Not available")
 
-        if keyring_status["kde_wallet_available"]:
-            print("✅ KDE Wallet - Available and supported")
-        else:
-            print("❌ KDE Wallet - Not available")
-
-        if keyring_status["crypto_available"]:
-            print("✅ Encrypted file storage - Available and supported")
-        else:
-            print("❌ Encrypted file storage - Not available")
-
-        if not keyring_status["any_keyring_available"] and not keyring_status["crypto_available"]:
+        if not keyring_status["gnome_keyring_available"]:
             print("⚠️ Warning: No secure storage methods detected on this system!")
-            print("   Consider installing a keyring or cryptography module.")
-            print("   Run 'pip install keyring cryptography' for better security.")
-
-        # Show file locations if appropriate
-        if storage_method == "Encrypted file" or not keyring_status["any_keyring_available"]:
-            print("\nFile Storage Locations:")
-            print(f"Token file: {TOKEN_FILE}")
-            print(f"Metadata file: {TOKEN_METADATA_FILE}")
-            print(f"Config directory: {CONFIG_DIR}")
+            print("   Consider installing GNOME keyring (Seahorse) for secure token storage.")
+            print("   Run 'sudo apt install seahorse libsecret-1-0' on Ubuntu/Debian")
 
         # Add some general security advice
         print("\nSecurity Recommendations:")
-        if (
-            not keyring_status["gnome_keyring_available"]
-            and not keyring_status["kde_wallet_available"]
-        ):
-            print("➤ Install and configure a system keyring for better security")
+        if not keyring_status["gnome_keyring_available"]:
+            print("➤ Install and configure GNOME keyring (Seahorse) for secure storage")
             print("  - For GNOME: Install seahorse package")
-            print("  - For KDE: Enable KWallet")
         else:
-            print("➤ Always use a system keyring when available for maximum security")
+            print("➤ GNOME keyring provides maximum security for token storage")
 
         print("➤ Rotate your token regularly (every 30-90 days)")
         print("➤ Use fine-grained access tokens with minimal permissions")
@@ -752,15 +731,10 @@ class ManageTokenCommand(Command):
         else:
             print("❌ GNOME keyring not available")
 
-        if keyring_status["kde_wallet_available"]:
-            print("✅ KDE Wallet detected")
-        else:
-            print("❌ KDE Wallet not available")
-
-        # Check if any keyring is available
-        if not keyring_status["any_keyring_available"]:
-            print("\n⚠️ Warning: No supported keyring found!")
-            print("The keyring module may be installed, but no supported backend is available.")
+        # Check if GNOME keyring is available
+        if not keyring_status["gnome_keyring_available"]:
+            print("\n⚠️ Warning: GNOME keyring is not available!")
+            print("GNOME keyring (Seahorse) is required for secure token storage.")
 
             choice = input("\nWould you like to try saving to keyring anyway? (y/n): ")
             if choice.lower() != "y":
@@ -768,20 +742,10 @@ class ManageTokenCommand(Command):
                 self._offer_fallback_options()
                 return
 
-        # Save directly to keyring using our enhanced method with improved metadata
-        metadata = {
-            "created_at": datetime.now().isoformat(),
-            "expires_at": (datetime.now() + timedelta(days=expiration_days)).isoformat(),
-            "source": "manage_token_command",
-            "security_level": "high",
-        }
-
-        # Save token to keyring using our enhanced method with improved metadata
+        # Save token to keyring
         result = SecureTokenManager.save_token(
             token,
             expires_in_days=expiration_days,
-            storage_preference="keyring_only",
-            metadata=metadata,
         )
 
         if result:
@@ -816,7 +780,7 @@ class ManageTokenCommand(Command):
                     GitHubAuthManager.clear_cached_headers()
 
                     # Show current rate limits with the token
-                    self._check_rate_limits(token)
+                    self.check_rate_limits(token)
                 else:
                     print("\n❌ Failed to save token with all methods!")
                     self._show_installation_help()

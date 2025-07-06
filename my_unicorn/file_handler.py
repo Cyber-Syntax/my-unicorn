@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # Local imports
-from my_unicorn.api.github_api import GitHubAPI
 from my_unicorn.icon_manager import IconManager
 from my_unicorn.utils.desktop_entry import DesktopEntryManager
 
@@ -59,7 +58,7 @@ class FileHandler:
     batch_mode: bool = False
     keep_backup: bool = True
     max_backups: int = 3
-    app_rename: str | None = None
+    app_rename: str = ""
 
     def __post_init__(self) -> None:
         """Post-initialization processing.
@@ -78,6 +77,10 @@ class FileHandler:
 
         # Use app_rename if provided, otherwise fallback to repo
         if not self.app_rename:
+            self.app_rename = self.repo
+
+        # Ensure app_rename is never None after initialization
+        if self.app_rename is None:
             self.app_rename = self.repo
 
         # Convert paths to Path objects
@@ -124,13 +127,10 @@ class FileHandler:
             return None
         return self.app_storage_path / self.installed_filename
 
-    def handle_appimage_operations(
-        self, github_api: GitHubAPI | None = None, icon_path: str | None = None
-    ) -> bool:
+    def handle_appimage_operations(self, icon_path: str | None = None) -> bool:
         """Perform all required file operations for an AppImage.
 
         Args:
-            github_api: Optional GitHubAPI instance for additional operations
             icon_path: Optional path to icon file (to avoid duplicate checks)
 
         Returns:
@@ -159,8 +159,8 @@ class FileHandler:
 
             return True
 
-        except Exception as e:
-            logger.error(f"Error handling AppImage operations: {e!s}")
+        except (OSError, ValueError) as e:
+            logger.error("Error handling AppImage operations: %s", e)
             return False
 
     def _ensure_directories_exist(self) -> None:
@@ -202,7 +202,11 @@ class FileHandler:
             new_backup_path = self.app_backup_storage_path / backup_name
 
             # Make backup of current AppImage
-            logger.info(f"Backing up {self.installed_path} to {new_backup_path}")
+            if not self.installed_path:
+                logger.error("Installation path not set for backup")
+                return False
+
+            logger.info("Backing up %s to %s", self.installed_path, new_backup_path)
             shutil.copy2(self.installed_path, new_backup_path)
 
             # Clean up old backups based on max_backups setting
@@ -211,7 +215,7 @@ class FileHandler:
             return True
 
         except OSError as e:
-            logger.error(f"Failed to backup AppImage: {e!s}")
+            logger.error("Failed to backup AppImage: %s", e)
             return False
 
     def _cleanup_old_backups(self, app_base_name: str) -> None:
@@ -229,7 +233,7 @@ class FileHandler:
             # Ensure backup directory exists
             backup_dir = self.app_backup_storage_path
             if not backup_dir.exists():
-                logger.info(f"Backup directory does not exist: {backup_dir}")
+                logger.info("Backup directory does not exist: %s", backup_dir)
                 return
 
             # Normalize app_base_name for consistent comparison
@@ -245,14 +249,13 @@ class FileHandler:
                 # Simplified matching - just check if filename starts with the app name
                 filename_lower = filepath.name.lower()
                 if (
-                    filename_lower.startswith(f"{app_base_name}-")
-                    or filename_lower.startswith(f"{app_base_name}_")
+                    filename_lower.startswith((f"{app_base_name}-", f"{app_base_name}_"))
                     or filename_lower == f"{app_base_name}.appimage"
                 ):
                     # Get file modification time for sorting
                     mod_time = filepath.stat().st_mtime
                     all_backups.append((filepath, mod_time, filepath.name))
-                    logger.debug(f"Found backup file: {filepath.name}")
+                    logger.debug("Found backup file: %s", filepath.name)
 
             # Sort backups by modification time (newest first)
             all_backups.sort(key=lambda x: x[1], reverse=True)
@@ -260,7 +263,10 @@ class FileHandler:
             # Log the number of backups found
             backups_count = len(all_backups)
             logger.info(
-                f"Found {backups_count} backups for {app_base_name}, max_backups={self.max_backups}"
+                "Found %d backups for %s, max_backups=%d",
+                backups_count,
+                app_base_name,
+                self.max_backups,
             )
 
             # Keep only the newest max_backups files
@@ -272,28 +278,33 @@ class FileHandler:
                     try:
                         filepath.unlink()
                         removed_count += 1
-                        logger.info(f"Removed old backup: {filename}")
+                        logger.info("Removed old backup: %s", filename)
                     except OSError as e:
-                        logger.warning(f"Failed to remove old backup {filename}: {e}")
+                        logger.warning("Failed to remove old backup %s: %s", filename, e)
 
                 if removed_count > 0:
+                    plural_s = "s" if removed_count > 1 else ""
                     logger.info(
-                        f"✓ Cleaned up {removed_count} old backup"
-                        f"{'s' if removed_count > 1 else ''} for {app_base_name}"
-                        f" (kept {self.max_backups} newest)"
+                        "✓ Cleaned up %d old backup%s for %s (kept %d newest)",
+                        removed_count,
+                        plural_s,
+                        app_base_name,
+                        self.max_backups,
                     )
             else:
                 logger.info(
-                    f"No backups to remove for {app_base_name}, "
-                    f"current count ({backups_count}) ≤ max_backups ({self.max_backups})"
+                    "No backups to remove for %s, current count (%d) ≤ max_backups (%d)",
+                    app_base_name,
+                    backups_count,
+                    self.max_backups,
                 )
 
         except OSError as e:
             # Log but don't fail the whole operation if cleanup fails
-            logger.warning(f"Error during backup cleanup: {e!s}")
-        except Exception as e:
+            logger.warning("Error during backup cleanup: %s", e)
+        except ValueError as e:
             # Catch any other unexpected errors
-            logger.warning(f"Unexpected error during backup cleanup: {e!s}")
+            logger.warning("Unexpected error during backup cleanup: %s", e)
 
     def _move_appimage(self) -> bool:
         """Move downloaded AppImage to destination folder.
@@ -305,7 +316,7 @@ class FileHandler:
         try:
             # Check if source file exists
             if not self.download_path.exists():
-                logger.error(f"Downloaded AppImage not found at {self.download_path}")
+                logger.error("Downloaded AppImage not found at %s", self.download_path)
                 return False
 
             # Check if destination path is set
@@ -314,16 +325,16 @@ class FileHandler:
                 return False
 
             # Move file to destination
-            logger.info(f"Moving {self.download_path} to {self.installed_path}")
+            logger.info("Moving %s to %s", self.download_path, self.installed_path)
             shutil.move(str(self.download_path), str(self.installed_path))
             return True
 
-        except Exception as e:
-            logger.error(f"Failed to move AppImage: {e!s}")
+        except OSError as e:
+            logger.error("Failed to move AppImage: %s", e)
             return False
 
     def _set_executable_permission(self) -> bool:
-        """set executable permissions on the AppImage.
+        """Set executable permissions on the AppImage.
 
         Returns:
             bool: True if permissions were set successfully, False otherwise
@@ -336,11 +347,11 @@ class FileHandler:
 
             # Make the AppImage executable (add +x to current permissions)
             self.installed_path.chmod(self.installed_path.stat().st_mode | DESKTOP_ENTRY_FILE_MODE)
-            logger.info(f"set executable permissions on {self.installed_path}")
+            logger.info("Set executable permissions on %s", self.installed_path)
             return True
 
-        except Exception as e:
-            logger.error(f"Failed to set executable permissions: {e!s}")
+        except OSError as e:
+            logger.error("Failed to set executable permissions: %s", e)
             return False
 
     def _create_desktop_entry(self, icon_path: str | None = None) -> bool:
@@ -377,13 +388,13 @@ class FileHandler:
             )
 
             if not success:
-                logger.error(f"Desktop entry creation failed: {message}")
+                logger.error("Desktop entry creation failed: %s", message)
 
             return success
 
         except OSError as e:
-            logger.error(f"Failed to create desktop entry due to file system error: {e!s}")
+            logger.error("Failed to create desktop entry due to file system error: %s", e)
             return False
-        except Exception as e:
-            logger.error(f"Unexpected error creating desktop entry: {e!s}")
+        except (ValueError, TypeError) as e:
+            logger.error("Unexpected error creating desktop entry: %s", e)
             return False

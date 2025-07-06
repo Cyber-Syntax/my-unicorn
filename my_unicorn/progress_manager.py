@@ -39,19 +39,6 @@ def _terminal_width() -> int:
     """Get terminal width."""
     return shutil.get_terminal_size((80, 20)).columns
 
-
-def format_number(number: float | None) -> str:
-    """Format number to human readable string with units."""
-    if number is None or number == 0:
-        return "0"
-    if number < THOUSAND:
-        return f"{number:d}" if number == int(number) else f"{number:.0f}"
-    elif number < MILLION:
-        return f"{number / THOUSAND:.1f}K"
-    else:
-        return f"{number / MILLION:.1f}M"
-
-
 def format_time(seconds: float | None) -> str:
     """Format time duration to MM:SS."""
     if seconds is None or seconds <= 0:
