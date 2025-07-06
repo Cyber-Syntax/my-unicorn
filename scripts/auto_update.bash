@@ -12,4 +12,4 @@
 
 set -e # Exit on any error
 
-python3 main.py update --all
+my-unicorn update --all

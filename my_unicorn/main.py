@@ -26,6 +26,7 @@ from my_unicorn.commands.manage_token import ManageTokenCommand
 from my_unicorn.commands.migrate_config import MigrateConfigCommand
 from my_unicorn.commands.update_all_async import UpdateAsyncCommand
 from my_unicorn.commands.update_all_auto import UpdateAllAutoCommand
+from my_unicorn.commands.version import VersionCommand
 from my_unicorn.global_config import GlobalConfigManager
 
 _ = gettext.gettext
@@ -110,6 +111,7 @@ def display_menu() -> None:
     print("\n--- Maintenance ---")
     print("8. Update configuration files")
     print("9. Clean old backups")
+    print("10. Show version")
     print("0. Exit")
     print(f"{'-' * 40}")
 
@@ -200,6 +202,7 @@ def setup_commands(invoker: CommandInvoker) -> None:
     invoker.register_command(7, ManageTokenCommand())
     invoker.register_command(8, MigrateConfigCommand())
     invoker.register_command(9, DeleteBackupsCommand())
+    invoker.register_command(10, VersionCommand())
 
 
 def initialize_app_definitions() -> None:
@@ -226,6 +229,9 @@ def create_argument_parser() -> argparse.ArgumentParser:
         epilog="""
 Examples:
 %(prog)s # Interactive mode (default)
+%(prog)s version # Show current version
+%(prog)s version --check # Check for updates
+%(prog)s version --update # Update to latest version
 %(prog)s download https://github.com/johannesjo/super-productivity # Download AppImage from URL
 %(prog)s install joplin # Install AppImage from catalog
 %(prog)s update --all # Update all AppImages
@@ -240,6 +246,11 @@ Examples:
 
     # Add subcommands
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Version command
+    version_parser = subparsers.add_parser("version", help="Display version and manage updates")
+    version_cmd = VersionCommand()
+    version_cmd.add_arguments(version_parser)
 
     # Download command
     download_parser = subparsers.add_parser("download", help="Download AppImage from URL")
@@ -273,6 +284,12 @@ def execute_cli_command(args: argparse.Namespace) -> None:
     """Execute a CLI command based on parsed arguments."""
     invoker = CommandInvoker()
     setup_commands(invoker)
+
+    if args.command == "version":
+        cmd = VersionCommand()
+        cmd.set_args(args)
+        cmd.execute()
+        return
 
     if args.command == "download":
         # Set URL and execute download command
