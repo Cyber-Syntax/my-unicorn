@@ -232,21 +232,21 @@ def create_argument_parser() -> argparse.ArgumentParser:
         epilog="""
 Examples:
 %(prog)s # Interactive mode (default)
-%(prog)s version # Show current version
-%(prog)s version --check # Check for updates
-%(prog)s version --update # Update to latest version
-%(prog)s download https://github.com/johannesjo/super-productivity # Download AppImage from URL
+%(prog)s version # Show current version for my-unicorn
+%(prog)s version --check # Check for updates for my-unicorn
+%(prog)s version --update # Update my-unicorn
+%(prog)s download https://github.com/johannesjo/super-productivity
 %(prog)s catalog # List available AppImages on catalog
 %(prog)s install joplin # Install AppImage from catalog
 %(prog)s update --all # Update all AppImages
-%(prog)s update --select joplin,super-productivity # Update specific AppImages by name
+%(prog)s update --select joplin,super-productivity
 %(prog)s update --select # Interactive selection mode
-%(prog)s token --save # Save GitHub token to keyring
-%(prog)s token --remove # Remove GitHub token
+%(prog)s token --save
+%(prog)s token --remove
 %(prog)s token --check # Check GitHub API rate limits
-%(prog)s token --expiration # View token expiration details
-%(prog)s token --storage # View storage details
-%(prog)s token --rotate # Rotate token
+%(prog)s token --expiration
+%(prog)s token --storage
+%(prog)s token --rotate
 %(prog)s migrate --clean # Migrate configuration files
 %(prog)s migrate --force # Migrate configuration without confirmation
 """,
@@ -256,7 +256,7 @@ Examples:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Version command
-    version_parser = subparsers.add_parser("version", help="Display version and manage updates")
+    version_parser = subparsers.add_parser("version", help="Display version and manage updates for my-unicorn")
     version_cmd = VersionCommand()
     version_cmd.add_arguments(version_parser)
 
@@ -279,7 +279,8 @@ Examples:
         "--select",
         nargs="?",
         const=True,
-        help="Select apps to update interactively or provide comma-separated app names (e.g., --select joplin,obsidian)",
+        help="Select apps to update interactively or provide comma-separated app names"
+        "Example: my-unicorn update --select joplin,obsidian ",
     )
 
     # Token command

@@ -2,7 +2,7 @@
 All notable changes to this project will be documented in this file.
 
 ## v0.12.1-alpha
-### BREAKING CHANGES
+### Changed
 This release fixes the cli command issues.
 
 ## v0.12.0-alpha
