@@ -255,7 +255,8 @@ def perform_update() -> bool:
         logger.info(f"Copying code + scripts into {INSTALL_DIR}")
         INSTALL_DIR.mkdir(parents=True, exist_ok=True)
 
-        for name in ("my_unicorn", "scripts"):
+        # Copy over the package code, scripts, and pyproject.toml
+        for name in ("my_unicorn", "scripts", "pyproject.toml"):
             src = source_dir / name
             dst = INSTALL_DIR / name
 
