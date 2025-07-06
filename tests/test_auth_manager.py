@@ -53,7 +53,6 @@ class TestGitHubAuthManager:
         GitHubAuthManager._rate_limit_cache = {}
         GitHubAuthManager._rate_limit_cache_time = 0
         GitHubAuthManager._request_count_since_cache = 0
-        GitHubAuthManager._audit_enabled = True
         yield
         # Reset again after test
         GitHubAuthManager._cached_headers = None
@@ -62,7 +61,6 @@ class TestGitHubAuthManager:
         GitHubAuthManager._rate_limit_cache = {}
         GitHubAuthManager._rate_limit_cache_time = 0
         GitHubAuthManager._request_count_since_cache = 0
-        GitHubAuthManager._audit_enabled = True
 
     @pytest.fixture
     def mock_token_manager(self, monkeypatch):
@@ -511,17 +509,6 @@ class TestGitHubAuthManager:
 
         # Verify clear_session was called for auth failure retry
         mock_clear_session.assert_called_once()
-
-    def test_set_audit_enabled(self, reset_class_state):
-        """Test set_audit_enabled changes audit setting."""
-        # Setup
-        GitHubAuthManager._audit_enabled = True
-
-        # Execute
-        GitHubAuthManager.set_audit_enabled(False)
-
-        # Verify
-        assert GitHubAuthManager._audit_enabled is False
 
     @patch("my_unicorn.auth_manager.datetime")
     def test_get_token_info(self, mock_datetime, reset_class_state, mock_token_manager):

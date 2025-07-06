@@ -81,7 +81,6 @@ class ReleaseManager:
             api_url,
             headers=headers,
             timeout=30,
-            audit_action="fetch_latest_stable_release_raw",
         )
 
         if response.status_code == 200:  # HTTP_OK

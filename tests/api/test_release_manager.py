@@ -40,7 +40,6 @@ class TestReleaseManager:
                 f"https://api.github.com/repos/{release_manager_instance.owner}/{release_manager_instance.repo}/releases/latest",
                 headers=headers,
                 timeout=30,
-                audit_action="fetch_latest_stable_release_raw",
             )
 
     def test_get_latest_release_data_fallback_to_all_releases(
@@ -74,7 +73,6 @@ class TestReleaseManager:
                 f"https://api.github.com/repos/{release_manager_instance.owner}/{release_manager_instance.repo}/releases/latest",
                 headers=headers,
                 timeout=30,
-                audit_action="fetch_latest_stable_release_raw",
             )
             # Check second call (to /releases)
             mock_auth_request.assert_any_call(
@@ -82,7 +80,6 @@ class TestReleaseManager:
                 f"https://api.github.com/repos/{release_manager_instance.owner}/{release_manager_instance.repo}/releases",
                 headers=headers,
                 timeout=30,
-                audit_action="fetch_all_releases_for_fallback",
             )
 
     def test_get_latest_release_data_fallback_no_releases_at_all(
