@@ -5,15 +5,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.api.assets import ReleaseInfo  # Added import for type hint
-from src.api.github_api import GitHubAPI
-from src.utils import (
+from my_unicorn.api.assets import ReleaseInfo  # Added import for type hint
+from my_unicorn.api.github_api import GitHubAPI
+from my_unicorn.utils import (
     arch_extraction,  # Added import for extract_arch_from_filename
     version_utils,  # Added import
 )
 
 # ReleaseManager might be needed for type hinting if we mock its instance
-# from src.api.release_manager import ReleaseManager
+# from my_unicorn.api.release_manager import ReleaseManager
 
 
 @pytest.fixture
@@ -25,11 +25,11 @@ def github_api_instance() -> GitHubAPI:
 
     """
     with patch(
-        "src.api.github_api.GitHubAuthManager.get_auth_headers", return_value={"User-Agent": "test"}
+        "my_unicorn.api.github_api.GitHubAuthManager.get_auth_headers", return_value={"User-Agent": "test"}
     ):
-        with patch("src.api.github_api.IconManager") as mock_icon_manager:
+        with patch("my_unicorn.api.github_api.IconManager") as mock_icon_manager:
             # Mock the ReleaseManager that GitHubAPI instantiates
-            with patch("src.api.github_api.ReleaseManager") as mock_release_manager_class:
+            with patch("my_unicorn.api.github_api.ReleaseManager") as mock_release_manager_class:
                 # Configure the instance that will be created
                 mock_rm_instance = MagicMock()
                 mock_release_manager_class.return_value = mock_rm_instance
@@ -186,7 +186,7 @@ class TestGitHubAPIDirect:
         ):
             # Mock the ReleaseProcessor's compare_versions method
             with patch(
-                "src.api.github_api.ReleaseProcessor.compare_versions",
+                "my_unicorn.api.github_api.ReleaseProcessor.compare_versions",
                 return_value=(True, "1.0.0", "1.2.3"),
             ) as mock_compare:
                 # Simulate that _process_release has populated necessary attributes
@@ -211,7 +211,7 @@ class TestGitHubAPIDirect:
                 # ... other attributes of _release_info if needed by ReleaseProcessor.compare_versions
 
                 # Mock the ReleaseProcessor instance used within check_latest_version
-                with patch("src.api.github_api.ReleaseProcessor") as mock_rp_class:
+                with patch("my_unicorn.api.github_api.ReleaseProcessor") as mock_rp_class:
                     mock_rp_instance = MagicMock()
                     mock_rp_class.return_value = mock_rp_instance
 
@@ -253,7 +253,7 @@ class TestGitHubAPIDirect:
         with patch.object(
             github_api_instance, "get_latest_release", return_value=(True, mock_release_data)
         ):
-            with patch("src.api.github_api.ReleaseProcessor") as mock_rp_class:
+            with patch("my_unicorn.api.github_api.ReleaseProcessor") as mock_rp_class:
                 mock_rp_instance = MagicMock()
                 mock_rp_class.return_value = mock_rp_instance
                 # Mock compare_versions to indicate no update
@@ -312,7 +312,7 @@ class TestGitHubAPIDirect:
         with patch.object(
             github_api_instance, "get_latest_release", return_value=(True, mock_release_data)
         ):
-            with patch("src.api.github_api.ReleaseProcessor") as mock_rp_class:
+            with patch("my_unicorn.api.github_api.ReleaseProcessor") as mock_rp_class:
                 mock_rp_instance = MagicMock()
                 mock_rp_class.return_value = mock_rp_instance
                 mock_rp_instance.compare_versions.side_effect = Exception("RP Error")
@@ -354,9 +354,9 @@ class TestGitHubAPIDirect:
 
     def test_refresh_auth(self, github_api_instance: GitHubAPI) -> None:
         """Test refreshing authentication headers."""
-        with patch("src.api.github_api.GitHubAuthManager.clear_cached_headers") as mock_clear:
+        with patch("my_unicorn.api.github_api.GitHubAuthManager.clear_cached_headers") as mock_clear:
             with patch(
-                "src.api.github_api.GitHubAuthManager.get_auth_headers",
+                "my_unicorn.api.github_api.GitHubAuthManager.get_auth_headers",
                 return_value={"New": "Headers"},
             ) as mock_get:
                 github_api_instance.refresh_auth()
@@ -376,8 +376,8 @@ class TestGitHubAPIDirect:
         """
         # Mock dependencies of _process_release: AppImageSelector, SHAManager.
         with (
-            patch("src.api.github_api.AppImageSelector") as mock_ais_class,
-            patch("src.api.github_api.SHAManager") as mock_sham_class,
+            patch("my_unicorn.api.github_api.AppImageSelector") as mock_ais_class,
+            patch("my_unicorn.api.github_api.SHAManager") as mock_sham_class,
         ):  # mock_sham_class is the patcher object
             mock_ais_instance = MagicMock()
             mock_sham_instance = MagicMock()  # This will be the instance returned by SHAManager()
@@ -388,7 +388,7 @@ class TestGitHubAPIDirect:
             )
 
             # Configure AppImageSelector mock
-            from src.api.selector import AssetSelectionResult
+            from my_unicorn.api.selector import AssetSelectionResult
 
             appimage_filename_for_test = "app-x86_64.AppImage"
             asset_dict = {
@@ -471,9 +471,9 @@ class TestGitHubAPIDirect:
     ) -> None:
         """Test _process_release when AppImageSelector finds no AppImage."""
         with (
-            patch("src.api.github_api.AppImageSelector") as mock_ais_class,
-            patch("src.api.github_api.SHAManager"),
-            patch("src.api.github_api.ReleaseProcessor") as mock_rp_class_for_process_release,
+            patch("my_unicorn.api.github_api.AppImageSelector") as mock_ais_class,
+            patch("my_unicorn.api.github_api.SHAManager"),
+            patch("my_unicorn.api.github_api.ReleaseProcessor") as mock_rp_class_for_process_release,
         ):  # Patch class used by _process_release
             mock_ais_instance = MagicMock()
             mock_ais_class.return_value = mock_ais_instance

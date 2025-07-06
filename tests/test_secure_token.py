@@ -34,7 +34,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Import constants directly
-from src.utils.datetime_utils import parse_timestamp, format_timestamp
+from my_unicorn.utils.datetime_utils import parse_timestamp, format_timestamp
 
 # We'll access SecureTokenManager through fixtures and patches instead of importing directly
 # This avoids import issues when running in the global test context
@@ -43,7 +43,7 @@ from src.utils.datetime_utils import parse_timestamp, format_timestamp
 DEFAULT_TOKEN_EXPIRATION_DAYS = 90  # Match the value in secure_token.py
 
 # Disable logging during tests to prevent token exposure in logs
-logging.getLogger("src.secure_token").setLevel(logging.CRITICAL)
+logging.getLogger("my_unicorn.secure_token").setLevel(logging.CRITICAL)
 
 # Safe mock token value used throughout tests
 SAFE_MOCK_TOKEN = "ghp_mocktokenfortesting123456789abcdefghijklmnopq"
@@ -53,15 +53,15 @@ SAFE_MOCK_TOKEN = "ghp_mocktokenfortesting123456789abcdefghijklmnopq"
 def secure_token_manager(monkeypatch):
     """Fixture to provide access to the SecureTokenManager class."""
     # Import the module here to avoid import issues at module level
-    import src.secure_token
+    import my_unicorn.secure_token
 
-    return src.secure_token.SecureTokenManager
+    return my_unicorn.secure_token.SecureTokenManager
 
 
 def monkeypatch_path_exists():
     """Helper function to patch Path.exists() methods for tests."""
     return patch.multiple(
-        "src.secure_token",
+        "my_unicorn.secure_token",
         **{"TOKEN_FILE.exists.return_value": True, "TOKEN_METADATA_FILE.exists.return_value": True},
     )
 
@@ -69,8 +69,8 @@ def monkeypatch_path_exists():
 @pytest.fixture(autouse=True)
 def set_consts(monkeypatch):
     # override constants via monkeypatch, not via patch()
-    monkeypatch.setattr("src.secure_token.KEYRING_AVAILABLE", False)
-    monkeypatch.setattr("src.secure_token.CRYPTO_AVAILABLE", True)
+    monkeypatch.setattr("my_unicorn.secure_token.KEYRING_AVAILABLE", False)
+    monkeypatch.setattr("my_unicorn.secure_token.CRYPTO_AVAILABLE", True)
 
 
 class TestSecureTokenManager:
@@ -86,11 +86,11 @@ class TestSecureTokenManager:
         mock_token_metadata_file.exists.return_value = True
 
         # Patch the TOKEN_FILE and TOKEN_METADATA_FILE attributes with our mock objects
-        monkeypatch.setattr("src.secure_token.TOKEN_FILE", mock_token_file)
-        monkeypatch.setattr("src.secure_token.TOKEN_METADATA_FILE", mock_token_metadata_file)
+        monkeypatch.setattr("my_unicorn.secure_token.TOKEN_FILE", mock_token_file)
+        monkeypatch.setattr("my_unicorn.secure_token.TOKEN_METADATA_FILE", mock_token_metadata_file)
 
         # Disable keyring for this test
-        monkeypatch.setattr("src.secure_token.KEYRING_AVAILABLE", False)
+        monkeypatch.setattr("my_unicorn.secure_token.KEYRING_AVAILABLE", False)
 
         # Mock os.remove
         with patch("os.remove") as mock_remove:
@@ -112,17 +112,17 @@ class TestSecureTokenManager:
         mock_token_metadata_file.exists.return_value = True
 
         # Patch the TOKEN_FILE and TOKEN_METADATA_FILE attributes with our mock objects
-        monkeypatch.setattr("src.secure_token.TOKEN_FILE", mock_token_file)
-        monkeypatch.setattr("src.secure_token.TOKEN_METADATA_FILE", mock_token_metadata_file)
+        monkeypatch.setattr("my_unicorn.secure_token.TOKEN_FILE", mock_token_file)
+        monkeypatch.setattr("my_unicorn.secure_token.TOKEN_METADATA_FILE", mock_token_metadata_file)
 
         # Patch other dependencies
-        monkeypatch.setattr("src.secure_token.os.path.exists", lambda *args: True)
-        monkeypatch.setattr("src.secure_token.KEYRING_AVAILABLE", False)
-        monkeypatch.setattr("src.secure_token.CRYPTO_AVAILABLE", True)
+        monkeypatch.setattr("my_unicorn.secure_token.os.path.exists", lambda *args: True)
+        monkeypatch.setattr("my_unicorn.secure_token.KEYRING_AVAILABLE", False)
+        monkeypatch.setattr("my_unicorn.secure_token.CRYPTO_AVAILABLE", True)
 
         # Mock the encryption key retrieval
         mock_get_key = MagicMock(return_value=b"test_key")
-        monkeypatch.setattr("src.secure_token.SecureTokenManager._get_encryption_key", mock_get_key)
+        monkeypatch.setattr("my_unicorn.secure_token.SecureTokenManager._get_encryption_key", mock_get_key)
 
         # Mock the file reading
         mock_file = mock_open(read_data=b"encrypted_mock_token")
@@ -135,13 +135,13 @@ class TestSecureTokenManager:
             "expires_at": (datetime.now() + timedelta(days=30)).timestamp(),
         }
         mock_json_load = MagicMock(return_value=metadata)
-        monkeypatch.setattr("src.secure_token.json.load", mock_json_load)
+        monkeypatch.setattr("my_unicorn.secure_token.json.load", mock_json_load)
 
         # Mock Fernet for decryption
         mock_fernet = MagicMock()
         mock_fernet.decrypt.return_value = SAFE_MOCK_TOKEN.encode("utf-8")
         mock_fernet_class = MagicMock(return_value=mock_fernet)
-        monkeypatch.setattr("src.secure_token.Fernet", mock_fernet_class)
+        monkeypatch.setattr("my_unicorn.secure_token.Fernet", mock_fernet_class)
 
         # Execute
         token = secure_token_manager.get_token()
@@ -162,17 +162,17 @@ class TestSecureTokenManager:
         mock_token_metadata_file.exists.return_value = True
 
         # Patch the TOKEN_FILE and TOKEN_METADATA_FILE attributes with our mock objects
-        monkeypatch.setattr("src.secure_token.TOKEN_FILE", mock_token_file)
-        monkeypatch.setattr("src.secure_token.TOKEN_METADATA_FILE", mock_token_metadata_file)
+        monkeypatch.setattr("my_unicorn.secure_token.TOKEN_FILE", mock_token_file)
+        monkeypatch.setattr("my_unicorn.secure_token.TOKEN_METADATA_FILE", mock_token_metadata_file)
 
         # Patch other dependencies
-        monkeypatch.setattr("src.secure_token.os.path.exists", lambda *args: True)
-        monkeypatch.setattr("src.secure_token.KEYRING_AVAILABLE", False)
-        monkeypatch.setattr("src.secure_token.CRYPTO_AVAILABLE", True)
+        monkeypatch.setattr("my_unicorn.secure_token.os.path.exists", lambda *args: True)
+        monkeypatch.setattr("my_unicorn.secure_token.KEYRING_AVAILABLE", False)
+        monkeypatch.setattr("my_unicorn.secure_token.CRYPTO_AVAILABLE", True)
 
         # Mock the encryption key retrieval
         mock_get_key = MagicMock(return_value=b"test_key")
-        monkeypatch.setattr("src.secure_token.SecureTokenManager._get_encryption_key", mock_get_key)
+        monkeypatch.setattr("my_unicorn.secure_token.SecureTokenManager._get_encryption_key", mock_get_key)
 
         # Mock the file reading
         mock_file = mock_open(read_data=b"encrypted_mock_token")
@@ -185,13 +185,13 @@ class TestSecureTokenManager:
             "expires_at": (datetime.now() - timedelta(days=1)).timestamp(),
         }
         mock_json_load = MagicMock(return_value=metadata)
-        monkeypatch.setattr("src.secure_token.json.load", mock_json_load)
+        monkeypatch.setattr("my_unicorn.secure_token.json.load", mock_json_load)
 
         # Mock Fernet for decryption
         mock_fernet = MagicMock()
         mock_fernet.decrypt.return_value = SAFE_MOCK_TOKEN.encode("utf-8")
         mock_fernet_class = MagicMock(return_value=mock_fernet)
-        monkeypatch.setattr("src.secure_token.Fernet", mock_fernet_class)
+        monkeypatch.setattr("my_unicorn.secure_token.Fernet", mock_fernet_class)
 
         # Execute
         token = secure_token_manager.get_token(validate_expiration=True)
@@ -202,11 +202,11 @@ class TestSecureTokenManager:
     @patch("os.replace")
     @patch("os.chmod")
     @patch("builtins.open", new_callable=mock_open)
-    @patch("src.secure_token.json.dump")
-    @patch("src.secure_token.os.makedirs")
-    @patch("src.secure_token.SecureTokenManager._get_encryption_key")
-    @patch("src.secure_token.TOKEN_FILE")
-    @patch("src.secure_token.TOKEN_METADATA_FILE")
+    @patch("my_unicorn.secure_token.json.dump")
+    @patch("my_unicorn.secure_token.os.makedirs")
+    @patch("my_unicorn.secure_token.SecureTokenManager._get_encryption_key")
+    @patch("my_unicorn.secure_token.TOKEN_FILE")
+    @patch("my_unicorn.secure_token.TOKEN_METADATA_FILE")
     def test_save_token(
         self,
         mock_token_metadata_file,
@@ -229,14 +229,14 @@ class TestSecureTokenManager:
 
         # Arrange: stub encryption key and Fernet
         mock_get_key.return_value = b"test_key"
-        with patch("src.secure_token.Fernet") as mock_fernet_class:
+        with patch("my_unicorn.secure_token.Fernet") as mock_fernet_class:
             inst = MagicMock()
             inst.encrypt.return_value = b"encrypted"
             mock_fernet_class.return_value = inst
 
             # Act
-            with patch("src.secure_token.CRYPTO_AVAILABLE", True):
-                with patch("src.secure_token.KEYRING_AVAILABLE", False):
+            with patch("my_unicorn.secure_token.CRYPTO_AVAILABLE", True):
+                with patch("my_unicorn.secure_token.KEYRING_AVAILABLE", False):
                     ok = secure_token_manager.save_token(
                         SAFE_MOCK_TOKEN,
                         expires_in_days=30,

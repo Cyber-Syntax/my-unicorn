@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from src.utils.arch_utils import (
+from my_unicorn.utils.arch_utils import (
     get_arch_keywords,
     get_incompatible_archs,
     extract_arch_from_filename,

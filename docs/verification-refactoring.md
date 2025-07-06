@@ -137,7 +137,7 @@ Individual components can be reused in different contexts or combined in new way
 
 The refactoring maintains full backwards compatibility:
 
-- The original `src.verify.VerificationManager` import still works
+- The original `my_unicorn.verify.VerificationManager` import still works
 - All public methods and their signatures remain unchanged
 - Constants like `SUPPORTED_checksum_hash_typeS`, `STATUS_SUCCESS`, and `STATUS_FAIL` are still available
 - Existing code using the verification system requires no changes
@@ -148,10 +148,10 @@ Existing code continues to work without modification:
 
 ```python
 # Old way (still works)
-from src.verify import VerificationManager
+from my_unicorn.verify import VerificationManager
 
 # New way (recommended for new code)
-from src.verification import VerificationManager
+from my_unicorn.verification import VerificationManager
 ```
 
 ## Testing

@@ -3,7 +3,7 @@
 
 import pytest
 
-from src.utils.checksums.parser import parse_checksums_from_description
+from my_unicorn.utils.checksums.parser import parse_checksums_from_description
 
 
 class TestChecksumParser:

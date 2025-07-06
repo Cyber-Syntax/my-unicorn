@@ -2,8 +2,8 @@ import time
 
 import pytest
 
-from src.appimage_progress import AppImageProgressMeter, format_number
-from src.progress_manager import (
+from my_unicorn.progress import AppImageProgressMeter, format_number
+from my_unicorn.progress_manager import (
     BasicProgressBar,
     DynamicProgressManager,
     ProgressManager,
@@ -66,7 +66,7 @@ def test_format_number():
     assert format_number(5 * 1024 * 1024) == "5.0 MB"
 
 
-def test_appimage_progress_meter_basic():
+def test_progress_meter_basic():
     import io
 
     # Use StringIO to capture output instead of stderr
@@ -98,7 +98,7 @@ def test_appimage_progress_meter_basic():
     assert meter.downloads["dl2"]["status"] == "completed"
 
 
-def test_appimage_progress_meter_failed_download():
+def test_progress_meter_failed_download():
     import io
 
     output = io.StringIO()

@@ -9,8 +9,8 @@ from unittest.mock import patch, MagicMock, mock_open
 import json
 import os
 
-from src.commands.migrate_config import MigrateConfigCommand
-from src.config_migrator import ConfigMigrator
+from my_unicorn.commands.migrate_config import MigrateConfigCommand
+from my_unicorn.config_migrator import ConfigMigrator
 
 
 class TestMigrateConfigCommand(unittest.TestCase):
@@ -37,8 +37,8 @@ class TestMigrateConfigCommand(unittest.TestCase):
             "app_configs": {"migrated_count": 0, "details": {}},
         }
 
-    @patch("src.commands.migrate_config.ConfigMigrator")
-    @patch("src.commands.migrate_config.os.path.isfile")
+    @patch("my_unicorn.commands.migrate_config.ConfigMigrator")
+    @patch("my_unicorn.commands.migrate_config.os.path.isfile")
     @patch("builtins.open", new_callable=mock_open)
     @patch("json.load")
     @patch("builtins.print")
@@ -79,8 +79,8 @@ class TestMigrateConfigCommand(unittest.TestCase):
             )
         )
 
-    @patch("src.commands.migrate_config.ConfigMigrator")
-    @patch("src.commands.migrate_config.os.path.isfile")
+    @patch("my_unicorn.commands.migrate_config.ConfigMigrator")
+    @patch("my_unicorn.commands.migrate_config.os.path.isfile")
     @patch("builtins.print")
     def test_execute_with_nonexistent_config(self, mock_print, mock_isfile, mock_config_migrator):
         """Test execute method when config file doesn't exist yet."""
@@ -106,8 +106,8 @@ class TestMigrateConfigCommand(unittest.TestCase):
             )
         )
 
-    @patch("src.commands.migrate_config.ConfigMigrator")
-    @patch("src.commands.migrate_config.os.path.isfile")
+    @patch("my_unicorn.commands.migrate_config.ConfigMigrator")
+    @patch("my_unicorn.commands.migrate_config.os.path.isfile")
     @patch("builtins.open", new_callable=mock_open)
     @patch("json.load")
     @patch("builtins.print")
@@ -144,8 +144,8 @@ class TestMigrateConfigCommand(unittest.TestCase):
             )
         )
 
-    @patch("src.commands.migrate_config.ConfigMigrator")
-    @patch("src.commands.migrate_config.os.path.isfile")
+    @patch("my_unicorn.commands.migrate_config.ConfigMigrator")
+    @patch("my_unicorn.commands.migrate_config.os.path.isfile")
     @patch("builtins.open", new_callable=mock_open)
     @patch("json.load")
     @patch("builtins.print")

@@ -18,14 +18,14 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Import the module directly to avoid import issues
-import src.utils.icon_paths
-from src.utils.icon_paths import get_icon_paths, get_icon_path, get_icon_filename
+import my_unicorn.utils.icon_paths
+from my_unicorn.utils.icon_paths import get_icon_paths, get_icon_path, get_icon_filename
 
 
 # Use a function to access ICON_PATHS to avoid direct import issues in global test runs
 def get_icon_paths_map() -> tuple[str, Any]:
     """Get the ICON_PATHS dictionary from the module."""
-    return src.utils.icon_paths.ICON_PATHS
+    return my_unicorn.utils.icon_paths.ICON_PATHS
 
 
 class TestGetIconPaths:

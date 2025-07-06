@@ -7,7 +7,7 @@ import pytest
 
 from api.assets import ReleaseInfo
 from api.release_processor import ReleaseProcessor
-from src.api.github_api import GitHubAPI
+from my_unicorn.api.github_api import GitHubAPI
 
 
 @pytest.fixture
@@ -171,16 +171,16 @@ def test_release_processor_create_update_response(release_processor, mock_releas
 def test_github_api_refactored(mock_release_data):
     """Test the refactored GitHubAPI class."""
     with patch(
-        "src.api.github_api.GitHubAuthManager.get_auth_headers", return_value={"User-Agent": "test"}
+        "my_unicorn.api.github_api.GitHubAuthManager.get_auth_headers", return_value={"User-Agent": "test"}
     ):
-        with patch("src.api.github_api.IconManager"):
+        with patch("my_unicorn.api.github_api.IconManager"):
             github_api = GitHubAPI(owner="test-owner", repo="test-repo")
 
             # Mock get_response to return our test data
             with patch.object(github_api, "get_response", return_value=(True, mock_release_data)):
                 # Test check_latest_version with the refactored implementation
                 with patch(
-                    "src.release_processor.ReleaseProcessor.compare_versions"
+                    "my_unicorn.release_processor.ReleaseProcessor.compare_versions"
                 ) as mock_compare:
                     mock_compare.return_value = (
                         True,

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 # Now import the IconManager under test
-from src.icon_manager import IconManager
+from my_unicorn.icon_manager import IconManager
 
 # --- Setup dummy src package modules so IconManager imports succeed ---
 
@@ -15,30 +15,30 @@ from src.icon_manager import IconManager
 src = types.ModuleType("src")
 sys.modules["src"] = src
 
-# Create src.utils package
-utils_pkg = types.ModuleType("src.utils")
-src.utils = utils_pkg
-sys.modules["src.utils"] = utils_pkg
+# Create my_unicorn.utils package
+utils_pkg = types.ModuleType("my_unicorn.utils")
+my_unicorn.utils = utils_pkg
+sys.modules["my_unicorn.utils"] = utils_pkg
 
-# Create src.utils.icon_paths with stubs for our functions
-icon_paths_mod = types.ModuleType("src.utils.icon_paths")
+# Create my_unicorn.utils.icon_paths with stubs for our functions
+icon_paths_mod = types.ModuleType("my_unicorn.utils.icon_paths")
 # Default get_icon_paths returns None; individual tests can monkeypatch this
 icon_paths_mod.get_icon_paths = lambda key: None
 icon_paths_mod.get_icon_path = lambda key: None
 icon_paths_mod.get_icon_filename = lambda key: None
 utils_pkg.icon_paths = icon_paths_mod
-sys.modules["src.utils.icon_paths"] = icon_paths_mod
+sys.modules["my_unicorn.utils.icon_paths"] = icon_paths_mod
 
-# Create src.secure_token module for tests that need to mock it
-secure_token_mod = types.ModuleType("src.secure_token")
+# Create my_unicorn.secure_token module for tests that need to mock it
+secure_token_mod = types.ModuleType("my_unicorn.secure_token")
 secure_token_mod.KEYRING_AVAILABLE = False
 secure_token_mod.CRYPTO_AVAILABLE = False
 secure_token_mod.DEFAULT_TOKEN_EXPIRATION_DAYS = 30
-src.secure_token = secure_token_mod
-sys.modules["src.secure_token"] = secure_token_mod
+my_unicorn.secure_token = secure_token_mod
+sys.modules["my_unicorn.secure_token"] = secure_token_mod
 
-# Create src.auth_manager with GitHubAuthManager stub
-auth_mod = types.ModuleType("src.auth_manager")
+# Create my_unicorn.auth_manager with GitHubAuthManager stub
+auth_mod = types.ModuleType("my_unicorn.auth_manager")
 
 
 class DummyGitHubAuthManager:
@@ -94,11 +94,11 @@ auth_mod.SecureTokenManager = types.SimpleNamespace()  # Add placeholder for Sec
 auth_mod.CACHE_DIR = "/tmp/cache"  # Add CACHE_DIR constant
 auth_mod.requests = types.SimpleNamespace()  # Add requests module placeholder
 auth_mod.os = os  # Add os module reference
-src.auth_manager = auth_mod
-sys.modules["src.auth_manager"] = auth_mod
+my_unicorn.auth_manager = auth_mod
+sys.modules["my_unicorn.auth_manager"] = auth_mod
 
-# Create src.app_config with AppConfigManager stub
-app_config_mod = types.ModuleType("src.app_config")
+# Create my_unicorn.app_config with AppConfigManager stub
+app_config_mod = types.ModuleType("my_unicorn.app_config")
 
 
 class DummyAppConfigManager:
@@ -112,17 +112,17 @@ class DummyAppConfigManager:
 
 
 app_config_mod.AppConfigManager = DummyAppConfigManager
-src.app_config = app_config_mod
-sys.modules["src.app_config"] = app_config_mod
+my_unicorn.app_config = app_config_mod
+sys.modules["my_unicorn.app_config"] = app_config_mod
 
-# Create src.catalog with get_app_rename_for_owner_repo
-app_catalog_mod = types.ModuleType("src.catalog")
+# Create my_unicorn.catalog with get_app_rename_for_owner_repo
+app_catalog_mod = types.ModuleType("my_unicorn.catalog")
 app_catalog_mod.get_app_rename_for_owner_repo = (
     lambda owner, repo: repo
 )  # Simply return repo as app_rename
 app_catalog_mod.AppInfo = types.SimpleNamespace  # Add AppInfo class placeholder
-src.catalog = app_catalog_mod
-sys.modules["src.catalog"] = app_catalog_mod
+my_unicorn.catalog = app_catalog_mod
+sys.modules["my_unicorn.catalog"] = app_catalog_mod
 
 # Override IconManager._check_icon_path to properly track paths
 original_check_icon_path = IconManager._check_icon_path

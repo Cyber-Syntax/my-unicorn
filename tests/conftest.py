@@ -28,8 +28,8 @@ def pytest_configure(config):
 
 
 # Now import after the path setup
-from src.progress_manager import DynamicProgressManager
-from src.secure_token import (
+from my_unicorn.progress_manager import DynamicProgressManager
+from my_unicorn.secure_token import (
     SecureTokenManager,
     DEFAULT_TOKEN_EXPIRATION_DAYS,
 )
@@ -164,8 +164,8 @@ def simulated_time() -> Generator[None, None, None]:
 @pytest.fixture(autouse=True)
 def reset_env(monkeypatch):
     # ensure keyring and crypto paths are disabled by default
-    monkeypatch.setattr("src.secure_token.KEYRING_AVAILABLE", False)
-    monkeypatch.setattr("src.secure_token.CRYPTO_AVAILABLE", False)
+    monkeypatch.setattr("my_unicorn.secure_token.KEYRING_AVAILABLE", False)
+    monkeypatch.setattr("my_unicorn.secure_token.CRYPTO_AVAILABLE", False)
     yield
 
 
@@ -191,5 +191,5 @@ def past_metadata():
 
 @pytest.fixture(autouse=True)
 def set_consts(monkeypatch):
-    monkeypatch.setattr("src.secure_token.KEYRING_AVAILABLE", False)
-    monkeypatch.setattr("src.secure_token.CRYPTO_AVAILABLE", True)
+    monkeypatch.setattr("my_unicorn.secure_token.KEYRING_AVAILABLE", False)
+    monkeypatch.setattr("my_unicorn.secure_token.CRYPTO_AVAILABLE", True)

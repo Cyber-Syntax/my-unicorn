@@ -7,10 +7,10 @@ updating multiple AppImages concurrently using async I/O operations.
 
 import pytest
 
-from src.auth_manager import GitHubAuthManager
+from my_unicorn.auth_manager import GitHubAuthManager
 
 # Import the classes to test
-from src.commands.update_all_async import UpdateAsyncCommand
+from my_unicorn.commands.update_all_async import UpdateAsyncCommand
 
 
 class DummyApp:

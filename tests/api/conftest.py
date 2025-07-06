@@ -6,7 +6,7 @@ from typing import Any
 # It's good practice to keep imports specific to where they are used,
 # but for conftest, direct imports for types used in fixtures are common.
 # If ReleaseInfo is only used in one fixture, it could be imported there.
-from src.api.assets import ReleaseInfo
+from my_unicorn.api.assets import ReleaseInfo
 
 
 @pytest.fixture
@@ -118,7 +118,7 @@ def mock_release_info_fixture() -> "ReleaseInfo":  # Renamed to avoid conflict i
 
     """
     # Import locally if preferred, or keep at top if used by multiple fixtures
-    # from src.api.assets import ReleaseInfo
+    # from my_unicorn.api.assets import ReleaseInfo
 
     return ReleaseInfo(
         owner="test-owner",

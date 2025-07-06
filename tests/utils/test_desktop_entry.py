@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.utils.desktop_entry import (
+from my_unicorn.utils.desktop_entry import (
     DEFAULT_CATEGORIES,
     DESKTOP_ENTRY_DIR,
     DESKTOP_ENTRY_FILE_MODE,

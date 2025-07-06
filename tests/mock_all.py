@@ -9,20 +9,20 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.api.github_api import GitHubAPI
-from src.commands.install_url import DownloadCommand
+from my_unicorn.api.github_api import GitHubAPI
+from my_unicorn.commands.install_url import DownloadCommand
 
 
 class TestIntegrationDownloadFlow(unittest.TestCase):
     @patch("builtins.input")
-    @patch("src.download.DownloadManager.download")
-    @patch("src.verify.VerificationManager.verify_appimage", return_value=True)
-    @patch("src.file_handler.FileHandler.handle_appimage_operations", return_value=True)
-    @patch("src.app_config.AppConfigManager.ask_sha_hash", return_value=("test.sha256", "sha256"))
-    @patch("src.api.github_api.GitHubAPI.get_response")
-    @patch("src.app_config.AppConfigManager.temp_save_config")
-    @patch("src.app_config.AppConfigManager.save_config")
-    @patch("src.global_config.GlobalConfigManager.load_config")
+    @patch("my_unicorn.download.DownloadManager.download")
+    @patch("my_unicorn.verify.VerificationManager.verify_appimage", return_value=True)
+    @patch("my_unicorn.file_handler.FileHandler.handle_appimage_operations", return_value=True)
+    @patch("my_unicorn.app_config.AppConfigManager.ask_sha_hash", return_value=("test.sha256", "sha256"))
+    @patch("my_unicorn.api.github_api.GitHubAPI.get_response")
+    @patch("my_unicorn.app_config.AppConfigManager.temp_save_config")
+    @patch("my_unicorn.app_config.AppConfigManager.save_config")
+    @patch("my_unicorn.global_config.GlobalConfigManager.load_config")
     def test_full_flow(
         self,
         mock_gc_load,

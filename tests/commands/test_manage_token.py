@@ -25,14 +25,14 @@ if TYPE_CHECKING:
     from pytest_mock.plugin import MockerFixture
 
 # Import the module to test
-from src.commands.manage_token import ManageTokenCommand
-from src.secure_token import SecureTokenManager
-from src.auth_manager import GitHubAuthManager
+from my_unicorn.commands.manage_token import ManageTokenCommand
+from my_unicorn.secure_token import SecureTokenManager
+from my_unicorn.auth_manager import GitHubAuthManager
 
 # Disable logging during tests to prevent token exposure
-logging.getLogger("src.commands.manage_token").setLevel(logging.CRITICAL)
-logging.getLogger("src.secure_token").setLevel(logging.CRITICAL)
-logging.getLogger("src.auth_manager").setLevel(logging.CRITICAL)
+logging.getLogger("my_unicorn.commands.manage_token").setLevel(logging.CRITICAL)
+logging.getLogger("my_unicorn.secure_token").setLevel(logging.CRITICAL)
+logging.getLogger("my_unicorn.auth_manager").setLevel(logging.CRITICAL)
 
 # Safe mock token value used throughout tests
 SAFE_MOCK_TOKEN = "ghp_mocktokenfortesting123456789abcdefghijklmnopq"
@@ -94,7 +94,7 @@ class TestManageTokenCommand:
             }
         ]
 
-        monkeypatch.setattr("src.commands.manage_token.SecureTokenManager", mock_manager)
+        monkeypatch.setattr("my_unicorn.commands.manage_token.SecureTokenManager", mock_manager)
         return mock_manager
 
     @pytest.fixture
@@ -141,7 +141,7 @@ class TestManageTokenCommand:
             },
         )
 
-        monkeypatch.setattr("src.commands.manage_token.GitHubAuthManager", mock_manager)
+        monkeypatch.setattr("my_unicorn.commands.manage_token.GitHubAuthManager", mock_manager)
         return mock_manager
 
     @patch("builtins.print")

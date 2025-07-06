@@ -19,7 +19,7 @@ try:
 except ImportError:
     HYPOTHESIS_AVAILABLE = False
 
-from src.utils.datetime_utils import parse_timestamp, format_timestamp, get_next_hour_timestamp
+from my_unicorn.utils.datetime_utils import parse_timestamp, format_timestamp, get_next_hour_timestamp
 
 
 class TestParseTimestamp:

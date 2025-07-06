@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from src.utils.checksums import (
+from my_unicorn.utils.checksums import (
     ReleaseChecksumExtractor,
     extract_checksums_to_file,
     get_checksums_from_release,
@@ -44,7 +44,7 @@ bcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab  zen-aarch64.A
     @pytest.fixture
     def mock_auth_headers(self):
         """Mock auth headers for GitHub API."""
-        with patch("src.auth_manager.GitHubAuthManager.get_auth_headers") as mock_headers:
+        with patch("my_unicorn.auth_manager.GitHubAuthManager.get_auth_headers") as mock_headers:
             mock_headers.return_value = {"Authorization": "Bearer mock_token"}
             yield mock_headers
 
@@ -93,7 +93,7 @@ bcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab  zen-aarch64.A
             in checksums
         )
 
-    @patch("src.utils.checksums.verification.calculate_file_checksum")
+    @patch("my_unicorn.utils.checksums.verification.calculate_file_checksum")
     def test_handle_release_description_verification_integration(
         self, mock_calc, mock_github_api, mock_auth_headers, test_appimage
     ):
@@ -113,7 +113,7 @@ bcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab  zen-aarch64.A
         mock_calc.assert_called_once()
         mock_github_api.assert_called_once()
 
-    @patch("src.utils.checksums.verification.calculate_file_checksum")
+    @patch("my_unicorn.utils.checksums.verification.calculate_file_checksum")
     def test_handle_release_description_verification_failure_integration(
         self, mock_calc, mock_github_api, mock_auth_headers, test_appimage
     ):
