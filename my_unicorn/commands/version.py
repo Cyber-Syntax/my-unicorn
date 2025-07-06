@@ -100,7 +100,7 @@ class VersionCommand(Command):
         
         # Perform the update
         try:
-            success = perform_update(custom_dir)
+            success = perform_update()
             if success:
                 print("Update completed successfully!")
                 print("Please restart your terminal or run 'source ~/.zshrc' to use the updated version.")
