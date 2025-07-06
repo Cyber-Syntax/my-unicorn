@@ -391,7 +391,7 @@ class BaseUpdateCommand(Command):
 
             # Perform file operations and update config
             if file_handler.handle_appimage_operations(
-                github_api=github_api, icon_path=icon_path if icon_success else None
+                icon_path=icon_path if icon_success else None
             ):
                 app_config.update_version(
                     new_version=github_api.version,

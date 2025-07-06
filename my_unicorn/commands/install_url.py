@@ -265,7 +265,7 @@ class DownloadCommand(Command):
 
         # Check if the file operations were successful
         success = file_handler.handle_appimage_operations(
-            github_api=api, icon_path=icon_path if icon_success else None
+            icon_path=icon_path if icon_success else None
         )
 
         # Clean up progress display
