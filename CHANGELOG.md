@@ -1,7 +1,9 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## v0.12.4-alpha
+## v0.13.0-alpha
+### BREAKING CHANGES
+This release remove compability with kdewallet and salting for the tokens. Tokens are now stored in the gnome keyring only. This is done to simplify the code and improve security. 
 
 ## v0.12.3-alpha
 ### Changed
