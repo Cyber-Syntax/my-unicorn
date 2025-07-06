@@ -63,19 +63,19 @@ class ManageTokenCommand(Command):
                     choice_num = int(choice)
                     if 1 <= choice_num <= 8:
                         if choice_num == 1:
-                            self._save_to_keyring()
+                            self.save_to_keyring()
                         elif choice_num == 2:
-                            self._remove_token()
+                            self.remove_token()
                         elif choice_num == 3:
-                            self._check_rate_limits()
+                            self.check_rate_limits()
                         elif choice_num == 4:
-                            self._view_token_expiration()
+                            self.view_token_expiration()
                         elif choice_num == 5:
-                            self._view_audit_logs()
+                            self.view_audit_logs()
                         elif choice_num == 6:
-                            self._rotate_token()
+                            self.rotate_token()
                         elif choice_num == 7:
-                            self._view_storage_details()
+                            self.view_storage_details()
                         elif choice_num == 8:
                             self._logger.info("Exiting token management")
                             return
@@ -142,6 +142,7 @@ class ManageTokenCommand(Command):
 
         Returns:
             int | None: Number of days until token expiration or None if cancelled
+
         """
         print("\nToken Expiration:")
         print("1. 30 days (recommended for regular tokens)")
@@ -182,7 +183,7 @@ class ManageTokenCommand(Command):
             print("\nOperation cancelled.")
             return None
 
-    def _remove_token(self) -> None:
+    def remove_token(self) -> None:
         """Remove the GitHub token from secure storage.
 
         This removes the token from all potential storage locations.
@@ -211,7 +212,7 @@ class ManageTokenCommand(Command):
         else:
             print("\n❓ No tokens were found to remove or removal failed")
 
-    def _check_rate_limits(self, token: str = None) -> None:
+    def check_rate_limits(self, token: str = None) -> None:
         """Check and display GitHub API rate limits for the current token.
 
         This method makes a direct API call to GitHub to get the most up-to-date
@@ -220,6 +221,7 @@ class ManageTokenCommand(Command):
         Args:
             token: Optional token to use for checking rate limits.
                   If not provided, the stored token will be used.
+
         """
         self._logger.info("Checking GitHub API rate limits directly from API")
         print("\n--- GitHub API Rate Limits ---")
@@ -409,7 +411,7 @@ class ManageTokenCommand(Command):
             print("   Please check your network connection and token validity.")
             print("   Check application logs for more details.")
 
-    def _validate_token(self, token: str) -> bool:
+    def validate_token(self, token: str) -> bool:
         """Validate a GitHub token by testing API access.
 
         This uses GitHubAuthManager for more reliable token validation.
@@ -419,6 +421,7 @@ class ManageTokenCommand(Command):
 
         Returns:
             bool: True if token is valid, False otherwise
+
         """
         print("\nValidating GitHub token...", end="", flush=True)
         self._logger.info("Validating GitHub token")
@@ -463,7 +466,7 @@ class ManageTokenCommand(Command):
             print(f" ❌ Error! {e!s}")
             return False
 
-    def _view_token_expiration(self) -> None:
+    def view_token_expiration(self) -> None:
         """Display detailed information about token expiration."""
         if not SecureTokenManager.token_exists():
             print("\n❌ No token configured")
@@ -538,8 +541,13 @@ class ManageTokenCommand(Command):
                 self._logger.error(f"Error processing last used date: {e}")
                 print("Last used: Unknown")
 
-    def _view_audit_logs(self) -> None:
-        """Display token usage audit logs."""
+    def view_audit_logs(self, interactive: bool = True) -> None:
+        """Display token usage audit logs.
+
+        Args:
+            interactive: If True, prompts user for input. If False, shows all logs directly.
+
+        """
         audit_logs = SecureTokenManager.get_audit_logs()
 
         if not audit_logs:
@@ -579,8 +587,18 @@ class ManageTokenCommand(Command):
 
         # Option to view all logs
         if len(audit_logs) > 10:
-            view_all = input("\nView all logs? (y/n): ")
-            if view_all.lower() == "y":
+            if interactive:
+                try:
+                    view_all = input("\nView all logs? (y/n): ")
+                    show_all = view_all.lower() == "y"
+                except (EOFError, KeyboardInterrupt):
+                    show_all = False
+            else:
+                # In CLI mode, always show all logs
+                show_all = True
+                print(f"\nShowing all {len(audit_logs)} audit log entries:")
+
+            if show_all:
                 print("\nTimestamp            | Action                | Source IP")
                 print("-" * 70)
 
@@ -608,7 +626,7 @@ class ManageTokenCommand(Command):
                             f"{'Error':19} | {log.get('action', 'unknown'):20} | {log.get('source_ip', 'unknown')}"
                         )
 
-    def _rotate_token(self) -> None:
+    def rotate_token(self) -> None:
         """Guide the user through rotating their GitHub token."""
         if not SecureTokenManager.token_exists():
             print("\n❌ No token configured to rotate")
@@ -676,7 +694,7 @@ class ManageTokenCommand(Command):
             print("\n❌ Failed to save new token! Rotation aborted.")
             print("   Make sure you have keyring or cryptography modules installed.")
 
-    def _view_storage_details(self) -> None:
+    def view_storage_details(self) -> None:
         """Display detailed information about the current storage method for the token."""
         if not SecureTokenManager.token_exists():
             print("\n❌ No token configured")
@@ -770,7 +788,7 @@ class ManageTokenCommand(Command):
         print("➤ Use fine-grained access tokens with minimal permissions")
         print("➤ Never share your token or commit it to version control")
 
-    def _save_to_keyring(self) -> None:
+    def save_to_keyring(self) -> None:
         """Save token specifically to the keyring using the keyring library.
 
         This is a simpler approach than the standard save method, directly
@@ -802,7 +820,7 @@ class ManageTokenCommand(Command):
                 return
 
             # Validate the token using GitHubAuthManager for improved validation
-            if not self._validate_token(token):
+            if not self.validate_token(token):
                 logging.error("Invalid GitHub token! _validate_token returned False")
                 print("\n❌ Invalid GitHub token! Token was not saved.")
                 print("   Please make sure you've entered the token correctly.")
@@ -869,7 +887,7 @@ class ManageTokenCommand(Command):
             GitHubAuthManager.set_audit_enabled(True)
 
             # Show current rate limits with the token
-            self._check_rate_limits(token)
+            self.check_rate_limits(token)
         else:
             print("\n❌ Failed to save token to keyring!")
             self._offer_fallback_options()

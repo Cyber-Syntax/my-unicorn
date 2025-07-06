@@ -244,6 +244,10 @@ Examples:
 %(prog)s token --save # Save GitHub token to keyring
 %(prog)s token --remove # Remove GitHub token
 %(prog)s token --check # Check GitHub API rate limits
+%(prog)s token --expiration # View token expiration details
+%(prog)s token --storage # View storage details
+%(prog)s token --audit # View audit logs
+%(prog)s token --rotate # Rotate token
 %(prog)s migrate --clean # Migrate configuration files
 %(prog)s migrate --force # Migrate configuration without confirmation
 """,
@@ -284,6 +288,10 @@ Examples:
     token_parser.add_argument("--save", action="store_true", help="Save token to keyring")
     token_parser.add_argument("--remove", action="store_true", help="Remove token")
     token_parser.add_argument("--check", action="store_true", help="Check rate limits")
+    token_parser.add_argument("--expiration", action="store_true", help="View token expiration")
+    token_parser.add_argument("--storage", action="store_true", help="View storage details")
+    token_parser.add_argument("--audit", action="store_true", help="View audit logs")
+    token_parser.add_argument("--rotate", action="store_true", help="Rotate token")
 
     # Migrate command
     migrate_parser = subparsers.add_parser("migrate", help="Migrate configuration files")
@@ -346,8 +354,25 @@ def execute_cli_command(args: argparse.Namespace) -> None:
 
     elif args.command == "token":
         cmd = ManageTokenCommand()
-        # You'd need to modify ManageTokenCommand to handle CLI flags
-        cmd.execute()
+
+        # Check if any CLI arguments were provided
+        if args.check:
+            cmd.check_rate_limits()
+        elif args.save:
+            cmd.save_to_keyring()
+        elif args.remove:
+            cmd.remove_token()
+        elif args.expiration:
+            cmd.view_token_expiration()
+        elif args.storage:
+            cmd.view_storage_details()
+        elif args.audit:
+            cmd.view_audit_logs(interactive=False)
+        elif args.rotate:
+            cmd.rotate_token()
+        else:
+            # No arguments provided, show interactive menu
+            cmd.execute()
 
     elif args.command == "migrate":
         cmd = MigrateConfigCommand()
