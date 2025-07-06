@@ -48,7 +48,6 @@ class ReleaseDescriptionFetcher:
                 api_url,
                 headers=self._headers,
                 timeout=30,
-                audit_action="fetch_release_description",
             )
 
             if response.status_code != 200:  # noqa: PLR2004
@@ -94,7 +93,6 @@ class ReleaseDescriptionFetcher:
                 api_url,
                 headers=self._headers,
                 timeout=30,
-                audit_action="fetch_release_description_by_tag",
             )
 
             if response.status_code != 200:  # noqa: PLR2004
@@ -139,7 +137,6 @@ class ReleaseDescriptionFetcher:
                 api_url,
                 headers=self._headers,
                 timeout=30,
-                audit_action="fetch_release_data",
             )
 
             if response.status_code != 200:  # noqa: PLR2004

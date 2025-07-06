@@ -71,7 +71,6 @@ class TestGitHubAuthManager:
         mock_manager.get_token.return_value = SAFE_MOCK_TOKEN
         mock_manager.get_token_expiration_info.return_value = (False, "2099-12-31 23:59:59")
         mock_manager.is_token_expired.return_value = False
-        mock_manager.audit_log_token_usage.return_value = None
         monkeypatch.setattr("my_unicorn.auth_manager.SecureTokenManager", mock_manager)
         return mock_manager
 
@@ -447,21 +446,13 @@ class TestGitHubAuthManager:
         self, reset_class_state, mock_requests, mock_token_manager, monkeypatch
     ):
         """Test make_authenticated_request uses correct headers and returns response."""
-        # Setup - ensure audit is enabled for this test
-        GitHubAuthManager.set_audit_enabled(True)
-
-        # Pre-cache headers to avoid the initial get_auth_headers audit call
+        # Pre-cache headers to avoid the initial get_auth_headers call
         GitHubAuthManager._cached_headers = {
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {SAFE_MOCK_TOKEN}",
-            "User-Agent": "my-unicorn-app/1.0",
-            "X-GitHub-Api-Version": "2022-11-28",
         }
         GitHubAuthManager._last_token = SAFE_MOCK_TOKEN
         GitHubAuthManager._cached_headers_expiration = time.time() + 3600
-
-        # Reset the audit call counter
-        mock_token_manager.audit_log_token_usage.reset_mock()
 
         # Mock the SessionPool to return a controlled session
         from my_unicorn.auth_manager import SessionPool
@@ -472,7 +463,7 @@ class TestGitHubAuthManager:
 
         # Execute
         response = GitHubAuthManager.make_authenticated_request(
-            "GET", "https://api.github.com/user", audit_action="test_action"
+            "GET", "https://api.github.com/user"
         )
 
         # Verify
@@ -483,9 +474,6 @@ class TestGitHubAuthManager:
         call_args = mock_session.request.call_args[0]
         assert call_args[0] == "GET"
         assert call_args[1] == "https://api.github.com/user"
-
-        # Check audit log - should be called exactly once with audit_action
-        mock_token_manager.audit_log_token_usage.assert_called_once_with("test_action")
 
     def test_make_authenticated_request_retry(
         self, reset_class_state, mock_requests, mock_token_manager, monkeypatch

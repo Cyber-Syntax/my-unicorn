@@ -246,7 +246,6 @@ Examples:
 %(prog)s token --check # Check GitHub API rate limits
 %(prog)s token --expiration # View token expiration details
 %(prog)s token --storage # View storage details
-%(prog)s token --audit # View audit logs
 %(prog)s token --rotate # Rotate token
 %(prog)s migrate --clean # Migrate configuration files
 %(prog)s migrate --force # Migrate configuration without confirmation
@@ -290,7 +289,6 @@ Examples:
     token_parser.add_argument("--check", action="store_true", help="Check rate limits")
     token_parser.add_argument("--expiration", action="store_true", help="View token expiration")
     token_parser.add_argument("--storage", action="store_true", help="View storage details")
-    token_parser.add_argument("--audit", action="store_true", help="View audit logs")
     token_parser.add_argument("--rotate", action="store_true", help="Rotate token")
 
     # Migrate command
@@ -366,8 +364,6 @@ def execute_cli_command(args: argparse.Namespace) -> None:
             cmd.view_token_expiration()
         elif args.storage:
             cmd.view_storage_details()
-        elif args.audit:
-            cmd.view_audit_logs(interactive=False)
         elif args.rotate:
             cmd.rotate_token()
         else:

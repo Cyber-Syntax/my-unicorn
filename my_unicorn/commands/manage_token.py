@@ -51,17 +51,16 @@ class ManageTokenCommand(Command):
             print("3. Check API Rate Limits")
             print("4. View Token Expiration")
             print("\nAdvanced Options:")
-            print("5. View Token Audit Logs")
-            print("6. Rotate Token")
-            print("7. View Storage Details")
-            print("8. Back to Main Menu")
+            print("5. Rotate Token")
+            print("6. View Storage Details")
+            print("7. Back to Main Menu")
             print("------------------------")
 
             try:
-                choice = input("\nEnter your choice (1-8): ")
+                choice = input("\nEnter your choice (1-7): ")
                 try:
                     choice_num = int(choice)
-                    if 1 <= choice_num <= 8:
+                    if 1 <= choice_num <= 7:
                         if choice_num == 1:
                             self.save_to_keyring()
                         elif choice_num == 2:
@@ -71,12 +70,10 @@ class ManageTokenCommand(Command):
                         elif choice_num == 4:
                             self.view_token_expiration()
                         elif choice_num == 5:
-                            self.view_audit_logs()
-                        elif choice_num == 6:
                             self.rotate_token()
-                        elif choice_num == 7:
+                        elif choice_num == 6:
                             self.view_storage_details()
-                        elif choice_num == 8:
+                        elif choice_num == 7:
                             self._logger.info("Exiting token management")
                             return
                     else:
@@ -541,91 +538,6 @@ class ManageTokenCommand(Command):
                 self._logger.error(f"Error processing last used date: {e}")
                 print("Last used: Unknown")
 
-    def view_audit_logs(self, interactive: bool = True) -> None:
-        """Display token usage audit logs.
-
-        Args:
-            interactive: If True, prompts user for input. If False, shows all logs directly.
-
-        """
-        audit_logs = SecureTokenManager.get_audit_logs()
-
-        if not audit_logs:
-            print("\n❓ No audit logs available")
-            return
-
-        print("\n--- Token Usage Audit Logs ---")
-        print("Showing last 10 entries (most recent first):")
-        print("\nTimestamp            | Action                | Source IP")
-        print("-" * 70)
-
-        # Display the 10 most recent logs
-        for log in sorted(audit_logs, key=lambda x: x.get("timestamp", ""), reverse=True)[:10]:
-            try:
-                # Parse timestamp safely using our utility
-                timestamp_str = log.get("timestamp", "")
-                formatted_timestamp = "Unknown"
-
-                if timestamp_str:
-                    timestamp_date = parse_timestamp(timestamp_str)
-                    if timestamp_date:
-                        formatted_timestamp = timestamp_date.strftime("%Y-%m-%d %H:%M:%S")
-                    else:
-                        # If parsing fails, use the raw string (truncated if needed)
-                        formatted_timestamp = str(timestamp_str)[:19]
-
-                action = log.get("action", "unknown")
-                source_ip = log.get("source_ip", "unknown")
-
-                print(f"{formatted_timestamp} | {action:20} | {source_ip}")
-            except Exception as e:
-                self._logger.error(f"Error parsing log entry: {e}")
-                # Print whatever we can from the log
-                print(
-                    f"{'Error':19} | {log.get('action', 'unknown'):20} | {log.get('source_ip', 'unknown')}"
-                )
-
-        # Option to view all logs
-        if len(audit_logs) > 10:
-            if interactive:
-                try:
-                    view_all = input("\nView all logs? (y/n): ")
-                    show_all = view_all.lower() == "y"
-                except (EOFError, KeyboardInterrupt):
-                    show_all = False
-            else:
-                # In CLI mode, always show all logs
-                show_all = True
-                print(f"\nShowing all {len(audit_logs)} audit log entries:")
-
-            if show_all:
-                print("\nTimestamp            | Action                | Source IP")
-                print("-" * 70)
-
-                for log in sorted(audit_logs, key=lambda x: x.get("timestamp", ""), reverse=True):
-                    try:
-                        # Parse timestamp safely using our utility
-                        timestamp_str = log.get("timestamp", "")
-                        formatted_timestamp = "Unknown"
-
-                        if timestamp_str:
-                            timestamp_date = parse_timestamp(timestamp_str)
-                            if timestamp_date:
-                                formatted_timestamp = timestamp_date.strftime("%Y-%m-%d %H:%M:%S")
-                            else:
-                                # If parsing fails, use the raw string (truncated if needed)
-                                formatted_timestamp = str(timestamp_str)[:19]
-
-                        action = log.get("action", "unknown")
-                        source_ip = log.get("source_ip", "unknown")
-
-                        print(f"{formatted_timestamp} | {action:20} | {source_ip}")
-                    except Exception as e:
-                        self._logger.error(f"Error parsing log entry: {e}")
-                        print(
-                            f"{'Error':19} | {log.get('action', 'unknown'):20} | {log.get('source_ip', 'unknown')}"
-                        )
-
     def rotate_token(self) -> None:
         """Guide the user through rotating their GitHub token."""
         if not SecureTokenManager.token_exists():
@@ -675,9 +587,6 @@ class ManageTokenCommand(Command):
         if SecureTokenManager.save_token(new_token, expires_in_days=expiration_days):
             print("\n✅ New GitHub token saved successfully!")
             print(f"📅 New token will expire in {expiration_days} days")
-
-            # Log the rotation in audit logs
-            SecureTokenManager.audit_log_token_usage("token_rotation", source_ip="localhost")
 
             # Clear any cached authentication headers
             GitHubAuthManager.clear_cached_headers()
