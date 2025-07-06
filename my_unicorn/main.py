@@ -60,10 +60,10 @@ def display_github_api_status() -> None:
     try:
         # Use estimated method instead of get_rate_limit_info to avoid API calls during startup
         rate_info = GitHubAuthManager.get_estimated_rate_limit_info()
-        if isinstance(rate_info, tuple) and len(rate_info) == 4:
-            remaining, limit, reset_time, is_authenticated = rate_info
+        if hasattr(rate_info, "__len__") and len(rate_info) >= 4:
+            remaining, limit, reset_time, is_authenticated = rate_info[:4]
         else:
-            remaining, limit = rate_info
+            remaining, limit = rate_info[:2]
             reset_time, is_authenticated = "unknown", False
 
         # Create a status display for API rate limit information
