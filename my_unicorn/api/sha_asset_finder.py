@@ -18,7 +18,7 @@ class SHAAssetFinder:
     def find_best_match(
         self,
         selected_appimage_name: str,
-        definitive_app_info: AppInfo,
+        definitive_app_info: AppInfo | None,
         assets: list[dict],
     ) -> dict | None:
         """Find the best SHA asset match for the selected AppImage.
@@ -34,12 +34,14 @@ class SHAAssetFinder:
 
         """
         logger.info(f"Looking for SHA file matching: {selected_appimage_name}")
-        
+
         # Handle case where definitive_app_info is None (URL-based installs)
         if definitive_app_info is None:
             logger.info("No app definition found - using automatic SHA detection")
         else:
-            logger.info(f"Using SHA name from definitive info: {definitive_app_info.checksum_file_name}")
+            logger.info(
+                f"Using SHA name from definitive info: {definitive_app_info.checksum_file_name}"
+            )
 
             # Skip SHA search if verification is disabled
             if definitive_app_info.skip_verification:
@@ -97,6 +99,7 @@ class SHAAssetFinder:
 
         Returns:
             dict: Special asset info with digest data if found, None otherwise
+
         """
         # Look for the AppImage asset that matches our selected file
         for asset in assets:

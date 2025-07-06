@@ -61,7 +61,7 @@ class SHAManager:
             return False
 
         logger.info(
-            f"Attempting to extract SHA for {self.appimage_name} from release description..."
+            "Attempting to extract SHA for %s from release description...", self.appimage_name
         )
 
         try:
@@ -71,7 +71,7 @@ class SHAManager:
             # Create verifier and extract checksums to temporary file
             verifier = ReleaseDescVerifier(self.owner, self.repo)
             appimage_base_name = Path(self.appimage_name).name
-            
+
             temp_sha_file = verifier.extract_checksums_to_file(appimage_base_name)
             if not temp_sha_file:
                 logger.info("No checksums found in release description")
@@ -79,7 +79,7 @@ class SHAManager:
 
             # Read the first hash from the temporary file to set as extracted hash
             try:
-                with open(temp_sha_file, "r", encoding="utf-8") as f:
+                with open(temp_sha_file, encoding="utf-8") as f:
                     first_line = f.readline().strip()
                     if first_line:
                         parts = first_line.split(maxsplit=1)
@@ -91,27 +91,26 @@ class SHAManager:
                                 self.checksum_file_name = "extracted_checksum"
                                 self.checksum_file_download_url = None
                                 logger.info(
-                                    f"Successfully extracted SHA256 hash '{self.extracted_hash_from_body}' "
-                                    f"for {self.appimage_name} from release body."
+                                    "Successfully extracted SHA256 hash '%s' for %s from release body.",
+                                    self.extracted_hash_from_body,
+                                    self.appimage_name,
                                 )
                                 # Clean up temporary file
                                 Path(temp_sha_file).unlink(missing_ok=True)
                                 return True
-            except Exception as e:
-                logger.debug(f"Error reading temporary SHA file: {e}")
+            except (OSError, UnicodeDecodeError) as e:
+                logger.debug("Error reading temporary SHA file: %s", e)
                 # Clean up temporary file on error
                 Path(temp_sha_file).unlink(missing_ok=True)
 
             logger.info(
-                f"No valid SHA256 hash found for {appimage_base_name} in release description"
+                "No valid SHA256 hash found for %s in release description", appimage_base_name
             )
 
-        except Exception as e:
-            logger.error(f"Error during SHA extraction from release body: {e}", exc_info=True)
+        except (ImportError, AttributeError, ValueError) as e:
+            logger.error("Error during SHA extraction from release body: %s", e, exc_info=True)
 
         return False
-
-
 
     def _validate_sha256_hash(self, hash_value: str) -> bool:
         """Validate that a hash value is a valid SHA256 hash.
@@ -127,7 +126,7 @@ class SHAManager:
             return True
         else:
             logger.warning(
-                f"Extracted hash '{hash_value}' does not look like a valid SHA256 hash."
+                "Extracted hash '%s' does not look like a valid SHA256 hash.", hash_value
             )
             return False
 
@@ -150,9 +149,11 @@ class SHAManager:
         # No need for separate check here - let SHAAssetFinder handle it
 
         # Priority 2: Try to extract from release body description
-        if (self._app_info and
-            getattr(self._app_info, "use_github_release_desc", False) and
-            self._try_extract_sha_from_release_body()):
+        if (
+            self._app_info
+            and getattr(self._app_info, "use_github_release_desc", False)
+            and self._try_extract_sha_from_release_body()
+        ):
             logger.info(
                 f"Successfully extracted SHA for {self.appimage_name} from release description"
             )
@@ -202,7 +203,9 @@ class SHAManager:
             # Always ask for hash type if not detected, regardless of is_batch
             self.checksum_hash_type = ui_utils.get_user_input("Enter hash type", default="sha256")
 
-        logger.info(f"Selected SHA file: {self.checksum_file_name} (hash type: {self.checksum_hash_type})")
+        logger.info(
+            f"Selected SHA file: {self.checksum_file_name} (hash type: {self.checksum_hash_type})"
+        )
 
     def _handle_sha_fallback(self, assets: list[dict]) -> None:
         """Handle fallback when SHA file couldn't be automatically determined.

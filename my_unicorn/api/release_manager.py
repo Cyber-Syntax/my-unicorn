@@ -26,7 +26,9 @@ class ReleaseManager:
         self.repo = repo
         logger.debug(f"ReleaseManager initialized for {owner}/{repo} to fetch raw data.")
 
-    def _fetch_all_releases_data(self, headers: tuple) -> tuple[bool, tuple[str, Any] | str]:
+    def _fetch_all_releases_data(
+        self, headers: dict[str, str] | None
+    ) -> tuple[bool, dict[str, Any] | str]:
         """Fetch all releases and return the latest one's raw data."""
         api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases"
         logger.debug(f"Fetching all releases from {api_url}")
@@ -64,7 +66,9 @@ class ReleaseManager:
             logger.error(error_msg)
             return False, error_msg
 
-    def get_latest_release_data(self, headers: tuple) -> tuple[bool, tuple[str, Any] | str]:
+    def get_latest_release_data(
+        self, headers: dict[str, str] | None
+    ) -> tuple[bool, dict[str, Any] | str]:
         """Get the latest stable release's raw data, or fallback to the latest pre-release.
 
         Args:
@@ -109,7 +113,9 @@ class ReleaseManager:
             logger.error(error_msg)
             return False, error_msg
 
-    def get_latest_beta_release_data(self, headers: tuple) -> tuple[bool, dict[str, Any] | str]:
+    def get_latest_beta_release_data(
+        self, headers: dict[str, str] | None
+    ) -> tuple[bool, dict[str, Any] | str]:
         """Get the latest beta/pre-release data directly (bypassing stable release check).
 
         This method fetches all releases and returns the latest one, which may be a beta.

@@ -6,6 +6,8 @@ This module defines data structures for GitHub release assets.
 
 from dataclasses import dataclass
 
+from my_unicorn.utils import arch_utils
+
 
 @dataclass
 class ReleaseAsset:
@@ -90,12 +92,10 @@ class ArchitectureInfo:
             ArchitectureInfo: New ArchitectureInfo instance for current system
 
         """
-        from my_unicorn.utils import arch_utils
-
         current_arch = arch_utils.get_current_arch()
         return cls(
             name=current_arch,
-            keywords=arch_utils.get_arch_keywords(current_arch),
+            keywords=arch_utils.get_compatible_arch_strings(current_arch),
             incompatible_archs=arch_utils.get_incompatible_archs(current_arch),
         )
 

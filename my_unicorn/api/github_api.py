@@ -50,9 +50,9 @@ class GitHubAPI:
         self.checksum_file_name: str | None = checksum_file_name  # Can be updated by SHAManager
         self.checksum_hash_type: str | None = checksum_hash_type  # Can be updated by SHAManager
         self._arch_keyword = arch_keyword
-        self.version: str = None
-        self.appimage_name: str = None
-        self.app_download_url: str = None
+        self.version: str | None = None
+        self.appimage_name: str | None = None
+        self.app_download_url: str | None = None
         self.checksum_file_download_url: str | None = None
         self.extracted_hash_from_body: str | None = None
         self.asset_digest: str | None = None
@@ -79,11 +79,13 @@ class GitHubAPI:
     @property
     def skip_verification(self) -> bool:
         """Check if verification should be skipped for this app."""
-        return self._app_info and getattr(self._app_info, "skip_verification", False)
+        if self._app_info is None:
+            return False
+        return bool(getattr(self._app_info, "skip_verification", False))
 
     def get_latest_release(
         self, version_check_only: bool = False, is_batch: bool = False
-    ) -> tuple[bool, dict[str, Any]] | tuple[bool, str] | tuple[bool, dict[str, Any], str]:
+    ) -> tuple[bool, dict[str, Any] | str]:
         """Fetch latest stable or beta release based on app configuration.
 
         Uses ReleaseManager to fetch the appropriate release version (stable or beta) based on the
@@ -124,15 +126,15 @@ class GitHubAPI:
                 )
                 self.refresh_auth()
                 return False, "Rate limit exceeded. Authentication refreshed. Please try again."
-            logger.error(f"Failed to fetch release data via ReleaseManager: {raw_data_or_error}")
-            return False, raw_data_or_error
+            logger.error("Failed to fetch release data via ReleaseManager: %s", raw_data_or_error)
+            return False, str(raw_data_or_error)
 
         if not isinstance(raw_data_or_error, dict):
             error_msg = (
                 f"Type mismatch: Expected dict from ReleaseManager, got {type(raw_data_or_error)}"
             )
             logger.error(error_msg)
-            return False, {}, "Internal error: Unexpected data type from release fetcher"
+            return False, "Internal error: Unexpected data type from release fetcher"
 
         raw_release_json: dict[str, Any] = raw_data_or_error
         try:
@@ -142,7 +144,10 @@ class GitHubAPI:
             return True, raw_release_json
         except ValueError as e:
             logger.error(
-                f"Failed to process release data for {self.owner}/{self.repo} (fetched by ReleaseManager): {e}"
+                "Failed to process release data for %s/%s (fetched by ReleaseManager): %s",
+                self.owner,
+                self.repo,
+                e,
             )
             return False, f"Failed to process release data: {e}"
 
@@ -267,11 +272,18 @@ class GitHubAPI:
             )
 
         # Use the pre-initialized selector
-        selected_asset_result = self._selector.find_appimage_asset(
-            assets=assets,
-            definitive_app_info=self._app_info,
-            user_local_config_data=user_local_config_data,
-        )
+        if self._app_info is not None:
+            selected_asset_result = self._selector.find_appimage_asset(
+                assets=assets,
+                definitive_app_info=self._app_info,
+                user_local_config_data=user_local_config_data,
+            )
+        else:
+            selected_asset_result = self._selector.find_appimage_asset(
+                assets=assets,
+                definitive_app_info=None,
+                user_local_config_data=user_local_config_data,
+            )
 
         if not selected_asset_result:
             if self._app_info:
@@ -294,10 +306,13 @@ class GitHubAPI:
         logger.info(f"Selected AppImage: {self.appimage_name}")
 
         # Try extracting version from filename if not found in tag
-        if not normalized_version and self.appimage_name:
-            if extracted_version := extract_version_from_filename(self.appimage_name):
-                logger.debug(f"Using version from filename: {extracted_version}")
-                self.version = normalized_version = extracted_version
+        if (
+            not normalized_version
+            and self.appimage_name
+            and (extracted_version := extract_version_from_filename(self.appimage_name))
+        ):
+            logger.debug("Using version from filename: %s", extracted_version)
+            self.version = normalized_version = extracted_version
 
         if self.appimage_name:
             extracted_arch = extract_arch_from_filename(self.appimage_name)
@@ -425,10 +440,10 @@ class GitHubAPI:
 
         processor = ReleaseProcessor(self.owner, self.repo, self._arch_keyword)
         try:
-            update_available, version_comparison_info = processor.compare_versions(
+            update_available, _version_comparison_info = processor.compare_versions(
                 current_version or "", raw_github_tag
             )
-        except Exception as e:
+        except ValueError as e:
             logger.error(f"Error during version comparison for {self.owner}/{self.repo}: {e}")
             latest_version_for_error = self.version or raw_github_tag or "unknown"
             return False, {
@@ -462,16 +477,23 @@ class GitHubAPI:
         }
 
     def find_app_icon(self) -> dict[str, Any] | None:
+        """Find and return app icon information.
+
+        Returns:
+            dict[str, Any] | None: Icon information dictionary if found, None otherwise
+
+        """
         try:
             icon_info = self._icon_manager.find_icon(self.owner, self.repo, headers=self._headers)
             if icon_info:
                 logger.info(f"Found app icon: {icon_info.get('name')}")
             return icon_info
-        except Exception as e:
+        except (ValueError, KeyError, AttributeError) as e:
             logger.error(f"Error finding app icon: {e!s}")
             return None
 
     def refresh_auth(self) -> None:
+        """Refresh authentication headers by clearing cached headers."""
         logger.debug("Refreshing authentication headers")
         GitHubAuthManager.clear_cached_headers()
         self._headers = GitHubAuthManager.get_auth_headers()

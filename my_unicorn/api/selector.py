@@ -8,6 +8,7 @@ from GitHub releases based on system architecture and app characteristics.
 import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from my_unicorn.catalog import AppInfo
 from my_unicorn.utils import arch_utils
@@ -22,9 +23,10 @@ class AssetSelectionResult:
     Attributes:
         asset: Selected GitHub release asset
         characteristic_suffix: The suffix that matched this asset
+
     """
 
-    asset: tuple
+    asset: dict[str, Any]
     characteristic_suffix: str
 
 
@@ -38,10 +40,10 @@ class AppImageSelector:
     def find_appimage_asset(
         self,
         assets: list[dict],
-        definitive_app_info: AppInfo = None,
+        definitive_app_info: AppInfo | None = None,
         user_local_config_data: dict | None = None,
         release_prerelease: bool = False,
-    ) -> AssetSelectionResult:
+    ) -> AssetSelectionResult | None:
         """Find and select appropriate AppImage asset based on app metadata and system architecture.
 
         Args:
@@ -52,6 +54,7 @@ class AppImageSelector:
 
         Returns:
             AssetSelectionResult if an appropriate asset is found, None otherwise
+
         """
         self._logger.info("Starting AppImage selection process")
 
@@ -67,14 +70,15 @@ class AppImageSelector:
 
         # Filter AppImage assets
         appimage_assets = [
-            asset for asset in assets 
-            if asset.get("content_type") == "application/vnd.appimage"
+            asset for asset in assets if asset.get("content_type") == "application/vnd.appimage"
         ]
 
         # Fallback to filename extension if no assets found by content_type
         if not appimage_assets:
             self._logger.info("No assets found by content_type, falling back to filename extension")
-            appimage_assets = [asset for asset in assets if asset["name"].lower().endswith(".appimage")]
+            appimage_assets = [
+                asset for asset in assets if asset["name"].lower().endswith(".appimage")
+            ]
 
         if not appimage_assets:
             self._logger.warning("No AppImage assets found in release")
@@ -202,6 +206,7 @@ class AppImageSelector:
 
         Returns:
             True if the asset matches the suffix
+
         """
         # Try exact pattern matching first - suffix should appear before .appimage
         # Pattern: anything-{suffix}.appimage
