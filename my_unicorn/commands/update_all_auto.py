@@ -15,16 +15,13 @@ from my_unicorn.auth_manager import GitHubAuthManager
 from my_unicorn.commands.update_base import BaseUpdateCommand
 from my_unicorn.download import DownloadManager
 
+# Constants for rate limit thresholds
+LOW_AUTHENTICATED_THRESHOLD = 100
+LOW_UNAUTHENTICATED_THRESHOLD = 20
+
 
 class UpdateAllAutoCommand(BaseUpdateCommand):
     """Command to automatically check and update all AppImages without manual selection."""
-
-    def __init__(self):
-        """Initialize with base configuration and async-specific settings."""
-        super().__init__()
-
-        # Note: max_concurrent_updates is already initialized in the BaseUpdateCommand constructor
-        # and the global_config is already loaded in __post_init__
 
     def execute(self):
         """Check all AppImage configurations and update those with new versions available.
@@ -43,7 +40,18 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
             # Check rate limits before proceeding with any API operations
             # Get current rate limit information
-            remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+            (raw_remaining, raw_limit, reset_time, is_authenticated) = (
+                GitHubAuthManager.get_rate_limit_info()
+            )
+
+            # Convert to integers as the API sometimes returns strings
+            try:
+                remaining = int(raw_remaining)
+                limit = int(raw_limit)
+            except (ValueError, TypeError):
+                logging.error("Failed to parse rate limit information")
+                print("Error: Could not determine API rate limits. Please try again.")
+                return
 
             # Calculate minimum requests needed (at least one per app config)
             json_files = self._list_all_config_files()
@@ -58,13 +66,15 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             # Check if we have enough requests to at least check all apps
             if remaining < min_requests_needed:
                 logging.error(
-                    f"Insufficient API requests to check all apps: {remaining}/{min_requests_needed} available"
+                    "Insufficient API requests to check all apps: %d/%d available",
+                    remaining,
+                    min_requests_needed,
                 )
                 print("\n--- GitHub API Rate Limit Warning ---")
                 print("⚠️  Not enough API requests available to check all apps!")
-                print(
-                    f"Rate limit status: {remaining}/{limit} requests remaining{' (authenticated)' if is_authenticated else ' (unauthenticated)'}"
-                )
+
+                auth_status = " (authenticated)" if is_authenticated else " (unauthenticated)"
+                print(f"Rate limit status: {remaining}/{limit} requests remaining{auth_status}")
 
                 if reset_time:
                     print(f"Limits reset at: {reset_time}")
@@ -73,7 +83,8 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
                 if not is_authenticated:
                     print(
-                        "\n🔑 Please add a GitHub token using option 6 in the main menu to increase rate limits (5000/hour)."
+                        "\n🔑 Please add a GitHub token using option 6 in the main menu "
+                        "to increase rate limits (5000/hour)."
                     )
 
                 print("\nPlease try again later when more API requests are available.")
@@ -93,10 +104,12 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             # Determine what to do based on batch mode
             if self.global_config.batch_mode:
                 logging.info(
-                    f"Batch mode enabled - updating all {len(updatable_apps)} AppImages automatically"
+                    "Batch mode enabled - updating all %d AppImages automatically",
+                    len(updatable_apps),
                 )
                 print(
-                    f"Batch mode enabled - updating all {len(updatable_apps)} AppImages automatically"
+                    f"Batch mode enabled - updating all {len(updatable_apps)} "
+                    f"AppImages automatically"
                 )
                 if use_async:
                     self._update_apps_async_wrapper(updatable_apps)
@@ -141,7 +154,8 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
                     if app_data:
                         print(
-                            f"{app_name}: update available: {app_data['current']} → {app_data['latest']}"
+                            f"{app_name}: update available: {app_data['current']} → "
+                            f"{app_data['latest']}"
                         )
                         updatable_apps.append(app_data)
                     else:
@@ -200,41 +214,41 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                     self._update_apps_async_wrapper(updatable_apps)
                 else:
                     self._update_apps(updatable_apps)
-                return
-
-            try:
-                # Parse user selection
-                selected_indices = [int(idx.strip()) - 1 for idx in user_input.split(",")]
-
-                # Validate indices
-                if any(idx < 0 or idx >= len(updatable_apps) for idx in selected_indices):
-                    logging.warning("Invalid app selection indices")
-                    print("Invalid selection. Please enter valid numbers.")
                     return
 
-                # Create list of selected apps
-                selected_apps = [updatable_apps[idx] for idx in selected_indices]
+                try:
+                    # Parse user selection
+                    selected_indices = [int(idx.strip()) - 1 for idx in user_input.split(",")]
 
-                if selected_apps:
-                    logging.info(f"User selected {len(selected_apps)} apps to update")
-                    if use_async:
-                        self._update_apps_async_wrapper(selected_apps)
+                    # Validate indices
+                    if any(idx < 0 or idx >= len(updatable_apps) for idx in selected_indices):
+                        logging.warning("Invalid app selection indices")
+                        print("Invalid selection. Please enter valid numbers.")
+                        return
+
+                    # Create list of selected apps
+                    selected_apps = [updatable_apps[idx] for idx in selected_indices]
+
+                    if selected_apps:
+                        logging.info("User selected %d apps to update", len(selected_apps))
+                        if use_async:
+                            self._update_apps_async_wrapper(selected_apps)
+                        else:
+                            self._update_apps(selected_apps)
                     else:
-                        self._update_apps(selected_apps)
-                else:
-                    logging.info("No apps selected for update")
-                    print("No apps selected for update.")
+                        logging.info("No apps selected for update")
+                        print("No apps selected for update.")
 
-            except ValueError:
-                logging.warning("Invalid input format for app selection")
-                print("Invalid input. Please enter numbers separated by commas.")
+                except ValueError:
+                    logging.warning("Invalid input format for app selection")
+                    print("Invalid input. Please enter numbers separated by commas.")
         except KeyboardInterrupt:
             logging.info("Selection cancelled by user (Ctrl+C)")
             print("\nSelection cancelled by user (Ctrl+C)")
             return
 
     def _update_apps_async_wrapper(self, apps_to_update: list[dict[str, Any]]) -> None:
-        """Wrapper to call the async update method from a synchronous context.
+        """Wrap the async update method to call it from a synchronous context.
 
         Args:
             apps_to_update: list of app information dictionaries to update
@@ -249,10 +263,13 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                 asyncio.set_event_loop(loop)
 
             print(
-                f"\nStarting asynchronous update of {len(apps_to_update)} AppImages (max {self.max_concurrent_updates} concurrent)..."
+                f"\nStarting asynchronous update of {len(apps_to_update)} AppImages "
+                f"(max {self.max_concurrent_updates} concurrent)..."
             )
             logging.info(
-                f"Starting asynchronous update of {len(apps_to_update)} AppImages with concurrency limit {self.max_concurrent_updates}"
+                "Starting asynchronous update of %d AppImages with concurrency limit %d",
+                len(apps_to_update),
+                self.max_concurrent_updates,
             )
 
             # Initialize progress manager for all downloads
@@ -273,7 +290,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             logging.info("Update process cancelled by user (Ctrl+C)")
             print("\nUpdate process cancelled by user (Ctrl+C)")
         except Exception as e:
-            logging.error(f"Error in async update process: {e!s}", exc_info=True)
+            logging.error("Error in async update process: %s", str(e), exc_info=True)
             print(f"\nError in update process: {e!s}")
 
     def _display_async_results(
@@ -363,10 +380,10 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
             if result:
                 success_count += 1
-                logging.info(f"Successfully updated {app_data['name']}")
+                logging.info("Successfully updated %s", app_data["name"])
             else:
                 failure_count += 1
-                logging.error(f"Failed to update {app_data['name']}")
+                logging.error("Failed to update %s", app_data["name"])
 
         print("\n=== Update Summary ===")
         print(f"Total apps processed: {success_count + failure_count}/{len(apps_to_update)}")
@@ -398,23 +415,34 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         print("-" * 60)
 
     def _display_rate_limit_info(self) -> None:
-        """Display GitHub API rate limit information after updates using standard print statements."""
+        """Display GitHub API rate limit information after updates using standard print."""
         try:
             # Use the cached rate limit info to avoid unnecessary API calls
-            remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+            raw_remaining, raw_limit, reset_time, is_authenticated = (
+                GitHubAuthManager.get_rate_limit_info()
+            )
+
+            # Convert to integers as the API sometimes returns strings
+            try:
+                remaining = int(raw_remaining)
+                limit = int(raw_limit)
+            except (ValueError, TypeError):
+                return
 
             print("\n--- GitHub API Rate Limits ---")
-            print(
-                f"Remaining requests: {remaining}/{limit} ({'authenticated' if is_authenticated else 'unauthenticated'})"
-            )
+            auth_status = "authenticated" if is_authenticated else "unauthenticated"
+            print(f"Remaining requests: {remaining}/{limit} ({auth_status})")
 
             if reset_time:
                 print(f"Resets at: {reset_time}")
 
-            if remaining < (100 if is_authenticated else 20):
-                if remaining < 100 and is_authenticated:
+            threshold = (
+                LOW_AUTHENTICATED_THRESHOLD if is_authenticated else LOW_UNAUTHENTICATED_THRESHOLD
+            )
+            if remaining < threshold:
+                if remaining < LOW_AUTHENTICATED_THRESHOLD and is_authenticated:
                     print("⚠️ Running low on API requests!")
-                elif remaining < 20 and not is_authenticated:
+                elif remaining < LOW_UNAUTHENTICATED_THRESHOLD and not is_authenticated:
                     print("⚠️ Low on unauthenticated requests!")
                     print("Tip: Add a GitHub token to increase rate limits (5000/hour).")
 
@@ -422,4 +450,4 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
         except Exception as e:
             # Silently handle any errors to avoid breaking update completion
-            logging.debug(f"Error displaying rate limit info: {e}")
+            logging.debug("Error displaying rate limit info: %s", e)
