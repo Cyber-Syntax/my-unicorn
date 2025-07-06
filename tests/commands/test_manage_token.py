@@ -1,33 +1,22 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Tests for the manage_token command module.
+"""Tests for the manage_token command module.
 
 This module contains tests for the ManageTokenCommand class that handles
 GitHub token management through a command-line interface.
 """
 
-import os
-import builtins
-import pytest
-from unittest.mock import patch, MagicMock, call, mock_open
-from datetime import datetime, timedelta
-import json
 import logging
-
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 if TYPE_CHECKING:
-    from _pytest.capture import CaptureFixture
-    from _pytest.fixtures import FixtureRequest
-    from _pytest.logging import LogCaptureFixture
-    from _pytest.monkeypatch import MonkeyPatch
-    from pytest_mock.plugin import MockerFixture
+    pass
 
 # Import the module to test
 from my_unicorn.commands.manage_token import ManageTokenCommand
-from my_unicorn.secure_token import SecureTokenManager
-from my_unicorn.auth_manager import GitHubAuthManager
 
 # Disable logging during tests to prevent token exposure
 logging.getLogger("my_unicorn.commands.manage_token").setLevel(logging.CRITICAL)
@@ -43,8 +32,7 @@ class TestManageTokenCommand:
 
     @pytest.fixture(autouse=True)
     def prevent_real_token_access(self, monkeypatch):
-        """
-        Prevent any potential access to real tokens during tests.
+        """Prevent any potential access to real tokens during tests.
 
         This fixture runs automatically for all tests in this class.
         """
@@ -54,7 +42,6 @@ class TestManageTokenCommand:
         monkeypatch.setattr("keyring.get_password", lambda *args: None)
         # Prevent any real file access for token files
         monkeypatch.setattr("os.path.expanduser", lambda path: "/tmp/fake_home" + path[1:])
-        return None
 
     @pytest.fixture
     def command(self):
@@ -86,13 +73,6 @@ class TestManageTokenCommand:
             "kde_wallet_available": False,
             "crypto_available": True,
         }
-        mock_manager.get_audit_logs.return_value = [
-            {
-                "timestamp": datetime.now().isoformat(),
-                "action": "test_action",
-                "source_ip": "127.0.0.1",
-            }
-        ]
 
         monkeypatch.setattr("my_unicorn.commands.manage_token.SecureTokenManager", mock_manager)
         return mock_manager
@@ -240,31 +220,6 @@ class TestManageTokenCommand:
         mock_secure_token_manager.get_token_metadata.assert_not_called()
         # Should print no token message
         mock_print.assert_any_call("\n❌ No token configured")
-
-    @patch("builtins.print")
-    def test_view_audit_logs(self, mock_print, command, mock_secure_token_manager):
-        """Test viewing audit logs."""
-        # Execute
-        command._view_audit_logs()
-
-        # Verify
-        mock_secure_token_manager.get_audit_logs.assert_called_once()
-        # Should print audit log header
-        mock_print.assert_any_call("\n--- Token Usage Audit Logs ---")
-
-    @patch("builtins.print")
-    def test_view_audit_logs_no_logs(self, mock_print, command, mock_secure_token_manager):
-        """Test viewing audit logs when no logs exist."""
-        # Setup
-        mock_secure_token_manager.get_audit_logs.return_value = []
-
-        # Execute
-        command._view_audit_logs()
-
-        # Verify
-        mock_secure_token_manager.get_audit_logs.assert_called_once()
-        # Should print no logs message
-        mock_print.assert_any_call("\n❓ No audit logs available")
 
     @patch("builtins.print")
     @patch("builtins.input", return_value="y")  # Confirm removal
@@ -416,9 +371,7 @@ class TestManageTokenCommand:
                 mock_get_days.assert_called_once()
                 mock_validate.assert_called_once()
                 mock_secure_token_manager.save_token.assert_called_once()
-                mock_secure_token_manager.audit_log_token_usage.assert_called_once_with(
-                    "token_rotation", source_ip="localhost"
-                )
+
                 mock_auth_manager.clear_cached_headers.assert_called_once()
 
     @patch("builtins.print")

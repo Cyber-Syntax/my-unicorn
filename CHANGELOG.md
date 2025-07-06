@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v0.12.1-alpha
+### Changed
+This release fixes the cli command issues.
+
 ## v0.12.0-alpha
 ### Changed 
 This release add cli support and package support for python 3.12 and higher.

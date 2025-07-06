@@ -3,6 +3,9 @@
 
 This module provides customizable progress tracking for both synchronous and asynchronous
 operations with support for nested progress bars using standard terminal output.
+
+NOTE: These classes are primarily used for testing. The main application uses
+AppImageProgressMeter from progress.py for actual download progress tracking.
 """
 
 import asyncio
@@ -10,9 +13,11 @@ import logging
 import shutil
 import sys
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
 from typing import Any, ClassVar
+
+from .progress import format_number
 
 # Constants for progress display
 BYTES_IN_KB = 1024
@@ -517,7 +522,7 @@ class BasicProgressBar:
 
         return (
             f"{self.description}: [{bar}] {percentage:.1f}% "
-            f"({self.completed}/{self.total}) {elapsed_str} {self.status}"
+            f"({format_number(self.completed)}/{format_number(self.total)}) {elapsed_str} {self.status}"
         )
 
 
@@ -708,3 +713,69 @@ class DynamicProgressManager[T]:
 
             self.progress.update(task_data["task_id"], completed=steps_count, status=status_msg)
             self._download_in_progress[item_id] = False
+
+    @contextmanager
+    def start_progress(self, total_items: int, title: str):
+        """Start a progress context for download operations.
+
+        Args:
+            total_items: Total number of items to process
+            title: Title for the progress display
+
+        Yields:
+            ProgressContext: Context manager for progress tracking
+
+        """
+        self.task_stats["start_time"] = time.time()
+        self.task_stats["items"] = total_items
+        self.task_stats["completed"] = 0
+        self.task_stats["failed"] = 0
+
+        # Start the progress display
+        self.progress.start()
+
+        try:
+            # Yield a context that provides the interface expected by download code
+            yield ProgressContext(self.progress)
+        finally:
+            # Clean up and stop progress display
+            self.progress.stop()
+
+
+class ProgressContext:
+    """Context manager wrapper for progress tracking during downloads."""
+
+    def __init__(self, progress_manager: "ProgressManager"):
+        """Initialize with a progress manager instance."""
+        self.progress_manager = progress_manager
+        self._task_ids: dict[str, int] = {}
+
+    def add_task(self, filename: str, total: int, description: str) -> str:
+        """Add a task to track progress.
+
+        Args:
+            filename: Name of the file being downloaded
+            total: Total bytes to download
+            description: Description of the task
+
+        Returns:
+            Task identifier
+
+        """
+        task_id = self.progress_manager.add_task(
+            description=description, total=total, status="Starting..."
+        )
+        self._task_ids[filename] = task_id
+        return filename
+
+    def update(self, task_id: str, completed: int):
+        """Update progress for a task.
+
+        Args:
+            task_id: Task identifier (filename)
+            completed: Number of bytes completed
+
+        """
+        if task_id in self._task_ids:
+            real_task_id = self._task_ids[task_id]
+            self.progress_manager.update(real_task_id, completed=completed)

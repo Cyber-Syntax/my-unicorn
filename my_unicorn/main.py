@@ -59,9 +59,12 @@ def display_github_api_status() -> None:
     """
     try:
         # Use estimated method instead of get_rate_limit_info to avoid API calls during startup
-        remaining, limit, reset_time, is_authenticated = (
-            GitHubAuthManager.get_estimated_rate_limit_info()
-        )
+        rate_info = GitHubAuthManager.get_estimated_rate_limit_info()
+        if hasattr(rate_info, "__len__") and len(rate_info) >= 4:
+            remaining, limit, reset_time, is_authenticated = rate_info[:4]
+        else:
+            remaining, limit = rate_info[:2]
+            reset_time, is_authenticated = "unknown", False
 
         # Create a status display for API rate limit information
         print("\n--- GitHub API Status ---")
@@ -229,16 +232,21 @@ def create_argument_parser() -> argparse.ArgumentParser:
         epilog="""
 Examples:
 %(prog)s # Interactive mode (default)
-%(prog)s version # Show current version
-%(prog)s version --check # Check for updates
-%(prog)s version --update # Update to latest version
-%(prog)s download https://github.com/johannesjo/super-productivity # Download AppImage from URL
+%(prog)s version # Show current version for my-unicorn
+%(prog)s version --check # Check for updates for my-unicorn
+%(prog)s version --update # Update my-unicorn
+%(prog)s download https://github.com/johannesjo/super-productivity
+%(prog)s catalog # List available AppImages on catalog
 %(prog)s install joplin # Install AppImage from catalog
 %(prog)s update --all # Update all AppImages
-%(prog)s update --select joplin,super-productivity # Select AppImages to update
-%(prog)s token --save # Save GitHub token to keyring
-%(prog)s token --remove # Remove GitHub token
+%(prog)s update --select joplin,super-productivity
+%(prog)s update --select # Interactive selection mode
+%(prog)s token --save
+%(prog)s token --remove
 %(prog)s token --check # Check GitHub API rate limits
+%(prog)s token --expiration
+%(prog)s token --storage
+%(prog)s token --rotate
 %(prog)s migrate --clean # Migrate configuration files
 %(prog)s migrate --force # Migrate configuration without confirmation
 """,
@@ -248,29 +256,41 @@ Examples:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Version command
-    version_parser = subparsers.add_parser("version", help="Display version and manage updates")
+    version_parser = subparsers.add_parser("version", help="Display version and manage updates for my-unicorn")
     version_cmd = VersionCommand()
     version_cmd.add_arguments(version_parser)
 
     # Download command
     download_parser = subparsers.add_parser("download", help="Download AppImage from URL")
-    download_parser.add_argument("url", help="GitHub repository URL")
+    download_parser.add_argument("url", help="GitHub repository URL (required)")
 
     # Install command
     install_parser = subparsers.add_parser("install", help="Install app from catalog")
     install_parser.add_argument("app_name", nargs="?", help="Application name to install")
+    install_parser.add_argument(
+        "catalog", action="store_true", help="List all available applications"
+    )
 
     # Update command
     update_parser = subparsers.add_parser("update", help="Update AppImages")
     update_group = update_parser.add_mutually_exclusive_group()
     update_group.add_argument("--all", action="store_true", help="Update all apps")
-    update_group.add_argument("--select", action="store_true", help="Select apps to update")
+    update_group.add_argument(
+        "--select",
+        nargs="?",
+        const=True,
+        help="Select apps to update interactively or provide comma-separated app names"
+        "Example: my-unicorn update --select joplin,obsidian ",
+    )
 
     # Token command
     token_parser = subparsers.add_parser("token", help="GitHub token management")
     token_parser.add_argument("--save", action="store_true", help="Save token to keyring")
     token_parser.add_argument("--remove", action="store_true", help="Remove token")
     token_parser.add_argument("--check", action="store_true", help="Check rate limits")
+    token_parser.add_argument("--expiration", action="store_true", help="View token expiration")
+    token_parser.add_argument("--storage", action="store_true", help="View storage details")
+    token_parser.add_argument("--rotate", action="store_true", help="Rotate token")
 
     # Migrate command
     migrate_parser = subparsers.add_parser("migrate", help="Migrate configuration files")
@@ -293,20 +313,33 @@ def execute_cli_command(args: argparse.Namespace) -> None:
 
     if args.command == "download":
         # Set URL and execute download command
-        cmd = DownloadCommand()
-        # You'd need to modify DownloadCommand to accept URL parameter
+        cmd = DownloadCommand(url=args.url)
         cmd.execute()
 
     elif args.command == "install":
         cmd = InstallAppCommand()
-        # You'd need to modify InstallAppCommand to accept app_name parameter
-        cmd.execute()
+        # Handle --catalog option
+        if hasattr(args, "catalog") and args.catalog:
+            cmd.list_apps()
+        # Pass app name if provided
+        elif hasattr(args, "app_name") and args.app_name:
+            cmd.set_app_name(args.app_name)
+            cmd.execute()
+        else:
+            cmd.execute()
 
     elif args.command == "update":
         if args.all:
             invoker.execute_command(3)  # UpdateAllAutoCommand
         elif args.select:
-            invoker.execute_command(4)  # UpdateAsyncCommand
+            if args.select is True:
+                # Interactive selection mode
+                invoker.execute_command(4)  # UpdateAsyncCommand
+            else:
+                # Parse comma-separated app names
+                app_names = [name.strip() for name in args.select.split(",")]
+                cmd = UpdateAsyncCommand(app_names=app_names)
+                cmd.execute()
         else:
             print("Please specify --all or --select for update command")
 
@@ -320,8 +353,23 @@ def execute_cli_command(args: argparse.Namespace) -> None:
 
     elif args.command == "token":
         cmd = ManageTokenCommand()
-        # You'd need to modify ManageTokenCommand to handle CLI flags
-        cmd.execute()
+
+        # Check if any CLI arguments were provided
+        if args.check:
+            cmd.check_rate_limits()
+        elif args.save:
+            cmd.save_to_keyring()
+        elif args.remove:
+            cmd.remove_token()
+        elif args.expiration:
+            cmd.view_token_expiration()
+        elif args.storage:
+            cmd.view_storage_details()
+        elif args.rotate:
+            cmd.rotate_token()
+        else:
+            # No arguments provided, show interactive menu
+            cmd.execute()
 
     elif args.command == "migrate":
         cmd = MigrateConfigCommand()

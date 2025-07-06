@@ -6,7 +6,6 @@ keyring when available, with a fallback to encrypted file storage.
 """
 
 import base64
-import datetime
 import getpass
 import json
 import logging
@@ -284,6 +283,7 @@ class SecureTokenManager:
 
     Attributes:
         None - This class uses only static methods
+
     """
 
     @staticmethod
@@ -300,6 +300,7 @@ class SecureTokenManager:
 
         Returns:
             str: The GitHub token or empty string if not found or expired
+
         """
         token = ""
         metadata = {}
@@ -382,6 +383,7 @@ class SecureTokenManager:
 
         Args:
             metadata: Token metadata dictionary
+
         """
         if not metadata:
             return
@@ -413,6 +415,7 @@ class SecureTokenManager:
 
         Returns:
             tuple: Token metadata including creation time and expiration
+
         """
         metadata = {}
 
@@ -442,6 +445,7 @@ class SecureTokenManager:
 
         Returns:
             bool: True if token has expired or doesn't exist, False if valid
+
         """
         metadata = SecureTokenManager.get_token_metadata()
         if not metadata or "expires_at" not in metadata:
@@ -465,6 +469,7 @@ class SecureTokenManager:
 
         Returns:
             tuple[bool, Optional[str]]: (is_expired, expiration_date_string)
+
         """
         metadata = SecureTokenManager.get_token_metadata()
         if not metadata or "expires_at" not in metadata:
@@ -493,6 +498,7 @@ class SecureTokenManager:
 
         Returns:
             bool: True if removal was successful, False otherwise
+
         """
         success = False
 
@@ -542,6 +548,7 @@ class SecureTokenManager:
 
         Returns:
             bool: True if a token exists, False otherwise
+
         """
         # Check keyring
         if KEYRING_AVAILABLE:
@@ -567,6 +574,7 @@ class SecureTokenManager:
 
         Returns:
             bytes: An encryption key for Fernet symmetric encryption
+
         """
         # Create a machine-specific identifier to minimize asking for password
         machine_id = SecureTokenManager._get_machine_id()
@@ -597,6 +605,7 @@ class SecureTokenManager:
 
         Returns:
             bytes: Salt value for key derivation
+
         """
         if SALT_FILE.exists():
             try:
@@ -641,6 +650,7 @@ class SecureTokenManager:
 
         Returns:
             bytes: A reasonably stable machine-specific identifier
+
         """
         # Try to get a machine-specific ID from various sources
         machine_id = None
@@ -668,6 +678,7 @@ class SecureTokenManager:
 
         Returns:
             str: The entered token or empty string if cancelled
+
         """
         print("\nEnter your GitHub token (or press Enter to cancel):")
         print("Create one at: https://github.com/settings/tokens")
@@ -686,6 +697,7 @@ class SecureTokenManager:
 
         Returns:
             tuple[str, bool]: Dictionary with status of keyring backends
+
         """
         return {
             "any_keyring_available": KEYRING_AVAILABLE,
@@ -703,6 +715,7 @@ class SecureTokenManager:
 
         Returns:
             bool: True if configuration succeeded, False otherwise
+
         """
         try:
             print("\nAttempting to configure Seahorse/GNOME keyring...")
@@ -837,76 +850,6 @@ class SecureTokenManager:
             return False
 
     @staticmethod
-    def audit_log_token_usage(action: str, source_ip: str | None = None) -> None:
-        """Log token usage for auditing purposes.
-
-        Args:
-            action: The action being performed with the token
-            source_ip: Optional source IP for the request
-        """
-        try:
-            metadata = SecureTokenManager.get_token_metadata()
-            token_id = metadata.get("token_id", "unknown")
-
-            audit_entry = {
-                "timestamp": datetime.datetime.now().isoformat(),
-                "action": action,
-                "token_id": token_id,
-                "source_ip": source_ip or "local",
-            }
-
-            # Write to audit log file
-            audit_log_path = CONFIG_DIR / "token_audit.log"
-
-            with open(audit_log_path, "a") as f:
-                f.write(json.dumps(audit_entry) + "\n")
-
-            # set proper permissions
-            try:
-                os.chmod(audit_log_path, 0o600)
-            except:
-                pass
-
-        except Exception as e:
-            logger.debug(f"Failed to log token usage to audit log: {e}")
-
-    @staticmethod
-    def get_audit_logs() -> list[tuple[str, Any]]:
-        """Get token usage audit logs.
-
-        Returns:
-            list[tuple[str, Any]]: list of audit log entries in reverse chronological order (newest first)
-        """
-        audit_logs = []
-        audit_log_path = CONFIG_DIR / "token_audit.log"
-
-        if not audit_log_path.exists():
-            return audit_logs
-
-        try:
-            with open(audit_log_path) as f:
-                for line in f:
-                    try:
-                        log_entry = json.loads(line.strip())
-                        # Convert timestamp string to isoformat if it's not already
-                        if "timestamp" in log_entry and not isinstance(log_entry["timestamp"], str):
-                            log_entry["timestamp"] = datetime.datetime.fromtimestamp(
-                                log_entry["timestamp"]
-                            ).isoformat()
-                        audit_logs.append(log_entry)
-                    except json.JSONDecodeError:
-                        logger.debug(f"Skipping invalid audit log entry: {line}")
-                        continue
-
-            # Sort logs by timestamp (newest first)
-            audit_logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-
-        except Exception as e:
-            logger.error(f"Failed to retrieve audit logs: {e}")
-
-        return audit_logs
-
-    @staticmethod
     def _create_token_metadata(
         token: str, expires_in_days: int, storage_info: tuple[str, str] | None = None
     ) -> tuple[str, Any]:
@@ -919,6 +862,7 @@ class SecureTokenManager:
 
         Returns:
             tuple[str, Any]: Token metadata
+
         """
         if not token:
             logger.warning("Attempted to create metadata for an empty token")
@@ -957,6 +901,7 @@ class SecureTokenManager:
 
         Returns:
             tuple[bool, tuple[str, Any]]: (success, updated_metadata)
+
         """
         if not KEYRING_AVAILABLE:
             return False, metadata
@@ -1008,6 +953,7 @@ class SecureTokenManager:
 
         Returns:
             tuple[bool, tuple[str, Any]]: (success, updated_metadata)
+
         """
         if not CRYPTO_AVAILABLE:
             return False, metadata
@@ -1097,6 +1043,7 @@ class SecureTokenManager:
 
         Returns:
             bool: True if successful, False otherwise
+
         """
         import re
 

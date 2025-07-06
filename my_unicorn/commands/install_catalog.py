@@ -9,8 +9,8 @@ import logging
 from pathlib import Path
 
 from my_unicorn.api.github_api import GitHubAPI
-from my_unicorn.catalog import AppInfo, get_all_apps
 from my_unicorn.app_config import AppConfigManager
+from my_unicorn.catalog import AppInfo, get_all_apps
 from my_unicorn.commands.base import Command
 from my_unicorn.download import DownloadManager
 from my_unicorn.file_handler import FileHandler
@@ -30,13 +30,75 @@ class InstallAppCommand(Command):
         self._logger = logging.getLogger(__name__)
         self.global_config = GlobalConfigManager()
         self.global_config.load_config()
+        self._app_name = None
+        self._cli_mode = False
+
+    def set_app_name(self, app_name: str) -> None:
+        """Set the app name for direct installation."""
+        self._app_name = app_name
+        self._cli_mode = True
+
+    def list_apps(self) -> None:
+        """List all available applications in the catalog."""
+        apps = get_all_apps()
+        if not apps:
+            print("No applications available in catalog.")
+            return
+
+        # Sort apps alphabetically by app_rename
+        sorted_apps = sorted(apps.values(), key=lambda app: app.app_rename)
+
+        print(f"\n=== Available Applications ({len(sorted_apps)}) ===")
+        print("-" * 60)
+
+        for app in sorted_apps:
+            print(f"Name: {app.app_rename}")
+            print(f"  Repository: {app.owner}/{app.repo}")
+            print(f"  Description: {app.description}")
+            print(f"  Category: {app.category}")
+            if app.tags:
+                print(f"  Tags: {', '.join(app.tags)}")
+            print()
+
+        print("Usage: python run.py install <app_name>")
+        print("Example: python run.py install joplin")
 
     def execute(self) -> None:
         """Execute the install app command to browse and install applications."""
         print("\n=== Install Application ===")
 
+        # If app name is provided via CLI, install directly
+        if self._app_name:
+            self._install_app_by_name(self._app_name)
+            return
+
         # Show browsing options
         self._display_browse_menu()
+
+    def _install_app_by_name(self, app_name: str) -> None:
+        """Install an application by name directly.
+
+        Args:
+            app_name: Name of the application to install
+
+        """
+        apps = get_all_apps()
+
+        # Try to find the app by name (case-insensitive)
+        app_info = None
+        for app in apps.values():
+            if app.app_rename.lower() == app_name.lower() or app.repo.lower() == app_name.lower():
+                app_info = app
+                break
+
+        if not app_info:
+            print(f"Application '{app_name}' not found in catalog.")
+            print("Available applications:")
+            for app in sorted(apps.values(), key=lambda x: x.app_rename):
+                print(f"  - {app.app_rename}")
+            return
+
+        self._confirm_and_install_app(app_info)
 
     def _display_browse_menu(self) -> None:
         """Display menu for browsing applications."""
@@ -58,7 +120,6 @@ class InstallAppCommand(Command):
                 print("Please enter a number.")
             except KeyboardInterrupt:
                 print("\nOperation cancelled.")
-                return
 
     def _display_all_apps(self) -> None:
         """Display and allow selection from all applications."""
@@ -113,6 +174,12 @@ class InstallAppCommand(Command):
         if app_info.tags:
             print(f"Tags: {', '.join(app_info.tags)}")
 
+        # In CLI mode, auto-confirm installation
+        if self._cli_mode:
+            print(f"\nInstalling {app_info.app_rename}...")
+            self._install_app(app_info)
+            return
+
         try:
             confirm = input("\nInstall this application? (y/N): ").strip().lower()
             if confirm != "y":
@@ -132,8 +199,12 @@ class InstallAppCommand(Command):
 
         # Initialize GitHubAPI with proper parameters
         # Use auto-detection when no specific values are provided
-        checksum_file_name_param = app_info.checksum_file_name if app_info.checksum_file_name else "auto"
-        checksum_hash_type_param = app_info.checksum_hash_type if app_info.checksum_hash_type else "auto"
+        checksum_file_name_param = (
+            app_info.checksum_file_name if app_info.checksum_file_name else "auto"
+        )
+        checksum_hash_type_param = (
+            app_info.checksum_hash_type if app_info.checksum_hash_type else "auto"
+        )
 
         api = GitHubAPI(
             owner=app_info.owner,
@@ -159,6 +230,9 @@ class InstallAppCommand(Command):
             f"API detection results: appimage={api.appimage_name}, "
             f"sha={api.checksum_file_name}, checksum_hash_type={api.checksum_hash_type}, arch={api.arch_keyword}"
         )
+
+        # Initialize progress bar for single download
+        DownloadManager.get_or_create_progress(1)
 
         # Track verification success and skip status across attempts
         verification_success = False
@@ -203,7 +277,7 @@ class InstallAppCommand(Command):
                             print("Verifying download integrity...")
 
                         # Debug logging for API values
-                        logging.debug(f"API values before VerificationManager creation:")
+                        logging.debug("API values before VerificationManager creation:")
                         logging.debug(f"  api.checksum_file_name: {api.checksum_file_name}")
                         logging.debug(f"  api.checksum_hash_type: {api.checksum_hash_type}")
                         logging.debug(f"  api.asset_digest: {api.asset_digest}")
@@ -254,6 +328,8 @@ class InstallAppCommand(Command):
 
         # If verification wasn't successful after all attempts, exit
         if not verification_success or not downloaded_file_path or not api.appimage_name:
+            # Clean up progress display
+            DownloadManager.stop_progress()
             return
 
         # Handle file operations
@@ -286,6 +362,9 @@ class InstallAppCommand(Command):
             github_api=api, icon_path=icon_path if icon_success else None
         )
 
+        # Clean up progress display
+        DownloadManager.stop_progress()
+
         if success:
             # Save the configuration only if all previous steps succeed
             app_config.save_config()
@@ -310,4 +389,3 @@ class InstallAppCommand(Command):
                 print("You can run it from the command line or create a desktop shortcut.")
         else:
             print("Error during file operations. Installation failed.")
-            return

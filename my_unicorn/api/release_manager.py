@@ -20,6 +20,7 @@ class ReleaseManager:
         Args:
             owner: Repository owner/organization.
             repo: Repository name.
+
         """
         self.owner = owner
         self.repo = repo
@@ -34,7 +35,6 @@ class ReleaseManager:
             api_url,
             headers=headers,
             timeout=30,
-            audit_action="fetch_all_releases_for_fallback",
         )
 
         if response.status_code == 200:  # HTTP_OK
@@ -72,6 +72,7 @@ class ReleaseManager:
 
         Returns:
             tuple: (Success flag, Raw release JSON data or error message string)
+
         """
         api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
         logger.debug(f"Fetching latest stable release from {api_url}")
@@ -109,9 +110,7 @@ class ReleaseManager:
             logger.error(error_msg)
             return False, error_msg
 
-    def get_latest_beta_release_data(
-        self, headers: tuple
-    ) -> tuple[bool, dict[str, Any] | str]:
+    def get_latest_beta_release_data(self, headers: tuple) -> tuple[bool, dict[str, Any] | str]:
         """Get the latest beta/pre-release data directly (bypassing stable release check).
 
         This method fetches all releases and returns the latest one, which may be a beta.
@@ -122,6 +121,7 @@ class ReleaseManager:
 
         Returns:
             tuple: (Success flag, Raw release JSON data or error message string)
+
         """
         logger.debug(f"Fetching latest beta release directly for {self.owner}/{self.repo}")
         return self._fetch_all_releases_data(headers)

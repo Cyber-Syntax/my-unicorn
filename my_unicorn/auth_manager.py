@@ -17,7 +17,11 @@ import requests
 
 from my_unicorn.secure_token import SecureTokenManager
 from my_unicorn.utils.cache_utils import ensure_directory_exists, load_json_cache, save_json_cache
-from my_unicorn.utils.datetime_utils import format_timestamp, get_next_hour_timestamp, parse_timestamp
+from my_unicorn.utils.datetime_utils import (
+    format_timestamp,
+    get_next_hour_timestamp,
+    parse_timestamp,
+)
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -44,7 +48,7 @@ class GitHubAuthManager:
     _last_token_check: float = 0
     _token_check_interval: int = 300  # Check token validity every 5 minutes
     _cached_headers_expiration: float = 0  # Timestamp when cached headers expire
-    _audit_enabled: bool = True  # Enable audit logging by default
+
     _rate_limit_cache: dict[str, Any] = {}
     _rate_limit_cache_time: float = 0
     _request_count_since_cache: int = 0  # Counter for API requests since last cache refresh
@@ -130,10 +134,6 @@ class GitHubAuthManager:
                 cls._cached_headers_expiration = time.time() + cls._token_check_interval
         else:
             cls._cached_headers_expiration = time.time() + cls._token_check_interval
-
-        # Log this action if audit is enabled (but don't expose token)
-        if cls._audit_enabled:
-            SecureTokenManager.audit_log_token_usage("generate_auth_headers")
 
         logger.debug("Created GitHub API authentication headers with token")
         return auth_headers
@@ -441,10 +441,6 @@ class GitHubAuthManager:
                     "%Y-%m-%d %H:%M:%S"
                 )
 
-                # Log usage for audit
-                if cls._audit_enabled and is_authenticated:
-                    SecureTokenManager.audit_log_token_usage("check_rate_limit")
-
                 # Create the result dictionary
                 cache_data = {
                     "remaining": remaining,
@@ -717,7 +713,6 @@ class GitHubAuthManager:
         method: str,
         url: str,
         retry_auth: bool = True,
-        audit_action: str | None = None,
         **kwargs,
     ) -> requests.Response:
         """Make an authenticated request to GitHub API with session reuse.
@@ -726,7 +721,7 @@ class GitHubAuthManager:
             method: HTTP method (GET, POST, etc)
             url: URL to request
             retry_auth: Whether to retry on auth failures (with token refresh)
-            audit_action: Action name for audit logging
+
             **kwargs: Additional arguments to pass to requests
 
         Returns:
@@ -755,10 +750,6 @@ class GitHubAuthManager:
             try:
                 # Make the request with session
                 response = session.request(method, url, **kwargs)
-
-                # Audit logging (only when needed)
-                if cls._audit_enabled and audit_action:
-                    SecureTokenManager.audit_log_token_usage(audit_action)
 
                 # Extract rate limit info from headers instead of separate API calls
                 if response.status_code == 200 and url.startswith("https://api.github.com"):
@@ -794,17 +785,6 @@ class GitHubAuthManager:
                 raise
 
     @classmethod
-    def set_audit_enabled(cls, enabled: bool) -> None:
-        """Enable or disable audit logging for authentication activities.
-
-        Args:
-            enabled: Whether to enable audit logging
-
-        """
-        cls._audit_enabled = enabled
-        logger.info(f"Authentication audit logging {'enabled' if enabled else 'disabled'}")
-
-    @classmethod
     def get_token_info(cls) -> dict[str, Any]:
         """Get information about the current token.
 
@@ -817,9 +797,10 @@ class GitHubAuthManager:
                 - token_valid: bool
                 - is_expired: bool
                 - expiration_date: str | None
-                - days_until_rotation: int | None 
+                - days_until_rotation: int | None
                 - created_at: str | None
                 - last_used_at: str | None
+
         """
         logger.debug("Getting token information and status")
         token_metadata = SecureTokenManager.get_token_metadata()
@@ -890,6 +871,7 @@ class GitHubAuthManager:
                 - limit: Total request limit
                 - reset_formatted: Human readable reset time
                 - is_authenticated: Whether request was authenticated
+
         """
         logger.info("Checking live rate limit information from GitHub API")
 
@@ -1113,6 +1095,7 @@ class SessionPool:
 
         Args:
             token_key: Token identifier to clear session for, None for unauthenticated
+
         """
         key = str(token_key or "unauthenticated")
 

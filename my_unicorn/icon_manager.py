@@ -12,8 +12,8 @@ from typing import Any
 
 import requests
 
-from my_unicorn.catalog import load_app_definition
 from my_unicorn.auth_manager import GitHubAuthManager
+from my_unicorn.catalog import load_app_definition
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +139,7 @@ class IconManager:
 
             # Use GitHubAuthManager for authenticated requests with rate limit handling
             response = GitHubAuthManager.make_authenticated_request(
-                "GET", content_url, headers=headers, timeout=10, audit_action="icon_path_check"
+                "GET", content_url, headers=headers, timeout=10
             )
 
             if response.status_code == 200:
@@ -243,7 +243,7 @@ class IconManager:
             if "api.github.com" in download_url:
                 # Use GitHubAuthManager for GitHub API URLs
                 response = GitHubAuthManager.make_authenticated_request(
-                    "GET", download_url, stream=True, timeout=10, audit_action="icon_download"
+                    "GET", download_url, stream=True, timeout=10
                 )
             else:
                 # Direct download for external URLs
