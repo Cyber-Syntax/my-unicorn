@@ -11,6 +11,8 @@ import logging
 import os
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 
 class HashCalculator:
     """Handles hash computation and comparison for file verification."""
@@ -61,7 +63,7 @@ class HashCalculator:
 
         """
         if self._is_special_checksum_hash_type():
-            logging.warning("Attempted to calculate hash with special checksum_hash_type '%s'",
+            logger.warning("Attempted to calculate hash with special checksum_hash_type '%s'",
             self.checksum_hash_type
         )
             return ""
@@ -83,7 +85,7 @@ class HashCalculator:
 
                 except OSError as lock_error:
                     # If locking fails, proceed without lock but log warning
-                    logging.warning("Could not acquire file lock for %s: %s", filepath, lock_error)
+                    logger.warning("Could not acquire file lock for %s: %s", filepath, lock_error)
                     f.seek(0)  # Reset file position
                     for chunk in iter(lambda: f.read(chunk_size), b""):
                         hash_func.update(chunk)

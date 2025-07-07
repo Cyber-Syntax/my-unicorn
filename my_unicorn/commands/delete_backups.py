@@ -13,6 +13,8 @@ import os
 from my_unicorn.commands.base import Command
 from my_unicorn.global_config import GlobalConfigManager
 
+logger = logging.getLogger(__name__)
+
 
 class DeleteBackupsCommand(Command):
     """Command for managing and deleting backup files."""
@@ -72,12 +74,12 @@ class DeleteBackupsCommand(Command):
 
             if file_count > 0:
                 print(f"✓ Successfully deleted {file_count} backup files.")
-                logging.info("Deleted %s backup files from %s", file_count, backup_dir)
+                logger.info("Deleted %s backup files from %s", file_count, backup_dir)
             else:
                 print("No backup files found to delete.")
 
         except OSError as e:
-            logging.error("Error deleting backup files: %s", e)
+            logger.error("Error deleting backup files: %s", e)
             print(f"Error deleting backup files: {e}")
 
     def _delete_app_backups(self, global_config: GlobalConfigManager) -> None:
@@ -133,14 +135,14 @@ class DeleteBackupsCommand(Command):
 
             if file_count > 0:
                 print(f"✓ Successfully deleted {file_count} backup files for {selected_app}.")
-                logging.info("Deleted %s backup files for %s", file_count, selected_app)
+                logger.info("Deleted %s backup files for %s", file_count, selected_app)
             else:
                 print(f"No backup files found for {selected_app}.")
 
         except ValueError:
             print("Invalid input. Please enter a number.")
         except OSError as e:
-            logging.error("Error deleting app backups: %s", e)
+            logger.error("Error deleting app backups: %s", e)
             print(f"Error deleting app backups: {e!s}")
 
     def _delete_old_backups(self, global_config: GlobalConfigManager) -> None:
@@ -216,12 +218,13 @@ class DeleteBackupsCommand(Command):
 
             if file_count > 0:
                 print(f"✓ Successfully deleted {file_count} backup files older than {date_desc}.")
-                logging.info("Deleted %s backup files older than %s", file_count, date_desc)
+                logger.info("Deleted %s backup files older than %s", file_count, date_desc)
             else:
+                logger.info("No backup files found older than %s", date_desc)
                 print(f"No backup files found older than {date_desc}.")
 
         except OSError as e:
-            logging.error("Error deleting old backups: %s", e)
+            logger.error("Error deleting old backups: %s", e)
             print(f"Error deleting old backups: {e!s}")
 
     def _cleanup_to_max_backups(self, global_config: GlobalConfigManager) -> None:
@@ -272,7 +275,7 @@ class DeleteBackupsCommand(Command):
 
             len_app_backups = len(app_backups)
             # Log what we found
-            logging.info("Found %s backups for %s, max_backups=%d", len_app_backups, app, max_backups)
+            logger.info("Found %s backups for %s, max_backups=%d", len_app_backups, app, max_backups)
 
             # Keep only the newest max_backups files
             if len_app_backups > max_backups:
@@ -282,13 +285,13 @@ class DeleteBackupsCommand(Command):
                     try:
                         os.remove(filepath)
                         removed_count += 1
-                        logging.info("Removed old backup: %s", filename)
+                        logger.info("Removed old backup: %s", filename)
                     except OSError as e:
-                        logging.warning("Failed to remove old backup %s: %s", filename, e)
+                        logger.warning("Failed to remove old backup %s: %s", filename, e)
 
                 total_removed += removed_count
                 if removed_count > 0:
-                    logging.info("Cleaned up %d old backups for %s", removed_count, app)
+                    logger.info("Cleaned up %d old backups for %s", removed_count, app)
 
         if total_removed > 0:
             print(
@@ -329,6 +332,6 @@ class DeleteBackupsCommand(Command):
 
                     apps.add(app_name)
         except OSError as e:
-            logging.error("Error getting available apps: %s", e)
+            logger.error("Error getting available apps: %s", e)
 
         return sorted(list(apps))

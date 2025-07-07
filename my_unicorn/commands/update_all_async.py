@@ -33,7 +33,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
     improved performance.
 
     Attributes:
-        _logger (logging.Logger): Logger instance for this class
+        _logger (self._logger.Logger): Logger instance for this class
 
     """
 
@@ -70,7 +70,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             available_files = self.app_config.list_json_files()
 
             if not available_files:
-                logging.warning("No AppImage configuration files found")
+                self._logger.warning("No AppImage configuration files found")
                 print("No AppImage configuration files found. Use the Download option first.")
                 return
 
@@ -119,12 +119,12 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             # 1. Find updatable apps via user selection
             updatable = self._find_updatable_apps()
             if not updatable:
-                logging.info("No AppImages selected for update or all are up to date")
+                self._logger.info("No AppImages selected for update or all are up to date")
                 return
 
             # 2. Get user confirmation
             if not self._confirm_updates(updatable):
-                logging.info("Update cancelled by user")
+                self._logger.info("Update cancelled by user")
                 print("Update cancelled")
                 return
 
@@ -137,7 +137,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                 print(status_message)
 
                 if not filtered_apps:
-                    logging.warning("Update aborted: Insufficient API rate limits")
+                    self._logger.warning("Update aborted: Insufficient API rate limits")
                     print("Update process aborted due to rate limit constraints.")
                     return
 
@@ -153,11 +153,11 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                     )
 
                     if not continue_partial:
-                        logging.info("User declined partial update")
+                        self._logger.info("User declined partial update")
                         print("Update cancelled.")
                         return
                 except KeyboardInterrupt:
-                    logging.info("Rate limit confirmation cancelled by user (Ctrl+C)")
+                    self._logger.info("Rate limit confirmation cancelled by user (Ctrl+C)")
                     print("\nUpdate cancelled by user (Ctrl+C)")
                     return
 
@@ -169,7 +169,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             self._perform_async_updates(updatable)
 
         except KeyboardInterrupt:
-            logging.info("Operation cancelled by user (Ctrl+C)")
+            self._logger.info("Operation cancelled by user (Ctrl+C)")
             print("\nOperation cancelled by user (Ctrl+C)")
             return
         except Exception as e:

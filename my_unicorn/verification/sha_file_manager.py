@@ -12,6 +12,8 @@ import re
 import requests
 import yaml
 
+logger = logging.getLogger(__name__)
+
 
 class ShaFileManager:
     """Manages SHA file operations including downloading and parsing."""
@@ -39,7 +41,7 @@ class ShaFileManager:
         if os.path.exists(sha_path):
             try:
                 os.remove(sha_path)
-                logging.info("Removed existing SHA file: %s", sha_path)
+                logger.info("Removed existing SHA file: %s", sha_path)
             except OSError as e:
                 raise OSError(f"Failed to remove existing SHA file: {e}")
 
@@ -49,7 +51,7 @@ class ShaFileManager:
 
             with open(sha_path, "w", encoding="utf-8") as f:
                 f.write(response.text)
-            logging.info("Successfully downloaded SHA file: %s", sha_path)
+            logger.info("Successfully downloaded SHA file: %s", sha_path)
 
         except requests.RequestException as e:
             raise OSError(f"Failed to download SHA file from {checksum_file_download_url}: {e}")
@@ -91,7 +93,7 @@ class ShaFileManager:
         except ValueError as e:
             # If standard parsing fails, try path-based parser as fallback
             if "No valid hash found" in str(e):
-                logging.info("Standard hash parsing failed, trying path-based fallback")
+                logger.info("Standard hash parsing failed, trying path-based fallback")
                 return self._parse_path_sha(sha_path, appimage_name)
             raise
 
@@ -201,7 +203,7 @@ class ShaFileManager:
                 hash_match = re.search(hash_pattern, content, re.MULTILINE | re.IGNORECASE)
                 if hash_match:
                     hash_value = hash_match.group(1).lower()
-                    logging.info("Found valid hash for %s in GitHub-style SHA file", target_name)
+                    logger.info("Found valid hash for %s in GitHub-style SHA file", target_name)
                     return hash_value
 
             # Process line by line for common formats
@@ -219,7 +221,7 @@ class ShaFileManager:
 
                 hash_value = self._extract_hash_from_line(parts, target_name, line)
                 if hash_value:
-                    logging.info("Found valid hash for %s in SHA file", target_name)
+                    logger.info("Found valid hash for %s in SHA file", target_name)
                     return hash_value
 
             raise ValueError("No valid hash found for %s in SHA file", appimage_name)
@@ -227,7 +229,7 @@ class ShaFileManager:
         except OSError as e:
             raise OSError(f"Failed to read SHA file: {e}")
         except Exception as e:
-            logging.error("Error parsing SHA file: %s", e)
+            logger.error("Error parsing SHA file: %s", e)
             raise
 
     def _extract_hash_from_line(self, parts: list[str], target_name: str, line: str) -> str | None:
@@ -271,13 +273,13 @@ class ShaFileManager:
         expected_length = 64 if self.checksum_hash_type == "sha256" else 128
         len_hash_value = len(hash_value)
         if len_hash_value != expected_length:
-            logging.warning(
+            logger.warning(
                 "Hash has wrong length: %s, expected %s", len_hash_value, expected_length
             )
             return None
 
         if not re.match(r"^[0-9a-f]+$", hash_value, re.IGNORECASE):
-            logging.warning("Invalid hex characters in hash: %s", hash_value)
+            logger.warning("Invalid hex characters in hash: %s", hash_value)
             return None
 
         return hash_value.lower()
@@ -318,7 +320,7 @@ class ShaFileManager:
                     if path_filename == target_filename:
                         validated_hash = self._validate_and_return_hash(hash_value)
                         if validated_hash:
-                            logging.info(
+                            logger.info(
                                 f"Found valid hash for {path_filename} in path-based SHA file"
                             )
                             return validated_hash
@@ -326,5 +328,5 @@ class ShaFileManager:
             raise ValueError(f"No valid hash found for {target_filename} in path-based SHA file")
 
         except OSError as e:
-            logging.error("Failed to read SHA file: %s", e)
+            logger.error("Failed to read SHA file: %s", e)
             raise OSError("Failed to read SHA file: %s" % e)

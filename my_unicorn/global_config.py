@@ -3,6 +3,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class GlobalConfigManager:
@@ -38,7 +39,7 @@ class GlobalConfigManager:
             bool: True if config was loaded successfully, False otherwise
 
         """
-        logging.info("Explicitly reloading global configuration from disk")
+        logger.info("Explicitly reloading global configuration from disk")
         return self.load_config()
 
     def load_config(self):
@@ -76,12 +77,12 @@ class GlobalConfigManager:
                     # If any expected keys are missing, log it
                     missing_keys = expected_keys - found_keys
                     if missing_keys:
-                        logging.info("Config file is missing keys: %s", missing_keys)
+                        logger.info("Config file is missing keys: %s", missing_keys)
             except json.JSONDecodeError as e:
-                logging.error("Failed to parse the configuration file: %s", e)
+                logger.error("Failed to parse the configuration file: %s", e)
                 raise ValueError("Invalid JSON format in the configuration file.")
         else:
-            logging.info("Configuration file not found at %s. Creating one...", self.config_file)
+            logger.info("Configuration file not found at %s. Creating one...", self.config_file)
             self.create_global_config()
             return False
 
@@ -145,7 +146,7 @@ class GlobalConfigManager:
             self.save_config()
             print("Global configuration saved successfully!")
         except KeyboardInterrupt:
-            logging.info("Global configuration setup interrupted by user")
+            logger.info("Global configuration setup interrupted by user")
             print("\nConfiguration setup interrupted. Using default values.")
 
             # set default values
@@ -167,7 +168,7 @@ class GlobalConfigManager:
         os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
         with open(self.config_file, "w", encoding="utf-8") as file:
             json.dump(self.to_dict(), file, indent=4)
-        logging.info("Global configuration saved to %s", self.config_file)
+        logger.info("Global configuration saved to %s", self.config_file)
 
     # Properties to access expanded paths on demand
     @property
@@ -270,10 +271,10 @@ class GlobalConfigManager:
                 print(f"\033[42m{key.capitalize()} updated successfully in settings.json\033[0m")
                 print("=================================================")
             except KeyboardInterrupt:
-                logging.info("User interrupted configuration update")
+                logger.info("User interrupted configuration update")
                 print("\nConfiguration update cancelled. No changes were made.")
                 return
         except KeyboardInterrupt:
-            logging.info("User interrupted configuration customization")
+            logger.info("User interrupted configuration customization")
             print("\nConfiguration customization cancelled. No changes were made.")
             return

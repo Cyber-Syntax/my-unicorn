@@ -707,7 +707,7 @@ class ManageTokenCommand(Command):
 
             # Validate the token using GitHubAuthManager for improved validation
             if not self.validate_token(token):
-                logging.error("Invalid GitHub token! _validate_token returned False")
+                self._logger.error("Invalid GitHub token! _validate_token returned False")
                 print("\n❌ Invalid GitHub token! Token was not saved.")
                 print("   Please make sure you've entered the token correctly.")
                 return
@@ -715,7 +715,7 @@ class ManageTokenCommand(Command):
         # Ask for token expiration
         expiration_days = self._get_token_expiration_days()
         if expiration_days is None:
-            logging.error(
+            self._logger.error(
                 "Token expiration days not provided. _get_token_expiration_days returned None"
             )
             print("Operation cancelled.")
