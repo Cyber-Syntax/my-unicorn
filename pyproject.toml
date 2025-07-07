@@ -1,7 +1,7 @@
 [project]
 name = 'my-unicorn'
 # dynamic = ["version"]
-version = '0.13.0-alpha'
+version = '0.13.1-alpha'
 maintainers = [{ name = "Cyber-Syntax" }]
 license = { text = "GPL-3.0-or-later" }
 description = 'It downloads/updates appimages via GitHub API. It also validates the appimage with SHA256 and SHA512.'
