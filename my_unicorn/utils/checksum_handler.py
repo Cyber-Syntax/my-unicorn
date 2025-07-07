@@ -35,7 +35,7 @@ def verify_with_strategy(
 
     """
     if not os.path.exists(appimage_path):
-        logger.error(f"AppImage file not found: {appimage_path}")
+        logger.error("AppImage file not found: %s", appimage_path)
         return False
 
     # Get verification parameters
@@ -46,7 +46,7 @@ def verify_with_strategy(
 
     # Handle special case for release description checksums
     if checksum_file_name == "extracted_checksum":
-        logger.info(f"Using GitHub release description for verification of {appimage_name}")
+        logger.info("Using GitHub release description for verification of %s", appimage_name)
 
         # Get owner/repo from app_info if available
         owner = app_info.get("owner")
@@ -93,12 +93,11 @@ def verify_downloaded_appimage(
         # Find the downloaded AppImage file
         appimage_files = list(downloads_dir.glob(f"{app_rename}-*.AppImage"))
         if not appimage_files:
-            error_msg = f"No AppImage found for {app_rename} in {downloads_dir}"
-            logger.error(error_msg)
-            return False, error_msg
+            logger.error("No AppImage found for %s in %s", app_rename, downloads_dir)
+            return False, "No AppImage found for %s in %s" % (app_rename, downloads_dir)
 
         appimage_path = str(appimage_files[0])
-        logger.info(f"Found AppImage to verify: {appimage_path}")
+        logger.info("Found AppImage to verify: %s", appimage_path)
 
         # Handle verification based on app_info
         success = verify_with_strategy(
@@ -106,14 +105,12 @@ def verify_downloaded_appimage(
         )
 
         if success:
-            logger.info(f"Successfully verified {os.path.basename(appimage_path)}")
+            logger.info("Successfully verified %s", os.path.basename(appimage_path))
             return True, appimage_path
         else:
-            error_msg = f"Verification failed for {os.path.basename(appimage_path)}"
-            logger.error(error_msg)
-            return False, error_msg
+            logger.error("Verification failed for %s", os.path.basename(appimage_path))
+            return False, "Verification failed for %s" % os.path.basename(appimage_path)
 
     except Exception as e:
-        error_msg = f"Error during verification: {e}"
-        logger.exception(error_msg)
-        return False, error_msg
+        logger.exception("Error during verification: %s", e)
+        return False, "Error during verification: %s" % e

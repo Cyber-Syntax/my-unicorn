@@ -1,6 +1,6 @@
 """File storage operations for checksum data.
 
-This module provides functionality to securely store and manage checksum data for AppImage 
+This module provides functionality to securely store and manage checksum data for AppImage
 verification. It handles writing checksums to files in a standardized format and ensures proper
 file permissions are set.
 """
@@ -56,9 +56,9 @@ def save_checksums_file(checksums: list[str], output_path: str | None = None) ->
             os.remove(output_path)
         os.rename(f"{output_path}.tmp", output_path)
 
-        logger.info(f"Created checksums file with {len(checksums)} entries: {output_path}")
+        logger.info("Created checksums file with %d entries: %s", len(checksums), output_path)
         return output_path
 
     except OSError as e:
-        logger.error(f"Failed to write checksums file: {e}")
+        logger.error("Failed to write checksums file: %s", e)
         raise OSError(f"Failed to write checksums file: {e}")

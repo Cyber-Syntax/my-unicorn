@@ -1,6 +1,6 @@
 """GitHub release description checksum parsing strategies.
 
-This module provides functionality to extract SHA256 checksums from GitHub release descriptions 
+This module provides functionality to extract SHA256 checksums from GitHub release descriptions
 using various parsing strategies. Each strategy handles different common formats found in release
 descriptions.
 """
@@ -67,5 +67,5 @@ def parse_checksums_from_description(description: str) -> list[str]:
             if re.match(r"^[0-9a-f]{64}\s+\S+", line, re.IGNORECASE):
                 checksums.append(line)
 
-    logger.debug(f"Found {len(checksums)} SHA256 checksum entries")
+    logger.debug("Found %d SHA256 checksum entries", len(checksums))
     return checksums

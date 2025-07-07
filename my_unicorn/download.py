@@ -191,9 +191,8 @@ class DownloadManager:
         appimage_name = self.github_api.appimage_name
 
         if not app_download_url or not appimage_name:
-            error_msg = "AppImage URL or name is not available. Cannot download."
-            self._logger.error(error_msg)
-            raise ValueError(error_msg)
+            self._logger.error("AppImage URL or name is not available. Cannot download.")
+            raise ValueError("AppImage URL or name is not available. Cannot download.")
 
         downloads_dir = self.get_downloads_dir()
         existing_file_path = os.path.join(downloads_dir, appimage_name)
@@ -207,17 +206,17 @@ class DownloadManager:
             if os.path.exists(existing_file_path):
                 # Verify the existing file is complete
                 if self._verify_existing_file(existing_file_path):
-                    self._logger.info(f"File already exists and verified: {appimage_name}")
+                    self._logger.info("File already exists and verified: %s", appimage_name)
                     print(f"Found existing file: {appimage_name}")
                     return existing_file_path, True
                 else:
                     # Remove corrupted/incomplete file
-                    self._logger.info(f"Removing corrupted existing file: {appimage_name}")
+                    self._logger.info("Removing corrupted existing file: %s", appimage_name)
                     try:
                         os.remove(existing_file_path)
                     except OSError as e:
                         self._logger.warning(
-                            f"Could not remove corrupted file {existing_file_path}: {e}"
+                            "Could not remove corrupted file %s: %s", existing_file_path, e
                         )
 
             # Download the file with progress tracking
@@ -226,9 +225,8 @@ class DownloadManager:
                     app_download_url, appimage_name, existing_file_path
                 )
             except Exception as e:
-                error_msg = f"Error downloading {appimage_name}: {e!s}"
-                self._logger.error(error_msg)
-                raise RuntimeError(error_msg) from e
+                self._logger.error("Error downloading %s: %s", appimage_name, e)
+                raise RuntimeError("Error downloading %s: %s" % (appimage_name, e)) from e
 
     def _get_file_size(self, url: str, headers: dict[str, str]) -> int:
         """Get the file size by making a HEAD request.
@@ -244,7 +242,7 @@ class DownloadManager:
             requests.exceptions.RequestException: For network errors
 
         """
-        self._logger.info(f"Fetching headers for {url}")
+        self._logger.info("Fetching headers for %s", url)
         response = requests.head(url, allow_redirects=True, timeout=10, headers=headers)
         response.raise_for_status()
         return int(response.headers.get("content-length", 0))
@@ -276,7 +274,7 @@ class DownloadManager:
             return download_id
 
         except Exception as e:
-            self._logger.error(f"Error creating progress task: {e!s}")
+            self._logger.error("Error creating progress task: %s", e)
             # Fallback to console output without progress bar
             print(f"{prefix}Downloading {filename}...")
             return None
@@ -339,7 +337,7 @@ class DownloadManager:
             for chunk in response.iter_content(chunk_size=chunk_size):
                 if self.cancel_event and self.cancel_event.is_set():
                     self._logger.info(
-                        f"Download of {os.path.basename(file_path)} cancelled by user."
+                        "Download of %s cancelled by user.", os.path.basename(file_path)
                     )
                     # response.close() # Ensure connection is closed
                     # f.close() # Ensure file is closed before attempting to remove
@@ -445,9 +443,13 @@ class DownloadManager:
         # VerificationManager will download and parse the checksum_file_name file.
 
         logging.info(
-            f"Instantiating VerificationManager for {self.github_api.appimage_name} with: "
-            f"checksum_file_name='{checksum_file_name_to_pass}', checksum_hash_type='{self.github_api.checksum_hash_type}', "
-            f"direct_hash_provided={direct_hash_to_pass is not None}"
+            "Instantiating VerificationManager for %s with: "
+            "checksum_file_name='%s', checksum_hash_type='%s', "
+            "direct_hash_provided=%s",
+            self.github_api.appimage_name,
+            checksum_file_name_to_pass,
+            self.github_api.checksum_hash_type,
+            direct_hash_to_pass is not None
         )
 
         verifier = VerificationManager(
@@ -499,7 +501,7 @@ class DownloadManager:
 
             # File should be at least 1KB for an AppImage (allow smaller files for testing)
             if file_size < 1024:
-                self._logger.warning(f"File {file_path} is too small ({file_size} bytes)")
+                self._logger.warning("File %s is too small (%s bytes)", file_path, file_size)
                 return False
 
             # Try to get expected file size from server if possible
@@ -509,7 +511,7 @@ class DownloadManager:
                     expected_size > 0 and abs(file_size - expected_size) > 1024
                 ):  # Allow 1KB tolerance
                     self._logger.warning(
-                        f"File size mismatch: expected {expected_size}, got {file_size}"
+                        "File size mismatch: expected %s, got %s", expected_size, file_size
                     )
                     return False
             except Exception:
@@ -519,7 +521,7 @@ class DownloadManager:
             return True
 
         except Exception as e:
-            self._logger.error(f"Error verifying existing file {file_path}: {e}")
+            self._logger.error("Error verifying existing file %s: %s", file_path, e)
             return False
 
     def _get_expected_file_size(self) -> int:
@@ -541,7 +543,7 @@ class DownloadManager:
                 return int(content_length)
 
         except Exception as e:
-            self._logger.debug(f"Could not get expected file size: {e}")
+            self._logger.debug("Could not get expected file size: %s", e)
 
         return 0
 
@@ -593,7 +595,7 @@ class DownloadManager:
             # Atomically move the completed file to its final location
             os.rename(temp_path, final_path)
 
-            self._logger.info(f"Successfully downloaded {filename} to {final_path}")
+            self._logger.info("Successfully downloaded %s to %s", filename, final_path)
             return final_path, False
 
         except Exception as e:
@@ -684,7 +686,7 @@ class DownloadManager:
             if os.path.exists(file_path):
                 # File exists, verify it's complete
                 if self._verify_existing_file(file_path):
-                    self._logger.info(f"Download of {filename} completed by another process")
+                    self._logger.info("Download of %s completed by another process", filename)
                     return file_path, True
 
             # Check if lock file still exists (indicating download is still in progress)
@@ -694,9 +696,8 @@ class DownloadManager:
                 break
 
         # Timeout or download failed
-        error_msg = f"Timeout waiting for {filename} to be downloaded by another process"
-        self._logger.error(error_msg)
-        raise RuntimeError(error_msg)
+        self._logger.error("Timeout waiting for %s to be downloaded by another process", filename)
+        raise RuntimeError("Timeout waiting for %s to be downloaded by another process" % filename)
 
     def _get_download_id(self, file_path: str) -> str:
         """Generate a unique download ID from file path.

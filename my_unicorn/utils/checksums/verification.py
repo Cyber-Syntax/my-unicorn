@@ -21,12 +21,13 @@ def get_repo_info_for_appimage(appimage_path: str | Path) -> dict[str, str]:
         "get_repo_info_for_appimage() is deprecated. "
         "Use ReleaseDescVerifier.get_repo_info_for_appimage() from my_unicorn.verification.release_desc_verifier instead."
     )
-    
+
     try:
         from my_unicorn.verification.release_desc_verifier import ReleaseDescVerifier
+
         return ReleaseDescVerifier.get_repo_info_for_appimage(appimage_path)
     except ImportError as e:
-        logger.error(f"Failed to import ReleaseDescVerifier: {e}")
+        logger.error("Failed to import ReleaseDescVerifier: %s", e)
         return {}
 
 
@@ -51,11 +52,7 @@ def validate_repo_info(repo_info: dict[str, str]) -> bool:
         "validate_repo_info() is deprecated. "
         "Use ReleaseDescVerifier.validate_repo_info() from my_unicorn.verification.release_desc_verifier instead."
     )
-    return bool(
-        repo_info 
-        and repo_info.get("owner") 
-        and repo_info.get("repo")
-    )
+    return bool(repo_info and repo_info.get("owner") and repo_info.get("repo"))
 
 
 def format_repo_identifier(owner: str, repo: str) -> str:
@@ -63,10 +60,7 @@ def format_repo_identifier(owner: str, repo: str) -> str:
 
     DEPRECATED: Use f"{owner}/{repo}" directly.
     """
-    logger.warning(
-        "format_repo_identifier() is deprecated. "
-        "Use f'{owner}/{repo}' directly."
-    )
+    logger.warning("format_repo_identifier() is deprecated. Use f'{owner}/{repo}' directly.")
     return f"{owner}/{repo}"
 
 
@@ -81,13 +75,16 @@ def verify_with_release_checksums(
         "verify_with_release_checksums() is deprecated. "
         "Use ReleaseDescVerifier from my_unicorn.verification.release_desc_verifier instead."
     )
-    
+
     try:
         from my_unicorn.verification.release_desc_verifier import ReleaseDescVerifier
+
         verifier = ReleaseDescVerifier(owner=owner, repo=repo)
-        return verifier.verify_appimage(appimage_path=appimage_path, cleanup_on_failure=cleanup_on_failure)
+        return verifier.verify_appimage(
+            appimage_path=appimage_path, cleanup_on_failure=cleanup_on_failure
+        )
     except ImportError as e:
-        logger.error(f"Failed to import ReleaseDescVerifier: {e}")
+        logger.error("Failed to import ReleaseDescVerifier: %s", e)
         return False
 
 
@@ -105,9 +102,10 @@ def handle_release_description_verification(
         "handle_release_description_verification() is deprecated. "
         "Use ReleaseDescVerifier.verify_appimage_standalone() from my_unicorn.verification.release_desc_verifier instead."
     )
-    
+
     try:
         from my_unicorn.verification.release_desc_verifier import ReleaseDescVerifier
+
         return ReleaseDescVerifier.verify_appimage_standalone(
             appimage_path=appimage_path,
             owner=owner,
@@ -115,5 +113,5 @@ def handle_release_description_verification(
             cleanup_on_failure=cleanup_on_failure,
         )
     except ImportError as e:
-        logger.error(f"Failed to import ReleaseDescVerifier: {e}")
+        logger.error("Failed to import ReleaseDescVerifier: %s", e)
         return False

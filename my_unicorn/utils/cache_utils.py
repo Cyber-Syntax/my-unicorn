@@ -23,13 +23,16 @@ def ensure_directory_exists(directory_path: str) -> str:
 
     Returns:
         str: Path to the directory
+
     """
     os.makedirs(directory_path, exist_ok=True)
     return directory_path
 
 
 def load_json_cache(
-    cache_file_path: str, ttl_seconds: int = 3600, hard_refresh_seconds: tuple[str, str] | None = None
+    cache_file_path: str,
+    ttl_seconds: int = 3600,
+    hard_refresh_seconds: tuple[str, str] | None = None,
 ) -> tuple[str, Any]:
     """Load cached data from a JSON file with TTL validation.
 
@@ -40,6 +43,7 @@ def load_json_cache(
 
     Returns:
         tuple[str, Any]: Cache data or empty dict if invalid/expired
+
     """
     try:
         if os.path.exists(cache_file_path):
@@ -52,21 +56,23 @@ def load_json_cache(
 
             # Check primary TTL
             if cache_age < ttl_seconds:
-                logger.debug(f"Using cache from {cache_file_path} (age: {int(cache_age)}s)")
+                logger.debug("Using cache from %s (age: %ds)", cache_file_path, int(cache_age))
                 return data
 
             # Check secondary TTL (hard refresh limit) if specified
             if hard_refresh_seconds and cache_age < hard_refresh_seconds:
-                logger.debug(f"Using stale cache from {cache_file_path} (age: {int(cache_age)}s)")
+                logger.debug(
+                    "Using stale cache from %s (age: %ds)", cache_file_path, int(cache_age)
+                )
                 # Reset request counter but keep the data
                 if "request_count" in data:
                     data["request_count"] = 0
                 return data
 
-            logger.debug(f"Cache expired: {cache_file_path} (age: {int(cache_age)}s)")
+            logger.debug("Cache expired: %s (age: %ds)", cache_file_path, int(cache_age))
         return {}
     except Exception as e:
-        logger.debug(f"Error loading cache from {cache_file_path}: {e}")
+        logger.debug("Error loading cache from %s: %s", cache_file_path, e)
         return {}
 
 
@@ -79,6 +85,7 @@ def save_json_cache(cache_file_path: str, data: tuple[str, Any]) -> bool:
 
     Returns:
         bool: True if saved successfully, False otherwise
+
     """
     try:
         # Add timestamp if not present
@@ -100,12 +107,12 @@ def save_json_cache(cache_file_path: str, data: tuple[str, Any]) -> bool:
         os.replace(temp_file, cache_file_path)
         return True
     except Exception as e:
-        logger.debug(f"Error saving cache to {cache_file_path}: {e}")
+        logger.debug("Error saving cache to %s: %s", cache_file_path, e)
 
         # Try to clean up temp file if it exists
         try:
-            if os.path.exists(f"{cache_file_path}.tmp"):
-                os.remove(f"{cache_file_path}.tmp")
+            if os.path.exists("%s.tmp" % cache_file_path):
+                os.remove("%s.tmp" % cache_file_path)
         except:
             pass
 

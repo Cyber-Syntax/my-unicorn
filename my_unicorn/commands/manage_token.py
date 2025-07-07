@@ -115,7 +115,7 @@ class ManageTokenCommand(Command):
                             else:
                                 print(f"✅ Token valid - {days_remaining} days until expiration")
                     except Exception as e:
-                        self._logger.error(f"Error processing expiration date: {e}")
+                        self._logger.error("Error processing expiration date: %s", e)
                         print("⚠️ Token expiration date could not be determined")
 
                 # Show when the token was last used
@@ -125,7 +125,7 @@ class ManageTokenCommand(Command):
                         if last_used_dt:
                             print(f"📊 Last used: {last_used_dt.strftime('%Y-%m-%d %H:%M:%S')}")
                     except Exception as e:
-                        self._logger.error(f"Error processing last used date: {e}")
+                        self._logger.error("Error processing last used date: %s", e)
         else:
             print("❌ No GitHub token configured")
 
@@ -238,11 +238,10 @@ class ManageTokenCommand(Command):
 
             # Check if there was an error
             if "error" in rate_limit_info:
-                error_msg = (
-                    f"❌ Error retrieving rate limit information: {rate_limit_info['error']}"
+                self._logger.error(
+                    "❌ Error retrieving rate limit information: %s", rate_limit_info["error"]
                 )
-                self._logger.error(error_msg)
-                print(error_msg)
+                print("❌ Error retrieving rate limit information: %s" % rate_limit_info["error"])
                 print("   Please check your token validity and network connection.")
                 return
 
@@ -395,12 +394,12 @@ class ManageTokenCommand(Command):
                         print("ℹ️ Using classic personal access token")
                         print("   Consider upgrading to a fine-grained token for better security")
             except Exception as token_info_error:
-                self._logger.error(f"Error retrieving token information: {token_info_error}")
+                self._logger.error("Error retrieving token information: %s", token_info_error)
                 # Continue execution - token info is not critical
 
         except Exception as e:
             # Log both the error type and the message for better debugging
-            self._logger.error(f"Error checking rate limits: {type(e).__name__}: {e!s}")
+            self._logger.error("Error checking rate limits: %s", type(e).__name__)
             self._logger.exception("Detailed exception info:")
 
             print(f"❌ Error checking rate limits: {type(e).__name__}: {e!s}")
@@ -458,7 +457,7 @@ class ManageTokenCommand(Command):
 
                 return False
         except Exception as e:
-            self._logger.error(f"Error validating token: {e}")
+            self._logger.error("Error validating token: %s", e)
             print(f" ❌ Error! {e!s}")
             return False
 
@@ -484,7 +483,7 @@ class ManageTokenCommand(Command):
                 else:
                     print("Creation date: Unknown")
             except Exception as e:
-                self._logger.error(f"Error processing creation date: {e}")
+                self._logger.error("Error processing creation date: %s", e)
                 print("Creation date: Unknown")
 
         # Display expiration date and status
@@ -513,7 +512,7 @@ class ManageTokenCommand(Command):
                 else:
                     print("Expiration date: Unknown")
             except Exception as e:
-                self._logger.error(f"Error processing expiration date: {e}")
+                self._logger.error("Error processing expiration date: %s", e)
                 print("Expiration date: Unknown")
 
         # Token usage information
@@ -534,7 +533,7 @@ class ManageTokenCommand(Command):
                 else:
                     print("Last used: Unknown")
             except Exception as e:
-                self._logger.error(f"Error processing last used date: {e}")
+                self._logger.error("Error processing last used date: %s", e)
                 print("Last used: Unknown")
 
     def rotate_token(self) -> None:
@@ -646,7 +645,7 @@ class ManageTokenCommand(Command):
                     else:
                         print("Storage Date: Unknown")
                 except Exception as e:
-                    self._logger.error(f"Error processing creation date: {e}")
+                    self._logger.error("Error processing creation date: %s", e)
                     print("Storage Date: Unknown")
         else:
             print("❓ No storage metadata available")

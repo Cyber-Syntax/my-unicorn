@@ -214,7 +214,7 @@ class InstallAppCommand(Command):
         )
 
         if app_info.checksum_file_name:
-            self._logger.debug(f"Using SHA file from app catalog: {app_info.checksum_file_name}")
+            self._logger.debug("Using SHA file from app catalog: %s", app_info.checksum_file_name)
         else:
             self._logger.debug("Using automatic SHA file detection")
 
@@ -226,8 +226,11 @@ class InstallAppCommand(Command):
 
         # Log what was detected by the API
         self._logger.debug(
-            f"API detection results: appimage={api.appimage_name}, "
-            f"sha={api.checksum_file_name}, checksum_hash_type={api.checksum_hash_type}, arch={api.arch_keyword}"
+            "API detection results: appimage=%s, sha=%s, checksum_hash_type=%s, arch=%s",
+            api.appimage_name,
+            api.checksum_file_name,
+            api.checksum_hash_type,
+            api.arch_keyword,
         )
 
         # Initialize progress bar for single download

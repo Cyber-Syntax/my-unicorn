@@ -95,8 +95,8 @@ def display_current_version() -> None:
     try:
         print(get_formatted_version())
     except Exception as e:
+        logger.exception("Failed to get version: %s", e)
         print(f"Error: {e}")
-        logger.exception("Failed to get version")
 
 
 # NOTE: This need to be changed when we switch to a stable release
@@ -129,7 +129,7 @@ def get_latest_release_info() -> dict | None:
 
             # Return the first release (most recent)
             latest_release = releases[0]
-            logger.info(f"Found latest release: {latest_release.get('tag_name', 'unknown')}")
+            logger.info("Found latest release: %s", latest_release.get("tag_name", "unknown"))
             return latest_release
 
         elif response.status_code == 403:
@@ -141,10 +141,10 @@ def get_latest_release_info() -> dict | None:
                     "GitHub Rate limit exceeded. Please try again later within 1 hour or use different network/VPN."
                 )
             else:
-                logger.error(f"GitHub API error: {message}")
+                logger.error("GitHub API error: %s", message)
                 print(f"GitHub API error: {message}")
         else:
-            logger.error(f"Unexpected status code: {response.status_code}")
+            logger.error("Unexpected status code: %s", response.status_code)
             print(f"Unexpected status code: {response.status_code}")
 
         return None
@@ -155,11 +155,11 @@ def get_latest_release_info() -> dict | None:
         exceptions.RequestException,
         exceptions.HTTPError,
     ) as e:
-        logger.error(f"Error connecting to GitHub API: {e}")
+        logger.error("Error connecting to GitHub API: %s", e)
         print("Error connecting to server!")
         return None
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
+        logger.error("Unexpected error: %s", e)
         print(f"Unexpected error: {e}")
         return None
 
@@ -197,8 +197,8 @@ def check_for_update() -> bool:
         print(f"Current version: {current_version_str}")
         print(f"Latest version: {latest_version_tag}")
 
-        logger.debug(f"Normalized current: {current_normalized}")
-        logger.debug(f"Normalized latest: {latest_normalized}")
+        logger.debug("Normalized current: %s", current_normalized)
+        logger.debug("Normalized latest: %s", latest_normalized)
 
         # Use packaging library for proper version comparison
         try:
@@ -219,7 +219,7 @@ def check_for_update() -> bool:
                 return False
 
         except Exception as e:
-            logger.error(f"Error parsing versions: {e}")
+            logger.error("Error parsing versions: %s", e)
             print(f"Error comparing versions: {e}")
             return False
 
@@ -228,9 +228,9 @@ def check_for_update() -> bool:
         print("Error: my-unicorn package not found. Please reinstall.")
         return False
 
+
 def perform_update() -> bool:
-    """
-    Update by doing a fresh git clone into INSTALL_DIR/source,
+    """Update by doing a fresh git clone into INSTALL_DIR/source,
     copying only the package and scripts over, then invoking
     the installer script in update mode.
     """
@@ -240,19 +240,16 @@ def perform_update() -> bool:
     try:
         # 1) Prepare fresh source tree
         if source_dir.exists():
-            logger.info(f"Removing old source at {source_dir}")
+            logger.info("Removing old source at %s", source_dir)
             shutil.rmtree(source_dir)
         source_dir.mkdir(parents=True)
 
         # 2) Clone into source_dir
-        logger.info(f"Cloning into {source_dir}")
-        subprocess.run(
-            ["git", "clone", f"{GITHUB}.git", str(source_dir)],
-            check=True
-        )
+        logger.info("Cloning into %s", source_dir)
+        subprocess.run(["git", "clone", f"{GITHUB}.git", str(source_dir)], check=True)
 
         # 3) Copy over only the package code and scripts
-        logger.info(f"Copying code + scripts into {INSTALL_DIR}")
+        logger.info("Copying code + scripts into %s", INSTALL_DIR)
         INSTALL_DIR.mkdir(parents=True, exist_ok=True)
 
         # Copy over the package code, scripts, and pyproject.toml, my-unicorn-installer.sh
@@ -283,6 +280,7 @@ def perform_update() -> bool:
         result = subprocess.run(
             ["bash", str(installer), "update"],
             cwd=str(INSTALL_DIR),
+            check=False,
         )
 
         if result.returncode != 0:
@@ -295,7 +293,7 @@ def perform_update() -> bool:
         return True
 
     except Exception as e:
-        logger.exception("Update failed")
+        logger.exception("Update failed: %s", e)
         print(f"❌ Update failed: {e}")
         return False
 

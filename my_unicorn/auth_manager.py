@@ -472,7 +472,7 @@ class GitHubAuthManager:
                     return remaining, limit, reset_formatted, is_authenticated
 
             # Handle error response
-            logger.debug(f"Rate limit check failed, status code: {response.status_code}")
+            logger.debug("Rate limit check failed, status code: %s", response.status_code)
             if response.status_code == 401:
                 # Authentication failed - token may be invalid
                 logger.warning("Rate limit check failed due to authentication error")
@@ -524,7 +524,7 @@ class GitHubAuthManager:
                 return defaults
 
         except Exception as e:
-            logger.debug(f"Failed to check rate limits: {e}")
+            logger.debug("Failed to check rate limits: %s", e)
 
             # Create default values based on authentication status
             if is_authenticated:
@@ -662,8 +662,9 @@ class GitHubAuthManager:
             if current_time >= reset_time:
                 reset_passed = True
                 logger.debug(
-                    f"Rate limit reset detected: current={datetime.fromtimestamp(current_time).strftime('%H:%M:%S')}, "
-                    f"reset={datetime.fromtimestamp(reset_time).strftime('%H:%M:%S')}"
+                    "Rate limit reset detected: current=%s, reset=%s",
+                    datetime.fromtimestamp(current_time).strftime("%H:%M:%S"),
+                    datetime.fromtimestamp(reset_time).strftime("%H:%M:%S"),
                 )
         else:
             # If no reset time available, check if we've crossed an hour boundary
@@ -688,7 +689,8 @@ class GitHubAuthManager:
             if is_authenticated:
                 estimated_remaining = cached_limit  # Default to full limit (5000 for authenticated)
                 logger.debug(
-                    f"Reset passed: setting estimated remaining to full limit ({cached_limit})"
+                    "Reset passed: setting estimated remaining to full limit (%s)",
+                    cached_limit,
                 )
             else:
                 estimated_remaining = 60  # Default GitHub unauthenticated limit
@@ -703,11 +705,17 @@ class GitHubAuthManager:
             # If reset hasn't occurred, adjust remaining based on tracked request count
             estimated_remaining = max(0, cached_remaining - request_count)
             logger.debug(
-                f"No reset detected: estimated remaining = {cached_remaining} - {request_count} = {estimated_remaining}"
+                "No reset detected: estimated remaining = %s - %s = %s",
+                cached_remaining,
+                request_count,
+                estimated_remaining,
             )
 
         logger.debug(
-            f"Final estimated rate limit: {estimated_remaining}/{cached_limit}, reset at {reset_formatted}"
+            "Final estimated rate limit: %s/%s, reset at %s",
+            estimated_remaining,
+            cached_limit,
+            reset_formatted,
         )
         return estimated_remaining, cached_limit, reset_formatted, is_authenticated
 
@@ -778,7 +786,7 @@ class GitHubAuthManager:
                             session.headers[k] = v
 
                     retries += 1
-                    logger.warning(f"Authentication failed, retrying ({retries}/{max_retries})")
+                    logger.warning("Authentication failed, retrying (%s/%s)", retries, max_retries)
                     continue
 
                 return response
@@ -786,7 +794,7 @@ class GitHubAuthManager:
             except requests.RequestException as e:
                 if retries < max_retries:
                     retries += 1
-                    logger.warning(f"Request failed, retrying ({retries}/{max_retries}): {e}")
+                    logger.warning("Request failed, retrying (%s/%s): %s", retries, max_retries, e)
                     continue
                 raise
 
@@ -827,7 +835,7 @@ class GitHubAuthManager:
                     else:
                         days_until_rotation = days_until_expiration - TOKEN_REFRESH_THRESHOLD_DAYS
             except Exception as e:
-                logger.warning(f"Error calculating token rotation time: {e}")
+                logger.warning("Error calculating token rotation time: %s", e)
 
         # Use our own has_valid_token method
         result = {
@@ -855,7 +863,9 @@ class GitHubAuthManager:
                     result["last_used_at"] = last_used_str
 
         logger.debug(
-            f"Token info result: valid={result['token_valid']}, expired={result['is_expired']}"
+            "Token info result: valid=%s, expired=%s",
+            result["token_valid"],
+            result["is_expired"],
         )
         return result
 
@@ -884,7 +894,9 @@ class GitHubAuthManager:
         # Log cache status before the check
         cache_age = time.time() - cls._rate_limit_cache_time
         logger.debug(
-            f"Cache status before live check: age={int(cache_age)}s, requests since refresh={cls._request_count_since_cache}"
+            "Cache status before live check: age=%ss, requests since refresh=%s",
+            int(cache_age),
+            cls._request_count_since_cache,
         )
         if cls._rate_limit_cache:
             logger.debug(
@@ -997,7 +1009,7 @@ class GitHubAuthManager:
                         if "rate" in rate_data and "limit" in rate_data["rate"]:
                             token_info["rate_limit"] = rate_data["rate"]["limit"]
                 except Exception as e:
-                    logger.warning(f"Failed to get rate limit info during token validation: {e}")
+                    logger.warning("Failed to get rate limit info during token validation: %s", e)
 
                 return True, token_info
 
@@ -1021,18 +1033,18 @@ class GitHubAuthManager:
                     return False, token_info
 
             else:
-                logger.warning(f"Token validation failed with status code: {response.status_code}")
-                token_info["error"] = f"GitHub API returned status code {response.status_code}"
+                logger.warning("Token validation failed with status code: %s", response.status_code)
+                token_info["error"] = "GitHub API returned status code %s" % response.status_code
                 return False, token_info
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Network error during token validation: {e}")
-            token_info["error"] = f"Network error: {e!s}"
+            logger.error("Network error during token validation: %s", e)
+            token_info["error"] = "Network error: %s" % (e,)
             return False, token_info
 
         except Exception as e:
-            logger.error(f"Unexpected error during token validation: {e}")
-            token_info["error"] = f"Unexpected error: {e!s}"
+            logger.error("Unexpected error during token validation: %s", e)
+            token_info["error"] = "Unexpected error: %s" % (e,)
             return False, token_info
 
 
@@ -1065,7 +1077,7 @@ class SessionPool:
             # If we have an existing session for this token
             if key in cls._sessions:
                 cls._last_used[key] = time.time()
-                logger.debug(f"Reusing existing session for token key: {key[:8]}...")
+                logger.debug("Reusing existing session for token key: %s...", key[:8])
                 return cls._sessions[key]
 
             # Create a new session with proper headers
@@ -1104,10 +1116,10 @@ class SessionPool:
         for key in to_remove:
             if key in cls._sessions:
                 try:
-                    logger.debug(f"Closing idle session: {key[:8]}...")
+                    logger.debug("Closing idle session: %s...", key[:8])
                     cls._sessions[key].close()
                 except Exception as e:
-                    logger.debug(f"Error closing session: {e}")
+                    logger.debug("Error closing session: %s", e)
                 del cls._sessions[key]
                 del cls._last_used[key]
 

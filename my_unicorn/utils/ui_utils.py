@@ -4,11 +4,12 @@
 This module provides functions for user interface interactions.
 """
 
-import logging
-from typing import Any, Callable
 import asyncio
-import threading
 import concurrent.futures
+import logging
+import threading
+from collections.abc import Callable
+from typing import Any
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ def set_main_event_loop(loop: asyncio.AbstractEventLoop) -> None:
     """Sets the main asyncio event loop for ui_utils to use."""
     global _main_event_loop
     _main_event_loop = loop
-    logger.debug(f"Main event loop set in ui_utils: {_main_event_loop}")
+    logger.debug("Main event loop set in ui_utils: %s", _main_event_loop)
 
 
 def select_from_list(
@@ -43,6 +44,7 @@ def select_from_list(
 
     Raises:
         ValueError: If items list is empty
+
     """
     if not items:
         raise ValueError("No items to select from")
@@ -105,9 +107,10 @@ def get_user_input(prompt: str, default: str | None = None) -> str:
                 logger.debug("Using current thread's running event loop for input.")
             except RuntimeError as e:
                 logger.warning(
-                    f"Could not get running asyncio loop from worker thread: {e}. "
-                    f"Globally set loop was: {_main_event_loop}. Falling back to direct input."
+                    "Could not get running asyncio loop from worker thread: {}. "
+                    "Globally set loop was: {}. Falling back to direct input.".format(e, _main_event_loop)
                 )
+
                 # Fallback to direct input if asyncio context is not available
                 return _actual_input_logic(prompt, default)  # Pass original prompt and default
 
@@ -137,11 +140,11 @@ def get_user_input(prompt: str, default: str | None = None) -> str:
                     # We just need to re-raise it so the caller (e.g. SHAManager) can also stop.
                     raise
                 except Exception as e:
-                    logger.error(f"Error getting input via main thread: {e}")
+                    logger.error("Error getting input via main thread: %s", e)
                     raise  # Re-raise to make it visible
             except Exception as e_outer:  # Catch other errors during loop interaction
                 logger.error(
-                    f"Outer error interacting with event loop for input: {e_outer}. Falling back."
+                    "Outer error interacting with event loop for input: %s. Falling back.", e_outer
                 )
                 # Fallback to direct input
                 return _actual_input_logic(prompt, default)
@@ -165,6 +168,7 @@ def confirm_action(prompt: str, default: bool = False) -> bool:
 
     Returns:
         bool: True if user confirmed, False otherwise
+
     """
     default_prompt = "[Y/n]" if default else "[y/N]"
     response = input(f"{prompt} {default_prompt}: ").strip().lower()

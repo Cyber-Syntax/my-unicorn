@@ -39,8 +39,8 @@ class ReleaseDescriptionFetcher:
             RequestException: If network request fails
 
         """
-        api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
-        logger.debug(f"Fetching release description from {api_url}")
+        api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}" + "/releases/latest"
+        logger.debug("Fetching release description from %s", api_url)
 
         try:
             response = GitHubAuthManager.make_authenticated_request(
@@ -51,7 +51,7 @@ class ReleaseDescriptionFetcher:
             )
 
             if response.status_code != 200:  # noqa: PLR2004
-                logger.error(f"Failed to fetch release: {response.status_code} {response.text}")
+                logger.error("Failed to fetch release: %s %s", response.status_code, response.text)
                 return None
 
             release_data = response.json()
@@ -62,13 +62,15 @@ class ReleaseDescriptionFetcher:
                 return None
 
             logger.info(
-                f"Successfully fetched release description "
-                f"({len(description)} characters) for {self.owner}/{self.repo}"
+                "Successfully fetched release description (%d characters) for %s/%s",
+                len(description),
+                self.owner,
+                self.repo,
             )
             return description
 
         except RequestException as e:
-            logger.error(f"Network error fetching release description: {e}")
+            logger.error("Network error fetching release description: %s", e)
             raise
 
     def fetch_release_description_by_tag(self, tag: str) -> str | None:
@@ -85,7 +87,7 @@ class ReleaseDescriptionFetcher:
 
         """
         api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/tags/{tag}"
-        logger.debug(f"Fetching release description for tag {tag} from {api_url}")
+        logger.debug("Fetching release description for tag %s from %s", tag, api_url)
 
         try:
             response = GitHubAuthManager.make_authenticated_request(
@@ -97,7 +99,10 @@ class ReleaseDescriptionFetcher:
 
             if response.status_code != 200:  # noqa: PLR2004
                 logger.error(
-                    f"Failed to fetch release for tag {tag}: {response.status_code} {response.text}"
+                    "Failed to fetch release for tag %s: %s %s",
+                    tag,
+                    response.status_code,
+                    response.text,
                 )
                 return None
 
@@ -105,17 +110,20 @@ class ReleaseDescriptionFetcher:
             description = release_data.get("body", "")
 
             if not description:
-                logger.warning(f"Empty release description for tag {tag}")
+                logger.warning("Empty release description for tag %s", tag)
                 return None
 
             logger.info(
-                f"Successfully fetched release description for tag {tag} "
-                f"({len(description)} characters) for {self.owner}/{self.repo}"
+                "Successfully fetched release description for tag %s (%d characters) for %s/%s",
+                tag,
+                len(description),
+                self.owner,
+                self.repo,
             )
             return description
 
         except RequestException as e:
-            logger.error(f"Network error fetching release description for tag {tag}: {e}")
+            logger.error("Network error fetching release description for tag %s: %s", tag, e)
             raise
 
     def get_release_data(self) -> dict[str, Any] | None:
@@ -128,8 +136,8 @@ class ReleaseDescriptionFetcher:
             RequestException: If network request fails
 
         """
-        api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
-        logger.debug(f"Fetching complete release data from {api_url}")
+        api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}" + "/releases/latest"
+        logger.debug("Fetching complete release data from %s", api_url)
 
         try:
             response = GitHubAuthManager.make_authenticated_request(
@@ -141,14 +149,14 @@ class ReleaseDescriptionFetcher:
 
             if response.status_code != 200:  # noqa: PLR2004
                 logger.error(
-                    f"Failed to fetch release data: {response.status_code} {response.text}"
+                    "Failed to fetch release data: %s %s", response.status_code, response.text
                 )
                 return None
 
             release_data = response.json()
-            logger.info(f"Successfully fetched release data for {self.owner}/{self.repo}")
+            logger.info("Successfully fetched release data for %s/%s", self.owner, self.repo)
             return release_data
 
         except RequestException as e:
-            logger.error(f"Network error fetching release data: {e}")
+            logger.error("Network error fetching release data: %s", e)
             raise

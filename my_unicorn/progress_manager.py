@@ -39,6 +39,7 @@ def _terminal_width() -> int:
     """Get terminal width."""
     return shutil.get_terminal_size((80, 20)).columns
 
+
 def format_time(seconds: float | None) -> str:
     """Format time duration to MM:SS."""
     if seconds is None or seconds <= 0:
@@ -391,7 +392,7 @@ class AsyncAppUpdateProgressManager:
             yield self
 
         except Exception as e:
-            self._logger.error(f"Error in progress tracking: {e}")
+            self._logger.error("Error in progress tracking: %s", e)
             raise
         finally:
             # Clean up

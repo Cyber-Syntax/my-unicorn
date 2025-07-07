@@ -53,22 +53,22 @@ class IconManager:
         # Load app definition
         app_info = load_app_definition(repo.lower())
         if not app_info:
-            logger.info(f"No app definition found for {owner}/{repo}")
+            logger.info("No app definition found for %s/%s", owner, repo)
             return None
 
         # First try to use repository path if specified
         icon_info = None
         if app_info.icon_repo_path:
-            logger.info(f"Checking repository icon path: {app_info.icon_repo_path}")
+            logger.info("Checking repository icon path: %s", app_info.icon_repo_path)
             icon_info = self._check_icon_path(owner, repo, app_info.icon_repo_path, headers)
             if icon_info and app_info.icon_file_name:
                 preferred_filename = app_info.icon_file_name.lower()  # Ensure lowercase
                 icon_info["preferred_filename"] = preferred_filename
-                logger.info(f"Found icon at repository path: {app_info.icon_repo_path}")
+                logger.info("Found icon at repository path: %s", app_info.icon_repo_path)
 
         # Fall back to direct icon URL if available and repo path didn't work
         if not icon_info and app_info.icon_info:
-            logger.info(f"Repository path failed, trying direct icon URL: {app_info.icon_info}")
+            logger.info("Repository path failed, trying direct icon URL: %s", app_info.icon_info)
             preferred_filename = (
                 app_info.icon_file_name.lower()
                 if app_info.icon_file_name
@@ -88,8 +88,10 @@ class IconManager:
             return icon_info
 
         logger.info(
-            f"No icon configuration found for {owner}/{repo}. "
-            f"Will use app name in desktop file; this may work with system icon themes like Papirus."
+            "No icon configuration found for %s/%s. "
+            "Will use app name in desktop file; this may work with system icon themes like Papirus.",
+            owner,
+            repo,
         )
         return None
 
@@ -129,13 +131,13 @@ class IconManager:
         """
         # Validate path before attempting to check
         if not path or path == "default":
-            logger.warning(f"Invalid icon path: '{path}'")
+            logger.warning("Invalid icon path: '%s'", path)
             return None
 
         try:
             # Format the GitHub content API URL
             content_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
-            logger.debug(f"Checking for icon at: {content_url}")
+            logger.debug("Checking for icon at: %s", content_url)
 
             # Use GitHubAuthManager for authenticated requests with rate limit handling
             response = GitHubAuthManager.make_authenticated_request(
@@ -147,21 +149,21 @@ class IconManager:
                 if isinstance(content, dict) and content.get("type") == "file":
                     name = content.get("name", "").lower()
                     if any(name.endswith(ext) for ext in [".png", ".svg", ".jpg", ".jpeg"]):
-                        logger.info(f"Found icon at {path}")
+                        logger.info("Found icon at %s", path)
                         return self._format_icon_info(content)
 
             elif response.status_code == 403 and "rate limit exceeded" in response.text.lower():
                 logger.warning("GitHub API rate limit exceeded during icon search")
                 GitHubAuthManager.clear_cached_headers()
             elif response.status_code == 404:
-                logger.debug(f"Icon path not found: {path}")
+                logger.debug("Icon path not found: %s", path)
             else:
-                logger.debug(f"Unexpected response ({response.status_code}) for icon path: {path}")
+                logger.debug("Unexpected response (%s) for icon path: %s", response.status_code, path)
 
             return None
 
         except Exception as e:
-            logger.debug(f"Error checking icon path {path}: {e!s}")
+            logger.debug("Error checking icon path %s: %s", path, e)
             return None
 
     def _format_icon_info(self, content: dict[str, Any]) -> dict[str, Any]:
@@ -215,7 +217,9 @@ class IconManager:
                     # Fall back to original name if preferred_filename is invalid
                     base_name = icon_info["name"].lower()  # Ensure lowercase
                     logger.warning(
-                        f"Invalid preferred_filename '{icon_info['preferred_filename']}', using {base_name} instead"
+                        "Invalid preferred_filename '%s', using %s instead",
+                        icon_info["preferred_filename"],
+                        base_name,
                     )
             else:
                 base_name = icon_info["name"].lower()  # Ensure lowercase
@@ -257,11 +261,11 @@ class IconManager:
             # Replace with atomic operation
             os.replace(temp_icon_path, icon_path)
 
-            logger.info(f"Downloaded icon to {icon_path}")
+            logger.info("Downloaded icon to %s", icon_path)
             return True, icon_path
 
         except Exception as e:
-            logger.error(f"Failed to download icon: {e!s}")
+            logger.error("Failed to download icon: %s", e)
             # Clean up temp file if exists
             if "temp_icon_path" in locals() and os.path.exists(temp_icon_path):
                 try:
@@ -298,14 +302,17 @@ class IconManager:
                 app_info = load_app_definition(repo.lower())
                 if app_info and app_info.app_rename:
                     app_rename = app_info.app_rename
-                    logger.debug(f"Using app_rename from JSON: {app_rename}")
+                    logger.debug("Using app_rename from JSON: %s", app_rename)
                 else:
                     # Use repo name as fallback
                     app_rename = repo
-                    logger.debug(f"Using repo name as app_rename: {app_rename}")
+                    logger.debug("Using repo name as app_rename: %s", app_rename)
 
             logger.info(
-                f"Using app_rename '{app_rename}' for icon folder (owner={owner}, repo={repo})"
+                "Using app_rename '%s' for icon folder (owner=%s, repo=%s)",
+                app_rename,
+                owner,
+                repo,
             )
 
             # Check if icon already exists
@@ -327,7 +334,7 @@ class IconManager:
                 for directory in [app_icon_dir, app_icon_dir_original]:
                     icon_path = directory / icon_filename
                     if icon_path.exists() and icon_path.is_file():
-                        logger.info(f"✓ Using existing icon: {icon_path} (skipping API request)")
+                        logger.info("✓ Using existing icon: %s (skipping API request)", icon_path)
                         return True, str(icon_path)
 
             # Also check for any image file in the directories
@@ -336,13 +343,14 @@ class IconManager:
                     for ext in [".png", ".svg", ".jpg", ".jpeg"]:
                         for icon_file in directory.glob(f"*{ext}"):
                             logger.info(
-                                f"✓ Using existing icon: {icon_file} (skipping API request)"
+                                "✓ Using existing icon: %s (skipping API request)", icon_file
                             )
                             return True, str(icon_file)
 
             # No existing icon found, proceed with download
             logger.info(
-                f"✗ No existing icon found for {repo}, proceeding with API request to download icon"
+                "✗ No existing icon found for %s, proceeding with API request to download icon",
+                repo,
             )
 
             # Get authentication headers if not provided
@@ -350,32 +358,32 @@ class IconManager:
                 headers = GitHubAuthManager.get_auth_headers()
 
             # Find icon in the repository or from URL
-            logger.info(f"Making API request to find icon for {owner}/{repo}")
+            logger.info("Making API request to find icon for %s", owner + "/" + repo)
             icon_info = self.find_icon(owner, repo, headers)
 
             if not icon_info:
                 message = (
-                    f"No icon configuration found for {owner}/{repo}. "
-                    f"Desktop entry will use the app name ('{app_rename}') which may work with "
-                    f"system icon themes like Papirus or Adwaita."
+                    "No icon configuration found for %s/%s. "
+                    "Desktop entry will use the app name ('%s') which may work with "
+                    "system icon themes like Papirus or Adwaita."
                 )
-                logger.info(message)
+                logger.info(message, owner, repo, app_rename)
                 return True, None
 
             # Create and download to the lowercase directory for consistency
             os.makedirs(app_icon_dir, exist_ok=True)
-            logger.info(f"Icon found for {repo}, downloading to {app_icon_dir}")
+            logger.info("Icon found for %s, downloading to %s", repo, app_icon_dir)
             success, result_path = self.download_icon(icon_info, str(app_icon_dir))
 
             if success:
-                logger.info(f"✓ Successfully downloaded icon to {result_path}")
+                logger.info("✓ Successfully downloaded icon to %s", result_path)
                 return True, result_path
             else:
-                logger.error(f"✗ Failed to download icon: {result_path}")
+                logger.error("✗ Failed to download icon: %s", result_path)
                 return False, result_path
 
         except Exception as e:
-            logger.error(f"Failed to ensure app icon: {e!s}")
+            logger.error("Failed to ensure app icon: %s", e)
             return False, f"Error: {e!s}"
 
     def get_icon_path(self, app_rename: str, repo: str | None = None) -> str | None:
@@ -429,8 +437,8 @@ class IconManager:
         # Return the first valid icon found
         for icon_path in locations_to_check:
             if icon_path.exists() and icon_path.is_file():
-                logger.debug(f"Found existing icon at {icon_path}")
+                logger.debug("Found existing icon at %s", icon_path)
                 return str(icon_path)
 
-        logger.debug(f"No existing icon found for {app_rename}")
+        logger.debug("No existing icon found for %s", app_rename)
         return None

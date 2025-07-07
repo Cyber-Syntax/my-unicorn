@@ -8,8 +8,6 @@ import base64
 import logging
 import os
 import re
-from pathlib import Path
-from typing import Any
 
 import requests
 import yaml
@@ -23,6 +21,7 @@ class ShaFileManager:
 
         Args:
             checksum_hash_type: The hash algorithm type (e.g., 'sha256', 'sha512')
+
         """
         self.checksum_hash_type = checksum_hash_type.lower()
 
@@ -35,6 +34,7 @@ class ShaFileManager:
 
         Raises:
             OSError: If download or file operations fail
+
         """
         if os.path.exists(sha_path):
             try:
@@ -69,6 +69,7 @@ class ShaFileManager:
         Raises:
             OSError: If file cannot be read
             ValueError: If no valid hash is found
+
         """
         if not os.path.exists(sha_path):
             raise OSError(f"SHA file not found: {sha_path}")
@@ -107,6 +108,7 @@ class ShaFileManager:
         Raises:
             OSError: If YAML parsing fails
             ValueError: If hash is not found or invalid
+
         """
         try:
             with open(sha_path, encoding="utf-8") as f:
@@ -141,6 +143,7 @@ class ShaFileManager:
         Raises:
             OSError: If file cannot be read
             ValueError: If hash is invalid
+
         """
         try:
             with open(sha_path, encoding="utf-8") as f:
@@ -182,6 +185,7 @@ class ShaFileManager:
         Raises:
             OSError: If file cannot be read
             ValueError: If no valid hash is found
+
         """
         target_name = os.path.basename(appimage_name).lower()
 
@@ -236,6 +240,7 @@ class ShaFileManager:
 
         Returns:
             Hash value if found, None otherwise
+
         """
         # Format: <hash> <filename> (most common)
         if len(parts[0]) in (64, 128) and parts[1].lower() == target_name:
@@ -261,12 +266,14 @@ class ShaFileManager:
 
         Returns:
             Validated hash value or None if invalid
+
         """
         expected_length = 64 if self.checksum_hash_type == "sha256" else 128
         len_hash_value = len(hash_value)
         if len_hash_value != expected_length:
-            
-            logging.warning("Hash has wrong length: %s, expected %s", len_hash_value, expected_length)
+            logging.warning(
+                "Hash has wrong length: %s, expected %s", len_hash_value, expected_length
+            )
             return None
 
         if not re.match(r"^[0-9a-f]+$", hash_value, re.IGNORECASE):
@@ -291,6 +298,7 @@ class ShaFileManager:
         Raises:
             OSError: If file cannot be read
             ValueError: If no valid hash is found
+
         """
         target_filename = os.path.basename(appimage_name).lower()
 
@@ -318,4 +326,5 @@ class ShaFileManager:
             raise ValueError(f"No valid hash found for {target_filename} in path-based SHA file")
 
         except OSError as e:
-            raise OSError(f"Failed to read SHA file: {e}")
+            logging.error("Failed to read SHA file: %s", e)
+            raise OSError("Failed to read SHA file: %s" % e)

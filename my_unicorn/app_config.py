@@ -28,6 +28,9 @@ DESKTOP_ENTRY_PERMISSIONS = 0o755
 # Image file extensions
 IMAGE_EXTENSIONS = [".svg", ".png", ".jpg", ".jpeg"]
 
+# Maximum configuration option for selection
+MAX_CONFIG_OPTION = 3
+
 
 @dataclass
 class AppConfigManager:
@@ -60,7 +63,7 @@ class AppConfigManager:
         self.config_folder.mkdir(parents=True, exist_ok=True)
 
     def set_app_name(self, app_name: str) -> None:
-        """set the app name and update derived paths.
+        """Set the app name and update derived paths.
 
         Args:
             app_name: Name of the application (used for config file naming)
@@ -195,11 +198,11 @@ class AppConfigManager:
             with self.config_file.open("w", encoding="utf-8") as file:
                 json.dump(config_data, file, indent=4)
 
-            logger.info(f"Updated configuration in {self.config_file}")
+            logger.info("Updated configuration in %s", self.config_file)
         except json.JSONDecodeError as e:
-            logger.error(f"Error decoding JSON: {e}")
+            logger.error("Error decoding JSON: %s", e)
         except Exception as e:
-            logger.error(f"An error occurred while updating version: {e}")
+            logger.error("An error occurred while updating version: %s", e)
 
     def create_desktop_file(
         self, appimage_path: str | Path, icon_path: str | Path | None = None
@@ -240,12 +243,11 @@ class AppConfigManager:
             )
 
         except Exception as e:
-            error_msg = f"Failed to create/update desktop file: {e}"
-            logger.error(error_msg)
-            return False, error_msg
+            logger.error("Failed to create/update desktop file: %s", e)
+            return False, "Failed to create/update desktop file: %s" % e
 
     def list_json_files(self) -> list[str]:
-        """list JSON files in the configuration directory.
+        """List JSON files in the configuration directory.
 
         Returns:
             list[str]: list of JSON files in the configuration directory
@@ -261,8 +263,8 @@ class AppConfigManager:
             ]
             return sorted(json_files) if json_files else []
         except (FileNotFoundError, PermissionError) as error:
-            logger.error(f"Error accessing configuration folder: {error}")
-            raise FileNotFoundError(f"Configuration folder access error: {error}")
+            logger.error("Error accessing configuration folder: %s", error)
+            raise FileNotFoundError("Configuration folder access error: %s" % error) from error
 
     def temp_save_config(self) -> bool:
         """Atomically save configuration using temporary file.
@@ -283,16 +285,16 @@ class AppConfigManager:
             with temp_file.open("w", encoding="utf-8") as file:
                 json.dump(self.to_dict(), file, indent=4)
 
-            logger.info(f"Temporary config saved to {temp_file}")
+            logger.info("Temporary config saved to %s", temp_file)
             return True
         except Exception as e:
-            logger.error(f"Temp config save failed: {e}")
+            logger.error("Temp config save failed: %s", e)
             # Cleanup if possible
             if temp_file.exists():
                 try:
                     temp_file.unlink()
                 except Exception as cleanup_error:
-                    logger.warning(f"Failed to clean up temporary file: {cleanup_error}")
+                    logger.warning("Failed to clean up temporary file: %s", cleanup_error)
             return False
 
     def save_config(self) -> bool:
@@ -314,21 +316,21 @@ class AppConfigManager:
 
             # Atomic replace operation
             temp_file.replace(self.config_file)
-            logger.info(f"Configuration committed to {self.config_file}")
+            logger.info("Configuration committed to %s", self.config_file)
             return True
 
         except Exception as e:
-            logger.error(f"Config commit failed: {e}")
+            logger.error("Config commit failed: %s", e)
             # Cleanup temp file if it exists
             if temp_file.exists():
                 try:
                     temp_file.unlink()
                 except Exception as cleanup_error:
-                    logger.warning(f"Failed to clean up temporary file: {cleanup_error}")
+                    logger.warning("Failed to clean up temporary file: %s", cleanup_error)
             return False
 
     def select_files(self) -> list[str] | None:
-        """list available JSON configuration files and allow the user to select multiple.
+        """List available JSON configuration files and allow the user to select multiple.
 
         Shows application names without the .json extension for better readability.
 
@@ -359,7 +361,9 @@ class AppConfigManager:
                 selected_indices = [int(idx.strip()) - 1 for idx in user_input.split(",")]
                 if any(idx < 0 or idx >= len(json_files) for idx in selected_indices):
                     raise ValueError("Invalid selection.")
-                logger.info(f"User selected files: {[json_files[idx] for idx in selected_indices]}")
+                logger.info(
+                    "User selected files: %s", [json_files[idx] for idx in selected_indices]
+                )
                 return [json_files[idx] for idx in selected_indices]
             except (ValueError, IndexError):
                 logger.error("Invalid selection. Please enter valid numbers.")
@@ -396,13 +400,13 @@ class AppConfigManager:
                     self.version = config.get("version", self.version)
                     self.appimage_name = config.get("appimage_name", self.appimage_name)
 
-                    logger.info(f"Successfully loaded configuration from {config_file_name}")
+                    logger.info("Successfully loaded configuration from %s", config_file_name)
                     return config
             except json.JSONDecodeError as e:
-                logger.error(f"Invalid JSON in the configuration file: {e}")
-                raise ValueError("Failed to parse JSON from the configuration file.")
+                logger.error("Invalid JSON in the configuration file: %s", e)
+                raise ValueError("Failed to parse JSON from the configuration file.") from e
         else:
-            logger.warning(f"Configuration file {config_file_name} not found.")
+            logger.warning("Configuration file %s not found.", config_file_name)
             return None
 
     def reload(self) -> bool:
@@ -424,7 +428,7 @@ class AppConfigManager:
             self.load_appimage_config(self.config_file_name)
             return True
         except Exception as e:
-            logger.error(f"Failed to reload app configuration: {e}")
+            logger.error("Failed to reload app configuration: %s", e)
             return False
 
     def customize_appimage_config(self) -> None:
@@ -454,7 +458,7 @@ class AppConfigManager:
 
         # Show application name in title instead of filename
         app_name = Path(selected_file).stem
-        logger.info(f"Displaying configuration options for {app_name}")
+        logger.info("Displaying configuration options for %s", app_name)
 
         # Show current configuration and menu
         self._display_config_info(app_name)
@@ -527,13 +531,13 @@ class AppConfigManager:
         """
         while True:
             choice = input("Enter your choice (1-3): ")
-            if choice.isdigit() and 1 <= int(choice) <= 3:
+            if choice.isdigit() and 1 <= int(choice) <= MAX_CONFIG_OPTION:
                 break
             else:
                 logger.warning("Invalid choice, please enter a number between 1 and 3.")
                 print("Invalid choice, please enter a number between 1 and 3.")
 
-        if choice == "3":
+        if choice == str(MAX_CONFIG_OPTION):
             logger.info("User exited configuration customization without changes")
             print("Exiting without changes.")
             return
@@ -547,7 +551,7 @@ class AppConfigManager:
         old_value = getattr(self, key)
         setattr(self, key, new_value)
         self.save_config()
-        logger.info(f"Updated {key} from '{old_value}' to '{new_value}'")
+        logger.info("Updated %s from '%s' to '%s'", key, old_value, new_value)
         print(f"\033[42m{key.capitalize()} updated successfully in {app_name}\033[0m")
         print("=" * 60)
 

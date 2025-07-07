@@ -89,9 +89,9 @@ class MigrateConfigCommand(Command):
                 with open(global_config_path, encoding="utf-8") as f:
                     current_config = json.load(f)
                 print(f"Current config keys: {list(current_config.keys())}")
-                self._logger.debug(f"Current config content: {current_config}")
+                self._logger.debug("Current config content: %s", current_config)
             except Exception as e:
-                self._logger.error(f"Error reading config file: {e}")
+                self._logger.error("Error reading config file: %s", e)
                 print(f"Error reading config file: {e}")
         else:
             print("Global config file does not exist yet.")

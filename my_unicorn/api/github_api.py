@@ -64,12 +64,12 @@ class GitHubAPI:
         # Load app info from catalog to get beta preference and other settings
         self._app_info: AppInfo | None = find_app_by_owner_repo(owner, repo)
         if self._app_info:
-            logger.debug(f"Loaded app info for {owner}/{repo}, beta={self._app_info.beta}")
+            logger.debug("Loaded app info for %s/%s, beta=%s", owner, repo, self._app_info.beta)
         else:
-            logger.debug(f"No app info found for {owner}/{repo} in catalog")
+            logger.debug("No app info found for %s/%s in catalog", owner, repo)
 
         self._selector = AppImageSelector()  # Create selector once and reuse
-        logger.debug(f"API initialized for {owner}/{repo}")
+        logger.debug("API initialized for %s/%s", owner, repo)
 
     @property
     def arch_keyword(self) -> str | None:
@@ -105,7 +105,9 @@ class GitHubAPI:
 
         if prefer_beta:
             logger.debug(
-                f"App {self.owner}/{self.repo} configured for beta releases, fetching directly"
+                "App %s/%s configured for beta releases, fetching directly",
+                self.owner,
+                self.repo,
             )
             success, raw_data_or_error = self._release_fetcher.get_latest_beta_release_data(
                 self._headers
@@ -130,10 +132,9 @@ class GitHubAPI:
             return False, str(raw_data_or_error)
 
         if not isinstance(raw_data_or_error, dict):
-            error_msg = (
-                f"Type mismatch: Expected dict from ReleaseManager, got {type(raw_data_or_error)}"
+            logger.error(
+                "Type mismatch: Expected dict from ReleaseManager, got %s", type(raw_data_or_error)
             )
-            logger.error(error_msg)
             return False, "Internal error: Unexpected data type from release fetcher"
 
         raw_release_json: dict[str, Any] = raw_data_or_error
@@ -149,7 +150,7 @@ class GitHubAPI:
                 self.repo,
                 e,
             )
-            return False, f"Failed to process release data: {e}"
+            return False, "Failed to process release data: %s" % e
 
     def _process_release(
         self, release_data: dict[str, Any], version_check_only: bool = False, is_batch: bool = False
@@ -170,7 +171,10 @@ class GitHubAPI:
 
         """
         logger.debug(
-            f"Processing release in github_api.py: {release_data.get('tag_name', 'Unknown tag')}, version_check_only: {version_check_only}, is_batch: {is_batch}"
+            "Processing release in github_api.py: %s, version_check_only: %s, is_batch: %s",
+            release_data.get("tag_name", "Unknown tag"),
+            version_check_only,
+            is_batch,
         )
 
         raw_tag = release_data.get("tag_name", "")
@@ -191,8 +195,7 @@ class GitHubAPI:
                 potential_zen_version = f"{version_base}{letter_suffix}"
                 if normalized_version != potential_zen_version:
                     logger.info(
-                        f"zen-browser: using version format {potential_zen_version} "
-                        f"instead of {normalized_version} from tag {raw_tag}"
+                        f"zen-browser: using version format {potential_zen_version} instead of {normalized_version} from tag {raw_tag}"
                     )
                     normalized_version = potential_zen_version
 
@@ -204,7 +207,9 @@ class GitHubAPI:
         # Skip asset processing for version-only checks to optimize performance
         if version_check_only:
             logger.debug(
-                f"Version check only: skipping asset processing for {self.owner}/{self.repo}"
+                "Version check only: skipping asset processing for %s/%s",
+                self.owner,
+                self.repo,
             )
             # Clear asset-related attributes for version-only checks
             self.appimage_name = None
@@ -232,14 +237,19 @@ class GitHubAPI:
 
             self._release_info = ReleaseInfo.from_release_data(release_data, asset_info_dict)
             logger.info(
-                f"Successfully processed version-only release {self.version} for {self.owner}/{self.repo}"
+                "Successfully processed version-only release %s for %s/%s",
+                self.version,
+                self.owner,
+                self.repo,
             )
             return
 
         # Process assets for installation/download
         assets: list[dict[str, Any]] = release_data.get("assets", [])
         if not assets:
-            logger.warning(f"No assets found in release {raw_tag} for {self.owner}/{self.repo}")
+            logger.warning(
+                "No assets found in release %s for %s/%s", raw_tag, self.owner, self.repo
+            )
 
         # Ensure app info is loaded for asset selection
         if self._app_info is None:
@@ -248,7 +258,7 @@ class GitHubAPI:
             if self._app_info is None:
                 # Fall back to repo name lookup
                 self._app_info = load_app_definition(self.repo)
-                logger.debug(f"Loaded app info via repo name for {self.repo}")
+                logger.debug("Loaded app info via repo name for %s", self.repo)
 
         # Create config dict for selection - use app definition for preferred characteristic suffixes
         if self._app_info:
@@ -257,8 +267,9 @@ class GitHubAPI:
                 "installed_characteristic_suffix": None  # Let app definition guide selection
             }
             logger.debug(
-                f"Using preferred suffixes for {self.repo}: "
-                f"{self._app_info.preferred_characteristic_suffixes}"
+                "Using preferred suffixes for %s: %s",
+                self.repo,
+                self._app_info.preferred_characteristic_suffixes,
             )
         else:
             # Fallback to legacy arch_keyword if no app definition found
@@ -268,7 +279,9 @@ class GitHubAPI:
                 else None
             )
             logger.warning(
-                f"No app definition found for {self.repo}, using legacy arch_keyword: {self._arch_keyword}"
+                "No app definition found for %s, using legacy arch_keyword: %s",
+                self.repo,
+                self._arch_keyword,
             )
 
         # Use the pre-initialized selector
@@ -288,22 +301,27 @@ class GitHubAPI:
         if not selected_asset_result:
             if self._app_info:
                 suffixes_info = (
-                    f"with preferred suffixes {self._app_info.preferred_characteristic_suffixes}"
+                    "with preferred suffixes %s" % self._app_info.preferred_characteristic_suffixes
                 )
             else:
-                suffixes_info = f"with arch_keyword '{self._arch_keyword}'"
+                suffixes_info = "with arch_keyword '%s'" % self._arch_keyword
 
-            error_msg = (
-                f"No compatible AppImage asset found for {self.owner}/{self.repo} "
-                f"{suffixes_info} in release '{raw_tag}'"
+            logger.error(
+                "No compatible AppImage asset found for %s/%s %s in release '%s'",
+                self.owner,
+                self.repo,
+                suffixes_info,
+                raw_tag,
             )
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise ValueError(
+                "No compatible AppImage asset found for %s/%s %s in release '%s'"
+                % (self.owner, self.repo, suffixes_info, raw_tag)
+            )
 
         appimage_asset_obj = AppImageAsset.from_github_asset(selected_asset_result.asset)
         self.appimage_name = appimage_asset_obj.name
         self.app_download_url = appimage_asset_obj.browser_download_url
-        logger.info(f"Selected AppImage: {self.appimage_name}")
+        logger.info("Selected AppImage: %s", self.appimage_name)
 
         # Try extracting version from filename if not found in tag
         if (
@@ -318,16 +336,19 @@ class GitHubAPI:
             extracted_arch = extract_arch_from_filename(self.appimage_name)
             if extracted_arch:
                 logger.info(
-                    f"Extracted architecture keyword from AppImage filename: {extracted_arch}"
+                    "Extracted architecture keyword from AppImage filename: %s",
+                    extracted_arch,
                 )
                 self._arch_keyword = extracted_arch
             else:
                 logger.warning(
-                    f"No architecture found in {self.appimage_name}, keeping {self._arch_keyword}"
+                    "No architecture found in %s, keeping %s",
+                    self.appimage_name,
+                    self._arch_keyword,
                 )
 
         if self.appimage_name:
-            logger.debug(f"Processing SHA verification for {self.appimage_name}")
+            logger.debug("Processing SHA verification for %s", self.appimage_name)
             if self._app_info:
                 # Log verification settings from app info
                 app_settings = {
@@ -336,12 +357,13 @@ class GitHubAPI:
                     "use_github_release_desc": self._app_info.use_github_release_desc,
                 }
                 for setting, value in app_settings.items():
-                    logger.debug(f"{setting}: {value}")
+                    logger.debug("%s: %s", setting, value)
 
             # Check if verification should be skipped for this app
             if self._app_info and getattr(self._app_info, "skip_verification", False):
                 logger.info(
-                    f"Skipping SHA search for {self.appimage_name} - verification disabled for this app"
+                    "Skipping SHA search for %s - verification disabled for this app",
+                    self.appimage_name,
                 )
                 self.checksum_file_name = None
                 self.checksum_file_download_url = None
@@ -350,18 +372,19 @@ class GitHubAPI:
                 self.asset_digest = None
 
             else:
-                logger.debug(f"Proceeding with SHA processing for {self.appimage_name}")
+                logger.debug("Proceeding with SHA processing for %s", self.appimage_name)
                 # Use SHA name from app definition if available, otherwise use provided checksum_file_name
                 if self._app_info and self._app_info.checksum_file_name:
                     initial_checksum_file_name_hint = self._app_info.checksum_file_name
                     logger.debug(
-                        f"Using SHA name from app definition: {initial_checksum_file_name_hint}"
+                        "Using SHA name from app definition: %s",
+                        initial_checksum_file_name_hint,
                     )
                 else:
                     initial_checksum_file_name_hint = self.checksum_file_name or "sha256"
-                    logger.debug(f"Using fallback SHA name: {initial_checksum_file_name_hint}")
+                    logger.debug("Using fallback SHA name: %s", initial_checksum_file_name_hint)
 
-                logger.debug(f"Creating SHAManager with app_info: {self._app_info}")
+                logger.debug("Creating SHAManager with app_info: %s", self._app_info)
                 sha_mgr = SHAManager(
                     self.owner,
                     self.repo,
@@ -372,7 +395,10 @@ class GitHubAPI:
                 sha_mgr.find_sha_asset(assets)
 
                 logger.debug(
-                    f"SHAManager results - checksum_hash_type: {sha_mgr.checksum_hash_type}, checksum_file_name: {sha_mgr.checksum_file_name}, asset_digest: {sha_mgr.asset_digest}"
+                    "SHAManager results - checksum_hash_type: %s, checksum_file_name: %s, asset_digest: %s",
+                    sha_mgr.checksum_hash_type,
+                    sha_mgr.checksum_file_name,
+                    sha_mgr.asset_digest,
                 )
 
                 # Update instance attributes with results from SHAManager
@@ -383,7 +409,10 @@ class GitHubAPI:
                 self.asset_digest = sha_mgr.asset_digest
 
                 logger.debug(
-                    f"GitHub API updated - checksum_hash_type: {self.checksum_hash_type}, checksum_file_name: {self.checksum_file_name}, asset_digest: {self.asset_digest}"
+                    "GitHub API updated - checksum_hash_type: %s, checksum_file_name: %s, asset_digest: %s",
+                    self.checksum_hash_type,
+                    self.checksum_file_name,
+                    self.asset_digest,
                 )
         else:
             self.checksum_file_name = None
@@ -408,9 +437,17 @@ class GitHubAPI:
 
         self._release_info = ReleaseInfo.from_release_data(release_data, asset_info_dict)
 
-        logger.info(f"Successfully processed release {self.version} for {self.owner}/{self.repo}")
+        logger.info(
+            "Successfully processed release %s for %s/%s",
+            self.version,
+            self.owner,
+            self.repo,
+        )
         logger.debug(
-            f"AppImage: {self.appimage_name}, SHA: {self.checksum_file_name or 'Not found'} (Type: {self.checksum_hash_type or 'N/A'})"
+            "AppImage: %s, SHA: %s (Type: %s)",
+            self.appimage_name,
+            self.checksum_file_name or "Not found",
+            self.checksum_hash_type or "N/A",
         )
 
     def check_latest_version(
@@ -427,7 +464,9 @@ class GitHubAPI:
 
         if not isinstance(data, dict):
             logger.error(
-                f"Unexpected data type from get_latest_release. Expected dict, got {type(data)}. Data: {data}"
+                "Unexpected data type from get_latest_release. Expected dict, got %s. Data: %s",
+                type(data),
+                data,
             )
             return False, {"error": "Internal error: Unexpected data type from release fetch."}
 
@@ -444,10 +483,15 @@ class GitHubAPI:
                 current_version or "", raw_github_tag
             )
         except ValueError as e:
-            logger.error(f"Error during version comparison for {self.owner}/{self.repo}: {e}")
+            logger.error(
+                "Error during version comparison for %s/%s: %s",
+                self.owner,
+                self.repo,
+                e,
+            )
             latest_version_for_error = self.version or raw_github_tag or "unknown"
             return False, {
-                "error": f"Error during version comparison: {e!s}",
+                "error": "Error during version comparison: %s" % (e,),
                 "current_version": current_version,
                 "latest_version": latest_version_for_error,
             }
@@ -486,10 +530,10 @@ class GitHubAPI:
         try:
             icon_info = self._icon_manager.find_icon(self.owner, self.repo, headers=self._headers)
             if icon_info:
-                logger.info(f"Found app icon: {icon_info.get('name')}")
+                logger.info("Found app icon: %s", icon_info.get("name"))
             return icon_info
         except (ValueError, KeyError, AttributeError) as e:
-            logger.error(f"Error finding app icon: {e!s}")
+            logger.error("Error finding app icon: %s", e)
             return None
 
     def refresh_auth(self) -> None:
