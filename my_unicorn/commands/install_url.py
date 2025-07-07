@@ -202,10 +202,10 @@ class DownloadCommand(Command):
 
         # Debug logging for API values
         logging.debug("API values before VerificationManager creation:")
-        logging.debug("  api.checksum_file_name: %s", api.checksum_file_name)
-        logging.debug("  api.checksum_hash_type: %s", api.checksum_hash_type)
-        logging.debug("  api.asset_digest: %s", api.asset_digest)
-        logging.debug("  api.skip_verification: %s", api.skip_verification)
+        logging.debug("api.checksum_file_name: %s", api.checksum_file_name)
+        logging.debug("api.checksum_hash_type: %s", api.checksum_hash_type)
+        logging.debug("api.asset_digest: %s", api.asset_digest)
+        logging.debug("api.skip_verification: %s", api.skip_verification)
 
         # Perform verification with cleanup on failure
         verification_manager = VerificationManager(

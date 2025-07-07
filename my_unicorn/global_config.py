@@ -76,12 +76,12 @@ class GlobalConfigManager:
                     # If any expected keys are missing, log it
                     missing_keys = expected_keys - found_keys
                     if missing_keys:
-                        logging.info(f"Config file is missing keys: {missing_keys}")
+                        logging.info("Config file is missing keys: %s", missing_keys)
             except json.JSONDecodeError as e:
-                logging.error(f"Failed to parse the configuration file: {e}")
+                logging.error("Failed to parse the configuration file: %s", e)
                 raise ValueError("Invalid JSON format in the configuration file.")
         else:
-            logging.info(f"Configuration file not found at {self.config_file}. Creating one...")
+            logging.info("Configuration file not found at %s. Creating one...", self.config_file)
             self.create_global_config()
             return False
 
@@ -167,7 +167,7 @@ class GlobalConfigManager:
         os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
         with open(self.config_file, "w", encoding="utf-8") as file:
             json.dump(self.to_dict(), file, indent=4)
-        logging.info(f"Global configuration saved to {self.config_file}")
+        logging.info("Global configuration saved to %s", self.config_file)
 
     # Properties to access expanded paths on demand
     @property

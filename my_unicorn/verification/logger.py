@@ -29,7 +29,7 @@ class VerificationLogger:
             appimage_name: Name of the AppImage being verified
             checksum_hash_type: Type of hash being used for verification
         """
-        logging.info(f"Starting verification of {appimage_name} using {checksum_hash_type}")
+        logging.info("Starting verification of %s using %s", appimage_name, checksum_hash_type)
 
     def log_verification_skipped(self, reason: str) -> None:
         """Log and print when verification is skipped.
@@ -87,7 +87,7 @@ class VerificationLogger:
         message = (
             f"{STATUS_SUCCESS}{verification_type.title()} verification passed for {appimage_name}"
         )
-        logging.info(f"Verification successful for {appimage_name}")
+        logging.info("Verification successful for %s", appimage_name)
         print(message)
 
     def log_verification_failure(self, appimage_name: str, verification_type: str = "hash") -> None:
@@ -100,7 +100,7 @@ class VerificationLogger:
         message = (
             f"{STATUS_FAIL}{verification_type.title()} verification failed for {appimage_name}"
         )
-        logging.error(f"Verification failed for {appimage_name}")
+        logging.error("Verification failed for %s", appimage_name)
         print(message)
 
     def log_error(self, message: str, exception: Exception | None = None) -> None:
@@ -111,7 +111,7 @@ class VerificationLogger:
             exception: Optional exception that caused the error
         """
         if exception:
-            logging.error(f"{message}: {exception}")
+            logging.error("%s: %s", message, exception)
         else:
             logging.error(message)
 

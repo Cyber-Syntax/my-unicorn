@@ -115,7 +115,7 @@ class VerificationConfig:
             full_path: The complete path to the AppImage file
         """
         self.appimage_path = full_path
-        logging.info(f"set AppImage path for verification: {full_path}")
+        logging.info("set AppImage path for verification: %s", full_path)
 
     def is_verification_skipped(self) -> bool:
         """Check if verification should be skipped."""

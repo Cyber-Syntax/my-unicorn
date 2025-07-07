@@ -33,7 +33,7 @@ class VerificationCleanup:
             True if cleanup succeeded or file didn't exist, False otherwise
         """
         if not sha_path or not os.path.exists(sha_path):
-            logging.debug(f"No SHA file to clean up: {sha_path}")
+            logging.debug("No SHA file to clean up: %s", sha_path)
             return True
 
         return remove_single_file(sha_path, verbose=False)
@@ -120,6 +120,6 @@ class VerificationCleanup:
             for file_path in downloads_path.glob(pattern):
                 try:
                     file_path.unlink()
-                    logging.debug(f"Removed leftover verification file: {file_path}")
+                    logging.debug("Removed leftover verification file: %s", file_path)
                 except OSError as e:
-                    logging.warning(f"Could not remove leftover file {file_path}: {e}")
+                    logging.warning("Could not remove leftover file %s: %s", file_path, e)

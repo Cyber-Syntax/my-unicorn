@@ -21,10 +21,10 @@ class CommandInvoker:
                 logging.info("Command execution interrupted by user (Ctrl+C)")
                 print("\nCommand interrupted. Returning to main menu...")
             except TypeError as e:
-                logging.error(f"Type error occurred: {e}")
+                logging.error("Type error occurred: %s", e)
                 print(f"Error: {e}. Please check your configuration files.")
             except Exception as e:
-                logging.error(f"Error executing command: {e}")
+                logging.error("Error executing command: %s", e)
                 print(f"An error occurred: {e}")
         else:
             logging.error("Invalid choice. Please try again.")

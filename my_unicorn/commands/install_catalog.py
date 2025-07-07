@@ -277,10 +277,10 @@ class InstallAppCommand(Command):
 
                     # Debug logging for API values
                     logging.debug("API values before VerificationManager creation:")
-                    logging.debug(f"  api.checksum_file_name: {api.checksum_file_name}")
-                    logging.debug(f"  api.checksum_hash_type: {api.checksum_hash_type}")
-                    logging.debug(f"  api.asset_digest: {api.asset_digest}")
-                    logging.debug(f"  api.skip_verification: {api.skip_verification}")
+                    logging.debug("  api.checksum_file_name: %s", api.checksum_file_name)
+                    logging.debug("  api.checksum_hash_type: %s", api.checksum_hash_type)
+                    logging.debug("  api.asset_digest: %s", api.asset_digest)
+                    logging.debug("  api.skip_verification: %s", api.skip_verification)
 
                     verification_manager = VerificationManager(
                         checksum_file_name=api.checksum_file_name,
@@ -312,7 +312,7 @@ class InstallAppCommand(Command):
                             return
 
             except Exception as e:
-                logging.error(f"Download attempt {attempt} failed: {e!s}", exc_info=True)
+                logging.error("Download attempt %s failed: %s", attempt, e, exc_info=True)
                 print(f"Error during download: {e!s}")
 
                 if attempt == self.MAX_ATTEMPTS:
