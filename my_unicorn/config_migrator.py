@@ -40,10 +40,10 @@ class ConfigMigrator:
 
         # Path to user's config file
         config_file = Path(os.path.expanduser("~/.config/myunicorn/settings.json"))
-        logger.debug(f"Global config file path: {config_file}")
+        logger.debug("Global config file path: %s", config_file)
 
         # Debug output for default configuration
-        logger.debug(f"Default config keys: {list(default_dict.keys())}")
+        logger.debug("Default config keys: %s", list(default_dict.keys()))
 
         try:
             if config_file.is_file():
@@ -53,22 +53,22 @@ class ConfigMigrator:
 
                 # Parse the JSON content
                 user_config_dict = json.loads(file_content)
-                logger.debug(f"User config keys: {list(user_config_dict.keys())}")
+                logger.debug("User config keys: %s", list(user_config_dict.keys()))
 
                 # Find missing keys (in default but not in user config)
                 missing_keys = [key for key in default_dict if key not in user_config_dict]
-                logger.info(f"Missing keys check result: {missing_keys}")
+                logger.info("Missing keys check result: %s", missing_keys)
 
                 # Find unused keys (in user config but not in default)
                 unused_keys = [key for key in user_config_dict if key not in default_dict]
-                logger.info(f"Unused keys check result: {unused_keys}")
+                logger.info("Unused keys check result: %s", unused_keys)
 
                 has_changes = False
                 deleted_keys = []
 
                 # Handle unused keys if deletion is requested
                 if delete_unused and unused_keys:
-                    logger.info(f"Found {len(unused_keys)} unused keys: {unused_keys}")
+                    logger.info("Found %d unused keys: %s", len(unused_keys), unused_keys)
 
                     # Get confirmation if required
                     confirmed = not require_confirmation
@@ -108,7 +108,7 @@ class ConfigMigrator:
 
                         # Record which keys were deleted
                         deleted_keys = unused_keys
-                        logger.info(f"Removed {len(deleted_keys)} unused keys from global config")
+                        logger.info("Removed %d unused keys from global config", len(deleted_keys))
                         has_changes = True
                     else:
                         logger.info("Skipped deleting unused keys (not confirmed)")
@@ -125,7 +125,9 @@ class ConfigMigrator:
                     for key in missing_keys:
                         updated_config[key] = default_dict[key]
                         logger.info(
-                            f"Added missing key '{key}' with default value: {default_dict[key]}"
+                            "Added missing key '%s' with default value: %s",
+                            key,
+                            default_dict[key],
                         )
 
                     # Write back the updated configuration
@@ -136,23 +138,25 @@ class ConfigMigrator:
 
                 if has_changes:
                     logger.info(
-                        f"Successfully migrated global config with {len(missing_keys)} new keys, "
-                        f"removed {len(deleted_keys)} unused keys"
+                        "Successfully migrated global config with %d new keys, "
+                        "removed %d unused keys",
+                        len(missing_keys),
+                        len(deleted_keys),
                     )
                 return has_changes, missing_keys, deleted_keys
             else:
                 # Config file doesn't exist, create a new one using GlobalConfigManager
-                logger.info(f"Config file not found at {config_file}, creating new")
+                logger.info("Config file not found at %s, creating new", config_file)
                 new_config = GlobalConfigManager()
                 new_config.save_config()
                 logger.info("Created new global configuration with default values")
                 return True, list(default_dict.keys()), []
 
         except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in config file: {e}")
+            logger.error("Invalid JSON in config file: %s", e)
             return False, [], []
         except Exception as e:
-            logger.error(f"Error during global config migration: {e!s}", exc_info=True)
+            logger.error("Error during global config migration: %s", e, exc_info=True)
             return False, [], []
 
     @staticmethod
@@ -201,7 +205,7 @@ class ConfigMigrator:
         # Create app config manager to list files and get default values
         app_config = AppConfigManager()
         app_config_folder = app_config.config_folder
-        logger.info(f"Checking app configs in: {app_config_folder}")
+        logger.info("Checking app configs in: %s", app_config_folder)
 
         migrated_configs = {}
         deleted_configs = {}
@@ -209,7 +213,7 @@ class ConfigMigrator:
         try:
             # list all JSON files in the app config directory
             json_files = app_config.list_json_files()
-            logger.debug(f"Found {len(json_files)} app config files: {json_files}")
+            logger.debug("Found %d app config files: %s", len(json_files), json_files)
 
             if not json_files:
                 logger.info("No app configuration files found")
@@ -218,13 +222,13 @@ class ConfigMigrator:
             # Get default template for app configs
             default_app_config = AppConfigManager()
             default_dict = default_app_config.to_dict()
-            logger.debug(f"Default app config keys: {list(default_dict.keys())}")
+            logger.debug("Default app config keys: %s", list(default_dict.keys()))
 
             # Check each app config file
             for json_file in json_files:
                 app_name = os.path.splitext(json_file)[0]
                 config_path = Path(os.path.join(app_config_folder, json_file))
-                logger.debug(f"Processing app config: {app_name} at {config_path}")
+                logger.debug("Processing app config: %s at %s", app_name, config_path)
 
                 try:
                     # Read the app config file
@@ -233,7 +237,7 @@ class ConfigMigrator:
 
                     # Parse JSON content
                     user_app_dict = json.loads(file_content)
-                    logger.debug(f"App '{app_name}' config keys: {list(user_app_dict.keys())}")
+                    logger.debug("App '%s' config keys: %s", app_name, list(user_app_dict.keys()))
 
                     # Special handling for app_rename being null
                     if (
@@ -242,7 +246,9 @@ class ConfigMigrator:
                         and "repo" in user_app_dict
                         and user_app_dict["repo"]
                     ):
-                        logger.info(f"Fixing null app_rename for app '{app_name}' using repo value")
+                        logger.info(
+                            "Fixing null app_rename for app '%s' using repo value", app_name
+                        )
                         user_app_dict["app_rename"] = user_app_dict["repo"]
                         has_changes = True  # Mark that this config needs to be saved
                     else:
@@ -250,18 +256,21 @@ class ConfigMigrator:
 
                     # Find missing keys
                     missing_keys = [key for key in default_dict if key not in user_app_dict]
-                    logger.debug(f"App '{app_name}' missing keys: {missing_keys}")
+                    logger.debug("App '%s' missing keys: %s", app_name, missing_keys)
 
                     # Find unused keys
                     unused_keys = [key for key in user_app_dict if key not in default_dict]
-                    logger.debug(f"App '{app_name}' unused keys: {unused_keys}")
+                    logger.debug("App '%s' unused keys: %s", app_name, unused_keys)
 
                     app_deleted_keys = []
 
                     # Handle unused keys if deletion is requested
                     if delete_unused and unused_keys:
                         logger.info(
-                            f"Found {len(unused_keys)} unused keys for app '{app_name}': {unused_keys}"
+                            "Found %d unused keys for app '%s': %s",
+                            len(unused_keys),
+                            app_name,
+                            unused_keys,
                         )
 
                         # Get confirmation if required
@@ -276,26 +285,29 @@ class ConfigMigrator:
                             for key in unused_keys:
                                 del user_app_dict[key]
                                 app_deleted_keys.append(key)
-                                logger.info(f"Deleted unused key '{key}' from app '{app_name}'")
+                                logger.info("Deleted unused key '%s' from app '%s'", key, app_name)
                             has_changes = True
                             deleted_configs[app_name] = app_deleted_keys
                             logger.info(
-                                f"Removed {len(app_deleted_keys)} unused keys from app '{app_name}'"
+                                "Removed %d unused keys from app '%s'",
+                                len(app_deleted_keys),
+                                app_name,
                             )
                         else:
                             logger.info(
-                                f"Skipped deleting unused keys for app '{app_name}' (not confirmed)"
+                                "Skipped deleting unused keys for app '%s' (not confirmed)",
+                                app_name,
                             )
 
                     # Early return if no changes needed
                     if not missing_keys and not has_changes:
-                        logger.info(f"App config '{app_name}' is up-to-date")
+                        logger.info("App config '%s' is up-to-date", app_name)
                         continue
 
                     # Add missing keys with default values
                     for key in missing_keys:
                         user_app_dict[key] = default_dict[key]
-                        logger.info(f"Added missing key '{key}' to app '{app_name}'")
+                        logger.info("Added missing key '%s' to app '%s'", key, app_name)
                         has_changes = True
 
                     # Write updated config back to file if there were changes
@@ -305,17 +317,19 @@ class ConfigMigrator:
 
                     if missing_keys:
                         migrated_configs[app_name] = missing_keys
-                        logger.info(f"Migrated app '{app_name}' with {len(missing_keys)} new keys")
+                        logger.info(
+                            "Migrated app '%s' with %d new keys", app_name, len(missing_keys)
+                        )
 
                 except json.JSONDecodeError as e:
-                    logger.error(f"Invalid JSON in app config '{app_name}': {e}")
+                    logger.error("Invalid JSON in app config '%s': %s", app_name, e)
                 except Exception as e:
-                    logger.error(f"Error processing app config '{app_name}': {e!s}", exc_info=True)
+                    logger.error("Error processing app config '%s': %s", app_name, e, exc_info=True)
 
             return len(migrated_configs), migrated_configs, deleted_configs
 
         except Exception as e:
-            logger.error(f"Error during app config migration: {e!s}", exc_info=True)
+            logger.error("Error during app config migration: %s", e, exc_info=True)
             return 0, {}, {}
 
     @staticmethod

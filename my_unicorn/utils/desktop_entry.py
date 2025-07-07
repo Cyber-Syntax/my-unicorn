@@ -23,10 +23,30 @@ BROWSER_CATEGORIES = "Network;WebBrowser;"
 
 # Known browser names (case-insensitive patterns)
 BROWSER_KEYWORDS = {
-    'firefox', 'chrome', 'chromium', 'brave', 'opera', 'edge', 'safari',
-    'zen-browser', 'zen', 'vivaldi', 'waterfox', 'librewolf', 'tor-browser',
-    'tor', 'epiphany', 'konqueror', 'falkon', 'qutebrowser', 'midori',
-    'seamonkey', 'palemoon', 'basilisk', 'icecat', 'iceweasel'
+    "firefox",
+    "chrome",
+    "chromium",
+    "brave",
+    "opera",
+    "edge",
+    "safari",
+    "zen-browser",
+    "zen",
+    "vivaldi",
+    "waterfox",
+    "librewolf",
+    "tor-browser",
+    "tor",
+    "epiphany",
+    "konqueror",
+    "falkon",
+    "qutebrowser",
+    "midori",
+    "seamonkey",
+    "palemoon",
+    "basilisk",
+    "icecat",
+    "iceweasel",
 }
 
 # MIME types for web browsers
@@ -45,7 +65,7 @@ BROWSER_MIME_TYPES = [
     "x-scheme-handler/ftp",
     "x-scheme-handler/chrome",
     "video/webm",
-    "application/x-xpinstall"
+    "application/x-xpinstall",
 ]
 
 
@@ -81,15 +101,16 @@ class DesktopEntryManager:
 
     def is_browser_app(self, app_name: str) -> bool:
         """Determine if an application is a web browser based on its name.
-        
+
         Args:
             app_name: The application name to check
-            
+
         Returns:
             True if the application appears to be a browser, False otherwise
+
         """
         app_name_lower = app_name.lower()
-        
+
         # Check if any browser keyword is contained in the app name
         return any(keyword in app_name_lower for keyword in BROWSER_KEYWORDS)
 
@@ -120,11 +141,11 @@ class DesktopEntryManager:
                     if section == DESKTOP_FILE_SECTION and "=" in stripped_line:
                         key, value = stripped_line.split("=", 1)
                         entries[key.strip()] = value.strip()
-            logger.info(f"Found existing desktop file: {desktop_path}")
+            logger.info("Found existing desktop file: %s", desktop_path)
         except OSError as e:
-            logger.warning(f"Error reading existing desktop file (OS error): {e!s}")
+            logger.warning("Error reading existing desktop file (OS error): %s", e)
         except Exception as e:
-            logger.warning(f"Unexpected error reading desktop file: {e!s}")
+            logger.warning("Unexpected error reading desktop file: %s", e)
 
         return entries
 
@@ -141,7 +162,7 @@ class DesktopEntryManager:
         """
         for key, new_value in new_entries.items():
             if key not in existing_entries or existing_entries[key] != new_value:
-                logger.info(f"Desktop entry update needed: {key} changed")
+                logger.info("Desktop entry update needed: %s changed", key)
                 return True
         return False
 
@@ -179,25 +200,25 @@ class DesktopEntryManager:
             # Replace original file with temp file (atomic operation)
             temp_path.replace(desktop_path)
 
-            logger.info(f"Updated desktop entry at {desktop_path}")
+            logger.info("Updated desktop entry at %s", desktop_path)
             return True
         except OSError as e:
-            logger.error(f"Failed to write desktop file (OS error): {e!s}")
+            logger.error("Failed to write desktop file (OS error): %s", e)
             # Clean up temp file if it exists
             if temp_path.exists():
                 try:
                     temp_path.unlink()
                 except Exception as cleanup_error:
-                    logger.warning(f"Failed to clean up temporary file: {cleanup_error}")
+                    logger.warning("Failed to clean up temporary file: %s", cleanup_error)
             return False
         except Exception as e:
-            logger.error(f"Unexpected error writing desktop file: {e!s}")
+            logger.error("Unexpected error writing desktop file: %s", e)
             # Clean up temp file if it exists
             if temp_path.exists():
                 try:
                     temp_path.unlink()
                 except Exception as cleanup_error:
-                    logger.warning(f"Failed to clean up temporary file: {cleanup_error}")
+                    logger.warning("Failed to clean up temporary file: %s", cleanup_error)
             return False
 
     def create_or_update_desktop_entry(
@@ -239,7 +260,7 @@ class DesktopEntryManager:
             desktop_file = f"{app_rename.lower()}.desktop"
             desktop_path = self.desktop_dir / desktop_file
 
-            logger.info(f"Processing desktop entry at {desktop_path}")
+            logger.info("Processing desktop entry at %s", desktop_path)
 
             # Read existing desktop file
             existing_entries = self.read_desktop_file(desktop_path)
@@ -247,9 +268,9 @@ class DesktopEntryManager:
             # Determine if this is a browser application
             if is_browser is None:
                 is_browser = self.is_browser_app(app_rename)
-            
+
             if is_browser:
-                logger.info(f"Detected browser application: {app_rename}")
+                logger.info("Detected browser application: %s", app_rename)
 
             # Create Exec field - add %u for browsers to handle URLs
             exec_cmd = str(appimage_path)
@@ -276,13 +297,13 @@ class DesktopEntryManager:
             # Add icon if available
             if icon_path:
                 new_entries["Icon"] = str(icon_path)
-                logger.info(f"Using icon from: {icon_path}")
+                logger.info("Using icon from: %s", icon_path)
             else:
                 logger.info("No icon specified for desktop entry")
 
             # Check if update is needed
             if not self.needs_update(existing_entries, new_entries):
-                logger.info(f"Desktop entry {desktop_path} is already up to date")
+                logger.info("Desktop entry %s is already up to date", desktop_path)
                 return True, str(desktop_path)
 
             # Write updated desktop file
@@ -292,10 +313,8 @@ class DesktopEntryManager:
                 return False, f"Failed to write desktop entry at {desktop_path}"
 
         except OSError as e:
-            error_msg = f"Failed to create desktop entry due to file system error: {e!s}"
-            logger.error(error_msg)
-            return False, error_msg
+            logger.error("Failed to create desktop entry due to file system error: %s", e)
+            return False, "Failed to create desktop entry due to file system error: %s" % e
         except Exception as e:
-            error_msg = f"Unexpected error creating desktop entry: {e!s}"
-            logger.error(error_msg)
-            return False, error_msg
+            logger.error("Unexpected error creating desktop entry: %s", e)
+            return False, "Unexpected error creating desktop entry: %s" % e

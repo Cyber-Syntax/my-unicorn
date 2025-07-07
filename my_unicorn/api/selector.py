@@ -60,13 +60,13 @@ class AppImageSelector:
 
         # 1. Determine system architecture
         system_cpu_arch = arch_utils.get_current_arch()
-        self._logger.info(f"System CPU architecture: {system_cpu_arch}")
+        self._logger.info("System CPU architecture: %s", system_cpu_arch)
 
         # 2. Determine target characteristic suffix list with priority
         target_suffixes = self._determine_target_suffixes(
             definitive_app_info, user_local_config_data
         )
-        self._logger.info(f"Target characteristic suffixes: {target_suffixes}")
+        self._logger.info("Target characteristic suffixes: %s", target_suffixes)
 
         # Filter AppImage assets
         appimage_assets = [
@@ -85,7 +85,7 @@ class AppImageSelector:
             return None
 
         self._logger.info(
-            f"Available AppImage assets: {[asset['name'] for asset in appimage_assets]}"
+            "Available AppImage assets: %s", [asset["name"] for asset in appimage_assets]
         )
 
         # 3. Try each suffix in priority order
@@ -147,11 +147,11 @@ class AppImageSelector:
     ) -> AssetSelectionResult | None:
         """Try to select an asset based on characteristic suffixes."""
         for suffix in target_suffixes:
-            self._logger.info(f"Trying suffix: '{suffix}'")
+            self._logger.info("Trying suffix: '%s'", suffix)
 
             # Skip suffix if not compatible with system architecture
             if not arch_utils.is_keyword_compatible_with_arch(suffix, system_cpu_arch):
-                self._logger.debug(f"Suffix '{suffix}' not compatible with {system_cpu_arch}")
+                self._logger.debug("Suffix '%s' not compatible with %s", suffix, system_cpu_arch)
                 continue
 
             # Find assets matching this suffix
@@ -162,7 +162,7 @@ class AppImageSelector:
 
                 # Check if this asset matches the suffix
                 if self._asset_matches_suffix(asset_name, suffix_lower):
-                    self._logger.info(f"Asset '{asset['name']}' matched suffix '{suffix}'")
+                    self._logger.info("Asset '%s' matched suffix '%s'", asset["name"], suffix)
                     matching_assets.append(asset)
 
             if matching_assets:
@@ -174,26 +174,30 @@ class AppImageSelector:
                         compatible_assets.append(asset)
                     else:
                         self._logger.debug(
-                            f"Asset '{asset['name']}' filtered out due to architecture incompatibility"
+                            "Asset '%s' filtered out due to architecture incompatibility",
+                            asset["name"],
                         )
 
                 if compatible_assets:
                     # Sort by name to ensure consistent selection
                     compatible_assets.sort(key=lambda x: x["name"])
                     self._logger.info(
-                        f"Found {len(compatible_assets)} architecture-compatible assets matching suffix '{suffix}': {[a['name'] for a in compatible_assets]}"
+                        "Found %d architecture-compatible assets matching suffix '%s': %s",
+                        len(compatible_assets),
+                        suffix,
+                        [a["name"] for a in compatible_assets],
                     )
 
                     # Return first compatible asset
                     selected_asset = compatible_assets[0]
-                    self._logger.info(f"Selected asset: {selected_asset['name']}")
+                    self._logger.info("Selected asset: %s", selected_asset["name"])
                     return AssetSelectionResult(asset=selected_asset, characteristic_suffix=suffix)
                 else:
                     self._logger.debug(
-                        f"No architecture-compatible assets found for suffix '{suffix}'"
+                        "No architecture-compatible assets found for suffix '%s'", suffix
                     )
             else:
-                self._logger.debug(f"No assets found matching suffix '{suffix}'")
+                self._logger.debug("No assets found matching suffix '%s'", suffix)
 
         return None
 

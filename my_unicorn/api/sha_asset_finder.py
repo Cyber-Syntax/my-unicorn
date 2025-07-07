@@ -33,14 +33,14 @@ class SHAAssetFinder:
             returns a special dict with asset digest information.
 
         """
-        logger.info(f"Looking for SHA file matching: {selected_appimage_name}")
+        logger.info("Looking for SHA file matching: %s", selected_appimage_name)
 
         # Handle case where definitive_app_info is None (URL-based installs)
         if definitive_app_info is None:
             logger.info("No app definition found - using automatic SHA detection")
         else:
             logger.info(
-                f"Using SHA name from definitive info: {definitive_app_info.checksum_file_name}"
+                "Using SHA name from definitive info: %s", definitive_app_info.checksum_file_name
             )
 
             # Skip SHA search if verification is disabled
@@ -50,21 +50,22 @@ class SHAAssetFinder:
 
             # Priority 1: Check if app uses asset digest verification
             if definitive_app_info.use_asset_digest:
-                logger.info(f"App {selected_appimage_name} prefers asset digest verification")
+                logger.info("App %s prefers asset digest verification", selected_appimage_name)
                 asset_digest_info = self._try_extract_asset_digest(selected_appimage_name, assets)
                 if asset_digest_info:
-                    logger.info(f"Successfully found asset digest for {selected_appimage_name}")
+                    logger.info("Successfully found asset digest for %s", selected_appimage_name)
                     return asset_digest_info
                 else:
                     logger.warning(
-                        f"Asset digest not available for {selected_appimage_name}, falling back to SHA files"
+                        "Asset digest not available for %s, falling back to SHA files",
+                        selected_appimage_name,
                     )
 
             # Priority 2: Try exact match from definitive app info
             if definitive_app_info.checksum_file_name:
                 for asset in assets:
                     if asset["name"].lower() == definitive_app_info.checksum_file_name.lower():
-                        logger.info(f"Found exact SHA name match: {asset['name']}")
+                        logger.info("Found exact SHA name match: %s", asset["name"])
                         return asset
 
         # Priority 3: Try pattern matching (for both catalog and URL-based installs)
@@ -83,7 +84,7 @@ class SHAAssetFinder:
         for asset in sha_assets:
             asset_name = asset["name"].lower()
             if appimage_base in asset_name:
-                logger.info(f"Found SHA file specific to AppImage: {asset['name']}")
+                logger.info("Found SHA file specific to AppImage: %s", asset["name"])
                 return asset
 
         # Fallback to a generic SHA file if available
@@ -105,7 +106,7 @@ class SHAAssetFinder:
         for asset in assets:
             if asset.get("name") == appimage_name and asset.get("digest"):
                 digest = asset["digest"]
-                logger.info(f"Found asset digest for {appimage_name}: {digest}")
+                logger.info("Found asset digest for %s: %s", appimage_name, digest)
 
                 # Validate digest format (should be like "sha256:hash_value")
                 if ":" in digest:
@@ -121,11 +122,11 @@ class SHAAssetFinder:
                             "asset_digest_type": digest_type,
                         }
                     else:
-                        logger.warning(f"Invalid digest format or unsupported type: {digest}")
+                        logger.warning("Invalid digest format or unsupported type: %s", digest)
                 else:
-                    logger.warning(f"Invalid digest format (missing colon): {digest}")
+                    logger.warning("Invalid digest format (missing colon): %s", digest)
 
-        logger.debug(f"No asset digest found for {appimage_name} in assets")
+        logger.debug("No asset digest found for %s in assets", appimage_name)
         return None
 
     def _filter_sha_assets(self, assets: list[dict]) -> list[dict]:

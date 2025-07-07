@@ -42,13 +42,14 @@ class BaseUpdateCommand(Command):
 
         self.max_concurrent_updates = self.global_config.max_concurrent_updates
         self._logger.debug(
-            f"set max_concurrent_updates to {self.max_concurrent_updates} from global config"
+            "set max_concurrent_updates to %s from global config", self.max_concurrent_updates
         )
 
         # Initialize semaphore in __init__
         if not isinstance(self.max_concurrent_updates, int) or self.max_concurrent_updates <= 0:
             self._logger.warning(
-                f"Invalid max_concurrent_updates value: {self.max_concurrent_updates} from global config. Defaulting to 1 for semaphore."
+                "Invalid max_concurrent_updates value: %s from global config. Defaulting to 1 for semaphore.",
+                self.max_concurrent_updates,
             )
             # Ensure max_concurrent_updates is a positive int for Semaphore
             semaphore_value = 1
@@ -56,7 +57,7 @@ class BaseUpdateCommand(Command):
             semaphore_value = self.max_concurrent_updates
 
         self.semaphore: asyncio.Semaphore = asyncio.Semaphore(semaphore_value)
-        self._logger.debug(f"Semaphore initialized with value: {semaphore_value}")
+        self._logger.debug("Semaphore initialized with value: %s", semaphore_value)
 
         # Ensure base directory paths exist
         os.makedirs(self.global_config.expanded_app_storage_path, exist_ok=True)
@@ -98,7 +99,7 @@ class BaseUpdateCommand(Command):
         results = {}
 
         try:
-            self._logger.info(f"Beginning asynchronous update of {total_apps} AppImages")
+            self._logger.info("Beginning asynchronous update of %s AppImages", total_apps)
 
             # Create tasks for all apps
             tasks = []
@@ -125,13 +126,13 @@ class BaseUpdateCommand(Command):
                 elif isinstance(result, Exception):
                     # Handle exceptions that escaped the task
                     failure_count += 1
-                    error_msg = str(result)
-                    self._logger.error(f"Update of {app_name} failed with exception: {error_msg}")
+                    error_msg = "Update of %s failed with exception: %s", app_name, result
+                    self._logger.error(error_msg)
                     results[app_name] = {"status": "exception", "message": error_msg, "elapsed": 0}
                 else:
                     # Handle unexpected result format
                     failure_count += 1
-                    self._logger.error(f"Unexpected result format for {app_name}: {result}")
+                    self._logger.error("Unexpected result format for %s: %s", app_name, result)
                     results[app_name] = {
                         "status": "error",
                         "message": "Unexpected result format",
@@ -139,7 +140,7 @@ class BaseUpdateCommand(Command):
                     }
 
         except Exception as e:
-            self._logger.error(f"Error in async update process: {e!s}", exc_info=True)
+            self._logger.error("Error in async update process: %s", e, exc_info=True)
 
         return success_count, failure_count, results
 
@@ -169,7 +170,7 @@ class BaseUpdateCommand(Command):
             start_time = time.time()
 
             try:
-                self._logger.info(f"[{app_index}/{total_apps}] Starting update for {app_name}")
+                self._logger.info("[%s/%s] Starting update for %s", app_index, total_apps, app_name)
 
                 # Create separate config managers for this app to avoid conflicts
                 app_config = AppConfigManager()
@@ -195,7 +196,11 @@ class BaseUpdateCommand(Command):
 
                 if result[0]:  # result is (success, result_data)
                     self._logger.info(
-                        f"[{app_index}/{total_apps}] ✓ Successfully updated {app_name} ({elapsed_time:.1f}s)"
+                        "[%s/%s] ✓ Successfully updated %s (%.1fs)",
+                        app_index,
+                        total_apps,
+                        app_name,
+                        elapsed_time,
                     )
                     result_appimage_name = result[1].get("appimage_name") if result[1] else None
                     result_checksum_file_name = (
@@ -210,7 +215,11 @@ class BaseUpdateCommand(Command):
                     }
                 else:
                     self._logger.warning(
-                        f"[{app_index}/{total_apps}] ✗ Failed to update {app_name} ({elapsed_time:.1f}s)"
+                        "[%s/%s] ✗ Failed to update %s (%.1fs)",
+                        app_index,
+                        total_apps,
+                        app_name,
+                        elapsed_time,
                     )
                     result_appimage_name = result[1].get("appimage_name") if result[1] else None
                     result_checksum_file_name = (
@@ -229,7 +238,7 @@ class BaseUpdateCommand(Command):
             except Exception as e:
                 error_message = str(e)
                 elapsed_time = time.time() - start_time
-                self._logger.error(f"Error updating {app_name}: {error_message}", exc_info=True)
+                self._logger.error("Error updating %s: %s", app_name, error_message, exc_info=True)
 
                 return False, {
                     "status": "error",
@@ -274,9 +283,15 @@ class BaseUpdateCommand(Command):
         # Load app definition FIRST to get static metadata
         app_info = load_app_definition(app_name)
         if not app_info:
-            error_msg = f"No app definition found for {app_name}. Please ensure {app_name}.json exists in the apps/ directory."
-            self._logger.error(error_msg)
-            return False, {"error": error_msg}
+            self._logger.error(
+                "No app definition found for %s. Please ensure %s.json exists in the apps/ directory.",
+                app_name,
+                app_name,
+            )
+            return False, {
+                "error": "No app definition found for %s. Please ensure %s.json exists in the apps/ directory."
+                % (app_name, app_name)
+            }
 
         # set the app name in config manager to enable property access
         app_config.set_app_name(app_name)
@@ -309,19 +324,26 @@ class BaseUpdateCommand(Command):
         )
 
         if "error" in version_info:
-            error_msg = f"Error checking latest version from GitHub API: {version_info['error']}"
-            self._logger.error(error_msg)
-            return False, {"error": error_msg}
+            self._logger.error(
+                "Error checking latest version from GitHub API: %s", version_info["error"]
+            )
+            return False, {
+                "error": "Error checking latest version from GitHub API: %s" % version_info["error"]
+            }
 
         if not update_available:
             self._logger.info(
-                f"No update available for {app_data['name']}. Current: {current_version}, Latest: {version_info.get('latest_version', 'unknown')}"
+                "No update available for %s. Current: %s, Latest: %s",
+                app_data["name"],
+                current_version,
+                version_info.get("latest_version", "unknown"),
             )
             return False, {"status": "no_update"}
 
         # Now that we know an update is available, do a full release processing to get SHA info
         self._logger.debug(
-            f"Update available for {app_data['name']}, processing full release info including SHA"
+            "Update available for %s, processing full release info including SHA",
+            app_data["name"],
         )
         full_result = github_api.get_latest_release(version_check_only=False, is_batch=is_batch)
 
@@ -332,9 +354,12 @@ class BaseUpdateCommand(Command):
             full_success, full_release_data, _ = full_result
 
         if not full_success:
-            error_msg = f"Error getting full release data from GitHub API: {full_release_data}"
-            self._logger.error(error_msg)
-            return False, {"error": error_msg}
+            self._logger.error(
+                "Error getting full release data from GitHub API: %s", full_release_data
+            )
+            return False, {
+                "error": "Error getting full release data from GitHub API: %s" % full_release_data
+            }
 
         # Download and verify AppImage
         try:
@@ -370,10 +395,9 @@ class BaseUpdateCommand(Command):
                 github_api, downloaded_file_path, cleanup_on_failure=cleanup
             )
             if not verification_result:
-                error_msg = f"Verification failed for {app_data['name']}."
-                self._logger.warning(error_msg)
+                self._logger.warning("Verification failed for %s.", app_data["name"])
                 return False, {
-                    "error": error_msg,
+                    "error": "Verification failed for %s." % app_data["name"],
                     "appimage_name": github_api.appimage_name,
                     "checksum_file_name": github_api.checksum_file_name,
                 }
@@ -424,19 +448,17 @@ class BaseUpdateCommand(Command):
                     "success_message": success_msg if is_async else "",
                 }
             else:
-                error_msg = f"Failed to perform file operations for {app_data['name']}"
-                self._logger.error(error_msg)
+                self._logger.error("Failed to perform file operations for %s", app_data["name"])
                 return False, {
-                    "error": error_msg,
+                    "error": "Failed to perform file operations for %s" % app_data["name"],
                     "appimage_name": github_api.appimage_name,
                     "checksum_file_name": github_api.checksum_file_name,
                 }
 
         except Exception as e:
-            error_msg = f"Error updating {app_data['name']}: {e!s}"
-            self._logger.error(error_msg)
+            self._logger.error("Error updating %s: %s", app_data["name"], e)
             # Include appimage_name and checksum_file_name if github_api was created successfully
-            result = {"error": error_msg}
+            result = {"error": "Error updating %s: %s" % (app_data["name"], e)}
             if "github_api" in locals() and github_api.appimage_name:
                 result["appimage_name"] = github_api.appimage_name
                 if github_api.checksum_file_name:
@@ -466,7 +488,7 @@ class BaseUpdateCommand(Command):
         global_config = global_config or self.global_config
 
         try:
-            update_msg = f"\nUpdating {app_data['name']}..."
+            update_msg = "\nUpdating %s...", app_data['name']
             self._logger.info(update_msg)
             print(update_msg)
 
@@ -507,8 +529,7 @@ class BaseUpdateCommand(Command):
                         break
 
                 except Exception as e:
-                    error_msg = f"Error updating {app_data['name']}: {e!s}"
-                    self._logger.error(error_msg)
+                    self._logger.error("Error updating %s: %s", app_data["name"], e)
 
                     # For batch updates or last attempt, skip to next app
                     if is_batch or attempt == max_attempts:
@@ -524,14 +545,13 @@ class BaseUpdateCommand(Command):
                         print("Update cancelled.")
                         break
 
-            finished_msg = f"Finished processing {app_data['name']}"
-            self._logger.info(finished_msg)
+            finished_msg = "Finished processing %s" % app_data["name"]
+            self._logger.info("Finished processing %s", app_data["name"])
             print(finished_msg)
             return False
 
         except Exception as e:
-            error_msg = f"Unexpected error updating {app_data['name']}: {e!s}"
-            self._logger.error(error_msg)
+            self._logger.error("Unexpected error updating %s: %s", app_data["name"], e)
             print(f"Unexpected error updating {app_data['name']}: {e!s}. Continuing to next app.")
             return False
 
@@ -587,7 +607,7 @@ class BaseUpdateCommand(Command):
         # set downloaded file path for verification
         if downloaded_file_path:
             verification_manager.set_appimage_path(downloaded_file_path)
-            self._logger.info(f"Using specific file path for verification: {downloaded_file_path}")
+            self._logger.info("Using specific file path for verification: %s", downloaded_file_path)
 
         # Verify and clean up on failure if requested
         verification_result = verification_manager.verify_appimage(
@@ -649,9 +669,12 @@ class BaseUpdateCommand(Command):
     def _display_update_list(self, updatable_apps: list[dict[str, Any]]) -> None:
         """Display list of apps to update."""
         print(f"\nFound {len(updatable_apps)} apps to update:")
-        for idx, app in enumerate(updatable_apps, 1):
+        for idx, app in enumerate(updatable_apps, start=1):
+            self._logger.info(
+                "%d. %s (%s → %s)",
+                idx, app["name"], app["current"], app["latest"]
+            )
             update_msg = f"{idx}. {app['name']} ({app['current']} → {app['latest']})"
-            self._logger.info(update_msg)
             print(update_msg)
 
     def _check_single_app_version(
@@ -707,7 +730,10 @@ class BaseUpdateCommand(Command):
             }
         elif latest_version and latest_version != current_version:
             self._logger.info(
-                f"Update available for {app_info.repo}: {current_version} → {latest_version}"
+                "Update available for %s: %s → %s",
+                app_info.repo,
+                current_version,
+                latest_version,
             )
             return {
                 "config_file": config_file,
@@ -715,7 +741,7 @@ class BaseUpdateCommand(Command):
                 "current": current_version,
                 "latest": latest_version,
             }
-        return False # No update available
+        return False  # No update available
 
     def _check_rate_limits(
         self, apps_to_update: list[dict[str, Any]]
@@ -769,7 +795,7 @@ class BaseUpdateCommand(Command):
             return False, filtered_apps, message
 
         except Exception as e:
-            self._logger.error(f"Error checking rate limits: {e}")
+            self._logger.error("Error checking rate limits: %s", e)
             message = f"Error checking rate limits: {e}. Proceeding with caution."
             return True, apps_to_update, message
 
@@ -797,5 +823,5 @@ class BaseUpdateCommand(Command):
             print(f"Resets at: {reset_time}")
 
         except Exception as e:
-            self._logger.error(f"Error displaying rate limit info: {e}")
+            self._logger.error("Error displaying rate limit info: %s", e)
             print(f"Error retrieving rate limit information: {e}")

@@ -24,6 +24,7 @@ def extract_checksums_from_text(
 
     Raises:
         ValueError: If no checksums found in the text
+
     """
     if not description_text:
         raise ValueError("No description text provided")
@@ -36,7 +37,7 @@ def extract_checksums_from_text(
     if not checksums:
         raise ValueError("No checksums found in description text")
 
-    logger.debug(f"Found {len(checksums)} checksums in description text")
+    logger.debug("Found %d checksums in description text", len(checksums))
 
     # Filter checksums for specific target file if provided
     if target_filename and checksums:
@@ -44,10 +45,10 @@ def extract_checksums_from_text(
         filtered = [line for line in checksums if filename_lower in line.lower()]
 
         if filtered:
-            logger.debug(f"Filtered to {len(filtered)} checksums for {target_filename}")
+            logger.debug("Filtered to %d checksums for %s", len(filtered), target_filename)
             return filtered
         else:
-            logger.warning(f"No checksums found for {target_filename}, returning all")
+            logger.warning("No checksums found for %s, returning all", target_filename)
 
     return checksums
 
@@ -61,6 +62,7 @@ def filter_checksums_by_filename(checksums: list[str], target_filename: str) -> 
 
     Returns:
         Filtered list of checksum lines matching the target filename
+
     """
     if not target_filename:
         return checksums
@@ -80,9 +82,10 @@ def validate_checksum_format(checksum_line: str) -> bool:
 
     Returns:
         True if the line matches expected "hash filename" format
+
     """
     import re
-    
+
     # Check for SHA256 hash pattern (64 hex chars) followed by filename
     return bool(re.match(r"^[0-9a-f]{64}\s+\S+", checksum_line.strip(), re.IGNORECASE))
 
@@ -95,6 +98,7 @@ def extract_hash_and_filename(checksum_line: str) -> tuple[str, str] | None:
 
     Returns:
         Tuple of (hash, filename) if valid, None if invalid format
+
     """
     parts = checksum_line.strip().split(maxsplit=1)
     if len(parts) >= 2 and validate_checksum_format(checksum_line):

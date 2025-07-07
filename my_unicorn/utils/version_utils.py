@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Version utilities.
 
-This module provides functions for parsing, comparing, and validating version strings 
-used in AppImage releases. It handles different version formats and normalizes them 
+This module provides functions for parsing, comparing, and validating version strings
+used in AppImage releases. It handles different version formats and normalizes them
 for consistent comparison.
 """
 
 import logging
 import re
-from packaging.version import parse as parse_version
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +23,7 @@ def normalize_version_for_comparison(version: str | None) -> str:
 
     Returns:
         str: Normalized version string, empty string if input is None
+
     """
     if not version:
         return ""
@@ -39,7 +39,7 @@ def normalize_version_for_comparison(version: str | None) -> str:
     std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", normalized)
     if std_notes_match:
         normalized = std_notes_match.group(1)
-        logger.debug(f"Normalized Standard Notes version format: {normalized}")
+        logger.debug("Normalized Standard Notes version format: %s", normalized)
 
     return normalized
 
@@ -52,6 +52,7 @@ def extract_base_version(version: str) -> str:
 
     Returns:
         str: Base version number (e.g., "0.23.3" from "0.23.3-beta")
+
     """
     # Split on common version separators
     for separator in ["-", "+", "_"]:
@@ -68,18 +69,19 @@ def extract_version(tag: str, is_beta: bool = False) -> str | None:
     - Standard semantic versions (X.Y.Z)
     - Standard Notes format (@standardnotes/desktop@X.Y.Z)
     - Beta versions with suffixes
-    
+
     Args:
         tag: Version tag to extract from
         is_beta: Whether this is a beta version
 
     Returns:
         str | None: Extracted version string if found, None if no version found
+
     """
     # Handle Standard Notes format: @standardnotes/desktop@3.195.13
     std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", tag)
     if std_notes_match:
-        logger.debug(f"Extracted version from Standard Notes format: {std_notes_match.group(1)}")
+        logger.debug("Extracted version from Standard Notes format: %s", std_notes_match.group(1))
         return std_notes_match.group(1)
 
     # Clean common prefixes/suffixes
@@ -108,6 +110,7 @@ def extract_version_from_filename(filename: str) -> str | None:
 
     Returns:
         str | None: Extracted version string if found, None if not found
+
     """
     if not filename:
         return None
@@ -115,14 +118,14 @@ def extract_version_from_filename(filename: str) -> str | None:
     # Handle Standard Notes format: @standardnotes/desktop@3.195.13
     std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", filename)
     if std_notes_match:
-        logger.debug(f"Extracted version from Standard Notes filename: {std_notes_match.group(1)}")
+        logger.debug("Extracted version from Standard Notes filename: %s", std_notes_match.group(1))
         return std_notes_match.group(1)
 
     # Handle Standard Notes AppImage format: app-3.195.13-x86_64.AppImage
     if filename.startswith("app-") and "standardnotes" in str(filename).lower():
         match = re.search(r"-(\d+\.\d+\.\d+)", filename)
         if match:
-            logger.debug(f"Extracted version from Standard Notes AppImage: {match.group(1)}")
+            logger.debug("Extracted version from Standard Notes AppImage: %s", match.group(1))
             return match.group(1)
 
     # First try a direct match for semantic version pattern
@@ -158,6 +161,7 @@ def repo_uses_beta(repo_name: str) -> bool:
 
     Returns:
         bool: True if the repository typically uses beta releases
+
     """
     # Import here to avoid circular imports
     from my_unicorn.catalog import get_all_apps
@@ -169,14 +173,14 @@ def repo_uses_beta(repo_name: str) -> bool:
     for app_info in all_apps.values():
         if app_info.repo.lower() == repo_name.lower():
             if app_info.beta:
-                logger.info(f"Repository {repo_name} is configured to use beta releases")
+                logger.info("Repository %s is configured to use beta releases", repo_name)
                 return True
             break
 
     # Fallback to hardcoded list for backward compatibility
     beta_repos = ["FreeTube"]
     if repo_name in beta_repos:
-        logger.info(f"Repository {repo_name} is configured to use beta releases (fallback)")
+        logger.info("Repository %s is configured to use beta releases (fallback)", repo_name)
         return True
 
     return False

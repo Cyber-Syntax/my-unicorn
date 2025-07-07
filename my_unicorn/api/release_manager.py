@@ -24,14 +24,14 @@ class ReleaseManager:
         """
         self.owner = owner
         self.repo = repo
-        logger.debug(f"ReleaseManager initialized for {owner}/{repo} to fetch raw data.")
+        logger.debug("ReleaseManager initialized for %s/%s to fetch raw data.", owner, repo)
 
     def _fetch_all_releases_data(
         self, headers: dict[str, str] | None
     ) -> tuple[bool, dict[str, Any] | str]:
         """Fetch all releases and return the latest one's raw data."""
         api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases"
-        logger.debug(f"Fetching all releases from {api_url}")
+        logger.debug("Fetching all releases from %s", api_url)
         response = GitHubAuthManager.make_authenticated_request(
             "GET",
             api_url,
@@ -43,28 +43,40 @@ class ReleaseManager:
             releases = response.json()
             if not releases:
                 logger.info(
-                    f"No releases found at all for {self.owner}/{self.repo} via _fetch_all_releases_data."
+                    "No releases found at all for %s/%s via _fetch_all_releases_data.",
+                    self.owner,
+                    self.repo,
                 )
                 return False, "No releases found (including pre-releases)"
             # The first release in the list is the most recent
             latest_release_data = releases[0]
             logger.debug(
-                f"Successfully fetched all releases, using the latest: {latest_release_data.get('tag_name')}"
+                "Successfully fetched all releases, using the latest: %s",
+                latest_release_data.get("tag_name"),
             )
             return True, latest_release_data
         # Rate limit handling is done by the caller (GitHubAPI) which can decide to refresh auth
         elif response.status_code == 403 and "rate limit exceeded" in response.text.lower():
             logger.warning(
-                f"GitHub API rate limit exceeded during _fetch_all_releases_data for {self.owner}/{self.repo}."
+                "GitHub API rate limit exceeded during _fetch_all_releases_data for %s/%s.",
+                self.owner,
+                self.repo,
             )
             return False, "GitHub API rate limit exceeded."  # Specific error for rate limit
         else:
-            error_msg = (
-                f"Failed to fetch all releases for {self.owner}/{self.repo}: "
-                f"{response.status_code} - {response.text}"
+            logger.error(
+                "Failed to fetch all releases for %s/%s: %s - %s",
+                self.owner,
+                self.repo,
+                response.status_code,
+                response.text,
             )
-            logger.error(error_msg)
-            return False, error_msg
+            return False, "Failed to fetch all releases for %s/%s: %s - %s" % (
+                self.owner,
+                self.repo,
+                response.status_code,
+                response.text,
+            )
 
     def get_latest_release_data(
         self, headers: dict[str, str] | None
@@ -79,7 +91,7 @@ class ReleaseManager:
 
         """
         api_url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
-        logger.debug(f"Fetching latest stable release from {api_url}")
+        logger.debug("Fetching latest stable release from %s", api_url)
         response = GitHubAuthManager.make_authenticated_request(
             "GET",
             api_url,
@@ -90,28 +102,39 @@ class ReleaseManager:
         if response.status_code == 200:  # HTTP_OK
             release_data = response.json()
             logger.debug(
-                f"Successfully fetched latest stable release: {release_data.get('tag_name')}"
+                "Successfully fetched latest stable release: %s", release_data.get("tag_name")
             )
             return True, release_data
         elif response.status_code == 404:  # HTTP_NOT_FOUND
             logger.info(
-                f"No stable release found for {self.owner}/{self.repo} via get_latest_release_data, "
-                f"falling back to fetching all releases."
+                "No stable release found for %s/%s via get_latest_release_data, "
+                "falling back to fetching all releases.",
+                self.owner,
+                self.repo,
             )
             return self._fetch_all_releases_data(headers)
         # Rate limit handling is done by the caller (GitHubAPI)
         elif response.status_code == 403 and "rate limit exceeded" in response.text.lower():
             logger.warning(
-                f"GitHub API rate limit exceeded during get_latest_release_data for {self.owner}/{self.repo}."
+                "GitHub API rate limit exceeded during get_latest_release_data for %s/%s.",
+                self.owner,
+                self.repo,
             )
             return False, "GitHub API rate limit exceeded."  # Specific error for rate limit
         else:
-            error_msg = (
-                f"Failed to fetch latest stable release for {self.owner}/{self.repo}: "
-                f"{response.status_code} - {response.text}"
+            logger.error(
+                "Failed to fetch latest stable release for %s/%s: %s - %s",
+                self.owner,
+                self.repo,
+                response.status_code,
+                response.text,
             )
-            logger.error(error_msg)
-            return False, error_msg
+            return False, "Failed to fetch latest stable release for %s/%s: %s - %s" % (
+                self.owner,
+                self.repo,
+                response.status_code,
+                response.text,
+            )
 
     def get_latest_beta_release_data(
         self, headers: dict[str, str] | None
@@ -128,5 +151,5 @@ class ReleaseManager:
             tuple: (Success flag, Raw release JSON data or error message string)
 
         """
-        logger.debug(f"Fetching latest beta release directly for {self.owner}/{self.repo}")
+        logger.debug("Fetching latest beta release directly for %s/%s", self.owner, self.repo)
         return self._fetch_all_releases_data(headers)

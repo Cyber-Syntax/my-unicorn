@@ -66,7 +66,9 @@ class ReleaseProcessor:
             if current_match_strip:
                 base_current = current_match_strip.group(1)
                 logger.debug(
-                    f"Zen-browser: stripping suffix for comparison. Current '{current_for_comparison}' -> '{base_current}'"
+                    "Zen-browser: stripping suffix for comparison. Current '%s' -> '%s'",
+                    current_for_comparison,
+                    base_current,
                 )
                 current_for_comparison = base_current
 
@@ -74,7 +76,9 @@ class ReleaseProcessor:
             if latest_match_strip:
                 base_latest = latest_match_strip.group(1)
                 logger.debug(
-                    f"Zen-browser: stripping suffix for comparison. Latest '{latest_for_comparison}' -> '{base_latest}'"
+                    "Zen-browser: stripping suffix for comparison. Latest '%s' -> '%s'",
+                    latest_for_comparison,
+                    base_latest,
                 )
                 latest_for_comparison = base_latest
 
@@ -94,10 +98,14 @@ class ReleaseProcessor:
         latest_full_parseable_str = latest_normalized_initial
 
         logger.debug(
-            f"Base versions for comparison: Current base '{current_parseable_str}' vs Latest base '{latest_parseable_str}'"
+            "Base versions for comparison: Current base '%s' vs Latest base '%s'",
+            current_parseable_str,
+            latest_parseable_str,
         )
         logger.debug(
-            f"Full versions for parsing: Current full '{current_full_parseable_str}' vs Latest full '{latest_full_parseable_str}'"
+            "Full versions for parsing: Current full '%s' vs Latest full '%s'",
+            current_full_parseable_str,
+            latest_full_parseable_str,
         )
 
         update_available = False

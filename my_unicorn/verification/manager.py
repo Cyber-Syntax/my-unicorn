@@ -58,7 +58,9 @@ class VerificationManager:
         # For asset_digest, we'll use sha256 as default since the actual algorithm
         # is determined from the digest string itself
         calculator_checksum_hash_type = (
-            "sha256" if self.config.checksum_hash_type == "asset_digest" else self.config.checksum_hash_type
+            "sha256"
+            if self.config.checksum_hash_type == "asset_digest"
+            else self.config.checksum_hash_type
         )
         self.hash_calculator = HashCalculator(calculator_checksum_hash_type)
         self.sha_manager = ShaFileManager(self.config.checksum_hash_type)
@@ -76,7 +78,7 @@ class VerificationManager:
         self.use_asset_digest = self.config.use_asset_digest
 
     def set_appimage_path(self, full_path: str) -> None:
-        """set the full path to the AppImage file for verification.
+        """Set the full path to the AppImage file for verification.
 
         Args:
             full_path: The complete path to the AppImage file
@@ -97,7 +99,7 @@ class VerificationManager:
         """
         try:
             self.logger.log_verification_start(
-                self.config.appimage_name or "Unknown", self.config.checksum_hash_type
+                "{}".format(self.config.appimage_name or "Unknown"), self.config.checksum_hash_type
             )
 
             # Check if verification should be skipped
@@ -117,7 +119,7 @@ class VerificationManager:
             return self._verify_with_sha_file(cleanup_on_failure)
 
         except Exception as e:
-            self.logger.log_error(f"Verification failed for {self.config.appimage_name}", e)
+            self.logger.log_error(f"Verification failed for {self.config.appimage_name}: {e}")
             if cleanup_on_failure and self.config.appimage_path:
                 self.cleanup.cleanup_failed_file(self.config.appimage_path)
             return False
@@ -141,7 +143,7 @@ class VerificationManager:
             return result
 
         except Exception as e:
-            self.logger.log_error("Asset digest verification failed", e)
+            self.logger.log_error(f"Asset digest verification failed: {e}")
             if cleanup_on_failure:
                 self.cleanup.cleanup_on_failure(self.config.appimage_path)
             return False
@@ -159,8 +161,9 @@ class VerificationManager:
             self.config.validate_for_verification()
 
             self.logger.log_info(
-                f"Verifying {self.config.appimage_name} using directly provided hash "
-                f"(type: {self.config.checksum_hash_type})"
+                "Verifying %s using directly provided hash (type: %s)",
+                self.config.appimage_name,
+                self.config.checksum_hash_type,
             )
 
             result = self.hash_calculator.verify_file_hash(
@@ -183,7 +186,7 @@ class VerificationManager:
             return result
 
         except Exception as e:
-            self.logger.log_error("Direct hash verification failed", e)
+            self.logger.log_error(f"Direct hash verification failed: {e}")
             if cleanup_on_failure:
                 self.cleanup.cleanup_on_failure(self.config.appimage_path)
             return False
@@ -208,7 +211,7 @@ class VerificationManager:
             )
 
         except Exception as e:
-            self.logger.log_error("Release checksums verification failed", e)
+            self.logger.log_error(f"Release checksums verification failed: {e}")
             if cleanup_on_failure:
                 self.cleanup.cleanup_on_failure(self.config.appimage_path)
             return False
@@ -229,10 +232,14 @@ class VerificationManager:
                 and self.config.checksum_file_name
                 and not os.path.exists(self.config.checksum_file_name)
             ):
-                self.sha_manager.download_sha_file(self.config.checksum_file_download_url, self.config.checksum_file_name)
+                self.sha_manager.download_sha_file(
+                    self.config.checksum_file_download_url, self.config.checksum_file_name
+                )
 
             # Verify SHA file exists
-            if not self.config.checksum_file_name or not os.path.exists(self.config.checksum_file_name):
+            if not self.config.checksum_file_name or not os.path.exists(
+                self.config.checksum_file_name
+            ):
                 self.logger.log_error(f"SHA file not found: {self.config.checksum_file_name}")
                 return False
 
@@ -247,7 +254,11 @@ class VerificationManager:
 
             # Log comparison results
             self.logger.log_hash_comparison(
-                self.config.appimage_name, self.config.checksum_hash_type, actual_hash, expected_hash, result
+                self.config.appimage_name,
+                self.config.checksum_hash_type,
+                actual_hash,
+                expected_hash,
+                result,
             )
 
             # Cleanup SHA file after verification
@@ -259,9 +270,11 @@ class VerificationManager:
             return result
 
         except Exception as e:
-            self.logger.log_error("SHA file verification failed", e)
+            self.logger.log_error(f"SHA file verification failed: {e}")
             if cleanup_on_failure:
-                self.cleanup.cleanup_on_failure(self.config.appimage_path, self.config.checksum_file_name)
+                self.cleanup.cleanup_on_failure(
+                    self.config.appimage_path, self.config.checksum_file_name
+                )
             return False
 
     def cleanup_batch_failed_files(

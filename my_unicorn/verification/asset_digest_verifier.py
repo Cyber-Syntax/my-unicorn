@@ -77,7 +77,7 @@ class AssetDigestVerifier:
             return is_valid
 
         except Exception as e:
-            logging.error("Error during digest verification: %s", e)
+            logger.error("Error during digest verification: %s", e)
             raise
 
     def _parse_digest(self, asset_digest: str) -> tuple[str, str]:
@@ -132,8 +132,8 @@ class AssetDigestVerifier:
         )
 
         if is_valid:
-            logging.info(log_message)
+            logger.info(log_message)
             print(f"{status_symbol} Digest verification passed for {appimage_name}")
         else:
-            logging.error(log_message)
+            logger.error(log_message)
             print(f"{status_symbol} Digest verification failed for {appimage_name}")

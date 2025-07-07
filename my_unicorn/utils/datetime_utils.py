@@ -8,7 +8,7 @@ This module provides functionality for handling date and time operations. It inc
 """
 
 import logging
-from datetime import datetime, UTC
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ def parse_timestamp(timestamp_value: str | float | datetime | None) -> datetime 
 
     Raises:
         No exceptions - returns None for any parsing failures
+
     """
     if timestamp_value is None:
         return None
@@ -49,7 +50,7 @@ def parse_timestamp(timestamp_value: str | float | datetime | None) -> datetime 
                 # Try parsing as float/int string
                 return datetime.fromtimestamp(float(timestamp_value))
             except (ValueError, TypeError, OverflowError) as e:
-                logger.debug(f"Failed to parse timestamp string '{timestamp_value}': {e}")
+                logger.debug("Failed to parse timestamp string '%s': %s", timestamp_value, e)
                 return None
 
     # Handle numeric timestamps (float/int)
@@ -57,17 +58,16 @@ def parse_timestamp(timestamp_value: str | float | datetime | None) -> datetime 
         try:
             return datetime.fromtimestamp(timestamp_value)
         except (ValueError, TypeError, OverflowError) as e:
-            logger.debug(f"Failed to parse numeric timestamp '{timestamp_value}': {e}")
+            logger.debug("Failed to parse numeric timestamp '%s': %s", timestamp_value, e)
             return None
 
     # Unsupported type
-    logger.debug(f"Unsupported timestamp type: {type(timestamp_value)}")
+    logger.debug("Unsupported timestamp type: %s", type(timestamp_value))
     return None
 
-            
+
 def format_timestamp(
-    timestamp_value: str | float | datetime,
-    format_str: str = "%Y-%m-%d %H:%M:%S"
+    timestamp_value: str | float | datetime, format_str: str = "%Y-%m-%d %H:%M:%S"
 ) -> str | None:
     """Parse a timestamp and format it as a string.
 
@@ -86,6 +86,7 @@ def format_timestamp(
         '2023-01-01 12:00:00'
         >>> format_timestamp(1672574400)
         '2023-01-01 12:00:00'
+
     """
     dt = parse_timestamp(timestamp_value)
     if dt:
@@ -106,6 +107,7 @@ def get_next_hour_timestamp() -> int:
         >>> current = 1672574400  # 2023-01-01 12:30:00
         >>> get_next_hour_timestamp()
         1672578000  # 2023-01-01 13:00:00
+
     """
     current_time = int(datetime.now().timestamp())
     return (current_time // 3600 + 1) * 3600

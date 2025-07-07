@@ -17,6 +17,7 @@ from my_unicorn.icon_manager import IconManager
 from my_unicorn.parser import ParseURL
 from my_unicorn.verify import VerificationManager
 
+logger = logging.getLogger(__name__)
 
 class DownloadCommand(Command):
     """Command to download the latest release's AppImage."""
@@ -98,7 +99,7 @@ class DownloadCommand(Command):
                     # Continue to next attempt
 
             except (ValueError, RuntimeError) as e:
-                logging.error("Download attempt %d failed: %s", attempt, str(e))
+                logger.error("Download attempt %d failed: %s", attempt, str(e))
                 print(f"Error during download: {e!s}")
 
                 if attempt == max_attempts:
@@ -181,7 +182,7 @@ class DownloadCommand(Command):
         """Handle verification logic. Returns (success, skipped) tuple."""
         # Handle verification based on skip_verification flag
         if app_config.skip_verification or api.skip_verification:
-            logging.info("Skipping verification due to skip_verification setting.")
+            logger.info("Skipping verification due to skip_verification setting.")
             print("Note: Verification skipped - verification disabled for this app")
             return True, True
 
@@ -190,7 +191,7 @@ class DownloadCommand(Command):
         has_asset_digest = api.asset_digest
 
         if not has_sha_data and not has_asset_digest:
-            logging.info("No SHA file or asset digest found - verification cannot be performed.")
+            logger.info("No SHA file or asset digest found - verification cannot be performed.")
             print("Note: Verification skipped - no hash file available")
             return True, True
 
@@ -200,12 +201,12 @@ class DownloadCommand(Command):
         else:
             print("Verifying download integrity...")
 
-        # Debug logging for API values
-        logging.debug("API values before VerificationManager creation:")
-        logging.debug("api.checksum_file_name: %s", api.checksum_file_name)
-        logging.debug("api.checksum_hash_type: %s", api.checksum_hash_type)
-        logging.debug("api.asset_digest: %s", api.asset_digest)
-        logging.debug("api.skip_verification: %s", api.skip_verification)
+        # Debug logger.for API values
+        logger.debug("API values before VerificationManager creation:")
+        logger.debug("api.checksum_file_name: %s", api.checksum_file_name)
+        logger.debug("api.checksum_hash_type: %s", api.checksum_hash_type)
+        logger.debug("api.asset_digest: %s", api.asset_digest)
+        logger.debug("api.skip_verification: %s", api.skip_verification)
 
         # Perform verification with cleanup on failure
         verification_manager = VerificationManager(

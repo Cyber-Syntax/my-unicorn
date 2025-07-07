@@ -61,7 +61,7 @@ class SHAManager:
             return False
 
         logger.info(
-            "Attempting to extract SHA for %s from release description...", self.appimage_name
+            f"Attempting to extract SHA for {self.appimage_name} from release description..."
         )
 
         try:
@@ -91,9 +91,7 @@ class SHAManager:
                                 self.checksum_file_name = "extracted_checksum"
                                 self.checksum_file_download_url = None
                                 logger.info(
-                                    "Successfully extracted SHA256 hash '%s' for %s from release body.",
-                                    self.extracted_hash_from_body,
-                                    self.appimage_name,
+                                    f"Successfully extracted SHA256 hash '{self.extracted_hash_from_body}' for {self.appimage_name} from release body."
                                 )
                                 # Clean up temporary file
                                 Path(temp_sha_file).unlink(missing_ok=True)
@@ -104,7 +102,7 @@ class SHAManager:
                 Path(temp_sha_file).unlink(missing_ok=True)
 
             logger.info(
-                "No valid SHA256 hash found for %s in release description", appimage_base_name
+                f"No valid SHA256 hash found for {appimage_base_name} in release description"
             )
 
         except (ImportError, AttributeError, ValueError) as e:
@@ -125,9 +123,7 @@ class SHAManager:
         if re.fullmatch(r"[0-9a-f]{64}", hash_value, re.IGNORECASE):
             return True
         else:
-            logger.warning(
-                "Extracted hash '%s' does not look like a valid SHA256 hash.", hash_value
-            )
+            logger.warning(f"Extracted hash '{hash_value}' does not look like a valid SHA256 hash.")
             return False
 
     def find_sha_asset(self, assets: list[dict]) -> None:
@@ -164,7 +160,7 @@ class SHAManager:
         sha_asset = finder.find_best_match(self.appimage_name, self._app_info, assets)
 
         if sha_asset:
-            logger.debug(f"SHAAssetFinder returned: {sha_asset}")
+            logger.debug("SHAAssetFinder returned: %s", sha_asset)
             # Check if this is a special asset digest response
             if sha_asset.get("checksum_hash_type") == "asset_digest":
                 self.checksum_hash_type = "asset_digest"
@@ -174,12 +170,14 @@ class SHAManager:
                 logger.info(
                     f"Successfully assigned asset digest verification for {self.appimage_name}"
                 )
-                logger.debug(f"Asset digest: {self.asset_digest}")
-                logger.debug(f"Hash type: {self.checksum_hash_type}")
-                logger.debug(f"SHA name: {self.checksum_file_name}")
+                logger.debug("Asset digest: %s", self.asset_digest)
+                logger.debug("Hash type: %s", self.checksum_hash_type)
+                logger.debug("SHA name: %s", self.checksum_file_name)
             else:
                 self._select_sha_asset(sha_asset)
-                logger.info(f"Found SHA file for {self.appimage_name}: {sha_asset['name']}")
+                logger.info(
+                    "Found SHA file for {}: {}".format(self.appimage_name, sha_asset["name"])
+                )
             return
 
         # Priority 4: Manual fallback - ask user

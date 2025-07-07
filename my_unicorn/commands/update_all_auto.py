@@ -19,6 +19,8 @@ from my_unicorn.download import DownloadManager
 LOW_AUTHENTICATED_THRESHOLD = 100
 LOW_UNAUTHENTICATED_THRESHOLD = 20
 
+logger = logging.getLogger(__name__)
+
 
 class UpdateAllAutoCommand(BaseUpdateCommand):
     """Command to automatically check and update all AppImages without manual selection."""
@@ -31,7 +33,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         synchronous update method, but if async_mode is enabled, it will use
         the more efficient concurrent update approach.
         """
-        logging.info("Starting automatic check of all AppImages")
+        logger.info("Starting automatic check of all AppImages")
         print("Checking all AppImages for updates...")
 
         try:
@@ -49,14 +51,14 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                 remaining = int(raw_remaining)
                 limit = int(raw_limit)
             except (ValueError, TypeError):
-                logging.error("Failed to parse rate limit information")
+                logger.error("Failed to parse rate limit information")
                 print("Error: Could not determine API rate limits. Please try again.")
                 return
 
             # Calculate minimum requests needed (at least one per app config)
             json_files = self._list_all_config_files()
             if not json_files:
-                logging.warning("No AppImage configuration files found")
+                logger.warning("No AppImage configuration files found")
                 print("No AppImage configuration files found. Use the Download option first.")
                 return
 
@@ -65,7 +67,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
             # Check if we have enough requests to at least check all apps
             if remaining < min_requests_needed:
-                logging.error(
+                logger.error(
                     "Insufficient API requests to check all apps: %d/%d available",
                     remaining,
                     min_requests_needed,
@@ -94,7 +96,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             updatable_apps = self._find_all_updatable_apps()
 
             if not updatable_apps:
-                logging.info("All AppImages are up to date")
+                logger.info("All AppImages are up to date")
                 print("All AppImages are up to date!")
                 return
 
@@ -103,7 +105,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
             # Determine what to do based on batch mode
             if self.global_config.batch_mode:
-                logging.info(
+                logger.info(
                     "Batch mode enabled - updating all %d AppImages automatically",
                     len(updatable_apps),
                 )
@@ -120,7 +122,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                 self._handle_interactive_update(updatable_apps, use_async)
 
         except KeyboardInterrupt:
-            logging.info("Operation cancelled by user (Ctrl+C)")
+            logger.info("Operation cancelled by user (Ctrl+C)")
             print("\nOperation cancelled by user (Ctrl+C)")
             return
 
@@ -137,7 +139,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             # Get all config files
             json_files = self._list_all_config_files()
             if not json_files:
-                logging.warning("No AppImage configuration files found")
+                logger.warning("No AppImage configuration files found")
                 print("No AppImage configuration files found. Use the Download option first.")
                 return []
 
@@ -164,15 +166,15 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                         print(f"{app_name}, unexpected result: {app_data}")
 
                 except Exception as e:
-                    logging.error("Error checking %s: %s", config_file, e)
+                    logger.error("Error checking %s: %s", config_file, e)
                     print(f"{app_name}: error: {e}")
                 except KeyboardInterrupt:
-                    logging.info("Update check cancelled by user (Ctrl+C)")
+                    logger.info("Update check cancelled by user (Ctrl+C)")
                     print("\nUpdate check cancelled by user (Ctrl+C)")
                     return updatable_apps
 
         except Exception as e:
-            logging.error("Error during update check: %s", e)
+            logger.error("Error during update check: %s", e)
             print("Error during update check:", e)
 
         return updatable_apps
@@ -204,12 +206,12 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             user_input = input("> ").strip().lower()
 
             if user_input == "cancel":
-                logging.info("Update cancelled by user")
+                logger.info("Update cancelled by user")
                 print("Update cancelled.")
                 return
 
             if user_input == "all":
-                logging.info("User selected to update all apps")
+                logger.info("User selected to update all apps")
                 if use_async:
                     self._update_apps_async_wrapper(updatable_apps)
                 else:
@@ -222,7 +224,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
                     # Validate indices
                     if any(idx < 0 or idx >= len(updatable_apps) for idx in selected_indices):
-                        logging.warning("Invalid app selection indices")
+                        logger.warning("Invalid app selection indices")
                         print("Invalid selection. Please enter valid numbers.")
                         return
 
@@ -230,20 +232,20 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                     selected_apps = [updatable_apps[idx] for idx in selected_indices]
 
                     if selected_apps:
-                        logging.info("User selected %d apps to update", len(selected_apps))
+                        logger.info("User selected %d apps to update", len(selected_apps))
                         if use_async:
                             self._update_apps_async_wrapper(selected_apps)
                         else:
                             self._update_apps(selected_apps)
                     else:
-                        logging.info("No apps selected for update")
+                        logger.info("No apps selected for update")
                         print("No apps selected for update.")
 
                 except ValueError:
-                    logging.warning("Invalid input format for app selection")
+                    logger.warning("Invalid input format for app selection")
                     print("Invalid input. Please enter numbers separated by commas.")
         except KeyboardInterrupt:
-            logging.info("Selection cancelled by user (Ctrl+C)")
+            logger.info("Selection cancelled by user (Ctrl+C)")
             print("\nSelection cancelled by user (Ctrl+C)")
             return
 
@@ -266,7 +268,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                 f"\nStarting asynchronous update of {len(apps_to_update)} AppImages "
                 f"(max {self.max_concurrent_updates} concurrent)..."
             )
-            logging.info(
+            logger.info(
                 "Starting asynchronous update of %d AppImages with concurrency limit %d",
                 len(apps_to_update),
                 self.max_concurrent_updates,
@@ -287,10 +289,10 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
             self._display_async_results(success_count, failure_count, results, len(apps_to_update))
 
         except KeyboardInterrupt:
-            logging.info("Update process cancelled by user (Ctrl+C)")
+            logger.info("Update process cancelled by user (Ctrl+C)")
             print("\nUpdate process cancelled by user (Ctrl+C)")
         except Exception as e:
-            logging.error("Error in async update process: %s", str(e), exc_info=True)
+            logger.error("Error in async update process: %s", str(e), exc_info=True)
             print(f"\nError in update process: {e!s}")
 
     def _display_async_results(
@@ -380,10 +382,10 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
             if result:
                 success_count += 1
-                logging.info("Successfully updated %s", app_data["name"])
+                logger.info("Successfully updated %s", app_data["name"])
             else:
                 failure_count += 1
-                logging.error("Failed to update %s", app_data["name"])
+                logger.error("Failed to update %s", app_data["name"])
 
         print("\n=== Update Summary ===")
         print(f"Total apps processed: {success_count + failure_count}/{len(apps_to_update)}")
@@ -450,4 +452,4 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
         except Exception as e:
             # Silently handle any errors to avoid breaking update completion
-            logging.debug("Error displaying rate limit info: %s", e)
+            logger.debug("Error displaying rate limit info: %s", e)

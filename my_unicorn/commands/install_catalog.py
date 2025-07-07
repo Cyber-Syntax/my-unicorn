@@ -18,6 +18,8 @@ from my_unicorn.global_config import GlobalConfigManager
 from my_unicorn.icon_manager import IconManager
 from my_unicorn.verify import VerificationManager
 
+logger = logging.getLogger(__name__)
+
 
 class InstallAppCommand(Command):
     """Command to install an application from the catalog by name."""
@@ -27,7 +29,6 @@ class InstallAppCommand(Command):
 
     def __init__(self) -> None:
         """Initialize the command with configuration managers."""
-        self._logger = logging.getLogger(__name__)
         self.global_config = GlobalConfigManager()
         self.global_config.load_config()
         self._app_name = None
@@ -214,9 +215,9 @@ class InstallAppCommand(Command):
         )
 
         if app_info.checksum_file_name:
-            self._logger.debug(f"Using SHA file from app catalog: {app_info.checksum_file_name}")
+            logger.debug("Using SHA file from app catalog: %s", app_info.checksum_file_name)
         else:
-            self._logger.debug("Using automatic SHA file detection")
+            logger.debug("Using automatic SHA file detection")
 
         # Get release data with full processing including SHA/asset digest detection
         release_result = api.get_latest_release()
@@ -225,9 +226,12 @@ class InstallAppCommand(Command):
             return
 
         # Log what was detected by the API
-        self._logger.debug(
-            f"API detection results: appimage={api.appimage_name}, "
-            f"sha={api.checksum_file_name}, checksum_hash_type={api.checksum_hash_type}, arch={api.arch_keyword}"
+        logger.debug(
+            "API detection results: appimage=%s, sha=%s, checksum_hash_type=%s, arch=%s",
+            api.appimage_name,
+            api.checksum_file_name,
+            api.checksum_hash_type,
+            api.arch_keyword,
         )
 
         # Initialize progress bar for single download
@@ -263,7 +267,7 @@ class InstallAppCommand(Command):
 
                     # Handle verification based on skip_verification flag
                     if app_config.skip_verification or api.skip_verification:
-                        logging.info("Skipping verification due to skip_verification setting.")
+                        logger.info("Skipping verification due to skip_verification setting.")
                         print("Skipping verification (verification disabled for this app).")
                         verification_success = True
                         verification_skipped = True  # set the flag that verification was skipped
@@ -275,12 +279,12 @@ class InstallAppCommand(Command):
                     else:
                         print("Verifying download integrity...")
 
-                    # Debug logging for API values
-                    logging.debug("API values before VerificationManager creation:")
-                    logging.debug("  api.checksum_file_name: %s", api.checksum_file_name)
-                    logging.debug("  api.checksum_hash_type: %s", api.checksum_hash_type)
-                    logging.debug("  api.asset_digest: %s", api.asset_digest)
-                    logging.debug("  api.skip_verification: %s", api.skip_verification)
+                    # Debug logger.for API values
+                    logger.debug("API values before VerificationManager creation:")
+                    logger.debug("  api.checksum_file_name: %s", api.checksum_file_name)
+                    logger.debug("  api.checksum_hash_type: %s", api.checksum_hash_type)
+                    logger.debug("  api.asset_digest: %s", api.asset_digest)
+                    logger.debug("  api.skip_verification: %s", api.skip_verification)
 
                     verification_manager = VerificationManager(
                         checksum_file_name=api.checksum_file_name,
@@ -312,7 +316,7 @@ class InstallAppCommand(Command):
                             return
 
             except Exception as e:
-                logging.error("Download attempt %s failed: %s", attempt, e, exc_info=True)
+                logger.error("Download attempt %s failed: %s", attempt, e, exc_info=True)
                 print(f"Error during download: {e!s}")
 
                 if attempt == self.MAX_ATTEMPTS:

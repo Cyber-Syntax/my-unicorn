@@ -163,8 +163,9 @@ def is_keyword_compatible_with_arch(keyword: str, system_cpu_arch: str) -> bool:
         for pattern in patterns:
             if re.search(pattern, keyword):
                 logger.debug(
-                    f"Found incompatible architecture '{arch}' in keyword '{keyword}' "
-                    f"for system architecture '{system_cpu_arch}'"
+                    "Found incompatible architecture '%s' in keyword '%s' "
+                    f"for system architecture '%s'",
+                    arch, keyword, system_cpu_arch
                 )
                 return False
 

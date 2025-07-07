@@ -35,7 +35,7 @@ class ReleaseDescVerifier:
         self,
         appimage_path: str | Path,
         appimage_name: str | None = None,
-        cleanup_on_failure: bool = False
+        cleanup_on_failure: bool = False,
     ) -> bool:
         """Verify an AppImage using checksums from GitHub release description.
 
@@ -56,8 +56,10 @@ class ReleaseDescVerifier:
             actual_appimage_name = appimage_name or appimage_path.name
 
             logger.info(
-                f"Starting release description verification for {actual_appimage_name} "
-                f"from {self.owner}/{self.repo}"
+                "Starting release description verification for %s from %s/%s",
+                actual_appimage_name,
+                self.owner,
+                self.repo,
             )
 
             # Extract checksums to temporary file
@@ -71,19 +73,17 @@ class ReleaseDescVerifier:
                 checksum_file_name=temp_sha_file,
                 appimage_name=actual_appimage_name,
                 appimage_path=str(appimage_path),
-                checksum_hash_type="sha256"  # Release descriptions typically use SHA256
+                checksum_hash_type="sha256",  # Release descriptions typically use SHA256
             )
 
             return verifier.verify_appimage(cleanup_on_failure=cleanup_on_failure)
 
         except Exception as e:
-            logger.exception(f"Error during release description verification: {e}")
+            logger.exception("Error during release description verification: %s", e)
             return False
 
     def extract_checksums_to_file(
-        self,
-        appimage_name: str | None = None,
-        output_path: str | None = None
+        self, appimage_name: str | None = None, output_path: str | None = None
     ) -> str | None:
         """Extract checksums from release description and save to file.
 
@@ -96,7 +96,7 @@ class ReleaseDescVerifier:
 
         """
         try:
-            logger.debug(f"Extracting checksums from {self.owner}/{self.repo}")
+            logger.debug("Extracting checksums from %s/%s", self.owner, self.repo)
 
             # Fetch release description
             description = self.fetcher.fetch_latest_release_description()
@@ -116,18 +116,16 @@ class ReleaseDescVerifier:
                 if target_checksums:
                     checksums = target_checksums
                 else:
-                    logger.warning(f"No checksums found for {appimage_name}, using all checksums")
+                    logger.warning("No checksums found for %s, using all checksums", appimage_name)
 
             # Save to file
             return save_checksums_file(checksums, output_path)
 
         except Exception as e:
-            logger.exception(f"Error extracting checksums to file: {e}")
+            logger.exception("Error extracting checksums to file: %s", e)
             return None
 
-    def _filter_checksums_for_target(
-        self, checksums: list[str], target_filename: str
-    ) -> list[str]:
+    def _filter_checksums_for_target(self, checksums: list[str], target_filename: str) -> list[str]:
         """Filter checksums for a specific target filename.
 
         Args:
@@ -145,10 +143,10 @@ class ReleaseDescVerifier:
         filtered = [line for line in checksums if filename_lower in line.lower()]
 
         if filtered:
-            logger.debug(f"Filtered to {len(filtered)} checksums for {target_filename}")
+            logger.debug("Filtered to %d checksums for %s", len(filtered), target_filename)
             return filtered
         else:
-            logger.warning(f"No checksums found for {target_filename}")
+            logger.warning("No checksums found for %s", target_filename)
             return []
 
     @staticmethod
@@ -166,17 +164,21 @@ class ReleaseDescVerifier:
             from my_unicorn.catalog import find_app_by_name_in_filename
 
             appimage_filename = Path(appimage_path).name
-            logger.debug(f"Looking up repository info for filename: {appimage_filename}")
+            logger.debug("Looking up repository info for filename: %s", appimage_filename)
 
             app_info = find_app_by_name_in_filename(appimage_filename)
             if app_info:
-                logger.debug(f"Found matching app in catalog: {app_info.owner}/{app_info.repo}")
+                logger.debug(
+                    "Found matching app in catalog: %s/%s",
+                    app_info.owner,
+                    app_info.repo,
+                )
                 return {"owner": app_info.owner, "repo": app_info.repo}
 
-            logger.warning(f"No matching repository found for {appimage_filename}")
+            logger.warning("No matching repository found for %s", appimage_filename)
 
         except Exception as e:
-            logger.exception(f"Error finding repository info: {e}")
+            logger.exception("Error finding repository info: %s", e)
 
         return {}
 
@@ -191,16 +193,10 @@ class ReleaseDescVerifier:
             True if repo_info contains both 'owner' and 'repo' keys with values
 
         """
-        return bool(
-            repo_info
-            and repo_info.get("owner")
-            and repo_info.get("repo")
-        )
+        return bool(repo_info and repo_info.get("owner") and repo_info.get("repo"))
 
     @classmethod
-    def create_from_appimage_path(
-        cls, appimage_path: str | Path
-    ) -> "ReleaseDescVerifier | None":
+    def create_from_appimage_path(cls, appimage_path: str | Path) -> "ReleaseDescVerifier | None":
         """Create a ReleaseDescVerifier by auto-detecting repository info from AppImage path.
 
         Args:
@@ -212,11 +208,13 @@ class ReleaseDescVerifier:
         """
         repo_info = cls.get_repo_info_for_appimage(appimage_path)
         if not cls.validate_repo_info(repo_info):
-            logger.error(f"Could not determine repository info for {appimage_path}")
+            logger.error("Could not determine repository info for %s", appimage_path)
             return None
 
         logger.info(
-            f"Auto-detected repository: {repo_info['owner']}/{repo_info['repo']}"
+            "Auto-detected repository: %s/%s",
+            repo_info["owner"],
+            repo_info["repo"],
         )
         return cls(owner=repo_info["owner"], repo=repo_info["repo"])
 
@@ -253,11 +251,14 @@ class ReleaseDescVerifier:
                 repo = repo_info.get("repo")
 
                 if not owner or not repo:
-                    logger.error(f"Could not determine owner/repo for {appimage_name}")
+                    logger.error("Could not determine owner/repo for %s", appimage_name)
                     return False
 
             logger.info(
-                f"Verifying {appimage_name} using GitHub release description from {owner}/{repo}"
+                "Verifying %s using GitHub release description from %s/%s",
+                appimage_name,
+                owner,
+                repo,
             )
 
             # Create verifier and verify
@@ -268,5 +269,5 @@ class ReleaseDescVerifier:
             )
 
         except Exception as e:
-            logger.exception(f"Release description verification error: {e}")
+            logger.exception("Release description verification error: %s", e)
             return False

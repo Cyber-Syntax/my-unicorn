@@ -83,7 +83,7 @@ def extract_checksums(owner: str, repo: str, appimage_name: str | None) -> Check
         with open(checksums_file, "r", encoding="utf-8") as f:
             return [line.strip() for line in f if line.strip()]
     except Exception as e:
-        logger.error(f"Failed to read checksums file: {e}")
+        logger.error("Failed to read checksums file: %s", e)
         raise ValueError("Failed to read extracted checksums")
 
 
