@@ -656,7 +656,7 @@ class BaseUpdateCommand(Command):
 
     def _check_single_app_version(
         self, app_config: AppConfigManager, config_file: str
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, Any] | bool:
         """Check version for single AppImage."""
         # Extract app name from config file
         app_name = os.path.splitext(config_file)[0]
@@ -715,7 +715,7 @@ class BaseUpdateCommand(Command):
                 "current": current_version,
                 "latest": latest_version,
             }
-        return None
+        return False # No update available
 
     def _check_rate_limits(
         self, apps_to_update: list[dict[str, Any]]

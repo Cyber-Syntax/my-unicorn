@@ -152,28 +152,28 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                     # Directly check version without redirecting output
                     app_data = self._check_single_app_version(self.app_config, config_file)
 
-                    if app_data:
+                    if isinstance(app_data, dict) and 'current' in app_data and 'latest' in app_data:
                         print(
                             f"{app_name}: update available: {app_data['current']} → "
                             f"{app_data['latest']}"
                         )
                         updatable_apps.append(app_data)
-                    else:
+                    elif app_data is False:
                         print(f"{app_name}: already up to date")
+                    else:
+                        print(f"{app_name}, unexpected result: {app_data}")
 
                 except Exception as e:
-                    error_msg = f"Error checking {config_file}: {e!s}"
-                    logging.error(error_msg)
-                    print(f"{app_name}: error: {e!s}")
+                    logging.error("Error checking %s: %s", config_file, e)
+                    print(f"{app_name}: error: {e}")
                 except KeyboardInterrupt:
                     logging.info("Update check cancelled by user (Ctrl+C)")
                     print("\nUpdate check cancelled by user (Ctrl+C)")
                     return updatable_apps
 
         except Exception as e:
-            error_msg = f"Error during update check: {e!s}"
-            logging.error(error_msg)
-            print(error_msg)
+            logging.error("Error during update check: %s", e)
+            print("Error during update check:", e)
 
         return updatable_apps
 
