@@ -129,7 +129,7 @@ class AsyncMultiFileProgressMeter:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logging.getLogger(__name__).debug(f"Progress update error: {e}")
+                logging.getLogger(__name__).debug("Progress update error: %s", e)
 
     async def progress(self, app_data: dict[str, Any], done: int) -> None:
         """Update progress for an app.

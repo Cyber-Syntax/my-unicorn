@@ -81,7 +81,7 @@ class HashCalculator:
 
                 except (OSError, IOError) as lock_error:
                     # If locking fails, proceed without lock but log warning
-                    logging.warning(f"Could not acquire file lock for {filepath}: {lock_error}")
+                    logging.warning("Could not acquire file lock for %s: %s", filepath, lock_error)
                     f.seek(0)  # Reset file position
                     for chunk in iter(lambda: f.read(chunk_size), b""):
                         hash_func.update(chunk)

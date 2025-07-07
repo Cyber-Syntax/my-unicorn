@@ -169,7 +169,7 @@ class DownloadManager:
             try:
                 cls._global_progress.stop()
             except Exception as e:
-                logging.error(f"Error stopping progress display: {e!s}")
+                logging.error("Error stopping progress display: %s", e)
             finally:
                 cls._global_progress = None
                 cls._active_tasks.clear()
@@ -425,7 +425,7 @@ class DownloadManager:
         checksum_file_download_url_to_pass: str | None = self.github_api.checksum_file_download_url
 
         if self.github_api.checksum_file_name == "extracted_checksum":
-            logging.info(f"Processing 'extracted_checksum' for {self.github_api.appimage_name}.")
+            logging.info("Processing 'extracted_checksum' for %s.", self.github_api.appimage_name)
             # SHAManager should have set extracted_hash_from_body if it successfully parsed one.
             # It also sets checksum_hash_type to "sha256".
             direct_hash_to_pass = self.github_api.extracted_hash_from_body

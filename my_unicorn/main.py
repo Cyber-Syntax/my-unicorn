@@ -85,7 +85,7 @@ def display_github_api_status() -> None:
 
         print(f"{'-' * 40}")
     except Exception as e:
-        logging.debug(f"Error checking rate limits: {e}")
+        logging.debug("Error checking rate limits: %s", e)
 
 
 def display_menu() -> None:
@@ -137,7 +137,7 @@ def get_user_choice() -> int:
         return int(choice)
     except ValueError as error:
         print(f"Invalid input: {error}")
-        logging.error(f"Invalid menu choice: {error}", exc_info=True)
+        logging.error("Invalid menu choice: %s", error)
         sys.exit(EXIT_FAILURE)
     except KeyboardInterrupt:
         logging.info("User interrupted the program with Ctrl+C")
@@ -220,7 +220,7 @@ def initialize_app_definitions() -> None:
         logging.info("Creating apps directory for JSON definitions")
         apps_dir.mkdir(exist_ok=True)
 
-    logging.info(f"Initializing app definitions path: {apps_dir}")
+    logging.info("Initializing app definitions path: %s", apps_dir)
     initialize_definitions_path(apps_dir)
 
 

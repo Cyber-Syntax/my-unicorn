@@ -72,13 +72,13 @@ class DeleteBackupsCommand(Command):
 
             if file_count > 0:
                 print(f"✓ Successfully deleted {file_count} backup files.")
-                logging.info(f"Deleted {file_count} backup files from {backup_dir}")
+                logging.info("Deleted %s backup files from %s", file_count, backup_dir)
             else:
                 print("No backup files found to delete.")
 
         except OSError as e:
-            logging.error(f"Error deleting backup files: {e!s}")
-            print(f"Error deleting backup files: {e!s}")
+            logging.error("Error deleting backup files: %s", e)
+            print(f"Error deleting backup files: {e}")
 
     def _delete_app_backups(self, global_config: GlobalConfigManager) -> None:
         """Delete backup files for a specific app."""
@@ -133,14 +133,14 @@ class DeleteBackupsCommand(Command):
 
             if file_count > 0:
                 print(f"✓ Successfully deleted {file_count} backup files for {selected_app}.")
-                logging.info(f"Deleted {file_count} backup files for {selected_app}")
+                logging.info("Deleted %s backup files for %s", file_count, selected_app)
             else:
                 print(f"No backup files found for {selected_app}.")
 
         except ValueError:
             print("Invalid input. Please enter a number.")
         except OSError as e:
-            logging.error(f"Error deleting app backups: {e!s}")
+            logging.error("Error deleting app backups: %s", e)
             print(f"Error deleting app backups: {e!s}")
 
     def _delete_old_backups(self, global_config: GlobalConfigManager) -> None:
@@ -216,12 +216,12 @@ class DeleteBackupsCommand(Command):
 
             if file_count > 0:
                 print(f"✓ Successfully deleted {file_count} backup files older than {date_desc}.")
-                logging.info(f"Deleted {file_count} backup files older than {date_desc}")
+                logging.info("Deleted %s backup files older than %s", file_count, date_desc)
             else:
                 print(f"No backup files found older than {date_desc}.")
 
         except OSError as e:
-            logging.error(f"Error deleting old backups: {e!s}")
+            logging.error("Error deleting old backups: %s", e)
             print(f"Error deleting old backups: {e!s}")
 
     def _cleanup_to_max_backups(self, global_config: GlobalConfigManager) -> None:
@@ -270,24 +270,25 @@ class DeleteBackupsCommand(Command):
             # Sort backups by modification time (newest first)
             app_backups.sort(key=lambda x: x[1], reverse=True)
 
+            len_app_backups = len(app_backups)
             # Log what we found
-            logging.info(f"Found {len(app_backups)} backups for {app}, max_backups={max_backups}")
+            logging.info("Found %s backups for %s, max_backups=%d", len_app_backups, app, max_backups)
 
             # Keep only the newest max_backups files
-            if len(app_backups) > max_backups:
+            if len_app_backups > max_backups:
                 files_to_remove = app_backups[max_backups:]
                 removed_count = 0
                 for filepath, _, filename in files_to_remove:
                     try:
                         os.remove(filepath)
                         removed_count += 1
-                        logging.info(f"Removed old backup: {filename}")
+                        logging.info("Removed old backup: %s", filename)
                     except OSError as e:
-                        logging.warning(f"Failed to remove old backup {filename}: {e}")
+                        logging.warning("Failed to remove old backup %s: %s", filename, e)
 
                 total_removed += removed_count
                 if removed_count > 0:
-                    logging.info(f"Cleaned up {removed_count} old backups for {app}")
+                    logging.info("Cleaned up %d old backups for %s", removed_count, app)
 
         if total_removed > 0:
             print(
@@ -328,6 +329,6 @@ class DeleteBackupsCommand(Command):
 
                     apps.add(app_name)
         except OSError as e:
-            logging.error(f"Error getting available apps: {e!s}")
+            logging.error("Error getting available apps: %s", e)
 
         return sorted(list(apps))
