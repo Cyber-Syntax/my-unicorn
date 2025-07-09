@@ -41,7 +41,6 @@ class AppImageSelector:
         self,
         assets: list[dict[str, str]],
         definitive_app_info: AppInfo | None = None,
-        user_local_config_data: dict[str, str] | None = None,
         release_prerelease: bool = False,
     ) -> AssetSelectionResult | None:
         """Find and select appropriate AppImage asset based on app metadata and system architecture.
@@ -49,7 +48,6 @@ class AppImageSelector:
         Args:
             assets: list of release assets from GitHub API
             definitive_app_info: Base app metadata from repository JSON (optional)
-            user_local_config_data: User's local config data (optional)
             release_prerelease: Whether this is a pre-release
 
         Returns:
@@ -64,7 +62,7 @@ class AppImageSelector:
 
         # 2. Determine target characteristic suffix list with priority
         target_suffixes = self._determine_target_suffixes(
-            definitive_app_info, user_local_config_data
+            definitive_app_info
         )
         self._logger.info("Target characteristic suffixes: %s", target_suffixes)
 
@@ -107,28 +105,15 @@ class AppImageSelector:
         return None
 
     def _determine_target_suffixes(
-        self, definitive_app_info: AppInfo | None, user_local_config_data: dict[str, str] | None
+        self, definitive_app_info: AppInfo | None
     ) -> list[str]:
         """Determine the prioritized list of characteristic suffixes to try.
 
         Priority order:
-        1. User's explicit override from local config
-        2. Currently installed suffix from local config
-        3. Preferred suffixes from definitive app info
+        1. Currently installed suffix from local config
+        2. Preferred suffixes from definitive app info
         """
-        suffixes = []
-
-        if user_local_config_data:
-            # Check for user override
-            if override := user_local_config_data.get(
-                "user_preferred_characteristic_suffix_override"
-            ):
-                suffixes.append(override)
-
-            # Check currently installed suffix
-            if installed := user_local_config_data.get("installed_characteristic_suffix"):
-                if installed not in suffixes:
-                    suffixes.append(installed)
+        suffixes: list[str] = []
 
         # Add preferred suffixes from definitive info if available
         if definitive_app_info and definitive_app_info.preferred_characteristic_suffixes:
