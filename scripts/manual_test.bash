@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Simple manual testing script for my-unicorn
-# 
-# QOwnNotes: Asset digest verification 
+#
+# QOwnNotes: Asset digest verification
 # Joplin: .yml sha512 verification
-# Appflowy: no verification 
+# Appflowy: no verification
 # Zettlr: sha256 verification with .txt file
-# 
+#
 
 set -e # Exit on any error
 
@@ -122,151 +122,86 @@ EOF
 
 # ======== Test Functions ========
 
-run_my_unicorn() {
-  local choice="$1"
-  local extra_input="$2"
-
-  log "Running my-unicorn with option $choice and extra input $extra_input"
-  cd "$APP_ROOT"
-
-  if [ -z "$extra_input" ]; then
-    # Simple choices without extra input
-    cat >"/tmp/input.txt" <<EOF
-$choice
-0
-EOF
-  else
-    # Choices with extra input
-    cat >"/tmp/input.txt" <<EOF
-$choice
-$extra_input
-y
-0
-EOF
-  fi
-
-  # Run command and handle errors
-  python3 main.py <"/tmp/input.txt" || {
-    local exit_code=$?
-    if [ $exit_code -eq 1 ]; then
-      log "Process completed with EOF (expected)"
-    else
-      log "ERROR: Command failed with exit code $exit_code"
-    fi
-  }
-
-  # Cleanup
-  rm -f "/tmp/input.txt"
-  sleep 1 # Give time for file operations to complete
-}
+# No longer needed: run_my_unicorn replaced by direct CLI calls
 
 # ======== Test Scenarios ========
 
 option3_joplin_qownnotes() {
   log "=== Testing Both QOwnNotes and Joplin Update Together ==="
-  # set up outdated versions for both apps
-  setup_qownnotes_config "0.1.0" # Old version for QOwnNotes
-  setup_joplin_config "0.1.0"    # Old version for Joplin
-  run_my_unicorn "3" "all"   # Update all
+  setup_qownnotes_config "0.1.0"
+  setup_joplin_config "0.1.0"
+  cd "$APP_ROOT"
+  python3 run.py update --select qownnotes,joplin || log "ERROR: update --select qownnotes,joplin failed"
   log "Combined QOwnNotes and Joplin update test completed"
 }
 
-option3_four_apps() {
-  log "=== Testing Both QOwnNotes and Joplin Update Together ==="
-  # set up outdated versions for both apps
-  setup_qownnotes_config "0.1.0" # Old version for QOwnNotes
-  setup_joplin_config "0.1.0"    # Old version for Joplin
-  setup_zettlr_config "0.1.0"    # Old version for Zettlr
-  setup_appflowy_config "0.1.0"  # Old version for AppFlowy
-  run_my_unicorn "3" "all"  # Update all
-  log "Combined QOwnNotes and Joplin update test completed"
+option3_fourapp() {
+  log "=== Testing Update All (Four Apps) ==="
+  setup_qownnotes_config "0.1.0"
+  setup_joplin_config "0.1.0"
+  setup_zettlr_config "0.1.0"
+  setup_appflowy_config "0.1.0"
+  cd "$APP_ROOT"
+  python3 run.py update --all || log "ERROR: update --all failed"
+  log "Update all (four apps) test completed"
 }
 
 option3_qownnotes() {
   log "=== Testing QOwnNotes Update ==="
-  setup_qownnotes_config "0.1.0" # Old version
-  run_my_unicorn "3" "all"   # Update all
+  setup_qownnotes_config "0.1.0"
+  cd "$APP_ROOT"
+  python3 run.py update --select qownnotes || log "ERROR: update --select qownnotes failed"
   log "QOwnNotes update test completed"
 }
 
 option3_joplin() {
   log "=== Testing Joplin Update ==="
-  setup_joplin_config "0.1.0" # Old version
-  run_my_unicorn "3" "all"     # Update all
+  setup_joplin_config "0.1.0"
+  cd "$APP_ROOT"
+  python3 run.py update --select joplin || log "ERROR: update --select joplin failed"
   log "Joplin update test completed"
 }
 
 option4_qownnotes() {
   log "=== Testing Selective Update (QOwnNotes) ==="
-  setup_qownnotes_config "0.1.0" # Old version
-
-  #selecting option 4 and than qownnotes 3
-  run_my_unicorn "4" "3"
+  setup_qownnotes_config "0.1.0"
+  cd "$APP_ROOT"
+  python3 run.py update --select qownnotes || log "ERROR: update --select qownnotes failed"
   log "Selective update test completed"
 }
 
 option4_joplin() {
   log "=== Testing Selective Update (Joplin) ==="
-  setup_joplin_config "0.1.0" # Old version
-
-  #selecting option 4 and than joplin 6
-  run_my_unicorn "4" "6"
+  setup_joplin_config "0.1.0"
+  cd "$APP_ROOT"
+  python3 run.py update --select joplin || log "ERROR: update --select joplin failed"
   log "Selective update test completed"
 }
 
 option4_fourapp() {
-    log "=== Testing Selective Update (Four Apps) ==="
-    # Lower versions for all apps before selective update
-    setup_appflowy_config "0.1.0"
-    setup_qownnotes_config "0.1.0"
-    setup_zettlr_config "0.1.0"
-    setup_joplin_config "0.1.0"
-    
-    # handle the options
-    run_my_unicorn "4" "1,2,3,4"
-
-    log "Selective update test for four apps completed"
+  log "=== Testing Selective Update (Four Apps) ==="
+  setup_appflowy_config "0.1.0"
+  setup_qownnotes_config "0.1.0"
+  setup_zettlr_config "0.1.0"
+  setup_joplin_config "0.1.0"
+  cd "$APP_ROOT"
+  python3 run.py update --select appflowy,qownnotes,zettlr,joplin || log "ERROR: update --select appflowy,qownnotes,zettlr,joplin failed"
+  log "Selective update test for four apps completed"
 }
 
 url_qownnotes() {
   log "=== Testing QOwnNotes Fresh Install ==="
-  # Remove existing config if present
   rm -f "$CONFIG_DIR/QOwnNotes.json"
-
-  # Create input file for download with GitHub URL
-  cat >"/tmp/input.txt" <<EOF
-1
-https://github.com/pbek/QOwnNotes
-
-
-0
-EOF
-
   cd "$APP_ROOT"
-  python3 main.py <"/tmp/input.txt" || true
-  rm -f "/tmp/input.txt"
-
+  python3 run.py download https://github.com/pbek/QOwnNotes || log "ERROR: download QOwnNotes failed"
   log "QOwnNotes installation test completed"
 }
 
 url_joplin() {
   log "=== Testing Joplin Fresh Install ==="
-  # Remove existing config if present
   rm -f "$CONFIG_DIR/joplin.json"
-
-  # Create input file for download with GitHub URL
-  cat >"/tmp/input.txt" <<EOF
-1
-https://github.com/laurent22/joplin
-
-
-0
-EOF
-
   cd "$APP_ROOT"
-  python3 main.py <"/tmp/input.txt" || true
-  rm -f "/tmp/input.txt"
-
+  python3 run.py download https://github.com/laurent22/joplin || log "ERROR: download joplin failed"
   log "Joplin installation test completed"
 }
 
@@ -290,7 +225,7 @@ main() {
     echo "4) (Auto)Option 3 test Joplin"
     echo "5) (Selective)Option 4 test QOwnNotes"
     echo "6) (Selective)Option 4 test Joplin"
-    
+
     echo "7) (URL)Option 1 test QOwnNotes"
     echo "8) (URL)Option 1 test Joplin"
     echo "9) (Auto)Option 3 test QOwnNotes and Joplin"
