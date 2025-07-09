@@ -161,7 +161,7 @@ classDiagram
             +compare_versions(current_version, latest_version): tuple
         }
 
-        class ReleaseAssetInfo {
+        class ReleaseInfo {
             <<src/api/assets.py - ReleaseInfo>>
             +owner: str
             +repo: str
@@ -213,7 +213,6 @@ classDiagram
     API.APIInterface --> Utils.VersionUtils
     API.APIInterface --> Utils.ArchExtractionUtils
     API.ReleaseManager o-- API.ReleaseProcessor
-    API.ReleaseProcessor o-- API.ReleaseAssetInfo
     API.ReleaseProcessor o-- API.AppImageAsset
     API.ReleaseProcessor o-- API.ShaAsset
     API.ShaManager o-- API.ShaAssetFinder
@@ -237,7 +236,7 @@ classDiagram
         class VerificationManager {
             <<src/verify.py>>
             -checksum_verifier: ChecksumVerification
-            +verify_download(filepath, release_info: ReleaseAssetInfo, downloaded_sha_content: str): bool
+            +verify_download(filepath, downloaded_sha_content: str): bool
         }
 
         class ChecksumVerification {

@@ -23,7 +23,6 @@ from my_unicorn.api.release_description_fetcher import ReleaseDescriptionFetcher
 
 # Asset data models
 from my_unicorn.api.assets import (
-    ReleaseAsset,
     AppImageAsset,
     SHAAsset,
     ArchitectureInfo,
@@ -42,8 +41,6 @@ __all__ = [
     "ReleaseManager", 
     "ReleaseProcessor",
     "ReleaseDescriptionFetcher",
-    # Asset data models
-    "ReleaseAsset",
     "AppImageAsset",
     "SHAAsset", 
     "ArchitectureInfo",

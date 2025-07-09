@@ -140,7 +140,7 @@ class AppImageSelector:
                 continue
 
             # Find assets matching this suffix
-            matching_assets = []
+            matching_assets: list[dict[str, str]] = []
             for asset in assets:
                 asset_name = asset["name"].lower()
                 suffix_lower = suffix.lower()
@@ -152,7 +152,7 @@ class AppImageSelector:
 
             if matching_assets:
                 # Filter by architecture compatibility first
-                compatible_assets = []
+                compatible_assets: list[dict[str, str]] = []
                 for asset in matching_assets:
                     asset_name = asset["name"].lower()
                     if arch_utils.is_keyword_compatible_with_arch(asset_name, system_cpu_arch):
