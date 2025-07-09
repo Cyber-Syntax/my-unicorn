@@ -19,8 +19,8 @@ class SHAAssetFinder:
         self,
         selected_appimage_name: str,
         definitive_app_info: AppInfo | None,
-        assets: list[dict],
-    ) -> dict | None:
+        assets: list[dict[str, str]],
+    ) -> dict[str, str] | None:
         """Find the best SHA asset match for the selected AppImage.
 
         Args:
@@ -91,7 +91,7 @@ class SHAAssetFinder:
         logger.info("Using first available SHA file as fallback")
         return sha_assets[0]
 
-    def _try_extract_asset_digest(self, appimage_name: str, assets: list[dict]) -> dict | None:
+    def _try_extract_asset_digest(self, appimage_name: str, assets: list[dict[str, str]]) -> dict[str, str] | None:
         """Try to extract asset digest information from GitHub API asset metadata.
 
         Args:
@@ -129,7 +129,7 @@ class SHAAssetFinder:
         logger.debug("No asset digest found for %s in assets", appimage_name)
         return None
 
-    def _filter_sha_assets(self, assets: list[dict]) -> list[dict]:
+    def _filter_sha_assets(self, assets: list[dict[str, str]]) -> list[dict[str, str]]:
         """Filter release assets to only SHA/checksum files."""
         sha_patterns = [
             r"\.sha\d+$",

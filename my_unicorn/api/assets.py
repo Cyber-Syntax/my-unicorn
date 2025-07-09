@@ -7,6 +7,7 @@ This module defines data structures for GitHub release assets.
 from dataclasses import dataclass
 
 from my_unicorn.utils import arch_utils
+from typing import Any
 
 
 @dataclass
@@ -29,7 +30,7 @@ class AppImageAsset:
     content_type: str | None = None
 
     @classmethod
-    def from_github_asset(cls, asset: dict) -> "AppImageAsset":
+    def from_github_asset(cls, asset: dict[str, str]) -> "AppImageAsset":
         """Create an AppImageAsset from a GitHub API asset dictionary.
 
         Args:
@@ -57,7 +58,7 @@ class SHAAsset:
     size: int | None = None
 
     @classmethod
-    def from_github_asset(cls, asset: dict, checksum_hash_type: str = "sha256") -> "SHAAsset":
+    def from_github_asset(cls, asset: dict[str, str], checksum_hash_type: str = "sha256") -> "SHAAsset":
         """Create a SHAAsset from a GitHub API asset dictionary.
 
         Args:
@@ -121,7 +122,7 @@ class ReleaseInfo:
     asset_digest: str | None = None
 
     @classmethod
-    def from_release_data(cls, release_data: dict, asset_info: dict) -> "ReleaseInfo":
+    def from_release_data(cls, release_data: dict[str, str], asset_info: dict[str, str]) -> "ReleaseInfo":
         """Create a ReleaseInfo from GitHub release data and processed asset information.
 
         Args:

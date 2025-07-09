@@ -26,7 +26,7 @@ class AssetSelectionResult:
 
     """
 
-    asset: dict[str, Any]
+    asset: dict[str, str]
     characteristic_suffix: str
 
 
@@ -39,9 +39,9 @@ class AppImageSelector:
 
     def find_appimage_asset(
         self,
-        assets: list[dict],
+        assets: list[dict[str, str]],
         definitive_app_info: AppInfo | None = None,
-        user_local_config_data: dict | None = None,
+        user_local_config_data: dict[str, str] | None = None,
         release_prerelease: bool = False,
     ) -> AssetSelectionResult | None:
         """Find and select appropriate AppImage asset based on app metadata and system architecture.
@@ -107,7 +107,7 @@ class AppImageSelector:
         return None
 
     def _determine_target_suffixes(
-        self, definitive_app_info: AppInfo | None, user_local_config_data: dict | None
+        self, definitive_app_info: AppInfo | None, user_local_config_data: dict[str, str] | None
     ) -> list[str]:
         """Determine the prioritized list of characteristic suffixes to try.
 
@@ -140,7 +140,7 @@ class AppImageSelector:
 
     def _try_suffix_based_selection(
         self,
-        assets: list[dict],
+        assets: list[dict[str, str]],
         target_suffixes: list[str],
         system_cpu_arch: str,
         prerelease: bool,
@@ -232,8 +232,8 @@ class AppImageSelector:
         return False
 
     def _try_generic_selection(
-        self, assets: list[dict], system_cpu_arch: str, prerelease: bool
-    ) -> dict | None:
+        self, assets: list[dict[str, str]], system_cpu_arch: str, prerelease: bool
+    ) -> dict[str, str] | None:
         """Try to select an asset without specific characteristic suffix."""
         # Filter to only architecture-compatible assets
         compatible_assets = []
