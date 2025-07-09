@@ -262,26 +262,10 @@ class GitHubAPI:
 
         # Create config dict for selection - use app definition for preferred characteristic suffixes
         if self._app_info:
-            # Use app definition's preferred characteristic suffixes
-            user_local_config_data = {
-                "installed_characteristic_suffix": None  # Let app definition guide selection
-            }
             logger.debug(
                 "Using preferred suffixes for %s: %s",
                 self.repo,
                 self._app_info.preferred_characteristic_suffixes,
-            )
-        else:
-            # Fallback to legacy arch_keyword if no app definition found
-            user_local_config_data = (
-                {"installed_characteristic_suffix": self._arch_keyword}
-                if self._arch_keyword
-                else None
-            )
-            logger.warning(
-                "No app definition found for %s, using legacy arch_keyword: %s",
-                self.repo,
-                self._arch_keyword,
             )
 
         # Use the pre-initialized selector
@@ -289,13 +273,11 @@ class GitHubAPI:
             selected_asset_result = self._selector.find_appimage_asset(
                 assets=assets,
                 definitive_app_info=self._app_info,
-                user_local_config_data=user_local_config_data,
             )
         else:
             selected_asset_result = self._selector.find_appimage_asset(
                 assets=assets,
                 definitive_app_info=None,
-                user_local_config_data=user_local_config_data,
             )
 
         if not selected_asset_result:

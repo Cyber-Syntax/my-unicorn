@@ -1,7 +1,7 @@
 [project]
 name = 'my-unicorn'
 # dynamic = ["version"]
-version = '0.13.3-alpha'
+version = '0.13.4-alpha'
 maintainers = [{ name = "Cyber-Syntax" }]
 license = { text = "GPL-3.0-or-later" }
 description = 'It downloads/updates appimages via GitHub API. It also validates the appimage with SHA256 and SHA512.'
@@ -120,7 +120,7 @@ exclude = [
   "__init__.py",
 ]
 
-line-length = 100
+line-length = 95
 indent-width = 4
 # target-version = [
 #     'py38',
@@ -196,7 +196,7 @@ ignore = [
 
 
 [tool.ruff.lint.pycodestyle]
-max-line-length = 100
+max-line-length = 95
 
 [tool.coverage.run]
 source = ["my_unicorn"]

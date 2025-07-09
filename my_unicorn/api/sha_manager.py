@@ -126,7 +126,7 @@ class SHAManager:
             logger.warning(f"Extracted hash '{hash_value}' does not look like a valid SHA256 hash.")
             return False
 
-    def find_sha_asset(self, assets: list[dict]) -> None:
+    def find_sha_asset(self, assets: list[dict[str, str]]) -> None:
         """Find and select appropriate SHA file for verification.
 
         Args:
@@ -205,7 +205,7 @@ class SHAManager:
             f"Selected SHA file: {self.checksum_file_name} (hash type: {self.checksum_hash_type})"
         )
 
-    def _handle_sha_fallback(self, assets: list[dict]) -> None:
+    def _handle_sha_fallback(self, assets: list[dict[str, str]]) -> None:
         """Handle fallback when SHA file couldn't be automatically determined.
 
         Args:
@@ -214,7 +214,7 @@ class SHAManager:
         """
         return self._handle_sha_fallback_sync(assets)
 
-    async def _handle_sha_fallback_async(self, assets: list[dict]) -> None:
+    async def _handle_sha_fallback_async(self, assets: list[dict[str, str]]) -> None:
         """Async version of SHA fallback handler.
 
         Args:
@@ -249,7 +249,7 @@ class SHAManager:
             logger.info("SHA fallback cancelled by user")
             raise
 
-    def _handle_sha_fallback_sync(self, assets: list[dict]) -> None:
+    def _handle_sha_fallback_sync(self, assets: list[dict[str, str]]) -> None:
         """Handle SHA fallback using synchronous operations.
 
         Args:

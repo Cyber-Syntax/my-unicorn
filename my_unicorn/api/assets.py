@@ -8,28 +8,17 @@ from dataclasses import dataclass
 
 from my_unicorn.utils import arch_utils
 
-
-@dataclass
-class ReleaseAsset:
-    """Represents a GitHub release asset."""
-
-    name: str
-    browser_download_url: str
-    size: int
-    content_type: str
-
-
 @dataclass
 class AppImageAsset:
     """Represents an AppImage asset from a GitHub release."""
 
     name: str
     browser_download_url: str
-    size: int | None = None
+    size: int
     content_type: str | None = None
 
     @classmethod
-    def from_github_asset(cls, asset: dict) -> "AppImageAsset":
+    def from_github_asset(cls, asset: dict[str, str]) -> "AppImageAsset":
         """Create an AppImageAsset from a GitHub API asset dictionary.
 
         Args:
@@ -54,10 +43,9 @@ class SHAAsset:
     name: str
     browser_download_url: str
     checksum_hash_type: str
-    size: int | None = None
 
     @classmethod
-    def from_github_asset(cls, asset: dict, checksum_hash_type: str = "sha256") -> "SHAAsset":
+    def from_github_asset(cls, asset: dict[str, str], checksum_hash_type: str = "sha256") -> "SHAAsset":
         """Create a SHAAsset from a GitHub API asset dictionary.
 
         Args:
@@ -72,7 +60,6 @@ class SHAAsset:
             name=asset["name"],
             browser_download_url=asset["browser_download_url"],
             checksum_hash_type=checksum_hash_type,
-            size=asset.get("size"),
         )
 
 
@@ -121,7 +108,7 @@ class ReleaseInfo:
     asset_digest: str | None = None
 
     @classmethod
-    def from_release_data(cls, release_data: dict, asset_info: dict) -> "ReleaseInfo":
+    def from_release_data(cls, release_data: dict[str, str], asset_info: dict[str, str]) -> "ReleaseInfo":
         """Create a ReleaseInfo from GitHub release data and processed asset information.
 
         Args:
@@ -132,6 +119,7 @@ class ReleaseInfo:
             ReleaseInfo: New ReleaseInfo instance
 
         """
+
         return cls(
             owner=asset_info["owner"],
             repo=asset_info["repo"],

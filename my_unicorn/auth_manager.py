@@ -56,7 +56,7 @@ class GitHubAuthManager:
     _request_count_since_cache: int = 0  # Counter for API requests since last cache refresh
 
     @classmethod
-    def get_auth_headers(cls, force_refresh: bool = False) -> dict | None:
+    def get_auth_headers(cls, force_refresh: bool = False) -> dict[str, str] | None:
         """Get authentication headers for GitHub API requests.
 
         Returns properly formatted headers with Bearer authentication if a token

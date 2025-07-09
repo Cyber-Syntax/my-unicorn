@@ -171,8 +171,8 @@ class ReleaseProcessor:
         }
 
     def filter_compatible_assets(
-        self, assets: list[dict[str, Any]], arch_keywords: list[str] | None = None
-    ) -> list[dict]:
+        self, assets: list[dict[str, str]], arch_keywords: list[str] | None = None
+    ) -> list[dict[str, str]]:
         """Filter assets based on architecture compatibility.
 
         Args:
@@ -224,7 +224,7 @@ class ReleaseProcessor:
         update_available: bool,
         current_version: str,
         release_info: ReleaseInfo,
-        compatible_assets: list[dict],
+        compatible_assets: list[dict[str, str]],
     ) -> dict[str, Any]:
         """Create a standardized response for update checks.
 
