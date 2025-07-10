@@ -290,9 +290,8 @@ class DownloadManager:
         if self._progress_task_id in DownloadManager._active_tasks:
             DownloadManager._active_tasks.remove(self._progress_task_id)
 
-        if progress is not None:
-            # Complete the download task in the progress manager
-            progress.complete_download(self._progress_task_id, success=True)
+        # Complete the download task in the progress manager
+        progress.complete_download(self._progress_task_id, success=True)
 
         self._progress_task_id = None
 
@@ -353,7 +352,7 @@ class DownloadManager:
                     downloaded_size += len(chunk)
 
                     # Always update progress if we have a task_id
-                    if task_id is not None and progress is not None:
+                    if task_id is not None:
                         # Update progress using the progress manager's API
                         progress.update_progress(task_id, downloaded_size)
 
@@ -362,7 +361,7 @@ class DownloadManager:
         os.chmod(file_path, os.stat(file_path).st_mode | 0o111)
 
         # Final update to mark task as completed
-        if task_id is not None and progress is not None:
+        if task_id is not None:
             progress.update_progress(task_id, total_size)
 
         return time.time() - start_time

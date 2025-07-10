@@ -13,7 +13,7 @@ from typing import Any
 
 def format_number(number: int) -> str:
     """Format number to human readable string with units."""
-    if number is None or number <= 0:
+    if number <= 0:
         return "0 B"
 
     units = ["B", "KB", "MB", "GB", "TB"]

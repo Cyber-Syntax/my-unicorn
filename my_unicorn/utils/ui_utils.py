@@ -94,8 +94,6 @@ def get_user_input(prompt: str, default: str | None = None) -> str:
     # For simplicity, we'll let _actual_input_logic handle the full prompt string construction.
     # Or, we can construct full_prompt here and pass it. Let's do that for clarity.
 
-    full_prompt_for_display = f"{prompt} (default: {default}): " if default else f"{prompt}: "
-
     if threading.current_thread() is not threading.main_thread():
         target_loop = None
         if _main_event_loop and _main_event_loop.is_running():

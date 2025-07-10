@@ -8,7 +8,6 @@ from GitHub releases based on system architecture and app characteristics.
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any
 
 from my_unicorn.catalog import AppInfo
 from my_unicorn.utils import arch_utils

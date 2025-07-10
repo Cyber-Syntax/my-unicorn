@@ -7,7 +7,6 @@ and provides utilities for maintaining a clean verification environment.
 import logging
 import os
 from pathlib import Path
-from typing import Any
 
 from my_unicorn.utils.cleanup_utils import (
     cleanup_failed_verification_files,

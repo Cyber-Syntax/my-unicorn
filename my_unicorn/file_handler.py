@@ -79,10 +79,6 @@ class FileHandler:
         if not self.app_rename:
             self.app_rename = self.repo
 
-        # Ensure app_rename is never None after initialization
-        if self.app_rename is None:
-            self.app_rename = self.repo
-
         # Convert paths to Path objects
         if self.app_storage_path and isinstance(self.app_storage_path, str):
             self.app_storage_path = Path(self.app_storage_path)

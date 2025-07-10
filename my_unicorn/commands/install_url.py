@@ -26,6 +26,8 @@ class DownloadCommand(Command):
         """Initialize with optional URL for CLI usage."""
         super().__init__()
         self.url = url
+        self.owner = None
+        self.repo = None
 
     def execute(self) -> None:
         """Execute the download command."""
@@ -131,15 +133,15 @@ class DownloadCommand(Command):
         if self.url:
             # CLI mode - use provided URL
             try:
-                parser = ParseURL(url=self.url)
-                parser._validate_url()  # Using protected method as intended
-                parser._parse_owner_repo()  # Using protected method as intended
+                parser = ParseURL(url=self.url, owner=self.owner, repo=self.repo)
+                parser.validate_url()  # Using protected method as intended
+                parser.parse_owner_repo()  # Using protected method as intended
             except (ValueError, RuntimeError) as e:
                 print(f"Error parsing URL '{self.url}': {e}")
                 return None
         else:
             # Interactive mode - ask for URL
-            parser = ParseURL()
+            parser = ParseURL(owner=self.owner, repo=self.repo)
             parser.ask_url()  # Get owner and repo by asking the user for the URL
 
         # Return the owner and repo from ParseURL instance

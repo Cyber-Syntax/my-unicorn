@@ -54,7 +54,7 @@ def parse_timestamp(timestamp_value: str | float | datetime | None) -> datetime 
                 return None
 
     # Handle numeric timestamps (float/int)
-    elif isinstance(timestamp_value, (int, float)):
+    elif isinstance(timestamp_value, int | float):
         try:
             return datetime.fromtimestamp(timestamp_value)
         except (ValueError, TypeError, OverflowError) as e:
