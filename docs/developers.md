@@ -8,9 +8,9 @@
 
 https://api.github.com/repos/zen-browser/desktop/releases/latest
 
-### Example of the beta api usage for zen-browser
+### Example of the beta api usage for FreeTube
 
-https://api.github.com/repos/zen-browser/desktop/releases/
+https://api.github.com/repos/FreeTubeApp/FreeTube/releases
 
 ### What we fetch from the API?
 
@@ -31,8 +31,12 @@ https://api.github.com/repos/zen-browser/desktop/releases/
 
 ### Example of raw data from github API for zen-browser
 
-> This example also shows app hashes information on the release description.
+> This example also shows app hashes information on the release description. 
+>
+> This example of latest release but beta is similar to this one. Only changes beta provide all the assets and we use the asset 0 for latest version informations, latest release provide directly to that asset 0. 
+>
 > This was the old behavior for the zen-browser desktop app. They use the asset_digest to provide hash information for the new releases.
+
 
 ````json
 {

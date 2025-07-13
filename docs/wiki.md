@@ -1,5 +1,6 @@
 # my-unicorn
 
+> [!NOTE]
 > my-unicorn is a command-line tool designed to manage AppImages, including downloading, installing, and updating them.
 >
 > It simplifies the process of automated process of managing AppImages by leveraging the GitHub API for release information.
