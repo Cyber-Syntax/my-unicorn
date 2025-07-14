@@ -125,7 +125,7 @@ case "${1-}" in
 Usage: $(basename "$0") [install|update]
 
   install   Copy source, setup venv, install wrapper, configure PATH
-  update    Copy source again, rebuild venv, reinstall wrapper
+  update    setup venv
 EOF
     exit 1
     ;;
