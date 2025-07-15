@@ -240,10 +240,7 @@ classDiagram
             <<src/utils/checksums/parser.py>>
             +parse_checksum_file_content(content, filename_to_match, checksum_hash_type): str
         }
-        class ChecksumExtractor {
-            <<src/utils/checksums/extractor.py>>
-            +extract_from_text(text, filename): str
-        }
+
     }
     Verification.VerificationManager o-- Verification.ChecksumVerification
     Verification.VerificationManager o-- Verification.ChecksumParser
