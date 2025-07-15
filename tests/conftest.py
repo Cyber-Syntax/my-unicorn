@@ -28,7 +28,6 @@ def pytest_configure(config):
 
 
 # Now import after the path setup
-from my_unicorn.progress_manager import DynamicProgressManager
 from my_unicorn.secure_token import (
     SecureTokenManager,
     DEFAULT_TOKEN_EXPIRATION_DAYS,
@@ -96,8 +95,6 @@ def github_rate_limit_response():
         "rate": {"limit": 5000, "remaining": 4990, "reset": reset_time, "used": 10},
     }
 
-
-# Fixtures specifically for progress_manager tests
 
 
 @pytest.fixture

@@ -3,7 +3,7 @@
 """
 Tests for architecture utility functions.
 
-This module contains tests for the architecture utility functions in src/utils/arch_utils.py.
+This module contains tests for the architecture utility functions in src/utils/arch.py.
 """
 
 import platform
@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from my_unicorn.utils.arch_utils import (
+from my_unicorn.utils.arch import (
     get_arch_keywords,
     get_incompatible_archs,
     extract_arch_from_filename,

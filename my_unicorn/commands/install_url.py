@@ -141,7 +141,7 @@ class DownloadCommand(Command):
                 return None
         else:
             # Interactive mode - ask for URL
-            parser = ParseURL(owner=self.owner, repo=self.repo)
+            parser = ParseURL(url=self.url, owner=self.owner, repo=self.repo)
             parser.ask_url()  # Get owner and repo by asking the user for the URL
 
         # Return the owner and repo from ParseURL instance

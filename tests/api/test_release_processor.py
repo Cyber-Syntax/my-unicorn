@@ -183,18 +183,18 @@ class TestReleaseProcessorLogic:
         """Test filtering of compatible assets."""
         raw_assets_list = mock_release_data["assets"]
 
-        # Case 1: ReleaseProcessor uses its self.arch_keyword internally via arch_utils.get_arch_keywords
+        # Case 1: ReleaseProcessor uses its self.arch_keyword internally via arch.get_arch_keywords
         # The arch_keyword for release_processor_instance is set from mock_platform_info["machine"]
-        # We mock arch_utils.get_arch_keywords to control its output based on this.
+        # We mock arch.get_arch_keywords to control its output based on this.
         expected_arch_keyword_for_call = release_processor_instance.arch_keyword  # e.g. "x86_64"
         assert expected_arch_keyword_for_call is not None, (
             "arch_keyword from fixture should not be None for this test"
         )
 
         with patch(
-            "my_unicorn.api.release_processor.arch_utils.get_arch_keywords"
+            "my_unicorn.api.release_processor.arch.get_arch_keywords"
         ) as mock_get_arch_keywords:
-            # If arch_utils.get_arch_keywords is called with a non-None arch_keyword (like "x86_64"),
+            # If arch.get_arch_keywords is called with a non-None arch_keyword (like "x86_64"),
             # it returns a list containing that keyword: `[arch_keyword]`.
             # So, the mock should replicate this behavior for the specific input it will receive.
             # We can use side_effect for more complex input-dependent mocking if needed,
@@ -209,12 +209,12 @@ class TestReleaseProcessorLogic:
             mock_get_arch_keywords.assert_called_once_with(expected_arch_keyword_for_call)
 
         # Case 2: Provide explicit arch_keywords argument to filter_compatible_assets
-        # This call should NOT use the mocked arch_utils.get_arch_keywords
+        # This call should NOT use the mocked arch.get_arch_keywords
         # because arch_keywords is provided directly.
         specific_arch_keywords_for_test = ["arm64", "aarch64"]
         # Reset mock or use a new one if concerned about call counts across cases
         with patch(
-            "my_unicorn.api.release_processor.arch_utils.get_arch_keywords"
+            "my_unicorn.api.release_processor.arch.get_arch_keywords"
         ) as mock_get_arch_keywords_case2:
             compatible_arm = release_processor_instance.filter_compatible_assets(
                 raw_assets_list, arch_keywords=specific_arch_keywords_for_test

@@ -220,17 +220,9 @@ classDiagram
 
     class Downloader {
         <<src/download.py>>
-        -progress_manager: ProgressManager
         +download_file(url, dest_path, expected_size=None): bool
     }
     Downloader o-- ProgressManager
-
-    class ProgressManager {
-        <<src/progress_manager.py>>
-        +start_download(filename, total_size)
-        +update_progress(chunk_size)
-        +finish_download()
-    }
 
     namespace Verification {
         class VerificationManager {
