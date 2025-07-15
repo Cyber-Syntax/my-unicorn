@@ -8,10 +8,9 @@ from GitHub releases based on system architecture and app characteristics.
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any
 
 from my_unicorn.catalog import AppInfo
-from my_unicorn.utils import arch_utils
+from my_unicorn.utils import arch
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,7 @@ class AppImageSelector:
         self._logger.info("Starting AppImage selection process")
 
         # 1. Determine system architecture
-        system_cpu_arch = arch_utils.get_current_arch()
+        system_cpu_arch = arch.get_current_arch()
         self._logger.info("System CPU architecture: %s", system_cpu_arch)
 
         # 2. Determine target characteristic suffix list with priority
@@ -135,7 +134,7 @@ class AppImageSelector:
             self._logger.info("Trying suffix: '%s'", suffix)
 
             # Skip suffix if not compatible with system architecture
-            if not arch_utils.is_keyword_compatible_with_arch(suffix, system_cpu_arch):
+            if not arch.is_keyword_compatible_with_arch(suffix, system_cpu_arch):
                 self._logger.debug("Suffix '%s' not compatible with %s", suffix, system_cpu_arch)
                 continue
 
@@ -155,7 +154,7 @@ class AppImageSelector:
                 compatible_assets: list[dict[str, str]] = []
                 for asset in matching_assets:
                     asset_name = asset["name"].lower()
-                    if arch_utils.is_keyword_compatible_with_arch(asset_name, system_cpu_arch):
+                    if arch.is_keyword_compatible_with_arch(asset_name, system_cpu_arch):
                         compatible_assets.append(asset)
                     else:
                         self._logger.debug(
@@ -225,7 +224,7 @@ class AppImageSelector:
 
         for asset in assets:
             name = asset["name"].lower()
-            is_compatible = arch_utils.is_keyword_compatible_with_arch(name, system_cpu_arch)
+            is_compatible = arch.is_keyword_compatible_with_arch(name, system_cpu_arch)
             if is_compatible:
                 compatible_assets.append(asset)
 

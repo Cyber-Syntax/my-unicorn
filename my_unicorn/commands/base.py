@@ -8,11 +8,6 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from typing_extensions import Self
-
 
 class CommandError(Exception):
     """Base exception for command errors."""

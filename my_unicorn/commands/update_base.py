@@ -46,7 +46,7 @@ class BaseUpdateCommand(Command):
         )
 
         # Initialize semaphore in __init__
-        if not isinstance(self.max_concurrent_updates, int) or self.max_concurrent_updates <= 0:
+        if self.max_concurrent_updates <= 0:
             self._logger.warning(
                 "Invalid max_concurrent_updates value: %s from global config. Defaulting to 1 for semaphore.",
                 self.max_concurrent_updates,
@@ -763,7 +763,8 @@ class BaseUpdateCommand(Command):
             remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
 
             # Ensure remaining is an integer
-            remaining = int(remaining) if remaining is not None else 0
+            if isinstance(remaining, str):
+                remaining = int(remaining)
 
             # Calculate requests needed (estimate 3 per app: version check, release info, icon check)
             requests_per_app = 3
@@ -805,8 +806,9 @@ class BaseUpdateCommand(Command):
             remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
 
             # Ensure remaining is an integer
-            remaining = int(remaining) if remaining is not None else 0
-
+            if isinstance(remaining, str):
+                remaining = int(remaining)
+            
             print("\n--- GitHub API Rate Limits ---")
             if is_authenticated:
                 print(f"Remaining requests: {remaining}/{limit}")

@@ -19,6 +19,8 @@ from .api import GitHubAPI
 from .global_config import GlobalConfigManager
 from .progress import AppImageProgressMeter
 
+logger = logging.getLogger(__name__)
+
 
 # Custom exception for download cancellation
 class DownloadCancelledError(Exception):
@@ -30,7 +32,7 @@ class DownloadManager:
 
     Attributes:
         github_api: The GitHub API object containing release information
-        _logger: Logger for this class
+        logger: Logger for this class
         is_async_mode: Whether the download is happening in an async context
         app_index: Index of the app in a multi-app update (1-based)
         total_apps: Total number of apps being updated
@@ -67,7 +69,6 @@ class DownloadManager:
 
         """
         self.github_api = github_api
-        self._logger = logging.getLogger(__name__)
         self.app_index = app_index
         self.total_apps = total_apps
         self.cancel_event = cancel_event
@@ -169,7 +170,7 @@ class DownloadManager:
             try:
                 cls._global_progress.stop()
             except Exception as e:
-                self._logger.error("Error stopping progress display: %s", e)
+                logger.error("Error stopping progress display: %s", e)
             finally:
                 cls._global_progress = None
                 cls._active_tasks.clear()
@@ -191,7 +192,7 @@ class DownloadManager:
         appimage_name = self.github_api.appimage_name
 
         if not app_download_url or not appimage_name:
-            self._logger.error("AppImage URL or name is not available. Cannot download.")
+            logger.error("AppImage URL or name is not available. Cannot download.")
             raise ValueError("AppImage URL or name is not available. Cannot download.")
 
         downloads_dir = self.get_downloads_dir()
@@ -206,16 +207,16 @@ class DownloadManager:
             if os.path.exists(existing_file_path):
                 # Verify the existing file is complete
                 if self._verify_existing_file(existing_file_path):
-                    self._logger.info("File already exists and verified: %s", appimage_name)
+                    logger.info("File already exists and verified: %s", appimage_name)
                     print(f"Found existing file: {appimage_name}")
                     return existing_file_path, True
                 else:
                     # Remove corrupted/incomplete file
-                    self._logger.info("Removing corrupted existing file: %s", appimage_name)
+                    logger.info("Removing corrupted existing file: %s", appimage_name)
                     try:
                         os.remove(existing_file_path)
                     except OSError as e:
-                        self._logger.warning(
+                        logger.warning(
                             "Could not remove corrupted file %s: %s", existing_file_path, e
                         )
 
@@ -225,7 +226,7 @@ class DownloadManager:
                     app_download_url, appimage_name, existing_file_path
                 )
             except Exception as e:
-                self._logger.error("Error downloading %s: %s", appimage_name, e)
+                logger.error("Error downloading %s: %s", appimage_name, e)
                 raise RuntimeError("Error downloading %s: %s" % (appimage_name, e)) from e
 
     def _get_file_size(self, url: str, headers: dict[str, str]) -> int:
@@ -242,7 +243,7 @@ class DownloadManager:
             requests.exceptions.RequestException: For network errors
 
         """
-        self._logger.info("Fetching headers for %s", url)
+        logger.info("Fetching headers for %s", url)
         response = requests.head(url, allow_redirects=True, timeout=10, headers=headers)
         response.raise_for_status()
         return int(response.headers.get("content-length", 0))
@@ -274,7 +275,7 @@ class DownloadManager:
             return download_id
 
         except Exception as e:
-            self._logger.error("Error creating progress task: %s", e)
+            logger.error("Error creating progress task: %s", e)
             # Fallback to console output without progress bar
             print(f"{prefix}Downloading {filename}...")
             return None
@@ -290,9 +291,8 @@ class DownloadManager:
         if self._progress_task_id in DownloadManager._active_tasks:
             DownloadManager._active_tasks.remove(self._progress_task_id)
 
-        if progress is not None:
-            # Complete the download task in the progress manager
-            progress.complete_download(self._progress_task_id, success=True)
+        # Complete the download task in the progress manager
+        progress.complete_download(self._progress_task_id, success=True)
 
         self._progress_task_id = None
 
@@ -336,7 +336,7 @@ class DownloadManager:
             # Process each chunk from the response
             for chunk in response.iter_content(chunk_size=chunk_size):
                 if self.cancel_event and self.cancel_event.is_set():
-                    self._logger.info(
+                    logger.info(
                         "Download of %s cancelled by user.", os.path.basename(file_path)
                     )
                     # response.close() # Ensure connection is closed
@@ -353,7 +353,7 @@ class DownloadManager:
                     downloaded_size += len(chunk)
 
                     # Always update progress if we have a task_id
-                    if task_id is not None and progress is not None:
+                    if task_id is not None:
                         # Update progress using the progress manager's API
                         progress.update_progress(task_id, downloaded_size)
 
@@ -362,7 +362,7 @@ class DownloadManager:
         os.chmod(file_path, os.stat(file_path).st_mode | 0o111)
 
         # Final update to mark task as completed
-        if task_id is not None and progress is not None:
+        if task_id is not None:
             progress.update_progress(task_id, total_size)
 
         return time.time() - start_time
@@ -400,11 +400,11 @@ class DownloadManager:
             bool: True if verification passed or skipped, False otherwise
 
         """
-        self._logger.info("Verifying download integrity...")
+        logger.info("Verifying download integrity...")
 
         # Skip verification if hash verification is disabled
         if self.github_api.skip_verification or not self.github_api.checksum_file_name:
-            self._logger.info(
+            logger.info(
                 "Skipping verification as requested (verification disabled or no hash provided)"
             )
             return True
@@ -420,36 +420,40 @@ class DownloadManager:
 
         direct_hash_to_pass: str | None = None
         checksum_file_name_to_pass: str | None = self.github_api.checksum_file_name
-        checksum_file_download_url_to_pass: str | None = self.github_api.checksum_file_download_url
+        checksum_file_download_url_to_pass: str | None = (
+            self.github_api.checksum_file_download_url
+        )
 
         if self.github_api.checksum_file_name == "extracted_checksum":
-            self._logger.info("Processing 'extracted_checksum' for %s.", self.github_api.appimage_name)
+            logger.info(
+                "Processing 'extracted_checksum' for %s.", self.github_api.appimage_name
+            )
             # SHAManager should have set extracted_hash_from_body if it successfully parsed one.
             # It also sets checksum_hash_type to "sha256".
             direct_hash_to_pass = self.github_api.extracted_hash_from_body
             if direct_hash_to_pass:
-                self._logger.info(
+                logger.info(
                     "Direct hash found for 'extracted_checksum', will pass to VerificationManager."
                 )
                 # checksum_file_download_url is not needed if direct_hash is used by VerificationManager's "extracted_checksum" path
                 checksum_file_download_url_to_pass = None
             else:
                 # If no direct hash, VerificationManager's "extracted_checksum" will use its legacy path
-                self._logger.info(
+                logger.info(
                     "No direct hash for 'extracted_checksum', VerificationManager will use legacy path."
                 )
 
         # For all other cases (actual SHA file names), direct_hash_to_pass remains None.
         # VerificationManager will download and parse the checksum_file_name file.
 
-        self._logger.info(
+        logger.info(
             "Instantiating VerificationManager for %s with: "
             "checksum_file_name='%s', checksum_hash_type='%s', "
             "direct_hash_provided=%s",
             self.github_api.appimage_name,
             checksum_file_name_to_pass,
             self.github_api.checksum_hash_type,
-            direct_hash_to_pass is not None
+            direct_hash_to_pass is not None,
         )
 
         verifier = VerificationManager(
@@ -501,7 +505,7 @@ class DownloadManager:
 
             # File should be at least 1KB for an AppImage (allow smaller files for testing)
             if file_size < 1024:
-                self._logger.warning("File %s is too small (%s bytes)", file_path, file_size)
+                logger.warning("File %s is too small (%s bytes)", file_path, file_size)
                 return False
 
             # Try to get expected file size from server if possible
@@ -510,7 +514,7 @@ class DownloadManager:
                 if (
                     expected_size > 0 and abs(file_size - expected_size) > 1024
                 ):  # Allow 1KB tolerance
-                    self._logger.warning(
+                    logger.warning(
                         "File size mismatch: expected %s, got %s", expected_size, file_size
                     )
                     return False
@@ -521,7 +525,7 @@ class DownloadManager:
             return True
 
         except Exception as e:
-            self._logger.error("Error verifying existing file %s: %s", file_path, e)
+            logger.error("Error verifying existing file %s: %s", file_path, e)
             return False
 
     def _get_expected_file_size(self) -> int:
@@ -534,7 +538,10 @@ class DownloadManager:
         try:
             headers = {"User-Agent": "AppImage-Updater/1.0"}
             response = requests.head(
-                self.github_api.app_download_url, allow_redirects=True, timeout=10, headers=headers
+                self.github_api.app_download_url,
+                allow_redirects=True,
+                timeout=10,
+                headers=headers,
             )
             response.raise_for_status()
 
@@ -543,7 +550,7 @@ class DownloadManager:
                 return int(content_length)
 
         except Exception as e:
-            self._logger.debug("Could not get expected file size: %s", e)
+            logger.debug("Could not get expected file size: %s", e)
 
         return 0
 
@@ -571,7 +578,10 @@ class DownloadManager:
 
         try:
             # Set up request headers
-            headers = {"User-Agent": "AppImage-Updater/1.0", "Accept": "application/octet-stream"}
+            headers = {
+                "User-Agent": "AppImage-Updater/1.0",
+                "Accept": "application/octet-stream",
+            }
 
             # Create a progress prefix if this is part of a multi-app update
             prefix = f"[{self.app_index}/{self.total_apps}] " if self.total_apps > 0 else ""
@@ -595,7 +605,7 @@ class DownloadManager:
             # Atomically move the completed file to its final location
             os.rename(temp_path, final_path)
 
-            self._logger.info("Successfully downloaded %s to %s", filename, final_path)
+            logger.info("Successfully downloaded %s to %s", filename, final_path)
             return final_path, False
 
         except Exception as e:
@@ -686,7 +696,7 @@ class DownloadManager:
             if os.path.exists(file_path):
                 # File exists, verify it's complete
                 if self._verify_existing_file(file_path):
-                    self._logger.info("Download of %s completed by another process", filename)
+                    logger.info("Download of %s completed by another process", filename)
                     return file_path, True
 
             # Check if lock file still exists (indicating download is still in progress)
@@ -696,8 +706,10 @@ class DownloadManager:
                 break
 
         # Timeout or download failed
-        self._logger.error("Timeout waiting for %s to be downloaded by another process", filename)
-        raise RuntimeError("Timeout waiting for %s to be downloaded by another process" % filename)
+        logger.error("Timeout waiting for %s to be downloaded by another process", filename)
+        raise RuntimeError(
+            "Timeout waiting for %s to be downloaded by another process" % filename
+        )
 
     def _get_download_id(self, file_path: str) -> str:
         """Generate a unique download ID from file path.

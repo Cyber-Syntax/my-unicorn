@@ -26,7 +26,7 @@ DEFAULT_TOKEN_EXPIRATION_DAYS = 90
 MIN_GITHUB_TOKEN_LENGTH = 40
 
 # Try to detect GNOME keyring availability
-GNOME_KEYRING_AVAILABLE = False
+gnome_keyring_available = False
 
 # Try to import keyring and GNOME keyring support
 keyring_module = None
@@ -53,7 +53,7 @@ try:
             bus = dbus.SessionBus()
             # Check if the Secret Service is available on the bus
             if bus.name_has_owner("org.freedesktop.secrets"):
-                GNOME_KEYRING_AVAILABLE = True
+                gnome_keyring_available = True
                 logger.info("Seahorse/GNOME keyring detected")
         except ImportError:
             logger.debug("D-Bus Python module not available, falling back to direct check")
@@ -62,7 +62,7 @@ try:
                 secretservice_backend = SecretService.Keyring()
                 if hasattr(secretservice_backend, "get_preferred_collection"):
                     # Don't call the method, just check if it exists to avoid exceptions
-                    GNOME_KEYRING_AVAILABLE = True
+                    gnome_keyring_available = True
                     logger.info("Seahorse/GNOME keyring detected (fallback method)")
             except (ImportError, AttributeError) as e:
                 logger.debug("Seahorse/GNOME keyring not available: %s", e)
@@ -70,7 +70,7 @@ try:
             logger.debug("Seahorse/GNOME keyring not available: %s", e)
 
         # Configure keyring priority - use GNOME keyring as preferred backend
-        if GNOME_KEYRING_AVAILABLE:
+        if gnome_keyring_available:
             try:
                 # Different keyring versions use different methods
                 if hasattr(keyring, "set_preferred_backend"):
@@ -91,7 +91,7 @@ try:
 
 except ImportError as e:
     logger.warning("Keyring module not available in current Python path: %s", e)
-    GNOME_KEYRING_AVAILABLE = False
+    gnome_keyring_available = False
 
 
 class SecureTokenManager:
@@ -121,7 +121,7 @@ class SecureTokenManager:
         metadata = {}
 
         # Try GNOME keyring
-        if GNOME_KEYRING_AVAILABLE and keyring_module:
+        if gnome_keyring_available and keyring_module:
             try:
                 token = keyring_module.get_password(SERVICE_NAME, USERNAME)
                 if token:
@@ -181,7 +181,7 @@ class SecureTokenManager:
         metadata["last_used_at"] = int(time.time())
 
         # Save updated metadata to GNOME keyring
-        if GNOME_KEYRING_AVAILABLE and keyring_module:
+        if gnome_keyring_available and keyring_module:
             try:
                 keyring_module.set_password(
                     f"{SERVICE_NAME}_metadata", USERNAME, json.dumps(metadata)
@@ -200,7 +200,7 @@ class SecureTokenManager:
         metadata = {}
 
         # Try GNOME keyring
-        if GNOME_KEYRING_AVAILABLE and keyring_module:
+        if gnome_keyring_available and keyring_module:
             try:
                 metadata_str = keyring_module.get_password(f"{SERVICE_NAME}_metadata", USERNAME)
                 if metadata_str:
@@ -275,7 +275,7 @@ class SecureTokenManager:
         success = False
 
         # Remove from GNOME keyring if available
-        if GNOME_KEYRING_AVAILABLE and keyring_module:
+        if gnome_keyring_available and keyring_module:
             try:
                 keyring_module.delete_password(SERVICE_NAME, USERNAME)
                 # Also try to remove metadata
@@ -298,7 +298,7 @@ class SecureTokenManager:
 
         """
         # Check GNOME keyring
-        if GNOME_KEYRING_AVAILABLE and keyring_module:
+        if gnome_keyring_available and keyring_module:
             try:
                 token = keyring_module.get_password(SERVICE_NAME, USERNAME)
                 if token:
@@ -317,7 +317,7 @@ class SecureTokenManager:
 
         """
         return {
-            "gnome_keyring_available": GNOME_KEYRING_AVAILABLE,
+            "gnome_keyring_available": gnome_keyring_available,
         }
 
     @staticmethod
@@ -440,7 +440,7 @@ class SecureTokenManager:
         metadata = SecureTokenManager._create_token_metadata(token, expires_in_days)
 
         # Save to GNOME keyring
-        if GNOME_KEYRING_AVAILABLE and keyring_module:
+        if gnome_keyring_available and keyring_module:
             try:
                 # Store token
                 keyring_module.set_password(SERVICE_NAME, USERNAME, token)

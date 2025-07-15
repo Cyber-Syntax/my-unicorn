@@ -220,17 +220,9 @@ classDiagram
 
     class Downloader {
         <<src/download.py>>
-        -progress_manager: ProgressManager
         +download_file(url, dest_path, expected_size=None): bool
     }
     Downloader o-- ProgressManager
-
-    class ProgressManager {
-        <<src/progress_manager.py>>
-        +start_download(filename, total_size)
-        +update_progress(chunk_size)
-        +finish_download()
-    }
 
     namespace Verification {
         class VerificationManager {
@@ -248,10 +240,7 @@ classDiagram
             <<src/utils/checksums/parser.py>>
             +parse_checksum_file_content(content, filename_to_match, checksum_hash_type): str
         }
-        class ChecksumExtractor {
-            <<src/utils/checksums/extractor.py>>
-            +extract_from_text(text, filename): str
-        }
+
     }
     Verification.VerificationManager o-- Verification.ChecksumVerification
     Verification.VerificationManager o-- Verification.ChecksumParser

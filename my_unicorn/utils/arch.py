@@ -9,9 +9,87 @@ This module provides utilities for:
 
 import logging
 import platform
+import re
 
 logger = logging.getLogger(__name__)
 
+# Constants for architecture identification
+# TODO: Make sure these architecture keywords are correct
+# Stop 32-bit support for now
+ARCH_KEYWORDS = {
+    "x86_64": ["x86_64", "amd64", "x86-64", "x64"],
+    "aarch64": ["aarch64", "arm64", "armv8"],
+    "armhf": ["armhf", "arm32", "armv7"],
+    "i686": ["i686", "x86", "i386"],
+}
+
+ARCH_PATTERNS = [
+    (r"(-arm64[^.]*\.appimage)$", "arm64"),
+    (r"(-aarch64[^.]*\.appimage)$", "aarch64"),
+    (r"(-amd64[^.]*\.appimage)$", "amd64"),
+    (r"(-x86_64[^.]*\.appimage)$", "x86_64"),
+    (r"(-x86[^.]*\.appimage)$", "x86"),
+    (r"(-i686[^.]*\.appimage)$", "i686"),
+    (r"(-i386[^.]*\.appimage)$", "i386"),
+    (r"(-linux(?:64)?\.appimage)$", "linux"),
+]
+
+ALL_ARCH_MARKERS = [
+    "arm64",
+    "aarch64",
+    "armhf",
+    "arm32",
+    "armv7",
+    "armv8",
+    "x86_64",
+    "amd64",
+    "x86-64",
+    "x64",
+    "i686",
+    "x86",
+    "i386",
+]
+
+
+def extract_arch_from_filename(filename: str) -> str | None:
+    """Extract architecture keyword from an AppImage filename.
+    Iterates through known architecture keywords and their markers.
+    Uses regex to ensure the marker is a distinct word or segment in the filename.
+
+    Args:
+        filename: The AppImage filename to extract from
+
+    Returns:
+        str | None: The extracted canonical architecture keyword (e.g., "x86_64") or None
+
+    """
+    if not filename:
+        return None
+
+    lower_name = filename.lower()
+
+    # Iterate through canonical keywords (x86_64, aarch64, etc.)
+    # and their associated markers (amd64, x86-64, arm64, etc.)
+    # The order in ARCH_KEYWORDS might matter if markers are ambiguous (e.g., "arm" vs "arm64")
+    # More specific markers should ideally be checked first or be distinct enough.
+    for canonical_arch, markers in ARCH_KEYWORDS.items():
+        for marker in markers:
+            # Regex to find the marker as a whole word or delimited by common separators.
+            # This helps avoid matching "arm" in "alarm" or "x86" in "someapp-x8600.AppImage".
+            # Pattern: (non-alphanumeric OR start of string) + marker + (non-alphanumeric OR end of string OR .appimage)
+            # Using word boundaries \b might be too restrictive if markers are like "x86-64".
+            # Using lookarounds for more precise matching:
+            # (?<=^|[\W_]) ensures start of string or non-word char before.
+            # (?=$|[\W_]|\.appimage) ensures end of string, non-word char, or .appimage after.
+            # Simpler regex: look for marker surrounded by non-alphanumeric chars or start/end of string.
+            # The re.escape(marker) is important if markers contain special regex characters.
+            pattern = re.compile(
+                rf"(?:^|[^a-zA-Z0-9])({re.escape(marker)})(?:$|[^a-zA-Z0-9])", re.IGNORECASE
+            )
+            if pattern.search(lower_name):
+                return canonical_arch  # Return the canonical keyword
+
+    return None  # No specific architecture keyword found
 
 def get_current_arch() -> str:
     """Get current system CPU architecture.

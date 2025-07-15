@@ -9,7 +9,6 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Self
 
 
 # Supported hash types
@@ -70,7 +69,6 @@ class VerificationConfig:
         from my_unicorn.global_config import GlobalConfigManager
 
         downloads_dir = GlobalConfigManager().expanded_app_download_path
-        sha_basename = Path(self.checksum_file_name).name
         sha_stem = Path(self.checksum_file_name).stem
         sha_suffix = Path(self.checksum_file_name).suffix
         app_specific_checksum_file_name = f"{self.appimage_name}_{sha_stem}{sha_suffix}"

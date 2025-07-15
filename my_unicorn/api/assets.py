@@ -5,8 +5,23 @@ This module defines data structures for GitHub release assets.
 """
 
 from dataclasses import dataclass
+from typing import NotRequired, TypedDict
 
-from my_unicorn.utils import arch_utils
+from my_unicorn.utils import arch
+
+
+@dataclass
+class github_asset(TypedDict):
+    """GitHub API asset information dictionary.
+
+    This make sure that the release information is come with correct types and values.
+    """
+
+    name: str
+    browser_download_url: str
+    size: int
+    content_type: NotRequired[str]
+
 
 @dataclass
 class AppImageAsset:
@@ -18,7 +33,7 @@ class AppImageAsset:
     content_type: str | None = None
 
     @classmethod
-    def from_github_asset(cls, asset: dict[str, str]) -> "AppImageAsset":
+    def from_github_asset(cls, asset: github_asset) -> "AppImageAsset":
         """Create an AppImageAsset from a GitHub API asset dictionary.
 
         Args:
@@ -31,7 +46,7 @@ class AppImageAsset:
         return cls(
             name=asset["name"],
             browser_download_url=asset["browser_download_url"],
-            size=asset.get("size"),
+            size=asset.get("size", 0),
             content_type=asset.get("content_type"),
         )
 
@@ -45,7 +60,9 @@ class SHAAsset:
     checksum_hash_type: str
 
     @classmethod
-    def from_github_asset(cls, asset: dict[str, str], checksum_hash_type: str = "sha256") -> "SHAAsset":
+    def from_github_asset(
+        cls, asset: dict[str, str], checksum_hash_type: str = "sha256"
+    ) -> "SHAAsset":
         """Create a SHAAsset from a GitHub API asset dictionary.
 
         Args:
@@ -79,12 +96,25 @@ class ArchitectureInfo:
             ArchitectureInfo: New ArchitectureInfo instance for current system
 
         """
-        current_arch = arch_utils.get_current_arch()
+        current_arch = arch.get_current_arch()
         return cls(
             name=current_arch,
-            keywords=arch_utils.get_compatible_arch_strings(current_arch),
-            incompatible_archs=arch_utils.get_incompatible_archs(current_arch),
+            keywords=arch.get_compatible_arch_strings(current_arch),
+            incompatible_archs=arch.get_incompatible_archs(current_arch),
         )
+
+
+@dataclass
+class ReleaseData(TypedDict):
+    """GitHub API release information dictionary.
+
+    This make sure that the release information is come with correct types and values.
+    """
+
+    prerelease: bool
+    release_notes: NotRequired[str]
+    release_url: NotRequired[str]
+    published_at: NotRequired[str]
 
 
 @dataclass
@@ -100,15 +130,17 @@ class ReleaseInfo:
     checksum_file_download_url: str | None = None
     checksum_hash_type: str | None = None
     arch_keyword: str | None = None
-    release_notes: str | None = None
-    release_url: str | None = None
-    prerelease: bool = False
-    published_at: str | None = None
     extracted_hash_from_body: str | None = None
     asset_digest: str | None = None
+    prerelease: bool = False
+    release_notes: str | None = None
+    release_url: str | None = None
+    published_at: str | None = None
 
     @classmethod
-    def from_release_data(cls, release_data: dict[str, str], asset_info: dict[str, str]) -> "ReleaseInfo":
+    def from_release_data(
+        cls, release_data: ReleaseData, asset_info: dict[str, str]
+    ) -> "ReleaseInfo":
         """Create a ReleaseInfo from GitHub release data and processed asset information.
 
         Args:
@@ -119,7 +151,6 @@ class ReleaseInfo:
             ReleaseInfo: New ReleaseInfo instance
 
         """
-
         return cls(
             owner=asset_info["owner"],
             repo=asset_info["repo"],

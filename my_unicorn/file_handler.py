@@ -13,6 +13,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from my_unicorn.global_config import GlobalConfigManager
+
 # Local imports
 from my_unicorn.icon_manager import IconManager
 from my_unicorn.utils.desktop_entry import DesktopEntryManager
@@ -79,10 +81,6 @@ class FileHandler:
         if not self.app_rename:
             self.app_rename = self.repo
 
-        # Ensure app_rename is never None after initialization
-        if self.app_rename is None:
-            self.app_rename = self.repo
-
         # Convert paths to Path objects
         if self.app_storage_path and isinstance(self.app_storage_path, str):
             self.app_storage_path = Path(self.app_storage_path)
@@ -98,7 +96,6 @@ class FileHandler:
             Path: Full path to the downloaded AppImage
 
         """
-        from my_unicorn.global_config import GlobalConfigManager
 
         downloads_dir = Path(GlobalConfigManager().expanded_app_download_path)
         return downloads_dir / self.appimage_name

@@ -10,7 +10,7 @@ import re  # For hash validation
 from pathlib import Path
 
 from my_unicorn.api.sha_asset_finder import SHAAssetFinder
-from my_unicorn.utils import sha_utils, ui_utils
+from my_unicorn.utils import ui_utils
 
 logger = logging.getLogger(__name__)
 
@@ -184,6 +184,28 @@ class SHAManager:
         logger.warning(f"No automatic verification method found for {self.appimage_name}")
         self._handle_sha_fallback(assets)
 
+    def detect_checksum_hash_type(self, checksum_file_name: str) -> str:
+        """Detect hash type from SHA filename.
+    
+        Args:
+            checksum_file_name: SHA filename
+    
+        Returns:
+            str: Detected hash type ('sha256', 'sha512', etc.)
+        """
+        name_lower = checksum_file_name.lower()
+    
+        if "sha256" in name_lower:
+            return "sha256"
+        elif "sha512" in name_lower:
+            return "sha512"
+        elif name_lower.endswith((".yml", ".yaml")):
+            # Default for YAML files
+            return "sha512"
+    
+        # Default fallback
+        return "sha256"
+    
     def _select_sha_asset(self, asset: dict) -> None:
         """Select a SHA asset and set instance attributes.
 
@@ -191,7 +213,7 @@ class SHAManager:
             asset: GitHub API asset information dictionary
 
         """
-        detected_checksum_hash_type = sha_utils.detect_checksum_hash_type(asset["name"])
+        detected_checksum_hash_type = self.detect_checksum_hash_type(asset["name"])
         self.checksum_hash_type = detected_checksum_hash_type or "sha256"
         self.checksum_file_name = asset["name"]
         self.checksum_file_download_url = asset["browser_download_url"]

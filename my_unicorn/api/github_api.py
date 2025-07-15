@@ -12,7 +12,7 @@ from typing import Any
 from my_unicorn.auth_manager import GitHubAuthManager
 from my_unicorn.catalog import AppInfo, find_app_by_owner_repo, load_app_definition
 from my_unicorn.icon_manager import IconManager
-from my_unicorn.utils.arch_extraction import extract_arch_from_filename
+from my_unicorn.utils.arch import extract_arch_from_filename
 from my_unicorn.utils.version_utils import extract_version, extract_version_from_filename
 
 from .assets import AppImageAsset, ReleaseInfo

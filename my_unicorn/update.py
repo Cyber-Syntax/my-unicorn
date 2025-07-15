@@ -100,7 +100,7 @@ def display_current_version() -> None:
 
 
 # NOTE: This need to be changed when we switch to a stable release
-def get_latest_release_info() -> dict | None:
+def get_latest_release_info() -> dict[str, str] | None:
     """Get the latest release information from GitHub API.
 
     Since this project uses pre-releases (alpha/beta), we get all releases
@@ -230,9 +230,9 @@ def check_for_update() -> bool:
 
 
 def perform_update() -> bool:
-    """Update by doing a fresh git clone into INSTALL_DIR/source,
-    copying only the package and scripts over, then invoking
-    the installer script in update mode.
+    """Update by doing a fresh git clone into INSTALL_DIR/source.
+    
+    Copies my_unicorn, scripts folders, and pyproject.toml, my-unicorn-installer.sh
     """
     source_dir = INSTALL_DIR / "source"
     installer = INSTALL_DIR / "my-unicorn-installer.sh"

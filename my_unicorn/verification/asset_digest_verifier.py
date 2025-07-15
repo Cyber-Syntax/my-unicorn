@@ -8,7 +8,6 @@ file verification to ensure data integrity.
 import hashlib
 import logging
 import os
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 from my_unicorn.verification.hash_calculator import HashCalculator

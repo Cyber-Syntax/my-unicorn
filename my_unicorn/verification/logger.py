@@ -6,7 +6,6 @@ for verification operations, including status messages and comparison results.
 
 import gettext
 import logging
-from typing import Any
 
 _ = gettext.gettext
 

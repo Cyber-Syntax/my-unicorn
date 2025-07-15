@@ -26,10 +26,6 @@ class GlobalConfigManager:
         os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
         self.load_config()
 
-    def expanded_path(self, path):
-        """Expand and return a user path."""
-        return os.path.expanduser(path)
-
     def reload(self):
         """Explicitly reload configuration from disk.
 
