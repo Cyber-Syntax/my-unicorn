@@ -16,11 +16,11 @@ venv_bin_dir="$install_dir/venv/bin"
 
 # Check if installation exists
 if [[ ! -d "$install_dir" ]]; then
-  err_exit "my-unicorn not found at $install_dir. Run setup.sh first."
+  err_exit "my-unicorn not found at $install_dir. Run my-unicorn-installer.sh first."
 fi
 
 if [[ ! -d "$venv_bin_dir" ]]; then
-  err_exit "Virtual environment not found at $venv_bin_dir. Run setup.sh first."
+  err_exit "Virtual environment not found at $venv_bin_dir. Run my-unicorn-installer.sh first."
 fi
 
 # Load python virtual environment
