@@ -590,43 +590,9 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                     print("\nCleanup cancelled.")
 
             # Display updated rate limit information after updates
-            self._display_rate_limit_info()
+            self.display_rate_limit_info()
 
         except KeyboardInterrupt:
             print("\nUpdate process cancelled by user (Ctrl+C)")
         except Exception as e:
             print(f"\nError in update process: {e!s}")
-
-    def _display_rate_limit_info(self) -> None:
-        """Display GitHub API rate limit information after updates using standard print statements."""
-        try:
-            # Use the cached rate limit info to avoid unnecessary API calls
-            raw_remaining, raw_limit, reset_time, is_authenticated = (
-                GitHubAuthManager.get_rate_limit_info()
-            )
-            try:
-                remaining = int(raw_remaining)
-                limit = int(raw_limit)
-            except (ValueError, TypeError):
-                return
-
-            print("\n--- GitHub API Rate Limits ---")
-            print(
-                f"Remaining requests: {remaining}/{limit} ({'authenticated' if is_authenticated else 'unauthenticated'})"
-            )
-
-            if reset_time:
-                print(f"Resets at: {reset_time}")
-
-            if remaining < (100 if is_authenticated else 20):
-                if remaining < 100 and is_authenticated:
-                    print("⚠️ Running low on API requests!")
-                elif remaining < 20 and not is_authenticated:
-                    print("⚠️ Low on unauthenticated requests!")
-                    print("Tip: Add a GitHub token to increase rate limits (5000/hour).")
-
-            print("Note: Rate limit information is an estimate based on usage since last refresh.")
-
-        except Exception:
-            # Silently handle any errors to avoid breaking update completion
-            pass

@@ -666,17 +666,6 @@ class BaseUpdateCommand(Command):
             print("\nRetry cancelled by user (Ctrl+C)")
             return False
 
-    def _display_update_list(self, updatable_apps: list[dict[str, Any]]) -> None:
-        """Display list of apps to update."""
-        print(f"\nFound {len(updatable_apps)} apps to update:")
-        for idx, app in enumerate(updatable_apps, start=1):
-            self._logger.info(
-                "%d. %s (%s → %s)",
-                idx, app["name"], app["current"], app["latest"]
-            )
-            update_msg = f"{idx}. {app['name']} ({app['current']} → {app['latest']})"
-            print(update_msg)
-
     def _check_single_app_version(
         self, app_config: AppConfigManager, config_file: str
     ) -> dict[str, Any] | bool:
@@ -800,7 +789,7 @@ class BaseUpdateCommand(Command):
             message = f"Error checking rate limits: {e}. Proceeding with caution."
             return True, apps_to_update, message
 
-    def _display_rate_limit_info(self) -> None:
+    def display_rate_limit_info(self) -> None:
         """Display current GitHub API rate limit information."""
         try:
             remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()

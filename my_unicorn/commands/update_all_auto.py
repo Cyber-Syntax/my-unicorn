@@ -364,7 +364,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                 print("\nCleanup cancelled.")
 
         # Display updated rate limit information after updates
-        self._display_rate_limit_info()
+        self.display_rate_limit_info()
 
     def _update_apps(self, apps_to_update: list[dict[str, Any]]) -> None:
         """Update multiple apps synchronously.
@@ -397,59 +397,15 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         print("\nUpdate process completed!")
 
         # Display updated rate limit information after updates
-        self._display_rate_limit_info()
+        self.display_rate_limit_info()
 
     def _display_update_list(self, updatable_apps: list[dict[str, Any]]) -> None:
-        """Display a list of updatable apps with standard print statements.
-
-        Args:
-            updatable_apps: list of updatable app information dictionaries
-
-        """
+        """Display list of apps to update."""
         print(f"\nFound {len(updatable_apps)} apps to update:")
-        print("-" * 60)
-        print("# | App                  | Current      | Latest")
-        print("-" * 60)
-
-        for idx, app in enumerate(updatable_apps, 1):
-            print(f"{idx:<2}| {app['name']:<20} | {app['current']:<12} | {app['latest']}")
-
-        print("-" * 60)
-
-    def _display_rate_limit_info(self) -> None:
-        """Display GitHub API rate limit information after updates using standard print."""
-        try:
-            # Use the cached rate limit info to avoid unnecessary API calls
-            raw_remaining, raw_limit, reset_time, is_authenticated = (
-                GitHubAuthManager.get_rate_limit_info()
+        for idx, app in enumerate(updatable_apps, start=1):
+            self._logger.info(
+                "%d. %s (%s → %s)",
+                idx, app["name"], app["current"], app["latest"]
             )
-
-            # Convert to integers as the API sometimes returns strings
-            try:
-                remaining = int(raw_remaining)
-                limit = int(raw_limit)
-            except (ValueError, TypeError):
-                return
-
-            print("\n--- GitHub API Rate Limits ---")
-            auth_status = "authenticated" if is_authenticated else "unauthenticated"
-            print(f"Remaining requests: {remaining}/{limit} ({auth_status})")
-
-            if reset_time:
-                print(f"Resets at: {reset_time}")
-
-            threshold = (
-                LOW_AUTHENTICATED_THRESHOLD if is_authenticated else LOW_UNAUTHENTICATED_THRESHOLD
-            )
-            if remaining < threshold:
-                if remaining < LOW_AUTHENTICATED_THRESHOLD and is_authenticated:
-                    print("⚠️ Running low on API requests!")
-                elif remaining < LOW_UNAUTHENTICATED_THRESHOLD and not is_authenticated:
-                    print("⚠️ Low on unauthenticated requests!")
-                    print("Tip: Add a GitHub token to increase rate limits (5000/hour).")
-
-            print("Note: Rate limit information is an estimate based on usage since last refresh.")
-
-        except Exception as e:
-            # Silently handle any errors to avoid breaking update completion
-            logger.debug("Error displaying rate limit info: %s", e)
+            update_msg = f"{idx}. {app['name']} ({app['current']} → {app['latest']})"
+            print(update_msg)
