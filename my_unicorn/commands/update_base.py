@@ -22,6 +22,7 @@ from my_unicorn.download import DownloadManager
 from my_unicorn.file_handler import FileHandler
 from my_unicorn.global_config import GlobalConfigManager
 from my_unicorn.verify import VerificationManager
+from my_unicorn.utils import ui_utils
 
 
 class BaseUpdateCommand(Command):
@@ -721,7 +722,14 @@ class BaseUpdateCommand(Command):
                 message = "Rate limit status: {}/{} requests remaining. Sufficient for all {} apps.".format(remaining, limit, len(apps))
                 self._logger.info(message)
                 return True, apps, message
-    
+
+            # Handle the case where we have 0 remaining requests
+            if remaining == 0:
+                print("\n❌ ERROR: No API requests available.")
+                print("Please wait until rate limits reset or add a GitHub token.")
+                self._logger.error("Update aborted: No API requests available (0 remaining)")
+                return
+
             # Show a warning if rate limits are low but don't prevent user from proceeding
             if remaining < 10:  # Now an int comparison
                 print("\n--- GitHub API Rate Limit Warning ---")
@@ -803,3 +811,122 @@ class BaseUpdateCommand(Command):
         except Exception as e:
             self._logger.error("Error displaying rate limit info: %s", e)
             print(f"Error retrieving rate limit information: {e}")
+
+    def display_async_results(
+            self,
+            success_count: int,
+            failure_count: int,
+            results: dict[str, dict[str, Any]],
+            total_apps: int,
+        ) -> None:
+            """Display the results of async update operation.
+    
+            Args:
+                success_count: Number of successful updates
+                failure_count: Number of failed updates
+                results: Dictionary mapping app names to their result data
+                total_apps: Total number of apps processed
+    
+            """
+            print("\n=== Update Summary ===")
+            print(f"Total apps processed: {success_count + failure_count}/{total_apps}")
+            print(f"Successfully updated: {success_count}")
+    
+            # Show detailed messages for successful updates
+            if success_count > 0:
+                print("\nSuccessful updates:")
+                for app_name, result in results.items():
+                    if result.get("status") == "success":
+                        # Show download message
+                        download_msg = result.get("download_message", "")
+                        if download_msg:
+                            print(f"  {download_msg}")
+    
+                        # Show verification message
+                        verification_msg = result.get("verification_message", "")
+                        if verification_msg:
+                            print(f"  {verification_msg}")
+    
+                        # Show success message
+                        success_msg = result.get("success_message", "")
+                        if success_msg:
+                            print(f"  {success_msg}")
+                        elif result.get("message"):
+                            print(f"  ✓ {app_name} - {result.get('message')}")
+    
+            if failure_count > 0:
+                print(f"\nFailed updates: {failure_count}")
+    
+                # list failed updates
+                for app_name, result in results.items():
+                    if result.get("status") != "success":
+                        message = result.get("message", "Unknown error")
+                        elapsed = result.get("elapsed", 0)
+                        print(f"  ✗ {app_name}: {message} ({elapsed:.1f}s)")
+    
+            print("\nUpdate process completed!")
+    
+            # Prompt to remove downloaded files for failed updates in batch
+            if failure_count > 0:
+                failed_apps = [name for name, res in results.items() if res.get("status") != "success"]
+    
+                from my_unicorn.utils.cleanup_utils import cleanup_batch_failed_updates
+    
+                try:
+                    # Use the unified batch cleanup function
+                    cleanup_batch_failed_updates(
+                        failed_apps=failed_apps, results=results, ask_confirmation=True, verbose=True
+                    )
+                except KeyboardInterrupt:
+                    print("\nCleanup cancelled.")
+    
+            # Display updated rate limit information after updates
+            self.display_rate_limit_info()
+            
+    def update_apps_async_wrapper(self, apps_to_update: list[dict[str, Any]]) -> None:
+        """Wrap the async update method to call it from a synchronous context.
+
+        Args:
+            apps_to_update: list of app information dictionaries to update
+
+        """
+        try:
+            # Create a new event loop if needed
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            print(
+                f"\nStarting asynchronous update of {len(apps_to_update)} AppImages "
+                f"(max {self.max_concurrent_updates} concurrent)..."
+            )
+            self._logger.info(
+                "Starting asynchronous update of %d AppImages with concurrency limit %d",
+                len(apps_to_update),
+                self.max_concurrent_updates,
+            )
+            # set the main event loop in ui_utils
+            ui_utils.set_main_event_loop(loop)
+
+            # Initialize progress manager for all downloads
+            DownloadManager.get_or_create_progress(len(apps_to_update))
+
+            # Run the async function using the base class method
+            success_count, failure_count, results = loop.run_until_complete(
+                self._update_apps_async(apps_to_update)
+            )
+
+            # Clean up progress manager after all downloads complete
+            DownloadManager.stop_progress()
+
+            # Display results
+            self.display_async_results(success_count, failure_count, results, len(apps_to_update))
+
+        except KeyboardInterrupt:
+            self._logger.info("Update process cancelled by user (Ctrl+C)")
+            print("\nUpdate process cancelled by user (Ctrl+C)")
+        except Exception as e:
+            self._logger.error("Error in async update process: %s", str(e), exc_info=True)
+            print(f"\nError in update process: {e!s}")           
