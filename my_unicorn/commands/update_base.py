@@ -723,13 +723,6 @@ class BaseUpdateCommand(Command):
                 self._logger.info(message)
                 return True, apps, message
 
-            # Handle the case where we have 0 remaining requests
-            if remaining == 0:
-                print("\n❌ ERROR: No API requests available.")
-                print("Please wait until rate limits reset or add a GitHub token.")
-                self._logger.error("Update aborted: No API requests available (0 remaining)")
-                return
-
             # Show a warning if rate limits are low but don't prevent user from proceeding
             if remaining < 10:  # Now an int comparison
                 print("\n--- GitHub API Rate Limit Warning ---")
