@@ -3,7 +3,7 @@
 """
 Tests for the update_all_auto command module.
 
-This module contains tests for the UpdateAllAutoCommand class,
+This module contains tests for the AutoUpdateCommand class,
 which handles automatic checking and updating of all AppImages.
 """
 
@@ -17,23 +17,23 @@ from unittest.mock import patch, MagicMock, call, PropertyMock
 import pytest
 import pytest_asyncio
 
-from my_unicorn.commands.update_all_auto import UpdateAllAutoCommand
+from my_unicorn.commands.update_all_auto import AutoUpdateCommand
 from my_unicorn.auth_manager import GitHubAuthManager
 from my_unicorn.app_config import AppConfigManager
 from my_unicorn.global_config import GlobalConfigManager
 
 
-class TestUpdateAllAutoCommand:
-    """Test suite for the UpdateAllAutoCommand class."""
+class TestAutoUpdateCommand:
+    """Test suite for the AutoUpdateCommand class."""
 
     @pytest.fixture
-    def command(self) -> UpdateAllAutoCommand:
-        """Create an instance of UpdateAllAutoCommand for testing.
+    def command(self) -> AutoUpdateCommand:
+        """Create an instance of AutoUpdateCommand for testing.
 
         Returns:
-            UpdateAllAutoCommand: An instance of the command class
+            AutoUpdateCommand: An instance of the command class
         """
-        cmd = UpdateAllAutoCommand()
+        cmd = AutoUpdateCommand()
         # Setup basic mocks for command dependencies
         cmd.app_config = MagicMock(spec=AppConfigManager)
         cmd.global_config = MagicMock(spec=GlobalConfigManager)
@@ -116,14 +116,14 @@ class TestUpdateAllAutoCommand:
         self,
         mock_auth_manager: MagicMock,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
     ) -> None:
         """Test execute method when no AppImage configuration files exist.
 
         Args:
             mock_auth_manager: Mocked GitHubAuthManager
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
         """
         # Setup
         mock_auth_manager.get_rate_limit_info.return_value = (
@@ -148,14 +148,14 @@ class TestUpdateAllAutoCommand:
         self,
         mock_auth_manager: MagicMock,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
     ) -> None:
         """Test execute method when there are insufficient GitHub API rate limits.
 
         Args:
             mock_auth_manager: Mocked GitHubAuthManager
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
         """
         # Setup
         command._list_all_config_files = MagicMock(
@@ -179,14 +179,14 @@ class TestUpdateAllAutoCommand:
         self,
         mock_auth_manager: MagicMock,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
     ) -> None:
         """Test execute method when all apps are up to date.
 
         Args:
             mock_auth_manager: Mocked GitHubAuthManager
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
         """
         # Setup
         mock_auth_manager.get_rate_limit_info.return_value = (
@@ -211,7 +211,7 @@ class TestUpdateAllAutoCommand:
         self,
         mock_auth_manager: MagicMock,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
         updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test execute method in batch mode with updates available.
@@ -219,7 +219,7 @@ class TestUpdateAllAutoCommand:
         Args:
             mock_auth_manager: Mocked GitHubAuthManager
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
             updatable_apps: Sample updatable apps data
         """
         # Setup
@@ -250,7 +250,7 @@ class TestUpdateAllAutoCommand:
         self,
         mock_auth_manager: MagicMock,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
         updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test execute method in interactive mode with updates available.
@@ -258,7 +258,7 @@ class TestUpdateAllAutoCommand:
         Args:
             mock_auth_manager: Mocked GitHubAuthManager
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
             updatable_apps: Sample updatable apps data
         """
         # Setup
@@ -287,14 +287,14 @@ class TestUpdateAllAutoCommand:
         self,
         mock_auth_manager: MagicMock,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
     ) -> None:
         """Test execute method when interrupted by KeyboardInterrupt.
 
         Args:
             mock_auth_manager: Mocked GitHubAuthManager
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
         """
         # Setup
         mock_auth_manager.get_rate_limit_info.return_value = (
@@ -315,13 +315,13 @@ class TestUpdateAllAutoCommand:
 
     @patch("sys.stdout", new_callable=io.StringIO)
     def test_find_all_updatable_apps(
-        self, mock_stdout: io.StringIO, command: UpdateAllAutoCommand
+        self, mock_stdout: io.StringIO, command: AutoUpdateCommand
     ) -> None:
         """Test _find_all_updatable_apps method to find apps with updates available.
 
         Args:
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
         """
         # Setup
         app_data = {"name": "app1", "current": "1.0.0", "latest": "2.0.0"}
@@ -342,13 +342,13 @@ class TestUpdateAllAutoCommand:
 
     @patch("sys.stdout", new_callable=io.StringIO)
     def test_find_all_updatable_apps_no_configs(
-        self, mock_stdout: io.StringIO, command: UpdateAllAutoCommand
+        self, mock_stdout: io.StringIO, command: AutoUpdateCommand
     ) -> None:
         """Test _find_all_updatable_apps when no config files exist.
 
         Args:
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
         """
         # Setup
         command._list_all_config_files = MagicMock(return_value=[])
@@ -363,13 +363,13 @@ class TestUpdateAllAutoCommand:
 
     @patch("sys.stdout", new_callable=io.StringIO)
     def test_find_all_updatable_apps_error(
-        self, mock_stdout: io.StringIO, command: UpdateAllAutoCommand
+        self, mock_stdout: io.StringIO, command: AutoUpdateCommand
     ) -> None:
         """Test _find_all_updatable_apps handling errors during check.
 
         Args:
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
         """
         # Setup
         command._list_all_config_files = MagicMock(return_value=["app1.json"])
@@ -389,7 +389,7 @@ class TestUpdateAllAutoCommand:
         self,
         mock_input: MagicMock,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
         updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _handle_interactive_update when user cancels.
@@ -397,7 +397,7 @@ class TestUpdateAllAutoCommand:
         Args:
             mock_input: Mocked input function
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
             updatable_apps: Sample updatable apps data
         """
         # Execute
@@ -414,7 +414,7 @@ class TestUpdateAllAutoCommand:
         self,
         mock_input: MagicMock,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
         updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _handle_interactive_update when user selects all apps.
@@ -422,7 +422,7 @@ class TestUpdateAllAutoCommand:
         Args:
             mock_input: Mocked input function
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
             updatable_apps: Sample updatable apps data
         """
         # Setup
@@ -446,7 +446,7 @@ class TestUpdateAllAutoCommand:
         self,
         mock_input: MagicMock,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
         updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _handle_interactive_update when user selects specific apps.
@@ -454,7 +454,7 @@ class TestUpdateAllAutoCommand:
         Args:
             mock_input: Mocked input function
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
             updatable_apps: Sample updatable apps data
         """
         # Setup
@@ -486,7 +486,7 @@ class TestUpdateAllAutoCommand:
         self,
         mock_input: MagicMock,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
         updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _handle_interactive_update with invalid user input.
@@ -494,7 +494,7 @@ class TestUpdateAllAutoCommand:
         Args:
             mock_input: Mocked input function
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
             updatable_apps: Sample updatable apps data
         """
         # Execute
@@ -511,7 +511,7 @@ class TestUpdateAllAutoCommand:
         self,
         mock_input: MagicMock,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
         updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _handle_interactive_update with out-of-range indices.
@@ -519,7 +519,7 @@ class TestUpdateAllAutoCommand:
         Args:
             mock_input: Mocked input function
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
             updatable_apps: Sample updatable apps data
         """
         # Execute
@@ -534,14 +534,14 @@ class TestUpdateAllAutoCommand:
     def test_update_apps_async_wrapper(
         self,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
         updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _update_apps_async_wrapper for async updates.
 
         Args:
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
             updatable_apps: Sample updatable apps data
         """
         # Setup
@@ -575,14 +575,14 @@ class TestUpdateAllAutoCommand:
     def test_display_update_list(
         self,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
         updatable_apps: list[tuple[str, Any]],
     ) -> None:
         """Test _display_update_list method shows apps correctly.
 
         Args:
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
             updatable_apps: Sample updatable apps data
         """
         # Execute
@@ -604,7 +604,7 @@ class TestUpdateAllAutoCommand:
         self,
         mock_auth_manager: MagicMock,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
         mock_rate_limit_info: tuple,
     ) -> None:
         """Test _display_rate_limit_info shows rate limit info.
@@ -612,7 +612,7 @@ class TestUpdateAllAutoCommand:
         Args:
             mock_auth_manager: Mocked GitHubAuthManager
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
             mock_rate_limit_info: Mock rate limit data
         """
         # Setup
@@ -633,14 +633,14 @@ class TestUpdateAllAutoCommand:
         self,
         mock_auth_manager: MagicMock,
         mock_stdout: io.StringIO,
-        command: UpdateAllAutoCommand,
+        command: AutoUpdateCommand,
     ) -> None:
         """Test _display_rate_limit_info shows warning when low on requests.
 
         Args:
             mock_auth_manager: Mocked GitHubAuthManager
             mock_stdout: Captured stdout
-            command: Instance of UpdateAllAutoCommand
+            command: Instance of AutoUpdateCommand
         """
         # Setup
         mock_auth_manager.get_rate_limit_info.return_value = (50, 5000, "2025-04-27 10:00:00", True)

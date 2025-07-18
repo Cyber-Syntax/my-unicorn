@@ -24,6 +24,26 @@ from .sha_manager import SHAManager
 logger = logging.getLogger(__name__)
 
 
+def handle_zen_browser_version(
+    raw_tag: str, normalized_version: str, owner: str, repo: str
+) -> str:
+    """Handle zen-browser's special version format (X.Y.Z[letter])."""
+    if owner == "zen-browser" and repo == "desktop":
+        import re
+
+        zen_tag_pattern = re.compile(r"^v?(\d+\.\d+\.\d+)([a-zA-Z])$")
+        match = zen_tag_pattern.match(raw_tag)
+        if match:
+            version_base, letter_suffix = match.group(1), match.group(2)
+            potential_zen_version = f"{version_base}{letter_suffix}"
+            if normalized_version != potential_zen_version:
+                logger.info(
+                    f"zen-browser: using version format {potential_zen_version} instead of {normalized_version} from tag {raw_tag}"
+                )
+                return potential_zen_version
+    return normalized_version
+
+
 class GitHubAPI:
     """Handler for GitHub API requests, processing releases end-to-end."""
 
@@ -47,8 +67,12 @@ class GitHubAPI:
         """
         self.owner = owner
         self.repo = repo
-        self.checksum_file_name: str | None = checksum_file_name  # Can be updated by SHAManager
-        self.checksum_hash_type: str | None = checksum_hash_type  # Can be updated by SHAManager
+        self.checksum_file_name: str | None = (
+            checksum_file_name  # Can be updated by SHAManager
+        )
+        self.checksum_hash_type: str | None = (
+            checksum_hash_type  # Can be updated by SHAManager
+        )
         self._arch_keyword = arch_keyword
         self.version: str | None = None
         self.appimage_name: str | None = None
@@ -64,7 +88,9 @@ class GitHubAPI:
         # Load app info from catalog to get beta preference and other settings
         self._app_info: AppInfo | None = find_app_by_owner_repo(owner, repo)
         if self._app_info:
-            logger.debug("Loaded app info for %s/%s, beta=%s", owner, repo, self._app_info.beta)
+            logger.debug(
+                "Loaded app info for %s/%s, beta=%s", owner, repo, self._app_info.beta
+            )
         else:
             logger.debug("No app info found for %s/%s in catalog", owner, repo)
 
@@ -127,13 +153,19 @@ class GitHubAPI:
                     "GitHub API rate limit exceeded (reported by ReleaseManager), refreshing authentication."
                 )
                 self.refresh_auth()
-                return False, "Rate limit exceeded. Authentication refreshed. Please try again."
-            logger.error("Failed to fetch release data via ReleaseManager: %s", raw_data_or_error)
+                return (
+                    False,
+                    "Rate limit exceeded. Authentication refreshed. Please try again.",
+                )
+            logger.error(
+                "Failed to fetch release data via ReleaseManager: %s", raw_data_or_error
+            )
             return False, str(raw_data_or_error)
 
         if not isinstance(raw_data_or_error, dict):
             logger.error(
-                "Type mismatch: Expected dict from ReleaseManager, got %s", type(raw_data_or_error)
+                "Type mismatch: Expected dict from ReleaseManager, got %s",
+                type(raw_data_or_error),
             )
             return False, "Internal error: Unexpected data type from release fetcher"
 
@@ -153,7 +185,10 @@ class GitHubAPI:
             return False, "Failed to process release data: %s" % e
 
     def _process_release(
-        self, release_data: dict[str, Any], version_check_only: bool = False, is_batch: bool = False
+        self,
+        release_data: dict[str, Any],
+        version_check_only: bool = False,
+        is_batch: bool = False,
     ) -> None:
         """Process release data and populate instance attributes.
 
@@ -185,19 +220,9 @@ class GitHubAPI:
         normalized_version = extract_version(raw_tag, is_beta)
 
         # Handle zen-browser's special version format (X.Y.Z[letter])
-        if self.owner == "zen-browser" and self.repo == "desktop":
-            import re
-
-            zen_tag_pattern = re.compile(r"^v?(\d+\.\d+\.\d+)([a-zA-Z])$")
-            match = zen_tag_pattern.match(raw_tag)
-            if match:
-                version_base, letter_suffix = match.group(1), match.group(2)
-                potential_zen_version = f"{version_base}{letter_suffix}"
-                if normalized_version != potential_zen_version:
-                    logger.info(
-                        f"zen-browser: using version format {potential_zen_version} instead of {normalized_version} from tag {raw_tag}"
-                    )
-                    normalized_version = potential_zen_version
+        normalized_version = handle_zen_browser_version(
+            raw_tag, normalized_version, self.owner, self.repo
+        )
 
         if not normalized_version:
             raise ValueError(f"Could not determine version from tag: '{raw_tag}'")
@@ -233,7 +258,7 @@ class GitHubAPI:
                 "extracted_hash_from_body": None,
                 "asset_digest": None,
                 "arch_keyword": self._arch_keyword,
-            }  # Minimal info for version-only checks
+            }
 
             self._release_info = ReleaseInfo.from_release_data(release_data, asset_info_dict)
             logger.info(
@@ -283,7 +308,8 @@ class GitHubAPI:
         if not selected_asset_result:
             if self._app_info:
                 suffixes_info = (
-                    "with preferred suffixes %s" % self._app_info.preferred_characteristic_suffixes
+                    "with preferred suffixes %s"
+                    % self._app_info.preferred_characteristic_suffixes
                 )
             else:
                 suffixes_info = "with arch_keyword '%s'" % self._arch_keyword
@@ -364,7 +390,9 @@ class GitHubAPI:
                     )
                 else:
                     initial_checksum_file_name_hint = self.checksum_file_name or "sha256"
-                    logger.debug("Using fallback SHA name: %s", initial_checksum_file_name_hint)
+                    logger.debug(
+                        "Using fallback SHA name: %s", initial_checksum_file_name_hint
+                    )
 
                 logger.debug("Creating SHAManager with app_info: %s", self._app_info)
                 sha_mgr = SHAManager(
@@ -439,7 +467,9 @@ class GitHubAPI:
         is_batch: bool = False,
     ) -> tuple[bool, dict[str, Any]]:
         """Check and return structured update info."""
-        ok, data = self.get_latest_release(version_check_only=version_check_only, is_batch=is_batch)
+        ok, data = self.get_latest_release(
+            version_check_only=version_check_only, is_batch=is_batch
+        )
 
         if not ok:
             return False, {"error": str(data)}
@@ -456,7 +486,9 @@ class GitHubAPI:
         raw_github_tag = latest_release_data.get("tag_name", "")
 
         if not raw_github_tag:
-            logger.error("No tag_name found in release data after successful fetch and process.")
+            logger.error(
+                "No tag_name found in release data after successful fetch and process."
+            )
             return False, {"error": "No tag_name found in fetched release data."}
 
         processor = ReleaseProcessor(self.owner, self.repo, self._arch_keyword)
@@ -510,7 +542,9 @@ class GitHubAPI:
 
         """
         try:
-            icon_info = self._icon_manager.find_icon(self.owner, self.repo, headers=self._headers)
+            icon_info = self._icon_manager.find_icon(
+                self.owner, self.repo, headers=self._headers
+            )
             if icon_info:
                 logger.info("Found app icon: %s", icon_info.get("name"))
             return icon_info

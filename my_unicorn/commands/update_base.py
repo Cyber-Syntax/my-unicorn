@@ -11,6 +11,7 @@ import logging
 import os
 import time
 from typing import Any
+from pathlib import Path
 
 from my_unicorn.api.github_api import GitHubAPI
 from my_unicorn.app_config import AppConfigManager
@@ -21,6 +22,7 @@ from my_unicorn.download import DownloadManager
 from my_unicorn.file_handler import FileHandler
 from my_unicorn.global_config import GlobalConfigManager
 from my_unicorn.verify import VerificationManager
+from my_unicorn.utils import ui_utils
 
 
 class BaseUpdateCommand(Command):
@@ -36,9 +38,6 @@ class BaseUpdateCommand(Command):
         self.global_config = GlobalConfigManager()
         self.app_config = AppConfigManager()
         self._logger = logging.getLogger(__name__)
-
-        # Ensure global config is loaded
-        self.global_config.load_config()
 
         self.max_concurrent_updates = self.global_config.max_concurrent_updates
         self._logger.debug(
@@ -59,10 +58,6 @@ class BaseUpdateCommand(Command):
         self.semaphore: asyncio.Semaphore = asyncio.Semaphore(semaphore_value)
         self._logger.debug("Semaphore initialized with value: %s", semaphore_value)
 
-        # Ensure base directory paths exist
-        os.makedirs(self.global_config.expanded_app_storage_path, exist_ok=True)
-        os.makedirs(self.global_config.expanded_app_backup_storage_path, exist_ok=True)
-        os.makedirs(self.global_config.expanded_app_download_path, exist_ok=True)
 
     def execute(self):
         """Abstract execute method to be implemented by subclasses."""
@@ -128,7 +123,11 @@ class BaseUpdateCommand(Command):
                     failure_count += 1
                     error_msg = "Update of %s failed with exception: %s", app_name, result
                     self._logger.error(error_msg)
-                    results[app_name] = {"status": "exception", "message": error_msg, "elapsed": 0}
+                    results[app_name] = {
+                        "status": "exception",
+                        "message": error_msg,
+                        "elapsed": 0,
+                    }
                 else:
                     # Handle unexpected result format
                     failure_count += 1
@@ -170,7 +169,9 @@ class BaseUpdateCommand(Command):
             start_time = time.time()
 
             try:
-                self._logger.info("[%s/%s] Starting update for %s", app_index, total_apps, app_name)
+                self._logger.info(
+                    "[%s/%s] Starting update for %s", app_index, total_apps, app_name
+                )
 
                 # Create separate config managers for this app to avoid conflicts
                 app_config = AppConfigManager()
@@ -202,7 +203,9 @@ class BaseUpdateCommand(Command):
                         app_name,
                         elapsed_time,
                     )
-                    result_appimage_name = result[1].get("appimage_name") if result[1] else None
+                    result_appimage_name = (
+                        result[1].get("appimage_name") if result[1] else None
+                    )
                     result_checksum_file_name = (
                         result[1].get("checksum_file_name") if result[1] else None
                     )
@@ -221,7 +224,9 @@ class BaseUpdateCommand(Command):
                         app_name,
                         elapsed_time,
                     )
-                    result_appimage_name = result[1].get("appimage_name") if result[1] else None
+                    result_appimage_name = (
+                        result[1].get("appimage_name") if result[1] else None
+                    )
                     result_checksum_file_name = (
                         result[1].get("checksum_file_name") if result[1] else None
                     )
@@ -238,7 +243,9 @@ class BaseUpdateCommand(Command):
             except Exception as e:
                 error_message = str(e)
                 elapsed_time = time.time() - start_time
-                self._logger.error("Error updating %s: %s", app_name, error_message, exc_info=True)
+                self._logger.error(
+                    "Error updating %s: %s", app_name, error_message, exc_info=True
+                )
 
                 return False, {
                     "status": "error",
@@ -328,7 +335,8 @@ class BaseUpdateCommand(Command):
                 "Error checking latest version from GitHub API: %s", version_info["error"]
             )
             return False, {
-                "error": "Error checking latest version from GitHub API: %s" % version_info["error"]
+                "error": "Error checking latest version from GitHub API: %s"
+                % version_info["error"]
             }
 
         if not update_available:
@@ -345,7 +353,9 @@ class BaseUpdateCommand(Command):
             "Update available for %s, processing full release info including SHA",
             app_data["name"],
         )
-        full_result = github_api.get_latest_release(version_check_only=False, is_batch=is_batch)
+        full_result = github_api.get_latest_release(
+            version_check_only=False, is_batch=is_batch
+        )
 
         # Handle variable return values (2 or 3 elements)
         if len(full_result) == 2:
@@ -358,7 +368,8 @@ class BaseUpdateCommand(Command):
                 "Error getting full release data from GitHub API: %s", full_release_data
             )
             return False, {
-                "error": "Error getting full release data from GitHub API: %s" % full_release_data
+                "error": "Error getting full release data from GitHub API: %s"
+                % full_release_data
             }
 
         # Download and verify AppImage
@@ -375,24 +386,37 @@ class BaseUpdateCommand(Command):
                 if not is_async:
                     print(f"\n{download_message}")
             else:
-                download_message = f"✓ Downloaded {github_api.appimage_name}"
+                download_message = (
+                    f"✓ Downloaded {github_api.appimage_name}"
+                    if github_api.appimage_name
+                    else "✓ Download completed"
+                )
                 if not is_async:
                     print(f"\n{download_message}")
+
+            # Define verification status message
+            verification_status_message = (
+                "Verifying existing file..."
+                if was_existing_file
+                else "Verifying download integrity..."
+            )
+            if not is_async:
+                print(verification_status_message)
 
             # Determine per-file cleanup behavior: skip interactive prompts in batch or async
             cleanup = False if is_batch else True
 
-            # Handle verification status messages
-            if was_existing_file:
-                verification_status_message = "Verifying existing file..."
-            else:
-                verification_status_message = "Verifying download integrity..."
+            # Delegate verification to VerificationManager
+            verification_manager = VerificationManager(
+                checksum_file_name=github_api.checksum_file_name,
+                checksum_file_download_url=github_api.checksum_file_download_url,
+                appimage_name=github_api.appimage_name,
+                checksum_hash_type=github_api.checksum_hash_type or "sha256",
+                asset_digest=github_api.asset_digest,
+            )
 
-            if not is_async:
-                print(verification_status_message)
-
-            verification_result, verification_skipped = self._verify_appimage(
-                github_api, downloaded_file_path, cleanup_on_failure=cleanup
+            verification_result, verification_skipped = verification_manager.verify_for_update(
+                downloaded_file_path, cleanup_on_failure=cleanup
             )
             if not verification_result:
                 self._logger.warning("Verification failed for %s.", app_data["name"])
@@ -444,11 +468,13 @@ class BaseUpdateCommand(Command):
                     "appimage_name": github_api.appimage_name,
                     "checksum_file_name": github_api.checksum_file_name,
                     "download_message": download_message if is_async else "",
-                    "verification_message": verification_status_message if is_async else "",
+                    "verification_status_message": verification_status_message,
                     "success_message": success_msg if is_async else "",
                 }
             else:
-                self._logger.error("Failed to perform file operations for %s", app_data["name"])
+                self._logger.error(
+                    "Failed to perform file operations for %s", app_data["name"]
+                )
                 return False, {
                     "error": "Failed to perform file operations for %s" % app_data["name"],
                     "appimage_name": github_api.appimage_name,
@@ -468,7 +494,9 @@ class BaseUpdateCommand(Command):
                     download_message if "download_message" in locals() else ""
                 )
                 result["verification_message"] = (
-                    verification_status_message if "verification_status_message" in locals() else ""
+                    verification_status_message
+                    if "verification_status_message" in locals()
+                    else ""
                 )
             else:
                 result["download_message"] = ""
@@ -488,7 +516,7 @@ class BaseUpdateCommand(Command):
         global_config = global_config or self.global_config
 
         try:
-            update_msg = "\nUpdating %s...", app_data['name']
+            update_msg = "\nUpdating %s...", app_data["name"]
             self._logger.info(update_msg)
             print(update_msg)
 
@@ -540,7 +568,9 @@ class BaseUpdateCommand(Command):
                         return False
 
                     # For single app update with retries remaining, ask to retry
-                    print(f"Download failed. Attempt {attempt} of {max_attempts}. Error: {e!s}")
+                    print(
+                        f"Download failed. Attempt {attempt} of {max_attempts}. Error: {e!s}"
+                    )
                     if not self._should_retry_download(attempt, max_attempts):
                         print("Update cancelled.")
                         break
@@ -552,69 +582,10 @@ class BaseUpdateCommand(Command):
 
         except Exception as e:
             self._logger.error("Unexpected error updating %s: %s", app_data["name"], e)
-            print(f"Unexpected error updating {app_data['name']}: {e!s}. Continuing to next app.")
-            return False
-
-    def _verify_appimage(
-        self,
-        github_api: GitHubAPI,
-        downloaded_file_path: str | None = None,
-        cleanup_on_failure: bool = True,
-    ) -> tuple[bool, bool]:
-        """Verify the downloaded AppImage using the SHA file.
-
-        Args:
-            github_api: The GitHub API instance with release information
-            downloaded_file_path: Path to the downloaded file for verification
-            cleanup_on_failure: Whether to delete the file on verification failure
-
-        Returns:
-            tuple containing:
-            - bool: True if verification succeeded or was skipped, False if failed
-            - bool: True if verification was skipped, False otherwise
-
-        """
-        verification_skipped = False
-
-        # Check if verification should be skipped based on app configuration
-        if github_api.skip_verification:
-            self._logger.info("Skipping verification - verification disabled for this app")
-            print("Note: Verification skipped - verification disabled for this app")
-            verification_skipped = True
-            return True, verification_skipped
-
-        # Check if we have no SHA information at all (fallback case)
-        if not github_api.checksum_file_name and not github_api.asset_digest:
-            self._logger.info("Skipping verification - no verification method available")
-            print("Note: Verification skipped - no verification method available")
-            verification_skipped = True
-            return True, verification_skipped
-
-        # Ensure critical VerificationManager parameters are not None
-        if github_api.appimage_name is None:
-            raise ValueError(
-                f"VerificationManager: appimage_name is None for {github_api.owner}/{github_api.repo}."
+            print(
+                f"Unexpected error updating {app_data['name']}: {e!s}. Continuing to next app."
             )
-
-        verification_manager = VerificationManager(
-            checksum_file_name=github_api.checksum_file_name,
-            checksum_file_download_url=github_api.checksum_file_download_url,
-            appimage_name=str(github_api.appimage_name),
-            checksum_hash_type=github_api.checksum_hash_type or "sha256",
-            asset_digest=github_api.asset_digest,
-        )
-
-        # set downloaded file path for verification
-        if downloaded_file_path:
-            verification_manager.set_appimage_path(downloaded_file_path)
-            self._logger.info("Using specific file path for verification: %s", downloaded_file_path)
-
-        # Verify and clean up on failure if requested
-        verification_result = verification_manager.verify_appimage(
-            cleanup_on_failure=cleanup_on_failure
-        )
-        # Return the result along with verification_skipped flag (False in this case)
-        return verification_result, verification_skipped
+            return False
 
     def _create_file_handler(
         self,
@@ -624,21 +595,8 @@ class BaseUpdateCommand(Command):
     ) -> FileHandler:
         """Create a FileHandler instance with proper configuration."""
         # Ensure critical FileHandler parameters are not None
-        required_fh_params = {
-            "appimage_name": github_api.appimage_name,
-            "repo": github_api.repo,
-            "owner": github_api.owner,
-            "version": github_api.version,
-            "app_rename": app_config.app_rename,
-        }
-
-        for param, value in required_fh_params.items():
-            if value is None:
-                raise ValueError(
-                    f"FileHandler critical parameter '{param}' is None before instantiation for {github_api.owner}/{github_api.repo}."
-                )
-
-        from pathlib import Path
+        if not all([github_api.appimage_name, github_api.repo, github_api.owner]):
+            raise ValueError("Missing required parameters for FileHandler")
 
         return FileHandler(
             appimage_name=str(github_api.appimage_name),
@@ -665,17 +623,6 @@ class BaseUpdateCommand(Command):
             self._logger.info("Retry cancelled by user (Ctrl+C)")
             print("\nRetry cancelled by user (Ctrl+C)")
             return False
-
-    def _display_update_list(self, updatable_apps: list[dict[str, Any]]) -> None:
-        """Display list of apps to update."""
-        print(f"\nFound {len(updatable_apps)} apps to update:")
-        for idx, app in enumerate(updatable_apps, start=1):
-            self._logger.info(
-                "%d. %s (%s → %s)",
-                idx, app["name"], app["current"], app["latest"]
-            )
-            update_msg = f"{idx}. {app['name']} ({app['current']} → {app['latest']})"
-            print(update_msg)
 
     def _check_single_app_version(
         self, app_config: AppConfigManager, config_file: str
@@ -743,37 +690,65 @@ class BaseUpdateCommand(Command):
             }
         return False  # No update available
 
-    def _check_rate_limits(
-        self, apps_to_update: list[dict[str, Any]]
+    def check_rate_limits(
+        self, apps: list[dict[str, Any]]
     ) -> tuple[bool, list[dict[str, Any]], str]:
-        """Check if we have sufficient GitHub API rate limits for updates.
+        """Generalized rate limit check logic.
 
         Args:
-            apps_to_update: list of apps to update
+            apps: list of app information dictionaries
 
         Returns:
             tuple containing:
-            - bool: Whether we can proceed with updates
-            - list[tuple[str, Any]]: Filtered list of apps (may be reduced)
-            - str: Message describing the rate limit status
+            - bool: True if we can proceed with all apps, False if partial/no update needed
+            - list[tuple[str, Any]]: Filtered list of apps that can be processed
+            - str: Status message explaining the rate limit situation
 
         """
         try:
             # Get current rate limit info
-            remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
-
-            # Ensure remaining is an integer
-            if isinstance(remaining, str):
-                remaining = int(remaining)
+            remaining, limit, reset_time, auth = (
+                GitHubAuthManager.get_rate_limit_info()
+            )
 
             # Calculate requests needed (estimate 3 per app: version check, release info, icon check)
+            #TODO: make sure that is also checked for each app
+            # and auto and selective commands
             requests_per_app = 3
-            total_requests_needed = len(apps_to_update) * requests_per_app
+            total_requests_needed = len(apps) * requests_per_app
 
             # Check if we have enough requests for all apps
             if remaining >= total_requests_needed:
-                message = f"Rate limit status: {remaining}/{limit} requests remaining. Sufficient for all {len(apps_to_update)} apps."
-                return True, apps_to_update, message
+                message = "Rate limit status: {}/{} requests remaining. Sufficient for all {} apps.".format(remaining, limit, len(apps))
+                self._logger.info(message)
+                return True, apps, message
+
+            # Show a warning if rate limits are low but don't prevent user from proceeding
+            if remaining < 10:  # Now an int comparison
+                print("\n--- GitHub API Rate Limit Warning ---")
+                print(f"⚠️ Low API requests remaining: {remaining}/{limit}")
+                self._logger.warning("Low API requests remaining: %s/%s", remaining, limit)
+                if reset_time:
+                    print(f"Limits reset at: {reset_time}")
+
+                if not is_authenticated:
+                    print(
+                        "\n🔑 Consider adding a GitHub token using option 7 in the main menu to increase rate limits (5000/hour)."
+                    )
+
+                print(
+                    "\nYou can still proceed, but you may not be able to update all selected apps."
+                )
+                print("Consider selecting fewer apps or only the most important ones.\n")
+
+                # Give user a chance to abort
+                try:
+                    if input("Do you want to continue anyway? [y/N]: ").strip().lower() != "y":
+                        print("Operation cancelled.")
+                        return
+                except KeyboardInterrupt:
+                    print("\nOperation cancelled.")
+                    return
 
             # Not enough for all apps - see how many we can process
             apps_we_can_process = max(0, remaining // requests_per_app)
@@ -784,13 +759,14 @@ class BaseUpdateCommand(Command):
                     f"Minimum requests required: {requests_per_app}. "
                     f"Rate limit resets at: {reset_time}"
                 )
+                self._logger.error("ERROR: Not enough API requests remaining (%d/%d). Minimum requests required: %d. Rate limit resets at: %s", remaining, limit, requests_per_app, reset_time)
                 return False, [], message
 
             # We can process some apps but not all
-            filtered_apps = apps_to_update[:apps_we_can_process]
+            filtered_apps = apps[:apps_we_can_process]
             message = (
                 f"WARNING: Not enough API requests for all updates. "
-                f"Can process {apps_we_can_process} out of {len(apps_to_update)} apps. "
+                f"Can process {apps_we_can_process} out of {len(apps)} apps. "
                 f"Remaining requests: {remaining}/{limit}"
             )
             return False, filtered_apps, message
@@ -798,17 +774,19 @@ class BaseUpdateCommand(Command):
         except Exception as e:
             self._logger.error("Error checking rate limits: %s", e)
             message = f"Error checking rate limits: {e}. Proceeding with caution."
-            return True, apps_to_update, message
+            return True, apps, message
 
-    def _display_rate_limit_info(self) -> None:
+    def display_rate_limit_info(self) -> None:
         """Display current GitHub API rate limit information."""
         try:
-            remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+            remaining, limit, reset_time, is_authenticated = (
+                GitHubAuthManager.get_rate_limit_info()
+            )
 
             # Ensure remaining is an integer
             if isinstance(remaining, str):
                 remaining = int(remaining)
-            
+
             print("\n--- GitHub API Rate Limits ---")
             if is_authenticated:
                 print(f"Remaining requests: {remaining}/{limit}")
@@ -827,3 +805,190 @@ class BaseUpdateCommand(Command):
         except Exception as e:
             self._logger.error("Error displaying rate limit info: %s", e)
             print(f"Error retrieving rate limit information: {e}")
+
+    def display_async_results(
+            self,
+            success_count: int,
+            failure_count: int,
+            results: dict[str, dict[str, Any]],
+            total_apps: int,
+        ) -> None:
+            """Display the results of async update operation.
+    
+            Args:
+                success_count: Number of successful updates
+                failure_count: Number of failed updates
+                results: Dictionary mapping app names to their result data
+                total_apps: Total number of apps processed
+    
+            """
+            print("\n=== Update Summary ===")
+            print(f"Total apps processed: {success_count + failure_count}/{total_apps}")
+            print(f"Successfully updated: {success_count}")
+    
+            # Show detailed messages for successful updates
+            if success_count > 0:
+                print("\nSuccessful updates:")
+                for app_name, result in results.items():
+                    if result.get("status") == "success":
+                        # Show download message
+                        download_msg = result.get("download_message", "")
+                        if download_msg:
+                            print(f"  {download_msg}")
+    
+                        # Show verification message
+                        verification_msg = result.get("verification_message", "")
+                        if verification_msg:
+                            print(f"  {verification_msg}")
+    
+                        # Show success message
+                        success_msg = result.get("success_message", "")
+                        if success_msg:
+                            print(f"  {success_msg}")
+                        elif result.get("message"):
+                            print(f"  ✓ {app_name} - {result.get('message')}")
+    
+            if failure_count > 0:
+                print(f"\nFailed updates: {failure_count}")
+    
+                # list failed updates
+                for app_name, result in results.items():
+                    if result.get("status") != "success":
+                        message = result.get("message", "Unknown error")
+                        elapsed = result.get("elapsed", 0)
+                        print(f"  ✗ {app_name}: {message} ({elapsed:.1f}s)")
+    
+            print("\nUpdate process completed!")
+    
+            # Prompt to remove downloaded files for failed updates in batch
+            if failure_count > 0:
+                failed_apps = [name for name, res in results.items() if res.get("status") != "success"]
+    
+                from my_unicorn.utils.cleanup_utils import cleanup_batch_failed_updates
+    
+                try:
+                    # Use the unified batch cleanup function
+                    cleanup_batch_failed_updates(
+                        failed_apps=failed_apps, results=results, ask_confirmation=True, verbose=True
+                    )
+                except KeyboardInterrupt:
+                    print("\nCleanup cancelled.")
+    
+            # Display updated rate limit information after updates
+            self.display_rate_limit_info()
+            
+    def update_apps_async_wrapper(self, apps_to_update: list[dict[str, Any]]) -> None:
+        """Wrap the async update method to call it from a synchronous context.
+
+        Args:
+            apps_to_update: list of app information dictionaries to update
+
+        """
+        try:
+            # Create a new event loop if needed
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            print(
+                f"\nStarting asynchronous update of {len(apps_to_update)} AppImages "
+                f"(max {self.max_concurrent_updates} concurrent)..."
+            )
+            self._logger.info(
+                "Starting asynchronous update of %d AppImages with concurrency limit %d",
+                len(apps_to_update),
+                self.max_concurrent_updates,
+            )
+            # set the main event loop in ui_utils
+            ui_utils.set_main_event_loop(loop)
+
+            # Initialize progress manager for all downloads
+            DownloadManager.get_or_create_progress(len(apps_to_update))
+
+            # Run the async function using the base class method
+            success_count, failure_count, results = loop.run_until_complete(
+                self._update_apps_async(apps_to_update)
+            )
+
+            # Clean up progress manager after all downloads complete
+            DownloadManager.stop_progress()
+
+            # Display results
+            self.display_async_results(success_count, failure_count, results, len(apps_to_update))
+
+        except KeyboardInterrupt:
+            self._logger.info("Update process cancelled by user (Ctrl+C)")
+            print("\nUpdate process cancelled by user (Ctrl+C)")
+        except Exception as e:
+            self._logger.error("Error in async update process: %s", str(e), exc_info=True)
+            print(f"\nError in update process: {e!s}")           
+            
+    def find_updatable_apps(
+            self, selected_files: list[str] | None = None
+        ) -> list[dict[str, Any]]:
+            """Find AppImages that have updates available.
+    
+            Args:
+                selected_files (Optional[list[str]]): List of selected configuration files to check.
+                                                        If None, all available files will be checked.
+    
+            Returns:
+                list[tuple[str, Any]]: list of updatable app information dictionaries
+    
+            """
+            updatable_apps = []
+    
+            try:
+                # Get the list of files to process
+                if selected_files is None:
+                    json_files = self.app_config.list_json_files()
+                    if not json_files:
+                        logger.warning("No AppImage configuration files found")
+                        print(
+                            "No AppImage configuration files found. Use the Download option first."
+                        )
+                        return []
+                    print(f"Checking {len(json_files)} AppImage configurations...")
+                else:
+                    json_files = selected_files
+                    print(f"Checking {len(json_files)} selected AppImage configurations...")
+    
+                # Check each app for updates
+                for config_file in json_files:
+                    try:
+                        # Create a temporary app config for checking this app
+                        app_name = os.path.splitext(config_file)[0]  # Remove .json extension
+    
+                        # Directly check version without redirecting output
+                        app_data = self._check_single_app_version(self.app_config, config_file)
+    
+                        if (
+                            isinstance(app_data, dict)
+                            and "current" in app_data
+                            and "latest" in app_data
+                        ):
+                            print(
+                                f"{app_name}: update available: {app_data['current']} → "
+                                f"{app_data['latest']}"
+                            )
+                            updatable_apps.append(app_data)
+                        elif app_data is False:
+                            print(f"{app_name}: already up to date")
+                        else:
+                            print(f"{app_name}, unexpected result: {app_data}")
+    
+                    except Exception as e:
+                        logger.error("Error checking %s: %s", config_file, e)
+                        print(f"{app_name}: error: {e}")
+                    except KeyboardInterrupt:
+                        logger.info("Update check cancelled by user (Ctrl+C)")
+                        print("\nUpdate check cancelled by user (Ctrl+C)")
+                        return updatable_apps
+    
+            except Exception as e:
+                logger.error("Error during update check: %s", e)
+                print("Error during update check:", e)
+    
+            return updatable_apps           

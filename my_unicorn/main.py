@@ -24,8 +24,8 @@ from my_unicorn.commands.install_url import DownloadCommand
 from my_unicorn.commands.invoker import CommandInvoker
 from my_unicorn.commands.manage_token import ManageTokenCommand
 from my_unicorn.commands.migrate_config import MigrateConfigCommand
-from my_unicorn.commands.update_all_async import UpdateAsyncCommand
-from my_unicorn.commands.update_all_auto import UpdateAllAutoCommand
+from my_unicorn.commands.update_all_async import SelectiveUpdateCommand
+from my_unicorn.commands.update_all_auto import AutoUpdateCommand
 from my_unicorn.commands.version import VersionCommand
 from my_unicorn.global_config import GlobalConfigManager
 
@@ -198,8 +198,8 @@ def setup_commands(invoker: CommandInvoker) -> None:
     """
     invoker.register_command(1, DownloadCommand())
     invoker.register_command(2, InstallAppCommand())
-    invoker.register_command(3, UpdateAllAutoCommand())
-    invoker.register_command(4, UpdateAsyncCommand())
+    invoker.register_command(3, AutoUpdateCommand())
+    invoker.register_command(4, SelectiveUpdateCommand())
     invoker.register_command(5, CustomizeAppConfigCommand())
     invoker.register_command(6, CustomizeGlobalConfigCommand())
     invoker.register_command(7, ManageTokenCommand())
@@ -330,15 +330,15 @@ def execute_cli_command(args: argparse.Namespace) -> None:
 
     elif args.command == "update":
         if args.all:
-            invoker.execute_command(3)  # UpdateAllAutoCommand
+            invoker.execute_command(3)  # AutoUpdateCommand
         elif args.select:
             if args.select is True:
                 # Interactive selection mode
-                invoker.execute_command(4)  # UpdateAsyncCommand
+                invoker.execute_command(4)  # SelectiveUpdateCommand
             else:
                 # Parse comma-separated app names
                 app_names = [name.strip() for name in args.select.split(",")]
-                cmd = UpdateAsyncCommand(app_names=app_names)
+                cmd = SelectiveUpdateCommand(app_names=app_names)
                 cmd.execute()
         else:
             print("Please specify --all or --select for update command")

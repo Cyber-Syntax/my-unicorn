@@ -99,7 +99,8 @@ class VerificationManager:
         """
         try:
             self.logger.log_verification_start(
-                "{}".format(self.config.appimage_name or "Unknown"), self.config.checksum_hash_type
+                "{}".format(self.config.appimage_name or "Unknown"),
+                self.config.checksum_hash_type,
             )
 
             # Check if verification should be skipped
@@ -302,3 +303,31 @@ class VerificationManager:
             checksum_file_name=checksum_file_name,
             ask_confirmation=ask_confirmation,
         )
+
+    def verify_for_update(
+        self, downloaded_file_path: str, cleanup_on_failure: bool = False
+    ) -> tuple[bool, bool]:
+        """Verify the AppImage for update commands.
+
+        Args:
+            downloaded_file_path: Path to the downloaded AppImage file.
+            cleanup_on_failure: Whether to clean up the file if verification fails.
+
+        Returns:
+            Tuple containing:
+            - bool: True if verification passed or skipped, False otherwise.
+            - bool: True if verification was skipped, False otherwise.
+
+        """
+        self.set_appimage_path(downloaded_file_path)
+
+        # Check if verification should be skipped
+        if self.config.is_verification_skipped():
+            self.logger.log_verification_skipped(
+                "Verification skipped: no hash file provided."
+            )
+            return True, True
+
+        # Perform verification
+        result = self.verify_appimage(cleanup_on_failure=cleanup_on_failure)
+        return result, False

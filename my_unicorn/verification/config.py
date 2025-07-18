@@ -9,6 +9,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from my_unicorn.catalog import AppInfo
 
 
 # Supported hash types
@@ -36,6 +37,7 @@ class VerificationConfig:
     checksum_file_download_url: str | None = None
     appimage_name: str | None = None
     checksum_hash_type: str = "sha256"
+    skip_verification: bool = None or AppInfo.skip_verification
     appimage_path: str | None = None
     direct_expected_hash: str | None = None
     asset_digest: str | None = None
@@ -119,9 +121,23 @@ class VerificationConfig:
 
     def is_verification_skipped(self) -> bool:
         """Check if verification should be skipped."""
-        return (
-            self.checksum_hash_type == "no_hash" or not self.checksum_file_name or self.checksum_file_name == self.appimage_name
-        )
+        
+        if self.skip_verification:
+            return True
+        
+        if not self.checksum_file_name:
+            return True
+        
+        if self.checksum_file_name == self.appimage_name:
+            return True
+        
+        if self.checksum_file_name == "no_sha_file":
+            return True
+            
+        if self.checksum_hash_type == "no_hash":
+            return True
+        
+        return False
 
     def is_asset_digest_verification(self) -> bool:
         """Check if this is asset digest verification."""
