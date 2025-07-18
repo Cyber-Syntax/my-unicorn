@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests for the update_all_async module.
 
-This module contains tests for the UpdateAsyncCommand class that handles
+This module contains tests for the SelectiveUpdateCommand class that handles
 updating multiple AppImages concurrently using async I/O operations.
 """
 
@@ -10,7 +10,7 @@ import pytest
 from my_unicorn.auth_manager import GitHubAuthManager
 
 # Import the classes to test
-from my_unicorn.commands.update_all_async import UpdateAsyncCommand
+from my_unicorn.commands.update_all_async import SelectiveUpdateCommand
 
 
 class DummyApp:
@@ -29,7 +29,7 @@ def no_github_actual_calls(monkeypatch):
 
 @pytest.fixture
 def cmd():
-    return UpdateAsyncCommand()
+    return SelectiveUpdateCommand()
 
 
 @pytest.mark.parametrize(

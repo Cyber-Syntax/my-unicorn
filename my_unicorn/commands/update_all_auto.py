@@ -7,7 +7,6 @@ asynchronous updates for improved performance.
 """
 
 import logging
-import os
 from typing import Any  # Retained for compatibility with Any type
 
 from my_unicorn.commands.update_base import BaseUpdateCommand
@@ -19,7 +18,7 @@ LOW_UNAUTHENTICATED_THRESHOLD = 20
 logger = logging.getLogger(__name__)
 
 
-class UpdateAllAutoCommand(BaseUpdateCommand):
+class AutoUpdateCommand(BaseUpdateCommand):
     """Command to automatically check and update all AppImages without manual selection."""
 
     def execute(self):
@@ -34,10 +33,6 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         print("Checking all AppImages for updates...")
 
         try:
-            # Use async mode by default - it's more efficient
-            use_async = True
-
-            # Find all updatable apps
             updatable_apps = self.find_updatable_apps()
 
             if not updatable_apps:
@@ -47,7 +42,6 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
             self.check_rate_limits(updatable_apps)
 
-            # Display updatable apps to user
             self._display_update_list(updatable_apps)
 
             # Determine what to do based on batch mode
@@ -60,20 +54,15 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                     f"Batch mode enabled - updating all {len(updatable_apps)} "
                     f"AppImages automatically"
                 )
-                if use_async:
-                    self.update_apps_async_wrapper(updatable_apps)
-                else:
-                    self._update_apps(updatable_apps)
+                self.update_apps_async_wrapper(updatable_apps)
             else:
-                # In interactive mode, ask which apps to update
-                self._handle_interactive_update(updatable_apps, use_async)
+                # ask which apps to update
+                self._handle_interactive_update(updatable_apps)
 
         except KeyboardInterrupt:
             logger.info("Operation cancelled by user (Ctrl+C)")
             print("\nOperation cancelled by user (Ctrl+C)")
             return
-
-    
 
     def _list_all_config_files(self) -> list[str]:
         """Get a list of all AppImage configuration files.
@@ -84,17 +73,14 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         """
         return self.app_config.list_json_files()
 
-    def _handle_interactive_update(
-        self, updatable_apps: list[dict[str, Any]], use_async: bool = False
-    ) -> None:
+    def _handle_interactive_update(self, updatable_apps: list[dict[str, Any]]) -> None:
         """Handle interactive mode where user selects which apps to update.
 
         Args:
             updatable_apps: list of updatable app information dictionaries
-            use_async: Whether to use async update mode
+
 
         """
-        # Ask user which apps to update
         print("\nEnter the numbers of the AppImages you want to update (comma-separated):")
         print("For example: 1,3,4 or 'all' for all apps, or 'cancel' to exit")
 
@@ -108,11 +94,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
             if user_input == "all":
                 logger.info("User selected to update all apps")
-                if use_async:
-                    self.update_apps_async_wrapper(updatable_apps)
-                else:
-                    self._update_apps(updatable_apps)
-                    return
+                self.update_apps_async_wrapper(updatable_apps)
 
                 try:
                     # Parse user selection
@@ -129,10 +111,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
 
                     if selected_apps:
                         logger.info("User selected %d apps to update", len(selected_apps))
-                        if use_async:
-                            self.update_apps_async_wrapper(selected_apps)
-                        else:
-                            self._update_apps(selected_apps)
+                        self.update_apps_async_wrapper(selected_apps)
                     else:
                         logger.info("No apps selected for update")
                         print("No apps selected for update.")

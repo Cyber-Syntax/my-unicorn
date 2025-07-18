@@ -22,7 +22,7 @@ from my_unicorn.auth_manager import GitHubAuthManager
 from my_unicorn.commands.update_base import BaseUpdateCommand
 
 
-class UpdateAsyncCommand(BaseUpdateCommand):
+class SelectiveUpdateCommand(BaseUpdateCommand):
     """Command to update multiple AppImages concurrently using async I/O.
 
     This class extends the BaseUpdateCommand to provide asynchronous update
