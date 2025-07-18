@@ -128,7 +128,11 @@ class BaseUpdateCommand(Command):
                     failure_count += 1
                     error_msg = "Update of %s failed with exception: %s", app_name, result
                     self._logger.error(error_msg)
-                    results[app_name] = {"status": "exception", "message": error_msg, "elapsed": 0}
+                    results[app_name] = {
+                        "status": "exception",
+                        "message": error_msg,
+                        "elapsed": 0,
+                    }
                 else:
                     # Handle unexpected result format
                     failure_count += 1
@@ -170,7 +174,9 @@ class BaseUpdateCommand(Command):
             start_time = time.time()
 
             try:
-                self._logger.info("[%s/%s] Starting update for %s", app_index, total_apps, app_name)
+                self._logger.info(
+                    "[%s/%s] Starting update for %s", app_index, total_apps, app_name
+                )
 
                 # Create separate config managers for this app to avoid conflicts
                 app_config = AppConfigManager()
@@ -202,7 +208,9 @@ class BaseUpdateCommand(Command):
                         app_name,
                         elapsed_time,
                     )
-                    result_appimage_name = result[1].get("appimage_name") if result[1] else None
+                    result_appimage_name = (
+                        result[1].get("appimage_name") if result[1] else None
+                    )
                     result_checksum_file_name = (
                         result[1].get("checksum_file_name") if result[1] else None
                     )
@@ -221,7 +229,9 @@ class BaseUpdateCommand(Command):
                         app_name,
                         elapsed_time,
                     )
-                    result_appimage_name = result[1].get("appimage_name") if result[1] else None
+                    result_appimage_name = (
+                        result[1].get("appimage_name") if result[1] else None
+                    )
                     result_checksum_file_name = (
                         result[1].get("checksum_file_name") if result[1] else None
                     )
@@ -238,7 +248,9 @@ class BaseUpdateCommand(Command):
             except Exception as e:
                 error_message = str(e)
                 elapsed_time = time.time() - start_time
-                self._logger.error("Error updating %s: %s", app_name, error_message, exc_info=True)
+                self._logger.error(
+                    "Error updating %s: %s", app_name, error_message, exc_info=True
+                )
 
                 return False, {
                     "status": "error",
@@ -328,7 +340,8 @@ class BaseUpdateCommand(Command):
                 "Error checking latest version from GitHub API: %s", version_info["error"]
             )
             return False, {
-                "error": "Error checking latest version from GitHub API: %s" % version_info["error"]
+                "error": "Error checking latest version from GitHub API: %s"
+                % version_info["error"]
             }
 
         if not update_available:
@@ -345,7 +358,9 @@ class BaseUpdateCommand(Command):
             "Update available for %s, processing full release info including SHA",
             app_data["name"],
         )
-        full_result = github_api.get_latest_release(version_check_only=False, is_batch=is_batch)
+        full_result = github_api.get_latest_release(
+            version_check_only=False, is_batch=is_batch
+        )
 
         # Handle variable return values (2 or 3 elements)
         if len(full_result) == 2:
@@ -358,7 +373,8 @@ class BaseUpdateCommand(Command):
                 "Error getting full release data from GitHub API: %s", full_release_data
             )
             return False, {
-                "error": "Error getting full release data from GitHub API: %s" % full_release_data
+                "error": "Error getting full release data from GitHub API: %s"
+                % full_release_data
             }
 
         # Download and verify AppImage
@@ -375,24 +391,37 @@ class BaseUpdateCommand(Command):
                 if not is_async:
                     print(f"\n{download_message}")
             else:
-                download_message = f"✓ Downloaded {github_api.appimage_name}"
+                download_message = (
+                    f"✓ Downloaded {github_api.appimage_name}"
+                    if github_api.appimage_name
+                    else "✓ Download completed"
+                )
                 if not is_async:
                     print(f"\n{download_message}")
+
+            # Define verification status message
+            verification_status_message = (
+                "Verifying existing file..."
+                if was_existing_file
+                else "Verifying download integrity..."
+            )
+            if not is_async:
+                print(verification_status_message)
 
             # Determine per-file cleanup behavior: skip interactive prompts in batch or async
             cleanup = False if is_batch else True
 
-            # Handle verification status messages
-            if was_existing_file:
-                verification_status_message = "Verifying existing file..."
-            else:
-                verification_status_message = "Verifying download integrity..."
+            # Delegate verification to VerificationManager
+            verification_manager = VerificationManager(
+                checksum_file_name=github_api.checksum_file_name,
+                checksum_file_download_url=github_api.checksum_file_download_url,
+                appimage_name=github_api.appimage_name,
+                checksum_hash_type=github_api.checksum_hash_type or "sha256",
+                asset_digest=github_api.asset_digest,
+            )
 
-            if not is_async:
-                print(verification_status_message)
-
-            verification_result, verification_skipped = self._verify_appimage(
-                github_api, downloaded_file_path, cleanup_on_failure=cleanup
+            verification_result, verification_skipped = verification_manager.verify_for_update(
+                downloaded_file_path, cleanup_on_failure=cleanup
             )
             if not verification_result:
                 self._logger.warning("Verification failed for %s.", app_data["name"])
@@ -444,11 +473,13 @@ class BaseUpdateCommand(Command):
                     "appimage_name": github_api.appimage_name,
                     "checksum_file_name": github_api.checksum_file_name,
                     "download_message": download_message if is_async else "",
-                    "verification_message": verification_status_message if is_async else "",
+                    "verification_status_message": verification_status_message,
                     "success_message": success_msg if is_async else "",
                 }
             else:
-                self._logger.error("Failed to perform file operations for %s", app_data["name"])
+                self._logger.error(
+                    "Failed to perform file operations for %s", app_data["name"]
+                )
                 return False, {
                     "error": "Failed to perform file operations for %s" % app_data["name"],
                     "appimage_name": github_api.appimage_name,
@@ -468,7 +499,9 @@ class BaseUpdateCommand(Command):
                     download_message if "download_message" in locals() else ""
                 )
                 result["verification_message"] = (
-                    verification_status_message if "verification_status_message" in locals() else ""
+                    verification_status_message
+                    if "verification_status_message" in locals()
+                    else ""
                 )
             else:
                 result["download_message"] = ""
@@ -488,7 +521,7 @@ class BaseUpdateCommand(Command):
         global_config = global_config or self.global_config
 
         try:
-            update_msg = "\nUpdating %s...", app_data['name']
+            update_msg = "\nUpdating %s...", app_data["name"]
             self._logger.info(update_msg)
             print(update_msg)
 
@@ -540,7 +573,9 @@ class BaseUpdateCommand(Command):
                         return False
 
                     # For single app update with retries remaining, ask to retry
-                    print(f"Download failed. Attempt {attempt} of {max_attempts}. Error: {e!s}")
+                    print(
+                        f"Download failed. Attempt {attempt} of {max_attempts}. Error: {e!s}"
+                    )
                     if not self._should_retry_download(attempt, max_attempts):
                         print("Update cancelled.")
                         break
@@ -552,69 +587,10 @@ class BaseUpdateCommand(Command):
 
         except Exception as e:
             self._logger.error("Unexpected error updating %s: %s", app_data["name"], e)
-            print(f"Unexpected error updating {app_data['name']}: {e!s}. Continuing to next app.")
-            return False
-
-    def _verify_appimage(
-        self,
-        github_api: GitHubAPI,
-        downloaded_file_path: str | None = None,
-        cleanup_on_failure: bool = True,
-    ) -> tuple[bool, bool]:
-        """Verify the downloaded AppImage using the SHA file.
-
-        Args:
-            github_api: The GitHub API instance with release information
-            downloaded_file_path: Path to the downloaded file for verification
-            cleanup_on_failure: Whether to delete the file on verification failure
-
-        Returns:
-            tuple containing:
-            - bool: True if verification succeeded or was skipped, False if failed
-            - bool: True if verification was skipped, False otherwise
-
-        """
-        verification_skipped = False
-
-        # Check if verification should be skipped based on app configuration
-        if github_api.skip_verification:
-            self._logger.info("Skipping verification - verification disabled for this app")
-            print("Note: Verification skipped - verification disabled for this app")
-            verification_skipped = True
-            return True, verification_skipped
-
-        # Check if we have no SHA information at all (fallback case)
-        if not github_api.checksum_file_name and not github_api.asset_digest:
-            self._logger.info("Skipping verification - no verification method available")
-            print("Note: Verification skipped - no verification method available")
-            verification_skipped = True
-            return True, verification_skipped
-
-        # Ensure critical VerificationManager parameters are not None
-        if github_api.appimage_name is None:
-            raise ValueError(
-                f"VerificationManager: appimage_name is None for {github_api.owner}/{github_api.repo}."
+            print(
+                f"Unexpected error updating {app_data['name']}: {e!s}. Continuing to next app."
             )
-
-        verification_manager = VerificationManager(
-            checksum_file_name=github_api.checksum_file_name,
-            checksum_file_download_url=github_api.checksum_file_download_url,
-            appimage_name=str(github_api.appimage_name),
-            checksum_hash_type=github_api.checksum_hash_type or "sha256",
-            asset_digest=github_api.asset_digest,
-        )
-
-        # set downloaded file path for verification
-        if downloaded_file_path:
-            verification_manager.set_appimage_path(downloaded_file_path)
-            self._logger.info("Using specific file path for verification: %s", downloaded_file_path)
-
-        # Verify and clean up on failure if requested
-        verification_result = verification_manager.verify_appimage(
-            cleanup_on_failure=cleanup_on_failure
-        )
-        # Return the result along with verification_skipped flag (False in this case)
-        return verification_result, verification_skipped
+            return False
 
     def _create_file_handler(
         self,
@@ -749,7 +725,9 @@ class BaseUpdateCommand(Command):
         """
         try:
             # Get current rate limit info
-            remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+            remaining, limit, reset_time, is_authenticated = (
+                GitHubAuthManager.get_rate_limit_info()
+            )
 
             # Ensure remaining is an integer
             if isinstance(remaining, str):
@@ -792,12 +770,14 @@ class BaseUpdateCommand(Command):
     def display_rate_limit_info(self) -> None:
         """Display current GitHub API rate limit information."""
         try:
-            remaining, limit, reset_time, is_authenticated = GitHubAuthManager.get_rate_limit_info()
+            remaining, limit, reset_time, is_authenticated = (
+                GitHubAuthManager.get_rate_limit_info()
+            )
 
             # Ensure remaining is an integer
             if isinstance(remaining, str):
                 remaining = int(remaining)
-            
+
             print("\n--- GitHub API Rate Limits ---")
             if is_authenticated:
                 print(f"Remaining requests: {remaining}/{limit}")

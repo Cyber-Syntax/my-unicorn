@@ -239,7 +239,6 @@ class InstallAppCommand(Command):
 
         # Track verification success and skip status across attempts
         verification_success = False
-        verification_skipped = False  # New flag to track if verification was skipped
         downloaded_file_path: str | None = None
 
         # Try up to MAX_ATTEMPTS times to download and verify
@@ -265,20 +264,6 @@ class InstallAppCommand(Command):
                     else:
                         print(f"✓ Downloaded {api.appimage_name}")
 
-                    # Handle verification based on skip_verification flag
-                    if app_config.skip_verification or api.skip_verification:
-                        logger.info("Skipping verification due to skip_verification setting.")
-                        print("Skipping verification (verification disabled for this app).")
-                        verification_success = True
-                        verification_skipped = True  # set the flag that verification was skipped
-                        break
-
-                    # Single verification point for both existing and downloaded files
-                    if was_existing_file:
-                        print("Verifying existing file...")
-                    else:
-                        print("Verifying download integrity...")
-
                     # Debug logger.for API values
                     logger.debug("API values before VerificationManager creation:")
                     logger.debug("  api.checksum_file_name: %s", api.checksum_file_name)
@@ -294,13 +279,22 @@ class InstallAppCommand(Command):
                         asset_digest=api.asset_digest,
                     )
 
+                    # Define verification status message
+                    verification_status_message = (
+                        "Verification skipped: no hash file provided."
+                        if api.skip_verification
+                        else "Verification completed successfully."
+                    )
+
                     # set the full path to the downloaded file
                     verification_manager.set_appimage_path(downloaded_file_path)
-                    is_valid = verification_manager.verify_appimage(cleanup_on_failure=True)
+                    is_valid, verification_skipped = verification_manager.verify_for_update(
+                        downloaded_file_path, cleanup_on_failure=True
+                    )
 
                     if is_valid:
                         verification_success = True
-                        print("Verification successful!")
+                        print(f"Verification successful! {verification_status_message}")
                         break
                     # Verification failed
                     elif attempt == self.MAX_ATTEMPTS:
@@ -309,7 +303,9 @@ class InstallAppCommand(Command):
                         )
                         return
                     else:
-                        print(f"Verification failed. Attempt {attempt} of {self.MAX_ATTEMPTS}.")
+                        print(
+                            f"Verification failed. Attempt {attempt} of {self.MAX_ATTEMPTS}."
+                        )
                         retry = input("Retry download? (y/N): ").strip().lower()
                         if retry != "y":
                             print("Installation cancelled.")
@@ -372,22 +368,25 @@ class InstallAppCommand(Command):
             # Save the configuration only if all previous steps succeed
             app_config.save_config()
 
-            # Display success message with paths
-            if verification_skipped:
-                print(f"\n✅ {app_info.app_rename} successfully installed!")
-                print("⚠️ Note: AppImage was not verified because developers did not provide")
-                print("   a SHA file for this AppImage.")
-            else:
-                print(f"\n✅ {app_info.app_rename} successfully installed and verified!")
+            # # Display success message with paths
+            # if verification_skipped:
+            #     print(f"\n✅ {app_info.app_rename} successfully installed!")
+            #     print("⚠️ Note: AppImage was not verified because developers did not provide")
+            #     print("   a SHA file for this AppImage.")
+            # else:
+            #     print(f"\n✅ {app_info.app_rename} successfully installed and verified!")
 
             # Show config file location
             if app_config.config_file:
                 config_path = Path(app_config.config_file)
                 print(f"Config file created at: {config_path}")
+                print(f"Verification status: {verification_status_message}")
 
             # Show location of executable
             if api.appimage_name:
-                app_path = Path(self.global_config.expanded_app_storage_path) / api.appimage_name
+                app_path = (
+                    Path(self.global_config.expanded_app_storage_path) / api.appimage_name
+                )
                 print(f"Application installed to: {app_path}")
                 print("You can run it from the command line or create a desktop shortcut.")
         else:
