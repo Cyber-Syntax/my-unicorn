@@ -923,3 +923,71 @@ class BaseUpdateCommand(Command):
         except Exception as e:
             self._logger.error("Error in async update process: %s", str(e), exc_info=True)
             print(f"\nError in update process: {e!s}")           
+            
+    def find_updatable_apps(
+            self, selected_files: list[str] | None = None
+        ) -> list[dict[str, Any]]:
+            """Find AppImages that have updates available.
+    
+            Args:
+                selected_files (Optional[list[str]]): List of selected configuration files to check.
+                                                        If None, all available files will be checked.
+    
+            Returns:
+                list[tuple[str, Any]]: list of updatable app information dictionaries
+    
+            """
+            updatable_apps = []
+    
+            try:
+                # Get the list of files to process
+                if selected_files is None:
+                    json_files = self._list_all_config_files()
+                    if not json_files:
+                        logger.warning("No AppImage configuration files found")
+                        print(
+                            "No AppImage configuration files found. Use the Download option first."
+                        )
+                        return []
+                    print(f"Checking {len(json_files)} AppImage configurations...")
+                else:
+                    json_files = selected_files
+                    print(f"Checking {len(json_files)} selected AppImage configurations...")
+    
+                # Check each app for updates
+                for config_file in json_files:
+                    try:
+                        # Create a temporary app config for checking this app
+                        app_name = os.path.splitext(config_file)[0]  # Remove .json extension
+    
+                        # Directly check version without redirecting output
+                        app_data = self._check_single_app_version(self.app_config, config_file)
+    
+                        if (
+                            isinstance(app_data, dict)
+                            and "current" in app_data
+                            and "latest" in app_data
+                        ):
+                            print(
+                                f"{app_name}: update available: {app_data['current']} → "
+                                f"{app_data['latest']}"
+                            )
+                            updatable_apps.append(app_data)
+                        elif app_data is False:
+                            print(f"{app_name}: already up to date")
+                        else:
+                            print(f"{app_name}, unexpected result: {app_data}")
+    
+                    except Exception as e:
+                        logger.error("Error checking %s: %s", config_file, e)
+                        print(f"{app_name}: error: {e}")
+                    except KeyboardInterrupt:
+                        logger.info("Update check cancelled by user (Ctrl+C)")
+                        print("\nUpdate check cancelled by user (Ctrl+C)")
+                        return updatable_apps
+    
+            except Exception as e:
+                logger.error("Error during update check: %s", e)
+                print("Error during update check:", e)
+    
+            return updatable_apps           

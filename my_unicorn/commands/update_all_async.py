@@ -63,8 +63,14 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         5. Displays progress and results
         """
         try:
+            # Use predefined app names if provided, otherwise use interactive selection
+            if self._predefined_app_names:
+                selected_files = self._select_files_by_names(self._predefined_app_names)
+            else:
+                selected_files = self.app_config.select_files()
+
             # 1. Find updatable_apps apps via user selection
-            updatable_apps = self._find_updatable_apps()
+            updatable_apps = self.find_updatable_apps(selected_files)
             if not updatable_apps:
                 self._logger.info("No AppImages selected for update or all are up to date")
                 return
@@ -123,81 +129,6 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             self._logger.error("Unexpected error in async update: %s", str(e), exc_info=True)
             print(f"\nUnexpected error: {e!s}")
             return
-
-    def _find_updatable_apps(self) -> list[dict[str, Any]]:
-        """Find applications that can be updated through user selection.
-
-        This method handles rate limits during the scanning process by:
-        1. Checking available rate limits before API calls
-        2. Providing feedback about which apps could be checked
-        3. Allowing users to make informed decisions about which apps to update
-
-        Returns:
-            list[tuple[str, Any]]: A list of updatable_apps application information dictionaries
-
-        """
-        updatable_apps = []
-
-        # Use predefined app names if provided, otherwise use interactive selection
-        if self._predefined_app_names:
-            selected_files = self._select_files_by_names(self._predefined_app_names)
-        else:
-            selected_files = self.app_config.select_files()
-
-        if not selected_files:
-            print("No configuration files selected or available.")
-            return updatable_apps
-
-        # Check current rate limits before making API calls
-        self.check_rate_limits(selected_files)
-
-        # Check each selected file for updates with progress indication
-        print(f"\nChecking {len(selected_files)} selected apps for updates...")
-        print("-" * 60)
-
-        failed_checks = 0
-        checked_count = 0
-
-        for idx, config_file in enumerate(selected_files, 1):
-            app_name = config_file.split(".")[0]  # Extract name without extension
-            status_msg = f"Checking {app_name} ({idx}/{len(selected_files)})..."
-            print(f"{status_msg}", end="\r")
-
-            try:
-                app_data = self._check_single_app_version(self.app_config, config_file)
-                checked_count += 1
-
-                if app_data:
-                    if "error" in app_data:
-                        print(f"{app_name}: Error: {app_data['error']}" + " " * 20)
-                        failed_checks += 1
-                    else:
-                        print(
-                            f"{app_name}: Update available: {app_data['current']} → {app_data['latest']}"
-                            + " " * 20
-                        )
-                        updatable_apps.append(app_data)
-                else:
-                    print(f"{app_name}: Already up to date" + " " * 20)
-            except Exception as e:
-                print(f"{app_name}: Failed: {e!s}" + " " * 20)
-                failed_checks += 1
-                # If we hit rate limits, provide clear feedback
-                if "rate limit exceeded" in str(e).lower():
-                    print("\n⚠️ GitHub API rate limit exceeded. Cannot check remaining apps.")
-                    print("Consider adding a GitHub token or waiting until rate limits reset.")
-                    break
-
-        # Summary of check results
-        if not selected_files:
-            print("\nNo apps were checked due to rate limit constraints.")
-        else:
-            print("\n--- Check Summary ---")
-            print(f"✓ Updates available: {len(updatable_apps)}")
-            print(f"✗ Checks failed: {failed_checks}")
-            print(f"Total checked: {checked_count}/{len(selected_files)}")
-
-        return updatable_apps
 
     def _select_files_by_names(self, app_names: list[str]) -> list[str]:
         """Select configuration files based on provided app names.
