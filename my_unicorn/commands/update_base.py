@@ -727,6 +727,7 @@ class BaseUpdateCommand(Command):
             if remaining < 10:  # Now an int comparison
                 print("\n--- GitHub API Rate Limit Warning ---")
                 print(f"⚠️ Low API requests remaining: {remaining}/{limit}")
+                self._logger.warning("Low API requests remaining: %s/%s", remaining, limit)
                 if reset_time:
                     print(f"Limits reset at: {reset_time}")
 
@@ -942,7 +943,7 @@ class BaseUpdateCommand(Command):
             try:
                 # Get the list of files to process
                 if selected_files is None:
-                    json_files = self._list_all_config_files()
+                    json_files = self.app_config.list_json_files()
                     if not json_files:
                         logger.warning("No AppImage configuration files found")
                         print(

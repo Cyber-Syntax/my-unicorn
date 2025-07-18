@@ -18,7 +18,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from my_unicorn.auth_manager import GitHubAuthManager
 from my_unicorn.commands.update_base import BaseUpdateCommand
 
 
@@ -53,14 +52,9 @@ class SelectiveUpdateCommand(BaseUpdateCommand):
         # that was already loaded in BaseUpdateCommand.__post_init__()
 
     def execute(self) -> None:
-        """Main update execution flow with asynchronous processing.
+        """Execute the update process with selective asynchronous updates.
 
-        This method orchestrates the async update process:
-        1. Loads configuration and checks for available AppImages
-        2. Verifies GitHub API rate limits before proceeding
-        3. Finds updatable_apps apps through user selection
-        4. Manages concurrent update operations
-        5. Displays progress and results
+        This method checks all selected AppImages for updates and updates them asynchronously.
         """
         try:
             # Use predefined app names if provided, otherwise use interactive selection
@@ -82,41 +76,7 @@ class SelectiveUpdateCommand(BaseUpdateCommand):
                 return
 
             # 3. Check if we have enough rate limits for the selected apps
-            can_proceed, filtered_apps, status_message = self.check_rate_limits(updatable_apps)
-
-            if not can_proceed:
-                # Display rate limit status
-                print("\n--- GitHub API Rate Limit Check ---")
-                print(status_message)
-
-                if not filtered_apps:
-                    self._logger.warning("Update aborted: Insufficient API rate limits")
-                    print("Update process aborted due to rate limit constraints.")
-                    return
-
-                # Ask user if they want to proceed with partial updates
-                try:
-                    continue_partial = (
-                        input(
-                            f"\nProceed with partial update ({len(filtered_apps)}/{len(updatable_apps)} apps)? [y/N]: "
-                        )
-                        .strip()
-                        .lower()
-                        == "y"
-                    )
-
-                    if not continue_partial:
-                        self._logger.info("User declined partial update")
-                        print("Update cancelled.")
-                        return
-                except KeyboardInterrupt:
-                    self._logger.info("Rate limit confirmation cancelled by user (Ctrl+C)")
-                    print("\nUpdate cancelled by user (Ctrl+C)")
-                    return
-
-                # User confirmed - proceed with partial update
-                updatable_apps = filtered_apps
-                print(f"\nProceeding with update of {len(updatable_apps)} apps within rate limits.")
+            self.check_rate_limits(updatable_apps)
 
             # 4. Perform async updates
             self.update_apps_async_wrapper(updatable_apps)

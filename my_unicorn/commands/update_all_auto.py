@@ -7,13 +7,9 @@ asynchronous updates for improved performance.
 """
 
 import logging
-from typing import Any  # Retained for compatibility with Any type
+from typing import Any
 
 from my_unicorn.commands.update_base import BaseUpdateCommand
-
-# Constants for rate limit thresholds
-LOW_AUTHENTICATED_THRESHOLD = 100
-LOW_UNAUTHENTICATED_THRESHOLD = 20
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +21,7 @@ class AutoUpdateCommand(BaseUpdateCommand):
         """Check all AppImage configurations and update those with new versions available.
 
         This method automatically scans all available AppImage configurations and
-        updates any that have newer versions available. By default, it uses the
-        synchronous update method, but if async_mode is enabled, it will use
-        the more efficient concurrent update approach.
+        updates any that have newer versions available.
         """
         logger.info("Starting automatic check of all AppImages")
         print("Checking all AppImages for updates...")
@@ -64,21 +58,11 @@ class AutoUpdateCommand(BaseUpdateCommand):
             print("\nOperation cancelled by user (Ctrl+C)")
             return
 
-    def _list_all_config_files(self) -> list[str]:
-        """Get a list of all AppImage configuration files.
-
-        Returns:
-            list[str]: list of configuration filenames
-
-        """
-        return self.app_config.list_json_files()
-
     def _handle_interactive_update(self, updatable_apps: list[dict[str, Any]]) -> None:
         """Handle interactive mode where user selects which apps to update.
 
         Args:
             updatable_apps: list of updatable app information dictionaries
-
 
         """
         print("\nEnter the numbers of the AppImages you want to update (comma-separated):")
@@ -123,39 +107,6 @@ class AutoUpdateCommand(BaseUpdateCommand):
             logger.info("Selection cancelled by user (Ctrl+C)")
             print("\nSelection cancelled by user (Ctrl+C)")
             return
-
-    def _update_apps(self, apps_to_update: list[dict[str, Any]]) -> None:
-        """Update multiple apps synchronously.
-
-        Args:
-            apps_to_update: list of app information dictionaries to update
-
-        """
-        success_count = 0
-        failure_count = 0
-
-        for idx, app_data in enumerate(apps_to_update, 1):
-            print(f"\n[{idx}/{len(apps_to_update)}] Updating {app_data['name']}...")
-            result = self._update_single_app(app_data, is_batch=True)
-
-            if result:
-                success_count += 1
-                logger.info("Successfully updated %s", app_data["name"])
-            else:
-                failure_count += 1
-                logger.error("Failed to update %s", app_data["name"])
-
-        print("\n=== Update Summary ===")
-        print(f"Total apps processed: {success_count + failure_count}/{len(apps_to_update)}")
-        print(f"Successfully updated: {success_count}")
-
-        if failure_count > 0:
-            print(f"Failed updates: {failure_count}")
-
-        print("\nUpdate process completed!")
-
-        # Display updated rate limit information after updates
-        self.display_rate_limit_info()
 
     def _display_update_list(self, updatable_apps: list[dict[str, Any]]) -> None:
         """Display list of apps to update."""
