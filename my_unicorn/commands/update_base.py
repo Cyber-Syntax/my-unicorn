@@ -11,6 +11,7 @@ import logging
 import os
 import time
 from typing import Any
+from pathlib import Path
 
 from my_unicorn.api.github_api import GitHubAPI
 from my_unicorn.app_config import AppConfigManager
@@ -37,9 +38,6 @@ class BaseUpdateCommand(Command):
         self.app_config = AppConfigManager()
         self._logger = logging.getLogger(__name__)
 
-        # Ensure global config is loaded
-        self.global_config.load_config()
-
         self.max_concurrent_updates = self.global_config.max_concurrent_updates
         self._logger.debug(
             "set max_concurrent_updates to %s from global config", self.max_concurrent_updates
@@ -59,10 +57,6 @@ class BaseUpdateCommand(Command):
         self.semaphore: asyncio.Semaphore = asyncio.Semaphore(semaphore_value)
         self._logger.debug("Semaphore initialized with value: %s", semaphore_value)
 
-        # Ensure base directory paths exist
-        os.makedirs(self.global_config.expanded_app_storage_path, exist_ok=True)
-        os.makedirs(self.global_config.expanded_app_backup_storage_path, exist_ok=True)
-        os.makedirs(self.global_config.expanded_app_download_path, exist_ok=True)
 
     def execute(self):
         """Abstract execute method to be implemented by subclasses."""
@@ -600,21 +594,8 @@ class BaseUpdateCommand(Command):
     ) -> FileHandler:
         """Create a FileHandler instance with proper configuration."""
         # Ensure critical FileHandler parameters are not None
-        required_fh_params = {
-            "appimage_name": github_api.appimage_name,
-            "repo": github_api.repo,
-            "owner": github_api.owner,
-            "version": github_api.version,
-            "app_rename": app_config.app_rename,
-        }
-
-        for param, value in required_fh_params.items():
-            if value is None:
-                raise ValueError(
-                    f"FileHandler critical parameter '{param}' is None before instantiation for {github_api.owner}/{github_api.repo}."
-                )
-
-        from pathlib import Path
+        if not all([github_api.appimage_name, github_api.repo, github_api.owner]):
+            raise ValueError("Missing required parameters for FileHandler")
 
         return FileHandler(
             appimage_name=str(github_api.appimage_name),
@@ -708,39 +689,64 @@ class BaseUpdateCommand(Command):
             }
         return False  # No update available
 
-    def _check_rate_limits(
-        self, apps_to_update: list[dict[str, Any]]
+    def check_rate_limits(
+        self, apps: list[dict[str, Any]]
     ) -> tuple[bool, list[dict[str, Any]], str]:
-        """Check if we have sufficient GitHub API rate limits for updates.
+        """Generalized rate limit check logic.
 
         Args:
-            apps_to_update: list of apps to update
+            apps: list of app information dictionaries
 
         Returns:
             tuple containing:
-            - bool: Whether we can proceed with updates
-            - list[tuple[str, Any]]: Filtered list of apps (may be reduced)
-            - str: Message describing the rate limit status
+            - bool: True if we can proceed with all apps, False if partial/no update needed
+            - list[tuple[str, Any]]: Filtered list of apps that can be processed
+            - str: Status message explaining the rate limit situation
 
         """
         try:
             # Get current rate limit info
-            remaining, limit, reset_time, is_authenticated = (
+            remaining, limit, reset_time, auth = (
                 GitHubAuthManager.get_rate_limit_info()
             )
 
-            # Ensure remaining is an integer
-            if isinstance(remaining, str):
-                remaining = int(remaining)
-
             # Calculate requests needed (estimate 3 per app: version check, release info, icon check)
+            #TODO: make sure that is also checked for each app
+            # and auto and selective commands
             requests_per_app = 3
-            total_requests_needed = len(apps_to_update) * requests_per_app
+            total_requests_needed = len(apps) * requests_per_app
 
             # Check if we have enough requests for all apps
             if remaining >= total_requests_needed:
-                message = f"Rate limit status: {remaining}/{limit} requests remaining. Sufficient for all {len(apps_to_update)} apps."
-                return True, apps_to_update, message
+                message = "Rate limit status: {}/{} requests remaining. Sufficient for all {} apps.".format(remaining, limit, len(apps))
+                self._logger.info(message)
+                return True, apps, message
+    
+            # Show a warning if rate limits are low but don't prevent user from proceeding
+            if remaining < 10:  # Now an int comparison
+                print("\n--- GitHub API Rate Limit Warning ---")
+                print(f"⚠️ Low API requests remaining: {remaining}/{limit}")
+                if reset_time:
+                    print(f"Limits reset at: {reset_time}")
+
+                if not is_authenticated:
+                    print(
+                        "\n🔑 Consider adding a GitHub token using option 7 in the main menu to increase rate limits (5000/hour)."
+                    )
+
+                print(
+                    "\nYou can still proceed, but you may not be able to update all selected apps."
+                )
+                print("Consider selecting fewer apps or only the most important ones.\n")
+
+                # Give user a chance to abort
+                try:
+                    if input("Do you want to continue anyway? [y/N]: ").strip().lower() != "y":
+                        print("Operation cancelled.")
+                        return
+                except KeyboardInterrupt:
+                    print("\nOperation cancelled.")
+                    return
 
             # Not enough for all apps - see how many we can process
             apps_we_can_process = max(0, remaining // requests_per_app)
@@ -751,13 +757,14 @@ class BaseUpdateCommand(Command):
                     f"Minimum requests required: {requests_per_app}. "
                     f"Rate limit resets at: {reset_time}"
                 )
+                self._logger.error("ERROR: Not enough API requests remaining (%d/%d). Minimum requests required: %d. Rate limit resets at: %s", remaining, limit, requests_per_app, reset_time)
                 return False, [], message
 
             # We can process some apps but not all
-            filtered_apps = apps_to_update[:apps_we_can_process]
+            filtered_apps = apps[:apps_we_can_process]
             message = (
                 f"WARNING: Not enough API requests for all updates. "
-                f"Can process {apps_we_can_process} out of {len(apps_to_update)} apps. "
+                f"Can process {apps_we_can_process} out of {len(apps)} apps. "
                 f"Remaining requests: {remaining}/{limit}"
             )
             return False, filtered_apps, message
@@ -765,7 +772,7 @@ class BaseUpdateCommand(Command):
         except Exception as e:
             self._logger.error("Error checking rate limits: %s", e)
             message = f"Error checking rate limits: {e}. Proceeding with caution."
-            return True, apps_to_update, message
+            return True, apps, message
 
     def display_rate_limit_info(self) -> None:
         """Display current GitHub API rate limit information."""

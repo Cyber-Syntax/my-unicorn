@@ -61,75 +61,25 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         This method orchestrates the async update process:
         1. Loads configuration and checks for available AppImages
         2. Verifies GitHub API rate limits before proceeding
-        3. Finds updatable apps through user selection
+        3. Finds updatable_apps apps through user selection
         4. Manages concurrent update operations
         5. Displays progress and results
         """
         try:
-            # Get available configuration files
-            available_files = self.app_config.list_json_files()
-
-            if not available_files:
-                self._logger.warning("No AppImage configuration files found")
-                print("No AppImage configuration files found. Use the Download option first.")
-                return
-
-            # Check current rate limits before any API operations
-            raw_remaining, raw_limit, reset_time, is_authenticated = (
-                GitHubAuthManager.get_rate_limit_info()
-            )
-            try:
-                remaining = int(raw_remaining)
-                limit = int(raw_limit)
-            except (ValueError, TypeError):
-                self._logger.error(
-                    "Could not parse rate limit values: remaining=%s, limit=%s",
-                    raw_remaining,
-                    raw_limit,
-                )
-                print("Error: Could not determine API rate limits. Cannot proceed.")
-                return
-
-            # Show a warning if rate limits are low but don't prevent user from proceeding
-            if remaining < 10:  # Now an int comparison
-                print("\n--- GitHub API Rate Limit Warning ---")
-                print(f"⚠️ Low API requests remaining: {remaining}/{limit}")
-                if reset_time:
-                    print(f"Limits reset at: {reset_time}")
-
-                if not is_authenticated:
-                    print(
-                        "\n🔑 Consider adding a GitHub token using option 7 in the main menu to increase rate limits (5000/hour)."
-                    )
-
-                print(
-                    "\nYou can still proceed, but you may not be able to update all selected apps."
-                )
-                print("Consider selecting fewer apps or only the most important ones.\n")
-
-                # Give user a chance to abort
-                try:
-                    if input("Do you want to continue anyway? [y/N]: ").strip().lower() != "y":
-                        print("Operation cancelled.")
-                        return
-                except KeyboardInterrupt:
-                    print("\nOperation cancelled.")
-                    return
-
-            # 1. Find updatable apps via user selection
-            updatable = self._find_updatable_apps()
-            if not updatable:
+            # 1. Find updatable_apps apps via user selection
+            updatable_apps = self._find_updatable_apps()
+            if not updatable_apps:
                 self._logger.info("No AppImages selected for update or all are up to date")
                 return
 
             # 2. Get user confirmation
-            if not self._confirm_updates(updatable):
+            if not self._confirm_updates(updatable_apps):
                 self._logger.info("Update cancelled by user")
                 print("Update cancelled")
                 return
 
             # 3. Check if we have enough rate limits for the selected apps
-            can_proceed, filtered_apps, status_message = self._check_rate_limits(updatable)
+            can_proceed, filtered_apps, status_message = self.check_rate_limits(updatable_apps)
 
             if not can_proceed:
                 # Display rate limit status
@@ -145,7 +95,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                 try:
                     continue_partial = (
                         input(
-                            f"\nProceed with partial update ({len(filtered_apps)}/{len(updatable)} apps)? [y/N]: "
+                            f"\nProceed with partial update ({len(filtered_apps)}/{len(updatable_apps)} apps)? [y/N]: "
                         )
                         .strip()
                         .lower()
@@ -162,11 +112,11 @@ class UpdateAsyncCommand(BaseUpdateCommand):
                     return
 
                 # User confirmed - proceed with partial update
-                updatable = filtered_apps
-                print(f"\nProceeding with update of {len(updatable)} apps within rate limits.")
+                updatable_apps = filtered_apps
+                print(f"\nProceeding with update of {len(updatable_apps)} apps within rate limits.")
 
             # 4. Perform async updates
-            self._perform_async_updates(updatable)
+            self._perform_async_updates(updatable_apps)
 
         except KeyboardInterrupt:
             self._logger.info("Operation cancelled by user (Ctrl+C)")
@@ -186,7 +136,7 @@ class UpdateAsyncCommand(BaseUpdateCommand):
         3. Allowing users to make informed decisions about which apps to update
 
         Returns:
-            list[tuple[str, Any]]: A list of updatable application information dictionaries
+            list[tuple[str, Any]]: A list of updatable_apps application information dictionaries
 
         """
         updatable_apps = []
@@ -367,11 +317,11 @@ class UpdateAsyncCommand(BaseUpdateCommand):
 
         return selected_files
 
-    def _confirm_updates(self, updatable: list[dict[str, Any]]) -> bool:
+    def _confirm_updates(self, updatable_apps: list[dict[str, Any]]) -> bool:
         """Handle user confirmation based on batch mode.
 
         Args:
-            updatable: list of updatable app information dictionaries
+            updatable_apps: list of updatable_apps app information dictionaries
 
         Returns:
             bool: True if updates are confirmed, False otherwise
@@ -383,12 +333,12 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             return True
 
         # Display list of apps to update
-        print(f"\nFound {len(updatable)} apps to update:")
+        print(f"\nFound {len(updatable_apps)} apps to update:")
         print("-" * 60)
         print("# | App                  | Current      | Latest")
         print("-" * 60)
 
-        for idx, app in enumerate(updatable, 1):
+        for idx, app in enumerate(updatable_apps, 1):
             print(f"{idx:<2}| {app['name']:<20} | {app['current']:<12} | {app['latest']}")
 
         print("-" * 60)
@@ -399,101 +349,6 @@ class UpdateAsyncCommand(BaseUpdateCommand):
             self._logger.info("Confirmation cancelled by user (Ctrl+C)")
             print("\nConfirmation cancelled by user (Ctrl+C)")
             return False
-
-    def _check_rate_limits(
-        self, apps: list[dict[str, Any]]
-    ) -> tuple[bool, list[dict[str, Any]], str]:
-        """Check if we have enough API rate limits for the selected apps.
-
-        This method:
-        1. Gets current GitHub API rate limits
-        2. Estimates required requests per app (2-3 typically)
-        3. Determines if there are enough rate limits for all selected apps
-        4. If not, filters to apps that can be processed within limits
-
-        Args:
-            apps: list of app information dictionaries
-
-        Returns:
-            tuple containing:
-            - bool: True if we can proceed with all apps, False if partial/no update needed
-            - list[tuple[str, Any]]: Filtered list of apps that can be processed
-            - str: Status message explaining the rate limit situation
-
-        """
-        # Get current rate limit info
-        raw_remaining, raw_limit, reset_time, is_authenticated = (
-            GitHubAuthManager.get_rate_limit_info()
-        )
-        try:
-            remaining = int(raw_remaining)
-            limit = int(raw_limit)
-        except (ValueError, TypeError):
-            self._logger.error(
-                "Could not parse rate limit values: remaining=%s, limit=%s",
-                raw_remaining,
-                raw_limit,
-            )
-            return False, [], "Error: Could not determine API rate limits."
-
-        # For each app, we need approximately:
-        # - 1 API call to fetch releases
-        # - 1 API call to get version info
-        # - Potentially 1 more if we need additional info (uncommon)
-        # Using 3 as a conservative estimate to be safe
-        requests_per_app = 3
-
-        # Calculate total required requests
-        required_requests = len(apps) * requests_per_app
-
-        # Check if we have enough remaining
-        if remaining >= required_requests:
-            # We have enough rate limits for all apps
-            return (
-                True,
-                apps,
-                f"Sufficient API rate limits: {remaining} remaining, {required_requests} required",
-            )
-
-        # Not enough for all apps - calculate how many we can process
-        processable_apps_count = remaining // requests_per_app
-        filtered_apps = []
-
-        if processable_apps_count > 0:
-            # Take only as many apps as we can process with available rate limits
-            filtered_apps = apps[:processable_apps_count]
-            status = (
-                f"⚠️ Insufficient API rate limits for all apps.\n"
-                f"Rate limits: {remaining}/{limit} remaining\n"
-                f"Total required: {required_requests} ({requests_per_app} per app × {len(apps)} apps)\n"
-                f"Can process: {processable_apps_count}/{len(apps)} apps with current rate limits"
-            )
-
-            if reset_time:
-                status += f"\nLimits reset at: {reset_time}"
-
-            if not is_authenticated:
-                status += (
-                    "\n\n🔑 Adding a GitHub token would increase your rate limit to 5000/hour."
-                )
-        else:
-            # Can't process any apps with current rate limits
-            status = (
-                f"❌ Insufficient API rate limits.\n"
-                f"Rate limits: {remaining}/{limit} remaining\n"
-                f"Required: {required_requests} ({requests_per_app} per app × {len(apps)} apps)\n"
-                f"Cannot process any apps with current rate limits."
-            )
-
-            if reset_time:
-                status += f"\nLimits reset at: {reset_time}"
-
-            if not is_authenticated:
-                status += (
-                    "\n\n🔑 Adding a GitHub token would increase your rate limit to 5000/hour."
-                )
-
-        return False, filtered_apps, status
 
     def _perform_async_updates(self, apps_to_update: list[dict[str, Any]]) -> None:
         """Perform async updates using the base class functionality.
@@ -535,7 +390,9 @@ class UpdateAsyncCommand(BaseUpdateCommand):
 
             # Show completion message
             print("\n=== Update Summary ===")
-            print(f"Total apps processed: {success_count + failure_count}/{len(apps_to_update)}")
+            print(
+                f"Total apps processed: {success_count + failure_count}/{len(apps_to_update)}"
+            )
             print(f"Successfully updated: {success_count}")
 
             # Show detailed messages for successful updates

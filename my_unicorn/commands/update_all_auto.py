@@ -39,59 +39,7 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
         try:
             # Use async mode by default - it's more efficient
             use_async = True
-
-            # Check rate limits before proceeding with any API operations
-            # Get current rate limit information
-            (raw_remaining, raw_limit, reset_time, is_authenticated) = (
-                GitHubAuthManager.get_rate_limit_info()
-            )
-
-            # Convert to integers as the API sometimes returns strings
-            try:
-                remaining = int(raw_remaining)
-                limit = int(raw_limit)
-            except (ValueError, TypeError):
-                logger.error("Failed to parse rate limit information")
-                print("Error: Could not determine API rate limits. Please try again.")
-                return
-
-            # Calculate minimum requests needed (at least one per app config)
-            json_files = self._list_all_config_files()
-            if not json_files:
-                logger.warning("No AppImage configuration files found")
-                print("No AppImage configuration files found. Use the Download option first.")
-                return
-
-            # Each app will need at least one request
-            min_requests_needed = len(json_files)
-
-            # Check if we have enough requests to at least check all apps
-            if remaining < min_requests_needed:
-                logger.error(
-                    "Insufficient API requests to check all apps: %d/%d available",
-                    remaining,
-                    min_requests_needed,
-                )
-                print("\n--- GitHub API Rate Limit Warning ---")
-                print("⚠️  Not enough API requests available to check all apps!")
-
-                auth_status = " (authenticated)" if is_authenticated else " (unauthenticated)"
-                print(f"Rate limit status: {remaining}/{limit} requests remaining{auth_status}")
-
-                if reset_time:
-                    print(f"Limits reset at: {reset_time}")
-
-                print(f"Minimum requests required: {min_requests_needed} (one per app config)")
-
-                if not is_authenticated:
-                    print(
-                        "\n🔑 Please add a GitHub token using option 6 in the main menu "
-                        "to increase rate limits (5000/hour)."
-                    )
-
-                print("\nPlease try again later when more API requests are available.")
-                return
-
+            
             # Find all updatable apps
             updatable_apps = self._find_all_updatable_apps()
 
@@ -99,6 +47,8 @@ class UpdateAllAutoCommand(BaseUpdateCommand):
                 logger.info("All AppImages are up to date")
                 print("All AppImages are up to date!")
                 return
+            
+            self.check_rate_limits(updatable_apps)
 
             # Display updatable apps to user
             self._display_update_list(updatable_apps)

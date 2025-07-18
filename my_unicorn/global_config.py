@@ -20,10 +20,15 @@ class GlobalConfigManager:
     max_concurrent_updates: int = field(default=3)  # Default value for maximum concurrent updates
 
     def __post_init__(self):
+        # Ensure the XDG config directory exists
+        os.makedirs(self.expanded_app_storage_path, exist_ok=True)
+        os.makedirs(self.expanded_app_backup_storage_path, exist_ok=True)
+        os.makedirs(self.expanded_app_download_path, exist_ok=True)
+        os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
+        
         # Expand only the config file path during initialization
         self.config_file = os.path.expanduser(self.config_file)
-        # Ensure the XDG config directory exists
-        os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
+        
         self.load_config()
 
     def reload(self):
