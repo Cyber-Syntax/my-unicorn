@@ -208,7 +208,7 @@ class ManageTokenCommand(Command):
         else:
             print("\n❓ No tokens were found to remove or removal failed")
 
-    def check_rate_limits(self, token: str = None) -> None:
+    def check_rate_limits(self, token: str | None = None) -> None:
         """Check and display GitHub API rate limits for the current token.
 
         This method makes a direct API call to GitHub to get the most up-to-date
@@ -406,7 +406,7 @@ class ManageTokenCommand(Command):
             print("   Please check your network connection and token validity.")
             print("   Check application logs for more details.")
 
-    def validate_token(self, token: str) -> bool:
+    def _validate_token(self, token: str) -> bool:
         """Validate a GitHub token by testing API access.
 
         This uses GitHubAuthManager for more reliable token validation.
@@ -706,7 +706,7 @@ class ManageTokenCommand(Command):
                 return
 
             # Validate the token using GitHubAuthManager for improved validation
-            if not self.validate_token(token):
+            if not self._validate_token(token):
                 self._logger.error("Invalid GitHub token! _validate_token returned False")
                 print("\n❌ Invalid GitHub token! Token was not saved.")
                 print("   Please make sure you've entered the token correctly.")

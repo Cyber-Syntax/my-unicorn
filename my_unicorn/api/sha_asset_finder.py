@@ -115,7 +115,6 @@ class SHAAssetFinder:
                         # Return a special asset dict that indicates asset digest usage
                         return {
                             "name": "asset_digest",
-                            "browser_download_url": None,
                             "digest": digest,
                             "checksum_hash_type": "asset_digest",
                             "asset_digest_hash": digest_hash,

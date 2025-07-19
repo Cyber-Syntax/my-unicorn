@@ -5,12 +5,12 @@ This module handles the processing of GitHub release data into structured format
 """
 
 import logging
-import re  # Import the 're' module
+import re
 from typing import Any
 
 from packaging.version import parse as parse_version_string
 
-from my_unicorn.api.assets import ReleaseInfo  # Corrected import path
+from my_unicorn.api.assets import ReleaseInfo
 from my_unicorn.utils import version_utils
 
 logger = logging.getLogger(__name__)
@@ -40,135 +40,67 @@ class ReleaseProcessor:
     def compare_versions(
         self, current_version: str, latest_version: str
     ) -> tuple[bool, dict[str, str]]:
-        """Compare two version strings to determine if an update is available.
-
-        Args:
-            current_version: Current version string
-            latest_version: Latest version string from GitHub
-
-        Returns:
-            tuple containing update available flag and version information
-
-        """
-        # Normalize original versions first (e.g., remove 'v' prefix)
-        current_normalized_initial = version_utils.normalize_version_for_comparison(current_version)
-        latest_normalized_initial = version_utils.normalize_version_for_comparison(latest_version)
-
-        # For zen-browser, for comparison logic *only*, strip the trailing letter.
-        # The actual latest_version (e.g., "1.12.28b") is kept for storage/display.
-        current_for_comparison = current_normalized_initial
-        latest_for_comparison = latest_normalized_initial
-
-        if self.owner == "zen-browser" and self.repo == "desktop":
-            zen_pattern_strip = re.compile(r"^(\d+\.\d+\.\d+)([a-zA-Z])$")  # Matches X.Y.Z[letter]
-
-            current_match_strip = zen_pattern_strip.match(current_for_comparison)
-            if current_match_strip:
-                base_current = current_match_strip.group(1)
-                logger.debug(
-                    "Zen-browser: stripping suffix for comparison. Current '%s' -> '%s'",
-                    current_for_comparison,
-                    base_current,
-                )
-                current_for_comparison = base_current
-
-            latest_match_strip = zen_pattern_strip.match(latest_for_comparison)
-            if latest_match_strip:
-                base_latest = latest_match_strip.group(1)
-                logger.debug(
-                    "Zen-browser: stripping suffix for comparison. Latest '%s' -> '%s'",
-                    latest_for_comparison,
-                    base_latest,
-                )
-                latest_for_comparison = base_latest
-
-        # These strings (potentially with suffixes stripped for zen-browser) are used for base version comparison
-        current_parseable_str = current_for_comparison  # Corrected typo
-        latest_parseable_str = latest_for_comparison
-
-        # However, for the actual parsing by packaging.version to check prerelease flags etc.,
-        # we should use the versions that have NOT been stripped of their suffixes,
-        # because "1.12.28b" is a pre-release according to packaging.version.
-        # The comparison of base versions (stripped) determines if we *consider* an update.
-        # The comparison of full versions (unstripped) by packaging.version then refines this.
-
-        # Let's define what gets parsed for the full comparison (with suffixes if any)
-        # These are the original normalized versions, before any zen-browser specific stripping for base comparison.
-        current_full_parseable_str = current_normalized_initial
-        latest_full_parseable_str = latest_normalized_initial
-
-        logger.debug(
-            "Base versions for comparison: Current base '%s' vs Latest base '%s'",
-            current_parseable_str,
-            latest_parseable_str,
+        """Compare two version strings to determine if an update is available."""
+        # Normalize versions
+        current_normalized = version_utils.normalize_version_for_comparison(current_version)
+        latest_normalized = version_utils.normalize_version_for_comparison(latest_version)
+        
+        # Handle zen-browser special formatting
+        current_normalized = version_utils.handle_zen_browser_version(
+            current_version, current_normalized, self.owner, self.repo
         )
-        logger.debug(
-            "Full versions for parsing: Current full '%s' vs Latest full '%s'",
-            current_full_parseable_str,
-            latest_full_parseable_str,
+        latest_normalized = version_utils.handle_zen_browser_version(
+            latest_version, latest_normalized, self.owner, self.repo
         )
-
+    
+        # For comparison, use base versions without letter suffixes
+        current_base = self._get_zen_base_version(current_normalized) if self._is_zen_browser else current_normalized
+        latest_base = self._get_zen_base_version(latest_normalized) if self._is_zen_browser else latest_normalized
+    
         update_available = False
-
-        if not current_parseable_str:  # Use the correct variable name
-            # No current version installed, so any latest version is technically not an "update"
-            # in the sense of replacing something. However, if latest_parseable_str exists,
-            # it implies a version is available for new install.
-            # For the purpose of "update_available" flag, if no current version, no update is "pending".
-            pass
-        elif not latest_parseable_str:  # Use the correct variable name
-            # No latest version found online, so no update available.
-            pass
-        else:
-            try:
-                # Parse the full versions (e.g., "1.12.28b") to respect their pre-release/etc flags
-                parsed_current_full_version = parse_version_string(current_full_parseable_str)
-                parsed_latest_full_version = parse_version_string(latest_full_parseable_str)
-
-                # Parse the (potentially stripped for zen-browser) versions for base comparison
-                parsed_current_base_for_compare = parse_version_string(
-                    current_parseable_str
-                )  # current_parseable_str was latest_for_comparison, fixed
-                parsed_latest_base_for_compare = parse_version_string(latest_parseable_str)
-
-                # zen-browser uses a custom versioning scheme with letter suffixes (e.g. 1.12.28b)
-                # They don't use GitHub's prerelease flag, marking all releases as "latest" with prerelease: false
-                # Historical versions: 1.0.1a (alpha) -> 1.12.28b (current pattern for ~2 years)
-                # The letter suffix could be any letter (a, b, c, etc.) and may change in the future
-                # If they adopt proper semver, they might switch to v1.15.5 format without suffixes
-                # NOTE: While packaging.version treats "1.12.28b" as a prerelease, for zen-browser
-                # this is their standard release format, NOT a prerelease (no beta: true in zen-browser.json)
-                if self.owner == "zen-browser" and self.repo == "desktop":
-                    # Allow updates if base version is newer OR if same base but different suffix
-                    # Examples: 1.12.28 -> 1.12.28b, 1.12.28a -> 1.12.28b, 1.12.28 -> 1.13.0
-                    if parsed_latest_base_for_compare > parsed_current_base_for_compare or (
-                        parsed_latest_base_for_compare == parsed_current_base_for_compare
-                        and latest_full_parseable_str != current_full_parseable_str
-                    ):
-                        update_available = True
-                # Standard logic for all other repositories: if latest version is newer, allow update
-                elif parsed_latest_full_version > parsed_current_full_version:
-                    update_available = True
-            except (ValueError, TypeError) as e:
-                # Log with the strings that were attempted to be parsed by packaging.version
-                logger.error(
-                    "Error parsing versions for comparison (current_full='%s', latest_full='%s'): %s",
-                    current_full_parseable_str,
-                    latest_full_parseable_str,
-                    e,
+        is_zen = self._is_zen_browser
+    
+        try:
+            parsed_current = parse_version_string(current_normalized)
+            parsed_latest = parse_version_string(latest_normalized)
+            parsed_current_base = parse_version_string(current_base)
+            parsed_latest_base = parse_version_string(latest_base)
+    
+            if is_zen:
+                # Zen-browser logic: update if base is newer or same base with different suffix
+                update_available = (
+                    parsed_latest_base > parsed_current_base or 
+                    (parsed_latest_base == parsed_current_base and latest_normalized != current_normalized)
                 )
-                # Keep update_available = False on error, or handle as appropriate
-
-        if update_available:  # Log only if an update is actually flagged
-            # Log with original latest_version (e.g., 1.12.28b), not the transformed one
-            logger.info("Update available: %s → %s", current_version, latest_version)
-
+            else:
+                # Standard logic: update if newer version
+                update_available = parsed_latest > parsed_current
+    
+        except (ValueError, TypeError) as e:
+            logger.error("Version parsing error: %s", e)
+            # Fallback to string comparison if parsing fails
+            update_available = latest_normalized > current_normalized
+    
         return update_available, {
             "current_version": current_version,
-            "latest_version": latest_version,  # This is the raw tag like "1.12.28b"
-            "current_normalized": current_full_parseable_str,  # What was parsed by packaging.version
-            "latest_normalized": latest_full_parseable_str,  # What was parsed by packaging.version
+            "latest_version": latest_version,
+            "current_normalized": current_normalized,
+            "latest_normalized": latest_normalized,
         }
+    
+    @property
+    def _is_zen_browser(self) -> bool:
+        """Check if this is zen-browser repo."""
+        return self.owner == "zen-browser" and self.repo == "desktop"
+    
+    def _get_zen_base_version(self, version: str) -> str:
+        """Extract base version number for zen-browser (without letter suffix)."""
+        if not self._is_zen_browser:
+            return version
+        
+        # Match patterns like 1.12.28b or 1.12.28
+        match = re.match(r"^(\d+\.\d+\.\d+)[a-zA-Z]?$", version)
+        return match.group(1) if match else version
 
     def filter_compatible_assets(
         self, assets: list[dict[str, str]], arch_keywords: list[str] | None = None

@@ -44,24 +44,6 @@ def normalize_version_for_comparison(version: str | None) -> str:
     return normalized
 
 
-def extract_base_version(version: str) -> str:
-    """Extract the base version number without beta/alpha suffixes.
-
-    Args:
-        version: Version string to extract from
-
-    Returns:
-        str: Base version number (e.g., "0.23.3" from "0.23.3-beta")
-
-    """
-    # Split on common version separators
-    for separator in ["-", "+", "_"]:
-        if separator in version:
-            return version.split(separator)[0]
-
-    return version
-
-
 def extract_version(tag: str, is_beta: bool = False) -> str | None:
     """Extract semantic version from tag string.
 
@@ -81,7 +63,9 @@ def extract_version(tag: str, is_beta: bool = False) -> str | None:
     # Handle Standard Notes format: @standardnotes/desktop@3.195.13
     std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", tag)
     if std_notes_match:
-        logger.debug("Extracted version from Standard Notes format: %s", std_notes_match.group(1))
+        logger.debug(
+            "Extracted version from Standard Notes format: %s", std_notes_match.group(1)
+        )
         return std_notes_match.group(1)
 
     # Clean common prefixes/suffixes
@@ -102,6 +86,24 @@ def extract_version(tag: str, is_beta: bool = False) -> str | None:
     return alt_match.group(1) if alt_match else None
 
 
+def handle_standard_notes_version(filename: str) -> str | None:
+    """Extract version from Standard Notes tag."""
+    # Handle Standard Notes format: @standardnotes/desktop@3.195.13
+    std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", filename)
+    if std_notes_match:
+        logger.debug(
+            "Extracted version from Standard Notes filename: %s", std_notes_match.group(1)
+        )
+        return std_notes_match.group(1)
+
+    # Handle Standard Notes AppImage format: app-3.195.13-x86_64.AppImage
+    if filename.startswith("app-") and "standardnotes" in str(filename).lower():
+        match = re.search(r"-(\d+\.\d+\.\d+)", filename)
+        if match:
+            logger.debug("Extracted version from Standard Notes AppImage: %s", match.group(1))
+            return match.group(1)
+
+
 def extract_version_from_filename(filename: str) -> str | None:
     """Extract version from AppImage filename.
 
@@ -115,18 +117,9 @@ def extract_version_from_filename(filename: str) -> str | None:
     if not filename:
         return None
 
-    # Handle Standard Notes format: @standardnotes/desktop@3.195.13
-    std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", filename)
-    if std_notes_match:
-        logger.debug("Extracted version from Standard Notes filename: %s", std_notes_match.group(1))
-        return std_notes_match.group(1)
-
-    # Handle Standard Notes AppImage format: app-3.195.13-x86_64.AppImage
+    # Handle standard notes
     if filename.startswith("app-") and "standardnotes" in str(filename).lower():
-        match = re.search(r"-(\d+\.\d+\.\d+)", filename)
-        if match:
-            logger.debug("Extracted version from Standard Notes AppImage: %s", match.group(1))
-            return match.group(1)
+        handle_standard_notes_version(filename)
 
     # First try a direct match for semantic version pattern
     version_match = re.search(r"(\d+\.\d+\.\d+)(?!-)", filename)
@@ -152,35 +145,21 @@ def extract_version_from_filename(filename: str) -> str | None:
 
     return version_match.group(0) if version_match else None
 
+def handle_zen_browser_version(
+    raw_tag: str, normalized_version: str, owner: str, repo: str
+) -> str:
+    """Handle zen-browser's special version format (X.Y.Z[letter])."""
+    if owner == "zen-browser" and repo == "desktop":
+        import re
 
-def repo_uses_beta(repo_name: str) -> bool:
-    """Determine if a repository typically uses beta/pre-releases.
-
-    Args:
-        repo_name: Repository name to check
-
-    Returns:
-        bool: True if the repository typically uses beta releases
-
-    """
-    # Import here to avoid circular imports
-    from my_unicorn.catalog import get_all_apps
-
-    # Get all apps from catalog
-    all_apps = get_all_apps()
-
-    # Look for the repo in the catalog
-    for app_info in all_apps.values():
-        if app_info.repo.lower() == repo_name.lower():
-            if app_info.beta:
-                logger.info("Repository %s is configured to use beta releases", repo_name)
-                return True
-            break
-
-    # Fallback to hardcoded list for backward compatibility
-    beta_repos = ["FreeTube"]
-    if repo_name in beta_repos:
-        logger.info("Repository %s is configured to use beta releases (fallback)", repo_name)
-        return True
-
-    return False
+        zen_tag_pattern = re.compile(r"^v?(\d+\.\d+\.\d+)([a-zA-Z])$")
+        match = zen_tag_pattern.match(raw_tag)
+        if match:
+            version_base, letter_suffix = match.group(1), match.group(2)
+            potential_zen_version = f"{version_base}{letter_suffix}"
+            if normalized_version != potential_zen_version:
+                logger.info(
+                    f"zen-browser: using version format {potential_zen_version} instead of {normalized_version} from tag {raw_tag}"
+                )
+                return potential_zen_version
+    return normalized_version

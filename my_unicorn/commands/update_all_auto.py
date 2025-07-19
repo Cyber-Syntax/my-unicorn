@@ -79,30 +79,31 @@ class AutoUpdateCommand(BaseUpdateCommand):
             if user_input == "all":
                 logger.info("User selected to update all apps")
                 self.update_apps_async_wrapper(updatable_apps)
+                return
 
-                try:
-                    # Parse user selection
-                    selected_indices = [int(idx.strip()) - 1 for idx in user_input.split(",")]
+            try:
+                # Parse user selection
+                selected_indices = [int(idx.strip()) - 1 for idx in user_input.split(",")]
 
-                    # Validate indices
-                    if any(idx < 0 or idx >= len(updatable_apps) for idx in selected_indices):
-                        logger.warning("Invalid app selection indices")
-                        print("Invalid selection. Please enter valid numbers.")
-                        return
+                # Validate indices
+                if any(idx < 0 or idx >= len(updatable_apps) for idx in selected_indices):
+                    logger.warning("Invalid app selection indices")
+                    print("Invalid selection. Please enter valid numbers.")
+                    return
 
-                    # Create list of selected apps
-                    selected_apps = [updatable_apps[idx] for idx in selected_indices]
+                # Create list of selected apps
+                selected_apps = [updatable_apps[idx] for idx in selected_indices]
 
-                    if selected_apps:
-                        logger.info("User selected %d apps to update", len(selected_apps))
-                        self.update_apps_async_wrapper(selected_apps)
-                    else:
-                        logger.info("No apps selected for update")
-                        print("No apps selected for update.")
+                if selected_apps:
+                    logger.info("User selected %d apps to update", len(selected_apps))
+                    self.update_apps_async_wrapper(selected_apps)
+                else:
+                    logger.info("No apps selected for update")
+                    print("No apps selected for update.")
+            except ValueError:
+                logger.warning("Invalid input format for app selection")
+                print("Invalid input. Please enter numbers separated by commas.")
 
-                except ValueError:
-                    logger.warning("Invalid input format for app selection")
-                    print("Invalid input. Please enter numbers separated by commas.")
         except KeyboardInterrupt:
             logger.info("Selection cancelled by user (Ctrl+C)")
             print("\nSelection cancelled by user (Ctrl+C)")

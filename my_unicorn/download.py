@@ -5,12 +5,10 @@ from GitHub releases with progress tracking, file verification, and concurrent
 download support.
 """
 
-import asyncio
 import logging
 import os
 import tempfile
 import threading  # Added for cancel_event
-import time
 from typing import ClassVar
 
 import requests
@@ -78,24 +76,8 @@ class DownloadManager:
             DownloadManager._global_config = GlobalConfigManager()
             DownloadManager._global_config.load_config()
 
-        # Detect if we're in an async context
-        self.is_async_mode = self._detect_async_mode()
-
         # Store task ID for this download instance
         self._progress_task_id: str | None = None
-
-    def _detect_async_mode(self) -> bool:
-        """Detect if we're running in an async context.
-
-        Returns:
-            bool: True if running in an async context
-
-        """
-        try:
-            asyncio.get_running_loop()
-            return True
-        except RuntimeError:
-            return False
 
     @classmethod
     def get_downloads_dir(cls) -> str:
@@ -114,33 +96,6 @@ class DownloadManager:
         downloads_dir = cls._global_config.expanded_app_download_path
         os.makedirs(downloads_dir, exist_ok=True)
         return downloads_dir
-
-    def _format_size(self, size_bytes: int) -> str:
-        """Format file size in human-readable format.
-
-        Args:
-            size_bytes: Size in bytes
-
-        Returns:
-            str: Formatted size string (e.g., '10.5 MB')
-
-        """
-        if size_bytes <= 0:
-            return "0 B"
-
-        units = ["B", "KB", "MB", "GB", "TB"]
-        unit_index = 0
-        size = float(size_bytes)
-
-        while size >= 1024 and unit_index < len(units) - 1:
-            size /= 1024
-            unit_index += 1
-
-        return (
-            f"{size:.1f} {units[unit_index]}"
-            if unit_index > 0
-            else f"{int(size)} {units[unit_index]}"
-        )
 
     @classmethod
     def get_or_create_progress(cls, total_downloads: int = 0) -> AppImageProgressMeter:
@@ -228,246 +183,6 @@ class DownloadManager:
             except Exception as e:
                 logger.error("Error downloading %s: %s", appimage_name, e)
                 raise RuntimeError("Error downloading %s: %s" % (appimage_name, e)) from e
-
-    def _get_file_size(self, url: str, headers: dict[str, str]) -> int:
-        """Get the file size by making a HEAD request.
-
-        Args:
-            url: URL to check
-            headers: HTTP headers for the request
-
-        Returns:
-            int: File size in bytes
-
-        Raises:
-            requests.exceptions.RequestException: For network errors
-
-        """
-        logger.info("Fetching headers for %s", url)
-        response = requests.head(url, allow_redirects=True, timeout=10, headers=headers)
-        response.raise_for_status()
-        return int(response.headers.get("content-length", 0))
-
-    def _setup_progress_task(self, filename: str, total_size: int, prefix: str) -> str | None:
-        """Set up a progress tracking task.
-
-        Args:
-            filename: Name of the file being downloaded
-            total_size: Total size in bytes
-            prefix: Prefix for the progress message
-
-        Returns:
-            Optional[str]: ID of the progress task, or None if setup failed
-
-        """
-        progress = self.get_or_create_progress()
-
-        try:
-            # Create a unique download ID
-            download_id = f"download_{abs(hash(filename))}"
-
-            # Add download to progress manager
-            progress.add_download(download_id, filename, total_size, prefix)
-
-            # Track this download
-            self._progress_task_id = download_id
-            DownloadManager._active_tasks.add(download_id)
-            return download_id
-
-        except Exception as e:
-            logger.error("Error creating progress task: %s", e)
-            # Fallback to console output without progress bar
-            print(f"{prefix}Downloading {filename}...")
-            return None
-
-    def _cleanup_progress_task(self) -> None:
-        """Clean up progress tracking task, ignoring any errors."""
-        if not hasattr(self, "_progress_task_id") or self._progress_task_id is None:
-            return
-
-        # Get the progress instance directly to ensure we use the same one
-        progress = self.get_or_create_progress()
-
-        if self._progress_task_id in DownloadManager._active_tasks:
-            DownloadManager._active_tasks.remove(self._progress_task_id)
-
-        # Complete the download task in the progress manager
-        progress.complete_download(self._progress_task_id, success=True)
-
-        self._progress_task_id = None
-
-    def _perform_download(
-        self,
-        url: str,
-        file_path: str,
-        headers: dict[str, str],
-        task_id: str | None,
-        total_size: int,
-    ) -> float:
-        """Perform the actual file download with progress updates.
-
-        Args:
-            url: URL to download from
-            file_path: Path to save the file to
-            headers: HTTP headers for the request
-            task_id: Progress task ID
-            total_size: Total file size in bytes
-
-        Returns:
-            float: Download time in seconds
-
-        Raises:
-            requests.exceptions.RequestException: For network errors
-
-        """
-        start_time = time.time()
-        response = requests.get(url, stream=True, timeout=30, headers=headers)
-        response.raise_for_status()
-
-        # Download with progress tracking
-        downloaded_size = 0
-        chunk_size = 1024 * 1024  # 1MB per chunk
-        progress = self.get_or_create_progress()  # Use instance method to get progress
-
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-        with open(file_path, "wb") as f:
-            # Process each chunk from the response
-            for chunk in response.iter_content(chunk_size=chunk_size):
-                if self.cancel_event and self.cancel_event.is_set():
-                    logger.info(
-                        "Download of %s cancelled by user.", os.path.basename(file_path)
-                    )
-                    # response.close() # Ensure connection is closed
-                    # f.close() # Ensure file is closed before attempting to remove
-                    # No, file is closed by with statement exit.
-                    # We need to ensure the file is closed before removing.
-                    # The 'with open' handles closing on break/return/exception.
-                    raise DownloadCancelledError(
-                        f"Download of {os.path.basename(file_path)} cancelled."
-                    )
-
-                if chunk:
-                    f.write(chunk)
-                    downloaded_size += len(chunk)
-
-                    # Always update progress if we have a task_id
-                    if task_id is not None:
-                        # Update progress using the progress manager's API
-                        progress.update_progress(task_id, downloaded_size)
-
-        # Make the AppImage executable only if download wasn't cancelled
-        # (If cancelled, this part is skipped due to exception)
-        os.chmod(file_path, os.stat(file_path).st_mode | 0o111)
-
-        # Final update to mark task as completed
-        if task_id is not None:
-            progress.update_progress(task_id, total_size)
-
-        return time.time() - start_time
-
-    def _display_completion_stats(
-        self, filename: str, total_size: int, download_time: float, prefix: str
-    ) -> None:
-        """Calculate and display download completion statistics.
-
-        Args:
-            filename: Name of the downloaded file
-            total_size: Size in bytes
-            download_time: Time taken to download in seconds
-            prefix: Message prefix
-
-        """
-        speed_mbps = (total_size / (1024 * 1024)) / download_time if download_time > 0 else 0
-
-        print(
-            f"{prefix}✓ Downloaded {filename} "
-            f"({self._format_size(total_size)}, {speed_mbps:.1f} MB/s)"
-        )
-
-    def verify_download(self, downloaded_file: str) -> bool:
-        """Verify the downloaded file using checksums.
-
-        This method uses the appropriate checksum verification strategy based on
-        the application's configuration, including special handling for apps
-        that store checksums in GitHub release descriptions.
-
-        Args:
-            downloaded_file: Path to the downloaded file to verify
-
-        Returns:
-            bool: True if verification passed or skipped, False otherwise
-
-        """
-        logger.info("Verifying download integrity...")
-
-        # Skip verification if hash verification is disabled
-        if self.github_api.skip_verification or not self.github_api.checksum_file_name:
-            logger.info(
-                "Skipping verification as requested (verification disabled or no hash provided)"
-            )
-            return True
-
-        from my_unicorn.verify import (
-            VerificationManager,  # Import once at the top of the relevant scope
-        )
-
-        # Handle "extracted_checksum" (which now implies hash might be directly available)
-        # or other standard SHA file scenarios.
-        # VerificationManager will internally decide whether to use direct_expected_hash
-        # or fall back to legacy "extracted_checksum" logic, or parse a SHA file.
-
-        direct_hash_to_pass: str | None = None
-        checksum_file_name_to_pass: str | None = self.github_api.checksum_file_name
-        checksum_file_download_url_to_pass: str | None = (
-            self.github_api.checksum_file_download_url
-        )
-
-        if self.github_api.checksum_file_name == "extracted_checksum":
-            logger.info(
-                "Processing 'extracted_checksum' for %s.", self.github_api.appimage_name
-            )
-            # SHAManager should have set extracted_hash_from_body if it successfully parsed one.
-            # It also sets checksum_hash_type to "sha256".
-            direct_hash_to_pass = self.github_api.extracted_hash_from_body
-            if direct_hash_to_pass:
-                logger.info(
-                    "Direct hash found for 'extracted_checksum', will pass to VerificationManager."
-                )
-                # checksum_file_download_url is not needed if direct_hash is used by VerificationManager's "extracted_checksum" path
-                checksum_file_download_url_to_pass = None
-            else:
-                # If no direct hash, VerificationManager's "extracted_checksum" will use its legacy path
-                logger.info(
-                    "No direct hash for 'extracted_checksum', VerificationManager will use legacy path."
-                )
-
-        # For all other cases (actual SHA file names), direct_hash_to_pass remains None.
-        # VerificationManager will download and parse the checksum_file_name file.
-
-        logger.info(
-            "Instantiating VerificationManager for %s with: "
-            "checksum_file_name='%s', checksum_hash_type='%s', "
-            "direct_hash_provided=%s",
-            self.github_api.appimage_name,
-            checksum_file_name_to_pass,
-            self.github_api.checksum_hash_type,
-            direct_hash_to_pass is not None,
-        )
-
-        verifier = VerificationManager(
-            checksum_file_name=checksum_file_name_to_pass,
-            checksum_file_download_url=checksum_file_download_url_to_pass,
-            appimage_name=self.github_api.appimage_name,
-            appimage_path=downloaded_file,
-            checksum_hash_type=self.github_api.checksum_hash_type
-            if self.github_api.checksum_hash_type is not None
-            else "sha256",
-            direct_expected_hash=direct_hash_to_pass,
-            asset_digest=self.github_api.asset_digest,
-        )
-        return verifier.verify_appimage(cleanup_on_failure=True)
 
     @classmethod
     def get_file_lock(cls, file_path: str) -> threading.Lock:
@@ -672,44 +387,6 @@ class DownloadManager:
 
         # Mark download as completed
         progress.complete_download(download_id, success=True)
-
-    def _wait_for_download_completion(
-        self, file_path: str, filename: str, timeout: int = 300
-    ) -> tuple[str, bool]:
-        """Wait for another process to complete downloading the file.
-
-        Args:
-            file_path: Path to the file being downloaded
-            filename: Name of the file for logging
-            timeout: Maximum time to wait in seconds
-
-        Returns:
-            tuple of (file_path, was_existing_file)
-
-        """
-        start_time = time.time()
-        check_interval = 2  # Check every 2 seconds
-
-        while time.time() - start_time < timeout:
-            time.sleep(check_interval)
-
-            if os.path.exists(file_path):
-                # File exists, verify it's complete
-                if self._verify_existing_file(file_path):
-                    logger.info("Download of %s completed by another process", filename)
-                    return file_path, True
-
-            # Check if lock file still exists (indicating download is still in progress)
-            lock_file_path = file_path + ".lock"
-            if not os.path.exists(lock_file_path):
-                # Lock file is gone but main file doesn't exist - download failed
-                break
-
-        # Timeout or download failed
-        logger.error("Timeout waiting for %s to be downloaded by another process", filename)
-        raise RuntimeError(
-            "Timeout waiting for %s to be downloaded by another process" % filename
-        )
 
     def _get_download_id(self, file_path: str) -> str:
         """Generate a unique download ID from file path.

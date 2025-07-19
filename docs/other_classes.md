@@ -57,9 +57,6 @@ namespace Configs {
 		+from_github_api()
 		+list_json_files()
     }
-	class AppConfigSetup {
-			+create_app_config()
-    }
 }
 
 ```

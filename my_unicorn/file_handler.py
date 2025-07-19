@@ -96,7 +96,6 @@ class FileHandler:
             Path: Full path to the downloaded AppImage
 
         """
-
         downloads_dir = Path(GlobalConfigManager().expanded_app_download_path)
         return downloads_dir / self.appimage_name
 
@@ -139,7 +138,11 @@ class FileHandler:
             self._ensure_directories_exist()
 
             # Make backup of existing AppImage if it exists and backup is needed
-            if self.installed_path and self.installed_path.exists() and not self._backup_appimage():
+            if (
+                self.installed_path
+                and self.installed_path.exists()
+                and not self._backup_appimage()
+            ):
                 return False
 
             # Move downloaded AppImage to destination folder
@@ -343,7 +346,9 @@ class FileHandler:
                 return False
 
             # Make the AppImage executable (add +x to current permissions)
-            self.installed_path.chmod(self.installed_path.stat().st_mode | DESKTOP_ENTRY_FILE_MODE)
+            self.installed_path.chmod(
+                self.installed_path.stat().st_mode | DESKTOP_ENTRY_FILE_MODE
+            )
             logger.info("Set executable permissions on %s", self.installed_path)
             return True
 

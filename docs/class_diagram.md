@@ -55,10 +55,7 @@ classDiagram
             +execute(args): bool
         }
 
-        class CreateAppConfigCommand {
-            <<src/commands/create_app_config.py>>
-            +execute(args): bool
-        }
+
 
         class UpdateAllAsyncCommand {
             <<src/commands/update_all_async.py>>

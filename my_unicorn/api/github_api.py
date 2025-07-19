@@ -13,7 +13,11 @@ from my_unicorn.auth_manager import GitHubAuthManager
 from my_unicorn.catalog import AppInfo, find_app_by_owner_repo, load_app_definition
 from my_unicorn.icon_manager import IconManager
 from my_unicorn.utils.arch import extract_arch_from_filename
-from my_unicorn.utils.version_utils import extract_version, extract_version_from_filename
+from my_unicorn.utils.version_utils import (
+    extract_version,
+    extract_version_from_filename,
+    handle_zen_browser_version,
+)
 
 from .assets import AppImageAsset, ReleaseInfo
 from .release_manager import ReleaseManager
@@ -22,27 +26,6 @@ from .selector import AppImageSelector
 from .sha_manager import SHAManager
 
 logger = logging.getLogger(__name__)
-
-
-def handle_zen_browser_version(
-    raw_tag: str, normalized_version: str, owner: str, repo: str
-) -> str:
-    """Handle zen-browser's special version format (X.Y.Z[letter])."""
-    if owner == "zen-browser" and repo == "desktop":
-        import re
-
-        zen_tag_pattern = re.compile(r"^v?(\d+\.\d+\.\d+)([a-zA-Z])$")
-        match = zen_tag_pattern.match(raw_tag)
-        if match:
-            version_base, letter_suffix = match.group(1), match.group(2)
-            potential_zen_version = f"{version_base}{letter_suffix}"
-            if normalized_version != potential_zen_version:
-                logger.info(
-                    f"zen-browser: using version format {potential_zen_version} instead of {normalized_version} from tag {raw_tag}"
-                )
-                return potential_zen_version
-    return normalized_version
-
 
 class GitHubAPI:
     """Handler for GitHub API requests, processing releases end-to-end."""

@@ -15,7 +15,11 @@ from typing import Any
 import requests
 
 from my_unicorn.secure_token import SecureTokenManager
-from my_unicorn.utils.cache_utils import ensure_directory_exists, load_json_cache, save_json_cache
+from my_unicorn.utils.cache_utils import (
+    ensure_directory_exists,
+    load_json_cache,
+    save_json_cache,
+)
 from my_unicorn.utils.datetime_utils import (
     format_timestamp,
     get_next_hour_timestamp,
@@ -28,12 +32,13 @@ logger = logging.getLogger(__name__)
 # Constants
 TOKEN_REFRESH_THRESHOLD_DAYS = 30  # Refresh token when it has fewer than this many days left
 MAX_AUTH_RETRIES = 2  # Maximum number of retries for failed auth
-RATE_LIMIT_CACHE_TTL = 60 * 60  # 1 hour cache TTL for rate limits - matches GitHub's reset window
-RATE_LIMIT_HARD_REFRESH = 60 * 60 * 2  # Force refresh after 2 hours (safety margin)
+RATE_LIMIT_CACHE_TTL = (
+    60 * 60
+)  # 1 hour cache TTL for rate limits - matches GitHub's reset window
+RATE_LIMIT_HARD_REFRESH = (
+    60 * 60 * 2  # Force refresh after 2 hours (safety margin)
+)
 CACHE_DIR = os.path.expanduser("~/.cache/myunicorn")  # Cache directory
-HTTP_OK = 200  # HTTP status code for successful requests
-HTTP_UNAUTHORIZED = 401  # HTTP status code for unauthorized requests
-HTTP_FORBIDDEN = 403  # HTTP status code for forbidden requests
 
 
 class GitHubAuthManager:
@@ -168,7 +173,7 @@ class GitHubAuthManager:
         next_hour = datetime.fromtimestamp(next_hour_timestamp)
 
         # set default unauthenticated rate limits
-        cache_data = {
+        cache_data= {
             "remaining": 50,  # Start a bit below max to be conservative
             "limit": 60,  # Unauthenticated limit is 60 per hour
             "reset_formatted": next_hour.strftime("%Y-%m-%d %H:%M:%S"),
@@ -306,7 +311,9 @@ class GitHubAuthManager:
             if cls._request_count_since_cache % 5 == 0:  # Update file every 5 requests
                 cls._save_rate_limit_cache(cls._rate_limit_cache)
 
-            logger.debug("Updated cached rate limit: %s (-%s) remaining", new_remaining, decrement)
+            logger.debug(
+                "Updated cached rate limit: %s (-%s) remaining", new_remaining, decrement
+            )
 
     @classmethod
     def _extract_rate_limit_from_headers(cls, headers: dict[str, Any]) -> None:
@@ -344,7 +351,7 @@ class GitHubAuthManager:
                 cls._rate_limit_cache = cache_data
                 cls._rate_limit_cache_time = time.time()
 
-            logger.debug("Updated rate limits from headers: %s/%s", remaining, limit)
+                logger.debug("Updated rate limits from headers: %s/%s", remaining, limit)
         except Exception as e:
             logger.debug("Failed to extract rate limits from headers: %s", e)
 
@@ -381,7 +388,9 @@ class GitHubAuthManager:
             elif (cache_age < RATE_LIMIT_CACHE_TTL) and cls._rate_limit_cache:
                 logger.debug("Using cached rate limit information")
                 # Include request count in debug info
-                logger.debug("API requests since cache refresh: %s", cls._request_count_since_cache)
+                logger.debug(
+                    "API requests since cache refresh: %s", cls._request_count_since_cache
+                )
 
                 # Return the appropriate format
                 if return_dict and "resources" in cls._rate_limit_cache:
@@ -441,9 +450,9 @@ class GitHubAuthManager:
 
                 # Add a full hour timestamp for the next reset
                 next_full_hour_reset = get_next_hour_timestamp()
-                full_hour_reset_formatted = datetime.fromtimestamp(next_full_hour_reset).strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
+                full_hour_reset_formatted = datetime.fromtimestamp(
+                    next_full_hour_reset
+                ).strftime("%Y-%m-%d %H:%M:%S")
 
                 # Create the result dictionary
                 cache_data = {
@@ -687,7 +696,9 @@ class GitHubAuthManager:
         if reset_passed:
             # If we're past the reset, rate limits would have been reset to full
             if is_authenticated:
-                estimated_remaining = cached_limit  # Default to full limit (5000 for authenticated)
+                estimated_remaining = (
+                    cached_limit  # Default to full limit (5000 for authenticated)
+                )
                 logger.debug(
                     "Reset passed: setting estimated remaining to full limit (%s)",
                     cached_limit,
@@ -725,68 +736,58 @@ class GitHubAuthManager:
         method: str,
         url: str,
         retry_auth: bool = True,
-        **kwargs,
+        headers: dict[str, str] | None = None,
+        **kwargs: Any,
     ) -> requests.Response:
-        """Make an authenticated request to GitHub API with session reuse.
+        """Make an authenticated request to the GitHub API with session reuse.
 
         Args:
-            method: HTTP method (GET, POST, etc)
-            url: URL to request
-            retry_auth: Whether to retry on auth failures (with token refresh)
-
-            **kwargs: Additional arguments to pass to requests
+            method (str): The HTTP method to use for the request (e.g., 'GET', 'POST').
+            url (str): The URL to send the request to.
+            retry_auth (bool): Whether to retry authentication if the token is invalid. Defaults to True.
+            headers (dict[str, str] | None): Optional HTTP headers to include in the request. Defaults to None.
+            **kwargs: Additional arguments to pass to the `requests` library.
 
         Returns:
-            Response object from requests
+            requests.Response: The HTTP response object returned by the GitHub API.
 
         """
-        # Get token for session key
         token = cls._last_token or SecureTokenManager.get_token(validate_expiration=False)
-        # Create a string key for the session pool
         token_key = str(hash(token)) if token else "unauthenticated"
 
-        # Get session from pool
         session = SessionPool.get_session(token_key)
-
-        # Update headers if needed
-        headers_copy = None
-        if "headers" in kwargs:
-            headers_copy = kwargs.pop("headers")  # Extract and remove from kwargs
-            for k, v in headers_copy.items():
-                session.headers[k] = v
-
-        # Track retries
         retries = 0
         max_retries = MAX_AUTH_RETRIES if retry_auth else 0
+        custom_headers: dict[str, str] = headers or {}  # Explicit type annotation
 
         while True:
-            try:
-                # Make the request with session
-                response = session.request(method, url, **kwargs)
+            # Explicit type annotation for request_headers
+            request_headers = session.headers.copy()
+            request_headers.update(custom_headers)
 
-                # Extract rate limit info from headers instead of separate API calls
+            if token:
+                request_headers["Authorization"] = f"Bearer {token}"
+            else:
+                request_headers.pop("Authorization", None)
+
+            try:
+                response = session.request(method, url, headers=request_headers, **kwargs)
+
                 if response.status_code == 200 and url.startswith("https://api.github.com"):
                     cls._extract_rate_limit_from_headers(dict(response.headers))
 
-                # Handle auth failures
                 if response.status_code in (401, 403) and retries < max_retries:
-                    # Clear session and headers to force refresh
                     SessionPool.clear_session(token_key)
                     cls.clear_cached_headers()
 
-                    # Get new token and session
                     token = SecureTokenManager.get_token(validate_expiration=True)
-                    # Create a string key for the session pool
                     token_key = str(hash(token)) if token else "unauthenticated"
                     session = SessionPool.get_session(token_key)
 
-                    # Reapply the custom headers if they were provided
-                    if headers_copy:
-                        for k, v in headers_copy.items():
-                            session.headers[k] = v
-
                     retries += 1
-                    logger.warning("Authentication failed, retrying (%s/%s)", retries, max_retries)
+                    logger.warning(
+                        "Authentication failed, retrying (%s/%s)", retries, max_retries
+                    )
                     continue
 
                 return response
@@ -794,7 +795,9 @@ class GitHubAuthManager:
             except requests.RequestException as e:
                 if retries < max_retries:
                     retries += 1
-                    logger.warning("Request failed, retrying (%s/%s): %s", retries, max_retries, e)
+                    logger.warning(
+                        "Request failed, retrying (%s/%s): %s", retries, max_retries, e
+                    )
                     continue
                 raise
 
@@ -833,7 +836,9 @@ class GitHubAuthManager:
                     if days_until_expiration <= TOKEN_REFRESH_THRESHOLD_DAYS:
                         days_until_rotation = 0  # Will be rotated on next use
                     else:
-                        days_until_rotation = days_until_expiration - TOKEN_REFRESH_THRESHOLD_DAYS
+                        days_until_rotation = (
+                            days_until_expiration - TOKEN_REFRESH_THRESHOLD_DAYS
+                        )
             except Exception as e:
                 logger.warning("Error calculating token rotation time: %s", e)
 
@@ -939,7 +944,9 @@ class GitHubAuthManager:
             # Log cache status after update
             logger.debug(
                 "Cache updated with fresh data. New timestamp: %s",
-                datetime.fromtimestamp(cls._rate_limit_cache_time).strftime("%Y-%m-%d %H:%M:%S"),
+                datetime.fromtimestamp(cls._rate_limit_cache_time).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
             )
 
         return result
@@ -984,7 +991,9 @@ class GitHubAuthManager:
                 # Get token type from response headers
                 if "X-OAuth-Scopes" in response.headers:
                     scopes = response.headers.get("X-OAuth-Scopes", "")
-                    token_info["scopes"] = [s.strip() for s in scopes.split(",")] if scopes else []
+                    token_info["scopes"] = (
+                        [s.strip() for s in scopes.split(",")] if scopes else []
+                    )
 
                 if "X-GitHub-Enterprise-Version" in response.headers:
                     token_info["is_enterprise"] = True
@@ -1009,7 +1018,9 @@ class GitHubAuthManager:
                         if "rate" in rate_data and "limit" in rate_data["rate"]:
                             token_info["rate_limit"] = rate_data["rate"]["limit"]
                 except Exception as e:
-                    logger.warning("Failed to get rate limit info during token validation: %s", e)
+                    logger.warning(
+                        "Failed to get rate limit info during token validation: %s", e
+                    )
 
                 return True, token_info
 
@@ -1033,8 +1044,12 @@ class GitHubAuthManager:
                     return False, token_info
 
             else:
-                logger.warning("Token validation failed with status code: %s", response.status_code)
-                token_info["error"] = "GitHub API returned status code %s" % response.status_code
+                logger.warning(
+                    "Token validation failed with status code: %s", response.status_code
+                )
+                token_info["error"] = (
+                    "GitHub API returned status code %s" % response.status_code
+                )
                 return False, token_info
 
         except requests.exceptions.RequestException as e:

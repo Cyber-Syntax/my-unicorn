@@ -6,10 +6,11 @@ between different verification methods and managing SHA asset selection.
 
 import asyncio
 import logging
-import re  # For hash validation
+import re
 from pathlib import Path
 
 from my_unicorn.api.sha_asset_finder import SHAAssetFinder
+from my_unicorn.catalog import AppInfo
 from my_unicorn.utils import ui_utils
 
 logger = logging.getLogger(__name__)
@@ -22,9 +23,9 @@ class SHAManager:
         self,
         owner: str,
         repo: str,
-        checksum_file_name: str,
+        checksum_file_name: str | None = None,
         appimage_name: str | None = None,
-        app_info=None,
+        app_info: AppInfo | None = None,
     ):
         """Initialize the SHAManager.
 
@@ -91,7 +92,8 @@ class SHAManager:
                                 self.checksum_file_name = "extracted_checksum"
                                 self.checksum_file_download_url = None
                                 logger.info(
-                                    f"Successfully extracted SHA256 hash '{self.extracted_hash_from_body}' for {self.appimage_name} from release body."
+                                    "Successfully extracted SHA256 hash '%s' for %s from release body.",
+                                    self.extracted_hash_from_body, self.appimage_name
                                 )
                                 # Clean up temporary file
                                 Path(temp_sha_file).unlink(missing_ok=True)
@@ -123,7 +125,9 @@ class SHAManager:
         if re.fullmatch(r"[0-9a-f]{64}", hash_value, re.IGNORECASE):
             return True
         else:
-            logger.warning(f"Extracted hash '{hash_value}' does not look like a valid SHA256 hash.")
+            logger.warning(
+                f"Extracted hash '{hash_value}' does not look like a valid SHA256 hash."
+            )
             return False
 
     def find_sha_asset(self, assets: list[dict[str, str]]) -> None:
@@ -141,10 +145,7 @@ class SHAManager:
             logger.error("Cannot find SHA asset: AppImage name not set")
             return
 
-        # Priority 1: Asset digest verification is handled by SHAAssetFinder
-        # No need for separate check here - let SHAAssetFinder handle it
-
-        # Priority 2: Try to extract from release body description
+        # Priority 1: Try to extract from release body description
         if (
             self._app_info
             and getattr(self._app_info, "use_github_release_desc", False)
@@ -155,7 +156,7 @@ class SHAManager:
             )
             return
 
-        # Priority 3: Try to find SHA asset file using SHAAssetFinder
+        # Priority 2: Try to find SHA asset file using SHAAssetFinder
         finder = SHAAssetFinder()
         sha_asset = finder.find_best_match(self.appimage_name, self._app_info, assets)
 
@@ -186,15 +187,16 @@ class SHAManager:
 
     def detect_checksum_hash_type(self, checksum_file_name: str) -> str:
         """Detect hash type from SHA filename.
-    
+
         Args:
             checksum_file_name: SHA filename
-    
+
         Returns:
             str: Detected hash type ('sha256', 'sha512', etc.)
+
         """
         name_lower = checksum_file_name.lower()
-    
+
         if "sha256" in name_lower:
             return "sha256"
         elif "sha512" in name_lower:
@@ -202,11 +204,11 @@ class SHAManager:
         elif name_lower.endswith((".yml", ".yaml")):
             # Default for YAML files
             return "sha512"
-    
+
         # Default fallback
         return "sha256"
-    
-    def _select_sha_asset(self, asset: dict) -> None:
+
+    def _select_sha_asset(self, asset: dict[str, str]) -> None:
         """Select a SHA asset and set instance attributes.
 
         Args:
@@ -221,7 +223,9 @@ class SHAManager:
         if not detected_checksum_hash_type:
             logger.info(f"Could not detect hash type from {self.checksum_file_name}")
             # Always ask for hash type if not detected, regardless of is_batch
-            self.checksum_hash_type = ui_utils.get_user_input("Enter hash type", default="sha256")
+            self.checksum_hash_type = ui_utils.get_user_input(
+                "Enter hash type", default="sha256"
+            )
 
         logger.info(
             f"Selected SHA file: {self.checksum_file_name} (hash type: {self.checksum_hash_type})"
