@@ -216,82 +216,97 @@ class AppImageProgressMeter:
         self.message("\033[K")
 
     def _render_download_line(self, download: dict[str, Any]) -> None:
-        """Render a single download's progress line.
-
-        Args:
-            download: Download information dictionary
-
-        """
+        """Render a single download's progress line."""
         filename = download["filename"]
         status = download["status"]
         progress = download["progress"]
         total = download["total"]
         prefix = download.get("prefix", "")
         start_time = download["start_time"]
-
-        # Calculate progress percentage
-        if total > 0:
-            pct = min(int(progress * 100 / total), 100)
-        else:
-            pct = 0
-
-        # Calculate speed and ETA
-        now = time.time()
-        elapsed = now - start_time
-
-        if elapsed > 0 and progress > 0:
-            speed = progress / elapsed
-            if speed > 0 and total > progress and status == "downloading":
-                eta = (total - progress) / speed
-                eta_str = format_time(eta)
-            else:
-                eta_str = "00:00"
-            speed_str = f"{format_number(int(speed))}/s"
-        else:
-            speed_str = "-- B/s"
-            eta_str = "--:--"
-
-        # Create progress bar
-        bar_width = 40
-        if pct > 0:
-            filled = int(bar_width * pct / 100)
-            bar = "=" * filled + "-" * (bar_width - filled)
-        else:
-            bar = "-" * bar_width
-
-        # Status indicator and formatting
+        
+        # Common variables
+        reset_color = "\033[0m"
+        status_icon = ""
+        status_color = ""
+        description = ""
+        line = ""
+    
         if status == "completed":
+            # Handle completed downloads - show final stats
             status_icon = "✓"
             status_color = "\033[32m"  # Green
+            end_time = download["end_time"]
+            elapsed = end_time - start_time
+            avg_speed = total / elapsed if elapsed > 0 else 0
+            speed_str = f"{format_number(int(avg_speed))}/s" if avg_speed > 0 else "Complete"
+            time_str = format_time(elapsed)
+            
             description = f"Downloaded {filename}"
+            # Truncate description if needed
+            max_desc_length = 40
+            if len(description) > max_desc_length:
+                description = description[: max_desc_length - 3] + "..."
+            
+            # Final completed line - no progress bar
+            line = (f"{status_color}{prefix}{status_icon} {description} - "
+                    f"{format_number(total)} in {time_str} ({speed_str}){reset_color}")
+    
         elif status == "failed":
+            # Handle failed downloads
             status_icon = "✗"
             status_color = "\033[31m"  # Red
             description = f"Failed {filename}"
-        else:  # downloading
-            status_icon = ""
-            status_color = ""
-            description = f"Downloading {filename}"
-
-        reset_color = "\033[0m" if status_color else ""
-
-        # Format size information
-        size_info = f"{format_number(progress)}/{format_number(total)}"
-
-        # Truncate filename if too long
-        max_desc_length = 40
-        if len(description) > max_desc_length:
-            description = description[: max_desc_length - 3] + "..."
-
-        # Build single line like the working example
-        if status == "completed":
-            line = f"{status_color}{prefix}{status_icon} {description:<40} [{bar}] {pct:3d}% {size_info:>12} {speed_str:>8} ETA {eta_str}{reset_color}"
-        elif status == "failed":
             error_msg = download.get("error", "Unknown error")
-            line = f"{status_color}{prefix}{status_icon} {description:<40} FAILED: {error_msg}{reset_color}"
-        else:
-            line = f"{prefix}{description:<40} [{bar}] {pct:3d}% {size_info:>12} {speed_str:>8} ETA {eta_str}"
-
+            # Truncate description if needed
+            max_desc_length = 40
+            if len(description) > max_desc_length:
+                description = description[: max_desc_length - 3] + "..."
+            line = f"{status_color}{prefix}{status_icon} {description}: {error_msg}{reset_color}"
+    
+        else:  # downloading
+            # Active download - show progress bar
+            # Calculate progress percentage
+            if total > 0:
+                pct = min(int(progress * 100 / total), 100)
+            else:
+                pct = 0
+    
+            # Calculate speed and ETA
+            now = time.time()
+            elapsed = now - start_time
+    
+            if elapsed > 0 and progress > 0:
+                speed = progress / elapsed
+                if speed > 0 and total > progress:
+                    eta = (total - progress) / speed
+                    eta_str = format_time(eta)
+                else:
+                    eta_str = "00:00"
+                speed_str = f"{format_number(int(speed))}/s"
+            else:
+                speed_str = "-- B/s"
+                eta_str = "--:--"
+    
+            # Create progress bar
+            bar_width = 40
+            if pct > 0:
+                filled = int(bar_width * pct / 100)
+                bar = "=" * filled + "-" * (bar_width - filled)
+            else:
+                bar = "-" * bar_width
+    
+            description = f"Downloading {filename}"
+            # Truncate filename if too long
+            max_desc_length = 40
+            if len(description) > max_desc_length:
+                description = description[: max_desc_length - 3] + "..."
+    
+            # Format size information
+            size_info = f"{format_number(progress)}/{format_number(total)}"
+    
+            # Build the line for active download
+            line = f"{prefix}{description} [{bar}] {pct:3d}% {size_info:>12} {speed_str:>8} ETA {eta_str}"
+    
         # Output single line with clear to end
         self.message(line + "\033[K\n")
 
