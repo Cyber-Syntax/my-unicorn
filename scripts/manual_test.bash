@@ -16,7 +16,7 @@ BACKUP_DIR="/tmp/my_unicorn_test_backup"
 LOG_FILE="$HOME/.local/state/my-unicorn/manual_test.log"
 
 # Create necessary directories
-mkdir -p "$CONFIG_DIR"
+# mkdir -p "$CONFIG_DIR"
 mkdir -p "$BACKUP_DIR"
 mkdir -p "$(dirname "$LOG_FILE")"
 
