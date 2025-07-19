@@ -76,32 +76,6 @@ class VerificationLogger:
         if not is_verified:
             print("\n".join(log_lines))
 
-    def log_verification_success(self, appimage_name: str, verification_type: str = "hash") -> None:
-        """Log successful verification.
-
-        Args:
-            appimage_name: Name of the verified AppImage
-            verification_type: Type of verification performed
-        """
-        message = (
-            f"{STATUS_SUCCESS}{verification_type.title()} verification passed for {appimage_name}"
-        )
-        logging.info("Verification successful for %s", appimage_name)
-        print(message)
-
-    def log_verification_failure(self, appimage_name: str, verification_type: str = "hash") -> None:
-        """Log failed verification.
-
-        Args:
-            appimage_name: Name of the AppImage that failed verification
-            verification_type: Type of verification that failed
-        """
-        message = (
-            f"{STATUS_FAIL}{verification_type.title()} verification failed for {appimage_name}"
-        )
-        logging.error("Verification failed for %s", appimage_name)
-        print(message)
-
     def log_error(self, message: str, exception: Exception | None = None) -> None:
         """Log an error with optional exception details.
 
@@ -114,14 +88,6 @@ class VerificationLogger:
         else:
             logging.error(message)
 
-    def log_warning(self, message: str) -> None:
-        """Log a warning message.
-
-        Args:
-            message: Warning message to log
-        """
-        logging.warning(message)
-
     def log_info(self, message: str) -> None:
         """Log an informational message.
 
@@ -129,21 +95,3 @@ class VerificationLogger:
             message: Informational message to log
         """
         logging.info(message)
-
-    def log_debug(self, message: str) -> None:
-        """Log a debug message.
-
-        Args:
-            message: Debug message to log
-        """
-        logging.debug(message)
-
-    def print_status(self, message: str, success: bool = True) -> None:
-        """Print a status message with appropriate indicator.
-
-        Args:
-            message: Status message to print
-            success: Whether this is a success or failure status
-        """
-        status = STATUS_SUCCESS if success else STATUS_FAIL
-        print(f"{status}{message}")

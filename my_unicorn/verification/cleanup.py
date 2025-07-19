@@ -97,30 +97,3 @@ class VerificationCleanup:
 
         if sha_path:
             self.cleanup_verification_file(sha_path)
-
-    def ensure_clean_verification_environment(self, downloads_dir: str, app_name: str) -> None:
-        """Ensure the verification environment is clean before starting.
-
-        This removes any leftover files from previous failed verification attempts.
-
-        Args:
-            downloads_dir: Directory where downloads are stored
-            app_name: Name of the app being verified
-        """
-        downloads_path = Path(downloads_dir)
-
-        # Look for leftover SHA files for this app
-        sha_patterns = [
-            f"{app_name}_*.sha256",
-            f"{app_name}_*.sha512",
-            f"{app_name}_*.yml",
-            f"{app_name}_*.yaml",
-        ]
-
-        for pattern in sha_patterns:
-            for file_path in downloads_path.glob(pattern):
-                try:
-                    file_path.unlink()
-                    logger.debug("Removed leftover verification file: %s", file_path)
-                except OSError as e:
-                    logger.warning("Could not remove leftover file %s: %s", file_path, e)

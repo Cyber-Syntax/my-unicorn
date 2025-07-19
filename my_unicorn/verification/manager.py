@@ -161,12 +161,6 @@ class VerificationManager:
         try:
             self.config.validate_for_verification()
 
-            self.logger.log_info(
-                "Verifying %s using directly provided hash (type: %s)",
-                self.config.appimage_name,
-                self.config.checksum_hash_type,
-            )
-
             result = self.hash_calculator.verify_file_hash(
                 self.config.appimage_path, self.config.direct_expected_hash
             )
