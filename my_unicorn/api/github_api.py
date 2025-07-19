@@ -13,7 +13,11 @@ from my_unicorn.auth_manager import GitHubAuthManager
 from my_unicorn.catalog import AppInfo, find_app_by_owner_repo, load_app_definition
 from my_unicorn.icon_manager import IconManager
 from my_unicorn.utils.arch import extract_arch_from_filename
-from my_unicorn.utils.version_utils import extract_version, extract_version_from_filename, handle_zen_browser_version
+from my_unicorn.utils.version_utils import (
+    extract_version,
+    extract_version_from_filename,
+    handle_zen_browser_version,
+)
 
 from .assets import AppImageAsset, ReleaseInfo
 from .release_manager import ReleaseManager

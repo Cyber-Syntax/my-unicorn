@@ -896,15 +896,15 @@ class BaseUpdateCommand(Command):
                             print(f"{app_name}, unexpected result: {app_data}")
     
                     except Exception as e:
-                        logger.error("Error checking %s: %s", config_file, e)
+                        self._logger.error("Error checking %s: %s", config_file, e)
                         print(f"{app_name}: error: {e}")
                     except KeyboardInterrupt:
-                        logger.info("Update check cancelled by user (Ctrl+C)")
+                        self._logger.info("Update check cancelled by user (Ctrl+C)")
                         print("\nUpdate check cancelled by user (Ctrl+C)")
                         return updatable_apps
     
             except Exception as e:
-                logger.error("Error during update check: %s", e)
+                self._logger.error("Error during update check: %s", e)
                 print("Error during update check:", e)
     
             return updatable_apps           
