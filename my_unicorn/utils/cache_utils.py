@@ -32,7 +32,7 @@ def ensure_directory_exists(directory_path: str) -> str:
 def load_json_cache(
     cache_file_path: str,
     ttl_seconds: int = 3600,
-    hard_refresh_seconds: tuple[str, str] | None = None,
+    hard_refresh_seconds: int | None = None,
 ) -> tuple[str, Any]:
     """Load cached data from a JSON file with TTL validation.
 

@@ -35,7 +35,9 @@ MAX_AUTH_RETRIES = 2  # Maximum number of retries for failed auth
 RATE_LIMIT_CACHE_TTL = (
     60 * 60
 )  # 1 hour cache TTL for rate limits - matches GitHub's reset window
-RATE_LIMIT_HARD_REFRESH = 60 * 60 * 2  # Force refresh after 2 hours (safety margin)
+RATE_LIMIT_HARD_REFRESH = (
+    60 * 60 * 2  # Force refresh after 2 hours (safety margin)
+)
 CACHE_DIR = os.path.expanduser("~/.cache/myunicorn")  # Cache directory
 
 
@@ -171,7 +173,7 @@ class GitHubAuthManager:
         next_hour = datetime.fromtimestamp(next_hour_timestamp)
 
         # set default unauthenticated rate limits
-        cache_data = {
+        cache_data= {
             "remaining": 50,  # Start a bit below max to be conservative
             "limit": 60,  # Unauthenticated limit is 60 per hour
             "reset_formatted": next_hour.strftime("%Y-%m-%d %H:%M:%S"),
@@ -349,7 +351,7 @@ class GitHubAuthManager:
                 cls._rate_limit_cache = cache_data
                 cls._rate_limit_cache_time = time.time()
 
-            logger.debug("Updated rate limits from headers: %s/%s", remaining, limit)
+                logger.debug("Updated rate limits from headers: %s/%s", remaining, limit)
         except Exception as e:
             logger.debug("Failed to extract rate limits from headers: %s", e)
 
