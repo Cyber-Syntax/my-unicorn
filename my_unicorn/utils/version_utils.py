@@ -144,3 +144,22 @@ def extract_version_from_filename(filename: str) -> str | None:
     version_match = re.search(r"\d+\.\d+\.\d+", filename)
 
     return version_match.group(0) if version_match else None
+
+def handle_zen_browser_version(
+    raw_tag: str, normalized_version: str, owner: str, repo: str
+) -> str:
+    """Handle zen-browser's special version format (X.Y.Z[letter])."""
+    if owner == "zen-browser" and repo == "desktop":
+        import re
+
+        zen_tag_pattern = re.compile(r"^v?(\d+\.\d+\.\d+)([a-zA-Z])$")
+        match = zen_tag_pattern.match(raw_tag)
+        if match:
+            version_base, letter_suffix = match.group(1), match.group(2)
+            potential_zen_version = f"{version_base}{letter_suffix}"
+            if normalized_version != potential_zen_version:
+                logger.info(
+                    f"zen-browser: using version format {potential_zen_version} instead of {normalized_version} from tag {raw_tag}"
+                )
+                return potential_zen_version
+    return normalized_version

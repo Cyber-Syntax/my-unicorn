@@ -191,6 +191,7 @@ class InstallAppCommand(Command):
         except KeyboardInterrupt:
             print("\nInstallation cancelled.")
 
+    #FIXME: to many branches
     def _install_app(self, app_info: AppInfo) -> None:
         """Download and install the application with verification."""
         # Create a properly initialized app config manager for this app
@@ -367,14 +368,6 @@ class InstallAppCommand(Command):
         if success:
             # Save the configuration only if all previous steps succeed
             app_config.save_config()
-
-            # # Display success message with paths
-            # if verification_skipped:
-            #     print(f"\n✅ {app_info.app_rename} successfully installed!")
-            #     print("⚠️ Note: AppImage was not verified because developers did not provide")
-            #     print("   a SHA file for this AppImage.")
-            # else:
-            #     print(f"\n✅ {app_info.app_rename} successfully installed and verified!")
 
             # Show config file location
             if app_config.config_file:

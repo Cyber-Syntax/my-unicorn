@@ -232,10 +232,6 @@ class DeleteBackupsCommand(Command):
         backup_dir = global_config.expanded_app_backup_storage_path
         max_backups = global_config.max_backups
 
-        if not os.path.exists(backup_dir):
-            print(f"Backup directory {backup_dir} does not exist.")
-            return
-
         print(f"This will keep only the {max_backups} most recent backups for each app.")
         confirm = input("Do you want to proceed? (yes/no): ")
         if confirm.lower() != "yes":
