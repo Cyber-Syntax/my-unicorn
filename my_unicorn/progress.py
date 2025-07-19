@@ -334,17 +334,3 @@ class AppImageProgressMeter:
         summary += f" | Total: {format_number(total_downloaded)}/{format_number(total_size)} ({overall_pct}%)\n"
 
         self.message(summary)
-
-    def is_complete(self) -> bool:
-        """Check if all downloads are complete.
-
-        Returns:
-            True if all downloads are finished (completed or failed)
-
-        """
-        with self.lock:
-            return (
-                bool(self.downloads)
-                and self.completed_downloads >= len(self.downloads)
-                and all(d["status"] in ["completed", "failed"] for d in self.downloads.values())
-            )

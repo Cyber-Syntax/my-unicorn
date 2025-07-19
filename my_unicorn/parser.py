@@ -33,17 +33,3 @@ class ParseURL:
             return self.owner, self.repo
         else:
             raise ValueError("Invalid GitHub URL. Unable to parse owner and repository.")
-
-    @property
-    def get_owner(self) -> str:
-        """Return the owner from URL."""
-        if not self.owner:
-            raise ValueError("Owner not set. Please call 'ask_url()' first.")
-        return self.owner
-
-    @property
-    def get_repo(self) -> str:
-        """Return the repo from URL."""
-        if not self.repo:
-            raise ValueError("Repo not set. Please call 'ask_url()' first.")
-        return self.repo

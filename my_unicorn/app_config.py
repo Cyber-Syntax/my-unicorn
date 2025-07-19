@@ -21,16 +21,6 @@ logger = logging.getLogger(__name__)
 
 # Constants
 DEFAULT_CONFIG_PATH = "~/.config/myunicorn/apps/"
-DESKTOP_ENTRY_DIR = "~/.local/share/applications"
-ICON_BASE_DIR = "~/.local/share/icons/myunicorn"
-DESKTOP_ENTRY_PERMISSIONS = 0o755
-
-# Image file extensions
-IMAGE_EXTENSIONS = [".svg", ".png", ".jpg", ".jpeg"]
-
-# Maximum configuration option for selection
-MAX_CONFIG_OPTION = 3
-
 
 @dataclass
 class AppConfigManager:
@@ -530,6 +520,8 @@ class AppConfigManager:
 
         """
         while True:
+            MAX_CONFIG_OPTION = 3
+
             choice = input("Enter your choice (1-3): ")
             if choice.isdigit() and 1 <= int(choice) <= MAX_CONFIG_OPTION:
                 break

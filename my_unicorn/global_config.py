@@ -5,19 +5,24 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class GlobalConfigManager:
     """Manages global configuration settings."""
 
     config_file: str = field(default="~/.config/myunicorn/settings.json")
     app_storage_path: str = field(default_factory=lambda: "~/.local/share/myunicorn")
-    app_backup_storage_path: str = field(default_factory=lambda: "~/.local/share/myunicorn/backups")
+    app_backup_storage_path: str = field(
+        default_factory=lambda: "~/.local/share/myunicorn/backups"
+    )
     app_download_path: str = field(default_factory=lambda: "~/Downloads")
     keep_backup: bool = field(default=True)
     max_backups: int = field(default=3)  # Number of backups to keep per app
     batch_mode: bool = field(default=False)
     locale: str = field(default="en")
-    max_concurrent_updates: int = field(default=3)  # Default value for maximum concurrent updates
+    max_concurrent_updates: int = field(
+        default=3
+    )  # Default value for maximum concurrent updates
 
     def __post_init__(self):
         # Ensure the XDG config directory exists
@@ -25,23 +30,11 @@ class GlobalConfigManager:
         os.makedirs(self.expanded_app_backup_storage_path, exist_ok=True)
         os.makedirs(self.expanded_app_download_path, exist_ok=True)
         os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
-        
+
         # Expand only the config file path during initialization
         self.config_file = os.path.expanduser(self.config_file)
-        
+
         self.load_config()
-
-    def reload(self):
-        """Explicitly reload configuration from disk.
-
-        This ensures any external changes to the configuration file are loaded.
-
-        Returns:
-            bool: True if config was loaded successfully, False otherwise
-
-        """
-        logger.info("Explicitly reloading global configuration from disk")
-        return self.load_config()
 
     def load_config(self):
         """Load global settings from a JSON file or initialize defaults."""
@@ -83,7 +76,9 @@ class GlobalConfigManager:
                 logger.error("Failed to parse the configuration file: %s", e)
                 raise ValueError("Invalid JSON format in the configuration file.")
         else:
-            logger.info("Configuration file not found at %s. Creating one...", self.config_file)
+            logger.info(
+                "Configuration file not found at %s. Creating one...", self.config_file
+            )
             self.create_global_config()
             return False
 
@@ -121,13 +116,17 @@ class GlobalConfigManager:
                 or "~/Downloads"
             )
             keep_backup = (
-                input("Enable backup for old appimages? (yes/no, default: yes): ").strip().lower()
+                input("Enable backup for old appimages? (yes/no, default: yes): ")
+                .strip()
+                .lower()
                 or "yes"
             )
             max_backups = (
                 input("Max number of backups to keep per app (default: 3): ").strip() or "3"
             )
-            batch_mode = input("Enable batch mode? (yes/no, default: no): ").strip().lower() or "no"
+            batch_mode = (
+                input("Enable batch mode? (yes/no, default: no): ").strip().lower() or "no"
+            )
             locale = input("Select your locale (en/tr, default: en): ").strip() or "en"
             max_concurrent_updates = (
                 input("Max number of concurrent updates (default: 3): ").strip() or "3"
@@ -236,7 +235,8 @@ class GlobalConfigManager:
                     )
                 elif key == "keep_backup":
                     new_value = (
-                        input("Enable backup for old appimages? (yes/no): ").strip().lower() or "no"
+                        input("Enable backup for old appimages? (yes/no): ").strip().lower()
+                        or "no"
                     )
                     new_value = new_value == "yes"
                 elif key == "max_backups":
@@ -255,9 +255,13 @@ class GlobalConfigManager:
                     new_value = input("Enable batch mode? (yes/no): ").strip().lower() or "no"
                     new_value = new_value == "yes"
                 elif key == "locale":
-                    new_value = input("Select your locale (en/tr, default: en): ").strip() or "en"
+                    new_value = (
+                        input("Select your locale (en/tr, default: en): ").strip() or "en"
+                    )
                 elif key == "max_concurrent_updates":
-                    new_value_str = input("Enter max number of concurrent updates: ").strip() or "3"
+                    new_value_str = (
+                        input("Enter max number of concurrent updates: ").strip() or "3"
+                    )
                     try:
                         new_value = int(new_value_str)
                         if new_value < 1:
@@ -269,7 +273,9 @@ class GlobalConfigManager:
 
                 setattr(self, key, new_value)
                 self.save_config()
-                print(f"\033[42m{key.capitalize()} updated successfully in settings.json\033[0m")
+                print(
+                    f"\033[42m{key.capitalize()} updated successfully in settings.json\033[0m"
+                )
                 print("=================================================")
             except KeyboardInterrupt:
                 logger.info("User interrupted configuration update")

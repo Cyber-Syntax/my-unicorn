@@ -31,10 +31,6 @@ MAX_AUTH_RETRIES = 2  # Maximum number of retries for failed auth
 RATE_LIMIT_CACHE_TTL = 60 * 60  # 1 hour cache TTL for rate limits - matches GitHub's reset window
 RATE_LIMIT_HARD_REFRESH = 60 * 60 * 2  # Force refresh after 2 hours (safety margin)
 CACHE_DIR = os.path.expanduser("~/.cache/myunicorn")  # Cache directory
-HTTP_OK = 200  # HTTP status code for successful requests
-HTTP_UNAUTHORIZED = 401  # HTTP status code for unauthorized requests
-HTTP_FORBIDDEN = 403  # HTTP status code for forbidden requests
-
 
 class GitHubAuthManager:
     """Manages GitHub API authentication.

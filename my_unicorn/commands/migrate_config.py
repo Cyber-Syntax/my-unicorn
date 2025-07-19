@@ -104,7 +104,7 @@ class MigrateConfigCommand(Command):
         )
 
         # Reload the global configuration after migration
-        self._global_config.reload()
+        self._global_config.load_config()
 
         # Report on global config migration
         global_migrated = results["global_config"]["migrated"]

@@ -68,7 +68,9 @@ class IconManager:
 
         # Fall back to direct icon URL if available and repo path didn't work
         if not icon_info and app_info.icon_info:
-            logger.info("Repository path failed, trying direct icon URL: %s", app_info.icon_info)
+            logger.info(
+                "Repository path failed, trying direct icon URL: %s", app_info.icon_info
+            )
             preferred_filename = (
                 app_info.icon_file_name.lower()
                 if app_info.icon_file_name
@@ -152,13 +154,17 @@ class IconManager:
                         logger.info("Found icon at %s", path)
                         return self._format_icon_info(content)
 
-            elif response.status_code == 403 and "rate limit exceeded" in response.text.lower():
+            elif (
+                response.status_code == 403 and "rate limit exceeded" in response.text.lower()
+            ):
                 logger.warning("GitHub API rate limit exceeded during icon search")
                 GitHubAuthManager.clear_cached_headers()
             elif response.status_code == 404:
                 logger.debug("Icon path not found: %s", path)
             else:
-                logger.debug("Unexpected response (%s) for icon path: %s", response.status_code, path)
+                logger.debug(
+                    "Unexpected response (%s) for icon path: %s", response.status_code, path
+                )
 
             return None
 
@@ -192,7 +198,9 @@ class IconManager:
             "size": content.get("size", 0),
         }
 
-    def download_icon(self, icon_info: dict[str, Any], destination_dir: str) -> tuple[bool, str]:
+    def download_icon(
+        self, icon_info: dict[str, Any], destination_dir: str
+    ) -> tuple[bool, str]:
         """Download an icon file to the specified destination.
 
         Args:
@@ -334,7 +342,9 @@ class IconManager:
                 for directory in [app_icon_dir, app_icon_dir_original]:
                     icon_path = directory / icon_filename
                     if icon_path.exists() and icon_path.is_file():
-                        logger.info("✓ Using existing icon: %s (skipping API request)", icon_path)
+                        logger.info(
+                            "✓ Using existing icon: %s (skipping API request)", icon_path
+                        )
                         return True, str(icon_path)
 
             # Also check for any image file in the directories

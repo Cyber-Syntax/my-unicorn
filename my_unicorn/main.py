@@ -38,7 +38,9 @@ EXIT_FAILURE = 1
 
 
 def custom_excepthook(
-    exc_type: type[BaseException], exc_value: BaseException, exc_traceback: TracebackType | None
+    exc_type: type[BaseException],
+    exc_value: BaseException,
+    exc_traceback: TracebackType | None,
 ) -> None:
     """Custom excepthook to log uncaught exceptions.
 
@@ -256,7 +258,9 @@ Examples:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Version command
-    version_parser = subparsers.add_parser("version", help="Display version and manage updates for my-unicorn")
+    version_parser = subparsers.add_parser(
+        "version", help="Display version and manage updates for my-unicorn"
+    )
     version_cmd = VersionCommand()
     version_cmd.add_arguments(version_parser)
 
@@ -288,14 +292,18 @@ Examples:
     token_parser.add_argument("--save", action="store_true", help="Save token to keyring")
     token_parser.add_argument("--remove", action="store_true", help="Remove token")
     token_parser.add_argument("--check", action="store_true", help="Check rate limits")
-    token_parser.add_argument("--expiration", action="store_true", help="View token expiration")
+    token_parser.add_argument(
+        "--expiration", action="store_true", help="View token expiration"
+    )
     token_parser.add_argument("--storage", action="store_true", help="View storage details")
     token_parser.add_argument("--rotate", action="store_true", help="Rotate token")
 
     # Migrate command
     migrate_parser = subparsers.add_parser("migrate", help="Migrate configuration files")
     migrate_parser.add_argument("--clean", action="store_true", help="Remove unused settings")
-    migrate_parser.add_argument("--force", action="store_true", help="Remove without confirmation")
+    migrate_parser.add_argument(
+        "--force", action="store_true", help="Remove without confirmation"
+    )
 
     return parser
 
@@ -392,7 +400,6 @@ def main() -> None:
     parser = create_argument_parser()
     args = parser.parse_args()
 
-    # Initialize app definitions path
     initialize_app_definitions()
 
     # Config Initialize, global config auto loads the config file
@@ -406,10 +413,8 @@ def main() -> None:
     # locale_manager.load_translations(global_config.locale)
 
     if args.command:
-        # If command line arguments are provided, execute the CLI command
         execute_cli_command(args)
     else:
-        # Initialize CommandInvoker and register commands
         invoker = CommandInvoker()
         setup_commands(invoker)
 

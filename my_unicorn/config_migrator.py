@@ -73,7 +73,9 @@ class ConfigMigrator:
                     # Get confirmation if required
                     confirmed = not require_confirmation
                     if require_confirmation:
-                        print("\nDetected unused configuration keys that are no longer needed:")
+                        print(
+                            "\nDetected unused configuration keys that are no longer needed:"
+                        )
                         for key in unused_keys:
                             print(f"  • {key}: {user_config_dict[key]}")
 
@@ -108,7 +110,9 @@ class ConfigMigrator:
 
                         # Record which keys were deleted
                         deleted_keys = unused_keys
-                        logger.info("Removed %d unused keys from global config", len(deleted_keys))
+                        logger.info(
+                            "Removed %d unused keys from global config", len(deleted_keys)
+                        )
                         has_changes = True
                     else:
                         logger.info("Skipped deleting unused keys (not confirmed)")
@@ -237,7 +241,9 @@ class ConfigMigrator:
 
                     # Parse JSON content
                     user_app_dict = json.loads(file_content)
-                    logger.debug("App '%s' config keys: %s", app_name, list(user_app_dict.keys()))
+                    logger.debug(
+                        "App '%s' config keys: %s", app_name, list(user_app_dict.keys())
+                    )
 
                     # Special handling for app_rename being null
                     if (
@@ -285,7 +291,9 @@ class ConfigMigrator:
                             for key in unused_keys:
                                 del user_app_dict[key]
                                 app_deleted_keys.append(key)
-                                logger.info("Deleted unused key '%s' from app '%s'", key, app_name)
+                                logger.info(
+                                    "Deleted unused key '%s' from app '%s'", key, app_name
+                                )
                             has_changes = True
                             deleted_configs[app_name] = app_deleted_keys
                             logger.info(
@@ -324,7 +332,9 @@ class ConfigMigrator:
                 except json.JSONDecodeError as e:
                     logger.error("Invalid JSON in app config '%s': %s", app_name, e)
                 except Exception as e:
-                    logger.error("Error processing app config '%s': %s", app_name, e, exc_info=True)
+                    logger.error(
+                        "Error processing app config '%s': %s", app_name, e, exc_info=True
+                    )
 
             return len(migrated_configs), migrated_configs, deleted_configs
 

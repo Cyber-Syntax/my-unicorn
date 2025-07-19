@@ -126,6 +126,39 @@ EOF
 
 # ======== Test Scenarios ========
 
+## Option 1 : URL Installs
+option1_qownnotes() {
+  log "=== Testing QOwnNotes Fresh Install ==="
+  rm -f "$CONFIG_DIR/QOwnNotes.json"
+  cd "$APP_ROOT"
+  python3 run.py download https://github.com/pbek/QOwnNotes || log "ERROR: download QOwnNotes failed"
+  log "QOwnNotes installation test completed"
+}
+
+option1_joplin() {
+  log "=== Testing Joplin Fresh Install ==="
+  rm -f "$CONFIG_DIR/joplin.json"
+  cd "$APP_ROOT"
+  python3 run.py download https://github.com/laurent22/joplin || log "ERROR: download joplin failed"
+  log "Joplin installation test completed"
+}
+
+## Option 2: Catalog Installs
+option2_qownnotes() {
+  log "=== Testing QOwnNotes Catalog Install ==="
+  cd "$APP_ROOT"
+  python3 run.py install qownnotes || log "ERROR: install qownnotes failed"
+  log "QOwnNotes catalog install test completed"
+}
+
+option2_joplin() {
+  log "=== Testing Joplin Catalog Install ==="
+  cd "$APP_ROOT"
+  python3 run.py install joplin || log "ERROR: install joplin failed"
+  log "Joplin catalog install test completed"
+}
+
+## Option 3: Auto Update Installations
 option3_joplin_qownnotes() {
   log "=== Testing Both QOwnNotes and Joplin Update Together ==="
   setup_qownnotes_config "0.1.0"
@@ -162,6 +195,7 @@ option3_joplin() {
   log "Joplin update test completed"
 }
 
+## Option 4: Selective Update Installations
 option4_qownnotes() {
   log "=== Testing Selective Update (QOwnNotes) ==="
   setup_qownnotes_config "0.1.0"
@@ -189,21 +223,6 @@ option4_fourapp() {
   log "Selective update test for four apps completed"
 }
 
-url_qownnotes() {
-  log "=== Testing QOwnNotes Fresh Install ==="
-  rm -f "$CONFIG_DIR/QOwnNotes.json"
-  cd "$APP_ROOT"
-  python3 run.py download https://github.com/pbek/QOwnNotes || log "ERROR: download QOwnNotes failed"
-  log "QOwnNotes installation test completed"
-}
-
-url_joplin() {
-  log "=== Testing Joplin Fresh Install ==="
-  rm -f "$CONFIG_DIR/joplin.json"
-  cd "$APP_ROOT"
-  python3 run.py download https://github.com/laurent22/joplin || log "ERROR: download joplin failed"
-  log "Joplin installation test completed"
-}
 
 # ======== Main Function ========
 
@@ -219,32 +238,35 @@ main() {
   while true; do
     echo ""
     echo "Available tests:"
-    echo "1) (Auto)Option 3 test with 4 apps"
-    echo "2) (Selective)Option 4 test with 4 apps"
-    echo "3) (Auto)Option 3 test QOwnNotes"
-    echo "4) (Auto)Option 3 test Joplin"
-    echo "5) (Selective)Option 4 test QOwnNotes"
-    echo "6) (Selective)Option 4 test Joplin"
-
-    echo "7) (URL)Option 1 test QOwnNotes"
-    echo "8) (URL)Option 1 test Joplin"
-    echo "9) (Auto)Option 3 test QOwnNotes and Joplin"
-    echo "10) Exit and restore configs"
+    echo "1) (URL)Option 1 test QOwnNotes"
+    echo "2) (URL)Option 1 test Joplin"
+    echo "3) (Catalog)Option 2 test QOwnNotes"
+    echo "4) (Catalog)Option 2 test Joplin"
+    echo "5) (Auto)Option 3 test with 4 apps"
+    echo "6) (Auto)Option 3 test QOwnNotes and Joplin"
+    echo "7) (Auto)Option 3 test QOwnNotes"
+    echo "8) (Auto)Option 3 test Joplin"
+    echo "9) (Selective)Option 4 test with 4 apps"
+    echo "10) (Selective)Option 4 test QOwnNotes"
+    echo "11) (Selective)Option 4 test Joplin"
+    echo "0) Exit and restore configs"
     echo ""
 
     read -p "Select a test (1-10): " choice
 
     case $choice in
-    1) option3_fourapp ;;
-    2) option4_fourapp ;;
-    3) option3_qownnotes ;;
-    4) option3_joplin ;;
-    5) option4_qownnotes ;;
-    6) option4_joplin ;;
-    7) url_qownnotes ;;
-    8) url_joplin ;;
-    9) option3_joplin_qownnotes ;;
-    10)
+    1) option1_qownnotes ;;
+    2) option1_joplin ;;
+    3) option2_qownnotes ;;
+    4) option2_joplin ;;
+    5) option3_fourapp ;;
+    6) option3_joplin_qownnotes ;;
+    7) option3_qownnotes ;;
+    8) option3_joplin ;;
+    9) option4_fourapp ;;
+    10) option4_qownnotes ;;
+    11) option4_joplin ;;
+    0)
       log "Restoring original configurations"
       restore_app_configs
       log "Testing completed"
