@@ -16,7 +16,7 @@ Key features:
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 from my_unicorn.commands.update_base import BaseUpdateCommand
 
@@ -51,6 +51,7 @@ class SelectiveUpdateCommand(BaseUpdateCommand):
         # The max_concurrent_updates value is initialized from the global config
         # that was already loaded in BaseUpdateCommand.__post_init__()
 
+    @override
     def execute(self) -> None:
         """Execute the update process with selective asynchronous updates.
 

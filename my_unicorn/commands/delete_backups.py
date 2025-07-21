@@ -9,6 +9,7 @@ number of backups per app.
 
 import logging
 import os
+from typing import override
 
 from my_unicorn.commands.base import Command
 from my_unicorn.global_config import GlobalConfigManager
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 class DeleteBackupsCommand(Command):
     """Command for managing and deleting backup files."""
 
+    @override
     def execute(self) -> None:
         """Execute the command to delete backup files."""
         global_config = GlobalConfigManager()
@@ -217,7 +219,9 @@ class DeleteBackupsCommand(Command):
                             file_count += 1
 
             if file_count > 0:
-                print(f"✓ Successfully deleted {file_count} backup files older than {date_desc}.")
+                print(
+                    f"✓ Successfully deleted {file_count} backup files older than {date_desc}."
+                )
                 logger.info("Deleted %s backup files older than %s", file_count, date_desc)
             else:
                 logger.info("No backup files found older than %s", date_desc)
@@ -271,7 +275,9 @@ class DeleteBackupsCommand(Command):
 
             len_app_backups = len(app_backups)
             # Log what we found
-            logger.info("Found %s backups for %s, max_backups=%d", len_app_backups, app, max_backups)
+            logger.info(
+                "Found %s backups for %s, max_backups=%d", len_app_backups, app, max_backups
+            )
 
             # Keep only the newest max_backups files
             if len_app_backups > max_backups:

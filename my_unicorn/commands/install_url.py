@@ -6,6 +6,7 @@ and installing AppImage files from GitHub repositories.
 
 import logging
 from pathlib import Path
+from typing import override
 
 from my_unicorn.api.github_api import GitHubAPI
 from my_unicorn.app_config import AppConfigManager
@@ -29,6 +30,7 @@ class DownloadCommand(Command):
         self.owner = None
         self.repo = None
 
+    @override
     def execute(self) -> None:
         """Execute the download command."""
         repo_info = self._parse_url_and_get_repo_info()

@@ -9,6 +9,7 @@ import argparse
 import json
 import logging
 import os
+from typing import override
 
 from my_unicorn.commands.base import Command
 from my_unicorn.config_migrator import ConfigMigrator
@@ -25,6 +26,7 @@ class MigrateConfigCommand(Command):
 
     def __init__(self):
         """Initialize the migration command."""
+        super().__init__()
         self._logger = logging.getLogger(__name__)
         self._parser = argparse.ArgumentParser(
             description="Migrate configuration files by adding missing settings and optionally removing unused settings."
@@ -42,6 +44,7 @@ class MigrateConfigCommand(Command):
         # Create instance of GlobalConfigManager for use in the command
         self._global_config = GlobalConfigManager()
 
+    @override
     def execute(self, args=None):
         """Execute the configuration migration command.
 
@@ -60,7 +63,9 @@ class MigrateConfigCommand(Command):
         if args is None:
             # Interactive mode - called from menu
             print("\nDo you want to check for and remove unused configuration variables?")
-            user_choice = input("This will help clean up old settings (yes/no): ").strip().lower()
+            user_choice = (
+                input("This will help clean up old settings (yes/no): ").strip().lower()
+            )
             delete_unused = user_choice in ("yes", "y")
             require_confirmation = True  # Always require confirmation in interactive mode
         else:
@@ -135,7 +140,9 @@ class MigrateConfigCommand(Command):
 
             # Report added keys
             if app_count > 0:
-                print(f"  • Updated {app_count} application configuration files with new settings:")
+                print(
+                    f"  • Updated {app_count} application configuration files with new settings:"
+                )
                 for app_name, keys in results["app_configs"]["details"].items():
                     print(f"    - {app_name}: Added {len(keys)} settings ({', '.join(keys)})")
 
@@ -146,7 +153,9 @@ class MigrateConfigCommand(Command):
                     f"  • Removed unused settings from {len(deleted_apps)} application configurations:"
                 )
                 for app_name, keys in deleted_apps.items():
-                    print(f"    - {app_name}: Removed {len(keys)} settings ({', '.join(keys)})")
+                    print(
+                        f"    - {app_name}: Removed {len(keys)} settings ({', '.join(keys)})"
+                    )
         else:
             print("\n✓ All application configurations are up-to-date.")
 
