@@ -38,9 +38,18 @@ class SHAAssetFinder:
         # Handle case where definitive_app_info is None (URL-based installs)
         if definitive_app_info is None:
             logger.info("No app definition found - using automatic SHA detection")
+
+            # Lets check if the asset digest is available
+            asset_digest_info = self._try_extract_asset_digest(selected_appimage_name, assets)
+            if asset_digest_info:
+                logger.info("Using asset digest for verification")
+                return asset_digest_info
+            else:
+                logger.info("Asset digest not found")
         else:
             logger.info(
-                "Using SHA name from definitive info: %s", definitive_app_info.checksum_file_name
+                "Using SHA name from definitive info: %s",
+                definitive_app_info.checksum_file_name,
             )
 
             # Skip SHA search if verification is disabled
@@ -51,9 +60,13 @@ class SHAAssetFinder:
             # Priority 1: Check if app uses asset digest verification
             if definitive_app_info.use_asset_digest:
                 logger.info("App %s prefers asset digest verification", selected_appimage_name)
-                asset_digest_info = self._try_extract_asset_digest(selected_appimage_name, assets)
+                asset_digest_info = self._try_extract_asset_digest(
+                    selected_appimage_name, assets
+                )
                 if asset_digest_info:
-                    logger.info("Successfully found asset digest for %s", selected_appimage_name)
+                    logger.info(
+                        "Successfully found asset digest for %s", selected_appimage_name
+                    )
                     return asset_digest_info
                 else:
                     logger.warning(
@@ -67,8 +80,6 @@ class SHAAssetFinder:
                     if asset["name"].lower() == definitive_app_info.checksum_file_name.lower():
                         logger.info("Found exact SHA name match: %s", asset["name"])
                         return asset
-
-        # Priority 3: Try pattern matching (for both catalog and URL-based installs)
 
         # Priority 3: Look for SHA files that might contain our AppImage's hash
         sha_assets = self._filter_sha_assets(assets)
@@ -91,7 +102,9 @@ class SHAAssetFinder:
         logger.info("Using first available SHA file as fallback")
         return sha_assets[0]
 
-    def _try_extract_asset_digest(self, appimage_name: str, assets: list[dict[str, str]]) -> dict[str, str] | None:
+    def _try_extract_asset_digest(
+        self, appimage_name: str, assets: list[dict[str, str]]
+    ) -> dict[str, str] | None:
         """Try to extract asset digest information from GitHub API asset metadata.
 
         Args:

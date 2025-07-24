@@ -278,7 +278,11 @@ class DownloadCommand(Command):
 
         if success:
             # Save the configuration only if all previous steps succeed
-            app_config.save_config()
+            save: bool = app_config.save_config()
+            if save:
+                print("✅ Configuration saved successfully!")
+            else:
+                print("❌ Failed to save configuration!")
 
             # Display success message with paths
             if verification_skipped:
