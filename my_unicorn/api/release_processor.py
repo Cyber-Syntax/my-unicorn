@@ -33,9 +33,9 @@ class ReleaseProcessor:
             arch_keyword: Architecture keyword for filtering assets
 
         """
-        self.owner = owner
-        self.repo = repo
-        self.arch_keyword = arch_keyword
+        self.owner: str = owner
+        self.repo: str = repo
+        self.arch_keyword: str | None = arch_keyword
 
     def compare_versions(
         self, current_version: str, latest_version: str
@@ -44,7 +44,7 @@ class ReleaseProcessor:
         # Normalize versions
         current_normalized = version_utils.normalize_version_for_comparison(current_version)
         latest_normalized = version_utils.normalize_version_for_comparison(latest_version)
-        
+
         # Handle zen-browser special formatting
         current_normalized = version_utils.handle_zen_browser_version(
             current_version, current_normalized, self.owner, self.repo
@@ -52,52 +52,60 @@ class ReleaseProcessor:
         latest_normalized = version_utils.handle_zen_browser_version(
             latest_version, latest_normalized, self.owner, self.repo
         )
-    
+
         # For comparison, use base versions without letter suffixes
-        current_base = self._get_zen_base_version(current_normalized) if self._is_zen_browser else current_normalized
-        latest_base = self._get_zen_base_version(latest_normalized) if self._is_zen_browser else latest_normalized
-    
+        current_base = (
+            self._get_zen_base_version(current_normalized)
+            if self._is_zen_browser
+            else current_normalized
+        )
+        latest_base = (
+            self._get_zen_base_version(latest_normalized)
+            if self._is_zen_browser
+            else latest_normalized
+        )
+
         update_available = False
         is_zen = self._is_zen_browser
-    
+
         try:
             parsed_current = parse_version_string(current_normalized)
             parsed_latest = parse_version_string(latest_normalized)
             parsed_current_base = parse_version_string(current_base)
             parsed_latest_base = parse_version_string(latest_base)
-    
+
             if is_zen:
                 # Zen-browser logic: update if base is newer or same base with different suffix
-                update_available = (
-                    parsed_latest_base > parsed_current_base or 
-                    (parsed_latest_base == parsed_current_base and latest_normalized != current_normalized)
+                update_available = parsed_latest_base > parsed_current_base or (
+                    parsed_latest_base == parsed_current_base
+                    and latest_normalized != current_normalized
                 )
             else:
                 # Standard logic: update if newer version
                 update_available = parsed_latest > parsed_current
-    
+
         except (ValueError, TypeError) as e:
             logger.error("Version parsing error: %s", e)
             # Fallback to string comparison if parsing fails
             update_available = latest_normalized > current_normalized
-    
+
         return update_available, {
             "current_version": current_version,
             "latest_version": latest_version,
             "current_normalized": current_normalized,
             "latest_normalized": latest_normalized,
         }
-    
+
     @property
     def _is_zen_browser(self) -> bool:
         """Check if this is zen-browser repo."""
         return self.owner == "zen-browser" and self.repo == "desktop"
-    
+
     def _get_zen_base_version(self, version: str) -> str:
         """Extract base version number for zen-browser (without letter suffix)."""
         if not self._is_zen_browser:
             return version
-        
+
         # Match patterns like 1.12.28b or 1.12.28
         match = re.match(r"^(\d+\.\d+\.\d+)[a-zA-Z]?$", version)
         return match.group(1) if match else version
@@ -125,7 +133,9 @@ class ReleaseProcessor:
             if any(keyword.lower() in asset_name for keyword in arch_keywords):
                 compatible_assets.append(asset)
 
-        logger.debug("Found %d compatible assets out of %d", len(compatible_assets), len(assets))
+        logger.debug(
+            "Found %d compatible assets out of %d", len(compatible_assets), len(assets)
+        )
         return compatible_assets
 
     def process_release_data(

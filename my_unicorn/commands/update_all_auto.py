@@ -7,7 +7,7 @@ asynchronous updates for improved performance.
 """
 
 import logging
-from typing import Any
+from typing import Any, override
 
 from my_unicorn.commands.update_base import BaseUpdateCommand
 
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 class AutoUpdateCommand(BaseUpdateCommand):
     """Command to automatically check and update all AppImages without manual selection."""
 
+    @override
     def execute(self):
         """Check all AppImage configurations and update those with new versions available.
 

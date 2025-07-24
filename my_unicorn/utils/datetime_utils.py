@@ -9,6 +9,7 @@ This module provides functionality for handling date and time operations. It inc
 
 import logging
 from datetime import datetime
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -99,15 +100,5 @@ def get_next_hour_timestamp() -> int:
 
     Calculates the timestamp for the start of the next hour, used primarily
     for GitHub API rate limit reset timing.
-
-    Returns:
-        int: Unix timestamp (seconds since epoch) for the start of next hour
-
-    Example:
-        >>> current = 1672574400  # 2023-01-01 12:30:00
-        >>> get_next_hour_timestamp()
-        1672578000  # 2023-01-01 13:00:00
-
     """
-    current_time = int(datetime.now().timestamp())
-    return (current_time // 3600 + 1) * 3600
+    return int((time.time() // 3600) * 3600) + 3600

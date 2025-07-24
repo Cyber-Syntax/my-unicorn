@@ -10,8 +10,8 @@ import asyncio
 import logging
 import os
 import time
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 from my_unicorn.api.github_api import GitHubAPI
 from my_unicorn.app_config import AppConfigManager
@@ -21,8 +21,8 @@ from my_unicorn.commands.base import Command
 from my_unicorn.download import DownloadManager
 from my_unicorn.file_handler import FileHandler
 from my_unicorn.global_config import GlobalConfigManager
-from my_unicorn.verify import VerificationManager
 from my_unicorn.utils import ui_utils
+from my_unicorn.verify import VerificationManager
 
 
 class BaseUpdateCommand(Command):
@@ -35,6 +35,7 @@ class BaseUpdateCommand(Command):
 
     def __init__(self):
         """Initialize base update command with necessary configuration managers."""
+        super().__init__()
         self.global_config = GlobalConfigManager()
         self.app_config = AppConfigManager()
         self._logger = logging.getLogger(__name__)
@@ -57,7 +58,6 @@ class BaseUpdateCommand(Command):
 
         self.semaphore: asyncio.Semaphore = asyncio.Semaphore(semaphore_value)
         self._logger.debug("Semaphore initialized with value: %s", semaphore_value)
-
 
     def execute(self):
         """Abstract execute method to be implemented by subclasses."""
@@ -623,19 +623,17 @@ class BaseUpdateCommand(Command):
         """
         try:
             # Get current rate limit info
-            remaining, limit, reset_time, auth = (
-                GitHubAuthManager.get_rate_limit_info()
-            )
+            remaining, limit, reset_time, auth = GitHubAuthManager.get_rate_limit_info()
 
             # Calculate requests needed (estimate 3 per app: version check, release info, icon check)
-            #TODO: make sure that is also checked for each app
+            # TODO: make sure that is also checked for each app
             # and auto and selective commands
             requests_per_app = 3
             total_requests_needed = len(apps) * requests_per_app
 
             # Check if we have enough requests for all apps
             if remaining >= total_requests_needed:
-                message = "Rate limit status: {}/{} requests remaining. Sufficient for all {} apps.".format(remaining, limit, len(apps))
+                message = f"Rate limit status: {remaining}/{limit} requests remaining. Sufficient for all {len(apps)} apps."
                 self._logger.info(message)
                 return True, apps, message
 
@@ -675,7 +673,13 @@ class BaseUpdateCommand(Command):
                     f"Minimum requests required: {requests_per_app}. "
                     f"Rate limit resets at: {reset_time}"
                 )
-                self._logger.error("ERROR: Not enough API requests remaining (%d/%d). Minimum requests required: %d. Rate limit resets at: %s", remaining, limit, requests_per_app, reset_time)
+                self._logger.error(
+                    "ERROR: Not enough API requests remaining (%d/%d). Minimum requests required: %d. Rate limit resets at: %s",
+                    remaining,
+                    limit,
+                    requests_per_app,
+                    reset_time,
+                )
                 return False, [], message
 
             # We can process some apps but not all
@@ -723,76 +727,81 @@ class BaseUpdateCommand(Command):
             print(f"Error retrieving rate limit information: {e}")
 
     def display_async_results(
-            self,
-            success_count: int,
-            failure_count: int,
-            results: dict[str, dict[str, Any]],
-            total_apps: int,
-        ) -> None:
-            """Display the results of async update operation.
-    
-            Args:
-                success_count: Number of successful updates
-                failure_count: Number of failed updates
-                results: Dictionary mapping app names to their result data
-                total_apps: Total number of apps processed
-    
-            """
-            print("\n=== Update Summary ===")
-            print(f"Total apps processed: {success_count + failure_count}/{total_apps}")
-            print(f"Successfully updated: {success_count}")
-    
-            # Show detailed messages for successful updates
-            if success_count > 0:
-                print("\nSuccessful updates:")
-                for app_name, result in results.items():
-                    if result.get("status") == "success":
-                        # Show download message
-                        download_msg = result.get("download_message", "")
-                        if download_msg:
-                            print(f"  {download_msg}")
-    
-                        # Show verification message
-                        verification_msg = result.get("verification_message", "")
-                        if verification_msg:
-                            print(f"  {verification_msg}")
-    
-                        # Show success message
-                        success_msg = result.get("success_message", "")
-                        if success_msg:
-                            print(f"  {success_msg}")
-                        elif result.get("message"):
-                            print(f"  ✓ {app_name} - {result.get('message')}")
-    
-            if failure_count > 0:
-                print(f"\nFailed updates: {failure_count}")
-    
-                # list failed updates
-                for app_name, result in results.items():
-                    if result.get("status") != "success":
-                        message = result.get("message", "Unknown error")
-                        elapsed = result.get("elapsed", 0)
-                        print(f"  ✗ {app_name}: {message} ({elapsed:.1f}s)")
-    
-            print("\nUpdate process completed!")
-    
-            # Prompt to remove downloaded files for failed updates in batch
-            if failure_count > 0:
-                failed_apps = [name for name, res in results.items() if res.get("status") != "success"]
-    
-                from my_unicorn.utils.cleanup_utils import cleanup_batch_failed_updates
-    
-                try:
-                    # Use the unified batch cleanup function
-                    cleanup_batch_failed_updates(
-                        failed_apps=failed_apps, results=results, ask_confirmation=True, verbose=True
-                    )
-                except KeyboardInterrupt:
-                    print("\nCleanup cancelled.")
-    
-            # Display updated rate limit information after updates
-            self.display_rate_limit_info()
-            
+        self,
+        success_count: int,
+        failure_count: int,
+        results: dict[str, dict[str, Any]],
+        total_apps: int,
+    ) -> None:
+        """Display the results of async update operation.
+
+        Args:
+            success_count: Number of successful updates
+            failure_count: Number of failed updates
+            results: Dictionary mapping app names to their result data
+            total_apps: Total number of apps processed
+
+        """
+        print("\n=== Update Summary ===")
+        print(f"Total apps processed: {success_count + failure_count}/{total_apps}")
+        print(f"Successfully updated: {success_count}")
+
+        # Show detailed messages for successful updates
+        if success_count > 0:
+            print("\nSuccessful updates:")
+            for app_name, result in results.items():
+                if result.get("status") == "success":
+                    # Show download message
+                    download_msg = result.get("download_message", "")
+                    if download_msg:
+                        print(f"  {download_msg}")
+
+                    # Show verification message
+                    verification_msg = result.get("verification_message", "")
+                    if verification_msg:
+                        print(f"  {verification_msg}")
+
+                    # Show success message
+                    success_msg = result.get("success_message", "")
+                    if success_msg:
+                        print(f"  {success_msg}")
+                    elif result.get("message"):
+                        print(f"  ✓ {app_name} - {result.get('message')}")
+
+        if failure_count > 0:
+            print(f"\nFailed updates: {failure_count}")
+
+            # list failed updates
+            for app_name, result in results.items():
+                if result.get("status") != "success":
+                    message = result.get("message", "Unknown error")
+                    elapsed = result.get("elapsed", 0)
+                    print(f"  ✗ {app_name}: {message} ({elapsed:.1f}s)")
+
+        print("\nUpdate process completed!")
+
+        # Prompt to remove downloaded files for failed updates in batch
+        if failure_count > 0:
+            failed_apps = [
+                name for name, res in results.items() if res.get("status") != "success"
+            ]
+
+            from my_unicorn.utils.cleanup_utils import cleanup_batch_failed_updates
+
+            try:
+                # Use the unified batch cleanup function
+                cleanup_batch_failed_updates(
+                    failed_apps=failed_apps,
+                    results=results,
+                    ask_confirmation=True,
+                    verbose=True,
+                )
+            except KeyboardInterrupt:
+                print("\nCleanup cancelled.")
+
+        # Display updated rate limit information after updates
+        self.display_rate_limit_info()
+
     def update_apps_async_wrapper(self, apps_to_update: list[dict[str, Any]]) -> None:
         """Wrap the async update method to call it from a synchronous context.
 
@@ -832,79 +841,81 @@ class BaseUpdateCommand(Command):
             DownloadManager.stop_progress()
 
             # Display results
-            self.display_async_results(success_count, failure_count, results, len(apps_to_update))
+            self.display_async_results(
+                success_count, failure_count, results, len(apps_to_update)
+            )
 
         except KeyboardInterrupt:
             self._logger.info("Update process cancelled by user (Ctrl+C)")
             print("\nUpdate process cancelled by user (Ctrl+C)")
         except Exception as e:
             self._logger.error("Error in async update process: %s", str(e), exc_info=True)
-            print(f"\nError in update process: {e!s}")           
-            
+            print(f"\nError in update process: {e!s}")
+
     def find_updatable_apps(
-            self, selected_files: list[str] | None = None
-        ) -> list[dict[str, Any]]:
-            """Find AppImages that have updates available.
-    
-            Args:
-                selected_files (Optional[list[str]]): List of selected configuration files to check.
-                                                        If None, all available files will be checked.
-    
-            Returns:
-                list[tuple[str, Any]]: list of updatable app information dictionaries
-    
-            """
-            updatable_apps = []
-    
-            try:
-                # Get the list of files to process
-                if selected_files is None:
-                    json_files = self.app_config.list_json_files()
-                    if not json_files:
-                        logger.warning("No AppImage configuration files found")
+        self, selected_files: list[str] | None = None
+    ) -> list[dict[str, Any]]:
+        """Find AppImages that have updates available.
+
+        Args:
+            selected_files (Optional[list[str]]): List of selected configuration files to check.
+                                                    If None, all available files will be checked.
+
+        Returns:
+            list[tuple[str, Any]]: list of updatable app information dictionaries
+
+        """
+        updatable_apps = []
+
+        try:
+            # Get the list of files to process
+            if selected_files is None:
+                json_files = self.app_config.list_json_files()
+                if not json_files:
+                    logger.warning("No AppImage configuration files found")
+                    print(
+                        "No AppImage configuration files found. Use the Download option first."
+                    )
+                    return []
+                print(f"Checking {len(json_files)} AppImage configurations...")
+            else:
+                json_files = selected_files
+                print(f"Checking {len(json_files)} selected AppImage configurations...")
+
+            # Check each app for updates
+            for config_file in json_files:
+                try:
+                    # Create a temporary app config for checking this app
+                    app_name = os.path.splitext(config_file)[0]  # Remove .json extension
+
+                    # Directly check version without redirecting output
+                    app_data = self._check_single_app_version(self.app_config, config_file)
+
+                    if (
+                        isinstance(app_data, dict)
+                        and "current" in app_data
+                        and "latest" in app_data
+                    ):
                         print(
-                            "No AppImage configuration files found. Use the Download option first."
+                            f"{app_name}: update available: {app_data['current']} → "
+                            f"{app_data['latest']}"
                         )
-                        return []
-                    print(f"Checking {len(json_files)} AppImage configurations...")
-                else:
-                    json_files = selected_files
-                    print(f"Checking {len(json_files)} selected AppImage configurations...")
-    
-                # Check each app for updates
-                for config_file in json_files:
-                    try:
-                        # Create a temporary app config for checking this app
-                        app_name = os.path.splitext(config_file)[0]  # Remove .json extension
-    
-                        # Directly check version without redirecting output
-                        app_data = self._check_single_app_version(self.app_config, config_file)
-    
-                        if (
-                            isinstance(app_data, dict)
-                            and "current" in app_data
-                            and "latest" in app_data
-                        ):
-                            print(
-                                f"{app_name}: update available: {app_data['current']} → "
-                                f"{app_data['latest']}"
-                            )
-                            updatable_apps.append(app_data)
-                        elif app_data is False:
-                            print(f"{app_name}: already up to date")
-                        else:
-                            print(f"{app_name}, unexpected result: {app_data}")
-    
-                    except Exception as e:
-                        self._logger.error("Error checking %s: %s", config_file, e)
-                        print(f"{app_name}: error: {e}")
-                    except KeyboardInterrupt:
-                        self._logger.info("Update check cancelled by user (Ctrl+C)")
-                        print("\nUpdate check cancelled by user (Ctrl+C)")
-                        return updatable_apps
-    
-            except Exception as e:
-                self._logger.error("Error during update check: %s", e)
-                print("Error during update check:", e)
-    
-            return updatable_apps           
+                        updatable_apps.append(app_data)
+                    elif app_data is False:
+                        print(f"{app_name}: already up to date")
+                    else:
+                        print(f"{app_name}, unexpected result: {app_data}")
+
+                except Exception as e:
+                    self._logger.error("Error checking %s: %s", config_file, e)
+                    print(f"{app_name}: error: {e}")
+                except KeyboardInterrupt:
+                    self._logger.info("Update check cancelled by user (Ctrl+C)")
+                    print("\nUpdate check cancelled by user (Ctrl+C)")
+                    return updatable_apps
+
+        except Exception as e:
+            self._logger.error("Error during update check: %s", e)
+            print("Error during update check:", e)
+
+        return updatable_apps

@@ -8,6 +8,7 @@ by name, without requiring the user to enter URLs.
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 from my_unicorn.api.github_api import GitHubAPI
 from my_unicorn.app_config import AppConfigManager
@@ -40,6 +41,7 @@ class InstallAppCommand(Command):
 
     def __init__(self) -> None:
         """Initialize the command with configuration managers."""
+        super().__init__()
         self.global_config = GlobalConfigManager()
         self.global_config.load_config()
         self._app_name = None
@@ -75,6 +77,7 @@ class InstallAppCommand(Command):
         print("Usage: python run.py install <app_name>")
         print("Example: python run.py install joplin")
 
+    @override
     def execute(self) -> None:
         """Execute the install app command to browse and install applications."""
         print("\n=== Install Application ===")
@@ -268,13 +271,13 @@ class InstallAppCommand(Command):
 
                 # Initialize progress bar for this attempt
                 DownloadManager.get_or_create_progress(1)
-                
+
                 # Perform download
                 result = self._attempt_download_and_verification(api, attempt)
-                
+
                 # Stop progress immediately after download before printing
                 DownloadManager.stop_progress()
-                
+
                 if result.success:
                     return result
 

@@ -37,15 +37,15 @@ class SHAManager:
             app_info: AppInfo object containing app-specific settings
 
         """
-        self.owner = owner
-        self.repo = repo
-        self.checksum_file_name = checksum_file_name
-        self.appimage_name = appimage_name
-        self.checksum_file_download_url = None
-        self.checksum_hash_type = None
+        self.owner: str = owner
+        self.repo: str = repo
+        self.checksum_file_name: str | None = checksum_file_name
+        self.appimage_name: str | None = appimage_name
+        self.checksum_file_download_url: str | None = None
+        self.checksum_hash_type: str | None = None
         self.extracted_hash_from_body: str | None = None  # For hash from release body
         self.asset_digest: str | None = None  # For GitHub API asset digest verification
-        self._app_info = app_info
+        self._app_info: AppInfo | None = app_info
         self.skip_verification: bool = app_info.skip_verification if app_info else False
 
     def _try_extract_sha_from_release_body(self) -> bool:

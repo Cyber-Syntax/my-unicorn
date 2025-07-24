@@ -6,6 +6,7 @@ and installing AppImage files from GitHub repositories.
 
 import logging
 from pathlib import Path
+from typing import override
 
 from my_unicorn.api.github_api import GitHubAPI
 from my_unicorn.app_config import AppConfigManager
@@ -29,6 +30,7 @@ class DownloadCommand(Command):
         self.owner = None
         self.repo = None
 
+    @override
     def execute(self) -> None:
         """Execute the download command."""
         repo_info = self._parse_url_and_get_repo_info()
@@ -276,7 +278,11 @@ class DownloadCommand(Command):
 
         if success:
             # Save the configuration only if all previous steps succeed
-            app_config.save_config()
+            save: bool = app_config.save_config()
+            if save:
+                print("✅ Configuration saved successfully!")
+            else:
+                print("❌ Failed to save configuration!")
 
             # Display success message with paths
             if verification_skipped:
