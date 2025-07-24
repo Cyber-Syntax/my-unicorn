@@ -15,7 +15,7 @@ Türkçe Açıklama: [README.tr.md](README.tr.md)
 > Detailed information: [wiki.md](docs/wiki.md)
 
 - **Supported Applications:**
-    - Super-Productivity, Siyuan, Joplin, Standard-notes, Logseq, QOwnNotes, Tagspaces, Zen-Browser, weektodo, Zettlr
+    - Super-Productivity, Siyuan, Joplin, Standard-notes, Logseq, QOwnNotes, Tagspaces, Zen-Browser, weektodo, Zettlr, HeroicGamesLauncher, KDiskMark
     - Applications without verification (developer doesn't provide hash):
         - FreeTube
             - Related issue: https://github.com/FreeTubeApp/FreeTube/issues/4720)
