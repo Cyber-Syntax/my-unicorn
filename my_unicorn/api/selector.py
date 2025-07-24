@@ -12,8 +12,6 @@ from dataclasses import dataclass
 from my_unicorn.catalog import AppInfo
 from my_unicorn.utils import arch
 
-logger = logging.getLogger(__name__)
-
 
 @dataclass
 class AssetSelectionResult:
@@ -34,7 +32,7 @@ class AppImageSelector:
 
     def __init__(self) -> None:
         """Initialize the selector."""
-        self._logger = logging.getLogger(__name__)
+        self._logger: logging.Logger = logging.getLogger(__name__)
 
     def find_appimage_asset(
         self,

@@ -112,9 +112,6 @@ class ReleaseData(TypedDict):
     """
 
     prerelease: bool
-    release_notes: NotRequired[str]
-    release_url: NotRequired[str]
-    published_at: NotRequired[str]
 
 
 @dataclass
@@ -126,13 +123,13 @@ class ReleaseInfo:
     version: str
     appimage_name: str
     app_download_url: str
+    prerelease: bool = False
     checksum_file_name: str | None = None
     checksum_file_download_url: str | None = None
     checksum_hash_type: str | None = None
     arch_keyword: str | None = None
     extracted_hash_from_body: str | None = None
     asset_digest: str | None = None
-    prerelease: bool = False
     release_notes: str | None = None
     release_url: str | None = None
     published_at: str | None = None
@@ -163,8 +160,8 @@ class ReleaseInfo:
             extracted_hash_from_body=asset_info.get("extracted_hash_from_body"),
             asset_digest=asset_info.get("asset_digest"),
             arch_keyword=asset_info.get("arch_keyword"),
-            release_notes=release_data.get("body", ""),
-            release_url=release_data.get("html_url", ""),
+            release_notes=asset_info.get("body", ""),
+            release_url=asset_info.get("html_url", ""),
+            published_at=asset_info.get("published_at", ""),
             prerelease=release_data.get("prerelease", False),
-            published_at=release_data.get("published_at", ""),
         )

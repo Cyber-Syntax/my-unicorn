@@ -360,7 +360,7 @@ class GitHubAuthManager:
             logger.debug("Failed to extract rate limits from headers: %s", e)
 
     @classmethod
-    def get_auth_headers(cls, force_refresh: bool = False) -> dict[str, str] | None:
+    def get_auth_headers(cls, force_refresh: bool = False) -> dict[str, str]:
         """Get authentication headers for GitHub API requests.
 
         Returns properly formatted headers with Bearer authentication if a token
