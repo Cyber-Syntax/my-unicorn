@@ -7,8 +7,6 @@ This module defines data structures for GitHub release assets.
 from dataclasses import dataclass
 from typing import NotRequired, TypedDict
 
-from my_unicorn.utils import arch
-
 
 @dataclass
 class github_asset(TypedDict):
@@ -77,30 +75,6 @@ class SHAAsset:
             name=asset["name"],
             browser_download_url=asset["browser_download_url"],
             checksum_hash_type=checksum_hash_type,
-        )
-
-
-@dataclass
-class ArchitectureInfo:
-    """Represents architecture information for asset selection."""
-
-    name: str
-    keywords: list[str]
-    incompatible_archs: list[str]
-
-    @classmethod
-    def from_current_system(cls) -> "ArchitectureInfo":
-        """Create an ArchitectureInfo based on the current system architecture.
-
-        Returns:
-            ArchitectureInfo: New ArchitectureInfo instance for current system
-
-        """
-        current_arch = arch.get_current_arch()
-        return cls(
-            name=current_arch,
-            keywords=arch.get_compatible_arch_strings(current_arch),
-            incompatible_archs=arch.get_incompatible_archs(current_arch),
         )
 
 

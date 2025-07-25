@@ -25,7 +25,6 @@ from my_unicorn.api.release_description_fetcher import ReleaseDescriptionFetcher
 from my_unicorn.api.assets import (
     AppImageAsset,
     SHAAsset,
-    ArchitectureInfo,
     ReleaseInfo,
 )
 
@@ -43,7 +42,6 @@ __all__ = [
     "ReleaseDescriptionFetcher",
     "AppImageAsset",
     "SHAAsset", 
-    "ArchitectureInfo",
     "ReleaseInfo",
     # Asset management
     "SHAAssetFinder", 
