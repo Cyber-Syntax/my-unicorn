@@ -98,12 +98,14 @@ class ReleaseInfo:
     appimage_name: str
     app_download_url: str
     prerelease: bool = False
+
+    arch_keyword: str | None = None
     checksum_file_name: str | None = None
     checksum_file_download_url: str | None = None
     checksum_hash_type: str | None = None
-    arch_keyword: str | None = None
-    extracted_hash_from_body: str | None = None
     asset_digest: str | None = None
+    extracted_hash_from_body: str | None = None
+
     release_notes: str | None = None
     release_url: str | None = None
     published_at: str | None = None

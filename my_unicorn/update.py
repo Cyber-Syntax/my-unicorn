@@ -14,6 +14,8 @@ from packaging import version
 from requests import exceptions
 
 # Constants
+from my_unicorn.constants import HTTP_FORBIDDEN, HTTP_OK
+
 GITHUB = "https://github.com/Cyber-Syntax/my-unicorn"
 GITHUB_API_RELEASES_URL = "https://api.github.com/repos/Cyber-Syntax/my-unicorn/releases"
 XDG_DATA_HOME = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
@@ -114,7 +116,7 @@ def get_latest_release_info() -> dict[str, str] | None:
         logger.info("Fetching releases from GitHub API...")
         response = requests.get(GITHUB_API_RELEASES_URL, timeout=10)
 
-        if response.status_code == 200:
+        if response.status_code == HTTP_OK:
             releases = response.json()
 
             if not releases:
@@ -132,7 +134,7 @@ def get_latest_release_info() -> dict[str, str] | None:
             logger.info("Found latest release: %s", latest_release.get("tag_name", "unknown"))
             return latest_release
 
-        elif response.status_code == 403:
+        elif response.status_code == HTTP_FORBIDDEN:
             response_data = response.json() if response.content else {}
             message = response_data.get("message", "")
             if "rate limit exceeded" in message.lower():
@@ -181,7 +183,9 @@ def check_for_update() -> bool:
     latest_version_tag = latest_release.get("tag_name")
     if not latest_version_tag:
         logger.error("Malformed release data - no tag_name found")
-        print("Malformed release data! Reinstall manually or open an issue on GitHub for help!")
+        print(
+            "Malformed release data! Reinstall manually or open an issue on GitHub for help!"
+        )
         return False
 
     # Get current version
@@ -231,7 +235,7 @@ def check_for_update() -> bool:
 
 def perform_update() -> bool:
     """Update by doing a fresh git clone into INSTALL_DIR/source.
-    
+
     Copies my_unicorn, scripts folders, and pyproject.toml, my-unicorn-installer.sh
     """
     source_dir = INSTALL_DIR / "source"

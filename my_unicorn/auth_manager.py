@@ -15,6 +15,7 @@ from typing import Any, NotRequired, TypedDict, cast
 
 import requests
 
+from my_unicorn.constants import HTTP_FORBIDDEN, HTTP_OK, HTTP_UNAUTHORIZED
 from my_unicorn.secure_token import SecureTokenManager
 from my_unicorn.utils.cache_utils import (
     ensure_directory_exists,
@@ -151,7 +152,7 @@ class GitHubAuthManager:
                 timeout=timeout,
             )
 
-            if response.status_code == 200:
+            if response.status_code == HTTP_OK:
                 data = response.json()
                 # Focus only on core rate limits
                 rate = data.get("rate", {})
@@ -161,7 +162,7 @@ class GitHubAuthManager:
 
             # Handle API errors
             logger.debug("Rate limit check failed, status code: %s", response.status_code)
-            if response.status_code == 401:
+            if response.status_code == HTTP_UNAUTHORIZED:
                 logger.warning("Rate limit check failed due to authentication error")
                 if SecureTokenManager.get_token() and cls._last_token:
                     cls.clear_cached_headers()
@@ -665,7 +666,6 @@ class GitHubAuthManager:
             }
             request_headers.update(custom_headers)
 
-
             # Step 4: Insert or remove the Authorization header
             if token:
                 request_headers["Authorization"] = f"Bearer {token}"
@@ -678,11 +678,16 @@ class GitHubAuthManager:
                 response = session.request(method, url, headers=request_headers, **kwargs)
 
                 # Step 6: On success, extract rate‐limit info if we hit GitHub.
-                if response.status_code == 200 and url.startswith("https://api.github.com"):
+                if response.status_code == HTTP_OK and url.startswith(
+                    "https://api.github.com"
+                ):
                     cls._extract_rate_limit_from_headers(dict(response.headers))
 
                 # Step 7: If we got a 401/403, clear session and retry once
-                if response.status_code in (401, 403) and retries < max_retries:
+                if (
+                    response.status_code in (HTTP_UNAUTHORIZED, HTTP_FORBIDDEN)
+                    and retries < max_retries
+                ):
                     SessionPool.clear_session(token_key)
                     cls.clear_cached_headers()
 
@@ -869,7 +874,7 @@ class GitHubAuthManager:
             response = requests.get("https://api.github.com/user", headers=headers, timeout=10)
 
             # Check if the request was successful
-            if response.status_code == 200:
+            if response.status_code == HTTP_OK:
                 logger.info("Token validation successful")
                 token_info["is_valid"] = True
 
@@ -910,12 +915,12 @@ class GitHubAuthManager:
                 return True, token_info
 
             # Handle common error cases
-            elif response.status_code == 401:
+            elif response.status_code == HTTP_UNAUTHORIZED:
                 logger.warning("Token validation failed: Unauthorized")
                 token_info["error"] = "Token is invalid or expired"
                 return False, token_info
 
-            elif response.status_code == 403:
+            elif response.status_code == HTTP_FORBIDDEN:
                 logger.warning("Token validation failed: Forbidden")
                 # Check if it's a rate limit issue
                 if "rate limit exceeded" in response.text.lower():

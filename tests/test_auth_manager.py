@@ -82,7 +82,11 @@ class TestGitHubAuthManager:
             "resources": {
                 "core": {"limit": 5000, "remaining": 4990, "reset": int(time.time()) + 3600},
                 "search": {"limit": 30, "remaining": 28, "reset": int(time.time()) + 3600},
-                "graphql": {"limit": 5000, "remaining": 4999, "reset": int(time.time()) + 3600},
+                "graphql": {
+                    "limit": 5000,
+                    "remaining": 4999,
+                    "reset": int(time.time()) + 3600,
+                },
             },
         }
 
@@ -189,7 +193,10 @@ class TestGitHubAuthManager:
     def test_should_rotate_token_expired(self, reset_class_state, mock_token_manager):
         """Test _should_rotate_token when token is expired."""
         # Setup
-        mock_token_manager.get_token_expiration_info.return_value = (True, "2020-01-01 00:00:00")
+        mock_token_manager.get_token_expiration_info.return_value = (
+            True,
+            "2020-01-01 00:00:00",
+        )
 
         # Execute
         result = GitHubAuthManager._should_rotate_token()
@@ -216,7 +223,9 @@ class TestGitHubAuthManager:
         assert result is True
         mock_token_manager.get_token_expiration_info.assert_called_once()
 
-    def test_should_rotate_token_not_expiring_soon(self, reset_class_state, mock_token_manager):
+    def test_should_rotate_token_not_expiring_soon(
+        self, reset_class_state, mock_token_manager
+    ):
         """Test _should_rotate_token when token is not expiring soon."""
         # Setup - token expires in 60 days
         expiration_date = datetime.now() + timedelta(days=60)
@@ -348,7 +357,9 @@ class TestGitHubAuthManager:
         GitHubAuthManager._rate_limit_cache = {
             "remaining": 4990,
             "limit": 5000,
-            "reset_formatted": datetime.fromtimestamp(reset_time).strftime("%Y-%m-%d %H:%M:%S"),
+            "reset_formatted": datetime.fromtimestamp(reset_time).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            ),
             "is_authenticated": True,
         }
         GitHubAuthManager._rate_limit_cache_time = now
@@ -537,7 +548,9 @@ class TestGitHubAuthManager:
             assert "created_at" in result
             assert "last_used_at" in result
 
-    def test_get_live_rate_limit_info(self, reset_class_state, mock_requests, mock_token_manager):
+    def test_get_live_rate_limit_info(
+        self, reset_class_state, mock_requests, mock_token_manager
+    ):
         """Test get_live_rate_limit_info makes API call and returns fresh data."""
         # Setup - prepare mock response data structure matching implementation
         mock_response_data = {
@@ -679,7 +692,12 @@ class TestGitHubAuthManager:
                     datetime(2023, 1, 1, 22, 45, 0).timestamp()
                 ),  # Current time is 10:45pm (before reset)
                 False,
-                (50, 60, "2023-01-01 23:00:00", False),  # Should show remaining count from cache
+                (
+                    50,
+                    60,
+                    "2023-01-01 23:00:00",
+                    False,
+                ),  # Should show remaining count from cache
             ),
             # Test case 3: Authenticated user after hourly reset (10pm -> 11pm)
             (
@@ -714,7 +732,12 @@ class TestGitHubAuthManager:
                     datetime(2023, 1, 1, 22, 45, 0).timestamp()
                 ),  # Current time is 10:45pm (before reset)
                 True,
-                (4800, 5000, "2023-01-01 23:00:00", True),  # Should show remaining count from cache
+                (
+                    4800,
+                    5000,
+                    "2023-01-01 23:00:00",
+                    True,
+                ),  # Should show remaining count from cache
             ),
             # Test case 5: No cache available, unauthenticated user
             (
@@ -842,7 +865,9 @@ class TestGitHubAuthManager:
         remaining, limit, reset_formatted, is_authenticated = result
 
         # Verify each part of the result
-        assert remaining == expected_remaining, f"Test case {test_case}: Remaining count mismatch"
+        assert remaining == expected_remaining, (
+            f"Test case {test_case}: Remaining count mismatch"
+        )
         assert limit == expected_limit, f"Test case {test_case}: Limit mismatch"
 
         # Special handling for reset time - using a more flexible approach
@@ -866,7 +891,9 @@ class TestGitHubAuthManager:
                     f"Test case {test_case}: Reset time should be near hour boundary"
                 )
             except ValueError:
-                pytest.fail(f"Test case {test_case}: Invalid reset time format: {reset_formatted}")
+                pytest.fail(
+                    f"Test case {test_case}: Invalid reset time format: {reset_formatted}"
+                )
         else:
             assert reset_formatted == expected_reset_formatted, (
                 f"Test case {test_case}: Reset time mismatch"

@@ -14,6 +14,7 @@ import requests
 
 from my_unicorn.auth_manager import GitHubAuthManager
 from my_unicorn.catalog import load_app_definition
+from my_unicorn.constants import HTTP_FORBIDDEN, HTTP_OK, HTTP_NOT_FOUND
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +147,7 @@ class IconManager:
                 "GET", content_url, headers=headers, timeout=10
             )
 
-            if response.status_code == 200:
+            if response.status_code == HTTP_OK:
                 content = response.json()
                 if isinstance(content, dict) and content.get("type") == "file":
                     name = content.get("name", "").lower()
@@ -155,11 +156,12 @@ class IconManager:
                         return self._format_icon_info(content)
 
             elif (
-                response.status_code == 403 and "rate limit exceeded" in response.text.lower()
+                response.status_code == HTTP_FORBIDDEN
+                and "rate limit exceeded" in response.text.lower()
             ):
                 logger.warning("GitHub API rate limit exceeded during icon search")
                 GitHubAuthManager.clear_cached_headers()
-            elif response.status_code == 404:
+            elif response.status_code == HTTP_NOT_FOUND:
                 logger.debug("Icon path not found: %s", path)
             else:
                 logger.debug(

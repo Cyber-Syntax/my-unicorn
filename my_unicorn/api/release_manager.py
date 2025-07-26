@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 from my_unicorn.auth_manager import GitHubAuthManager  # Ensure this import is correct
+from my_unicorn.constants import HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_OK
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +23,8 @@ class ReleaseManager:
             repo: Repository name.
 
         """
-        self.owner = owner
-        self.repo = repo
+        self.owner: str = owner
+        self.repo: str = repo
         logger.debug("ReleaseManager initialized for %s/%s to fetch raw data.", owner, repo)
 
     def _fetch_all_releases_data(
@@ -39,7 +40,7 @@ class ReleaseManager:
             timeout=30,
         )
 
-        if response.status_code == 200:  # HTTP_OK
+        if response.status_code == HTTP_OK:
             releases = response.json()
             if not releases:
                 logger.info(
@@ -48,6 +49,7 @@ class ReleaseManager:
                     self.repo,
                 )
                 return False, "No releases found (including pre-releases)"
+
             # The first release in the list is the most recent
             latest_release_data = releases[0]
             logger.debug(
@@ -55,8 +57,12 @@ class ReleaseManager:
                 latest_release_data.get("tag_name"),
             )
             return True, latest_release_data
+
         # Rate limit handling is done by the caller (GitHubAPI) which can decide to refresh auth
-        elif response.status_code == 403 and "rate limit exceeded" in response.text.lower():
+        elif (
+            response.status_code == HTTP_FORBIDDEN
+            and "rate limit exceeded" in response.text.lower()
+        ):
             logger.warning(
                 "GitHub API rate limit exceeded during _fetch_all_releases_data for %s/%s.",
                 self.owner,
@@ -71,11 +77,9 @@ class ReleaseManager:
                 response.status_code,
                 response.text,
             )
-            return False, "Failed to fetch all releases for %s/%s: %s - %s" % (
-                self.owner,
-                self.repo,
-                response.status_code,
-                response.text,
+            return (
+                False,
+                f"Failed to fetch all releases for {self.owner}/{self.repo}: {response.status_code} - {response.text}",
             )
 
     def get_latest_release_data(
@@ -99,13 +103,13 @@ class ReleaseManager:
             timeout=30,
         )
 
-        if response.status_code == 200:  # HTTP_OK
+        if response.status_code == HTTP_OK:
             release_data = response.json()
             logger.debug(
                 "Successfully fetched latest stable release: %s", release_data.get("tag_name")
             )
             return True, release_data
-        elif response.status_code == 404:  # HTTP_NOT_FOUND
+        elif response.status_code == HTTP_NOT_FOUND:
             logger.info(
                 "No stable release found for %s/%s via get_latest_release_data, "
                 "falling back to fetching all releases.",
@@ -114,7 +118,10 @@ class ReleaseManager:
             )
             return self._fetch_all_releases_data(headers)
         # Rate limit handling is done by the caller (GitHubAPI)
-        elif response.status_code == 403 and "rate limit exceeded" in response.text.lower():
+        elif (
+            response.status_code == HTTP_FORBIDDEN
+            and "rate limit exceeded" in response.text.lower()
+        ):
             logger.warning(
                 "GitHub API rate limit exceeded during get_latest_release_data for %s/%s.",
                 self.owner,
