@@ -19,10 +19,10 @@ def normalize_version_for_comparison(version: str | None) -> str:
     Standard Notes versioning scheme for consistent comparison.
 
     Args:
-        version: Version string to normalize, or None
+        version: Version string to normalize, or None.
 
     Returns:
-        str: Normalized version string, empty string if input is None
+        A normalized version string. Returns an empty string if input is None.
 
     """
     if not version:
@@ -44,51 +44,46 @@ def normalize_version_for_comparison(version: str | None) -> str:
     return normalized
 
 
-def extract_version(tag: str, is_beta: bool = False) -> str | None:
+def extract_version(tag: str) -> str | None:
     """Extract semantic version from tag string.
 
-    Handles various version formats including:
-    - Standard semantic versions (X.Y.Z)
+    Handles:
+    - Semantic versions (X.Y.Z)
     - Standard Notes format (@standardnotes/desktop@X.Y.Z)
-    - Beta versions with suffixes
+    - Versions with prefixes/suffixes (v1.2.3, 4.5.6-beta, etc.)
 
     Args:
-        tag: Version tag to extract from
-        is_beta: Whether this is a beta version
+        tag: Tag string to extract version from.
 
     Returns:
-        str | None: Extracted version string if found, None if no version found
+        The extracted semantic version, or None if no valid version found.
 
     """
-    # Handle Standard Notes format: @standardnotes/desktop@3.195.13
     std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", tag)
     if std_notes_match:
-        logger.debug(
-            "Extracted version from Standard Notes format: %s", std_notes_match.group(1)
-        )
         return std_notes_match.group(1)
 
-    # Clean common prefixes/suffixes
     clean_tag = tag.lstrip("vV").replace("-stable", "")
+    clean_tag = re.sub(r"-beta(\.\d+)?", "", clean_tag)
 
-    # For beta versions, remove beta suffix before matching
-    if "-beta" in clean_tag:
-        # Remove beta suffix including any additional components (like beta.1)
-        clean_tag = re.sub(r"-beta(\.\d+)?", "", clean_tag)
-
-    # Match semantic version pattern
-    version_match = re.search(r"\d+\.\d+\.\d+(?:\.\d+)*", clean_tag)
+    version_match = re.search(r"\d+\.\d+\.\d+(?:\.\d+)?", clean_tag)
     if version_match:
         return version_match.group(0)
 
-    # Try alternative patterns if standard semantic version not found
-    alt_match = re.search(r"(\d+[\w\.]+)", clean_tag)
+    alt_match = re.search(r"(\d+(?:\.\d+)+)", clean_tag)
     return alt_match.group(1) if alt_match else None
 
 
 def handle_standard_notes_version(filename: str) -> str | None:
-    """Extract version from Standard Notes tag."""
-    # Handle Standard Notes format: @standardnotes/desktop@3.195.13
+    """Extract version from Standard Notes filename format.
+
+    Args:
+        filename: Filename to extract from.
+
+    Returns:
+        Extracted version string, or None if not matched.
+
+    """
     std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", filename)
     if std_notes_match:
         logger.debug(
@@ -96,66 +91,73 @@ def handle_standard_notes_version(filename: str) -> str | None:
         )
         return std_notes_match.group(1)
 
-    # Handle Standard Notes AppImage format: app-3.195.13-x86_64.AppImage
-    if filename.startswith("app-") and "standardnotes" in str(filename).lower():
+    if filename.startswith("app-") and "standardnotes" in filename.lower():
         match = re.search(r"-(\d+\.\d+\.\d+)", filename)
         if match:
             logger.debug("Extracted version from Standard Notes AppImage: %s", match.group(1))
             return match.group(1)
 
+    return None
+
 
 def extract_version_from_filename(filename: str) -> str | None:
-    """Extract version from AppImage filename.
+    """Extract version from a typical AppImage filename.
 
     Args:
-        filename: AppImage filename
+        filename: The AppImage filename.
 
     Returns:
-        str | None: Extracted version string if found, None if not found
+        Extracted semantic version string, or None if no match found.
 
     """
     if not filename:
         return None
 
-    # Handle standard notes
-    if filename.startswith("app-") and "standardnotes" in str(filename).lower():
-        handle_standard_notes_version(filename)
+    if filename.startswith("app-") and "standardnotes" in filename.lower():
+        return handle_standard_notes_version(filename)
 
-    # First try a direct match for semantic version pattern
     version_match = re.search(r"(\d+\.\d+\.\d+)(?!-)", filename)
     if version_match:
         return version_match.group(1)
 
-    # Try to find version in filename segments
     parts = filename.split("-")
     for part in parts:
-        # Check if this part has a semantic version pattern
-        if re.match(r"^\d+\.\d+\.\d+$", part):
+        if re.fullmatch(r"\d+\.\d+\.\d+", part):
             return part
 
-    # If no direct match, try more general pattern but avoid architecture like x86_64
     for part in parts:
         if re.match(r"^\d+\.\d+\.\d+", part) and not re.match(r"^x\d+_\d+$", part):
-            version = extract_version(part, False)
-            if version and re.match(r"^\d+\.\d+\.\d+$", version):
+            version = extract_version(part)
+            if version and re.fullmatch(r"\d+\.\d+\.\d+", version):
                 return version
 
-    # Final fallback to regex search
     version_match = re.search(r"\d+\.\d+\.\d+", filename)
-
     return version_match.group(0) if version_match else None
 
-def handle_zen_browser_version(
-    raw_tag: str, normalized_version: str, owner: str, repo: str
-) -> str:
-    """Handle zen-browser's special version format (X.Y.Z[letter])."""
-    if owner == "zen-browser" and repo == "desktop":
-        import re
 
+def handle_zen_browser_version(
+    raw_tag: str,
+    normalized_version: str,
+    owner: str,
+    repo: str,
+) -> str:
+    """Handle zen-browser's special version format (e.g., 1.2.3b).
+
+    Args:
+        raw_tag: Original tag name from GitHub.
+        normalized_version: Version string previously extracted.
+        owner: GitHub repo owner.
+        repo: GitHub repo name.
+
+    Returns:
+        Final normalized version string (possibly with letter suffix).
+
+    """
+    if owner == "zen-browser" and repo == "desktop":
         zen_tag_pattern = re.compile(r"^v?(\d+\.\d+\.\d+)([a-zA-Z])$")
         match = zen_tag_pattern.match(raw_tag)
         if match:
-            version_base, letter_suffix = match.group(1), match.group(2)
+            version_base, letter_suffix = match.groups()
             potential_zen_version = f"{version_base}{letter_suffix}"
             if normalized_version != potential_zen_version:
                 logger.info(
