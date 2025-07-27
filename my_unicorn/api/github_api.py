@@ -197,8 +197,7 @@ class GitHubAPI:
         if not raw_tag:
             raise ValueError("Release data missing tag_name")
 
-        is_beta = release_data.get("prerelease", False)
-        normalized_version = extract_version(raw_tag, is_beta)
+        normalized_version = extract_version(raw_tag)
 
         # Handle zen-browser's special version format (X.Y.Z[letter])
         normalized_version = handle_zen_browser_version(
