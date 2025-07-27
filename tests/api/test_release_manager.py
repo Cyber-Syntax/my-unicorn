@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from my_unicorn.api.release_manager import ReleaseManager
+from my_unicorn.constants import HTTP_INTERNAL_SERVER_ERROR, HTTP_SERVICE_UNAVAILABLE
 
 # Fixtures like mock_release_data, mock_beta_release_data, mock_all_releases_data
 # are available from tests/api/conftest.py
@@ -57,15 +58,20 @@ class TestReleaseManager:
         headers = {"Authorization": "token test_token"}
 
         # Simulate 404 for /latest, then 200 for /releases
-        mock_auth_request = MagicMock(side_effect=[mock_response_latest_404, mock_response_all_200])
+        mock_auth_request = MagicMock(
+            side_effect=[mock_response_latest_404, mock_response_all_200]
+        )
 
         with patch(
-            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
+            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request",
+            mock_auth_request,
         ):
             success, data = release_manager_instance.get_latest_release_data(headers=headers)
 
             assert success is True
-            assert data == mock_all_releases_data[0]  # Should be the first item from all releases
+            assert (
+                data == mock_all_releases_data[0]
+            )  # Should be the first item from all releases
             assert mock_auth_request.call_count == 2
             # Check first call (to /latest)
             mock_auth_request.assert_any_call(
@@ -98,9 +104,12 @@ class TestReleaseManager:
             side_effect=[mock_response_latest_404, mock_response_all_empty]
         )
         with patch(
-            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
+            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request",
+            mock_auth_request,
         ):
-            success, message = release_manager_instance.get_latest_release_data(headers=headers)
+            success, message = release_manager_instance.get_latest_release_data(
+                headers=headers
+            )
 
             assert success is False
             assert "no releases found" in str(message).lower()
@@ -119,7 +128,9 @@ class TestReleaseManager:
             "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request",
             return_value=mock_response_rate_limit,
         ) as mock_auth_request:
-            success, message = release_manager_instance.get_latest_release_data(headers=headers)
+            success, message = release_manager_instance.get_latest_release_data(
+                headers=headers
+            )
 
             assert success is False
             assert "rate limit exceeded" in str(message).lower()
@@ -141,9 +152,12 @@ class TestReleaseManager:
             side_effect=[mock_response_latest_404, mock_response_rate_limit_all]
         )
         with patch(
-            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
+            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request",
+            mock_auth_request,
         ):
-            success, message = release_manager_instance.get_latest_release_data(headers=headers)
+            success, message = release_manager_instance.get_latest_release_data(
+                headers=headers
+            )
 
             assert success is False
             assert "rate limit exceeded" in str(message).lower()
@@ -162,7 +176,9 @@ class TestReleaseManager:
             "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request",
             return_value=mock_response_error,
         ) as mock_auth_request:
-            success, message = release_manager_instance.get_latest_release_data(headers=headers)
+            success, message = release_manager_instance.get_latest_release_data(
+                headers=headers
+            )
 
             assert success is False
             assert "failed to fetch latest stable release" in str(message).lower()
@@ -185,9 +201,12 @@ class TestReleaseManager:
             side_effect=[mock_response_latest_404, mock_response_error_all]
         )
         with patch(
-            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request", mock_auth_request
+            "my_unicorn.auth_manager.GitHubAuthManager.make_authenticated_request",
+            mock_auth_request,
         ):
-            success, message = release_manager_instance.get_latest_release_data(headers=headers)
+            success, message = release_manager_instance.get_latest_release_data(
+                headers=headers
+            )
 
             assert success is False
             assert "failed to fetch all releases" in str(message).lower()

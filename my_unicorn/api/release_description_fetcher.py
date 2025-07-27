@@ -10,6 +10,7 @@ from typing import Any
 from requests.exceptions import RequestException
 
 from my_unicorn.auth_manager import GitHubAuthManager
+from my_unicorn.constants import HTTP_OK
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +26,9 @@ class ReleaseDescriptionFetcher:
             repo: Repository name
 
         """
-        self.owner = owner
-        self.repo = repo
-        self._headers = GitHubAuthManager.get_auth_headers()
+        self.owner: str = owner
+        self.repo: str = repo
+        self._headers: dict[str, str] = GitHubAuthManager.get_auth_headers()
 
     def fetch_latest_release_description(self) -> str | None:
         """Fetch the latest release description from GitHub API.
@@ -50,8 +51,10 @@ class ReleaseDescriptionFetcher:
                 timeout=30,
             )
 
-            if response.status_code != 200:  # noqa: PLR2004
-                logger.error("Failed to fetch release: %s %s", response.status_code, response.text)
+            if response.status_code != HTTP_OK:
+                logger.error(
+                    "Failed to fetch release: %s %s", response.status_code, response.text
+                )
                 return None
 
             release_data = response.json()
@@ -97,7 +100,7 @@ class ReleaseDescriptionFetcher:
                 timeout=30,
             )
 
-            if response.status_code != 200:  # noqa: PLR2004
+            if response.status_code != HTTP_OK:
                 logger.error(
                     "Failed to fetch release for tag %s: %s %s",
                     tag,
@@ -147,7 +150,7 @@ class ReleaseDescriptionFetcher:
                 timeout=30,
             )
 
-            if response.status_code != 200:  # noqa: PLR2004
+            if response.status_code != HTTP_OK:
                 logger.error(
                     "Failed to fetch release data: %s %s", response.status_code, response.text
                 )

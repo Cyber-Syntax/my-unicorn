@@ -72,7 +72,11 @@ class DownloadCommand(Command):
                 app_config.appimage_name = api.appimage_name
 
                 # Save temporary configuration
-                app_config.temp_save_config()
+                temp_save: bool = app_config.temp_save_config()
+                if temp_save:
+                    logger.info("Temporary configuration saved.")
+                else:
+                    logger.error("Failed to save temporary configuration.")
 
                 # 4. Use DownloadManager to download the AppImage or get existing file
                 download = DownloadManager(api)

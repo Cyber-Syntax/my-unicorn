@@ -27,6 +27,8 @@ from .sha_manager import SHAManager
 
 logger = logging.getLogger(__name__)
 
+
+
 class GitHubAPI:
     """Handler for GitHub API requests, processing releases end-to-end."""
 
@@ -48,24 +50,20 @@ class GitHubAPI:
             arch_keyword: Optional architecture keyword for filtering
 
         """
-        self.owner = owner
-        self.repo = repo
-        self.checksum_file_name: str | None = (
-            checksum_file_name  # Can be updated by SHAManager
-        )
-        self.checksum_hash_type: str | None = (
-            checksum_hash_type  # Can be updated by SHAManager
-        )
-        self._arch_keyword = arch_keyword
+        self.owner: str = owner
+        self.repo: str = repo
+        self.checksum_file_name: str | None = checksum_file_name
+        self.checksum_hash_type: str | None = checksum_hash_type
+        self._arch_keyword: str | None = arch_keyword
         self.version: str | None = None
         self.appimage_name: str | None = None
         self.app_download_url: str | None = None
         self.checksum_file_download_url: str | None = None
         self.extracted_hash_from_body: str | None = None
         self.asset_digest: str | None = None
-        self._headers = GitHubAuthManager.get_auth_headers()
-        self._icon_manager = IconManager()
-        self._release_fetcher = ReleaseManager(owner, repo)
+        self._headers: dict[str, str] = GitHubAuthManager.get_auth_headers()
+        self._icon_manager: IconManager = IconManager()
+        self._release_fetcher: ReleaseManager = ReleaseManager(owner, repo)
         self._release_info: ReleaseInfo | None = None
 
         # Load app info from catalog to get beta preference and other settings
@@ -199,8 +197,7 @@ class GitHubAPI:
         if not raw_tag:
             raise ValueError("Release data missing tag_name")
 
-        is_beta = release_data.get("prerelease", False)
-        normalized_version = extract_version(raw_tag, is_beta)
+        normalized_version = extract_version(raw_tag)
 
         # Handle zen-browser's special version format (X.Y.Z[letter])
         normalized_version = handle_zen_browser_version(

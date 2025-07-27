@@ -413,7 +413,7 @@ class TestGitHubAPIDirect:
             # Determine expected version as _process_release would
             current_tag = mock_release_data.get("tag_name", "")
             is_beta = mock_release_data.get("prerelease", False)
-            expected_version = version_utils.extract_version(current_tag, is_beta)
+            expected_version = version_utils.extract_version(current_tag)
             if not expected_version and appimage_filename_for_test:
                 expected_version = version_utils.extract_version_from_filename(
                     appimage_filename_for_test
