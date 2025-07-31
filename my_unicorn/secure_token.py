@@ -13,11 +13,19 @@ import uuid
 from typing import Any
 
 import keyring
+from keyring.backends import SecretService
 
 from my_unicorn.utils.datetime_utils import format_timestamp, parse_timestamp
 
 # Configure module logger
 logger = logging.getLogger(__name__)
+
+# Set SecretService as the preferred keyring backend
+try:
+    keyring.set_keyring(SecretService.Keyring())
+    logger.info("SecretService backend set as the preferred keyring backend")
+except Exception as e:
+    logger.warning("Failed to set SecretService as the preferred keyring backend: %s", e)
 
 # Constants for keyring and storage
 SERVICE_NAME = "my-unicorn-github"

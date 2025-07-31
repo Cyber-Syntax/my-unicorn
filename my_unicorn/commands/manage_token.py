@@ -29,7 +29,7 @@ class ManageTokenCommand(Command):
     def __init__(self):
         """Initialize the token management command."""
         super().__init__()
-        self._logger = logging.getLogger(__name__)
+        self._logger: logging.Logger = logging.getLogger(__name__)
 
     @override
     def execute(self) -> None:
