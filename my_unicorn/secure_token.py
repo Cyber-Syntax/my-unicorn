@@ -5,11 +5,14 @@ This module handles secure storage and retrieval of API tokens using the GNOME k
 """
 
 import contextlib
+import getpass
 import json
 import logging
 import time
 import uuid
 from typing import Any
+
+import keyring
 
 from my_unicorn.utils.datetime_utils import format_timestamp, parse_timestamp
 
@@ -32,7 +35,6 @@ gnome_keyring_available = False
 keyring_module = None
 try:
     # First try to import from normal paths
-    import keyring
 
     keyring_module = keyring
 
@@ -202,7 +204,9 @@ class SecureTokenManager:
         # Try GNOME keyring
         if gnome_keyring_available and keyring_module:
             try:
-                metadata_str = keyring_module.get_password(f"{SERVICE_NAME}_metadata", USERNAME)
+                metadata_str = keyring_module.get_password(
+                    f"{SERVICE_NAME}_metadata", USERNAME
+                )
                 if metadata_str:
                     metadata = json.loads(metadata_str)
             except json.JSONDecodeError:
@@ -321,60 +325,6 @@ class SecureTokenManager:
         }
 
     @staticmethod
-    def configure_keyring() -> bool:
-        """Configure the Seahorse/GNOME keyring for secure token storage.
-
-        Returns:
-            bool: True if configuration succeeded, False otherwise
-
-        """
-        try:
-            print("\nAttempting to configure Seahorse/GNOME keyring...")
-
-            # Check if seahorse is installed
-            import shutil
-
-            if shutil.which("seahorse"):
-                print("✅ Seahorse is installed")
-
-                # Offer to launch seahorse
-                launch = input(
-                    "Would you like to launch Seahorse to configure it manually? (y/n): "
-                )
-                if launch.lower() == "y":
-                    import subprocess as sp
-
-                    result = sp.run(["seahorse"], capture_output=True, check=False)
-                    if result.returncode == 0:
-                        print("\nSeahorse launched successfully. Please configure your keyring.")
-                        print("1. In Seahorse, go to File > New > Password Keyring if none exists")
-                        print("2. Name it 'login' for best compatibility")
-                        print("3. Create and remember your keyring password")
-                        print("4. Close Seahorse when done")
-                        input("\nPress Enter when you've completed the setup...")
-                        return True
-                    else:
-                        print("❌ Failed to launch Seahorse")
-            else:
-                print("❌ Seahorse not found")
-
-            # Provide installation instructions
-            print("\nTo install the required packages, run one of these commands:")
-            print("For Ubuntu/Debian:")
-            print("  sudo apt install seahorse libsecret-1-0 python3-secretstorage")
-            print("For Fedora:")
-            print("  sudo dnf install seahorse libsecret python3-gobject")
-            print("For Arch Linux:")
-            print("  sudo pacman -S seahorse libsecret python-gobject")
-
-            return False
-
-        except (AttributeError, ImportError, OSError) as e:
-            logger.error("Keyring configuration failed: %s", e)
-            print(f"❌ Keyring configuration failed: {e}")
-            return False
-
-    @staticmethod
     def _create_token_metadata(token: str, expires_in_days: int) -> dict[str, Any]:
         """Create basic token metadata.
 
@@ -453,7 +403,9 @@ class SecureTokenManager:
 
                 # Store metadata separately
                 metadata_json = json.dumps(metadata)
-                keyring_module.set_password(f"{SERVICE_NAME}_metadata", USERNAME, metadata_json)
+                keyring_module.set_password(
+                    f"{SERVICE_NAME}_metadata", USERNAME, metadata_json
+                )
 
                 logger.info("GitHub token saved to Seahorse/GNOME keyring")
                 return True
@@ -473,8 +425,6 @@ class SecureTokenManager:
             str: The entered token or empty string if cancelled
 
         """
-        import getpass
-
         print("\nEnter your GitHub token (or press Enter to cancel):")
         print("Create one at: https://github.com/settings/tokens")
         print("Tip: For rate limits only, you can create a token with NO permissions/scopes")
