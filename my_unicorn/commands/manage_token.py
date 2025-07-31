@@ -564,23 +564,22 @@ class ManageTokenCommand(Command):
 
         # Show available secure storage methods
         print("\nSupported Storage Methods:")
-        if keyring_status["gnome_keyring_available"]:
-            print("✅ GNOME keyring (Seahorse) - Available and supported")
-        else:
-            print("❌ GNOME keyring (Seahorse) - Not available")
+        backend_name = keyring_status.get("backend_name", "Unknown")
+        backend_module = keyring_status.get("backend_module", "Unknown")
 
-        if not keyring_status["gnome_keyring_available"]:
-            print("⚠️ Warning: No secure storage methods detected on this system!")
-            print("   Consider installing GNOME keyring (Seahorse) for secure token storage.")
-            print("   Run 'sudo apt install seahorse libsecret-1-0' on Ubuntu/Debian")
+        print(f"✅ Keyring Backend: {backend_name} (Module: {backend_module})")
+
+        if backend_name == "Unknown":
+            print("⚠️ Warning: No secure storage backend detected on this system!")
+            print("   Ensure a compatible keyring backend is installed and configured.")
 
         # Add some general security advice
         print("\nSecurity Recommendations:")
-        if not keyring_status["gnome_keyring_available"]:
-            print("➤ Install and configure GNOME keyring (Seahorse) for secure storage")
-            print("  - For GNOME: Install seahorse package")
+        if backend_name == "Unknown":
+            print("➤ Install and configure a secure keyring backend for token storage")
+            print("  - For GNOME: Consider installing the seahorse package")
         else:
-            print("➤ GNOME keyring provides maximum security for token storage")
+            print(f"➤ {backend_name} provides secure token storage")
 
         print("➤ Rotate your token regularly (every 30-90 days)")
         print("➤ Use fine-grained access tokens with minimal permissions")
@@ -637,15 +636,15 @@ class ManageTokenCommand(Command):
         keyring_status = SecureTokenManager.get_keyring_status()
         print("\nDetected keyring status:")
 
-        if keyring_status["gnome_keyring_available"]:
-            print("✅ GNOME keyring (Seahorse) detected")
-        else:
-            print("❌ GNOME keyring not available")
+        backend_name = keyring_status.get("backend_name", "Unknown")
+        backend_module = keyring_status.get("backend_module", "Unknown")
 
-        # Check if GNOME keyring is available
-        if not keyring_status["gnome_keyring_available"]:
-            print("\n⚠️ Warning: GNOME keyring is not available!")
-            print("GNOME keyring (Seahorse) is required for secure token storage.")
+        print(f"✅ Keyring Backend: {backend_name} (Module: {backend_module})")
+
+        # Check if a secure keyring backend is available
+        if backend_name == "Unknown":
+            print("\n⚠️ Warning: No secure keyring backend is available!")
+            print("A secure keyring backend is required for token storage.")
 
             choice = input("\nWould you like to try saving to keyring anyway? (y/n): ")
             if choice.lower() != "y":
