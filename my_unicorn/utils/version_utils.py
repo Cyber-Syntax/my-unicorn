@@ -44,7 +44,7 @@ def normalize_version_for_comparison(version: str | None) -> str:
     return normalized
 
 
-def extract_version(tag: str) -> str | None:
+def extract_version(tag: str) -> str:
     """Extract semantic version from tag string.
 
     Handles:
@@ -56,7 +56,7 @@ def extract_version(tag: str) -> str | None:
         tag: Tag string to extract version from.
 
     Returns:
-        The extracted semantic version, or None if no valid version found.
+        The extracted semantic version
 
     """
     std_notes_match = re.search(r"@standardnotes/desktop@(\d+\.\d+\.\d+)", tag)
@@ -71,7 +71,11 @@ def extract_version(tag: str) -> str | None:
         return version_match.group(0)
 
     alt_match = re.search(r"(\d+(?:\.\d+)+)", clean_tag)
-    return alt_match.group(1) if alt_match else None
+
+    if alt_match:
+        return alt_match.group(1)
+    else:
+        raise ValueError(f"Invalid version format: {tag}")
 
 
 def handle_standard_notes_version(filename: str) -> str | None:

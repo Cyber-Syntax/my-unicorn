@@ -1,20 +1,31 @@
 #!/usr/bin/env python3
 """Secure token management module.
 
-This module handles secure storage and retrieval of API tokens using the GNOME keyring.
+This module handles secure storage and retrieval of API tokens using the keyring library.
 """
 
 import contextlib
+import getpass
 import json
 import logging
 import time
 import uuid
 from typing import Any
 
+import keyring
+from keyring.backends import SecretService
+
 from my_unicorn.utils.datetime_utils import format_timestamp, parse_timestamp
 
 # Configure module logger
 logger = logging.getLogger(__name__)
+
+# Set SecretService as the preferred keyring backend
+try:
+    keyring.set_keyring(SecretService.Keyring())
+    logger.info("SecretService backend set as the preferred keyring backend")
+except Exception as e:
+    logger.warning("Failed to set SecretService as the preferred keyring backend: %s", e)
 
 # Constants for keyring and storage
 SERVICE_NAME = "my-unicorn-github"
@@ -24,74 +35,6 @@ DEFAULT_TOKEN_EXPIRATION_DAYS = 90
 
 # Minimum GitHub token length for validation
 MIN_GITHUB_TOKEN_LENGTH = 40
-
-# Try to detect GNOME keyring availability
-gnome_keyring_available = False
-
-# Try to import keyring and GNOME keyring support
-keyring_module = None
-try:
-    # First try to import from normal paths
-    import keyring
-
-    keyring_module = keyring
-
-    # Try to import GNOME keyring backend
-    try:
-        from keyring.backends import SecretService
-
-        logger.info("Keyring module found at: %s", keyring.__file__)
-
-        # Check if GNOME keyring (Seahorse) is available
-        try:
-            # Check for GNOME keyring if SecretService is available
-            secretservice_backend = SecretService.Keyring()
-
-            # Check for D-Bus connectivity first (more reliable than direct collection check)
-            import dbus
-
-            bus = dbus.SessionBus()
-            # Check if the Secret Service is available on the bus
-            if bus.name_has_owner("org.freedesktop.secrets"):
-                gnome_keyring_available = True
-                logger.info("Seahorse/GNOME keyring detected")
-        except ImportError:
-            logger.debug("D-Bus Python module not available, falling back to direct check")
-            try:
-                # Fallback detection without D-Bus module
-                secretservice_backend = SecretService.Keyring()
-                if hasattr(secretservice_backend, "get_preferred_collection"):
-                    # Don't call the method, just check if it exists to avoid exceptions
-                    gnome_keyring_available = True
-                    logger.info("Seahorse/GNOME keyring detected (fallback method)")
-            except (ImportError, AttributeError) as e:
-                logger.debug("Seahorse/GNOME keyring not available: %s", e)
-        except (AttributeError, RuntimeError) as e:
-            logger.debug("Seahorse/GNOME keyring not available: %s", e)
-
-        # Configure keyring priority - use GNOME keyring as preferred backend
-        if gnome_keyring_available:
-            try:
-                # Different keyring versions use different methods
-                if hasattr(keyring, "set_preferred_backend"):
-                    keyring.set_preferred_backend(SecretService.Keyring)
-                    logger.info("Using Seahorse/GNOME keyring as preferred backend")
-                elif hasattr(keyring, "set_keyring"):
-                    keyring.set_keyring(SecretService.Keyring())
-                    logger.info("Using Seahorse/GNOME keyring as preferred backend")
-                else:
-                    logger.warning(
-                        "Could not set GNOME keyring as preferred - no supported method found"
-                    )
-            except (AttributeError, ImportError) as e:
-                logger.warning("Failed to set GNOME keyring as preferred: %s", e)
-
-    except ImportError:
-        logger.debug("SecretService backend not available")
-
-except ImportError as e:
-    logger.warning("Keyring module not available in current Python path: %s", e)
-    gnome_keyring_available = False
 
 
 class SecureTokenManager:
@@ -121,24 +64,21 @@ class SecureTokenManager:
         metadata = {}
 
         # Try GNOME keyring
-        if gnome_keyring_available and keyring_module:
-            try:
-                token = keyring_module.get_password(SERVICE_NAME, USERNAME)
-                if token:
-                    # Try to get metadata
-                    try:
-                        metadata_str = keyring_module.get_password(
-                            f"{SERVICE_NAME}_metadata", USERNAME
-                        )
-                        if metadata_str:
-                            metadata = json.loads(metadata_str)
-                    except json.JSONDecodeError as e:
-                        logger.debug("Could not parse token metadata: %s", e)
-                        metadata = {}
+        try:
+            token = keyring.get_password(SERVICE_NAME, USERNAME)
+            if token:
+                # Try to get metadata
+                try:
+                    metadata_str = keyring.get_password(f"{SERVICE_NAME}_metadata", USERNAME)
+                    if metadata_str:
+                        metadata = json.loads(metadata_str)
+                except json.JSONDecodeError as e:
+                    logger.debug("Could not parse token metadata: %s", e)
+                    metadata = {}
 
-                    logger.info("Retrieved GitHub token from Seahorse/GNOME keyring")
-            except (KeyError, AttributeError, OSError) as e:
-                logger.warning("Could not retrieve from GNOME keyring: %s", e)
+                logger.info("Retrieved GitHub token from keyring")
+        except (KeyError, AttributeError, OSError) as e:
+            logger.warning("Could not retrieve from keyring: %s", e)
 
         # If token was found but we need to validate expiration
         if token and validate_expiration and metadata:
@@ -181,13 +121,10 @@ class SecureTokenManager:
         metadata["last_used_at"] = int(time.time())
 
         # Save updated metadata to GNOME keyring
-        if gnome_keyring_available and keyring_module:
-            try:
-                keyring_module.set_password(
-                    f"{SERVICE_NAME}_metadata", USERNAME, json.dumps(metadata)
-                )
-            except (KeyError, AttributeError) as e:
-                logger.debug("Could not update token metadata in keyring: %s", e)
+        try:
+            keyring.set_password(f"{SERVICE_NAME}_metadata", USERNAME, json.dumps(metadata))
+        except (KeyError, AttributeError) as e:
+            logger.debug("Could not update token metadata in keyring: %s", e)
 
     @staticmethod
     def get_token_metadata() -> dict[str, Any]:
@@ -200,14 +137,13 @@ class SecureTokenManager:
         metadata = {}
 
         # Try GNOME keyring
-        if gnome_keyring_available and keyring_module:
-            try:
-                metadata_str = keyring_module.get_password(f"{SERVICE_NAME}_metadata", USERNAME)
-                if metadata_str:
-                    metadata = json.loads(metadata_str)
-            except json.JSONDecodeError:
-                logger.debug("Could not decode token metadata from keyring")
-                metadata = {}
+        try:
+            metadata_str = keyring.get_password(f"{SERVICE_NAME}_metadata", USERNAME)
+            if metadata_str:
+                metadata = json.loads(metadata_str)
+        except json.JSONDecodeError:
+            logger.debug("Could not decode token metadata from keyring")
+            metadata = {}
 
         return metadata
 
@@ -274,18 +210,17 @@ class SecureTokenManager:
         """
         success = False
 
-        # Remove from GNOME keyring if available
-        if gnome_keyring_available and keyring_module:
-            try:
-                keyring_module.delete_password(SERVICE_NAME, USERNAME)
-                # Also try to remove metadata
-                with contextlib.suppress(KeyError, AttributeError):
-                    keyring_module.delete_password(f"{SERVICE_NAME}_metadata", USERNAME)
+        # Remove from keyring
+        try:
+            keyring.delete_password(SERVICE_NAME, USERNAME)
+            # Also try to remove metadata
+            with contextlib.suppress(KeyError, AttributeError):
+                keyring.delete_password(f"{SERVICE_NAME}_metadata", USERNAME)
 
-                logger.info("Removed GitHub token from Seahorse/GNOME keyring")
-                success = True
-            except (KeyError, AttributeError, OSError) as e:
-                logger.warning("Could not remove from GNOME keyring: %s", e)
+            logger.info("Removed GitHub token from keyring")
+            success = True
+        except (KeyError, AttributeError, OSError) as e:
+            logger.warning("Could not remove from keyring: %s", e)
 
         return success
 
@@ -297,82 +232,29 @@ class SecureTokenManager:
             bool: True if a token exists, False otherwise
 
         """
-        # Check GNOME keyring
-        if gnome_keyring_available and keyring_module:
-            try:
-                token = keyring_module.get_password(SERVICE_NAME, USERNAME)
-                if token:
-                    return True
-            except (KeyError, AttributeError):
-                pass
+        # Check keyring
+        try:
+            token = keyring.get_password(SERVICE_NAME, USERNAME)
+            if token:
+                return True
+        except (KeyError, AttributeError):
+            pass
 
         return False
 
     @staticmethod
-    def get_keyring_status() -> dict[str, bool]:
-        """Get the status of available keyring backends.
+    def get_keyring_status() -> dict[str, str]:
+        """Get information about the current keyring backend.
 
         Returns:
-            dict[str, bool]: Dictionary with status of keyring backends
+            dict[str, str]: Dictionary with details of the current keyring backend
 
         """
+        backend = keyring.get_keyring()
         return {
-            "gnome_keyring_available": gnome_keyring_available,
+            "backend_name": backend.__class__.__name__,
+            "backend_module": backend.__module__,
         }
-
-    @staticmethod
-    def configure_keyring() -> bool:
-        """Configure the Seahorse/GNOME keyring for secure token storage.
-
-        Returns:
-            bool: True if configuration succeeded, False otherwise
-
-        """
-        try:
-            print("\nAttempting to configure Seahorse/GNOME keyring...")
-
-            # Check if seahorse is installed
-            import shutil
-
-            if shutil.which("seahorse"):
-                print("✅ Seahorse is installed")
-
-                # Offer to launch seahorse
-                launch = input(
-                    "Would you like to launch Seahorse to configure it manually? (y/n): "
-                )
-                if launch.lower() == "y":
-                    import subprocess as sp
-
-                    result = sp.run(["seahorse"], capture_output=True, check=False)
-                    if result.returncode == 0:
-                        print("\nSeahorse launched successfully. Please configure your keyring.")
-                        print("1. In Seahorse, go to File > New > Password Keyring if none exists")
-                        print("2. Name it 'login' for best compatibility")
-                        print("3. Create and remember your keyring password")
-                        print("4. Close Seahorse when done")
-                        input("\nPress Enter when you've completed the setup...")
-                        return True
-                    else:
-                        print("❌ Failed to launch Seahorse")
-            else:
-                print("❌ Seahorse not found")
-
-            # Provide installation instructions
-            print("\nTo install the required packages, run one of these commands:")
-            print("For Ubuntu/Debian:")
-            print("  sudo apt install seahorse libsecret-1-0 python3-secretstorage")
-            print("For Fedora:")
-            print("  sudo dnf install seahorse libsecret python3-gobject")
-            print("For Arch Linux:")
-            print("  sudo pacman -S seahorse libsecret python-gobject")
-
-            return False
-
-        except (AttributeError, ImportError, OSError) as e:
-            logger.error("Keyring configuration failed: %s", e)
-            print(f"❌ Keyring configuration failed: {e}")
-            return False
 
     @staticmethod
     def _create_token_metadata(token: str, expires_in_days: int) -> dict[str, Any]:
@@ -440,29 +322,30 @@ class SecureTokenManager:
         metadata = SecureTokenManager._create_token_metadata(token, expires_in_days)
 
         # Save to GNOME keyring
-        if gnome_keyring_available and keyring_module:
-            try:
-                # Store token
-                keyring_module.set_password(SERVICE_NAME, USERNAME, token)
+        try:
+            # Store token
+            keyring.set_password(SERVICE_NAME, USERNAME, token)
 
-                # Update metadata with storage information
-                metadata["storage_method"] = "GNOME keyring"
-                metadata["storage_location"] = "Seahorse/GNOME keyring"
-                metadata["storage_status"] = "Active"
-                metadata["gnome_keyring_name"] = "login"
+            # Update metadata with storage information
+            # TODO: Test compatibility with other desktop environments
+            # and update the storage method details accordingly
+            metadata["storage_method"] = "GNOME keyring"
+            metadata["storage_location"] = "Seahorse/GNOME keyring"
+            metadata["storage_status"] = "Active"
+            metadata["gnome_keyring_name"] = "login"
 
-                # Store metadata separately
-                metadata_json = json.dumps(metadata)
-                keyring_module.set_password(f"{SERVICE_NAME}_metadata", USERNAME, metadata_json)
+            # Store metadata separately
+            metadata_json = json.dumps(metadata)
+            keyring.set_password(f"{SERVICE_NAME}_metadata", USERNAME, metadata_json)
 
-                logger.info("GitHub token saved to Seahorse/GNOME keyring")
-                return True
-            except (KeyError, AttributeError, OSError) as e:
-                logger.warning("Could not save to GNOME keyring: %s", e)
-                return False
+            logger.info("GitHub token saved to keyring")
+            return True
+        except (KeyError, AttributeError, OSError) as e:
+            logger.warning("Could not save to keyring: %s", e)
+            return False
 
-        # If GNOME keyring is not available, fail
-        logger.error("GNOME keyring is not available for secure token storage")
+        # If keyring operation fails, log the error
+        logger.error("Keyring operation failed for secure token storage")
         return False
 
     @staticmethod
@@ -473,8 +356,6 @@ class SecureTokenManager:
             str: The entered token or empty string if cancelled
 
         """
-        import getpass
-
         print("\nEnter your GitHub token (or press Enter to cancel):")
         print("Create one at: https://github.com/settings/tokens")
         print("Tip: For rate limits only, you can create a token with NO permissions/scopes")
