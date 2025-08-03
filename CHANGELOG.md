@@ -1,6 +1,19 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.0.0-alpha
+### BREAKING CHANGES
+This release written from scratch to simplify the code and maintainability.
+1. Global config now use INI format
+2. App specific configs now use better structured Json format
+3. We now use new libraries for better performance
+    - orjson instead of json
+    - uvloop instead of asyncio
+    - aiohttp instead of requests
+    - tqdm.asyncio instead of manual progress bar
+4. Authentication is simplified for better security and performance
+5. Removed command design pattern for decreasing complexity
+
 ## v0.15.1-alpha
 ## v0.15.0-alpha
 ## v0.14.1-alpha
