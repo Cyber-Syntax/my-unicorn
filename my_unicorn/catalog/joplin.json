@@ -1,0 +1,25 @@
+{
+    "owner": "laurent22",
+    "repo": "joplin",
+    "appimage": {
+        "rename": "joplin",
+        "name_template": "{rename}-{latest_version}.AppImage",
+        "characteristic_suffix": [
+            ""
+        ]
+    },
+    "github": {
+        "repo": true,
+        "prerelease": false
+    },
+    "verification": {
+        "digest": true,
+        "skip": false,
+        "checksum_file": "",
+        "checksum_hash_type": "sha256"
+    },
+    "icon": {
+        "url": "https://raw.githubusercontent.com/laurent22/joplin/dev/Assets/LinuxIcons/256x256.png",
+        "name": "joplin.png"
+    }
+}

@@ -1,0 +1,25 @@
+{
+    "owner": "JonMagon",
+    "repo": "KDiskMark",
+    "appimage": {
+        "rename": "kdiskmark",
+        "name_template": "kdiskmark-{characteristic_suffix}.AppImage",
+        "characteristic_suffix": [
+            "x86_64"
+        ]
+    },
+    "github": {
+        "repo": true,
+        "prerelease": false
+    },
+    "verification": {
+        "digest": true,
+        "skip": false,
+        "checksum_file": "",
+        "checksum_hash_type": "sha256"
+    },
+    "icon": {
+        "url": "https://raw.githubusercontent.com/JonMagon/KDiskMark/master/data/icons/128-apps-kdiskmark.png",
+        "name": "kdiskmark.png"
+    }
+}
