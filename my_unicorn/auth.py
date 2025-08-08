@@ -9,7 +9,8 @@ import time
 
 import keyring
 from keyring.backends import SecretService
-from logger import get_logger
+
+from .logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -19,6 +20,7 @@ try:
     logger.debug("SecretService backend set as the preferred keyring backend")
 except Exception as e:
     logger.warning("Failed to set SecretService as the preferred keyring backend: %s", e)
+
 
 class GitHubAuthManager:
     """Manages GitHub authentication tokens and rate limiting."""

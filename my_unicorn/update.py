@@ -12,6 +12,12 @@ from typing import Any
 import aiohttp
 
 try:
+    from packaging.version import InvalidVersion, Version
+except ImportError:
+    Version = None
+    InvalidVersion = None
+
+try:
     from .auth import GitHubAuthManager
     from .config import ConfigManager
     from .github_client import GitHubReleaseFetcher
@@ -19,7 +25,6 @@ try:
     from .logger import get_logger
     from .verify import Verifier, log_verification_summary
 except ImportError:
-    # Fallback for direct execution
     from auth import GitHubAuthManager
     from config import ConfigManager
     from github_client import GitHubReleaseFetcher
@@ -91,15 +96,23 @@ class UpdateManager:
             True if latest is newer than current
 
         """
-        # Simple string comparison for now
-        # In production, you'd want proper semantic version comparison
         current_clean = current.lstrip("v").lower()
         latest_clean = latest.lstrip("v").lower()
 
         if current_clean == latest_clean:
             return False
 
-        # Try to parse as semantic versions
+        # Try using packaging.version for proper semantic version comparison
+        if Version is not None:
+            try:
+                current_version = Version(current_clean)
+                latest_version = Version(latest_clean)
+                return latest_version > current_version
+            except InvalidVersion:
+                # Fall through to legacy comparison if parsing fails
+                pass
+
+        # Legacy comparison for backward compatibility
         try:
             current_parts = [int(x) for x in current_clean.split(".")]
             latest_parts = [int(x) for x in latest_clean.split(".")]

@@ -1,6 +1,5 @@
 [project]
 name = 'my-unicorn'
-# dynamic = ["version"]
 version = '1.0.0-alpha'
 maintainers = [{ name = "Cyber-Syntax" }]
 license = { text = "GPL-3.0-or-later" }
@@ -85,9 +84,6 @@ pythonpath = [".", "my_unicorn"]
 [tool.ruff]
 include = [
   "pyproject.toml",
-  # "my_unicorn/**/*.py",
-  # "scripts/**/*.py",
-  # "commands/**/*.py",
 ]
 # Exclude a variety of commonly ignored directories.
 exclude = [
