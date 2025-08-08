@@ -16,15 +16,9 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-try:
-    from .config import ConfigManager
-    from .logger import get_logger
-    from .utils import create_desktop_entry_name, sanitize_filename
-except ImportError:
-    # Fallback for direct execution
-    from config import ConfigManager
-    from logger import get_logger
-    from utils import create_desktop_entry_name, sanitize_filename
+from .config import ConfigManager
+from .logger import get_logger
+from .utils import create_desktop_entry_name, sanitize_filename
 
 logger = get_logger(__name__)
 

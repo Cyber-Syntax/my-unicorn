@@ -14,31 +14,17 @@ from typing import Any
 import aiohttp
 import uvloop
 
-try:
-    from .auth import GitHubAuthManager, auth_manager
-    from .config import AppConfig, AppImageConfig, ConfigManager, GitHubConfig, IconConfig
-    from .config import VerificationConfig as VConfig
-    from .desktop import create_desktop_entry_for_app
-    from .github_client import GitHubReleaseFetcher
-    from .install import IconAsset, Installer
-    from .logger import get_logger
-    from .parser import is_github_url, parse_github_url
-    from .update import UpdateManager
-    from .utils import check_icon_exists, get_icon_path
-    from .verify import Verifier, log_verification_summary
-except ImportError:
-    # Fallback for direct execution
-    from auth import GitHubAuthManager, auth_manager
-    from config import AppConfig, AppImageConfig, ConfigManager, GitHubConfig, IconConfig
-    from config import VerificationConfig as VConfig
-    from desktop import create_desktop_entry_for_app
-    from github_client import GitHubReleaseFetcher
-    from install import IconAsset, Installer
-    from logger import get_logger
-    from parser import is_github_url, parse_github_url
-    from update import UpdateManager
-    from utils import check_icon_exists
-    from verify import Verifier, log_verification_summary
+from .auth import GitHubAuthManager, auth_manager
+from .config import AppConfig, AppImageConfig, ConfigManager, GitHubConfig, IconConfig
+from .config import VerificationConfig as VConfig
+from .desktop import create_desktop_entry_for_app
+from .github_client import GitHubReleaseFetcher
+from .install import IconAsset, Installer
+from .logger import get_logger
+from .parser import is_github_url, parse_github_url
+from .update import UpdateManager
+from .utils import check_icon_exists
+from .verify import Verifier, log_verification_summary
 
 logger = get_logger(__name__)
 

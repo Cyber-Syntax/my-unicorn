@@ -17,20 +17,12 @@ except ImportError:
     Version = None
     InvalidVersion = None
 
-try:
-    from .auth import GitHubAuthManager
-    from .config import ConfigManager
-    from .github_client import GitHubReleaseFetcher
-    from .install import Installer
-    from .logger import get_logger
-    from .verify import Verifier, log_verification_summary
-except ImportError:
-    from auth import GitHubAuthManager
-    from config import ConfigManager
-    from github_client import GitHubReleaseFetcher
-    from install import Installer
-    from logger import get_logger
-    from verify import Verifier, log_verification_summary
+from .auth import GitHubAuthManager
+from .config import ConfigManager
+from .github_client import GitHubReleaseFetcher
+from .install import Installer
+from .logger import get_logger
+from .verify import Verifier, log_verification_summary
 
 logger = get_logger(__name__)
 

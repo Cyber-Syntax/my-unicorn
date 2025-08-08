@@ -10,15 +10,9 @@ from typing import Any, Literal
 
 import aiohttp
 
-try:
-    from .auth import GitHubAuthManager
-    from .logger import get_logger
-    from .utils import format_bytes
-except ImportError:
-    # Fallback for direct execution
-    from auth import GitHubAuthManager
-    from logger import get_logger
-    from utils import format_bytes
+from .auth import GitHubAuthManager
+from .logger import get_logger
+from .utils import format_bytes
 
 HashType = Literal["sha1", "sha256", "sha512", "md5"]
 logger = get_logger(__name__)

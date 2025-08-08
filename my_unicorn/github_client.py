@@ -9,11 +9,7 @@ from urllib.parse import urlparse
 
 import aiohttp
 
-try:
-    from .auth import GitHubAuthManager, auth_manager
-except ImportError:
-    # Fallback for direct execution
-    from auth import GitHubAuthManager, auth_manager
+from .auth import GitHubAuthManager, auth_manager
 
 
 class GitHubAsset(TypedDict):
