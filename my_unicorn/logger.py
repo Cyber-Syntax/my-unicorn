@@ -69,7 +69,7 @@ class MyUnicornLogger:
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%H:%M:%S"
         )
         self._console_handler.setFormatter(console_formatter)
-        self._console_handler.setLevel(logging.INFO)
+        self._console_handler.setLevel(logging.WARNING)
 
         self.logger.addHandler(self._console_handler)
 
@@ -117,9 +117,8 @@ class MyUnicornLogger:
         """
         numeric_level = getattr(logging, level.upper(), logging.INFO)
 
-        # Update console handler level
-        if self._console_handler:
-            self._console_handler.setLevel(numeric_level)
+        # Keep console handler at WARNING level, don't change it
+        # This ensures INFO messages only go to log file, not console
 
     def debug(self, message: str, *args: Any, **kwargs: Any) -> None:
         """Log debug message."""
@@ -179,13 +178,13 @@ class MyUnicornLogger:
     def set_console_level_temporarily(self, level: str) -> None:
         """Temporarily set console logging level."""
         if self._console_handler:
-            numeric_level = getattr(logging, level.upper(), logging.INFO)
+            numeric_level = getattr(logging, level.upper(), logging.WARNING)
             self._console_handler.setLevel(numeric_level)
 
     def restore_console_level(self) -> None:
-        """Restore console logging level to INFO."""
+        """Restore console logging level to WARNING."""
         if self._console_handler:
-            self._console_handler.setLevel(logging.INFO)
+            self._console_handler.setLevel(logging.WARNING)
 
 
 def get_logger(name: str = "my-unicorn", enable_file_logging: bool = True) -> MyUnicornLogger:
