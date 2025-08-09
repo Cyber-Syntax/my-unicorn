@@ -41,7 +41,7 @@ class SelfUpdateHandler(BaseCommandHandler):
                 print("✅ my-unicorn is up to date")
 
         except Exception as e:
-            logger.error("Failed to check for self-updates: %s", e)
+            logger.error("Failed to check for self-updates: %s", e, exc_info=True)
             print(f"❌ Failed to check for updates: {e}")
 
     async def _perform_self_update(self) -> None:
@@ -67,5 +67,5 @@ class SelfUpdateHandler(BaseCommandHandler):
                 print("❌ Self-update failed. Please try again or update manually.")
 
         except Exception as e:
-            logger.error("Self-update failed: %s", e)
+            logger.error("Self-update failed: %s", e, exc_info=True)
             print(f"❌ Self-update failed: {e}")

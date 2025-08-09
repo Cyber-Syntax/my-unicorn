@@ -88,7 +88,7 @@ class CLIRunner:
             print("\n⏹️  Operation cancelled by user")
             sys.exit(1)
         except Exception as e:
-            logger.error(f"Unexpected error: {e}")
+            logger.error(f"Unexpected error: {e}", exc_info=True)
             print(f"❌ Unexpected error: {e}")
             sys.exit(1)
 

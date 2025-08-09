@@ -143,7 +143,7 @@ class MyUnicornLogger:
 
     def error(self, message: str, *args: Any, **kwargs: Any) -> None:
         """Log error message."""
-        self.logger.error(message, *args, **kwargs)
+        self.logger.error(message, *args, **kwargs, exc_info=True)
 
     def critical(self, message: str, *args: Any, **kwargs: Any) -> None:
         """Log critical message."""

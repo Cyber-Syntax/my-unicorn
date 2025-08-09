@@ -272,7 +272,7 @@ class DesktopEntry:
                 return desktop_file_path
 
             except OSError as e:
-                logger.error(f"Failed to write desktop file {desktop_file_path}: {e}")
+                logger.error(f"Failed to write desktop file {desktop_file_path}: {e}", exc_info=True)
                 raise
         else:
             # File exists and is up to date, just return the path
@@ -321,7 +321,7 @@ class DesktopEntry:
             return existing_file
 
         except OSError as e:
-            logger.error(f"Failed to update desktop file {existing_file}: {e}")
+            logger.error(f"Failed to update desktop file {existing_file}: {e}", exc_info=True)
             return None
 
     def remove_desktop_file(self) -> bool:
@@ -341,7 +341,7 @@ class DesktopEntry:
             logger.debug(f"Removed desktop file: {existing_file}")
             return True
         except OSError as e:
-            logger.error(f"Failed to remove desktop file {existing_file}: {e}")
+            logger.error(f"Failed to remove desktop file {existing_file}: {e}", exc_info=True)
             return False
 
     def _is_browser_app(self) -> bool:

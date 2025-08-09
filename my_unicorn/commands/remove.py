@@ -45,7 +45,7 @@ class RemoveHandler(BaseCommandHandler):
                 print(f"✅ Kept config for {app_name}")
 
         except Exception as e:
-            logger.error(f"Failed to remove {app_name}: {e}")
+            logger.error(f"Failed to remove {app_name}: {e}", exc_info=True)
             print(f"❌ Failed to remove {app_name}: {e}")
 
     def _remove_appimage_files(self, app_config: dict, app_name: str) -> None:

@@ -132,7 +132,7 @@ class Installer:
                 logger.debug(f"✅ Download completed: {dest}")
 
         except Exception as e:
-            logger.error(f"❌ Download failed: {dest.name} - {e}")
+            logger.error(f"❌ Download failed: {dest.name} - {e}", exc_info=True)
             raise
 
     async def download_appimage(self, show_progress: bool = True) -> Path:
@@ -182,7 +182,7 @@ class Installer:
             logger.info(f"✅ Icon downloaded: {icon_path}")
             return icon_path
         except Exception as e:
-            logger.error(f"❌ Failed to download icon: {e}")
+            logger.error(f"❌ Failed to download icon: {e}", exc_info=True)
             return None
 
     def make_executable(self, path: Path) -> None:
@@ -340,7 +340,7 @@ class Installer:
 
         """
         if not path.exists():
-            logger.error(f"❌ File not found for verification: {path}")
+            logger.error(f"❌ File not found for verification: {path}", exc_info=True)
             return False
 
         expected_size = self.get_expected_size()
@@ -351,7 +351,8 @@ class Installer:
                 return True
             else:
                 logger.error(
-                    f"❌ File size mismatch: expected {expected_size:,}, got {actual_size:,}"
+                    f"❌ File size mismatch: expected {expected_size:,}, got {actual_size:,}",
+                    exc_info=True,
                 )
                 return False
 
