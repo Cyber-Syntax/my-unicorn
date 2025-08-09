@@ -101,11 +101,6 @@ class InstallHandler(BaseCommandHandler):
             print("\nNo valid URLs to install.")
             return
 
-        # Print what will be installed
-        print("✅ Will install from URLs:")
-        for owner, repo, url in valid_repos:
-            print(f"   📡 {owner}/{repo}")
-
         # Install concurrently
         await self._install_repos_concurrently(valid_repos, args)
 
@@ -204,7 +199,7 @@ class InstallHandler(BaseCommandHandler):
                     f"{owner}/{repo}", session, asyncio.Semaphore(1), args, catalog_entry
                 )
             except Exception as e:
-                logger.error(f"Failed to install catalog app {app_name}: {e}")
+                logger.error(f"Failed to install catalog app {app_name}: {e}", exc_info=True)
                 return False, str(e), {}
 
     async def _install_single_repo(
@@ -233,7 +228,10 @@ class InstallHandler(BaseCommandHandler):
                 )
 
                 if not should_use_github:
-                    logger.error(f"GitHub API disabled for {repo_name} (github.repo: false)")
+                    logger.error(
+                        f"GitHub API disabled for {repo_name} (github.repo: false)",
+                        exc_info=True,
+                    )
                     return False, "GitHub API disabled for this app", {}
 
                 # Fetch release data
@@ -298,14 +296,13 @@ class InstallHandler(BaseCommandHandler):
                     should_use_prerelease or used_prerelease_fallback,
                     config_key,
                     args.no_desktop,
-                    icon_dir,
                 )
 
                 print(f"✅ {repo_name} {release_data['version']} installed successfully")
                 return True, f"Installed {release_data['version']}", verification_results
 
             except Exception as e:
-                logger.error(f"Failed to install {repo}: {e}")
+                logger.error(f"Failed to install {repo}: {e}", exc_info=True)
                 return False, str(e), {}
 
     def _get_config_key(self, repo_name: str, catalog_entry: dict | None) -> str:
@@ -390,7 +387,8 @@ class InstallHandler(BaseCommandHandler):
                         used_prerelease_fallback = True
                     except Exception as prerelease_error:
                         logger.error(
-                            f"❌ No releases found for {owner}/{repo_name}: {prerelease_error}"
+                            f"❌ No releases found for {owner}/{repo_name}: {prerelease_error}",
+                            exc_info=True,
                         )
                         raise e  # Re-raise original 404 error
                 else:
@@ -596,7 +594,7 @@ class InstallHandler(BaseCommandHandler):
                 "details": "GitHub API digest verification",
             }
         except Exception as e:
-            logger.error(f"❌ Digest verification failed: {e}")
+            logger.error(f"❌ Digest verification failed: {e}", exc_info=True)
             verification_results["digest"] = {
                 "passed": False,
                 "hash": appimage_asset.get("digest", ""),
@@ -639,7 +637,7 @@ class InstallHandler(BaseCommandHandler):
                 "details": f"Verified against {checksum_file}",
             }
         except Exception as e:
-            logger.error(f"❌ Checksum file verification failed: {e}")
+            logger.error(f"❌ Checksum file verification failed: {e}", exc_info=True)
             verification_results["checksum_file"] = {
                 "passed": False,
                 "hash": "",
@@ -680,7 +678,6 @@ class InstallHandler(BaseCommandHandler):
         should_use_prerelease: bool,
         config_key: str,
         no_desktop: bool,
-        icon_dir: Path,
     ) -> None:
         """Finalize the installation with configuration and desktop entry."""
         # Create app configuration
