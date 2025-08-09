@@ -12,7 +12,6 @@ This release written from scratch to simplify the code and maintainability.
     - aiohttp instead of requests
     - tqdm.asyncio instead of manual progress bar
 4. Authentication is simplified for better security and performance
-5. Removed command design pattern for decreasing complexity
 
 ## v0.15.1-alpha
 ## v0.15.0-alpha

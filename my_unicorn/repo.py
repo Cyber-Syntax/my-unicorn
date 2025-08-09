@@ -4,6 +4,9 @@
 This module handles updating the my-unicorn package itself by fetching
 the latest release from GitHub, cloning the repository, and running
 the installer script in update mode.
+
+TODO: Switch to stable releases only when we publish stable versions
+Currently using latest releases (including prereleases) until stable releases are available.
 """
 
 import asyncio
@@ -61,24 +64,17 @@ def normalize_version_string(version_str: str) -> str:
 class SelfUpdater:
     """Handles self-updating of the my-unicorn package."""
 
-    def __init__(
-        self,
-        config_manager: ConfigManager,
-        session: aiohttp.ClientSession,
-        branch_type: str = "stable",
-    ) -> None:
+    def __init__(self, config_manager: ConfigManager, session: aiohttp.ClientSession) -> None:
         """Initialize the self-updater.
 
         Args:
             config_manager: Configuration manager instance
             session: aiohttp client session for API requests
-            branch_type: Type of branch to update from ("stable" or "dev")
 
         """
         self.config_manager: ConfigManager = config_manager
         self.global_config: GlobalConfig = config_manager.load_global_config()
         self.session: aiohttp.ClientSession = session
-        self.branch_type: str = branch_type
         self.github_fetcher: GitHubReleaseFetcher = GitHubReleaseFetcher(
             owner=GITHUB_OWNER, repo=GITHUB_REPO, session=session
         )
@@ -134,16 +130,11 @@ class SelfUpdater:
 
         """
         try:
-            if self.branch_type == "stable":
-                logger.info("Fetching latest stable release from GitHub...")
-                release_data = await self.github_fetcher.fetch_latest_release_or_prerelease(
-                    prefer_prerelease=False  # Prefer stable releases for stable branch
-                )
-            else:  # dev branch
-                logger.info("Fetching latest prerelease from GitHub...")
-                release_data = await self.github_fetcher.fetch_latest_release_or_prerelease(
-                    prefer_prerelease=True  # Prefer prereleases for dev branch
-                )
+            logger.info("Fetching latest release from GitHub...")
+            # TODO: Change to prefer_prerelease=False when we have stable releases
+            release_data = await self.github_fetcher.fetch_latest_release_or_prerelease(
+                prefer_prerelease=True  # Currently using prereleases until stable releases available
+            )
 
             logger.info("Found latest release: %s", release_data.get("version", "unknown"))
 
@@ -178,8 +169,7 @@ class SelfUpdater:
             True if update is available, False otherwise
 
         """
-        branch_desc = "stable" if self.branch_type == "stable" else "development"
-        logger.info("Checking for updates on %s branch...", branch_desc)
+        logger.info("Checking for updates...")
 
         # Get latest release info
         latest_release = await self.get_latest_release()
@@ -207,9 +197,8 @@ class SelfUpdater:
             )
             latest_normalized = normalize_version_string(latest_version_tag)
 
-            branch_desc = "stable" if self.branch_type == "stable" else "development"
             print(f"Current version: {current_version_str}")
-            print(f"Latest version ({branch_desc}): {latest_version_tag}")
+            print(f"Latest version: {latest_version_tag}")
 
             logger.debug("Normalized current: %s", current_normalized)
             logger.debug("Normalized latest: %s", latest_normalized)
@@ -229,7 +218,7 @@ class SelfUpdater:
                 print("✅ my-unicorn is up to date")
                 return False
             else:
-                print("💻 You are using a development version")
+                print("💻 You are using a newer version")
                 return False
 
         except (PackageNotFoundError, Exception) as e:
@@ -259,66 +248,15 @@ class SelfUpdater:
                 shutil.rmtree(source_dir)
             source_dir.mkdir(parents=True)
 
-            # 2) Determine branch to clone
-            if self.branch_type == "stable":
-                branch_name = await self.github_fetcher.get_default_branch()
-                logger.info("Using stable branch: %s", branch_name)
-                print(f"📥 Downloading latest stable version from {branch_name} branch...")
-                clone_args = [
-                    "git",
-                    "clone",
-                    "-b",
-                    branch_name,
-                    f"{GITHUB_URL}.git",
-                    str(source_dir),
-                ]
-            else:
-                # For dev branch, try common development branch names
-                dev_branches = ["develop", "dev", "development", "unstable"]
-                branch_name = None
+            # 2) Clone into source_dir
+            logger.info("Cloning repository to %s", source_dir)
+            print("📥 Downloading latest version...")
 
-                # Try to find an existing dev branch
-                for branch in dev_branches:
-                    try:
-                        check_process = await asyncio.create_subprocess_exec(
-                            "git",
-                            "ls-remote",
-                            "--heads",
-                            f"{GITHUB_URL}.git",
-                            branch,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE,
-                        )
-                        stdout, _ = await check_process.communicate()
-                        if check_process.returncode == 0 and stdout.strip():
-                            branch_name = branch
-                            break
-                    except Exception:
-                        continue
-
-                if not branch_name:
-                    # Fallback to default branch for dev if no dev branch found
-                    branch_name = await self.github_fetcher.get_default_branch()
-                    logger.warning(
-                        "No development branch found, using default branch: %s", branch_name
-                    )
-
-                logger.info("Using development branch: %s", branch_name)
-                print(
-                    f"📥 Downloading latest development version from {branch_name} branch..."
-                )
-                clone_args = [
-                    "git",
-                    "clone",
-                    "-b",
-                    branch_name,
-                    f"{GITHUB_URL}.git",
-                    str(source_dir),
-                ]
-
-            # 3) Clone into source_dir
             clone_process = await asyncio.create_subprocess_exec(
-                *clone_args,
+                "git",
+                "clone",
+                f"{GITHUB_URL}.git",
+                str(source_dir),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -401,14 +339,11 @@ class SelfUpdater:
             return False
 
 
-async def get_self_updater(
-    config_manager: ConfigManager | None = None, branch_type: str = "stable"
-) -> SelfUpdater:
+async def get_self_updater(config_manager: ConfigManager | None = None) -> SelfUpdater:
     """Get a SelfUpdater instance with proper session management.
 
     Args:
         config_manager: Optional config manager, will create one if not provided
-        branch_type: Type of branch to update from ("stable" or "dev")
 
     Returns:
         Configured SelfUpdater instance
@@ -423,37 +358,31 @@ async def get_self_updater(
     timeout = aiohttp.ClientTimeout(total=30)
     session = aiohttp.ClientSession(timeout=timeout)
 
-    return SelfUpdater(config_manager, session, branch_type)
+    return SelfUpdater(config_manager, session)
 
 
-async def check_for_self_update(branch_type: str = "stable") -> bool:
+async def check_for_self_update() -> bool:
     """Check for self-updates.
-
-    Args:
-        branch_type: Type of branch to check ("stable" or "dev")
 
     Returns:
         True if update is available, False otherwise
 
     """
-    updater = await get_self_updater(branch_type=branch_type)
+    updater = await get_self_updater()
     try:
         return await updater.check_for_update()
     finally:
         await updater.session.close()
 
 
-async def perform_self_update(branch_type: str = "stable") -> bool:
+async def perform_self_update() -> bool:
     """Perform self-update.
-
-    Args:
-        branch_type: Type of branch to update from ("stable" or "dev")
 
     Returns:
         True if update was successful, False otherwise
 
     """
-    updater = await get_self_updater(branch_type=branch_type)
+    updater = await get_self_updater()
     try:
         # First check if update is available
         if await updater.check_for_update():
@@ -483,15 +412,15 @@ def display_current_version() -> None:
 
 
 # Legacy compatibility functions for CLI usage
-async def main_check(branch_type: str = "stable") -> None:
+async def main_check() -> None:
     """Check for updates (CLI compatibility)."""
-    _ = await check_for_self_update(branch_type)
+    _ = await check_for_self_update()
 
 
-async def main_update(branch_type: str = "stable") -> None:
+async def main_update() -> None:
     """Perform updates (CLI compatibility)."""
-    if await check_for_self_update(branch_type):
-        _ = await perform_self_update(branch_type)
+    if await check_for_self_update():
+        _ = await perform_self_update()
 
 
 if __name__ == "__main__":

@@ -173,10 +173,8 @@ Examples:
             help="Update my-unicorn itself from GitHub",
             epilog="""
 Examples:
-  %(prog)s --check-only              # Check for stable updates only
-  %(prog)s --branch stable           # Update from stable branch (default)
-  %(prog)s --branch dev              # Update from development branch
-  %(prog)s --branch dev --check-only # Check for dev updates only
+  %(prog)s --check-only    # Check for updates only
+  %(prog)s                 # Update if available
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
@@ -184,12 +182,6 @@ Examples:
             "--check-only",
             action="store_true",
             help="Only check for updates without installing",
-        )
-        self_update_parser.add_argument(
-            "--branch",
-            choices=["stable", "dev"],
-            default=None,
-            help="Branch type to update from (default: configured preference or stable)",
         )
 
     def _add_list_command(self, subparsers) -> None:
@@ -250,9 +242,4 @@ Examples:
         )
         config_group.add_argument(
             "--reset", action="store_true", help="Reset configuration to defaults"
-        )
-        config_group.add_argument(
-            "--set-branch",
-            choices=["stable", "dev"],
-            help="Set preferred self-update branch (stable or dev)",
         )

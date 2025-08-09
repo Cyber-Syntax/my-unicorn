@@ -23,24 +23,17 @@ class SelfUpdateHandler(BaseCommandHandler):
             args: Parsed command-line arguments
 
         """
-        # Use command line branch option or fall back to configured preference
-        branch_type = getattr(args, "branch", None)
-        if branch_type is None:
-            # Use configured preference as default
-            branch_type = self.global_config["self_update"]["preferred_branch"]
-
         if args.check_only:
-            await self._check_for_self_updates(branch_type)
+            await self._check_for_self_updates()
         else:
-            await self._perform_self_update(branch_type)
+            await self._perform_self_update()
 
-    async def _check_for_self_updates(self, branch_type: str = "stable") -> None:
+    async def _check_for_self_updates(self) -> None:
         """Check for available self-updates without installing them."""
-        branch_desc = "stable" if branch_type == "stable" else "development"
-        print(f"🔍 Checking for my-unicorn updates on {branch_desc} branch...")
+        print("🔍 Checking for my-unicorn updates...")
 
         try:
-            has_update = await check_for_self_update(branch_type)
+            has_update = await check_for_self_update()
 
             if has_update:
                 print("\nRun 'my-unicorn self-update' to install the update.")
@@ -51,20 +44,19 @@ class SelfUpdateHandler(BaseCommandHandler):
             logger.error("Failed to check for self-updates: %s", e)
             print(f"❌ Failed to check for updates: {e}")
 
-    async def _perform_self_update(self, branch_type: str = "stable") -> None:
+    async def _perform_self_update(self) -> None:
         """Perform self-update if available."""
-        branch_desc = "stable" if branch_type == "stable" else "development"
-        print(f"🔍 Checking for my-unicorn updates on {branch_desc} branch...")
+        print("🔍 Checking for my-unicorn updates...")
 
         try:
-            has_update = await check_for_self_update(branch_type)
+            has_update = await check_for_self_update()
 
             if not has_update:
                 print("✅ my-unicorn is already up to date")
                 return
 
             print("\n🚀 Starting self-update...")
-            success = await perform_self_update(branch_type)
+            success = await perform_self_update()
 
             if success:
                 print("✅ Self-update completed successfully!")
