@@ -694,6 +694,7 @@ class InstallHandler(BaseCommandHandler):
             should_use_github,
             should_use_prerelease,
             appimage_path,
+            icon_path,
         )
 
         # Save configuration
@@ -724,6 +725,7 @@ class InstallHandler(BaseCommandHandler):
         should_use_github: bool,
         should_use_prerelease: bool,
         appimage_path: Path,
+        icon_path: Path | None,
     ) -> AppConfig:
         """Create application configuration."""
         # Get stored hash from verification or asset
