@@ -1,19 +1,17 @@
 #!/usr/bin/env bash
 # Simple manual testing script for my-unicorn
 #
-# QOwnNotes: Asset digest verification
-# Joplin: .yml sha512 verification
-# Appflowy: no verification
-# Zettlr: sha256 verification with .txt file
-#
+# qownnotes: Asset digest verification
+# appflowy: no verification
+# zettlr: sha256 verification with .txt file
 
 set -e # Exit on any error
 
 # Configuration
 APP_ROOT="$(dirname "$(dirname "$0")")"
-CONFIG_DIR="$HOME/.config/myunicorn/apps"
-BACKUP_DIR="/tmp/my_unicorn_test_backup"
-LOG_FILE="$HOME/.local/state/my-unicorn/manual_test.log"
+CONFIG_DIR="$HOME/.config/my-unicorn/apps/"
+BACKUP_DIR="$HOME/.config/my-unicorn/tmp/my_unicorn_test_backup"
+LOG_FILE="$HOME/.config/my-unicorn/logs/manual_test.log"
 
 # Create necessary directories
 # mkdir -p "$CONFIG_DIR"
@@ -42,31 +40,21 @@ confirm() {
 # ======== Backup and Restore ========
 
 backup_app_configs() {
-  log "Backing up QOwnNotes and Joplin configs"
+  log "Backing up qownnotes"
 
-  # Only backup QOwnNotes and Joplin
-  if [ -f "$CONFIG_DIR/QOwnNotes.json" ]; then
-    cp "$CONFIG_DIR/QOwnNotes.json" "$BACKUP_DIR/"
-    log "Backed up QOwnNotes.json"
-  fi
-
-  if [ -f "$CONFIG_DIR/joplin.json" ]; then
-    cp "$CONFIG_DIR/joplin.json" "$BACKUP_DIR/"
-    log "Backed up joplin.json"
+  # Only backup qownnotes 
+  if [ -f "$CONFIG_DIR/qownnotes.json" ]; then
+    cp "$CONFIG_DIR/qownnotes.json" "$BACKUP_DIR/"
+    log "Backed up qownnotes.json"
   fi
 }
 
 restore_app_configs() {
-  log "Restoring QOwnNotes and Joplin configs"
+  log "Restoring qownnotes"
 
-  if [ -f "$BACKUP_DIR/QOwnNotes.json" ]; then
-    cp "$BACKUP_DIR/QOwnNotes.json" "$CONFIG_DIR/"
-    log "Restored QOwnNotes.json"
-  fi
-
-  if [ -f "$BACKUP_DIR/joplin.json" ]; then
-    cp "$BACKUP_DIR/joplin.json" "$CONFIG_DIR/"
-    log "Restored joplin.json"
+  if [ -f "$BACKUP_DIR/qownnotes.json" ]; then
+    cp "$BACKUP_DIR/qownnotes.json" "$CONFIG_DIR/"
+    log "Restored qownnotes.json"
   fi
 }
 
@@ -74,162 +62,210 @@ restore_app_configs() {
 
 setup_qownnotes_config() {
   local version="$1"
-  log "Setting up QOwnNotes test config with version $version"
+  log "Setting up qownnotes test config with version $version"
 
-  cat >"$CONFIG_DIR/QOwnNotes.json" <<EOF
+  cat >"$CONFIG_DIR/qownnotes.json" <<EOF
 {
-    "version": "$version",
-    "appimage_name": "QOwnNotes-$version-x86_64.AppImage"
+    "config_version": "1.0.0",
+    "appimage": {
+        "version": "$version",
+        "name": "qownnotes-$version-x86_64.AppImage",
+        "rename": "qownnotes",
+        "name_template": "{repo}-{characteristic_suffix}.AppImage",
+        "characteristic_suffix": [
+            "x86_64.AppImage",
+            "x86_64-Qt6.AppImage"
+        ],
+        "installed_date": "$(date --iso-8601=seconds)",
+        "digest": ""
+    },
+    "owner": "pbek",
+    "repo": "QOwnNotes",
+    "github": {
+        "repo": true,
+        "prerelease": false
+    },
+    "verification": {
+        "digest": true,
+        "skip": false,
+        "checksum_file": "",
+        "checksum_hash_type": "sha256"
+    },
+    "icon": {
+        "url": "https://raw.githubusercontent.com/pbek/QOwnNotes/develop/icons/icon.png",
+        "name": "qownnotes.png",
+        "installed": false
+    }
 }
 EOF
 }
 
 setup_zettlr_config() {
   local version="$1"
-  log "Setting up Zettlr test config with version $version"
+  log "Setting up zettlr test config with version $version"
 
-  cat >"$CONFIG_DIR/Zettlr.json" <<EOF
+  cat >"$CONFIG_DIR/zettlr.json" <<EOF
 {
-    "version": "$version",
-    "appimage_name": "Zettlr-$version-x86_64.AppImage"
+    "config_version": "1.0.0",
+    "appimage": {
+        "version": "$version",
+        "name": "zettlr-$version-x86_64.AppImage",
+        "rename": "zettlr",
+        "name_template": "{repo}-{characteristic_suffix}.AppImage",
+        "characteristic_suffix": [
+            "x86_64.AppImage"
+        ],
+        "installed_date": "$(date --iso-8601=seconds)",
+        "digest": ""
+    },
+    "owner": "zettlr",
+    "repo": "zettlr",
+    "github": {
+        "repo": true,
+        "prerelease": false
+    },
+    "verification": {
+        "digest": true,
+        "skip": false,
+        "checksum_file": "",
+        "checksum_hash_type": "sha256"
+    },
+    "icon": {
+        "url": "",
+        "name": "zettlr.png",
+        "installed": false
+    }
 }
 EOF
 }
 
 setup_appflowy_config() {
   local version="$1"
-  log "Setting up AppFlowy test config with version $version"
+  log "Setting up appflowy test config with version $version"
 
-  cat >"$CONFIG_DIR/AppFlowy.json" <<EOF
+  cat >"$CONFIG_DIR/appflowy.json" <<EOF
 {
-    "version": "$version",
-    "appimage_name": "AppFlowy-$version-linux-x86_64.AppImage"
+    "config_version": "1.0.0",
+    "appimage": {
+        "version": "$version",
+        "name": "appflowy-$version-linux-x86_64.AppImage",
+        "rename": "appflowy",
+        "name_template": "{repo}-{characteristic_suffix}.AppImage",
+        "characteristic_suffix": [
+            "linux-x86_64.AppImage"
+        ],
+        "installed_date": "$(date --iso-8601=seconds)",
+        "digest": ""
+    },
+    "owner": "appflowy",
+    "repo": "appflowy",
+    "github": {
+        "repo": true,
+        "prerelease": false
+    },
+    "verification": {
+        "digest": true,
+        "skip": false,
+        "checksum_file": "",
+        "checksum_hash_type": "sha256"
+    },
+    "icon": {
+        "url": "",
+        "name": "appflowy.png",
+        "installed": false
+    }
 }
 EOF
 }
-
-setup_joplin_config() {
-  local version="$1"
-  log "Setting up Joplin test config with version $version"
-
-  cat >"$CONFIG_DIR/joplin.json" <<EOF
-{
-    "version": "$version",
-    "appimage_name": "Joplin-$version.AppImage"
-}
-EOF
-}
-
-# ======== Test Functions ========
-
-# No longer needed: run_my_unicorn replaced by direct CLI calls
 
 # ======== Test Scenarios ========
 
 ## Option 1 : URL Installs
 option1_qownnotes() {
-  log "=== Testing QOwnNotes Fresh Install ==="
-  rm -f "$CONFIG_DIR/QOwnNotes.json"
+  log "=== Testing qownnotes Fresh Install ==="
+  rm -f "$CONFIG_DIR/qownnotes.json"
   cd "$APP_ROOT"
-  python3 run.py download https://github.com/pbek/QOwnNotes || log "ERROR: download QOwnNotes failed"
-  log "QOwnNotes installation test completed"
-}
-
-option1_joplin() {
-  log "=== Testing Joplin Fresh Install ==="
-  rm -f "$CONFIG_DIR/joplin.json"
-  cd "$APP_ROOT"
-  python3 run.py download https://github.com/laurent22/joplin || log "ERROR: download joplin failed"
-  log "Joplin installation test completed"
+  python3 run.py install https://github.com/pbek/qownnotes || log "ERROR: download qownnotes failed"
+  log "qownnotes installation test completed"
 }
 
 ## Option 2: Catalog Installs
 option2_qownnotes() {
-  log "=== Testing QOwnNotes Catalog Install ==="
+  log "=== Testing qownnotes Catalog Install ==="
   cd "$APP_ROOT"
   python3 run.py install qownnotes || log "ERROR: install qownnotes failed"
-  log "QOwnNotes catalog install test completed"
-}
-
-option2_joplin() {
-  log "=== Testing Joplin Catalog Install ==="
-  cd "$APP_ROOT"
-  python3 run.py install joplin || log "ERROR: install joplin failed"
-  log "Joplin catalog install test completed"
+  log "qownnotes catalog install test completed"
 }
 
 ## Option 3: Auto Update Installations
-option3_joplin_qownnotes() {
-  log "=== Testing Both QOwnNotes and Joplin Update Together ==="
+option3_zettlr_qownnotes() {
+  log "=== Testing Both qownnotes and zettlr Update Together ==="
   setup_qownnotes_config "0.1.0"
-  setup_joplin_config "0.1.0"
+  setup_zettlr_config "0.1.0"
   cd "$APP_ROOT"
-  python3 run.py update --select qownnotes,joplin || log "ERROR: update --select qownnotes,joplin failed"
-  log "Combined QOwnNotes and Joplin update test completed"
+  python3 run.py update --select qownnotes,zettlr || log "ERROR: update --select qownnotes,zettlr failed"
+  log "Combined qownnotes and zettlr update test completed"
 }
 
-option3_fourapp() {
-  log "=== Testing Update All (Four Apps) ==="
+option3_threeapp() {
+  log "=== Testing Update All (Three Apps) ==="
   setup_qownnotes_config "0.1.0"
-  setup_joplin_config "0.1.0"
   setup_zettlr_config "0.1.0"
   setup_appflowy_config "0.1.0"
   cd "$APP_ROOT"
   python3 run.py update --all || log "ERROR: update --all failed"
-  log "Update all (four apps) test completed"
+  log "Update all (three apps) test completed"
 }
 
 option3_qownnotes() {
-  log "=== Testing QOwnNotes Update ==="
+  log "=== Testing qownnotes Update ==="
   setup_qownnotes_config "0.1.0"
   cd "$APP_ROOT"
   python3 run.py update --select qownnotes || log "ERROR: update --select qownnotes failed"
-  log "QOwnNotes update test completed"
+  log "qownnotes update test completed"
 }
 
-option3_joplin() {
-  log "=== Testing Joplin Update ==="
-  setup_joplin_config "0.1.0"
+option3_zettlr() {
+  log "=== Testing zettlr Update ==="
+  setup_zettlr_config "0.1.0"
   cd "$APP_ROOT"
-  python3 run.py update --select joplin || log "ERROR: update --select joplin failed"
-  log "Joplin update test completed"
+  python3 run.py update --select zettlr || log "ERROR: update --select zettlr failed"
+  log "zettlr update test completed"
 }
 
 ## Option 4: Selective Update Installations
 option4_qownnotes() {
-  log "=== Testing Selective Update (QOwnNotes) ==="
+  log "=== Testing Selective Update (qownnotes) ==="
   setup_qownnotes_config "0.1.0"
   cd "$APP_ROOT"
   python3 run.py update --select qownnotes || log "ERROR: update --select qownnotes failed"
   log "Selective update test completed"
 }
 
-option4_joplin() {
-  log "=== Testing Selective Update (Joplin) ==="
-  setup_joplin_config "0.1.0"
+option4_zettlr() {
+  log "=== Testing Selective Update (zettlr) ==="
+  setup_zettlr_config "0.1.0"
   cd "$APP_ROOT"
-  python3 run.py update --select joplin || log "ERROR: update --select joplin failed"
+  python3 run.py update --select zettlr || log "ERROR: update --select zettlr failed"
   log "Selective update test completed"
 }
 
-option4_fourapp() {
-  log "=== Testing Selective Update (Four Apps) ==="
+option4_threeapp() {
+  log "=== Testing Selective Update (Three Apps) ==="
   setup_appflowy_config "0.1.0"
   setup_qownnotes_config "0.1.0"
   setup_zettlr_config "0.1.0"
-  setup_joplin_config "0.1.0"
   cd "$APP_ROOT"
-  python3 run.py update --select appflowy,qownnotes,zettlr,joplin || log "ERROR: update --select appflowy,qownnotes,zettlr,joplin failed"
-  log "Selective update test for four apps completed"
+  python3 run.py update --select appflowy,qownnotes,zettlr || log "ERROR: update --select appflowy,qownnotes,zettlr failed"
+  log "Selective update test for three apps completed"
 }
-
 
 # ======== Main Function ========
 
 main() {
   echo "Simple Manual Testing Script for my-unicorn"
   echo "-------------------------------------------"
-  echo "This script only backs up and tests QOwnNotes and Joplin"
+  echo "This script only backs up and tests qownnotes and zettlr"
 
   # Backup configs before testing
   backup_app_configs
@@ -238,17 +274,17 @@ main() {
   while true; do
     echo ""
     echo "Available tests:"
-    echo "1) (URL)Option 1 test QOwnNotes"
-    echo "2) (URL)Option 1 test Joplin"
-    echo "3) (Catalog)Option 2 test QOwnNotes"
-    echo "4) (Catalog)Option 2 test Joplin"
-    echo "5) (Auto)Option 3 test with 4 apps"
-    echo "6) (Auto)Option 3 test QOwnNotes and Joplin"
-    echo "7) (Auto)Option 3 test QOwnNotes"
-    echo "8) (Auto)Option 3 test Joplin"
-    echo "9) (Selective)Option 4 test with 4 apps"
-    echo "10) (Selective)Option 4 test QOwnNotes"
-    echo "11) (Selective)Option 4 test Joplin"
+    echo "1) (URL)Option 1 test qownnotes"
+    echo "2) (URL)Option 1 test zettlr"
+    echo "3) (Catalog)Option 2 test qownnotes"
+    echo "4) (Catalog)Option 2 test zettlr"
+    echo "5) (Auto)Option 3 test with 3 apps"
+    echo "6) (Auto)Option 3 test qownnotes and zettlr"
+    echo "7) (Auto)Option 3 test qownnotes"
+    echo "8) (Auto)Option 3 test zettlr"
+    echo "9) (Selective)Option 4 test with 3 apps"
+    echo "10) (Selective)Option 4 test qownnotes"
+    echo "11) (Selective)Option 4 test zettlr"
     echo "0) Exit and restore configs"
     echo ""
 
@@ -256,16 +292,16 @@ main() {
 
     case $choice in
     1) option1_qownnotes ;;
-    2) option1_joplin ;;
+    2) option1_zettlr ;;
     3) option2_qownnotes ;;
-    4) option2_joplin ;;
-    5) option3_fourapp ;;
-    6) option3_joplin_qownnotes ;;
+    4) option2_zettlr ;;
+    5) option3_threeapp ;;
+    6) option3_zettlr_qownnotes ;;
     7) option3_qownnotes ;;
-    8) option3_joplin ;;
-    9) option4_fourapp ;;
+    8) option3_zettlr ;;
+    9) option4_threeapp ;;
     10) option4_qownnotes ;;
-    11) option4_joplin ;;
+    11) option4_zettlr ;;
     0)
       log "Restoring original configurations"
       restore_app_configs
