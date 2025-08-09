@@ -26,6 +26,12 @@ class NetworkConfig(TypedDict):
     timeout_seconds: int
 
 
+class SelfUpdateConfig(TypedDict):
+    """Self-update configuration options."""
+
+    preferred_branch: str
+
+
 class DirectoryConfig(TypedDict):
     """Directory paths configuration."""
 
@@ -52,6 +58,7 @@ class GlobalConfig(TypedDict):
     log_level: str
     network: NetworkConfig
     directory: DirectoryConfig
+    self_update: SelfUpdateConfig
 
 
 class AppImageConfig(TypedDict):
@@ -176,6 +183,7 @@ class ConfigManager:
             "locale": "en_US",
             "log_level": "INFO",
             "network": {"retry_attempts": "3", "timeout_seconds": "10"},
+            "self_update": {"preferred_branch": "stable"},
             "directory": {
                 "repo": str(home / ".local" / "share" / "my-unicorn-repo"),
                 "package": str(home / ".local" / "share" / "my-unicorn"),
@@ -277,6 +285,14 @@ class ConfigManager:
             else 10,
         )
 
+        # Get self-update config
+        self_update_dict = config_dict.get("self_update", {})
+        self_update_config = SelfUpdateConfig(
+            preferred_branch=str(self_update_dict.get("preferred_branch", "stable"))
+            if isinstance(self_update_dict, dict)
+            else "stable"
+        )
+
         # Get batch mode value
         batch_mode_str = config_dict.get("batch_mode", "true")
         batch_mode = (
@@ -292,6 +308,7 @@ class ConfigManager:
             log_level=str(config_dict.get("log_level", "INFO")),
             network=network_config,
             directory=DirectoryConfig(**directory_config),
+            self_update=self_update_config,
         )
 
     def save_global_config(self, config: GlobalConfig) -> None:
@@ -312,6 +329,11 @@ class ConfigManager:
         parser["network"] = {
             "retry_attempts": str(config["network"]["retry_attempts"]),
             "timeout_seconds": str(config["network"]["timeout_seconds"]),
+        }
+
+        # Self-update section
+        parser["self_update"] = {
+            "preferred_branch": config["self_update"]["preferred_branch"],
         }
 
         # Directory section

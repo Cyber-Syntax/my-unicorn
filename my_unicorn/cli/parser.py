@@ -54,6 +54,10 @@ Examples:
   %(prog)s update appflowy,joplin
   %(prog)s update
 
+  # Self-update
+  %(prog)s self-update --check-only
+  %(prog)s self-update
+
   # Other commands
   %(prog)s list
   %(prog)s auth --save-token
@@ -71,6 +75,7 @@ Examples:
 
         self._add_install_command(subparsers)
         self._add_update_command(subparsers)
+        self._add_self_update_command(subparsers)
         self._add_list_command(subparsers)
         self._add_remove_command(subparsers)
         self._add_auth_command(subparsers)
@@ -101,7 +106,7 @@ Note: Cannot mix URLs and catalog names in the same command
         install_parser.add_argument(
             "targets",
             nargs="+",
-            "GitHub URLs OR catalog app names (comma-separated, cannot mix types)",
+            help="GitHub URLs OR catalog app names (comma-separated, cannot mix types)",
         )
         install_parser.add_argument(
             "--concurrency",
@@ -148,10 +153,43 @@ Examples:
             help="App names to update (comma-separated supported, empty to update all)",
         )
         update_parser.add_argument(
-            "--check-only", action="store_true", help="Only check for updates without installing"
+            "--check-only",
+            action="store_true",
+            help="Only check for updates without installing",
         )
         update_parser.add_argument(
             "--verbose", action="store_true", help="Show detailed logging during update"
+        )
+
+    def _add_self_update_command(self, subparsers) -> None:
+        """Add self-update command parser.
+
+        Args:
+            subparsers: The subparsers object to add the self-update command to
+
+        """
+        self_update_parser = subparsers.add_parser(
+            "self-update",
+            help="Update my-unicorn itself from GitHub",
+            epilog="""
+Examples:
+  %(prog)s --check-only              # Check for stable updates only
+  %(prog)s --branch stable           # Update from stable branch (default)
+  %(prog)s --branch dev              # Update from development branch
+  %(prog)s --branch dev --check-only # Check for dev updates only
+            """,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+        self_update_parser.add_argument(
+            "--check-only",
+            action="store_true",
+            help="Only check for updates without installing",
+        )
+        self_update_parser.add_argument(
+            "--branch",
+            choices=["stable", "dev"],
+            default=None,
+            help="Branch type to update from (default: configured preference or stable)",
         )
 
     def _add_list_command(self, subparsers) -> None:
@@ -188,11 +226,15 @@ Examples:
         """
         auth_parser = subparsers.add_parser("auth", help="Manage GitHub authentication")
         auth_group = auth_parser.add_mutually_exclusive_group(required=True)
-        auth_group.add_argument("--save-token", action="store_true", help="Save GitHub authentication token")
+        auth_group.add_argument(
+            "--save-token", action="store_true", help="Save GitHub authentication token"
+        )
         auth_group.add_argument(
             "--remove-token", action="store_true", help="Remove GitHub authentication token"
         )
-        auth_group.add_argument("--status", action="store_true", help="Show authentication status")
+        auth_group.add_argument(
+            "--status", action="store_true", help="Show authentication status"
+        )
 
     def _add_config_command(self, subparsers) -> None:
         """Add config command parser.
@@ -203,5 +245,14 @@ Examples:
         """
         config_parser = subparsers.add_parser("config", help="Manage configuration")
         config_group = config_parser.add_mutually_exclusive_group(required=True)
-        config_group.add_argument("--show", action="store_true", help="Show current configuration")
-        config_group.add_argument("--reset", action="store_true", help="Reset configuration to defaults")
+        config_group.add_argument(
+            "--show", action="store_true", help="Show current configuration"
+        )
+        config_group.add_argument(
+            "--reset", action="store_true", help="Reset configuration to defaults"
+        )
+        config_group.add_argument(
+            "--set-branch",
+            choices=["stable", "dev"],
+            help="Set preferred self-update branch (stable or dev)",
+        )
