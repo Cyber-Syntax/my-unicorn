@@ -102,7 +102,7 @@ class Installer:
                                 unit="B",
                                 unit_scale=True,
                                 desc=initial_desc,
-                                leave=False,
+                                leave=True,
                                 colour=success_color,
                                 bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
                                 ncols=100,
@@ -174,15 +174,15 @@ class Installer:
 
         # Check if icon already exists
         if icon_path.exists():
-            print(f"✅ Icon already exists: {icon_path}")
+            logger.info(f"✅ Icon already exists: {icon_path}")
             return icon_path
 
         try:
             await self.download_file(self.icon["icon_url"], icon_path, show_progress=False)
-            print(f"✅ Icon downloaded: {icon_path}")
+            logger.info(f"✅ Icon downloaded: {icon_path}")
             return icon_path
         except Exception as e:
-            print(f"❌ Failed to download icon: {e}")
+            logger.error(f"❌ Failed to download icon: {e}")
             return None
 
     def make_executable(self, path: Path) -> None:
