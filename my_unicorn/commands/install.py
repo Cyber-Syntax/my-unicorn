@@ -679,7 +679,23 @@ class InstallHandler(BaseCommandHandler):
 
         # Create desktop entry
         if not no_desktop:
-            self._create_desktop_entry(appimage_path, icon_path, catalog_entry, repo_name)
+            # Get appimage rename from catalog if available, otherwise use repo_name
+            appimage_rename = (
+                catalog_entry.get("appimage", {}).get("rename") if catalog_entry else None
+            )
+            app_name = appimage_rename if appimage_rename else repo_name
+            try:
+                desktop_path = create_desktop_entry_for_app(
+                    app_name=app_name,
+                    appimage_path=appimage_path,
+                    icon_path=icon_path,
+                    comment=f"{repo_name.title()} AppImage Application",
+                    categories=["Utility"],
+                    config_manager=self.config_manager,
+                )
+                logger.debug(f"🖥️  Desktop entry ready: {desktop_path.name}")
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to create desktop entry: {e}")
 
         # Log verification summary
         log_verification_summary(appimage_path, app_config, verification_results)
@@ -801,28 +817,6 @@ class InstallHandler(BaseCommandHandler):
         else:
             # No icon configuration
             return IconConfig(url="", name="", installed=False)
-
-    def _create_desktop_entry(
-        self,
-        appimage_path: Path,
-        icon_path: Path | None,
-        catalog_entry: dict | None,
-        repo_name: str,
-    ) -> None:
-        """Create desktop entry for the installed application."""
-        try:
-            desktop_path = create_desktop_entry_for_app(
-                appimage_path=appimage_path,
-                icon_path=icon_path,
-                comment=f"{repo_name.title()} AppImage Application",
-                categories=["Utility"],
-                config_manager=self.config_manager,
-                catalog_entry=catalog_entry,
-                repo_name=repo_name,
-            )
-            logger.debug(f"🖥️  Desktop entry ready: {desktop_path.name}")
-        except Exception as e:
-            logger.warning(f"⚠️  Failed to create desktop entry: {e}")
 
     def _print_installation_summary(
         self, repos: list[tuple[str, str, str]], results: list
