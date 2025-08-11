@@ -432,10 +432,6 @@ class InstallHandler(BaseCommandHandler):
         if catalog_entry and catalog_entry.get("icon"):
             return await self._setup_catalog_icon(fetcher, catalog_entry, icon_dir)
 
-        # Fallback for specific repos (demo purposes)
-        if "appflowy" in repo.lower():
-            return await self._setup_appflowy_icon(fetcher, repo_name, icon_dir)
-
         return None
 
     async def _setup_catalog_icon(
@@ -465,29 +461,6 @@ class InstallHandler(BaseCommandHandler):
                 return None
 
         return IconAsset(icon_filename=icon_name, icon_url=icon_url)
-
-    async def _setup_appflowy_icon(
-        self,
-        fetcher: GitHubReleaseFetcher,
-        repo_name: str,
-        icon_dir: Path,
-    ) -> IconAsset | None:
-        """Setup AppFlowy-specific icon (fallback demo)."""
-        icon_name = "appflowy.svg"
-
-        if check_icon_exists(icon_name, icon_dir):
-            logger.debug(f"Icon already exists for {repo_name}, skipping download")
-            return None
-
-        try:
-            icon_path = "frontend/resources/flowy_icons/40x/app_logo.svg"
-            default_branch = await fetcher.get_default_branch()
-            icon_url = fetcher.build_icon_url(icon_path, default_branch)
-            logger.debug(f"🎨 Built AppFlowy icon URL: {icon_url}")
-            return IconAsset(icon_filename=icon_name, icon_url=icon_url)
-        except Exception as e:
-            logger.warning(f"⚠️  Failed to build AppFlowy icon URL: {e}")
-            return None
 
     async def _download_and_install(
         self,
@@ -706,7 +679,7 @@ class InstallHandler(BaseCommandHandler):
 
         # Create desktop entry
         if not no_desktop:
-            self._create_desktop_entry(appimage_path, icon_path, repo_name)
+            self._create_desktop_entry(appimage_path, icon_path, catalog_entry, repo_name)
 
         # Log verification summary
         log_verification_summary(appimage_path, app_config, verification_results)
@@ -830,17 +803,22 @@ class InstallHandler(BaseCommandHandler):
             return IconConfig(url="", name="", installed=False)
 
     def _create_desktop_entry(
-        self, appimage_path: Path, icon_path: Path | None, repo_name: str
+        self,
+        appimage_path: Path,
+        icon_path: Path | None,
+        catalog_entry: dict | None,
+        repo_name: str,
     ) -> None:
         """Create desktop entry for the installed application."""
         try:
             desktop_path = create_desktop_entry_for_app(
-                app_name=repo_name,
                 appimage_path=appimage_path,
                 icon_path=icon_path,
                 comment=f"{repo_name.title()} AppImage Application",
                 categories=["Utility"],
                 config_manager=self.config_manager,
+                catalog_entry=catalog_entry,
+                repo_name=repo_name,
             )
             logger.debug(f"🖥️  Desktop entry ready: {desktop_path.name}")
         except Exception as e:

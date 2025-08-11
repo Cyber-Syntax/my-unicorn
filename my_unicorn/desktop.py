@@ -272,7 +272,9 @@ class DesktopEntry:
                 return desktop_file_path
 
             except OSError as e:
-                logger.error(f"Failed to write desktop file {desktop_file_path}: {e}", exc_info=True)
+                logger.error(
+                    f"Failed to write desktop file {desktop_file_path}: {e}", exc_info=True
+                )
                 raise
         else:
             # File exists and is up to date, just return the path
@@ -526,12 +528,14 @@ class DesktopEntry:
 
 
 def create_desktop_entry_for_app(
-    app_name: str,
-    appimage_path: Path,
+    app_name: str | None = None,
+    appimage_path: Path | None = None,
     icon_path: Path | None = None,
     comment: str = "",
     categories: list[str] | None = None,
     config_manager: ConfigManager | None = None,
+    catalog_entry: dict[str, Any] | None = None,
+    repo_name: str | None = None,
     **kwargs: Any,
 ) -> Path:
     """Convenience function to create or update desktop entry for an app.
@@ -541,18 +545,35 @@ def create_desktop_entry_for_app(
     actual changes to important fields like icon paths, exec paths, MIME types, etc.
 
     Args:
-        app_name: Name of the application (will be normalized to lowercase)
+        app_name: Name of the application (will be normalized to lowercase).
+                 If None, will be determined from catalog_entry or repo_name.
         appimage_path: Path to the AppImage file (should use clean name without version)
         icon_path: Optional path to icon file
         comment: Application description
         categories: List of application categories
         config_manager: Configuration manager for directory paths
+        catalog_entry: Optional catalog entry dict containing appimage rename info
+        repo_name: Repository name to use as fallback for app_name
         **kwargs: Additional desktop entry options
 
     Returns:
         Path to desktop file (existing, newly created, or updated)
 
     """
+    # Determine the best app name to use
+    if app_name is None:
+        if catalog_entry and catalog_entry.get("appimage", {}).get("rename"):
+            app_name = str(catalog_entry["appimage"]["rename"])
+        elif repo_name:
+            app_name = repo_name
+        else:
+            raise ValueError(
+                "app_name, catalog_entry with rename, or repo_name must be provided"
+            )
+
+    if appimage_path is None:
+        raise ValueError("appimage_path must be provided")
+
     desktop_entry = DesktopEntry(app_name, appimage_path, icon_path, config_manager)
     return desktop_entry.create_desktop_file(comment=comment, categories=categories, **kwargs)
 
