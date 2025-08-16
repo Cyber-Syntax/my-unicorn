@@ -44,11 +44,11 @@ class CLIParser:
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-  # Install from GitHub URL
-  %(prog)s install https://github.com/AppFlowy-IO/AppFlowy
-
   # Install from catalog (comma-separated)
   %(prog)s install appflowy,joplin,obsidian
+
+  # Install from GitHub repository URL
+  %(prog)s install https://github.com/pbek/QOwnNotes
 
   # Update apps
   %(prog)s update appflowy,joplin
@@ -59,7 +59,7 @@ Examples:
   %(prog)s self-update
 
   # Other commands
-  %(prog)s list
+  %(prog)s list --available
   %(prog)s auth --save-token
             """,
         )
@@ -90,23 +90,27 @@ Examples:
         """
         install_parser = subparsers.add_parser(
             "install",
-            help="Install AppImages from URLs or catalog",
+            help="Install AppImages from catalog or URLs",
             epilog="""
 Examples:
-  # Install from GitHub URL
-  %(prog)s install https://github.com/AppFlowy-IO/AppFlowy
+  # Install single app from catalog
+  %(prog)s install obsidian
 
-  # Install from catalog (comma-separated)
+  # Install multiple apps (comma-separated)
   %(prog)s install appflowy,joplin,obsidian
 
-Note: Cannot mix URLs and catalog names in the same command
+  # Install from GitHub repository URL
+  %(prog)s install https://github.com/pbek/QOwnNotes
+
+  # List available apps
+  %(prog)s list --available
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
         install_parser.add_argument(
             "targets",
             nargs="+",
-            help="GitHub URLs OR catalog app names (comma-separated, cannot mix types)",
+            help="Catalog app names or GitHub repository URLs (comma-separated)",
         )
         install_parser.add_argument(
             "--concurrency",

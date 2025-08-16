@@ -470,3 +470,69 @@ class GitHubReleaseFetcher:
         else:
             # Default to .png if no extension detected
             return f"{app_name}.png"
+
+
+class GitHubClient:
+    """Simplified GitHub API client for catalog-based installations."""
+
+    def __init__(self, session: aiohttp.ClientSession) -> None:
+        """Initialize GitHub client.
+
+        Args:
+            session: aiohttp session for making requests
+
+        """
+        self.session = session
+
+    async def get_latest_release(self, owner: str, repo: str) -> dict[str, Any] | None:
+        """Get the latest release for a repository.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+
+        Returns:
+            Release data dictionary or None if not found
+
+        """
+        try:
+            fetcher = GitHubReleaseFetcher(owner, repo, self.session)
+            release_details = await fetcher.fetch_latest_release()
+
+            # Convert to dictionary format expected by catalog strategy
+            return {
+                "tag_name": release_details["version"],
+                "prerelease": release_details["prerelease"],
+                "assets": release_details["assets"],
+                "html_url": f"https://github.com/{owner}/{repo}/releases/tag/v{release_details['version']}",
+            }
+        except Exception:
+            return None
+
+    async def get_release_by_tag(
+        self, owner: str, repo: str, tag: str
+    ) -> dict[str, Any] | None:
+        """Get a specific release by tag.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            tag: Release tag
+
+        Returns:
+            Release data dictionary or None if not found
+
+        """
+        try:
+            fetcher = GitHubReleaseFetcher(owner, repo, self.session)
+            release_details = await fetcher.fetch_specific_release(tag)
+
+            # Convert to dictionary format expected by catalog strategy
+            return {
+                "tag_name": release_details["version"],
+                "prerelease": release_details["prerelease"],
+                "assets": release_details["assets"],
+                "html_url": f"https://github.com/{owner}/{repo}/releases/tag/{tag}",
+            }
+        except Exception:
+            return None

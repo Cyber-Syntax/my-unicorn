@@ -5,8 +5,7 @@
         "rename": "qownnotes",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": [
-            "x86_64.AppImage",
-            "x86_64-Qt6.AppImage"
+            "x86_64.AppImage"
         ]
     },
     "github": {

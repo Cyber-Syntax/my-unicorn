@@ -6,8 +6,6 @@ and managing the update process for installed AppImages.
 
 import asyncio
 from datetime import datetime
-from pathlib import Path
-from typing import Any
 
 import aiohttp
 
@@ -20,9 +18,11 @@ except ImportError:
 from .auth import GitHubAuthManager
 from .config import ConfigManager
 from .github_client import GitHubReleaseFetcher
-from .install import Installer
 from .logger import get_logger
-from .verify import Verifier, log_verification_summary
+from .services.backup import BackupService
+from .services.download import DownloadService, IconAsset
+from .services.storage import StorageService
+from .verify import Verifier
 
 logger = get_logger(__name__)
 
@@ -76,6 +76,13 @@ class UpdateManager:
         self.config_manager = config_manager or ConfigManager()
         self.global_config = self.config_manager.load_global_config()
         self.auth_manager = GitHubAuthManager()
+
+        # Initialize storage service with install directory
+        storage_dir = self.global_config["directory"]["storage"]
+        self.storage_service = StorageService(storage_dir)
+
+        # Initialize backup service
+        self.backup_service = BackupService(self.config_manager, self.global_config)
 
     def _compare_versions(self, current: str, latest: str) -> bool:
         """Compare version strings to determine if update is available.
@@ -324,33 +331,15 @@ class UpdateManager:
             # Create backup of current version
             current_appimage_path = storage_dir / app_config["appimage"]["name"]
             if current_appimage_path.exists():
-                # Create backup directly without using Installer object
-                # since Installer uses the new asset filename, not the existing one
-                backup_dir.mkdir(parents=True, exist_ok=True)
-
-                # Create backup filename
-                stem = current_appimage_path.stem
-                suffix = current_appimage_path.suffix
-                version_str = (
-                    f"-{update_info.current_version}" if update_info.current_version else ""
+                backup_path = self.backup_service.create_backup(
+                    current_appimage_path, backup_dir, update_info.current_version
                 )
-                backup_name = f"{stem}{version_str}.backup{suffix}"
-                backup_path = backup_dir / backup_name
-
-                # Copy file to backup location
-                import shutil
-
-                shutil.copy2(current_appimage_path, backup_path)
-                logger.debug(f"💾 Backup created: {backup_path}")
+                if backup_path:
+                    logger.debug(f"💾 Backup created: {backup_path}")
 
             # Download and install new version
             icon_asset = None
             if app_config.get("icon") and app_config["icon"].get("url"):
-                try:
-                    from .install import IconAsset
-                except ImportError:
-                    from install import IconAsset
-
                 icon_url = app_config["icon"]["url"]
 
                 # Check if icon URL is a path template (doesn't start with http)
@@ -377,24 +366,34 @@ class UpdateManager:
                         icon_url=icon_url,
                     )
 
-            installer = Installer(
-                asset=appimage_asset,
-                session=session,
-                icon=icon_asset,
-                download_dir=download_dir,
-                install_dir=storage_dir,
-            )
+            # Initialize services for direct usage
+            download_service = DownloadService(session)
 
-            # Get clean name for renaming
-            rename_to = app_config["appimage"].get("rename", app_name)
+            # Get clean name for renaming from catalog config if available
+            catalog_entry = self.config_manager.load_catalog_entry(app_config["repo"].lower())
+            rename_to = app_name  # fallback
+            if catalog_entry and catalog_entry.get("appimage", {}).get("rename"):
+                rename_to = catalog_entry["appimage"]["rename"]
+            else:
+                # Fallback to app config for backward compatibility
+                rename_to = app_config["appimage"].get("rename", app_name)
+
+            # Setup download path
+            filename = download_service.get_filename_from_url(
+                appimage_asset["browser_download_url"]
+            )
+            download_path = download_dir / filename
 
             # Download AppImage first (without renaming)
-            appimage_path = await installer.download_appimage(show_progress=True)
+            appimage_path = await download_service.download_appimage(
+                appimage_asset, download_path, show_progress=True
+            )
 
             # Download icon if requested
             icon_path = None
             if bool(icon_asset):
-                icon_path = await installer.download_icon(icon_dir=icon_dir)
+                icon_full_path = icon_dir / icon_asset["icon_filename"]
+                icon_path = await download_service.download_icon(icon_asset, icon_full_path)
 
             # Perform verification if configured (BEFORE renaming)
             verification_config = app_config.get("verification", {})
@@ -470,13 +469,13 @@ class UpdateManager:
                 logger.debug(f"⏭️  Verification skipped for {app_name} (configured)")
 
             # Now make executable and move to install directory
-            installer.make_executable(appimage_path)
-            appimage_path = installer.move_to_install_dir(appimage_path)
+            self.storage_service.make_executable(appimage_path)
+            appimage_path = self.storage_service.move_to_install_dir(appimage_path)
 
-            # Finally rename to clean name
+            # Finally rename to clean name using catalog configuration
             if rename_to:
-                clean_name = installer.get_clean_appimage_name(rename_to)
-                appimage_path = installer.rename_appimage(clean_name)
+                clean_name = self.storage_service.get_clean_appimage_name(rename_to)
+                appimage_path = self.storage_service.rename_appimage(appimage_path, clean_name)
 
             # Store the computed hash from verification or GitHub digest
             stored_hash = ""
@@ -508,15 +507,17 @@ class UpdateManager:
             # Track if icon was updated for desktop entry regeneration
             icon_updated = False
             if icon_path:
-                previous_icon_status = app_config["icon"]["installed"]
-                app_config["icon"]["installed"] = True
+                previous_icon_status = app_config.get("icon", {}).get("path") is not None
+                if "icon" not in app_config:
+                    app_config["icon"] = {}
+                app_config["icon"]["path"] = str(icon_path)
                 icon_updated = not previous_icon_status  # Icon was newly installed
 
             self.config_manager.save_app_config(app_name, app_config)
 
             # Clean up old backups after successful update
             try:
-                self.cleanup_old_backups(app_name)
+                self.backup_service.cleanup_old_backups(app_name)
             except Exception as e:
                 logger.warning(f"⚠️  Failed to cleanup old backups for {app_name}: {e}")
 
@@ -525,7 +526,7 @@ class UpdateManager:
                 try:
                     from .desktop import create_desktop_entry_for_app
                 except ImportError:
-                    from desktop import create_desktop_entry_for_app
+                    from .desktop import create_desktop_entry_for_app
 
                 desktop_path = create_desktop_entry_for_app(
                     app_name=app_name,
@@ -539,9 +540,6 @@ class UpdateManager:
             except Exception as e:
                 logger.warning(f"⚠️  Failed to update desktop entry: {e}")
 
-            # Log comprehensive verification summary for debugging
-            if verification_results:
-                log_verification_summary(appimage_path, app_config, verification_results)
 
             logger.debug(f"✅ Successfully updated {app_name} to {update_info.latest_version}")
             if stored_hash:
@@ -586,102 +584,3 @@ class UpdateManager:
                     logger.error(f"Update task failed: {result}")
 
         return results
-
-    def cleanup_old_backups(self, app_name: str | None = None) -> None:
-        """Clean up old backup files.
-
-        Args:
-            app_name: Specific app to clean up, or None for all apps
-
-        """
-        backup_dir = self.global_config["directory"]["backup"]
-        max_backups = self.global_config["max_backup"]
-
-        if not backup_dir.exists():
-            return
-
-        if app_name:
-            app_configs = [self.config_manager.load_app_config(app_name)]
-        else:
-            installed_apps = self.config_manager.list_installed_apps()
-            app_configs = [self.config_manager.load_app_config(app) for app in installed_apps]
-
-        for app_config in app_configs:
-            if not app_config:
-                continue
-
-            # Use the actual AppImage name (without extension) instead of repo name
-            appimage_name = app_config["appimage"]["name"]
-            # Remove .AppImage extension to get the base name for backup matching
-            if appimage_name.lower().endswith(".appimage"):
-                base_name = appimage_name[:-9]  # Remove .AppImage
-            else:
-                base_name = Path(appimage_name).stem
-
-            app_backups = []
-
-            # Find all backup files for this app using the actual AppImage base name
-            for backup_file in backup_dir.glob(f"{base_name}*.backup.AppImage"):
-                app_backups.append(backup_file)
-
-            # Sort by modification time (newest first)
-            app_backups.sort(key=lambda x: x.stat().st_mtime, reverse=True)
-
-            # Handle max_backup=0 case: delete all backups
-            if max_backups == 0:
-                backups_to_remove = app_backups
-            else:
-                # Keep only the most recent max_backups files
-                backups_to_remove = app_backups[max_backups:]
-
-            # Remove excess backups
-            for backup_file in backups_to_remove:
-                try:
-                    backup_file.unlink()
-                    logger.info(f"Removed old backup: {backup_file}")
-                except Exception as e:
-                    logger.error(f"Failed to remove backup {backup_file}: {e}")
-
-    def get_backup_info(self, app_name: str) -> list[dict[str, Any]]:
-        """Get information about available backups for an app.
-
-        Args:
-            app_name: Name of the app
-
-        Returns:
-            List of backup information dictionaries
-
-        """
-        backup_dir = self.global_config["directory"]["backup"]
-        backups = []
-
-        if not backup_dir.exists():
-            return backups
-
-        # Load app config to get the actual AppImage name
-        app_config = self.config_manager.load_app_config(app_name)
-        if not app_config:
-            return backups
-
-        # Use the actual AppImage name (without extension) instead of repo name
-        appimage_name = app_config["appimage"]["name"]
-        # Remove .AppImage extension to get the base name for backup matching
-        if appimage_name.lower().endswith(".appimage"):
-            base_name = appimage_name[:-9]  # Remove .AppImage
-        else:
-            base_name = Path(appimage_name).stem
-
-        for backup_file in backup_dir.glob(f"{base_name}*.backup.AppImage"):
-            stat = backup_file.stat()
-            backups.append(
-                {
-                    "path": backup_file,
-                    "size": stat.st_size,
-                    "created": datetime.fromtimestamp(stat.st_mtime),
-                    "name": backup_file.name,
-                }
-            )
-
-        # Sort by creation time (newest first)
-        backups.sort(key=lambda x: x["created"], reverse=True)
-        return backups

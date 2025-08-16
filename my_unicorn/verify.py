@@ -382,7 +382,7 @@ class Verifier:
             logger.error(f"   Actual: {format_bytes(actual_size)} ({actual_size:,} bytes)")
             logger.error(f"   Difference: {actual_size - expected_size:+,} bytes")
             raise ValueError(
-                f"File size mismatch!\n"
+                "File size mismatch!\n"
                 f"Expected: {expected_size} bytes\n"
                 f"Actual:   {actual_size} bytes"
             )
@@ -448,62 +448,3 @@ class VerificationConfig:
         logger.debug(f"   Source data: {data}")
 
         return config
-
-
-def log_verification_summary(
-    file_path: Path,
-    app_config: dict[str, Any] | None = None,
-    verification_performed: dict[str, Any] | None = None,
-) -> None:
-    """Log a comprehensive verification summary for debugging.
-
-    Args:
-        file_path: Path to the verified file
-        app_config: Application configuration (for stored hash info)
-        verification_performed: Dictionary of verification results
-
-    """
-    logger.debug(f"📋 Verification Summary for {file_path.name}")
-    logger.debug("=" * 60)
-
-    # File information
-    if file_path.exists():
-        file_size = file_path.stat().st_size
-        logger.debug(f"📁 File: {file_path}")
-        logger.debug(f"💾 Size: {format_bytes(file_size)} ({file_size:,} bytes)")
-    else:
-        logger.warning(f"⚠️  File not found: {file_path}")
-        return
-
-    # App config information
-    if app_config:
-        appimage_info = app_config.get("appimage", {})
-        verification_info = app_config.get("verification", {})
-
-        logger.debug("📦 App Info:")
-        logger.debug(f"   Name: {appimage_info.get('name', 'Unknown')}")
-        logger.debug(f"   Version: {appimage_info.get('version', 'Unknown')}")
-        logger.debug(f"   Installed: {appimage_info.get('installed_date', 'Unknown')}")
-
-        stored_digest = appimage_info.get("digest", "")
-        if stored_digest:
-            logger.debug(f"🔐 Stored Digest: {stored_digest}")
-
-        logger.debug("⚙️  Verification Config:")
-        logger.debug(f"   Digest enabled: {verification_info.get('digest', False)}")
-        logger.debug(f"   Skip verification: {verification_info.get('skip', False)}")
-        logger.debug(f"   Checksum file: {verification_info.get('checksum_file', 'None')}")
-        logger.debug(f"   Hash type: {verification_info.get('checksum_hash_type', 'sha256')}")
-
-    # Verification results
-    if verification_performed:
-        logger.debug("✅ Verification Results:")
-        for check_type, result in verification_performed.items():
-            status = "✅ PASSED" if result.get("passed", False) else "❌ FAILED"
-            logger.debug(f"   {check_type}: {status}")
-            if "hash" in result:
-                logger.debug(f"      Digest/Hash: {result['hash']}")
-            if "details" in result:
-                logger.debug(f"      Details: {result['details']}")
-
-    logger.debug("=" * 60)

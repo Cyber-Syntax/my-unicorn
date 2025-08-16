@@ -102,12 +102,20 @@ class AppConfig(TypedDict):
     icon: IconConfig
 
 
+class AppImageConfig(TypedDict):
+    """AppImage configuration within catalog entry."""
+
+    rename: str
+    name_template: str
+    characteristic_suffix: list[str]
+
+
 class CatalogEntry(TypedDict):
     """Catalog entry for an application."""
 
     owner: str
     repo: str
-    appimage: dict[str, str | list[str]]
+    appimage: AppImageConfig
     verification: VerificationConfig
     icon: IconConfig | None
 
