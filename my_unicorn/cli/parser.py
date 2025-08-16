@@ -50,17 +50,23 @@ Examples:
   # Install from GitHub repository URL
   %(prog)s install https://github.com/pbek/QOwnNotes
 
-  # Update apps
+  # Update appimages
   %(prog)s update appflowy,joplin
+  %(prog)s update appflowy joplin
   %(prog)s update
 
-  # Self-update
+  # my-unicorn update and check
   %(prog)s self-update --check-only
   %(prog)s self-update
 
   # Other commands
-  %(prog)s list --available
+  %(prog)s list                # Show installed appimages
+  %(prog)s list --available    # Available appimages via catalog installation
+
+  # Auth Token Management
   %(prog)s auth --save-token
+  %(prog)s auth --remove-token
+  %(prog)s auth --status
             """,
         )
 
@@ -94,16 +100,13 @@ Examples:
             epilog="""
 Examples:
   # Install single app from catalog
-  %(prog)s install obsidian
+  %(prog)s obsidian
 
   # Install multiple apps (comma-separated)
-  %(prog)s install appflowy,joplin,obsidian
+  %(prog)s appflowy,joplin,obsidian
 
   # Install from GitHub repository URL
-  %(prog)s install https://github.com/pbek/QOwnNotes
-
-  # List available apps
-  %(prog)s list --available
+  %(prog)s https://github.com/pbek/QOwnNotes
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
@@ -145,9 +148,9 @@ Examples:
             help="Update installed AppImages",
             epilog="""
 Examples:
-  %(prog)s update                    # Update all installed apps
-  %(prog)s update appflowy joplin    # Update specific apps
-  %(prog)s update appflowy,joplin    # Comma-separated apps
+  %(prog)s                    # Update all installed apps
+  %(prog)s appflowy joplin    # Update specific apps (without comma)
+  %(prog)s appflowy,joplin    # Update specific apps (with comma)
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
@@ -207,8 +210,17 @@ Examples:
             subparsers: The subparsers object to add the remove command to
 
         """
-        remove_parser = subparsers.add_parser("remove", help="Remove installed AppImages")
-        remove_parser.add_argument("apps", nargs="+", help="Application names to remove")
+        remove_parser = subparsers.add_parser(
+            "remove",
+            help="Remove installed AppImages",
+            epilog="""
+    Examples:
+        %(prog)s appflowy
+        %(prog)s appflowy --keep-config
+    """,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+        (remove_parser.add_argument("apps", nargs="+", help="Application names to remove"),)
         remove_parser.add_argument(
             "--keep-config", action="store_true", help="Keep configuration files"
         )
