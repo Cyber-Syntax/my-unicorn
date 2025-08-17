@@ -529,12 +529,26 @@ class GitHubClient:
             fetcher = GitHubReleaseFetcher(owner, repo, self.session)
             release_details = await fetcher.fetch_latest_release()
 
+            # For URL construction, we need the original tag name from the raw API response
+            try:
+                async with self.session.get(
+                    f"https://api.github.com/repos/{owner}/{repo}/releases/latest",
+                    headers=GitHubAuthManager.apply_auth({}),
+                ) as response:
+                    raw_data = await response.json()
+                    original_tag_name = raw_data.get(
+                        "tag_name", f"v{release_details['version']}"
+                    )
+            except Exception:
+                original_tag_name = f"v{release_details['version']}"
+
             # Convert to dictionary format expected by catalog strategy
             return {
                 "tag_name": release_details["version"],
+                "original_tag_name": original_tag_name,
                 "prerelease": release_details["prerelease"],
                 "assets": release_details["assets"],
-                "html_url": f"https://github.com/{owner}/{repo}/releases/tag/v{release_details['version']}",
+                "html_url": f"https://github.com/{owner}/{repo}/releases/tag/{original_tag_name}",
             }
         except Exception:
             return None
@@ -557,9 +571,9 @@ class GitHubClient:
             fetcher = GitHubReleaseFetcher(owner, repo, self.session)
             release_details = await fetcher.fetch_specific_release(tag)
 
-            # Convert to dictionary format expected by catalog strategy
             return {
                 "tag_name": release_details["version"],
+                "original_tag_name": tag,
                 "prerelease": release_details["prerelease"],
                 "assets": release_details["assets"],
                 "html_url": f"https://github.com/{owner}/{repo}/releases/tag/{tag}",

@@ -225,6 +225,40 @@ class DownloadService:
         """
         return Path(urlparse(url).path).name
 
+    async def download_checksum_file(self, checksum_url: str) -> str:
+        """Download checksum file content.
+
+        Args:
+            checksum_url: URL to the checksum file
+
+        Returns:
+            Content of the checksum file
+
+        Raises:
+            aiohttp.ClientError: If download fails
+
+        """
+        headers = GitHubAuthManager.apply_auth({})
+
+        try:
+            async with self.session.get(checksum_url, headers=headers) as response:
+                response.raise_for_status()
+                content = await response.text()
+
+                logger.debug("📄 Checksum file downloaded successfully")
+                logger.debug(f"   Status: {response.status}")
+                logger.debug(f"   Content length: {len(content)} characters")
+                logger.debug(
+                    f"   Content preview: {content[:200]}{'...' if len(content) > 200 else ''}"
+                )
+
+                return content
+
+        except Exception as e:
+            logger.error(f"❌ Failed to download checksum file: {e}")
+            logger.error(f"   URL: {checksum_url}")
+            raise
+
 
 class DownloadError(Exception):
     """Raised when download fails."""

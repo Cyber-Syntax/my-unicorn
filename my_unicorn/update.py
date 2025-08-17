@@ -38,6 +38,7 @@ class UpdateInfo:
         has_update: bool,
         release_url: str = "",
         prerelease: bool = False,
+        original_tag_name: str = "",
     ):
         """Initialize update information.
 
@@ -48,6 +49,7 @@ class UpdateInfo:
             has_update: Whether an update is available
             release_url: URL to the release
             prerelease: Whether the latest version is a prerelease
+            original_tag_name: Original tag name from GitHub (preserves 'v' prefix)
 
         """
         self.app_name = app_name
@@ -56,6 +58,7 @@ class UpdateInfo:
         self.has_update = has_update
         self.release_url = release_url
         self.prerelease = prerelease
+        self.original_tag_name = original_tag_name or f"v{latest_version}"
 
     def __repr__(self) -> str:
         """String representation of update info."""
@@ -226,6 +229,7 @@ class UpdateManager:
                 has_update=has_update,
                 release_url=f"https://github.com/{owner}/{repo}/releases/tag/{latest_version}",
                 prerelease=release_data.get("prerelease", False),
+                original_tag_name=release_data.get("original_tag_name", f"v{latest_version}"),
             )
 
         except Exception as e:
@@ -456,13 +460,13 @@ class UpdateManager:
                 elif verification_config.get("checksum_file"):
                     checksum_file = verification_config["checksum_file"]
                     hash_type = verification_config.get("checksum_hash_type", "sha256")
-                    checksum_url = f"https://github.com/{owner}/{repo}/releases/download/{update_info.latest_version}/{checksum_file}"
+                    checksum_url = f"https://github.com/{owner}/{repo}/releases/download/{update_info.original_tag_name}/{checksum_file}"
 
                     try:
                         logger.debug(f"🔍 Verifying using checksum file: {checksum_file}")
                         # Use original filename for checksum verification
                         await verifier.verify_from_checksum_file(
-                            checksum_url, hash_type, session, appimage_path.name
+                            checksum_url, hash_type, download_service, appimage_path.name
                         )
                         computed_hash = verifier.compute_hash(hash_type)
                         verification_results["checksum_file"] = {

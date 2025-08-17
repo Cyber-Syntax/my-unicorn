@@ -6,11 +6,11 @@ checksum file parsing, and hash computation for downloaded AppImages.
 
 import hashlib
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
-import aiohttp
+if TYPE_CHECKING:
+    from .services.download import DownloadService
 
-from .auth import GitHubAuthManager
 from .logger import get_logger
 from .utils import format_bytes
 
@@ -175,7 +175,7 @@ class Verifier:
         self,
         checksum_url: str,
         hash_type: HashType,
-        session: aiohttp.ClientSession,
+        download_service: "DownloadService",
         filename: str | None = None,
     ) -> None:
         """Verify file using remote checksum file.
@@ -183,7 +183,7 @@ class Verifier:
         Args:
             checksum_url: URL to the checksum file
             hash_type: Type of hash used in checksum file
-            session: aiohttp session for downloading
+            download_service: DownloadService instance for downloading checksum file
             filename: Specific filename to look for (defaults to file_path.name)
 
         Raises:
@@ -199,7 +199,7 @@ class Verifier:
 
         # Download checksum file
         logger.debug("📥 Downloading checksum file...")
-        checksum_content = await self._download_checksum_file(checksum_url, session)
+        checksum_content = await download_service.download_checksum_file(checksum_url)
         logger.debug(f"   Downloaded {len(checksum_content)} characters")
 
         # Parse checksum file to find our file's hash
@@ -216,43 +216,6 @@ class Verifier:
 
         # Verify the hash
         self.verify_hash(expected_hash, hash_type)
-
-    async def _download_checksum_file(
-        self, checksum_url: str, session: aiohttp.ClientSession
-    ) -> str:
-        """Download checksum file content.
-
-        Args:
-            checksum_url: URL to the checksum file
-            session: aiohttp session for downloading
-
-        Returns:
-            Content of the checksum file
-
-        Raises:
-            aiohttp.ClientError: If download fails
-
-        """
-        headers = GitHubAuthManager.apply_auth({})
-
-        try:
-            async with session.get(checksum_url, headers=headers) as response:
-                response.raise_for_status()
-                content = await response.text()
-
-                logger.debug("📄 Checksum file downloaded successfully")
-                logger.debug(f"   Status: {response.status}")
-                logger.debug(f"   Content length: {len(content)} characters")
-                logger.debug(
-                    f"   Content preview: {content[:200]}{'...' if len(content) > 200 else ''}"
-                )
-
-                return content
-
-        except Exception as e:
-            logger.error(f"❌ Failed to download checksum file: {e}")
-            logger.error(f"   URL: {checksum_url}")
-            raise
 
     def _parse_checksum_file(
         self, content: str, filename: str, hash_type: HashType

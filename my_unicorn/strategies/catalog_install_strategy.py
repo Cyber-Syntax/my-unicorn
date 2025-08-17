@@ -371,16 +371,18 @@ class CatalogInstallStrategy(InstallStrategy):
             checksum_file = verification_config["checksum_file"]
             hash_type = verification_config.get("checksum_hash_type", "sha256")
 
-            # Build checksum URL
-            tag_name = release_data.get("tag_name", "")
+            # Build checksum URL using original tag name (preserves 'v' prefix)
+            original_tag_name = release_data.get(
+                "original_tag_name", release_data.get("tag_name", "")
+            )
             owner = app_config.get("owner", "")
             repo = app_config.get("repo", "")
-            checksum_url = f"https://github.com/{owner}/{repo}/releases/download/{tag_name}/{checksum_file}"
+            checksum_url = f"https://github.com/{owner}/{repo}/releases/download/{original_tag_name}/{checksum_file}"
 
             try:
                 logger.debug(f"🔍 Attempting checksum file verification: {checksum_file}")
                 await verifier.verify_from_checksum_file(
-                    checksum_url, hash_type, self.session, path.name
+                    checksum_url, hash_type, self.download_service, path.name
                 )
                 logger.debug("✅ Checksum file verification passed")
                 verification_passed = True
