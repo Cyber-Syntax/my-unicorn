@@ -12,6 +12,8 @@ Türkçe Açıklama: [README.tr.md](README.tr.md)
 > [!NOTE]
 > I always frustrated with the manual AppImage update process and I created this project to automate the process.
 >
+> This project introduces a Python-based CLI tool that treats AppImages like packages: installable, updatable,
+> and manageable via a simple interface.
 > Detailed information: [wiki.md](docs/wiki.md)
 
 - **Supported Applications:**
@@ -20,7 +22,7 @@ Türkçe Açıklama: [README.tr.md](README.tr.md)
         - FreeTube
             - Related issue: https://github.com/FreeTubeApp/FreeTube/issues/4720)
         - Obsidian
-    - More can be found in the [apps](my_unicorn/apps/) folder.
+    - More can be found in the [catalog](my_unicorn/catalog/) folder.
 - **Supported hash types:**
     - sha256, sha512
 
@@ -35,7 +37,7 @@ Türkçe Açıklama: [README.tr.md](README.tr.md)
     cd ~/Downloads &
     git clone https://github.com/Cyber-Syntax/my-unicorn.git
     ```
-    
+
 2. Build as a package:
 
     ```bash
@@ -43,52 +45,11 @@ Türkçe Açıklama: [README.tr.md](README.tr.md)
     sh my-unicorn-installer.sh install
     ```
 
-## Remove the package:
-
-> [!TIP]
-> This would remove the package if you installed globally.
+3. Start using my-unicorn:
 
     ```bash
-    pip uninstall my-unicorn
+    my-unicorn --help # to see the command options
     ```
-
-# How to use the script?
-
-## Using as a package:
-
-```bash
-my-unicorn --help # to see the command options
-```
-
-```bash
-usage: my-unicorn [-h] {download,install,update,token,migrate} ...
-
-my-unicorn: AppImage management tool
-
-positional arguments:
-  {download,install,update,token,migrate}
-                        Available commands
-    download            Download AppImage from URL
-    install             Install app from catalog
-    update              Update AppImages
-    token               GitHub token management
-    migrate             Migrate configuration files
-
-options:
-  -h, --help            show this help message and exit
-
-Examples:
-my-unicorn # Interactive mode (default)
-my-unicorn download https://github.com/johannesjo/super-productivity # Download AppImage from URL
-my-unicorn install joplin # Install AppImage from catalog
-my-unicorn update --all # Update all AppImages
-my-unicorn update --select joplin,super-productivity # Select AppImages to update
-my-unicorn token --save # Save GitHub token to keyring
-my-unicorn token --remove # Remove GitHub token
-my-unicorn token --check # Check GitHub API rate limits
-my-unicorn migrate --clean # Migrate configuration files
-my-unicorn migrate --force # Migrate configuration without confirmation
-```
 
 ## For using uncompatible apps (installing with URL):
 
@@ -100,7 +61,7 @@ my-unicorn migrate --force # Migrate configuration without confirmation
     - **Hash type:** Specify the hash type (e.g., sha512 for super-productivity).
     - **Hash verification issues:** If the hash verification fails, you can manually add the hash to the JSON file:
         - Look for the latest hash in the GitHub release page (e.g., [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
-        - Check the [apps](my_unicorn/apps/) folder for examples.
+        - Check the [catalog](my_unicorn/catalog/) folder for examples.
 
 # **🙏 Support This Project**
 

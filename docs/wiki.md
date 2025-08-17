@@ -1,19 +1,15 @@
 # My Unicorn first stable release
 
-> [!NOTE]
-> This project introduces a Python-based CLI tool that treats AppImages like packages: installable, updatable,
-> and manageable via a simple interface backed by local JSON metadata and GitHub releases.
-
-# Features
+## Features
 
 - Install via URL: Download and install AppImages directly from their GitHub repository URLs.
 - Install from Catalog: Install AppImages from a catalog of compatible applications.
-- Update Management: Automatically check for updates and apply them to installed AppImages.
+- Update Management: Backup/Remove existing AppImages and install the latest version. (Backup default enabled)
 - Token Management: Securely manage GitHub API tokens. Save them in the GNOME keyring for secure storage.
 - Backup Management: Create and manage backups of AppImages before updates.
 - Desktop Entry Creation: Automatically create desktop entry files for AppImages to integrate them into the system menu.
 - App Configuration: Use JSON configuration files to save AppImage version, appimage name for update checks.
-- Global Configuration: Manage global settings such as maximum concurrent updates and backup limits.
+- Global Configuration: Manage global settings such as maximum concurrent updates, backup limits and more.
 
 ## 🛠️ Usage Examples
 
@@ -21,55 +17,55 @@
 
 ```bash
 # Install via URL
-python main.py install https://github.com/johannesjo/super-productivity
+python run.py install https://github.com/johannesjo/super-productivity
 
 # Install from catalog
-python main.py install appflowy,qownotes
+python run.py install appflowy,qownotes
 
 # Install with options
-python main.py install appflowy --no-icon --no-verify
+python run.py install appflowy --no-icon --no-verify
 ```
 
 ### Updates
 
 ```bash
 # Check for updates
-python main.py update --check-only
+python run.py update --check-only
 
 # Update specific apps
-python main.py update appflowy,joplin
+python run.py update appflowy,joplin
 
 # Update all installed apps
-python main.py update
+python run.py update
 ```
 
 ### Management
 
 ```bash
 # List installed apps
-python main.py list
+python run.py list
 
 # List available catalog apps
-python main.py list --available
+python run.py list --available
 
 # Remove apps
-python main.py remove appflowy --keep-config
+python run.py remove appflowy --keep-config
 
 # Show configuration
-python main.py config --show
+python run.py config --show
 ```
 
 ### Authentication
 
 ```bash
 # Save GitHub token
-python main.py auth --save-token
+python run.py auth --save-token
 
 # Check auth status
-python main.py auth --status
+python run.py auth --status
 
 # Remove token
-python main.py auth --remove-token
+python run.py auth --remove-token
 ```
 
 ## 📋 Dependencies
@@ -288,3 +284,12 @@ tmp = "~/.config/my-unicorn/tmp"
     }
 }
 ```
+
+## Remove the package:
+
+> [!TIP]
+> This would remove the package if you installed globally.
+
+    ```bash
+    pip uninstall my-unicorn
+    ```
