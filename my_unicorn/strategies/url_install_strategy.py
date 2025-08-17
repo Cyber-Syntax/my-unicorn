@@ -174,7 +174,30 @@ class URLInstallStrategy(InstallStrategy):
                     appimage_asset,
                     icon_path,
                 )
+                
+                # Get icon directory from global config
+                from ..config import ConfigManager
+                config_manager = ConfigManager()
 
+                # Create desktop entry to reflect any changes (icon, paths, etc.)
+                try:
+                    try:
+                        from ..desktop import create_desktop_entry_for_app
+                    except ImportError:
+                        from ..desktop import create_desktop_entry_for_app
+        
+                    desktop_path = create_desktop_entry_for_app(
+                        app_name=repo_name.lower(),
+                        appimage_path=final_path,
+                        icon_path=icon_path,
+                        comment=f"{repo_name.title()} AppImage Application",
+                        categories=["Utility"],
+                        config_manager=config_manager,
+                    )
+                    # Desktop entry creation/update logging is handled by the desktop module
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to update desktop entry: {e}")
+        
                 logger.info(f"✅ Successfully installed: {final_path}")
 
                 return {

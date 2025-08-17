@@ -169,7 +169,7 @@ class CatalogInstallStrategy(InstallStrategy):
                 download_path = download_dir / filename
 
                 # Download AppImage
-                await self.download_service.download_appimage(
+                appimage_path = await self.download_service.download_appimage(
                     appimage_asset,
                     download_path,
                     show_progress=kwargs.get("show_progress", True),
@@ -208,6 +208,25 @@ class CatalogInstallStrategy(InstallStrategy):
                 self._create_app_config(
                     app_name, final_path, app_config, release_data, icon_dir, appimage_asset
                 )
+                
+                # Create desktop entry to reflect any changes (icon, paths, etc.)
+                try:
+                    try:
+                        from ..desktop import create_desktop_entry_for_app
+                    except ImportError:
+                        from ..desktop import create_desktop_entry_for_app
+    
+                    desktop_path = create_desktop_entry_for_app(
+                        app_name=app_name,
+                        appimage_path=final_path,
+                        icon_path=icon_path,
+                        comment=f"{app_name.title()} AppImage Application",
+                        categories=["Utility"],
+                        config_manager=config_manager,
+                    )
+                    # Desktop entry creation/update logging is handled by the desktop module
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to update desktop entry: {e}")
 
                 logger.info(f"✅ Successfully installed from catalog: {final_path}")
 
