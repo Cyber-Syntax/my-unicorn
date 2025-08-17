@@ -37,7 +37,8 @@ def sanitize_filename(filename: str) -> str:
 
 
 # TODO: We probably not need to use this because most of the appimages
-# provide amd64 only
+# we might keep arm64 for macos support for future
+# windows and linux would be amd64
 def get_system_architecture() -> str:
     """Get system architecture string.
 

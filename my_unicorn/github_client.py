@@ -299,23 +299,32 @@ class GitHubReleaseFetcher:
         ]
 
     def select_best_appimage(
-        self, release_data: GitHubReleaseDetails, preferred_suffixes: list[str] | None = None
+        self,
+        release_data: GitHubReleaseDetails,
+        preferred_suffixes: list[str] | None = None,
+        installation_source: str = "catalog",
     ) -> GitHubAsset | None:
-        """Select the best AppImage based on architecture and preferences.
+        """Select the best AppImage based on architecture, preferences, and installation source.
 
         This method prioritizes amd64/x86_64 architecture since that's what most users need.
         It automatically filters out ARM architectures (arm64, aarch64, armhf, etc.) to
         avoid complexity and focus on the most common use case.
 
-        Selection strategy:
+        Selection strategy for catalog installs:
         1. Filter by preferred_suffixes if provided
         2. Filter out ARM architectures (arm64, aarch64, armhf, armv7, armv6)
         3. Among remaining candidates, prefer explicit x86_64/amd64 markers
         4. Fall back to first remaining candidate
 
+        Selection strategy for URL installs:
+        1. Filter out unstable versions (experimental, beta, alpha, etc.)
+        2. Filter out ARM architectures (arm64, aarch64, armhf, armv7, armv6)
+        3. Return first remaining stable candidate
+
         Args:
             release_data: Release details containing assets
             preferred_suffixes: List of preferred filename suffixes (e.g., ["x86_64", "linux"])
+            installation_source: Installation source ("catalog" or "url")
 
         Returns:
             Best matching AppImage asset or None
@@ -329,16 +338,36 @@ class GitHubReleaseFetcher:
         if len(appimages) == 1:
             return appimages[0]
 
-        # If we have preferences, try to match them
-        matched_appimages = []
-        if preferred_suffixes:
-            for suffix in preferred_suffixes:
-                for appimage in appimages:
-                    if suffix.lower() in appimage["name"].lower():
-                        matched_appimages.append(appimage)
+        # Apply different strategies based on installation source
+        if installation_source == "url":
+            # For URL installs: filter out unstable versions first
+            unstable_keywords = [
+                "experimental",
+                "beta",
+                "alpha",
+                "rc",
+                "pre",
+                "dev",
+                "test",
+                "nightly",
+            ]
+            stable_candidates = []
+            for appimage in appimages:
+                name_lower = appimage["name"].lower()
+                if not any(keyword in name_lower for keyword in unstable_keywords):
+                    stable_candidates.append(appimage)
 
-        # If we found matches, work with those; otherwise work with all
-        candidates = matched_appimages if matched_appimages else appimages
+            candidates = stable_candidates if stable_candidates else appimages
+        else:
+            # For catalog installs: use preferred_suffixes matching
+            matched_appimages = []
+            if preferred_suffixes:
+                for suffix in preferred_suffixes:
+                    for appimage in appimages:
+                        if suffix.lower() in appimage["name"].lower():
+                            matched_appimages.append(appimage)
+
+            candidates = matched_appimages if matched_appimages else appimages
 
         # Filter out ARM architectures to prefer amd64 (most common)
         arm_keywords = ["arm64", "aarch64", "armhf", "armv7", "armv6"]
@@ -352,11 +381,12 @@ class GitHubReleaseFetcher:
         if amd64_candidates:
             candidates = amd64_candidates
 
-        # Among remaining candidates, prefer those with explicit x86_64/amd64 markers
-        for appimage in candidates:
-            name_lower = appimage["name"].lower()
-            if "x86_64" in name_lower or "amd64" in name_lower:
-                return appimage
+        # For catalog installs, prefer explicit x86_64/amd64 markers
+        if installation_source == "catalog":
+            for appimage in candidates:
+                name_lower = appimage["name"].lower()
+                if "x86_64" in name_lower or "amd64" in name_lower:
+                    return appimage
 
         # Fallback: return first candidate
         return candidates[0]

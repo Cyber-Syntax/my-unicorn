@@ -7,7 +7,12 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from ..github_client import GitHubAsset, GitHubClient, GitHubReleaseFetcher
+from ..github_client import (
+    GitHubAsset,
+    GitHubClient,
+    GitHubReleaseDetails,
+    GitHubReleaseFetcher,
+)
 from ..logger import get_logger
 from ..services.download import IconAsset
 from ..verify import Verifier
@@ -112,14 +117,15 @@ class URLInstallStrategy(InstallStrategy):
 
                 owner, repo_name = parts[0], parts[1]
 
-                # Get release data
-                release_data = await self.github_client.get_latest_release(owner, repo_name)
+                # Use GitHubReleaseFetcher for both fetching and asset selection
+                fetcher = GitHubReleaseFetcher(owner, repo_name, self.session)
+                release_data = await fetcher.fetch_latest_release()
                 if not release_data:
                     raise InstallationError(f"No releases found for {owner}/{repo_name}")
 
-                # Use GitHubReleaseFetcher for intelligent asset selection
-                fetcher = GitHubReleaseFetcher(owner, repo_name, self.session)
-                appimage_asset = self._select_best_appimage_for_url(fetcher, release_data)
+                appimage_asset = fetcher.select_best_appimage(
+                    release_data, installation_source="url"
+                )
                 if not appimage_asset:
                     raise InstallationError(
                         f"No AppImage found in {owner}/{repo_name} releases"
@@ -326,69 +332,13 @@ class URLInstallStrategy(InstallStrategy):
         logger.debug(f"⚠️ No icon found for {owner}/{repo_name}")
         return None
 
-    def _select_best_appimage_for_url(
-        self, fetcher: GitHubReleaseFetcher, release_data: dict[str, Any]
-    ) -> GitHubAsset | None:
-        """Select best AppImage for URL installation, preferring stable versions.
-
-        Args:
-            fetcher: GitHub release fetcher
-            release_data: Release data from GitHub API
-
-        Returns:
-            Best AppImage asset or None if not found
-
-        """
-        appimages = fetcher.extract_appimage_assets(release_data)
-
-        if not appimages:
-            return None
-
-        if len(appimages) == 1:
-            return appimages[0]
-
-        # Filter out experimental/beta/alpha versions for URL installs
-        unstable_keywords = [
-            "experimental",
-            "beta",
-            "alpha",
-            "rc",
-            "pre",
-            "dev",
-            "test",
-            "nightly",
-        ]
-        stable_candidates = []
-
-        for appimage in appimages:
-            name_lower = appimage["name"].lower()
-            if not any(keyword in name_lower for keyword in unstable_keywords):
-                stable_candidates.append(appimage)
-
-        # If we have stable candidates, use them; otherwise fall back to all
-        candidates = stable_candidates if stable_candidates else appimages
-
-        # Filter out ARM architectures to prefer amd64 (same as GitHubReleaseFetcher logic)
-        arm_keywords = ["arm64", "aarch64", "armhf", "armv7", "armv6"]
-        amd64_candidates = []
-        for appimage in candidates:
-            name_lower = appimage["name"].lower()
-            if not any(arm_keyword in name_lower for arm_keyword in arm_keywords):
-                amd64_candidates.append(appimage)
-
-        # Use amd64 candidates if available, otherwise use all candidates
-        final_candidates = amd64_candidates if amd64_candidates else candidates
-
-        # Return the first one from our filtered candidates
-        return final_candidates[0] if final_candidates else None
-
     async def _create_app_config(
         self,
         app_name: str,
         app_path: Path,
         owner: str,
         repo_name: str,
-        release_data: dict[str, Any],
+        release_data: GitHubReleaseDetails,
         appimage_asset: GitHubAsset,
         icon_path: Path | None,
     ) -> None:
@@ -417,7 +367,7 @@ class URLInstallStrategy(InstallStrategy):
             "config_version": "1.0.0",
             "source": "url",
             "appimage": {
-                "version": release_data.get("tag_name", "unknown"),
+                "version": release_data.get("version", "unknown"),
                 "name": app_path.name,
                 "rename": app_name,
                 "name_template": "",
@@ -445,7 +395,7 @@ class URLInstallStrategy(InstallStrategy):
         # TODO: Implement default icon for URL installs
         if icon_path and icon_path.exists():
             config["icon"]["name"] = icon_path.name
-            config["icon"]["url"] = ""  
+            config["icon"]["url"] = ""
             config["icon"]["path"] = str(icon_path)
 
         # Save the configuration

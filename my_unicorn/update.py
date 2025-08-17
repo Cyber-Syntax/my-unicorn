@@ -16,8 +16,8 @@ except ImportError:
     InvalidVersion = None
 
 from .auth import GitHubAuthManager
-from .config import ConfigManager
-from .github_client import GitHubReleaseFetcher
+from .config import AppConfig, ConfigManager
+from .github_client import GitHubAsset, GitHubReleaseDetails, GitHubReleaseFetcher
 from .logger import get_logger
 from .services.backup import BackupService
 from .services.download import DownloadService, IconAsset
@@ -83,6 +83,35 @@ class UpdateManager:
 
         # Initialize backup service
         self.backup_service = BackupService(self.config_manager, self.global_config)
+
+    def _select_best_appimage_by_source(
+        self,
+        fetcher: GitHubReleaseFetcher,
+        release_data: GitHubReleaseDetails,
+        app_config: AppConfig,
+    ) -> GitHubAsset | None:
+        """Select best AppImage based on the installation source.
+
+        Args:
+            fetcher: GitHubReleaseFetcher instance
+            release_data: Release data from GitHub API
+            app_config: App configuration containing source information
+
+        Returns:
+            Best AppImage asset or None if not found
+
+        """
+        source = app_config.get("source", "catalog")
+
+        if source == "catalog":
+            # Use catalog approach with characteristic_suffix
+            characteristic_suffix = app_config["appimage"].get("characteristic_suffix", [])
+            return fetcher.select_best_appimage(
+                release_data, characteristic_suffix, installation_source="catalog"
+            )
+        else:
+            # Use URL approach for "url" source or unknown sources
+            return fetcher.select_best_appimage(release_data, installation_source="url")
 
     def _compare_versions(self, current: str, latest: str) -> bool:
         """Compare version strings to determine if update is available.
@@ -313,9 +342,9 @@ class UpdateManager:
             else:
                 release_data = await fetcher.fetch_latest_release()
 
-            # Find AppImage asset
-            appimage_asset = fetcher.select_best_appimage(
-                release_data, app_config["appimage"].get("characteristic_suffix", [])
+            # Find AppImage asset using source-aware selection
+            appimage_asset = self._select_best_appimage_by_source(
+                fetcher, release_data, app_config
             )
 
             if not appimage_asset:
@@ -539,7 +568,6 @@ class UpdateManager:
                 # Desktop entry creation/update logging is handled by the desktop module
             except Exception as e:
                 logger.warning(f"⚠️  Failed to update desktop entry: {e}")
-
 
             logger.debug(f"✅ Successfully updated {app_name} to {update_info.latest_version}")
             if stored_hash:
