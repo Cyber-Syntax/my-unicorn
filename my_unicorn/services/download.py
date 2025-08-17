@@ -75,8 +75,6 @@ class DownloadService:
                     await self._download_with_progress(
                         response, dest, total, success_color, description_prefix
                     )
-                else:
-                    await self._download_without_progress(response, dest)
 
                 logger.debug(f"✅ Download completed: {dest}")
 
@@ -130,15 +128,6 @@ class DownloadService:
                     pbar.set_description(f"❌ {dest.name}")
                     pbar.refresh()
                     raise
-
-    async def _download_without_progress(
-        self, response: aiohttp.ClientResponse, dest: Path
-    ) -> None:
-        """Download file without progress bar."""
-        with open(dest, "wb") as f:
-            async for chunk in response.content.iter_chunked(8192):
-                if chunk:
-                    f.write(chunk)
 
     async def download_appimage(
         self, asset: GitHubAsset, dest: Path, show_progress: bool = True

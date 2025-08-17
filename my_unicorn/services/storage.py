@@ -137,8 +137,6 @@ class StorageService:
             clean_name = clean_name[:-9]  # Remove .AppImage or .appimage
         return clean_name
 
-
-
     def remove_file(self, path: Path) -> None:
         """Remove a file if it exists.
 

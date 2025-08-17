@@ -441,9 +441,11 @@ class URLInstallStrategy(InstallStrategy):
         }
 
         # Add icon information if available
+        # We don't store the URL since icon only exists on catalog installs for now.
+        # TODO: Implement default icon for URL installs
         if icon_path and icon_path.exists():
             config["icon"]["name"] = icon_path.name
-            config["icon"]["url"] = ""  # We don't store the URL since it's auto-detected
+            config["icon"]["url"] = ""  
             config["icon"]["path"] = str(icon_path)
 
         # Save the configuration
