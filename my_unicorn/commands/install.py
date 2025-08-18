@@ -9,12 +9,13 @@ from typing import Any
 
 import aiohttp
 
-from ..github_client import GitHubClient
-from ..logger import get_logger
 from my_unicorn.download import DownloadService
 from my_unicorn.storage import StorageService
-from ..strategies.install_catalog import CatalogInstallStrategy
+
+from ..github_client import GitHubClient
+from ..logger import get_logger
 from ..strategies.install import ValidationError
+from ..strategies.install_catalog import CatalogInstallStrategy
 from ..strategies.install_url import URLInstallStrategy
 from .base import BaseCommandHandler
 
@@ -29,6 +30,7 @@ class InstallCommand:
         session: aiohttp.ClientSession,
         github_client: GitHubClient,
         catalog_manager: Any,
+        config_manager: Any,
         install_dir: Path,
         download_dir: Path | None = None,
     ) -> None:
@@ -38,6 +40,7 @@ class InstallCommand:
             session: aiohttp session for HTTP requests
             github_client: GitHub client for API access
             catalog_manager: Catalog manager for app lookup
+            config_manager: Configuration manager for app configs
             install_dir: Directory for installations
             download_dir: Directory for temporary downloads
 
@@ -45,6 +48,7 @@ class InstallCommand:
         self.session = session
         self.github_client = github_client
         self.catalog_manager = catalog_manager
+        self.config_manager = config_manager
         self.install_dir = install_dir
         self.download_dir = download_dir or Path.cwd()
 
@@ -55,6 +59,7 @@ class InstallCommand:
         # Initialize strategies
         self.catalog_strategy = CatalogInstallStrategy(
             catalog_manager=catalog_manager,
+            config_manager=config_manager,
             github_client=github_client,
             download_service=self.download_service,
             storage_service=self.storage_service,
@@ -63,6 +68,7 @@ class InstallCommand:
 
         self.url_strategy = URLInstallStrategy(
             github_client=github_client,
+            config_manager=config_manager,
             download_service=self.download_service,
             storage_service=self.storage_service,
             session=session,
@@ -309,6 +315,7 @@ class InstallHandler(BaseCommandHandler):
                 session=session,
                 github_client=github_client,
                 catalog_manager=catalog_manager,
+                config_manager=config_manager,
                 install_dir=install_dir,
                 download_dir=download_dir,
             )

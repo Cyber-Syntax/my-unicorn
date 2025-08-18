@@ -7,8 +7,9 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from ..logger import get_logger
 from my_unicorn.download import IconAsset
+
+from ..logger import get_logger
 from .install_url import InstallationError, InstallStrategy, ValidationError
 
 logger = get_logger(__name__)
@@ -18,18 +19,34 @@ class CatalogInstallStrategy(InstallStrategy):
     """Strategy for installing AppImages from the catalog."""
 
     def __init__(
-        self, catalog_manager: Any, github_client: Any, *args: Any, **kwargs: Any
+        self,
+        catalog_manager: Any,
+        config_manager: Any,
+        github_client: Any,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize catalog install strategy.
 
         Args:
             catalog_manager: Catalog manager for app lookup
+            config_manager: Configuration manager for app configs
             github_client: GitHub client for API access
             *args: Arguments passed to parent class
             **kwargs: Keyword arguments passed to parent class
 
         """
-        super().__init__(*args, **kwargs)
+        # Extract parent class parameters from kwargs
+        download_service = kwargs.pop("download_service")
+        storage_service = kwargs.pop("storage_service")
+        session = kwargs.pop("session")
+
+        super().__init__(
+            download_service=download_service,
+            storage_service=storage_service,
+            session=session,
+            config_manager=config_manager,
+        )
         self.catalog_manager = catalog_manager
         self.github_client = github_client
 
@@ -68,8 +85,7 @@ class CatalogInstallStrategy(InstallStrategy):
         """
         self.validate_targets(targets)
 
-        concurrent = kwargs.get("concurrent", 3)
-        semaphore = asyncio.Semaphore(concurrent)
+        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
 
         tasks = [
             self._install_single_app(semaphore, app_name, **kwargs) for app_name in targets
@@ -208,14 +224,14 @@ class CatalogInstallStrategy(InstallStrategy):
                 self._create_app_config(
                     app_name, final_path, app_config, release_data, icon_dir, appimage_asset
                 )
-                
+
                 # Create desktop entry to reflect any changes (icon, paths, etc.)
                 try:
                     try:
                         from ..desktop import create_desktop_entry_for_app
                     except ImportError:
                         from ..desktop import create_desktop_entry_for_app
-    
+
                     desktop_path = create_desktop_entry_for_app(
                         app_name=app_name,
                         appimage_path=final_path,

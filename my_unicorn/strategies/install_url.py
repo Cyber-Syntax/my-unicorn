@@ -7,6 +7,8 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
+from my_unicorn.download import IconAsset
+
 from ..github_client import (
     GitHubAsset,
     GitHubClient,
@@ -14,7 +16,6 @@ from ..github_client import (
     GitHubReleaseFetcher,
 )
 from ..logger import get_logger
-from my_unicorn.download import IconAsset
 from ..verify import Verifier
 from .install import InstallationError, InstallStrategy, ValidationError
 
@@ -24,16 +25,29 @@ logger = get_logger(__name__)
 class URLInstallStrategy(InstallStrategy):
     """Strategy for installing AppImages from GitHub repository URLs."""
 
-    def __init__(self, github_client: GitHubClient, *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self, github_client: GitHubClient, config_manager: Any, *args: Any, **kwargs: Any
+    ) -> None:
         """Initialize URL install strategy.
 
         Args:
             github_client: GitHub client for API access
+            config_manager: Configuration manager for app configs
             *args: Arguments passed to parent class
             **kwargs: Keyword arguments passed to parent class
 
         """
-        super().__init__(*args, **kwargs)
+        # Extract parent class parameters from kwargs
+        download_service = kwargs.pop("download_service")
+        storage_service = kwargs.pop("storage_service")
+        session = kwargs.pop("session")
+
+        super().__init__(
+            download_service=download_service,
+            storage_service=storage_service,
+            session=session,
+            config_manager=config_manager,
+        )
         self.github_client = github_client
 
     def validate_targets(self, targets: list[str]) -> None:
@@ -68,8 +82,7 @@ class URLInstallStrategy(InstallStrategy):
         """
         self.validate_targets(targets)
 
-        concurrent = kwargs.get("concurrent", 3)
-        semaphore = asyncio.Semaphore(concurrent)
+        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
 
         tasks = [self._install_single_repo(semaphore, url, **kwargs) for url in targets]
 
@@ -174,9 +187,10 @@ class URLInstallStrategy(InstallStrategy):
                     appimage_asset,
                     icon_path,
                 )
-                
+
                 # Get icon directory from global config
                 from ..config import ConfigManager
+
                 config_manager = ConfigManager()
 
                 # Create desktop entry to reflect any changes (icon, paths, etc.)
@@ -185,7 +199,7 @@ class URLInstallStrategy(InstallStrategy):
                         from ..desktop import create_desktop_entry_for_app
                     except ImportError:
                         from ..desktop import create_desktop_entry_for_app
-        
+
                     desktop_path = create_desktop_entry_for_app(
                         app_name=repo_name.lower(),
                         appimage_path=final_path,
@@ -197,7 +211,7 @@ class URLInstallStrategy(InstallStrategy):
                     # Desktop entry creation/update logging is handled by the desktop module
                 except Exception as e:
                     logger.warning(f"⚠️  Failed to update desktop entry: {e}")
-        
+
                 logger.info(f"✅ Successfully installed: {final_path}")
 
                 return {

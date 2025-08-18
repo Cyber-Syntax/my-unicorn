@@ -11,6 +11,7 @@ import aiohttp
 
 from my_unicorn.download import DownloadService
 from my_unicorn.storage import StorageService
+from my_unicorn.config import ConfigManager
 
 
 class InstallStrategy(ABC):
@@ -21,6 +22,7 @@ class InstallStrategy(ABC):
         download_service: DownloadService,
         storage_service: StorageService,
         session: aiohttp.ClientSession,
+        config_manager: ConfigManager
     ) -> None:
         """Initialize strategy with required services.
 
@@ -33,6 +35,8 @@ class InstallStrategy(ABC):
         self.download_service = download_service
         self.storage_service = storage_service
         self.session = session
+        self.config_manager = config_manager or ConfigManager()
+        self.global_config = self.config_manager.load_global_config()
 
     @abstractmethod
     async def install(self, targets: list[str], **kwargs: Any) -> list[dict[str, Any]]:
