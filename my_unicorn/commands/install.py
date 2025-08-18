@@ -11,8 +11,8 @@ import aiohttp
 
 from ..github_client import GitHubClient
 from ..logger import get_logger
-from ..services.download import DownloadService
-from ..services.storage import StorageService
+from my_unicorn.download import DownloadService
+from my_unicorn.storage import StorageService
 from ..strategies.catalog_install_strategy import CatalogInstallStrategy
 from ..strategies.install_strategy import ValidationError
 from ..strategies.url_install_strategy import URLInstallStrategy

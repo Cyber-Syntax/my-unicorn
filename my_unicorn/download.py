@@ -11,9 +11,9 @@ from urllib.parse import urlparse
 import aiohttp
 from tqdm.asyncio import tqdm
 
-from ..auth import GitHubAuthManager
-from ..github_client import GitHubAsset
-from ..logger import get_logger
+from .auth import GitHubAuthManager
+from .github_client import GitHubAsset
+from .logger import get_logger
 
 logger = get_logger(__name__)
 

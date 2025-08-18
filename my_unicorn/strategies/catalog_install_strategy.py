@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from ..logger import get_logger
-from ..services.download import IconAsset
+from my_unicorn.download import IconAsset
 from .install_strategy import InstallationError, InstallStrategy, ValidationError
 
 logger = get_logger(__name__)

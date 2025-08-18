@@ -19,9 +19,9 @@ from .auth import GitHubAuthManager
 from .config import AppConfig, ConfigManager
 from .github_client import GitHubAsset, GitHubReleaseDetails, GitHubReleaseFetcher
 from .logger import get_logger
-from .services.backup import BackupService
-from .services.download import DownloadService, IconAsset
-from .services.storage import StorageService
+from .backup import BackupService
+from .download import DownloadService, IconAsset
+from .storage import StorageService
 from .verify import Verifier
 
 logger = get_logger(__name__)

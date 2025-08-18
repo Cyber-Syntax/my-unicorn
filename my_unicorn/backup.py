@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..logger import get_logger
+from .logger import get_logger
 
 logger = get_logger(__name__)
 

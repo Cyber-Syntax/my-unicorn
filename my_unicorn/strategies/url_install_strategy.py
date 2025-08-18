@@ -14,7 +14,7 @@ from ..github_client import (
     GitHubReleaseFetcher,
 )
 from ..logger import get_logger
-from ..services.download import IconAsset
+from my_unicorn.download import IconAsset
 from ..verify import Verifier
 from .install_strategy import InstallationError, InstallStrategy, ValidationError
 

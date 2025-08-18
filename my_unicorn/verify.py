@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
-    from .services.download import DownloadService
+    from .download import DownloadService
 
 from .logger import get_logger
 from .utils import format_bytes

@@ -8,7 +8,7 @@ import os
 import shutil
 from pathlib import Path
 
-from ..logger import get_logger
+from .logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -149,6 +149,7 @@ class StorageService:
             path.unlink()
             logger.debug("✅ File removed")
 
+    #TODO: not used anymore
     def cleanup_download(self, download_path: Path, install_path: Path) -> None:
         """Clean up downloaded files if they differ from install path.
 

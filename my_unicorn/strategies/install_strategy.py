@@ -9,8 +9,8 @@ from typing import Any
 
 import aiohttp
 
-from ..services.download import DownloadService
-from ..services.storage import StorageService
+from my_unicorn.download import DownloadService
+from my_unicorn.storage import StorageService
 
 
 class InstallStrategy(ABC):
