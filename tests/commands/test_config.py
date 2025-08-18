@@ -36,6 +36,7 @@ def mock_config_manager():
 
         def _convert_to_global_config(self, data):
             called["converted_data"] = data
+            called["converted"] = self.converted
             return self.converted
 
         def save_global_config(self, config):
@@ -71,7 +72,6 @@ async def test_execute_show(monkeypatch, handler, capsys):
     assert "/tmp/download" in captured.out
 
 
-#FIXME: KeyError: 'converted'
 @pytest.mark.asyncio
 async def test_execute_reset(monkeypatch, handler, capsys):
     h, called = handler

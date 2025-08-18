@@ -102,6 +102,7 @@ class InstallCommand:
         url_targets, catalog_targets = self._separate_targets(targets)
 
         # Prepare options with defaults
+        #TODO: use the global setting for the concurrent option
         install_options = {
             "concurrent": options.get("concurrent", 3),
             "show_progress": options.get("show_progress", True),
