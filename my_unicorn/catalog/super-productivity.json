@@ -1,0 +1,26 @@
+{
+    "owner": "johannesjo",
+    "repo": "super-productivity",
+    "appimage": {
+        "rename": "super-productivity",
+        "name_template": "superProductivity-{characteristic_suffix}.AppImage",
+        "characteristic_suffix": [
+            "x86_64",
+            "amd64"
+        ]
+    },
+    "github": {
+        "repo": true,
+        "prerelease": false
+    },
+    "verification": {
+        "digest": true,
+        "skip": false,
+        "checksum_file": "",
+        "checksum_hash_type": "sha256"
+    },
+    "icon": {
+        "url": "https://raw.githubusercontent.com/johannesjo/super-productivity/master/src/assets/icons/favicon-192x192.png",
+        "name": "super-productivity.png"
+    }
+}

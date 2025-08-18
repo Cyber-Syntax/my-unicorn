@@ -1,0 +1,25 @@
+{
+    "owner": "obsidianmd",
+    "repo": "obsidian-releases",
+    "appimage": {
+        "rename": "obsidian",
+        "name_template": "{rename}-{latest_version}.AppImage",
+        "characteristic_suffix": [
+            ""
+        ]
+    },
+    "github": {
+        "repo": true,
+        "prerelease": false
+    },
+    "verification": {
+        "digest": false,
+        "skip": true,
+        "checksum_file": "",
+        "checksum_hash_type": "sha256"
+    },
+    "icon": {
+        "url": "",
+        "name": "obsidian.png"
+    }
+}

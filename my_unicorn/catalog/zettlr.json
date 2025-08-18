@@ -1,0 +1,26 @@
+{
+    "owner": "Zettlr",
+    "repo": "Zettlr",
+    "appimage": {
+        "rename": "zettlr",
+        "name_template": "{rename}-{latest_version}-{characteristic_suffix}.AppImage",
+        "characteristic_suffix": [
+            "x86_64",
+            "amd64"
+        ]
+    },
+    "github": {
+        "repo": true,
+        "prerelease": false
+    },
+    "verification": {
+        "digest": false,
+        "skip": false,
+        "checksum_file": "SHA256SUMS.txt",
+        "checksum_hash_type": "sha256"
+    },
+    "icon": {
+        "url": "https://raw.githubusercontent.com/Zettlr/Zettlr/master/resources/icons/png/256x256.png",
+        "name": "zettlr.png"
+    }
+}

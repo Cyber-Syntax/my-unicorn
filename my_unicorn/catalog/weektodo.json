@@ -1,0 +1,25 @@
+{
+    "owner": "manuelernestog",
+    "repo": "weekToDo",
+    "appimage": {
+        "rename": "weektodo",
+        "name_template": "WeekToDo-{latest_version}.AppImage",
+        "characteristic_suffix": [
+            ""
+        ]
+    },
+    "github": {
+        "repo": true,
+        "prerelease": false
+    },
+    "verification": {
+        "digest": false,
+        "skip": true,
+        "checksum_file": "",
+        "checksum_hash_type": "sha256"
+    },
+    "icon": {
+        "url": "https://raw.githubusercontent.com/manuelernestog/weekToDo/master/public/icon.png",
+        "name": "weektodo.png"
+    }
+}

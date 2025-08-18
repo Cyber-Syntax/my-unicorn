@@ -1,9 +1,0 @@
-{
-	"app_storage_path": "~/.local/share/myunicorn",
-	"app_backup_storage_path": "~/.local/share/myunicorn/backups",
-	"keep_backup": true,
-	"max_backups": 1,
-	"batch_mode": false,
-	"locale": "en",
-	"max_concurrent_updates": 3
-}

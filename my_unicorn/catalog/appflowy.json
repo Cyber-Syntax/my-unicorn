@@ -1,0 +1,23 @@
+{
+    "owner": "AppFlowy-IO",
+    "repo": "AppFlowy",
+    "appimage": {
+        "rename": "appflowy",
+        "name_template": "{rename}-{latest_version}-linux-{characteristic_suffix}.AppImage",
+        "characteristic_suffix": ["x86_64", "amd64"]
+    },
+    "github": {
+        "repo": true,
+        "prerelease": false
+    },
+    "verification": {
+        "digest": true,
+        "skip": false,
+        "checksum_file": "",
+        "checksum_hash_type": "sha256"
+    },
+    "icon": {
+        "url": "https://raw.githubusercontent.com/AppFlowy-IO/AppFlowy/main/frontend/resources/flowy_icons/40x/app_logo.svg",
+        "name": "appflowy.svg"
+    }
+}

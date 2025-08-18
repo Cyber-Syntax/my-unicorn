@@ -1,313 +1,665 @@
-#!/usr/bin/python3
-"""Update my_unicorn package from GitHub by cloning the repository."""
+"""Update management for installed AppImage applications.
 
-import logging
-import os
-import shutil
-import subprocess
-import sys
-from importlib.metadata import PackageNotFoundError, metadata
-from pathlib import Path
+This module handles checking for updates, downloading new versions,
+and managing the update process for installed AppImages.
+"""
 
-import requests
-from packaging import version
-from requests import exceptions
+import asyncio
+from datetime import datetime
 
-# Constants
-from my_unicorn.constants import HTTP_FORBIDDEN, HTTP_OK
+import aiohttp
 
-GITHUB = "https://github.com/Cyber-Syntax/my-unicorn"
-GITHUB_API_RELEASES_URL = "https://api.github.com/repos/Cyber-Syntax/my-unicorn/releases"
-XDG_DATA_HOME = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
-INSTALL_DIR = XDG_DATA_HOME / "my-unicorn"
+try:
+    from packaging.version import InvalidVersion, Version
+except ImportError:
+    Version = None
+    InvalidVersion = None
 
-logger = logging.getLogger(__name__)
+from .auth import GitHubAuthManager
+from .backup import BackupService
+from .config import AppConfig, ConfigManager
+from .download import DownloadService, IconAsset
+from .github_client import GitHubAsset, GitHubReleaseDetails, GitHubReleaseFetcher
+from .logger import get_logger
+from .storage import StorageService
+from .verify import Verifier
 
-
-def normalize_version_string(version_str: str) -> str:
-    """Normalize a version string to Python's version format.
-
-    Args:
-        version_str: Version string (e.g., "v0.11.1-alpha", "0.11.1a0")
-
-    Returns:
-        str: Normalized version string
-
-    """
-    # Remove 'v' prefix if present
-    clean_version = version_str.lstrip("v")
-
-    # Convert GitHub-style version tags to Python version format
-    replacements = {
-        "-alpha": "a0",
-        "-alpha.": "a",
-        "-beta": "b0",
-        "-beta.": "b",
-        "-rc": "rc0",
-        "-rc.": "rc",
-    }
-
-    for old, new in replacements.items():
-        if old in clean_version:
-            clean_version = clean_version.replace(old, new)
-            break
-
-    return clean_version
+logger = get_logger(__name__)
 
 
-def get_current_version() -> str:
-    """Get the current installed version of my-unicorn.
+class UpdateInfo:
+    """Information about an available update."""
 
-    Returns:
-        str: The current version string
+    def __init__(
+        self,
+        app_name: str,
+        current_version: str,
+        latest_version: str,
+        has_update: bool,
+        release_url: str = "",
+        prerelease: bool = False,
+        original_tag_name: str = "",
+    ):
+        """Initialize update information.
 
-    Raises:
-        PackageNotFoundError: If the package is not found
+        Args:
+            app_name: Name of the application
+            current_version: Currently installed version
+            latest_version: Latest available version
+            has_update: Whether an update is available
+            release_url: URL to the release
+            prerelease: Whether the latest version is a prerelease
+            original_tag_name: Original tag name from GitHub (preserves 'v' prefix)
 
-    """
-    try:
-        package_metadata = metadata("my-unicorn")
-        return package_metadata["Version"]
-    except PackageNotFoundError:
-        logger.error("Package 'my-unicorn' not found")
-        raise
+        """
+        self.app_name = app_name
+        self.current_version = current_version
+        self.latest_version = latest_version
+        self.has_update = has_update
+        self.release_url = release_url
+        self.prerelease = prerelease
+        self.original_tag_name = original_tag_name or f"v{latest_version}"
 
-
-def get_formatted_version() -> str:
-    """Get formatted version for better readability.
-
-    Returns:
-        str: Formatted version string
-
-    """
-    try:
-        version_str = get_current_version()
-        # Handle version with git info
-        if "+" in version_str:
-            numbered_version, git_version = version_str.split("+", 1)
-            return f"{numbered_version} (git: {git_version})"
-        return version_str
-    except PackageNotFoundError:
-        return "Package not found"
-
-
-def display_current_version() -> None:
-    """Display the current version of my-unicorn."""
-    print("my-unicorn version: ", end="")
-    try:
-        print(get_formatted_version())
-    except Exception as e:
-        logger.exception("Failed to get version: %s", e)
-        print(f"Error: {e}")
+    def __repr__(self) -> str:
+        """String representation of update info."""
+        status = "Available" if self.has_update else "Up to date"
+        return f"UpdateInfo({self.app_name}: {self.current_version} -> {self.latest_version}, {status})"
 
 
-# NOTE: This need to be changed when we switch to a stable release
-def get_latest_release_info() -> dict[str, str] | None:
-    """Get the latest release information from GitHub API.
+class UpdateManager:
+    """Manages updates for installed AppImages."""
 
-    Since this project uses pre-releases (alpha/beta), we get all releases
-    and return the most recent one.
+    def __init__(self, config_manager: ConfigManager | None = None):
+        """Initialize update manager.
 
-    Returns:
-        dict | None: Release information or None if failed
+        Args:
+            config_manager: Configuration manager instance
 
-    """
-    try:
-        logger.info("Fetching releases from GitHub API...")
-        response = requests.get(GITHUB_API_RELEASES_URL, timeout=10)
+        """
+        self.config_manager = config_manager or ConfigManager()
+        self.global_config = self.config_manager.load_global_config()
+        self.auth_manager = GitHubAuthManager()
 
-        if response.status_code == HTTP_OK:
-            releases = response.json()
+        # Initialize storage service with install directory
+        storage_dir = self.global_config["directory"]["storage"]
+        self.storage_service = StorageService(storage_dir)
 
-            if not releases:
-                logger.error("No releases found")
-                print("No releases found in the repository.")
-                return None
+        # Initialize backup service
+        self.backup_service = BackupService(self.config_manager, self.global_config)
 
-            if not isinstance(releases, list):
-                logger.error("Invalid response format - expected list of releases")
-                print("Invalid response format from GitHub API.")
-                return None
+    def _select_best_appimage_by_source(
+        self,
+        fetcher: GitHubReleaseFetcher,
+        release_data: GitHubReleaseDetails,
+        app_config: AppConfig,
+    ) -> GitHubAsset | None:
+        """Select the most appropriate AppImage asset based on the installation source.
 
-            # Return the first release (most recent)
-            latest_release = releases[0]
-            logger.info("Found latest release: %s", latest_release.get("tag_name", "unknown"))
-            return latest_release
+        If the source is `"catalog"`, the function uses a list of preferred filename
+        suffixes (defined in the app's catalog configuration under
+        `appimage.characteristic_suffix`) to prioritize which AppImage file to select.
+        The suffixes are checked in the given order.
 
-        elif response.status_code == HTTP_FORBIDDEN:
-            response_data = response.json() if response.content else {}
-            message = response_data.get("message", "")
-            if "rate limit exceeded" in message.lower():
-                logger.error("GitHub API rate limit exceeded")
-                print(
-                    "GitHub Rate limit exceeded. Please try again later within 1 hour or use different network/VPN."
-                )
-            else:
-                logger.error("GitHub API error: %s", message)
-                print(f"GitHub API error: {message}")
+        Example:
+            Catalog config:
+                "characteristic_suffix": ["-x86_64", "-arm64", "-linux"]
+
+            Release assets:
+                - "myapp-x86_64.AppImage"
+                - "myapp-arm64.AppImage"
+                - "myapp-linux.AppImage"
+
+            Selected asset: "myapp-x86_64.AppImage" (first match in order).
+
+        If the source is `"url"` or unknown, suffix preferences are ignored and a
+        generic URL-based selection strategy is applied.
+
+        Args:
+            fetcher: GitHubReleaseFetcher instance.
+            release_data: Release data from the GitHub API.
+            app_config: App configuration containing source and suffix preferences.
+
+        Returns:
+            The best matching AppImage asset, or None if no suitable file is found.
+
+        """
+        source = app_config.get("source", "catalog")
+
+        if source == "catalog":
+            # Use suffix preferences from catalog
+            characteristic_suffix = app_config["appimage"].get("characteristic_suffix", [])
+            return fetcher.select_best_appimage(
+                release_data, characteristic_suffix, installation_source="catalog"
+            )
         else:
-            logger.error("Unexpected status code: %s", response.status_code)
-            print(f"Unexpected status code: {response.status_code}")
+            # Fallback: URL-based selection
+            return fetcher.select_best_appimage(release_data, installation_source="url")
 
-        return None
+    def _compare_versions(self, current: str, latest: str) -> bool:
+        """Compare version strings to determine if update is available.
 
-    except (
-        exceptions.ConnectionError,
-        exceptions.Timeout,
-        exceptions.RequestException,
-        exceptions.HTTPError,
-    ) as e:
-        logger.error("Error connecting to GitHub API: %s", e)
-        print("Error connecting to server!")
-        return None
-    except Exception as e:
-        logger.error("Unexpected error: %s", e)
-        print(f"Unexpected error: {e}")
-        return None
+        Args:
+            current: Current version string
+            latest: Latest version string
 
+        Returns:
+            True if latest is newer than current
 
-def check_for_update() -> bool:
-    """Check if a new release is available from the GitHub repo.
+        """
+        current_clean = current.lstrip("v").lower()
+        latest_clean = latest.lstrip("v").lower()
 
-    Returns:
-        bool: True if update is available, False otherwise
+        if current_clean == latest_clean:
+            return False
 
-    """
-    logger.info("Checking for updates...")
+        # Try using packaging.version for proper semantic version comparison
+        if Version is not None:
+            try:
+                current_version = Version(current_clean)
+                latest_version = Version(latest_clean)
+                return latest_version > current_version
+            except InvalidVersion:
+                # Fall through to legacy comparison if parsing fails
+                pass
 
-    # Get latest release info
-    latest_release = get_latest_release_info()
-    if not latest_release:
-        return False
-
-    latest_version_tag = latest_release.get("tag_name")
-    if not latest_version_tag:
-        logger.error("Malformed release data - no tag_name found")
-        print(
-            "Malformed release data! Reinstall manually or open an issue on GitHub for help!"
-        )
-        return False
-
-    # Get current version
-    try:
-        current_version_str = get_current_version()
-
-        # Normalize both versions for proper comparison
-        current_normalized = normalize_version_string(
-            current_version_str.split("+")[0]
-        )  # Remove git info
-        latest_normalized = normalize_version_string(latest_version_tag)
-
-        print(f"Current version: {current_version_str}")
-        print(f"Latest version: {latest_version_tag}")
-
-        logger.debug("Normalized current: %s", current_normalized)
-        logger.debug("Normalized latest: %s", latest_normalized)
-
-        # Use packaging library for proper version comparison
+        # Legacy comparison for backward compatibility
         try:
-            current_version_obj = version.parse(current_normalized)
-            latest_version_obj = version.parse(latest_normalized)
+            current_parts = [int(x) for x in current_clean.split(".")]
+            latest_parts = [int(x) for x in latest_clean.split(".")]
 
-            if latest_version_obj > current_version_obj:
-                print("🆕 Updates are available!")
-                print(
-                    "Note: Your previous custom settings might be preserved, but please backup important data."
-                )
-                return True
-            elif latest_version_obj == current_version_obj:
-                print("✅ my-unicorn is up to date")
-                return False
+            # Pad shorter version with zeros
+            max_len = max(len(current_parts), len(latest_parts))
+            current_parts.extend([0] * (max_len - len(current_parts)))
+            latest_parts.extend([0] * (max_len - len(latest_parts)))
+
+            return latest_parts > current_parts
+
+        except ValueError:
+            # Fallback to string comparison
+            return latest_clean > current_clean
+
+    async def check_single_update(
+        self, app_name: str, session: aiohttp.ClientSession
+    ) -> UpdateInfo | None:
+        """Check for updates for a single app.
+
+        Args:
+            app_name: Name of the app to check
+            session: aiohttp session
+
+        Returns:
+            UpdateInfo object or None if app not found
+
+        """
+        try:
+            app_config = self.config_manager.load_app_config(app_name)
+            if not app_config:
+                logger.warning(f"No config found for app: {app_name}")
+                return None
+
+            current_version = app_config["appimage"]["version"]
+            owner = app_config["owner"]
+            repo = app_config["repo"]
+
+            logger.debug(f"Checking updates for {app_name} ({owner}/{repo})")
+
+            # Check if app is configured to use GitHub API
+            should_use_github = True
+            should_use_prerelease = False
+
+            # Check catalog first (preferred)
+            catalog_entry = self.config_manager.load_catalog_entry(app_config["repo"].lower())
+            if catalog_entry:
+                github_config = catalog_entry.get("github", {})
+                should_use_github = github_config.get("repo", True)
+                should_use_prerelease = github_config.get("prerelease", False)
+
+            # Fallback to app config for backward compatibility
+            if should_use_github and not should_use_prerelease:
+                # Check new github section first
+                app_github_config = app_config.get("github", {})
+                should_use_github = app_github_config.get("repo", should_use_github)
+                should_use_prerelease = app_github_config.get("prerelease", False)
+
+                # Fallback to old verification section for backward compatibility
+                if not should_use_prerelease:
+                    verification_config = app_config.get("verification", {})
+                    should_use_prerelease = verification_config.get("prerelease", False)
+
+            if not should_use_github:
+                logger.error(f"GitHub API disabled for {app_name} (github.repo: false)")
+                return None
+
+            # Fetch latest release
+            fetcher = GitHubReleaseFetcher(owner, repo, session)
+            if should_use_prerelease:
+                logger.debug(f"Fetching latest prerelease for {owner}/{repo}")
+                release_data = await fetcher.fetch_latest_prerelease()
             else:
-                print("ℹ️  You are using a development version")
-                return False
+                release_data = await fetcher.fetch_latest_release()
+
+            latest_version = release_data["version"]
+            has_update = self._compare_versions(current_version, latest_version)
+
+            return UpdateInfo(
+                app_name=app_name,
+                current_version=current_version,
+                latest_version=latest_version,
+                has_update=has_update,
+                release_url=f"https://github.com/{owner}/{repo}/releases/tag/{latest_version}",
+                prerelease=release_data.get("prerelease", False),
+                original_tag_name=release_data.get("original_tag_name", f"v{latest_version}"),
+            )
 
         except Exception as e:
-            logger.error("Error parsing versions: %s", e)
-            print(f"Error comparing versions: {e}")
-            return False
+            # Improved error handling for GitHub authentication errors
+            import aiohttp
 
-    except PackageNotFoundError:
-        logger.error("Current package not found")
-        print("Error: my-unicorn package not found. Please reinstall.")
-        return False
+            if (
+                isinstance(e, aiohttp.client_exceptions.ClientResponseError)
+                and getattr(e, "status", None) == 401
+            ):
+                # User-facing error message (no traceback)
+                logger.error(
+                    f"Failed to check updates for {app_name}: Unauthorized (401). "
+                    "This usually means your GitHub Personal Access Token (PAT) is invalid. "
+                    "Please set a valid token in your environment or configuration."
+                )
+                # Suppress traceback from console, log only to file
+                import traceback
 
+                logger.set_console_level_temporarily("CRITICAL")
+                logger.error("Traceback for Unauthorized (401):\n%s", traceback.format_exc())
+                logger.set_console_level_temporarily("WARNING")
+                return None
+            # Other errors: user-facing message
+            logger.error(f"Failed to check updates for {app_name}: {e}")
+            # Suppress traceback from console, log only to file
+            import traceback
 
-def perform_update() -> bool:
-    """Update by doing a fresh git clone into INSTALL_DIR/source.
+            logger.set_console_level_temporarily("CRITICAL")
+            logger.error("Traceback:\n%s", traceback.format_exc())
+            logger.set_console_level_temporarily("WARNING")
+            return None
 
-    Copies my_unicorn, scripts folders, and pyproject.toml, my-unicorn-installer.sh
-    """
-    source_dir = INSTALL_DIR / "source"
-    installer = INSTALL_DIR / "my-unicorn-installer.sh"
+    async def check_all_updates(self, app_names: list[str] | None = None) -> list[UpdateInfo]:
+        """Check for updates for all or specified apps.
 
-    try:
-        # 1) Prepare fresh source tree
-        if source_dir.exists():
-            logger.info("Removing old source at %s", source_dir)
-            shutil.rmtree(source_dir)
-        source_dir.mkdir(parents=True)
+        Args:
+            app_names: List of app names to check, or None for all installed apps
 
-        # 2) Clone into source_dir
-        logger.info("Cloning into %s", source_dir)
-        subprocess.run(["git", "clone", f"{GITHUB}.git", str(source_dir)], check=True)
+        Returns:
+            List of UpdateInfo objects
 
-        # 3) Copy over only the package code and scripts
-        logger.info("Copying code + scripts into %s", INSTALL_DIR)
-        INSTALL_DIR.mkdir(parents=True, exist_ok=True)
+        """
+        if app_names is None:
+            app_names = self.config_manager.list_installed_apps()
 
-        # Copy over the package code, scripts, and pyproject.toml, my-unicorn-installer.sh
-        for name in ("my_unicorn", "scripts", "pyproject.toml", "my-unicorn-installer.sh"):
-            src = source_dir / name
-            dst = INSTALL_DIR / name
+        if not app_names:
+            logger.info("No installed apps found")
+            return []
 
-            # Remove the old directory (but keep venv/)
-            if dst.exists():
-                if dst.is_dir():
-                    shutil.rmtree(dst)
-                else:
-                    dst.unlink()
+        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
 
-            # Copy fresh
-            if src.is_dir():
-                shutil.copytree(src, dst)
+        async with aiohttp.ClientSession() as session:
+
+            async def check_with_semaphore(app_name: str) -> UpdateInfo | None:
+                async with semaphore:
+                    return await self.check_single_update(app_name, session)
+
+            tasks = [check_with_semaphore(app) for app in app_names]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Filter out None results and exceptions
+        update_infos = []
+        for result in results:
+            if isinstance(result, UpdateInfo):
+                update_infos.append(result)
+            elif isinstance(result, Exception):
+                logger.error(f"Update check failed: {result}")
+
+        return update_infos
+
+    # FIXME: too many branches
+    async def update_single_app(
+        self, app_name: str, session: aiohttp.ClientSession, force: bool = False
+    ) -> bool:
+        """Update a single app.
+
+        Args:
+            app_name: Name of the app to update
+            session: aiohttp session
+            force: Force update even if no new version available
+
+        Returns:
+            True if update was successful
+
+        """
+        try:
+            app_config = self.config_manager.load_app_config(app_name)
+            if not app_config:
+                logger.error(f"No config found for app: {app_name}")
+                return False
+
+            # Check for updates first
+            update_info = await self.check_single_update(app_name, session)
+            if not update_info:
+                logger.error(f"Failed to check updates for {app_name}")
+                return False
+
+            if not force and not update_info.has_update:
+                logger.debug(f"{app_name} is already up to date")
+                return True
+
+            logger.debug(
+                f"Updating {app_name} from {update_info.current_version} to {update_info.latest_version}"
+            )
+
+            # Fetch latest release data
+            owner = app_config["owner"]
+            repo = app_config["repo"]
+
+            # Check if app is configured to use GitHub API
+            should_use_github = True
+            should_use_prerelease = False
+
+            # Check catalog first (preferred)
+            catalog_entry = self.config_manager.load_catalog_entry(app_config["repo"].lower())
+            if catalog_entry:
+                github_config = catalog_entry.get("github", {})
+                should_use_github = github_config.get("repo", True)
+                should_use_prerelease = github_config.get("prerelease", False)
+
+            # Fallback to app config for backward compatibility
+            if should_use_github and not should_use_prerelease:
+                # Check new github section first
+                app_github_config = app_config.get("github", {})
+                should_use_github = app_github_config.get("repo", should_use_github)
+                should_use_prerelease = app_github_config.get("prerelease", False)
+
+                # Fallback to old verification section for backward compatibility
+                if not should_use_prerelease:
+                    verification_config = app_config.get("verification", {})
+                    should_use_prerelease = verification_config.get("prerelease", False)
+
+            if not should_use_github:
+                logger.error(f"GitHub API disabled for {app_name} (github.repo: false)")
+                return False
+
+            fetcher = GitHubReleaseFetcher(owner, repo, session)
+            if should_use_prerelease:
+                logger.debug(f"Fetching latest prerelease for {owner}/{repo}")
+                release_data = await fetcher.fetch_latest_prerelease()
             else:
-                shutil.copy2(src, dst)
+                release_data = await fetcher.fetch_latest_release()
 
-        # 4) Invoke the installer in update mode
-        if not installer.exists():
-            logger.error("Installer script missing at %s", installer)
-            print("❌ Installer script not found.")
+            # Find AppImage asset using source-aware selection
+            appimage_asset = self._select_best_appimage_by_source(
+                fetcher, release_data, app_config
+            )
+
+            if not appimage_asset:
+                logger.error(f"No AppImage found for {app_name}")
+                return False
+
+            # Set up paths
+            storage_dir = self.global_config["directory"]["storage"]
+            backup_dir = self.global_config["directory"]["backup"]
+            icon_dir = self.global_config["directory"]["icon"]
+            download_dir = self.global_config["directory"]["download"]
+
+            # Create backup of current version
+            current_appimage_path = storage_dir / app_config["appimage"]["name"]
+            if current_appimage_path.exists():
+                backup_path = self.backup_service.create_backup(
+                    current_appimage_path, backup_dir, update_info.current_version
+                )
+                if backup_path:
+                    logger.debug(f"💾 Backup created: {backup_path}")
+
+            # Download and install new version
+            icon_asset = None
+            if app_config.get("icon") and app_config["icon"].get("url"):
+                icon_url = app_config["icon"]["url"]
+
+                # Check if icon URL is a path template (doesn't start with http)
+                if not icon_url.startswith("http"):
+                    # Build full URL from path template
+                    try:
+                        fetcher = GitHubReleaseFetcher(owner, repo, session)
+                        default_branch = await fetcher.get_default_branch()
+                        icon_url = fetcher.build_icon_url(icon_url, default_branch)
+                        logger.debug(
+                            f"🎨 Built icon URL from template during update: {icon_url}"
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"⚠️  Failed to build icon URL from template during update: {e}"
+                        )
+                        # Skip icon download if template building fails
+                        icon_url = None
+
+                # Only create icon asset if we have a valid URL
+                if icon_url:
+                    icon_asset = IconAsset(
+                        icon_filename=app_config["icon"]["name"],
+                        icon_url=icon_url,
+                    )
+
+            # Initialize services for direct usage
+            download_service = DownloadService(session)
+
+            # Get clean name for renaming from catalog config if available
+            catalog_entry = self.config_manager.load_catalog_entry(app_config["repo"].lower())
+            rename_to = app_name  # fallback
+            if catalog_entry and catalog_entry.get("appimage", {}).get("rename"):
+                rename_to = catalog_entry["appimage"]["rename"]
+            else:
+                # Fallback to app config for backward compatibility
+                rename_to = app_config["appimage"].get("rename", app_name)
+
+            # Setup download path
+            filename = download_service.get_filename_from_url(
+                appimage_asset["browser_download_url"]
+            )
+            download_path = download_dir / filename
+
+            # Download AppImage first (without renaming)
+            appimage_path = await download_service.download_appimage(
+                appimage_asset, download_path, show_progress=True
+            )
+
+            # Download icon if requested
+            icon_path = None
+            if bool(icon_asset):
+                icon_full_path = icon_dir / icon_asset["icon_filename"]
+                icon_path = await download_service.download_icon(icon_asset, icon_full_path)
+
+            # Perform verification if configured (BEFORE renaming)
+            verification_config = app_config.get("verification", {})
+            verification_results = {}
+
+            if not verification_config.get("skip", False):
+                logger.debug(
+                    f"🔍 Starting verification for updated {app_name} (original filename: {appimage_path.name})"
+                )
+                verifier = Verifier(appimage_path)
+
+                # Try digest verification first (from GitHub API)
+                if verification_config.get("digest", False) and appimage_asset.get("digest"):
+                    try:
+                        verifier.verify_digest(appimage_asset["digest"])
+                        verification_results["digest"] = {
+                            "passed": True,
+                            "hash": appimage_asset["digest"],
+                            "details": "GitHub API digest verification",
+                        }
+                        logger.debug("✅ Digest verification passed")
+                    except Exception as e:
+                        logger.error(f"❌ Digest verification failed: {e}")
+                        verification_results["digest"] = {
+                            "passed": False,
+                            "hash": appimage_asset.get("digest", ""),
+                            "details": str(e),
+                        }
+
+                # Try checksum file verification if configured
+                elif verification_config.get("checksum_file"):
+                    checksum_file = verification_config["checksum_file"]
+                    hash_type = verification_config.get("checksum_hash_type", "sha256")
+                    checksum_url = f"https://github.com/{owner}/{repo}/releases/download/{update_info.original_tag_name}/{checksum_file}"
+
+                    try:
+                        logger.debug(f"🔍 Verifying using checksum file: {checksum_file}")
+                        # Use original filename for checksum verification
+                        await verifier.verify_from_checksum_file(
+                            checksum_url, hash_type, download_service, appimage_path.name
+                        )
+                        computed_hash = verifier.compute_hash(hash_type)
+                        verification_results["checksum_file"] = {
+                            "passed": True,
+                            "hash": f"{hash_type}:{computed_hash}",
+                            "details": f"Verified against {checksum_file}",
+                        }
+                        logger.debug("✅ Checksum file verification passed")
+                    except Exception as e:
+                        logger.error(f"❌ Checksum file verification failed: {e}")
+                        verification_results["checksum_file"] = {
+                            "passed": False,
+                            "hash": "",
+                            "details": str(e),
+                        }
+
+                # Basic file integrity check
+                try:
+                    file_size = verifier.get_file_size()
+                    expected_size = appimage_asset.get("size", 0)
+                    if expected_size > 0:
+                        verifier.verify_size(expected_size)
+                    verification_results["size"] = {
+                        "passed": True,
+                        "details": f"File size: {file_size:,} bytes",
+                    }
+                except Exception as e:
+                    logger.warning(f"⚠️  Size verification failed: {e}")
+                    verification_results["size"] = {"passed": False, "details": str(e)}
+
+                logger.debug("✅ Verification completed")
+            else:
+                logger.debug(f"⏭️  Verification skipped for {app_name} (configured)")
+
+            # Now make executable and move to install directory
+            self.storage_service.make_executable(appimage_path)
+            appimage_path = self.storage_service.move_to_install_dir(appimage_path)
+
+            # Finally rename to clean name using catalog configuration
+            if rename_to:
+                clean_name = self.storage_service.get_clean_appimage_name(rename_to)
+                appimage_path = self.storage_service.rename_appimage(appimage_path, clean_name)
+
+            # Store the computed hash from verification or GitHub digest
+            stored_hash = ""
+            if verification_results.get("digest", {}).get("passed"):
+                stored_hash = verification_results["digest"]["hash"]
+            elif verification_results.get("checksum_file", {}).get("passed"):
+                stored_hash = verification_results["checksum_file"]["hash"]
+            elif appimage_asset.get("digest"):
+                stored_hash = appimage_asset["digest"]
+
+            # Auto-detect digest availability and update verification config
+            has_digest = bool(appimage_asset.get("digest"))
+            if has_digest and not app_config.get("verification", {}).get("digest", False):
+                logger.debug(
+                    f"🔍 Digest now available for {app_name}, enabling digest verification"
+                )
+                logger.debug(f"   Digest: {appimage_asset.get('digest', '')}")
+                app_config["verification"]["digest"] = True
+                # If we now have digest, we can optionally disable checksum file verification
+                if app_config["verification"].get("checksum_file"):
+                    logger.debug("   Keeping checksum file verification as fallback")
+
+            # Update app config
+            app_config["appimage"]["version"] = update_info.latest_version
+            app_config["appimage"]["name"] = appimage_path.name
+            app_config["appimage"]["installed_date"] = datetime.now().isoformat()
+            app_config["appimage"]["digest"] = stored_hash
+
+            # Track if icon was updated for desktop entry regeneration
+            icon_updated = False
+            if icon_path:
+                previous_icon_status = app_config.get("icon", {}).get("path") is not None
+                if "icon" not in app_config:
+                    app_config["icon"] = {}
+                app_config["icon"]["path"] = str(icon_path)
+                icon_updated = not previous_icon_status  # Icon was newly installed
+
+            self.config_manager.save_app_config(app_name, app_config)
+
+            # Clean up old backups after successful update
+            try:
+                self.backup_service.cleanup_old_backups(app_name)
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to cleanup old backups for {app_name}: {e}")
+
+            # Update desktop entry to reflect any changes (icon, paths, etc.)
+            try:
+                try:
+                    from .desktop import create_desktop_entry_for_app
+                except ImportError:
+                    from .desktop import create_desktop_entry_for_app
+
+                desktop_path = create_desktop_entry_for_app(
+                    app_name=app_name,
+                    appimage_path=appimage_path,
+                    icon_path=icon_path,
+                    comment=f"{app_name.title()} AppImage Application",
+                    categories=["Utility"],
+                    config_manager=self.config_manager,
+                )
+                # Desktop entry creation/update logging is handled by the desktop module
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to update desktop entry: {e}")
+
+            logger.debug(f"✅ Successfully updated {app_name} to {update_info.latest_version}")
+            if stored_hash:
+                logger.debug(f"🔐 Updated stored hash: {stored_hash}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to update {app_name}: {e}")
             return False
 
-        print("🚀 Running installer in UPDATE mode…")
-        result = subprocess.run(
-            ["bash", str(installer), "update"],
-            cwd=str(INSTALL_DIR),
-            check=False,
-        )
+    async def update_multiple_apps(
+        self, app_names: list[str], force: bool = False
+    ) -> dict[str, bool]:
+        """Update multiple apps.
 
-        if result.returncode != 0:
-            print(f"❌ Installer exited with {result.returncode}")
-            return False
+        Args:
+            app_names: List of app names to update
+            force: Force update even if no new version available
 
-        # 5) Clean up source_dir
-        shutil.rmtree(source_dir)
-        print("✅ Update successful!")
-        return True
+        Returns:
+            Dictionary mapping app names to success status
 
-    except Exception as e:
-        logger.exception("Update failed: %s", e)
-        print(f"❌ Update failed: {e}")
-        return False
+        """
+        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
+        results = {}
 
+        async with aiohttp.ClientSession() as session:
 
-if __name__ == "__main__":
-    # Simple CLI for testing
-    if len(sys.argv) > 1 and sys.argv[1] == "--check":
-        check_for_update()
-    elif len(sys.argv) > 1 and sys.argv[1] == "--update":
-        if check_for_update():
-            perform_update()
-    else:
-        display_current_version()
+            async def update_with_semaphore(app_name: str) -> tuple[str, bool]:
+                async with semaphore:
+                    success = await self.update_single_app(app_name, session, force)
+                    return app_name, success
+
+            tasks = [update_with_semaphore(app) for app in app_names]
+            task_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for result in task_results:
+                if isinstance(result, tuple):
+                    app_name, success = result
+                    results[app_name] = success
+                elif isinstance(result, Exception):
+                    logger.error(f"Update task failed: {result}")
+
+        return results
