@@ -26,6 +26,7 @@ class RemoveHandler(BaseCommandHandler):
             app_config = self.config_manager.load_app_config(app_name)
             if not app_config:
                 print(f"❌ App '{app_name}' not found")
+                logger.debug(f"App config for '{app_name}' not found. Skipping removal.")
                 return
 
             # Remove AppImage files
@@ -63,11 +64,15 @@ class RemoveHandler(BaseCommandHandler):
             if path.exists():
                 path.unlink()
                 removed_files.append(str(path))
+                logger.debug(f"Unlinked file: {path}")
 
         if removed_files:
             print(f"✅ Removed AppImage(s): {', '.join(removed_files)}")
         else:
             print(f"⚠️  AppImage not found: {appimage_path}")
+            logger.debug(
+                f"AppImage paths checked but not found: {appimage_path}, {clean_appimage_path}"
+            )
 
     def _remove_desktop_entry(self, app_name: str) -> None:
         """Remove desktop entry for the app."""
@@ -77,17 +82,22 @@ class RemoveHandler(BaseCommandHandler):
             if remove_desktop_entry_for_app(app_name, self.config_manager):
                 print(f"✅ Removed desktop entry for {app_name}")
         except Exception as e:
+            logger.debug(f"Exception occurred while processing app '{app_name}': {e}")
             logger.warning(f"⚠️  Failed to remove desktop entry: {e}")
 
     def _remove_icon(self, app_config: dict) -> None:
-        """Remove icon file if it exists."""
+        """Remove icon file if icon config is present."""
         icon_config = app_config.get("icon", {})
-        if not icon_config.get("installed"):
+        icon_name = icon_config.get("name")
+        if not icon_name:
+            logger.debug("No icon name found in config; skipping icon removal.")
             return
 
         icon_dir = self.global_config["directory"]["icon"]
-        icon_path = icon_dir / icon_config["name"]
+        icon_path = icon_dir / icon_name
 
         if icon_path.exists():
             icon_path.unlink()
             print(f"✅ Removed icon: {icon_path}")
+        else:
+            logger.debug("Icon file %s does not exist; nothing to remove.", icon_path)
