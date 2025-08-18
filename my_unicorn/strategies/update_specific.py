@@ -76,6 +76,21 @@ class UpdateSpecificAppsStrategy(UpdateStrategy):
         print("🔍 Checking for updates...")
         update_infos = await context.update_manager.check_all_updates(context.app_names)
 
+        # Detect if update_infos is empty due to authentication failure or other errors
+        if not update_infos:
+            message = (
+                "❌ Failed to check updates for specified apps. "
+                "This may be due to invalid GitHub Personal Access Token (PAT)."
+            )
+            return UpdateResult(
+                success=False,
+                updated_apps=[],
+                failed_apps=context.app_names if context.app_names else [],
+                up_to_date_apps=[],
+                update_infos=[],
+                message=message,
+            )
+
         apps_to_update = [info for info in update_infos if info.has_update]
         apps_up_to_date = [info for info in update_infos if not info.has_update]
 

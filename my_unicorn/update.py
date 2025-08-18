@@ -252,7 +252,34 @@ class UpdateManager:
             )
 
         except Exception as e:
+            # Improved error handling for GitHub authentication errors
+            import aiohttp
+
+            if (
+                isinstance(e, aiohttp.client_exceptions.ClientResponseError)
+                and getattr(e, "status", None) == 401
+            ):
+                # User-facing error message (no traceback)
+                logger.error(
+                    f"Failed to check updates for {app_name}: Unauthorized (401). "
+                    "This usually means your GitHub Personal Access Token (PAT) is invalid. "
+                    "Please set a valid token in your environment or configuration."
+                )
+                # Suppress traceback from console, log only to file
+                import traceback
+
+                logger.set_console_level_temporarily("CRITICAL")
+                logger.error("Traceback for Unauthorized (401):\n%s", traceback.format_exc())
+                logger.set_console_level_temporarily("WARNING")
+                return None
+            # Other errors: user-facing message
             logger.error(f"Failed to check updates for {app_name}: {e}")
+            # Suppress traceback from console, log only to file
+            import traceback
+
+            logger.set_console_level_temporarily("CRITICAL")
+            logger.error("Traceback:\n%s", traceback.format_exc())
+            logger.set_console_level_temporarily("WARNING")
             return None
 
     async def check_all_updates(self, app_names: list[str] | None = None) -> list[UpdateInfo]:
