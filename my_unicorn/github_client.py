@@ -403,7 +403,8 @@ class GitHubReleaseFetcher:
 
         async with self.session.get(url=url, headers=headers) as response:
             response.raise_for_status()
-            return await response.json()
+            data = await response.json()
+            return data
 
     @staticmethod
     def parse_repo_url(repo_url: str) -> tuple[str, str]:

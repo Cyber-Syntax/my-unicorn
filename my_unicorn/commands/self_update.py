@@ -7,7 +7,7 @@ allowing users to check for and install updates to the tool itself.
 from argparse import Namespace
 
 from ..logger import get_logger
-from ..repo import check_for_self_update, perform_self_update
+from ..self_update import check_for_self_update, perform_self_update
 from .base import BaseCommandHandler
 
 logger = get_logger(__name__)

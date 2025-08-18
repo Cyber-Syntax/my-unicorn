@@ -10,8 +10,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-#TODO: Some of these functions are not used in the codebase,
+# TODO: Some of these functions are not used in the codebase,
 # so determine which ones are necessary and remove the rest.
+
 
 def sanitize_filename(filename: str) -> str:
     """Sanitize filename by removing invalid characters.
@@ -211,7 +212,11 @@ def extract_version_from_filename(filename: str) -> str | None:
     for pattern in patterns:
         match = re.search(pattern, filename)
         if match:
-            return match.group(1)
+            version = match.group(1)
+            # Strip .AppImage/.appimage if present at end of version
+            if version.lower().endswith(".appimage"):
+                version = version[:-9]
+            return version
 
     return None
 
