@@ -6,14 +6,22 @@ All notable changes to this project will be documented in this file.
 This release written from scratch to simplify the code and maintainability. 
 Please read the [wiki.md](docs/wiki.md) for more information.
 
+#### What is new?
 1. Global config now use INI format
 2. App specific configs now use better structured Json format
 3. We now use new libraries for better performance
     - orjson instead of json
-    - uvloop instead of asyncio
+    - uvloop instead of asyncio for running
     - aiohttp instead of requests
     - tqdm.asyncio instead of manual progress bar
 4. Authentication is simplified for better security and performance
+5. Locale support, migration and other similar features removed for the simplicity of the code
+but they might be implemented in the future.
+
+#### Migration guide
+- Remove anything related to the old version, including old appimages, versions and configs.
+- Install the new version of the app with the instructions provided in the README.md.
+- Check the [wiki.md](docs/wiki.md) for more information how to use the app.
 
 ## v0.15.2-alpha
 ## v0.15.1-alpha
