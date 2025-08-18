@@ -19,7 +19,7 @@
         "checksum_hash_type": "sha256"
     },
     "icon": {
-        "url": "https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/images/obsidian.png",
+        "url": "",
         "name": "obsidian.png"
     }
 }
