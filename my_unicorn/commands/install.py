@@ -13,9 +13,9 @@ from ..github_client import GitHubClient
 from ..logger import get_logger
 from my_unicorn.download import DownloadService
 from my_unicorn.storage import StorageService
-from ..strategies.catalog_install_strategy import CatalogInstallStrategy
-from ..strategies.install_strategy import ValidationError
-from ..strategies.url_install_strategy import URLInstallStrategy
+from ..strategies.install_catalog import CatalogInstallStrategy
+from ..strategies.install import ValidationError
+from ..strategies.install_url import URLInstallStrategy
 from .base import BaseCommandHandler
 
 logger = get_logger(__name__)

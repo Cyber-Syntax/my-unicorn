@@ -6,7 +6,7 @@ in a consistent manner across all update strategies.
 
 from ..logger import get_logger
 from ..update import UpdateInfo
-from .update_strategy import UpdateResult
+from .update import UpdateResult
 
 logger = get_logger(__name__)
 

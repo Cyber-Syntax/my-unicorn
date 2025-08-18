@@ -6,7 +6,7 @@ on all apps that have updates available.
 """
 
 from ..logger import get_logger
-from .update_strategy import UpdateContext, UpdateResult, UpdateStrategy
+from .update import UpdateContext, UpdateResult, UpdateStrategy
 
 logger = get_logger(__name__)
 

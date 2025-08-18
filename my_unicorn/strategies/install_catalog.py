@@ -9,7 +9,7 @@ from typing import Any
 
 from ..logger import get_logger
 from my_unicorn.download import IconAsset
-from .install_strategy import InstallationError, InstallStrategy, ValidationError
+from .install_url import InstallationError, InstallStrategy, ValidationError
 
 logger = get_logger(__name__)
 

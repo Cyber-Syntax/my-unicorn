@@ -5,10 +5,10 @@ update strategy based on the given context and parameters.
 """
 
 from ..logger import get_logger
-from .check_only_update_strategy import CheckOnlyUpdateStrategy
-from .update_all_apps_strategy import UpdateAllAppsStrategy
-from .update_specific_apps_strategy import UpdateSpecificAppsStrategy
-from .update_strategy import UpdateContext, UpdateStrategy
+from .update_check_only import CheckOnlyUpdateStrategy
+from .update_all import UpdateAllAppsStrategy
+from .update_specific import UpdateSpecificAppsStrategy
+from .update import UpdateContext, UpdateStrategy
 
 logger = get_logger(__name__)
 

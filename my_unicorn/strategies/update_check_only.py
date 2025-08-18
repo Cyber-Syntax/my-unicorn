@@ -7,7 +7,7 @@ for apps without modifying the system.
 
 from ..logger import get_logger
 from ..update import UpdateInfo
-from .update_strategy import UpdateContext, UpdateResult, UpdateStrategy
+from .update import UpdateContext, UpdateResult, UpdateStrategy
 
 logger = get_logger(__name__)
 
