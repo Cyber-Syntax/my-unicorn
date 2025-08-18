@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+#TODO: Some of these functions are not used in the codebase,
+# so determine which ones are necessary and remove the rest.
 
 def sanitize_filename(filename: str) -> str:
     """Sanitize filename by removing invalid characters.

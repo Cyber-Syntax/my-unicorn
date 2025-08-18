@@ -16,11 +16,11 @@ except ImportError:
     InvalidVersion = None
 
 from .auth import GitHubAuthManager
+from .backup import BackupService
 from .config import AppConfig, ConfigManager
+from .download import DownloadService, IconAsset
 from .github_client import GitHubAsset, GitHubReleaseDetails, GitHubReleaseFetcher
 from .logger import get_logger
-from .backup import BackupService
-from .download import DownloadService, IconAsset
 from .storage import StorageService
 from .verify import Verifier
 
@@ -93,27 +93,46 @@ class UpdateManager:
         release_data: GitHubReleaseDetails,
         app_config: AppConfig,
     ) -> GitHubAsset | None:
-        """Select best AppImage based on the installation source.
+        """Select the most appropriate AppImage asset based on the installation source.
+
+        If the source is `"catalog"`, the function uses a list of preferred filename
+        suffixes (defined in the app's catalog configuration under
+        `appimage.characteristic_suffix`) to prioritize which AppImage file to select.
+        The suffixes are checked in the given order.
+
+        Example:
+            Catalog config:
+                "characteristic_suffix": ["-x86_64", "-arm64", "-linux"]
+
+            Release assets:
+                - "myapp-x86_64.AppImage"
+                - "myapp-arm64.AppImage"
+                - "myapp-linux.AppImage"
+
+            Selected asset: "myapp-x86_64.AppImage" (first match in order).
+
+        If the source is `"url"` or unknown, suffix preferences are ignored and a
+        generic URL-based selection strategy is applied.
 
         Args:
-            fetcher: GitHubReleaseFetcher instance
-            release_data: Release data from GitHub API
-            app_config: App configuration containing source information
+            fetcher: GitHubReleaseFetcher instance.
+            release_data: Release data from the GitHub API.
+            app_config: App configuration containing source and suffix preferences.
 
         Returns:
-            Best AppImage asset or None if not found
+            The best matching AppImage asset, or None if no suitable file is found.
 
         """
         source = app_config.get("source", "catalog")
 
         if source == "catalog":
-            # Use catalog approach with characteristic_suffix
+            # Use suffix preferences from catalog
             characteristic_suffix = app_config["appimage"].get("characteristic_suffix", [])
             return fetcher.select_best_appimage(
                 release_data, characteristic_suffix, installation_source="catalog"
             )
         else:
-            # Use URL approach for "url" source or unknown sources
+            # Fallback: URL-based selection
             return fetcher.select_best_appimage(release_data, installation_source="url")
 
     def _compare_versions(self, current: str, latest: str) -> bool:
@@ -274,6 +293,7 @@ class UpdateManager:
 
         return update_infos
 
+    # FIXME: too many branches
     async def update_single_app(
         self, app_name: str, session: aiohttp.ClientSession, force: bool = False
     ) -> bool:

@@ -388,6 +388,7 @@ class VerificationConfig:
         logger.debug(f"   Checksum hash type: {checksum_hash_type}")
         logger.debug(f"   Verify size: {verify_size}")
 
+    #TODO: is it better to save verify_size to app specific config file?
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "VerificationConfig":
         """Create VerificationConfig from dictionary.

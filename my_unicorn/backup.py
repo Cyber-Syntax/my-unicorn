@@ -24,6 +24,18 @@ class BackupService:
         self.config_manager = config_manager
         self.global_config = global_config
 
+    # TODO: Need a new method to handle which version going to be restored.
+    # A proper version backup design needs to be implemented.
+    # Currently, we only use the version specified in app specific config
+    # version = self.config_manager.get_config('VERSION')
+    # but we need to handle edge cases
+    # example backup: appflowy-0.9.1.backup.AppImage
+    # if we have 2 version backup it would be 2 versions
+    # appflowy-0.9.1.backup.AppImage
+    # appflowy-0.9.2.backup.AppImage
+    # we can parse the version from the backup file name
+    # and compare it with the version specified in app specific config
+
     def create_backup(
         self, file_path: Path, backup_dir: Path, version: str | None = None
     ) -> Path | None:
