@@ -236,7 +236,16 @@ class UpdateManager:
             fetcher = GitHubReleaseFetcher(owner, repo, session)
             if should_use_prerelease:
                 logger.debug(f"Fetching latest prerelease for {owner}/{repo}")
-                release_data = await fetcher.fetch_latest_prerelease()
+                try:
+                    release_data = await fetcher.fetch_latest_prerelease()
+                except ValueError as e:
+                    if "No prereleases found" in str(e):
+                        logger.warning(
+                            f"No prereleases found for {owner}/{repo}, falling back to latest release"
+                        )
+                        release_data = await fetcher.fetch_latest_release()
+                    else:
+                        raise
             else:
                 release_data = await fetcher.fetch_latest_release()
 
