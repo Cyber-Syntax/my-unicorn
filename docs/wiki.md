@@ -13,59 +13,70 @@
 
 ## 🛠️ Usage Examples
 
+### my-unicorn self-update
+
+```bash
+# Check for update
+my-unicorn self-update --check-only
+
+# Update my-unicorn
+my-unicorn self-update
+```
+
 ### Installation
 
 ```bash
 # Install via URL
-python run.py install https://github.com/johannesjo/super-productivity
+my-unicorn install https://github.com/johannesjo/super-productivity
 
 # Install from catalog
-python run.py install appflowy,qownotes
+my-unicorn install appflowy,qownotes
+my-unicorn install appflowy qownotes
 
 # Install with options
-python run.py install appflowy --no-icon --no-verify
+my-unicorn install appflowy --no-icon --no-verify
 ```
 
 ### Updates
 
 ```bash
-# Check for updates
-python run.py update --check-only
+# Check for updates without installation
+my-unicorn update --check-only
 
 # Update specific apps
-python run.py update appflowy,joplin
+my-unicorn update appflowy,joplin
 
 # Update all installed apps
-python run.py update
+my-unicorn update
 ```
 
 ### Management
 
 ```bash
 # List installed apps
-python run.py list
+my-unicorn list
 
 # List available catalog apps
-python run.py list --available
+my-unicorn list --available
 
 # Remove apps
-python run.py remove appflowy --keep-config
+my-unicorn remove appflowy --keep-config
 
 # Show configuration
-python run.py config --show
+my-unicorn config --show
 ```
 
 ### Authentication
 
 ```bash
 # Save GitHub token
-python run.py auth --save-token
+my-unicorn auth --save-token
 
 # Check auth status
-python run.py auth --status
+my-unicorn auth --status
 
 # Remove token
-python run.py auth --remove-token
+my-unicorn auth --remove-token
 ```
 
 ### Backup
@@ -74,45 +85,48 @@ python run.py auth --remove-token
 
 ```bash
 # Create backup of current version
-backup <app_name>
+my-unicorn backup <app_name>
 
 # Restore latest backup version
-backup <app_name> --restore-last
+my-unicorn backup <app_name> --restore-last
 
 # Restore specific version
-backup <app_name> --restore-version <version>
+my-unicorn backup <app_name> --restore-version <version>
 ```
 
 #### Information & Management
 
 ```bash
 # List backups for specific app
-backup <app_name> --list-backups
+my-unicorn backup <app_name> --list-backups
 
 # List all apps with backups
-backup --list-backups
+my-unicorn backup --list-backups
 
 # Show detailed backup info
-backup <app_name> --info
+my-unicorn backup <app_name> --info
 
 # Clean up old backups
-backup --cleanup                 # All apps
-backup <app_name> --cleanup      # Specific app
+my-unicorn backup --cleanup                 # All apps
+my-unicorn backup <app_name> --cleanup      # Specific app
 
 # Migrate old backup format
-backup --migrate
+my-unicorn backup --migrate
 ```
 
 ## 📋 Dependencies
 
-### Core (working now)
+### Core
 
 - Python 3.12+
 
 ### Required Dependencies
 
+> [!TIP]
+> These dependencies are already installed when you used my-unicorn-installer.sh to install my-unicorn.
+
 ```bash
-pip install aiohttp uvloop tqdm keyring orjson
+pip install aiohttp uvloop tqdm keyring orjson packaging
 ```
 
 ### Config Management
@@ -172,9 +186,24 @@ cache = "~/.config/my-unicorn/cache"
 tmp = "~/.config/my-unicorn/tmp"
 ```
 
-#### Catalog Entry (catalog/appflowy.json)
+#### Catalog Configuration
 
-```json
+##### 1. **Catalog Configuration Folder Structure**
+
+> [!NOTE]
+> Catalog entries are JSON files that contain metadata about the app, such as its name, version, and download URL.
+> It's stored in the repository.
+
+```
+my-unicorn/my_unicorn/catalog/
+  ├── appflowy.json
+  ├── freetube.json
+  └── obsidian.json
+```
+
+##### Catalog Entry JSON Structure
+
+```jsonc
 {
     "owner": "AppFlowy-IO",
     "repo": "AppFlowy",
@@ -183,13 +212,13 @@ tmp = "~/.config/my-unicorn/tmp"
         "rename": "AppFlowy",
         "name_template": "{rename}-{latest_version}-linux-{characteristic_suffix}.AppImage",
         // List of suffixes that are preferred for the AppImage filename. (e.g `x86_64`, `linux`, `Qt6`)
-        "characteristic_suffix": [""]
+        "characteristic_suffix": [""],
     },
     "github": {
         // app installed from github repo
         "repo": true,
         // Beta/prerelease used to download the latest beta version of the appimage.
-        "prerelease": false
+        "prerelease": false,
     },
     "verification": {
         // provided by the github api if the developer provides it.
@@ -201,50 +230,48 @@ tmp = "~/.config/my-unicorn/tmp"
         // This is the hash type of the checksum file.
         //         - sha256 example files: SHA256SUMS.txt, <appimage_name>.AppImage.sha256sum
         //         - sha512 example files: latest-linux.yml, <appimage_name>.AppImage.sha512sum
-        "checksum_hash_type": ""
+        "checksum_hash_type": "",
     },
     "icon": {
         // direct link to an SVG image file hosted on GitHub's raw content server
         "url": "https://raw.githubusercontent.com/AppFlowy-IO/AppFlowy/main/frontend/resources/flowy_icons/40x/app_logo.svg",
         // used to name the icon file.
-        "name": "appflowy.svg"
-    }
+        "name": "appflowy.svg",
+    },
 }
 ```
 
-```json
-{
-    "owner": "FreeTubeApp",
-    "repo": "FreeTube",
-    "appimage": {
-        "rename": "freetube",
-        "name_template": "{rename}-{latest_version}-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": ["amd64", "x86_64"]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": true
-    },
-    "verification": {
-        "digest": false,
-        "skip": true,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "url": "https://raw.githubusercontent.com/FreeTubeApp/FreeTube/development/_icons/icon.svg",
-        "name": "freetube.svg"
-    }
-}
+#### App-specific Configuration
+
+> [!NOTE]
+> Each of these files also represents the state of the installed appimages.
+> appimage_version and appimage_name are mandatory fields.
+> Other fields are needed only if the user installed unsupported appimage(with URL install)
+
+##### 1. **Configuration Folder Structure**
+
+```
+~/.config/my-unicorn/
+  ├── tmp/
+  ├── cache/
+  ├── settings.conf
+  ├── apps/
+  │   ├── appflowy.json
+  │   ├── obsidian.json
+  │   └── qownnotes.json
+  └── logs/
+      ├── my-unicorn.log
+      ├── my-unicorn.log.1
+      ├── my-unicorn.log.2
+      ├── my-unicorn.log.3
 ```
 
-#### App-specific Config (~/.config/my-unicorn/apps/appflowy.json)
+##### 2. **App-Specific Configuration JSON Structure**
 
-- Each of these files also represents the state of the installed appimages.
-- appimage_version and appimage_name are mandatory fields.
-- Other fields are needed only if the user installed unsupported appimage(with URL install)
+> [!NOTE]
+> Directory: `~/.config/my-unicorn/apps`
 
-```json
+```jsonc
 {
     // Configuration version for future migrations
     "config_version": "1.0.0",
@@ -261,13 +288,13 @@ tmp = "~/.config/my-unicorn/tmp"
         // installed date of the appimage
         "installed_date": "2025-08-03T14:57:00.204029",
         // digest algorithm used to verify the integrity of the appimage, provided by github api assets
-        "digest": "sha256:bd8b9374ec9c59fa98b08080fa7f96696d135e6173213d039939f94cc757c587"
+        "digest": "sha256:bd8b9374ec9c59fa98b08080fa7f96696d135e6173213d039939f94cc757c587",
     },
     "owner": "AppFlowy-IO",
     "repo": "AppFlowy",
     "github": {
         "repo": true,
-        "prerelease": false
+        "prerelease": false,
     },
     "verification": {
         // Verify the appimage with digest algorithm
@@ -277,15 +304,17 @@ tmp = "~/.config/my-unicorn/tmp"
         // checksum file used to verify the integrity of the appimage
         "checksum_file": "",
         // hash type used to verify the integrity of the appimage
-        "checksum_hash_type": "sha256"
+        "checksum_hash_type": "sha256",
     },
     "icon": {
         "url": "https://raw.githubusercontent.com/AppFlowy-IO/AppFlowy/main/frontend/resources/flowy_icons/40x/app_logo.svg",
         "name": "appflowy.svg",
-        "installed": true
-    }
+        "installed": true,
+    },
 }
 ```
+
+Example joplin.json:
 
 ```json
 {
@@ -365,6 +394,6 @@ tmp = "~/.config/my-unicorn/tmp"
 > [!TIP]
 > This would remove the package if you installed globally.
 
-    ```bash
-    pip uninstall my-unicorn
-    ```
+```bash
+pip uninstall my-unicorn
+```

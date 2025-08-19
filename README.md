@@ -17,11 +17,10 @@ Türkçe Açıklama: [README.tr.md](README.tr.md)
 > Detailed information: [wiki.md](docs/wiki.md)
 
 - **Supported Applications:**
-    - Super-Productivity, Siyuan, Joplin, Standard-notes, Logseq, QOwnNotes, Tagspaces, Zen-Browser, weektodo, Zettlr, HeroicGamesLauncher, KDiskMark, AppFlowy
+    - Super-Productivity, Siyuan, Joplin, Standard-notes, Logseq, QOwnNotes, Tagspaces, Zen-Browser, weektodo, Zettlr, HeroicGamesLauncher, KDiskMark, AppFlowy, Obsidian
     - Applications without verification (developer doesn't provide hash):
         - FreeTube
             - Related issue: https://github.com/FreeTubeApp/FreeTube/issues/4720)
-        - Obsidian
     - More can be found in the [catalog](my_unicorn/catalog/) folder.
 - **Supported hash types:**
     - sha256, sha512
