@@ -245,24 +245,18 @@ class TestBackupHandler:
         app_backup_dir = backup_dir / app_name
         app_backup_dir.mkdir(parents=True)
 
-        # Create multiple backup versions
+        # Create multiple backup versions using BackupMetadata for proper checksums
+        from my_unicorn.backup import BackupMetadata
+
         versions = ["1.2.1", "1.2.2", "1.2.3"]
-        metadata_versions = {}
+        metadata_manager = BackupMetadata(app_backup_dir)
 
         for version in versions:
             backup_file = app_backup_dir / f"{app_name}-{version}.AppImage"
             backup_file.write_text(f"content for {version}")
-
-            metadata_versions[version] = {
-                "filename": f"{app_name}-{version}.AppImage",
-                "sha256": f"hash_{version}",
-                "created": datetime.now().isoformat(),
-                "size": len(f"content for {version}"),
-            }
-
-        metadata = {"versions": metadata_versions}
-        metadata_file = app_backup_dir / "metadata.json"
-        metadata_file.write_text(json.dumps(metadata))
+            metadata_manager.add_version(
+                version, f"{app_name}-{version}.AppImage", backup_file
+            )
 
         args = MagicMock()
         args.app_name = app_name
@@ -273,40 +267,32 @@ class TestBackupHandler:
         args.info = False
         args.migrate = False
 
+        # Execute and verify no exceptions
         await backup_handler.execute(args)
 
-        # Test passes if no exception is raised
+        # Verify the backups were properly listed by checking metadata
+        metadata = metadata_manager.load()
+        assert len(metadata["versions"]) == 3
+        assert all(v in metadata["versions"] for v in versions)
 
     @pytest.mark.asyncio
-    async def test_list_all_apps_with_backups(
-        self, backup_handler, mock_config_manager, temp_config
-    ):
-        """Test listing all apps with backups."""
-        global_config, backup_dir, storage_dir = temp_config
+    async def test_list_backups_for_nonexistent_app(self, backup_handler, mock_config_manager):
+        """Test listing backups for a non-existent app."""
+        args = MagicMock()
+        args.app_name = "nonexistentapp"
+        args.restore_last = False
+        args.restore_version = None
+        args.list_backups = True
+        args.cleanup = False
+        args.info = False
+        args.migrate = False
 
-        # Create backup directories for multiple apps
-        apps = ["appflowy", "obsidian"]
+        # Should execute without error even if app has no backups
+        await backup_handler.execute(args)
 
-        for app_name in apps:
-            app_backup_dir = backup_dir / app_name
-            app_backup_dir.mkdir(parents=True)
-
-            backup_file = app_backup_dir / f"{app_name}-1.0.0.AppImage"
-            backup_file.write_text("content")
-
-            metadata = {
-                "versions": {
-                    "1.0.0": {
-                        "filename": f"{app_name}-1.0.0.AppImage",
-                        "sha256": "hash",
-                        "created": datetime.now().isoformat(),
-                        "size": 7,
-                    }
-                }
-            }
-            metadata_file = app_backup_dir / "metadata.json"
-            metadata_file.write_text(json.dumps(metadata))
-
+    @pytest.mark.asyncio
+    async def test_list_backups_requires_app_name(self, backup_handler):
+        """Test that --list-backups requires app_name."""
         args = MagicMock()
         args.app_name = None
         args.restore_last = False
@@ -316,11 +302,87 @@ class TestBackupHandler:
         args.info = False
         args.migrate = False
 
+        # Should fail validation
+        result = backup_handler._validate_arguments(args)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_info_command_with_backups(
+        self, backup_handler, mock_config_manager, temp_config
+    ):
+        """Test --info command shows detailed backup information."""
+        global_config, backup_dir, storage_dir = temp_config
+
+        app_name = "appflowy"
+        app_backup_dir = backup_dir / app_name
+        app_backup_dir.mkdir(parents=True)
+
+        # Create backups using BackupMetadata for proper structure
+        from my_unicorn.backup import BackupMetadata
+
+        versions = ["1.0.0", "1.1.0", "1.2.0"]
+        metadata_manager = BackupMetadata(app_backup_dir)
+
+        for version in versions:
+            backup_file = app_backup_dir / f"{app_name}-{version}.AppImage"
+            backup_file.write_text(f"content for version {version}")
+            metadata_manager.add_version(
+                version, f"{app_name}-{version}.AppImage", backup_file
+            )
+
+        args = MagicMock()
+        args.app_name = app_name
+        args.restore_last = False
+        args.restore_version = None
+        args.list_backups = False
+        args.cleanup = False
+        args.info = True
+        args.migrate = False
+
+        # Execute and verify no exceptions
+        await backup_handler.execute(args)
+
+        # Verify backup info is accessible
+        backup_info = backup_handler.backup_service.get_backup_info(app_name)
+        assert len(backup_info) == 3
+        assert all(info["version"] in versions for info in backup_info)
+
+    @pytest.mark.asyncio
+    async def test_info_command_no_backups(self, backup_handler, mock_config_manager):
+        """Test --info command when app has no backups."""
+        args = MagicMock()
+        args.app_name = "appwithnobackups"
+        args.restore_last = False
+        args.restore_version = None
+        args.list_backups = False
+        args.cleanup = False
+        args.info = True
+        args.migrate = False
+
+        # Should execute without error even if no backups exist
         await backup_handler.execute(args)
 
     @pytest.mark.asyncio
-    async def test_cleanup_backups(self, backup_handler, mock_config_manager, temp_config):
-        """Test cleanup of old backups."""
+    async def test_info_requires_app_name(self, backup_handler):
+        """Test that --info requires app_name."""
+        args = MagicMock()
+        args.app_name = None
+        args.restore_last = False
+        args.restore_version = None
+        args.list_backups = False
+        args.cleanup = False
+        args.info = True
+        args.migrate = False
+
+        # Should fail validation
+        result = backup_handler._validate_arguments(args)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_cleanup_backups_specific_app(
+        self, backup_handler, mock_config_manager, temp_config
+    ):
+        """Test cleanup of old backups for a specific app."""
         global_config, backup_dir, storage_dir = temp_config
         global_config["max_backup"] = 2
 
@@ -328,29 +390,18 @@ class TestBackupHandler:
         app_backup_dir = backup_dir / app_name
         app_backup_dir.mkdir(parents=True)
 
-        # Create multiple backup versions
-        versions = ["1.0.0", "1.1.0", "1.2.0", "1.3.0"]
-        metadata_versions = {}
+        # Create multiple backup versions using BackupMetadata
+        from my_unicorn.backup import BackupMetadata
 
-        for i, version in enumerate(versions):
+        versions = ["1.0.0", "1.1.0", "1.2.0", "1.3.0"]
+        metadata_manager = BackupMetadata(app_backup_dir)
+
+        for version in versions:
             backup_file = app_backup_dir / f"{app_name}-{version}.AppImage"
             backup_file.write_text(f"content {version}")
-
-            # Set different timestamps for proper sorting
-            timestamp = datetime.now()
-            if i > 0:
-                timestamp = timestamp.replace(microsecond=i * 1000)
-
-            metadata_versions[version] = {
-                "filename": f"{app_name}-{version}.AppImage",
-                "sha256": f"hash_{version}",
-                "created": timestamp.isoformat(),
-                "size": len(f"content {version}"),
-            }
-
-        metadata = {"versions": metadata_versions}
-        metadata_file = app_backup_dir / "metadata.json"
-        metadata_file.write_text(json.dumps(metadata))
+            metadata_manager.add_version(
+                version, f"{app_name}-{version}.AppImage", backup_file
+            )
 
         args = MagicMock()
         args.app_name = app_name
@@ -366,6 +417,97 @@ class TestBackupHandler:
         # Should keep only max_backup (2) files
         remaining_files = list(app_backup_dir.glob("*.AppImage"))
         assert len(remaining_files) <= 2
+
+        # Verify metadata was updated
+        updated_metadata = metadata_manager.load()
+        assert len(updated_metadata["versions"]) <= 2
+
+    @pytest.mark.asyncio
+    async def test_cleanup_backups_global(
+        self, backup_handler, mock_config_manager, temp_config
+    ):
+        """Test cleanup of old backups for all apps."""
+        global_config, backup_dir, storage_dir = temp_config
+        global_config["max_backup"] = 1
+
+        # Create backup directories for multiple apps
+        apps = ["appflowy", "obsidian"]
+        from my_unicorn.backup import BackupMetadata
+
+        for app_name in apps:
+            app_backup_dir = backup_dir / app_name
+            app_backup_dir.mkdir(parents=True)
+
+            # Create multiple backups for each app
+            versions = ["1.0.0", "1.1.0"]
+            metadata_manager = BackupMetadata(app_backup_dir)
+
+            for version in versions:
+                backup_file = app_backup_dir / f"{app_name}-{version}.AppImage"
+                backup_file.write_text(f"content {version}")
+                metadata_manager.add_version(
+                    version, f"{app_name}-{version}.AppImage", backup_file
+                )
+
+        args = MagicMock()
+        args.app_name = None  # Global cleanup
+        args.restore_last = False
+        args.restore_version = None
+        args.list_backups = False
+        args.cleanup = True
+        args.info = False
+        args.migrate = False
+
+        await backup_handler.execute(args)
+
+        # Each app should have only max_backup (1) files
+        for app_name in apps:
+            app_backup_dir = backup_dir / app_name
+            remaining_files = list(app_backup_dir.glob("*.AppImage"))
+            assert len(remaining_files) <= 1
+
+    @pytest.mark.asyncio
+    async def test_cleanup_zero_max_backup(
+        self, backup_handler, mock_config_manager, temp_config
+    ):
+        """Test cleanup when max_backup is set to 0 (remove all)."""
+        global_config, backup_dir, storage_dir = temp_config
+        global_config["max_backup"] = 0
+
+        app_name = "appflowy"
+        app_backup_dir = backup_dir / app_name
+        app_backup_dir.mkdir(parents=True)
+
+        # Create backups using BackupMetadata
+        from my_unicorn.backup import BackupMetadata
+
+        versions = ["1.0.0", "1.1.0"]
+        metadata_manager = BackupMetadata(app_backup_dir)
+
+        for version in versions:
+            backup_file = app_backup_dir / f"{app_name}-{version}.AppImage"
+            backup_file.write_text(f"content {version}")
+            metadata_manager.add_version(
+                version, f"{app_name}-{version}.AppImage", backup_file
+            )
+
+        args = MagicMock()
+        args.app_name = app_name
+        args.restore_last = False
+        args.restore_version = None
+        args.list_backups = False
+        args.cleanup = True
+        args.info = False
+        args.migrate = False
+
+        await backup_handler.execute(args)
+
+        # All backups should be removed
+        remaining_files = list(app_backup_dir.glob("*.AppImage"))
+        assert len(remaining_files) == 0
+
+        # Metadata file should also be removed
+        assert not (app_backup_dir / "metadata.json").exists()
 
     @pytest.mark.asyncio
     async def test_show_backup_info(self, backup_handler, mock_config_manager, temp_config):
@@ -476,15 +618,8 @@ class TestBackupHandler:
         result = backup_handler._validate_arguments(args)
         assert result is True
 
-        # Test global list-backups
-        args.migrate = False
-        args.list_backups = True
-
-        result = backup_handler._validate_arguments(args)
-        assert result is True
-
         # Test global cleanup
-        args.list_backups = False
+        args.migrate = False
         args.cleanup = True
 
         result = backup_handler._validate_arguments(args)
@@ -591,6 +726,7 @@ class TestBackupHandler:
         # Verify correct parsing
         assert migrated_count == len(test_cases)
 
+        # Verify correct parsing
         for filename, expected_app, expected_version in test_cases:
             app_backup_dir = backup_dir / expected_app
             assert app_backup_dir.exists(), f"Directory not created for {expected_app}"
@@ -605,3 +741,117 @@ class TestBackupHandler:
 
             # Verify old file was removed
             assert not (backup_dir / filename).exists(), f"Old file {filename} was not removed"
+
+    def test_all_commands_require_app_name_except_global_operations(self, backup_handler):
+        """Test that all commands except global operations require app_name."""
+        # Commands that should require app_name
+        required_app_name_commands = [
+            {"restore_last": True},
+            {"restore_version": "1.0.0"},
+            {"list_backups": True},
+            {"info": True},
+            {"cleanup": True, "app_name": "test"},  # Specific app cleanup
+        ]
+
+        for command_args in required_app_name_commands:
+            args = MagicMock()
+            args.app_name = None
+            args.restore_last = False
+            args.restore_version = None
+            args.list_backups = False
+            args.cleanup = False
+            args.info = False
+            args.migrate = False
+
+            # Set the specific command
+            for key, value in command_args.items():
+                if key != "app_name":
+                    setattr(args, key, value)
+
+            # Should fail validation for commands requiring app_name
+            if "app_name" not in command_args:
+                result = backup_handler._validate_arguments(args)
+                assert result is False, f"Command {command_args} should require app_name"
+
+        # Commands that don't require app_name (global operations)
+        global_operations = [
+            {"migrate": True},
+            {"cleanup": True},  # Global cleanup
+        ]
+
+        for command_args in global_operations:
+            args = MagicMock()
+            args.app_name = None
+            args.restore_last = False
+            args.restore_version = None
+            args.list_backups = False
+            args.cleanup = False
+            args.info = False
+            args.migrate = False
+
+            # Set the specific command
+            for key, value in command_args.items():
+                setattr(args, key, value)
+
+            result = backup_handler._validate_arguments(args)
+            assert result is True, (
+                f"Global operation {command_args} should not require app_name"
+            )
+
+    @pytest.mark.asyncio
+    async def test_commands_produce_visible_output(
+        self, backup_handler, mock_config_manager, temp_config, capsys
+    ):
+        """Test that commands produce visible output."""
+        global_config, backup_dir, storage_dir = temp_config
+
+        # Create test backup data
+        app_name = "testapp"
+        app_backup_dir = backup_dir / app_name
+        app_backup_dir.mkdir(parents=True)
+
+        from my_unicorn.backup import BackupMetadata
+
+        backup_file = app_backup_dir / f"{app_name}-1.2.3.AppImage"
+        backup_file.write_text("test content")
+
+        metadata_manager = BackupMetadata(app_backup_dir)
+        metadata_manager.add_version("1.2.3", f"{app_name}-1.2.3.AppImage", backup_file)
+
+        # Test --info command output
+        args = MagicMock()
+        args.app_name = app_name
+        args.restore_last = False
+        args.restore_version = None
+        args.list_backups = False
+        args.cleanup = False
+        args.info = True
+        args.migrate = False
+
+        await backup_handler.execute(args)
+        captured = capsys.readouterr()
+
+        assert "Backup Statistics for testapp" in captured.out
+        assert "Total backups: 1" in captured.out
+        assert "Configuration:" in captured.out
+
+        # Test --list-backups command output
+        args.info = False
+        args.list_backups = True
+
+        await backup_handler.execute(args)
+        captured = capsys.readouterr()
+
+        assert "Available backups for testapp" in captured.out
+        assert "v1.2.3" in captured.out
+        assert "SHA256:" in captured.out
+
+        # Test --cleanup command output
+        args.list_backups = False
+        args.cleanup = True
+
+        await backup_handler.execute(args)
+        captured = capsys.readouterr()
+
+        assert "Cleaning up old backups for testapp" in captured.out
+        assert "Cleanup completed" in captured.out

@@ -69,20 +69,14 @@ class BackupHandler(BaseCommandHandler):
 
         """
         # Operations that don't require app_name
-        if (
-            args.migrate
-            or (args.list_backups and not args.app_name)
-            or (args.cleanup and not args.app_name)
-        ):
+        if args.migrate or (args.cleanup and not args.app_name):
             return True
 
         # All other operations require app_name
         if not args.app_name:
             logger.error("❌ App name is required for this operation")
             logger.info("💡 Usage: backup <app_name> [options]")
-            logger.info(
-                "💡 For global operations, use: backup --list-backups, backup --cleanup, or backup --migrate"
-            )
+            logger.info("💡 For global operations, use: backup --cleanup or backup --migrate")
             return False
 
         # Validate app_name format (basic sanitization)
@@ -220,17 +214,14 @@ class BackupHandler(BaseCommandHandler):
         except Exception as e:
             logger.error(f"❌ Failed to create backup for {app_name}: {e}")
 
-    async def _handle_list_backups(self, app_name: str | None = None) -> None:
-        """Handle list backups operation.
+    async def _handle_list_backups(self, app_name: str) -> None:
+        """Handle list backups operation for a specific app.
 
         Args:
-            app_name: Name of specific app or None to list all apps with backups
+            app_name: Name of the application
 
         """
-        if app_name:
-            await self._list_backups_for_app(app_name)
-        else:
-            await self._list_all_apps_with_backups()
+        await self._list_backups_for_app(app_name)
 
     async def _list_backups_for_app(self, app_name: str) -> None:
         """List backups for a specific app.
@@ -245,11 +236,11 @@ class BackupHandler(BaseCommandHandler):
             backups = self.backup_service.get_backup_info(app_name)
 
             if not backups:
-                logger.info(f"No backups found for {app_name}")
+                print(f"No backups found for {app_name}")
                 return
 
-            logger.info(f"\n📦 Available backups for {app_name}:")
-            logger.info("=" * 60)
+            print(f"\n📋 Available backups for {app_name}:")
+            print("=" * 60)
 
             for backup in backups:
                 version = backup["version"]
@@ -261,46 +252,16 @@ class BackupHandler(BaseCommandHandler):
                 )
                 exists_symbol = "✅" if backup["exists"] else "❌"
 
-                logger.info(f"  {exists_symbol} v{version}")
-                logger.info(f"     📁 File: {backup['filename']}")
-                logger.info(f"     📏 Size: {size_mb:.1f} MB")
-                logger.info(f"     📅 Created: {created}")
+                print(f"  {exists_symbol} v{version}")
+                print(f"     📁 File: {backup['filename']}")
+                print(f"     📏 Size: {size_mb:.1f} MB")
+                print(f"     📅 Created: {created}")
                 if backup.get("sha256"):
-                    logger.info(f"     🔐 SHA256: {backup['sha256'][:16]}...")
-                logger.info("")
+                    print(f"     🔐 SHA256: {backup['sha256'][:16]}...")
+                print("")
 
         except Exception as e:
             logger.error(f"❌ Failed to list backups for {app_name}: {e}")
-
-    async def _list_all_apps_with_backups(self) -> None:
-        """List all apps that have backups."""
-        logger.info("📋 Listing all apps with backups...")
-
-        try:
-            apps_with_backups = self.backup_service.list_apps_with_backups()
-
-            if not apps_with_backups:
-                logger.info("No apps with backups found")
-                logger.info("💡 Create backups using 'backup <app_name>'")
-                return
-
-            logger.info(f"\n📦 Apps with backups ({len(apps_with_backups)}):")
-            logger.info("=" * 60)
-
-            for app_name in apps_with_backups:
-                backups = self.backup_service.get_backup_info(app_name)
-                backup_count = len(backups)
-                latest_version = backups[0]["version"] if backups else "Unknown"
-
-                logger.info(f"  📱 {app_name}")
-                logger.info(f"     📊 Backups: {backup_count}")
-                logger.info(f"     🔄 Latest: v{latest_version}")
-                logger.info("")
-
-            logger.info("💡 Use 'backup <app_name> --list-backups' for detailed info")
-
-        except Exception as e:
-            logger.error(f"❌ Failed to list apps with backups: {e}")
 
     async def _handle_cleanup(self, app_name: str | None = None) -> None:
         """Handle cleanup old backups operation.
@@ -310,20 +271,18 @@ class BackupHandler(BaseCommandHandler):
 
         """
         if app_name:
-            logger.info(f"🧹 Cleaning up old backups for {app_name}...")
+            print(f"🧹 Cleaning up old backups for {app_name}...")
         else:
-            logger.info("🧹 Cleaning up old backups for all apps...")
+            print("🧹 Cleaning up old backups for all apps...")
 
         try:
             self.backup_service.cleanup_old_backups(app_name)
 
             max_backups = self.global_config["max_backup"]
             if max_backups == 0:
-                logger.info("✅ All backups removed (max_backup=0)")
+                print("✅ All backups removed (max_backup=0)")
             else:
-                logger.info(
-                    f"✅ Cleanup completed (keeping {max_backups} most recent backups)"
-                )
+                print(f"✅ Cleanup completed (keeping {max_backups} most recent backups)")
 
         except Exception as e:
             logger.error(f"❌ Failed to cleanup backups: {e}")
@@ -335,17 +294,17 @@ class BackupHandler(BaseCommandHandler):
             app_name: Name of the application
 
         """
-        logger.info(f"ℹ️  Backup information for {app_name}...")
+        print(f"ℹ️  Backup information for {app_name}...")
 
         try:
             backups = self.backup_service.get_backup_info(app_name)
 
             if not backups:
-                logger.info(f"No backup information available for {app_name}")
+                print(f"No backup information available for {app_name}")
                 return
 
-            logger.info(f"\n📊 Backup Statistics for {app_name}:")
-            logger.info("=" * 60)
+            print(f"\n📊 Backup Statistics for {app_name}:")
+            print("=" * 60)
 
             total_backups = len(backups)
             total_size = sum(b["size"] for b in backups if b["size"])
@@ -354,8 +313,8 @@ class BackupHandler(BaseCommandHandler):
             oldest_backup = backups[-1] if backups else None
             newest_backup = backups[0] if backups else None
 
-            logger.info(f"  📦 Total backups: {total_backups}")
-            logger.info(f"  📏 Total size: {total_size_mb:.1f} MB")
+            print(f"  📦 Total backups: {total_backups}")
+            print(f"  📏 Total size: {total_size_mb:.1f} MB")
 
             if newest_backup:
                 latest_created = (
@@ -363,9 +322,7 @@ class BackupHandler(BaseCommandHandler):
                     if newest_backup["created"]
                     else "Unknown"
                 )
-                logger.info(
-                    f"  🆕 Latest version: v{newest_backup['version']} ({latest_created})"
-                )
+                print(f"  🆕 Latest version: v{newest_backup['version']} ({latest_created})")
 
             if oldest_backup:
                 oldest_created = (
@@ -373,34 +330,30 @@ class BackupHandler(BaseCommandHandler):
                     if oldest_backup["created"]
                     else "Unknown"
                 )
-                logger.info(
-                    f"  📜 Oldest version: v{oldest_backup['version']} ({oldest_created})"
-                )
+                print(f"  📜 Oldest version: v{oldest_backup['version']} ({oldest_created})")
 
             # Backup configuration
             max_backups = self.global_config["max_backup"]
             backup_dir = self.global_config["directory"]["backup"]
 
-            logger.info("\n⚙️  Configuration:")
-            logger.info(f"  📁 Backup directory: {backup_dir}")
-            logger.info(
-                f"  🔄 Max backups kept: {max_backups if max_backups > 0 else 'unlimited'}"
-            )
+            print("\n⚙️  Configuration:")
+            print(f"  📁 Backup directory: {backup_dir}")
+            print(f"  🔄 Max backups kept: {max_backups if max_backups > 0 else 'unlimited'}")
 
         except Exception as e:
             logger.error(f"❌ Failed to get backup info for {app_name}: {e}")
 
     async def _handle_migrate(self) -> None:
         """Handle migration of old backup format."""
-        logger.info("🔄 Migrating old backup files to new format...")
+        print("🔄 Migrating old backup files to new format...")
 
         try:
             migrated_count = self.backup_service.migrate_old_backups()
 
             if migrated_count > 0:
-                logger.info(f"✅ Successfully migrated {migrated_count} backup files")
+                print(f"✅ Successfully migrated {migrated_count} backup files")
             else:
-                logger.info("ℹ️  No old backup files found to migrate")
+                print("ℹ️  No old backup files found to migrate")
 
         except Exception as e:
             logger.error(f"❌ Failed to migrate old backups: {e}")

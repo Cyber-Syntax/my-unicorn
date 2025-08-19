@@ -250,8 +250,7 @@ Examples:
   # List backups for specific app
   %(prog)s appflowy --list-backups
 
-  # List all apps with backups
-  %(prog)s --list-backups
+
 
   # Show backup info
   %(prog)s appflowy --info
@@ -284,7 +283,7 @@ Examples:
         action_group.add_argument(
             "--list-backups",
             action="store_true",
-            help="List available backups (for specific app or all apps)",
+            help="List available backups for the specified app",
         )
 
         action_group.add_argument(
