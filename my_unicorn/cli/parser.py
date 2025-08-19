@@ -84,6 +84,7 @@ Examples:
         self._add_self_update_command(subparsers)
         self._add_list_command(subparsers)
         self._add_remove_command(subparsers)
+        self._add_backup_command(subparsers)
         self._add_auth_command(subparsers)
         self._add_config_command(subparsers)
 
@@ -223,6 +224,82 @@ Examples:
         (remove_parser.add_argument("apps", nargs="+", help="Application names to remove"),)
         remove_parser.add_argument(
             "--keep-config", action="store_true", help="Keep configuration files"
+        )
+
+    def _add_backup_command(self, subparsers) -> None:
+        """Add backup command parser.
+
+        Args:
+            subparsers: The subparsers object to add the backup command to
+
+        """
+        backup_parser = subparsers.add_parser(
+            "backup",
+            help="Manage AppImage backups and restore",
+            epilog="""
+Examples:
+  # Create backup
+  %(prog)s appflowy
+
+  # Restore latest backup
+  %(prog)s appflowy --restore-last
+
+  # Restore specific version
+  %(prog)s appflowy --restore-version 1.2.3
+
+  # List backups for specific app
+  %(prog)s appflowy --list-backups
+
+
+
+  # Show backup info
+  %(prog)s appflowy --info
+
+  # Cleanup old backups
+  %(prog)s --cleanup
+  %(prog)s appflowy --cleanup
+
+  # Migrate old backup format
+  %(prog)s --migrate
+            """,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+
+        backup_parser.add_argument(
+            "app_name", nargs="?", help="Application name (required for most operations)"
+        )
+
+        # Action group - mutually exclusive options
+        action_group = backup_parser.add_mutually_exclusive_group()
+
+        action_group.add_argument(
+            "--restore-last", action="store_true", help="Restore the latest backup version"
+        )
+
+        action_group.add_argument(
+            "--restore-version", type=str, metavar="VERSION", help="Restore a specific version"
+        )
+
+        action_group.add_argument(
+            "--list-backups",
+            action="store_true",
+            help="List available backups for the specified app",
+        )
+
+        action_group.add_argument(
+            "--cleanup",
+            action="store_true",
+            help="Clean up old backups according to max_backup setting",
+        )
+
+        action_group.add_argument(
+            "--info", action="store_true", help="Show detailed backup information"
+        )
+
+        action_group.add_argument(
+            "--migrate",
+            action="store_true",
+            help="Migrate old backup files to new folder-based format",
         )
 
     def _add_auth_command(self, subparsers) -> None:

@@ -1,6 +1,23 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.1.0-alpha
+### BREAKING CHANGES
+This release implement new backup commands and features.
+Please read [wiki.md](docs/wiki.md) for more information how to use the new feature and how to migrate old backups to new format.
+
+- Added support for `backup app_name --restore-last` restore last backup
+- Added support for `backup app_name --restore-version <version>` restore backup by version
+- Added support for `backup app_name --info` show backup info
+- Added support for `backup app_name --list-backups` list all backups
+- Added support for `backup app_name --cleanup` to clean up old backups manualy(This already automaticly works when the script used tough)
+- Added support for `backup app_name --migrate` to migrate old backups to new format
+#### Migration guide
+- Keep in mind that the migration process is irreversible and will cause data loss.
+- Run `backup app_name --migrate` to migrate old backups to new format.
+- If something goes wrong, migrate manually by moving the `~/Applications/backups` directory to `~/Applications/backups.old`
+than make sure to run migrate command again to migrate the new backups to the new format.
+
 ## v1.0.1-alpha
 ## v1.0.0-alpha
 ### BREAKING CHANGES

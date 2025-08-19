@@ -68,6 +68,41 @@ python run.py auth --status
 python run.py auth --remove-token
 ```
 
+### Backup
+
+#### Basic Operations
+
+```bash
+# Create backup of current version
+backup <app_name>
+
+# Restore latest backup version
+backup <app_name> --restore-last
+
+# Restore specific version
+backup <app_name> --restore-version <version>
+```
+
+#### Information & Management
+
+```bash
+# List backups for specific app
+backup <app_name> --list-backups
+
+# List all apps with backups
+backup --list-backups
+
+# Show detailed backup info
+backup <app_name> --info
+
+# Clean up old backups
+backup --cleanup                 # All apps
+backup <app_name> --cleanup      # Specific app
+
+# Migrate old backup format
+backup --migrate
+```
+
 ## 📋 Dependencies
 
 ### Core (working now)
@@ -281,6 +316,46 @@ tmp = "~/.config/my-unicorn/tmp"
         "url": "https://raw.githubusercontent.com/laurent22/joplin/dev/Assets/LinuxIcons/256x256.png",
         "name": "joplin.png",
         "installed": true
+    }
+}
+```
+
+#### Backup metadata.json implementation
+
+##### 1. **Backup Storage Structure** ✅
+
+```
+~/Applications/backups/
+  ├── appflowy/
+  │   ├── appflowy-1.2.3.AppImage
+  │   ├── appflowy-1.3.0.AppImage
+  │   └── metadata.json
+  └── obsidian/
+      ├── obsidian-1.9.1.AppImage
+      ├── obsidian-1.9.10.AppImage
+      └── metadata.json
+```
+
+##### 2. **Metadata Structure (metadata.json)** ✅
+
+> [!NOTE]
+> file path: `~/Applications/backups/obsidian/metadata.json`
+
+```json
+{
+    "versions": {
+        "1.9.1": {
+            "created": "2025-08-19T14:36:49.868125",
+            "filename": "obsidian-1.9.1.AppImage",
+            "sha256": "24471d25ed4d7d797a20a8ddf7b81ec43ae337f9ce495514dfdbb893307472b7",
+            "size": 125682911
+        },
+        "1.9.10": {
+            "created": "2025-08-19T14:01:21.787195",
+            "filename": "obsidian-1.9.10.AppImage",
+            "sha256": "24471d25ed4d7d797a20a8ddf7b81ec43ae337f9ce495514dfdbb893307472b7",
+            "size": 125682911
+        }
     }
 }
 ```

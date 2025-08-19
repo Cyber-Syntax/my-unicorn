@@ -9,6 +9,7 @@ from argparse import Namespace
 
 from ..auth import auth_manager
 from ..commands.auth import AuthHandler
+from ..commands.backup import BackupHandler
 from ..commands.config import ConfigHandler
 from ..commands.install import InstallHandler
 from ..commands.list import ListHandler
@@ -61,6 +62,9 @@ class CLIRunner:
             ),
             "list": ListHandler(self.config_manager, self.auth_manager, self.update_manager),
             "remove": RemoveHandler(
+                self.config_manager, self.auth_manager, self.update_manager
+            ),
+            "backup": BackupHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
             "auth": AuthHandler(self.config_manager, self.auth_manager, self.update_manager),
