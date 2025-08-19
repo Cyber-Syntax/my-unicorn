@@ -7,8 +7,6 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from my_unicorn.download import IconAsset
-
 from ..github_client import (
     GitHubAsset,
     GitHubClient,
@@ -16,6 +14,7 @@ from ..github_client import (
     GitHubReleaseFetcher,
 )
 from ..logger import get_logger
+from ..utils import extract_and_validate_version
 from ..verify import Verifier
 from .install import InstallationError, InstallStrategy, ValidationError
 
@@ -219,7 +218,7 @@ class URLInstallStrategy(InstallStrategy):
                     "path": str(final_path),
                     "name": final_path.name,
                     "source": "url",
-                    "version": release_data.get("tag_name"),
+                    "version": extract_and_validate_version(release_data.get("tag_name", "")),
                     "icon_path": str(icon_path) if icon_path else None,
                 }
 
@@ -315,7 +314,8 @@ class URLInstallStrategy(InstallStrategy):
             "config_version": "1.0.0",
             "source": "url",
             "appimage": {
-                "version": release_data.get("version", "unknown"),
+                "version": extract_and_validate_version(release_data.get("version", ""))
+                or "unknown",
                 "name": app_path.name,
                 "rename": app_name,
                 "name_template": "",

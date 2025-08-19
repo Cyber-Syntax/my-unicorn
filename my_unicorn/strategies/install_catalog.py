@@ -10,6 +10,7 @@ from typing import Any
 from my_unicorn.download import IconAsset
 
 from ..logger import get_logger
+from ..utils import extract_and_validate_version
 from .install_url import InstallationError, InstallStrategy, ValidationError
 
 logger = get_logger(__name__)
@@ -260,7 +261,7 @@ class CatalogInstallStrategy(InstallStrategy):
                     "path": str(final_path),
                     "name": final_path.name,
                     "source": "catalog",
-                    "version": release_data.get("tag_name"),
+                    "version": extract_and_validate_version(release_data.get("tag_name", "")),
                     "icon_path": str(icon_path) if icon_path else None,
                 }
 
@@ -568,7 +569,8 @@ class CatalogInstallStrategy(InstallStrategy):
             "config_version": "1.0.0",
             "source": "catalog",
             "appimage": {
-                "version": release_data.get("tag_name", "unknown"),
+                "version": extract_and_validate_version(release_data.get("tag_name", ""))
+                or "unknown",
                 "name": app_path.name,
                 "rename": appimage_config.get("rename", app_name),
                 "name_template": appimage_config.get("name_template", ""),

@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 import aiohttp
 
 from .auth import GitHubAuthManager, auth_manager
+from .utils import extract_and_validate_version
 
 
 class GitHubAsset(TypedDict):
@@ -46,16 +47,28 @@ class GitHubReleaseFetcher:
         self.session = session
 
     def _normalize_version(self, tag_name: str) -> str:
-        """Normalize version by stripping 'v' prefix.
+        """Normalize version by extracting and sanitizing version string.
+
+        Handles various formats including package@version and v-prefixed versions.
 
         Args:
-            tag_name: Version tag that may have 'v' prefix
+            tag_name: Version tag that may have 'v' prefix or package format
 
         Returns:
-            Version string without 'v' prefix
+            Sanitized version string
 
         """
-        return tag_name.lstrip("v") if tag_name else ""
+        if not tag_name:
+            return ""
+
+        # Use the comprehensive version extraction and validation
+        normalized = extract_and_validate_version(tag_name)
+
+        # Fall back to original logic if extraction fails
+        if normalized is None:
+            return tag_name.lstrip("v")
+
+        return normalized
 
     async def fetch_latest_release(self) -> GitHubReleaseDetails:
         """Fetch the latest release information from GitHub API.
