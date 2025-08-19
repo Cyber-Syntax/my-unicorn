@@ -151,12 +151,12 @@ class CatalogInstallStrategy(InstallStrategy):
 
                 # Get release configuration
                 release_config = self._get_release_config(app_config)
-                logger.debug(f"Release config: {release_config}")
+                logger.debug("Release config: %s", release_config)
 
                 # Fetch release data from GitHub
-                logger.info(f"📡 Fetching release data for {app_name}")
+                logger.info("📡 Fetching release data for %s", app_name)
                 release_data = await self._fetch_release_data(release_config)
-                logger.debug(f"Release data: {release_data}")
+                logger.debug("Release data: %s", release_data)
 
                 # Find AppImage asset using characteristic_suffix from catalog config
                 characteristic_suffix = app_config.get("appimage", {}).get(
@@ -251,9 +251,9 @@ class CatalogInstallStrategy(InstallStrategy):
                     )
                     # Desktop entry creation/update logging is handled by the desktop module
                 except Exception as e:
-                    logger.warning(f"⚠️  Failed to update desktop entry: {e}")
+                    logger.warning("⚠️  Failed to update desktop entry: %s", e)
 
-                logger.info(f"✅ Successfully installed from catalog: {final_path}")
+                logger.info("✅ Successfully installed from catalog: %s", final_path)
 
                 return {
                     "target": app_name,
@@ -266,10 +266,10 @@ class CatalogInstallStrategy(InstallStrategy):
                 }
 
             except Exception as e:
-                logger.error(f"❌ Failed to install {app_name}: {e}")
+                logger.error("❌ Failed to install %s: %s", app_name, e)
                 import traceback
 
-                logger.debug(f"Full traceback: {traceback.format_exc()}")
+                logger.debug("Full traceback: %s", traceback.format_exc())
                 return {
                     "target": app_name,
                     "success": False,
@@ -298,22 +298,22 @@ class CatalogInstallStrategy(InstallStrategy):
 
         existing_path = Path(existing_config.get("path", ""))
         if not existing_path.exists():
-            logger.debug(f"📝 Removing stale config for {app_name}")
+            logger.debug("📝 Removing stale config for %s", app_name)
             self.catalog_manager.remove_app_config(app_name)
             return None
 
         # Check for force reinstall
         if kwargs.get("force", False):
-            logger.info(f"🔄 Force reinstalling {app_name}")
+            logger.info("🔄 Force reinstalling %s", app_name)
             return None
 
         # Check for updates if update mode
         if kwargs.get("update", False):
-            logger.info(f"🔄 Checking for updates for {app_name}")
+            logger.info("🔄 Checking for updates for %s", app_name)
             # TODO: Implement update check logic
             return None
 
-        logger.info(f"✅ {app_name} is already installed at {existing_path}")
+        logger.info("✅ %s is already installed at %s", app_name, existing_path)
         return existing_path
 
     def _get_release_config(self, app_config: dict[str, Any]) -> dict[str, Any]:
@@ -393,7 +393,7 @@ class CatalogInstallStrategy(InstallStrategy):
         # Get verification configuration from catalog
         verification_config = app_config.get("verification", {})
 
-        logger.debug(f"🔍 Starting verification for {path.name}")
+        logger.debug("🔍 Starting verification for %s", path.name)
         verifier = Verifier(path)
         verification_passed = False
         successful_methods = {}
@@ -407,7 +407,7 @@ class CatalogInstallStrategy(InstallStrategy):
         logger.debug(
             f"   Available methods: digest={has_digest}, checksum_file={has_checksum_file}"
         )
-        logger.debug(f"   Catalog skip setting: {catalog_skip}")
+        logger.debug("   Catalog skip setting: %s", catalog_skip)
 
         # Only skip if configured AND no strong verification methods available
         if catalog_skip and not has_digest and not has_checksum_file:
@@ -435,7 +435,7 @@ class CatalogInstallStrategy(InstallStrategy):
                 # Enable digest verification in config for future use
                 updated_verification_config["digest"] = True
             except Exception as e:
-                logger.error(f"❌ Digest verification failed: {e}")
+                logger.error("❌ Digest verification failed: %s", e)
                 # Continue to try other verification methods
 
         # Try checksum file verification if configured and digest didn't pass
@@ -452,7 +452,7 @@ class CatalogInstallStrategy(InstallStrategy):
             checksum_url = f"https://github.com/{owner}/{repo}/releases/download/{original_tag_name}/{checksum_file}"
 
             try:
-                logger.debug(f"🔍 Attempting checksum file verification: {checksum_file}")
+                logger.debug("🔍 Attempting checksum file verification: %s", checksum_file)
                 await verifier.verify_from_checksum_file(
                     checksum_url, hash_type, self.download_service, path.name
                 )
@@ -464,7 +464,7 @@ class CatalogInstallStrategy(InstallStrategy):
                     "file": checksum_file,
                 }
             except Exception as e:
-                logger.error(f"❌ Checksum file verification failed: {e}")
+                logger.error("❌ Checksum file verification failed: %s", e)
                 # Continue to basic file size check
 
         # Always perform basic file size verification
@@ -477,7 +477,7 @@ class CatalogInstallStrategy(InstallStrategy):
             else:
                 logger.debug("⚠️ No expected file size available, skipping size verification")
         except Exception as e:
-            logger.error(f"❌ File size verification failed: {e}")
+            logger.error("❌ File size verification failed: %s", e)
             if not verification_passed:
                 raise InstallationError("File verification failed")
 
@@ -537,7 +537,7 @@ class CatalogInstallStrategy(InstallStrategy):
         try:
             return await self.download_service.download_icon(icon_asset, icon_path)
         except Exception as e:
-            logger.warning(f"⚠️  Failed to download icon for {app_name}: {e}")
+            logger.warning("⚠️  Failed to download icon for %s: %s", app_name, e)
             return None
 
     def _create_app_config(
@@ -609,7 +609,7 @@ class CatalogInstallStrategy(InstallStrategy):
                 f"📝 Saved configuration for {app_name} with updated verification: {', '.join(methods)}"
             )
         else:
-            logger.debug(f"📝 Saved configuration for {app_name}")
+            logger.debug("📝 Saved configuration for %s", app_name)
 
     def _get_updated_verification_config(
         self, catalog_config: dict[str, Any], verification_result: dict[str, Any] | None

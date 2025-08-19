@@ -7,43 +7,87 @@ levels and output formatting for the application.
 import logging
 import logging.handlers
 import sys
+import threading
+from collections import deque
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+# Module-level imports for better performance
+ConfigManager = None
+try:
+    from .config import ConfigManager
+except ImportError:
+    try:
+        from my_unicorn.config import ConfigManager
+    except ImportError:
+        pass
+
 # Global registry to prevent duplicate loggers
 _logger_instances = {}
 
-# Progress context state
-_progress_active = False
-_deferred_messages = []
+# Thread-local storage for progress context
+_thread_local = threading.local()
+
+# Maximum number of deferred messages to prevent memory leaks
+MAX_DEFERRED_MESSAGES = 1000
 
 
 class ColoredFormatter(logging.Formatter):
     """Custom formatter with color support for console output."""
 
-    # Color codes
-    COLORS = {
-        "DEBUG": "\033[36m",  # Cyan
-        "INFO": "\033[32m",  # Green
-        "WARNING": "\033[33m",  # Yellow
-        "ERROR": "\033[31m",  # Red
-        "CRITICAL": "\033[35m",  # Magenta
-    }
-    RESET = "\033[0m"
+    __slots__ = ("_colored_levels", "_reset")
+
+    def __init__(self, *args, **kwargs):
+        """Initialize formatter with cached color codes."""
+        super().__init__(*args, **kwargs)
+        colors = {
+            "DEBUG": "\033[36m",  # Cyan
+            "INFO": "\033[32m",  # Green
+            "WARNING": "\033[33m",  # Yellow
+            "ERROR": "\033[31m",  # Red
+            "CRITICAL": "\033[35m",  # Magenta
+        }
+        self._reset = "\033[0m"
+        self._colored_levels = {
+            level: f"{color}{level}{self._reset}" for level, color in colors.items()
+        }
 
     def format(self, record: logging.LogRecord) -> str:
         """Format log record with colors."""
-        # Add color to levelname
-        if record.levelname in self.COLORS:
-            record.levelname = f"{self.COLORS[record.levelname]}{record.levelname}{self.RESET}"
+        colored_level = self._colored_levels.get(record.levelname)
+        if colored_level:
+            original_levelname = record.levelname
+            record.levelname = colored_level
+            try:
+                return super().format(record)
+            finally:
+                record.levelname = original_levelname
 
         return super().format(record)
 
 
+def _get_progress_state():
+    """Get thread-local progress state."""
+    if not hasattr(_thread_local, "progress_active"):
+        _thread_local.progress_active = False
+        _thread_local.deferred_messages = deque(maxlen=MAX_DEFERRED_MESSAGES)
+    return _thread_local.progress_active, _thread_local.deferred_messages
+
+
+def _set_progress_state(active: bool):
+    """Set thread-local progress state."""
+    if not hasattr(_thread_local, "progress_active"):
+        _thread_local.progress_active = False
+        _thread_local.deferred_messages = deque(maxlen=MAX_DEFERRED_MESSAGES)
+    _thread_local.progress_active = active
+
+
 class MyUnicornLogger:
     """Logger manager for my-unicorn application."""
+
+    __slots__ = ("_console_handler", "_file_handler", "_file_logging_setup", "_name", "logger")
 
     def __init__(self, name: str = "my-unicorn"):
         """Initialize logger with given name.
@@ -52,10 +96,12 @@ class MyUnicornLogger:
             name: Logger name
 
         """
+        self._name = name
         self.logger = logging.getLogger(name)
         self.logger.setLevel(logging.DEBUG)
         self._file_logging_setup = False
         self._console_handler = None
+        self._file_handler = None
 
         # Prevent duplicate handlers
         if not self.logger.handlers:
@@ -90,7 +136,7 @@ class MyUnicornLogger:
 
         # Rotating file handler: max 1MB per file, keep 3 files
         # Files will be named: my-unicorn.log, my-unicorn.log.1, my-unicorn.log.2
-        file_handler = logging.handlers.RotatingFileHandler(
+        self._file_handler = logging.handlers.RotatingFileHandler(
             log_file,
             maxBytes=1024 * 1024,  # 1MB
             backupCount=3,
@@ -102,14 +148,14 @@ class MyUnicornLogger:
             "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
-        file_handler.setFormatter(file_formatter)
-        file_handler.setLevel(getattr(logging, level.upper()))
+        self._file_handler.setFormatter(file_formatter)
+        self._file_handler.setLevel(getattr(logging, level.upper()))
 
-        self.logger.addHandler(file_handler)
+        self.logger.addHandler(self._file_handler)
         self._file_logging_setup = True
 
     def set_level(self, level: str) -> None:
-        """Set logging level.
+        """Set logging level for file handler while keeping console at WARNING.
 
         Args:
             level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -117,63 +163,88 @@ class MyUnicornLogger:
         """
         numeric_level = getattr(logging, level.upper(), logging.INFO)
 
-        # Keep console handler at WARNING level, don't change it
-        # This ensures INFO messages only go to log file, not console
+        if self._file_handler:
+            self._file_handler.setLevel(numeric_level)
 
     def debug(self, message: str, *args: Any, **kwargs: Any) -> None:
         """Log debug message."""
-        self.logger.debug(message, *args, **kwargs)
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug(message, *args, **kwargs)
 
     def info(self, message: str, *args: Any, **kwargs: Any) -> None:
         """Log info message."""
-        global _progress_active, _deferred_messages
-        if _progress_active:
-            # Defer INFO messages during progress operations
-            _deferred_messages.append(("INFO", message % args if args else message))
+        if not self.logger.isEnabledFor(logging.INFO):
+            return
+
+        progress_active, deferred_messages = _get_progress_state()
+        if progress_active:
+            deferred_messages.append(("INFO", message, args, kwargs))
         else:
             self.logger.info(message, *args, **kwargs)
 
     def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
         """Log warning message."""
-        global _progress_active, _deferred_messages
-        if _progress_active:
-            _deferred_messages.append(("WARNING", message % args if args else message))
+        if not self.logger.isEnabledFor(logging.WARNING):
+            return
+
+        progress_active, deferred_messages = _get_progress_state()
+        if progress_active:
+            deferred_messages.append(("WARNING", message, args, kwargs))
         else:
             self.logger.warning(message, *args, **kwargs)
 
-    def error(self, message: str, *args: Any, **kwargs: Any) -> None:
+    def error(self, message: str, *args: Any, exc_info: bool = False, **kwargs: Any) -> None:
         """Log error message."""
-        self.logger.error(message, *args, **kwargs, exc_info=True)
+        if self.logger.isEnabledFor(logging.ERROR):
+            self.logger.error(message, *args, exc_info=exc_info, **kwargs)
 
     def critical(self, message: str, *args: Any, **kwargs: Any) -> None:
         """Log critical message."""
-        self.logger.critical(message, *args, **kwargs)
+        if self.logger.isEnabledFor(logging.CRITICAL):
+            self.logger.critical(message, *args, **kwargs)
 
     def exception(self, message: str, *args: Any, **kwargs: Any) -> None:
         """Log exception with traceback."""
-        self.logger.exception(message, *args, **kwargs)
+        if self.logger.isEnabledFor(logging.ERROR):
+            self.logger.exception(message, *args, **kwargs)
 
     @contextmanager
     def progress_context(self) -> Generator[None, None, None]:
         """Context manager to defer logging during progress operations."""
-        global _progress_active, _deferred_messages
-        old_state = _progress_active
-        _progress_active = True
-        _deferred_messages.clear()
+        progress_active, deferred_messages = _get_progress_state()
+        old_state = progress_active
+        _set_progress_state(True)
+
+        # Get fresh state after setting
+        _, deferred_messages = _get_progress_state()
+        deferred_messages.clear()
 
         try:
             yield
         finally:
-            _progress_active = old_state
+            _set_progress_state(old_state)
 
             # Flush deferred messages
-            if _deferred_messages:
-                for level, message in _deferred_messages:
-                    if level == "INFO":
-                        self.logger.info(message)
-                    elif level == "WARNING":
-                        self.logger.warning(message)
-                _deferred_messages.clear()
+            if deferred_messages:
+                for item in deferred_messages:
+                    if len(item) >= 3:  # New format with args
+                        level, message, args, kwargs = (
+                            item[0],
+                            item[1],
+                            item[2],
+                            item[3] if len(item) > 3 else {},
+                        )
+                        if level == "INFO":
+                            self.logger.info(message, *args, **kwargs)
+                        elif level == "WARNING":
+                            self.logger.warning(message, *args, **kwargs)
+                    else:  # Backward compatibility with old format
+                        level, formatted_message = item
+                        if level == "INFO":
+                            self.logger.info(formatted_message)
+                        elif level == "WARNING":
+                            self.logger.warning(formatted_message)
+                deferred_messages.clear()
 
     def set_console_level_temporarily(self, level: str) -> None:
         """Temporarily set console logging level."""
@@ -204,19 +275,8 @@ def get_logger(name: str = "my-unicorn", enable_file_logging: bool = True) -> My
 
     logger_instance = MyUnicornLogger(name)
 
-    # Setup file logging if enabled
-    if enable_file_logging:
-        try:
-            from .config import ConfigManager
-        except ImportError:
-            # Fallback for direct execution
-            try:
-                from config import ConfigManager
-            except ImportError:
-                # If config not available, skip file logging
-                _logger_instances[name] = logger_instance
-                return logger_instance
-
+    # Setup file logging if enabled and config is available
+    if enable_file_logging and ConfigManager is not None:
         try:
             config_manager = ConfigManager()
             global_config = config_manager.load_global_config()

@@ -50,12 +50,12 @@ class BackupMetadata:
             with open(self.metadata_file, encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError) as e:
-            logger.warning(f"Corrupted metadata file {self.metadata_file}: {e}")
+            logger.warning("Corrupted metadata file %s: %s", self.metadata_file, e)
             # Create backup of corrupted file
             corrupted_backup = self.metadata_file.with_suffix(".json.corrupted")
             if self.metadata_file.exists():
                 shutil.copy2(self.metadata_file, corrupted_backup)
-                logger.info(f"Backed up corrupted metadata to {corrupted_backup}")
+                logger.info("Backed up corrupted metadata to %s", corrupted_backup)
             return {"versions": {}}
 
     def save(self, metadata: dict[str, Any]) -> None:
@@ -83,7 +83,7 @@ class BackupMetadata:
 
         # Atomic move
         temp_path.replace(self.metadata_file)
-        logger.debug(f"Saved metadata to {self.metadata_file}")
+        logger.debug("Saved metadata to %s", self.metadata_file)
 
     def add_version(self, version: str, filename: str, file_path: Path) -> None:
         """Add a version entry to metadata with checksum.
@@ -108,7 +108,7 @@ class BackupMetadata:
         }
 
         self.save(metadata)
-        logger.debug(f"Added version {version} to metadata")
+        logger.debug("Added version %s to metadata", version)
 
     def get_latest_version(self) -> str | None:
         """Get the latest version from metadata.
@@ -178,7 +178,7 @@ class BackupMetadata:
         if version in metadata["versions"]:
             del metadata["versions"][version]
             self.save(metadata)
-            logger.debug(f"Removed version {version} from metadata")
+            logger.debug("Removed version %s from metadata", version)
             return True
         return False
 
@@ -199,7 +199,7 @@ class BackupMetadata:
 
         stored_hash = version_info.get("sha256")
         if not stored_hash:
-            logger.warning(f"No checksum stored for version {version}")
+            logger.warning("No checksum stored for version %s", version)
             return False
 
         actual_hash = self._calculate_sha256(file_path)
@@ -207,7 +207,10 @@ class BackupMetadata:
 
         if not is_valid:
             logger.error(
-                f"Integrity check failed for {file_path}: expected {stored_hash}, got {actual_hash}"
+                "Integrity check failed for %s: expected %s, got %s",
+                file_path,
+                stored_hash,
+                actual_hash,
             )
 
         return is_valid
@@ -300,7 +303,7 @@ class BackupService:
             metadata = BackupMetadata(app_backup_dir)
             metadata.add_version(version, backup_filename, backup_path)
 
-            logger.info(f"💾 Backup created: {backup_path} (v{version})")
+            logger.info("💾 Backup created: %s (v%s)", backup_path, version)
 
             # Cleanup old backups after successful backup
             self._cleanup_old_backups_for_app(app_name, app_backup_dir)
@@ -311,7 +314,7 @@ class BackupService:
             # Cleanup temp file on error
             if temp_path.exists():
                 temp_path.unlink()
-            logger.error(f"Failed to create backup for {app_name}: {e}")
+            logger.error("Failed to create backup for %s: %s", app_name, e)
             raise
 
     def restore_latest_backup(self, app_name: str, destination_dir: Path) -> Path | None:
@@ -338,7 +341,7 @@ class BackupService:
         app_backup_dir = backup_base_dir / app_name
 
         if not app_backup_dir.exists():
-            logger.warning(f"No backup directory found for {app_name}")
+            logger.warning("No backup directory found for %s", app_name)
             return None
 
         # Get latest version from metadata
@@ -346,7 +349,7 @@ class BackupService:
         latest_version = metadata.get_latest_version()
 
         if not latest_version:
-            logger.warning(f"No backup versions found for {app_name}")
+            logger.warning("No backup versions found for %s", app_name)
             return None
 
         return self._restore_specific_version(app_name, latest_version, destination_dir)
@@ -388,7 +391,7 @@ class BackupService:
         app_backup_dir = backup_base_dir / app_name
 
         if not app_backup_dir.exists():
-            logger.error(f"No backup directory found for {app_name}")
+            logger.error("No backup directory found for %s", app_name)
             return None
 
         # Get version info from metadata
@@ -396,31 +399,31 @@ class BackupService:
         version_info = metadata.get_version_info(version)
 
         if not version_info:
-            logger.error(f"Version {version} not found for {app_name}")
+            logger.error("Version %s not found for %s", version, app_name)
             return None
 
         backup_filename = version_info["filename"]
         backup_path = app_backup_dir / backup_filename
 
         if not backup_path.exists():
-            logger.error(f"Backup file not found: {backup_path}")
+            logger.error("Backup file not found: %s", backup_path)
             return None
 
         # Verify backup integrity
         if not metadata.verify_backup_integrity(version, backup_path):
-            logger.error(f"Backup integrity check failed for {app_name} v{version}")
+            logger.error("Backup integrity check failed for %s v%s", app_name, version)
             return None
 
         # Get app config to determine proper filename and current version
         app_config = self.config_manager.load_app_config(app_name)
         if not app_config:
-            logger.error(f"App configuration not found for {app_name}")
+            logger.error("App configuration not found for %s", app_name)
             return None
 
         # Validate app config structure
         if "appimage" not in app_config:
             logger.error(
-                f"Invalid app configuration for {app_name}: missing 'appimage' section"
+                "Invalid app configuration for %s: missing 'appimage' section", app_name
             )
             return None
 
@@ -437,20 +440,20 @@ class BackupService:
         # If current AppImage exists, backup it first with its current version
         current_version = appimage_config.get("version", "unknown")
         if destination_path.exists() and current_version != version:
-            logger.info(f"Backing up current version {current_version} before restore...")
+            logger.info("Backing up current version %s before restore...", current_version)
             try:
                 current_backup_path = self.create_backup(
                     destination_path, app_name, current_version
                 )
                 if current_backup_path:
-                    logger.info(f"Current version backed up to: {current_backup_path}")
+                    logger.info("Current version backed up to: %s", current_backup_path)
                 else:
                     logger.warning(
                         "Failed to backup current version, continuing with restore..."
                     )
             except Exception as e:
                 logger.warning(
-                    f"Failed to backup current version: {e}, continuing with restore..."
+                    "Failed to backup current version: %s, continuing with restore...", e
                 )
 
         # Restore file atomically
@@ -481,12 +484,12 @@ class BackupService:
             # Save updated config
             try:
                 self.config_manager.save_app_config(app_name, app_config)
-                logger.debug(f"Updated app config for {app_name} with version {version}")
+                logger.debug("Updated app config for %s with version %s", app_name, version)
             except Exception as e:
-                logger.error(f"Failed to update app config for {app_name}: {e}")
+                logger.error("Failed to update app config for %s: %s", app_name, e)
                 # Continue anyway, as the file restore was successful
 
-            logger.info(f"🔄 Restored {app_name} v{version} to {destination_path}")
+            logger.info("🔄 Restored %s v%s to %s", app_name, version, destination_path)
             logger.info("📝 Updated app configuration with restored version")
             return destination_path
 
@@ -494,7 +497,7 @@ class BackupService:
             # Cleanup temp file on error
             if temp_path.exists():
                 temp_path.unlink()
-            logger.error(f"Failed to restore {app_name} v{version}: {e}")
+            logger.error("Failed to restore %s v%s: %s", app_name, version, e)
             raise
 
     def get_backup_info(self, app_name: str) -> list[dict[str, Any]]:
@@ -586,7 +589,7 @@ class BackupService:
                     backup_path = app_backup_dir / version_info["filename"]
                     if backup_path.exists():
                         backup_path.unlink()
-                        logger.info(f"Removed backup: {backup_path}")
+                        logger.info("Removed backup: %s", backup_path)
                     metadata.remove_version(version)
 
             # Remove metadata file and directory if empty
@@ -610,9 +613,9 @@ class BackupService:
                     try:
                         backup_path.unlink()
                         metadata.remove_version(version)
-                        logger.info(f"Removed old backup: {backup_path} (v{version})")
+                        logger.info("Removed old backup: %s (v%s)", backup_path, version)
                     except Exception as e:
-                        logger.error(f"Failed to remove backup {backup_path}: {e}")
+                        logger.error("Failed to remove backup %s: %s", backup_path, e)
 
     def migrate_old_backups(self) -> int:
         """Migrate old flat backup structure to new folder-based structure.
@@ -633,7 +636,7 @@ class BackupService:
             logger.debug("No old backups found to migrate")
             return 0
 
-        logger.info(f"🔄 Migrating {len(old_backups)} old backups to new format...")
+        logger.info("🔄 Migrating %d old backups to new format...", len(old_backups))
 
         migrated_count = 0
 
@@ -696,17 +699,17 @@ class BackupService:
                     metadata.add_version(version, new_filename, new_path)
 
                     migrated_count += 1
-                    logger.debug(f"Migrated {old_backup} -> {new_path}")
+                    logger.debug("Migrated %s -> %s", old_backup, new_path)
                 else:
                     # File already exists, remove old backup
                     old_backup.unlink()
-                    logger.debug(f"Removed duplicate old backup: {old_backup}")
+                    logger.debug("Removed duplicate old backup: %s", old_backup)
 
             except Exception as e:
-                logger.error(f"Failed to migrate {old_backup}: {e}")
+                logger.error("Failed to migrate %s: %s", old_backup, e)
 
         if migrated_count > 0:
-            logger.info(f"✅ Successfully migrated {migrated_count} backups to new format")
+            logger.info("✅ Successfully migrated %d backups to new format", migrated_count)
 
         return migrated_count
 

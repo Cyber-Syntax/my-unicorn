@@ -14,12 +14,27 @@ from .logger import get_logger
 
 logger = get_logger(__name__)
 
-# Set SecretService as the preferred keyring backend
-try:
-    keyring.set_keyring(SecretService.Keyring())
-    logger.debug("SecretService backend set as the preferred keyring backend")
-except Exception as e:
-    logger.warning("Failed to set SecretService as the preferred keyring backend: %s", e)
+# Track keyring initialization to avoid redundant setup
+_keyring_initialized: bool = False
+
+
+def setup_keyring() -> None:
+    """Set SecretService as the preferred keyring backend and log the result."""
+    global _keyring_initialized
+
+    if _keyring_initialized:
+        return
+
+    try:
+        keyring.set_keyring(SecretService.Keyring())
+        logger.debug("SecretService backend set as the preferred keyring backend")
+        _keyring_initialized = True
+    except Exception as e:
+        logger.warning("Failed to set SecretService as the preferred keyring backend: %s", e)
+
+
+# Initialize the keyring backend
+setup_keyring()
 
 
 class GitHubAuthManager:
@@ -93,7 +108,7 @@ class GitHubAuthManager:
             ),
         }
 
-    #TODO: implement this method to install logics
+    # TODO: implement this method to install logics
     def should_wait_for_rate_limit(self) -> bool:
         """Check if we should wait due to rate limiting."""
         if self._remaining_requests is None:

@@ -196,14 +196,14 @@ class UpdateManager:
         try:
             app_config = self.config_manager.load_app_config(app_name)
             if not app_config:
-                logger.warning(f"No config found for app: {app_name}")
+                logger.warning("No config found for app: %s", app_name)
                 return None
 
             current_version = app_config["appimage"]["version"]
             owner = app_config["owner"]
             repo = app_config["repo"]
 
-            logger.debug(f"Checking updates for {app_name} ({owner}/{repo})")
+            logger.debug("Checking updates for %s (%s/%s)", app_name, owner, repo)
 
             # Check if app is configured to use GitHub API
             should_use_github = True
@@ -229,19 +229,21 @@ class UpdateManager:
                     should_use_prerelease = verification_config.get("prerelease", False)
 
             if not should_use_github:
-                logger.error(f"GitHub API disabled for {app_name} (github.repo: false)")
+                logger.error("GitHub API disabled for %s (github.repo: false)", app_name)
                 return None
 
             # Fetch latest release
             fetcher = GitHubReleaseFetcher(owner, repo, session)
             if should_use_prerelease:
-                logger.debug(f"Fetching latest prerelease for {owner}/{repo}")
+                logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
                 try:
                     release_data = await fetcher.fetch_latest_prerelease()
                 except ValueError as e:
                     if "No prereleases found" in str(e):
                         logger.warning(
-                            f"No prereleases found for {owner}/{repo}, falling back to latest release"
+                            "No prereleases found for %s/%s, falling back to latest release",
+                            owner,
+                            repo,
                         )
                         release_data = await fetcher.fetch_latest_release()
                     else:
@@ -284,7 +286,7 @@ class UpdateManager:
                 logger.set_console_level_temporarily("WARNING")
                 return None
             # Other errors: user-facing message
-            logger.error(f"Failed to check updates for {app_name}: {e}")
+            logger.error("Failed to check updates for %s: %s", app_name, e)
             # Suppress traceback from console, log only to file
             import traceback
 
@@ -327,7 +329,7 @@ class UpdateManager:
             if isinstance(result, UpdateInfo):
                 update_infos.append(result)
             elif isinstance(result, Exception):
-                logger.error(f"Update check failed: {result}")
+                logger.error("Update check failed: %s", result)
 
         return update_infos
 
@@ -349,17 +351,17 @@ class UpdateManager:
         try:
             app_config = self.config_manager.load_app_config(app_name)
             if not app_config:
-                logger.error(f"No config found for app: {app_name}")
+                logger.error("No config found for app: %s", app_name)
                 return False
 
             # Check for updates first
             update_info = await self.check_single_update(app_name, session)
             if not update_info:
-                logger.error(f"Failed to check updates for {app_name}")
+                logger.error("Failed to check updates for %s", app_name)
                 return False
 
             if not force and not update_info.has_update:
-                logger.debug(f"{app_name} is already up to date")
+                logger.debug("%s is already up to date", app_name)
                 return True
 
             logger.debug(
@@ -394,12 +396,12 @@ class UpdateManager:
                     should_use_prerelease = verification_config.get("prerelease", False)
 
             if not should_use_github:
-                logger.error(f"GitHub API disabled for {app_name} (github.repo: false)")
+                logger.error("GitHub API disabled for %s (github.repo: false)", app_name)
                 return False
 
             fetcher = GitHubReleaseFetcher(owner, repo, session)
             if should_use_prerelease:
-                logger.debug(f"Fetching latest prerelease for {owner}/{repo}")
+                logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
                 release_data = await fetcher.fetch_latest_prerelease()
             else:
                 release_data = await fetcher.fetch_latest_release()
@@ -410,7 +412,7 @@ class UpdateManager:
             )
 
             if not appimage_asset:
-                logger.error(f"No AppImage found for {app_name}")
+                logger.error("No AppImage found for %s", app_name)
                 return False
 
             # Set up paths
@@ -426,7 +428,7 @@ class UpdateManager:
                     current_appimage_path, backup_dir, update_info.current_version
                 )
                 if backup_path:
-                    logger.debug(f"💾 Backup created: {backup_path}")
+                    logger.debug("💾 Backup created: %s", backup_path)
 
             # Download and install new version
             icon_asset = None
