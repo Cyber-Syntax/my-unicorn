@@ -6,6 +6,8 @@ and managing the update process for installed AppImages.
 
 import asyncio
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 import aiohttp
 
@@ -475,78 +477,21 @@ class UpdateManager:
                 icon_full_path = icon_dir / icon_asset["icon_filename"]
                 icon_path = await download_service.download_icon(icon_asset, icon_full_path)
 
-            # Perform verification if configured (BEFORE renaming)
+            # Perform verification using priority-based approach (BEFORE renaming)
             verification_config = app_config.get("verification", {})
-            verification_results = {}
-
-            if not verification_config.get("skip", False):
-                logger.debug(
-                    f"🔍 Starting verification for updated {app_name} (original filename: {appimage_path.name})"
-                )
-                verifier = Verifier(appimage_path)
-
-                # Try digest verification first (from GitHub API)
-                if verification_config.get("digest", False) and appimage_asset.get("digest"):
-                    try:
-                        verifier.verify_digest(appimage_asset["digest"])
-                        verification_results["digest"] = {
-                            "passed": True,
-                            "hash": appimage_asset["digest"],
-                            "details": "GitHub API digest verification",
-                        }
-                        logger.debug("✅ Digest verification passed")
-                    except Exception as e:
-                        logger.error(f"❌ Digest verification failed: {e}")
-                        verification_results["digest"] = {
-                            "passed": False,
-                            "hash": appimage_asset.get("digest", ""),
-                            "details": str(e),
-                        }
-
-                # Try checksum file verification if configured
-                elif verification_config.get("checksum_file"):
-                    checksum_file = verification_config["checksum_file"]
-                    hash_type = verification_config.get("checksum_hash_type", "sha256")
-                    checksum_url = f"https://github.com/{owner}/{repo}/releases/download/{update_info.original_tag_name}/{checksum_file}"
-
-                    try:
-                        logger.debug(f"🔍 Verifying using checksum file: {checksum_file}")
-                        # Use original filename for checksum verification
-                        await verifier.verify_from_checksum_file(
-                            checksum_url, hash_type, download_service, appimage_path.name
-                        )
-                        computed_hash = verifier.compute_hash(hash_type)
-                        verification_results["checksum_file"] = {
-                            "passed": True,
-                            "hash": f"{hash_type}:{computed_hash}",
-                            "details": f"Verified against {checksum_file}",
-                        }
-                        logger.debug("✅ Checksum file verification passed")
-                    except Exception as e:
-                        logger.error(f"❌ Checksum file verification failed: {e}")
-                        verification_results["checksum_file"] = {
-                            "passed": False,
-                            "hash": "",
-                            "details": str(e),
-                        }
-
-                # Basic file integrity check
-                try:
-                    file_size = verifier.get_file_size()
-                    expected_size = appimage_asset.get("size", 0)
-                    if expected_size > 0:
-                        verifier.verify_size(expected_size)
-                    verification_results["size"] = {
-                        "passed": True,
-                        "details": f"File size: {file_size:,} bytes",
-                    }
-                except Exception as e:
-                    logger.warning(f"⚠️  Size verification failed: {e}")
-                    verification_results["size"] = {"passed": False, "details": str(e)}
-
-                logger.debug("✅ Verification completed")
-            else:
-                logger.debug(f"⏭️  Verification skipped for {app_name} (configured)")
+            (
+                verification_results,
+                updated_verification_config,
+            ) = await self._perform_update_verification(
+                appimage_path,
+                appimage_asset,
+                dict(verification_config),  # Cast to dict[str, Any]
+                owner,
+                repo,
+                update_info.original_tag_name,
+                download_service,
+                app_name,
+            )
 
             # Now make executable and move to install directory
             self.storage_service.make_executable(appimage_path)
@@ -563,20 +508,17 @@ class UpdateManager:
                 stored_hash = verification_results["digest"]["hash"]
             elif verification_results.get("checksum_file", {}).get("passed"):
                 stored_hash = verification_results["checksum_file"]["hash"]
-            elif appimage_asset.get("digest"):
+            elif appimage_asset["digest"]:
                 stored_hash = appimage_asset["digest"]
 
-            # Auto-detect digest availability and update verification config
-            has_digest = bool(appimage_asset.get("digest"))
-            if has_digest and not app_config.get("verification", {}).get("digest", False):
+            # Update verification config based on what was actually used
+            if updated_verification_config:
+                if "verification" not in app_config:
+                    app_config["verification"] = {}
+                app_config["verification"].update(updated_verification_config)
                 logger.debug(
-                    f"🔍 Digest now available for {app_name}, enabling digest verification"
+                    f"🔧 Updated verification config for {app_name} after successful verification"
                 )
-                logger.debug(f"   Digest: {appimage_asset.get('digest', '')}")
-                app_config["verification"]["digest"] = True
-                # If we now have digest, we can optionally disable checksum file verification
-                if app_config["verification"].get("checksum_file"):
-                    logger.debug("   Keeping checksum file verification as fallback")
 
             # Update app config
             app_config["appimage"]["version"] = update_info.latest_version
@@ -587,10 +529,11 @@ class UpdateManager:
             # Track if icon was updated for desktop entry regeneration
             icon_updated = False
             if icon_path:
-                previous_icon_status = app_config.get("icon", {}).get("path") is not None
+                previous_icon_status = app_config.get("icon", {}).get("installed", False)
                 if "icon" not in app_config:
-                    app_config["icon"] = {}
-                app_config["icon"]["path"] = str(icon_path)
+                    app_config["icon"] = {"url": "", "name": "", "installed": False}
+                # Store icon path in a separate field for backward compatibility
+                app_config["icon"]["installed"] = True
                 icon_updated = not previous_icon_status  # Icon was newly installed
 
             self.config_manager.save_app_config(app_name, app_config)
@@ -628,6 +571,147 @@ class UpdateManager:
         except Exception as e:
             logger.error(f"Failed to update {app_name}: {e}")
             return False
+
+    async def _perform_update_verification(
+        self,
+        path: Path,
+        asset: GitHubAsset,
+        verification_config: dict[str, Any],
+        owner: str,
+        repo: str,
+        tag_name: str,
+        download_service: Any,
+        app_name: str,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Perform update verification using priority-based approach.
+
+        Args:
+            path: Path to downloaded file
+            asset: GitHub asset information
+            verification_config: Current verification configuration
+            owner: Repository owner
+            repo: Repository name
+            tag_name: Release tag name
+            download_service: Download service instance
+            app_name: Application name
+
+        Returns:
+            Tuple of (verification_results, updated_verification_config)
+
+        """
+        verification_results = {}
+        updated_verification_config = verification_config.copy()
+        verification_passed = False
+
+        # Detect available verification methods
+        has_digest = bool(asset["digest"])
+        has_checksum_file = bool(verification_config.get("checksum_file"))
+        catalog_skip = verification_config.get("skip", False)
+
+        logger.debug(f"🔍 Starting verification for updated {app_name}")
+        logger.debug(
+            f"   Available methods: digest={has_digest}, checksum_file={has_checksum_file}"
+        )
+        logger.debug(f"   Catalog skip setting: {catalog_skip}")
+
+        # Only skip if configured AND no strong verification methods available
+        if catalog_skip and not has_digest and not has_checksum_file:
+            logger.debug(
+                "⏭️ Verification skipped (configured in app config, no strong methods available)"
+            )
+            return verification_results, updated_verification_config
+        elif catalog_skip and (has_digest or has_checksum_file):
+            logger.debug(
+                "🔄 Overriding app config skip setting - strong verification methods available"
+            )
+            # Update config to reflect that we're now using verification
+            updated_verification_config["skip"] = False
+
+        verifier = Verifier(path)
+
+        # Try digest verification first if available (prioritize over config setting)
+        if has_digest:
+            try:
+                logger.debug("🔐 Attempting digest verification (from GitHub API)")
+                if catalog_skip:
+                    logger.debug("   Note: Using digest despite app config skip=true setting")
+                verifier.verify_digest(asset["digest"])
+                verification_results["digest"] = {
+                    "passed": True,
+                    "hash": asset["digest"],
+                    "details": "GitHub API digest verification",
+                }
+                logger.debug("✅ Digest verification passed")
+                verification_passed = True
+                # Enable digest verification in config for future use
+                updated_verification_config["digest"] = True
+            except Exception as e:
+                logger.error(f"❌ Digest verification failed: {e}")
+                verification_results["digest"] = {
+                    "passed": False,
+                    "hash": asset["digest"],
+                    "details": str(e),
+                }
+
+        # Try checksum file verification if configured and digest didn't pass
+        if not verification_passed and has_checksum_file:
+            checksum_file = verification_config["checksum_file"]
+            hash_type = verification_config.get("checksum_hash_type", "sha256")
+            checksum_url = f"https://github.com/{owner}/{repo}/releases/download/{tag_name}/{checksum_file}"
+
+            try:
+                logger.debug(f"🔍 Verifying using checksum file: {checksum_file}")
+                # Use original filename for checksum verification
+                await verifier.verify_from_checksum_file(
+                    checksum_url, hash_type, download_service, path.name
+                )
+                computed_hash = verifier.compute_hash(hash_type)
+                verification_results["checksum_file"] = {
+                    "passed": True,
+                    "hash": f"{hash_type}:{computed_hash}",
+                    "details": f"Verified against {checksum_file}",
+                }
+                logger.debug("✅ Checksum file verification passed")
+                verification_passed = True
+            except Exception as e:
+                logger.error(f"❌ Checksum file verification failed: {e}")
+                verification_results["checksum_file"] = {
+                    "passed": False,
+                    "hash": "",
+                    "details": str(e),
+                }
+
+        # Basic file integrity check
+        try:
+            file_size = verifier.get_file_size()
+            expected_size = asset["size"]
+            if expected_size > 0:
+                verifier.verify_size(expected_size)
+            verification_results["size"] = {
+                "passed": True,
+                "details": f"File size: {file_size:,} bytes",
+            }
+        except Exception as e:
+            logger.warning(f"⚠️  Size verification failed: {e}")
+            verification_results["size"] = {"passed": False, "details": str(e)}
+            if not verification_passed:
+                # If no strong verification passed and size check failed, that's an error
+                if has_digest or has_checksum_file:
+                    raise Exception("File verification failed")
+
+        # If we have strong verification methods available but none passed, fail
+        if (has_digest or has_checksum_file) and not verification_passed:
+            available_methods = []
+            if has_digest:
+                available_methods.append("digest")
+            if has_checksum_file:
+                available_methods.append("checksum_file")
+            raise Exception(
+                f"Available verification methods failed: {', '.join(available_methods)}"
+            )
+
+        logger.debug("✅ Verification completed")
+        return verification_results, updated_verification_config
 
     async def update_multiple_apps(
         self, app_names: list[str], force: bool = False
