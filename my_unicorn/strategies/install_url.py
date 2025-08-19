@@ -174,8 +174,8 @@ class URLInstallStrategy(InstallStrategy):
                 clean_name = self.storage_service.get_clean_appimage_name(repo_name.lower())
                 final_path = self.storage_service.rename_appimage(final_path, clean_name)
 
-                # Try to download icon
-                icon_path = await self._try_download_icon(owner, repo_name, repo_name.lower())
+                # we don't support icons on url installs yet
+                icon_path = None
 
                 # Create app configuration
                 await self._create_app_config(
@@ -203,7 +203,6 @@ class URLInstallStrategy(InstallStrategy):
                     desktop_path = create_desktop_entry_for_app(
                         app_name=repo_name.lower(),
                         appimage_path=final_path,
-                        icon_path=icon_path,
                         comment=f"{repo_name.title()} AppImage Application",
                         categories=["Utility"],
                         config_manager=config_manager,
@@ -281,94 +280,6 @@ class URLInstallStrategy(InstallStrategy):
 
         logger.debug("✅ Verification completed")
 
-    async def _try_download_icon(
-        self, owner: str, repo_name: str, clean_name: str
-    ) -> Path | None:
-        """Try to download icon from common locations in the repository.
-
-        Args:
-            owner: Repository owner
-            repo_name: Repository name
-            clean_name: Clean app name for icon filename
-
-        Returns:
-            Path to downloaded icon or None
-
-        """
-        # Get icon directory from global config
-        from ..config import ConfigManager
-
-        config_manager = ConfigManager()
-        global_config = config_manager.load_global_config()
-        icon_dir = global_config["directory"]["icon"]
-
-        # Common icon paths to try
-        icon_paths = [
-            "icons/icon.png",
-            f"icons/{repo_name}.png",
-            "icon.png",
-            "logo.png",
-            "assets/icon.png",
-            "assets/logo.png",
-            "resources/icon.png",
-            "src/icon.png",
-        ]
-
-        for icon_path in icon_paths:
-            try:
-                icon_url = (
-                    f"https://raw.githubusercontent.com/{owner}/{repo_name}/main/{icon_path}"
-                )
-                icon_filename = f"{clean_name}.png"
-
-                icon_asset: IconAsset = {
-                    "icon_filename": icon_filename,
-                    "icon_url": icon_url,
-                }
-
-                icon_full_path = icon_dir / icon_filename
-
-                # Try to download the icon
-                downloaded_path = await self.download_service.download_icon(
-                    icon_asset, icon_full_path
-                )
-                if downloaded_path:
-                    logger.debug(f"✅ Downloaded icon from {icon_path}")
-                    return downloaded_path
-
-            except Exception as e:
-                logger.debug(f"Failed to download icon from {icon_path}: {e}")
-                continue
-
-        # Try with master branch as fallback
-        for icon_path in icon_paths[:3]:  # Only try the most common ones
-            try:
-                icon_url = (
-                    f"https://raw.githubusercontent.com/{owner}/{repo_name}/master/{icon_path}"
-                )
-                icon_filename = f"{clean_name}.png"
-
-                icon_asset: IconAsset = {
-                    "icon_filename": icon_filename,
-                    "icon_url": icon_url,
-                }
-
-                icon_full_path = icon_dir / icon_filename
-
-                downloaded_path = await self.download_service.download_icon(
-                    icon_asset, icon_full_path
-                )
-                if downloaded_path:
-                    logger.debug(f"✅ Downloaded icon from {icon_path} (master branch)")
-                    return downloaded_path
-
-            except Exception as e:
-                logger.debug(f"Failed to download icon from {icon_path} (master): {e}")
-                continue
-
-        logger.debug(f"⚠️ No icon found for {owner}/{repo_name}")
-        return None
-
     async def _create_app_config(
         self,
         app_name: str,
@@ -429,7 +340,7 @@ class URLInstallStrategy(InstallStrategy):
 
         # Add icon information if available
         # We don't store the URL since icon only exists on catalog installs for now.
-        # TODO: Implement default icon for URL installs
+        # TODO: Implement default icon.png for URL installs
         if icon_path and icon_path.exists():
             config["icon"]["name"] = icon_path.name
             config["icon"]["url"] = ""
