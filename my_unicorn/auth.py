@@ -14,12 +14,21 @@ from .logger import get_logger
 
 logger = get_logger(__name__)
 
+# Track keyring initialization to avoid redundant setup
+_keyring_initialized: bool = False
 
-def setup_keyring():
+
+def setup_keyring() -> None:
     """Set SecretService as the preferred keyring backend and log the result."""
+    global _keyring_initialized
+
+    if _keyring_initialized:
+        return
+
     try:
         keyring.set_keyring(SecretService.Keyring())
         logger.debug("SecretService backend set as the preferred keyring backend")
+        _keyring_initialized = True
     except Exception as e:
         logger.warning("Failed to set SecretService as the preferred keyring backend: %s", e)
 
