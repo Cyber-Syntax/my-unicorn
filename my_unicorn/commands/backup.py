@@ -81,7 +81,7 @@ class BackupHandler(BaseCommandHandler):
 
         # Validate app_name format (basic sanitization)
         if not args.app_name.replace("-", "").replace("_", "").replace(".", "").isalnum():
-            logger.error(f"❌ Invalid app name: {args.app_name}")
+            logger.error("❌ Invalid app name: %s", args.app_name)
             logger.info(
                 "💡 App names should contain only letters, numbers, hyphens, underscores, and dots"
             )
@@ -96,12 +96,12 @@ class BackupHandler(BaseCommandHandler):
             app_name: Name of the application to restore
 
         """
-        logger.info(f"🔄 Restoring latest backup for {app_name}...")
+        logger.info("🔄 Restoring latest backup for %s...", app_name)
 
         # Check if app is installed
         app_config = self.config_manager.load_app_config(app_name)
         if not app_config:
-            logger.error(f"❌ App '{app_name}' is not installed")
+            logger.error("❌ App '%s' is not installed", app_name)
             logger.info("💡 Use 'list' to see installed applications")
             return
 
@@ -112,24 +112,26 @@ class BackupHandler(BaseCommandHandler):
             )
 
             if restored_path:
-                logger.info(f"✅ Successfully restored {app_name} from latest backup")
-                logger.info(f"📁 Restored to: {restored_path}")
+                logger.info("✅ Successfully restored %s from latest backup", app_name)
+                logger.info("📁 Restored to: %s", restored_path)
 
                 # Show updated app config info
                 updated_config = self.config_manager.load_app_config(app_name)
                 if updated_config:
                     restored_version = updated_config["appimage"]["version"]
-                    logger.info(f"📝 App configuration updated to version: {restored_version}")
+                    logger.info(
+                        "📝 App configuration updated to version: %s", restored_version
+                    )
                     logger.info("💡 The app is now ready to use with the restored version")
                     logger.info(
                         "🔄 Use 'update' command to check for newer versions if needed"
                     )
             else:
-                logger.error(f"❌ No backups found for {app_name}")
+                logger.error("❌ No backups found for %s", app_name)
                 logger.info("💡 Create a backup first using the backup command")
 
         except Exception as e:
-            logger.error(f"❌ Failed to restore {app_name}: {e}")
+            logger.error("❌ Failed to restore %s: %s", app_name, e)
 
     async def _handle_restore_version(self, app_name: str, version: str) -> None:
         """Handle restore specific version operation.
@@ -139,12 +141,12 @@ class BackupHandler(BaseCommandHandler):
             version: Specific version to restore
 
         """
-        logger.info(f"🔄 Restoring {app_name} version {version}...")
+        logger.info("🔄 Restoring %s version %s...", app_name, version)
 
         # Check if app is installed
         app_config = self.config_manager.load_app_config(app_name)
         if not app_config:
-            logger.error(f"❌ App '{app_name}' is not installed")
+            logger.error("❌ App '%s' is not installed", app_name)
             logger.info("💡 Use 'list' to see installed applications")
             return
 
@@ -155,25 +157,25 @@ class BackupHandler(BaseCommandHandler):
             )
 
             if restored_path:
-                logger.info(f"✅ Successfully restored {app_name} v{version}")
-                logger.info(f"📁 Restored to: {restored_path}")
+                logger.info("✅ Successfully restored %s v%s", app_name, version)
+                logger.info("📁 Restored to: %s", restored_path)
 
                 # Show updated app config info
                 updated_config = self.config_manager.load_app_config(app_name)
                 if updated_config:
-                    logger.info(f"📝 App configuration updated to version: {version}")
+                    logger.info("📝 App configuration updated to version: %s", version)
                     logger.info("💡 The app is now ready to use with the restored version")
                     logger.info(
                         "🔄 Use 'update' command to check for newer versions if needed"
                     )
             else:
-                logger.error(f"❌ Version {version} not found for {app_name}")
+                logger.error("❌ Version %s not found for %s", version, app_name)
                 logger.info(
-                    f"💡 Use 'backup {app_name} --list-backups' to see available versions"
+                    "💡 Use 'backup %s --list-backups' to see available versions", app_name
                 )
 
         except Exception as e:
-            logger.error(f"❌ Failed to restore {app_name} v{version}: {e}")
+            logger.error("❌ Failed to restore %s v%s: %s", app_name, version, e)
 
     async def _handle_create_backup(self, app_name: str) -> None:
         """Handle create backup operation.
@@ -182,12 +184,12 @@ class BackupHandler(BaseCommandHandler):
             app_name: Name of the application to backup
 
         """
-        logger.info(f"💾 Creating backup for {app_name}...")
+        logger.info("💾 Creating backup for %s...", app_name)
 
         # Check if app is installed
         app_config = self.config_manager.load_app_config(app_name)
         if not app_config:
-            logger.error(f"❌ App '{app_name}' is not installed")
+            logger.error("❌ App '%s' is not installed", app_name)
             logger.info("💡 Use 'list' to see installed applications")
             return
 
@@ -198,7 +200,7 @@ class BackupHandler(BaseCommandHandler):
             appimage_path = storage_dir / appimage_name
 
             if not appimage_path.exists():
-                logger.error(f"❌ AppImage file not found: {appimage_path}")
+                logger.error("❌ AppImage file not found: %s", appimage_path)
                 return
 
             # Create backup
@@ -206,13 +208,13 @@ class BackupHandler(BaseCommandHandler):
             backup_path = self.backup_service.create_backup(appimage_path, app_name, version)
 
             if backup_path:
-                logger.info(f"✅ Successfully created backup for {app_name} v{version}")
-                logger.info(f"📁 Backup saved to: {backup_path}")
+                logger.info("✅ Successfully created backup for %s v%s", app_name, version)
+                logger.info("📁 Backup saved to: %s", backup_path)
             else:
-                logger.error(f"❌ Failed to create backup for {app_name}")
+                logger.error("❌ Failed to create backup for %s", app_name)
 
         except Exception as e:
-            logger.error(f"❌ Failed to create backup for {app_name}: {e}")
+            logger.error("❌ Failed to create backup for %s: %s", app_name, e)
 
     async def _handle_list_backups(self, app_name: str) -> None:
         """Handle list backups operation for a specific app.
@@ -230,7 +232,7 @@ class BackupHandler(BaseCommandHandler):
             app_name: Name of the application
 
         """
-        logger.info(f"📋 Listing backups for {app_name}...")
+        logger.info("📋 Listing backups for %s...", app_name)
 
         try:
             backups = self.backup_service.get_backup_info(app_name)
@@ -261,7 +263,7 @@ class BackupHandler(BaseCommandHandler):
                 print("")
 
         except Exception as e:
-            logger.error(f"❌ Failed to list backups for {app_name}: {e}")
+            logger.error("❌ Failed to list backups for %s: %s", app_name, e)
 
     async def _handle_cleanup(self, app_name: str | None = None) -> None:
         """Handle cleanup old backups operation.

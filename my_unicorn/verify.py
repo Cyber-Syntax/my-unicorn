@@ -148,10 +148,10 @@ class Verifier:
         }
 
         if hash_type not in hash_algorithms:
-            logger.error(f"❌ Unsupported hash type: {hash_type}")
+            logger.error("❌ Unsupported hash type: %s", hash_type)
             raise ValueError(f"Unsupported hash type: {hash_type}")
 
-        logger.debug(f"🧮 Computing {hash_type.upper()} hash for {self.file_path.name}")
+        logger.debug("🧮 Computing %s hash for %s", hash_type.upper(), self.file_path.name)
 
         hasher = hash_algorithms[hash_type]()
         bytes_processed = 0
@@ -167,7 +167,7 @@ class Verifier:
         logger.debug(
             f"   Processed: {format_bytes(bytes_processed)} ({bytes_processed:,} bytes)"
         )
-        logger.debug(f"   Hash: {computed_hash}")
+        logger.debug("   Hash: %s", computed_hash)
 
         return computed_hash
 
@@ -192,27 +192,27 @@ class Verifier:
         """
         target_filename = filename or self.file_path.name
 
-        logger.debug(f"🔍 Starting checksum file verification for {self.file_path.name}")
-        logger.debug(f"   Checksum URL: {checksum_url}")
-        logger.debug(f"   Target filename: {target_filename}")
-        logger.debug(f"   Hash type: {hash_type.upper()}")
+        logger.debug("🔍 Starting checksum file verification for %s", self.file_path.name)
+        logger.debug("   Checksum URL: %s", checksum_url)
+        logger.debug("   Target filename: %s", target_filename)
+        logger.debug("   Hash type: %s", hash_type.upper())
 
         # Download checksum file
         logger.debug("📥 Downloading checksum file...")
         checksum_content = await download_service.download_checksum_file(checksum_url)
-        logger.debug(f"   Downloaded {len(checksum_content)} characters")
+        logger.debug("   Downloaded %d characters", len(checksum_content))
 
         # Parse checksum file to find our file's hash
-        logger.debug(f"🔍 Parsing checksum file for {target_filename}...")
+        logger.debug("🔍 Parsing checksum file for %s...", target_filename)
         expected_hash = self._parse_checksum_file(checksum_content, target_filename, hash_type)
 
         if not expected_hash:
-            logger.error(f"❌ Hash for {target_filename} not found in checksum file")
-            logger.debug(f"   Checksum file content:\n{checksum_content}")
+            logger.error("❌ Hash for %s not found in checksum file", target_filename)
+            logger.debug("   Checksum file content:\n%s", checksum_content)
             raise ValueError(f"Hash for {target_filename} not found in checksum file")
 
         logger.debug("✅ Found expected hash in checksum file")
-        logger.debug(f"   Expected hash: {expected_hash}")
+        logger.debug("   Expected hash: %s", expected_hash)
 
         # Verify the hash
         self.verify_hash(expected_hash, hash_type)
@@ -232,17 +232,17 @@ class Verifier:
 
         """
         lines = content.strip().split("\n")
-        logger.debug(f"🔍 Parsing {len(lines)} lines in checksum file")
+        logger.debug("🔍 Parsing %d lines in checksum file", len(lines))
 
         found_entries = []
 
         for line_num, line in enumerate(lines, 1):
             line = line.strip()
             if not line or line.startswith("#"):
-                logger.debug(f"   Line {line_num}: Skipping (empty or comment)")
+                logger.debug("   Line %d: Skipping (empty or comment)", line_num)
                 continue
 
-            logger.debug(f"   Line {line_num}: {line}")
+            logger.debug("   Line %d: %s", line_num, line)
 
             # Handle different checksum file formats
             hash_value = None
@@ -265,21 +265,21 @@ class Verifier:
                     continue
 
             if hash_value and file_name:
-                logger.debug(f"      Parsed hash: {hash_value}")
-                logger.debug(f"      Parsed filename: {file_name}")
+                logger.debug("      Parsed hash: %s", hash_value)
+                logger.debug("      Parsed filename: %s", file_name)
                 found_entries.append((hash_value, file_name, Path(file_name).name))
 
             # Remove path separators and compare just the filename
             if file_name and Path(file_name).name == filename:
-                logger.debug(f"✅ Found matching entry for {filename}")
-                logger.debug(f"   Hash: {hash_value}")
-                logger.debug(f"   Full filename in checksum: {file_name}")
+                logger.debug("✅ Found matching entry for %s", filename)
+                logger.debug("   Hash: %s", hash_value)
+                logger.debug("   Full filename in checksum: %s", file_name)
                 return hash_value
 
-        logger.warning(f"⚠️  Target file {filename} not found in checksum file")
-        logger.debug(f"   Found {len(found_entries)} entries:")
+        logger.warning("⚠️  Target file %s not found in checksum file", filename)
+        logger.debug("   Found %d entries:", len(found_entries))
         for hash_val, full_name, base_name in found_entries:
-            logger.debug(f"      • {base_name} (full: {full_name}) -> {hash_val[:16]}...")
+            logger.debug("      • %s (full: %s) -> %s...", base_name, full_name, hash_val[:16])
 
         return None
 
@@ -329,21 +329,21 @@ class Verifier:
             ValueError: If size doesn't match
 
         """
-        logger.debug(f"🔍 Verifying file size for {self.file_path.name}")
+        logger.debug("🔍 Verifying file size for %s", self.file_path.name)
         logger.debug(
             f"   Expected size: {format_bytes(expected_size)} ({expected_size:,} bytes)"
         )
 
         actual_size = self.get_file_size()
-        logger.debug(f"   Actual size: {format_bytes(actual_size)} ({actual_size:,} bytes)")
+        logger.debug("   Actual size: %s (%d bytes)", format_bytes(actual_size), actual_size)
 
         if actual_size != expected_size:
             logger.error("❌ File size verification FAILED!")
             logger.error(
-                f"   Expected: {format_bytes(expected_size)} ({expected_size:,} bytes)"
+                "   Expected: %s (%d bytes)", format_bytes(expected_size), expected_size
             )
-            logger.error(f"   Actual: {format_bytes(actual_size)} ({actual_size:,} bytes)")
-            logger.error(f"   Difference: {actual_size - expected_size:+,} bytes")
+            logger.error("   Actual: %s (%d bytes)", format_bytes(actual_size), actual_size)
+            logger.error("   Difference: %+d bytes", actual_size - expected_size)
             raise ValueError(
                 "File size mismatch!\n"
                 f"Expected: {expected_size} bytes\n"
@@ -351,7 +351,7 @@ class Verifier:
             )
 
         logger.debug("✅ File size verification PASSED!")
-        logger.debug(f"   Size: {format_bytes(actual_size)} ({actual_size:,} bytes)")
+        logger.debug("   Size: %s (%d bytes)", format_bytes(actual_size), actual_size)
 
 
 class VerificationConfig:
@@ -382,13 +382,13 @@ class VerificationConfig:
         self.verify_size = verify_size
 
         logger.debug("🔧 Verification config initialized:")
-        logger.debug(f"   Digest verification: {digest}")
-        logger.debug(f"   Skip verification: {skip}")
-        logger.debug(f"   Checksum file: {checksum_file or 'None'}")
-        logger.debug(f"   Checksum hash type: {checksum_hash_type}")
-        logger.debug(f"   Verify size: {verify_size}")
+        logger.debug("   Digest verification: %s", digest)
+        logger.debug("   Skip verification: %s", skip)
+        logger.debug("   Checksum file: %s", checksum_file or "None")
+        logger.debug("   Checksum hash type: %s", checksum_hash_type)
+        logger.debug("   Verify size: %s", verify_size)
 
-    #TODO: is it better to save verify_size to app specific config file?
+    # TODO: is it better to save verify_size to app specific config file?
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "VerificationConfig":
         """Create VerificationConfig from dictionary.
@@ -409,6 +409,6 @@ class VerificationConfig:
         )
 
         logger.debug("🔧 VerificationConfig created from dict:")
-        logger.debug(f"   Source data: {data}")
+        logger.debug("   Source data: %s", data)
 
         return config

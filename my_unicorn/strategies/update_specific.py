@@ -64,7 +64,7 @@ class UpdateSpecificAppsStrategy(UpdateStrategy):
             UpdateResult with update results
 
         """
-        logger.debug(f"Executing update strategy for specific apps: {context.app_names}")
+        logger.debug("Executing update strategy for specific apps: %s", context.app_names)
 
         # At this point, app_names should not be None due to validation
         assert context.app_names is not None, "app_names should not be None after validation"

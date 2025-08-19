@@ -120,12 +120,12 @@ class URLInstallStrategy(InstallStrategy):
         """
         async with semaphore:
             try:
-                logger.info(f"🚀 Installing from GitHub: {repo_url}")
+                logger.info("🚀 Installing from GitHub: %s", repo_url)
 
                 # Parse owner/repo from URL
                 parts = repo_url.replace("https://github.com/", "").split("/")
                 if len(parts) < 2:
-                    raise ValueError(f"Invalid GitHub URL format: {repo_url}")
+                    raise ValueError("Invalid GitHub URL format: %s" % repo_url)
 
                 owner, repo_name = parts[0], parts[1]
 
@@ -208,9 +208,9 @@ class URLInstallStrategy(InstallStrategy):
                     )
                     # Desktop entry creation/update logging is handled by the desktop module
                 except Exception as e:
-                    logger.warning(f"⚠️  Failed to update desktop entry: {e}")
+                    logger.warning("⚠️  Failed to update desktop entry: %s", e)
 
-                logger.info(f"✅ Successfully installed: {final_path}")
+                logger.info("✅ Successfully installed: %s", final_path)
 
                 return {
                     "target": repo_url,
@@ -223,7 +223,7 @@ class URLInstallStrategy(InstallStrategy):
                 }
 
             except Exception as e:
-                logger.error(f"❌ Failed to install {repo_url}: {e}")
+                logger.error("❌ Failed to install %s: %s", repo_url, e)
                 return {
                     "target": repo_url,
                     "success": False,
@@ -246,7 +246,7 @@ class URLInstallStrategy(InstallStrategy):
             InstallationError: If verification fails
 
         """
-        logger.debug(f"🔍 Starting verification for {path.name}")
+        logger.debug("🔍 Starting verification for %s", path.name)
         verifier = Verifier(path)
         verification_passed = False
 
@@ -258,7 +258,7 @@ class URLInstallStrategy(InstallStrategy):
                 logger.debug("✅ Digest verification passed")
                 verification_passed = True
             except Exception as e:
-                logger.warning(f"⚠️ Digest verification failed: {e}")
+                logger.warning("⚠️ Digest verification failed: %s", e)
 
         # Always perform basic file size verification
         try:
@@ -349,9 +349,9 @@ class URLInstallStrategy(InstallStrategy):
         # Save the configuration
         try:
             config_manager.save_app_config(app_name, config)
-            logger.debug(f"📝 Saved configuration for {app_name}")
+            logger.debug("📝 Saved configuration for %s", app_name)
         except Exception as e:
-            logger.warning(f"⚠️ Failed to save app configuration: {e}")
+            logger.warning("⚠️ Failed to save app configuration: %s", e)
 
     def _get_current_timestamp(self) -> str:
         """Get current timestamp as ISO string.

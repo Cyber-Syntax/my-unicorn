@@ -5,10 +5,10 @@ update strategy based on the given context and parameters.
 """
 
 from ..logger import get_logger
-from .update_check_only import CheckOnlyUpdateStrategy
-from .update_all import UpdateAllAppsStrategy
-from .update_specific import UpdateSpecificAppsStrategy
 from .update import UpdateContext, UpdateStrategy
+from .update_all import UpdateAllAppsStrategy
+from .update_check_only import CheckOnlyUpdateStrategy
+from .update_specific import UpdateSpecificAppsStrategy
 
 logger = get_logger(__name__)
 
@@ -39,7 +39,7 @@ class UpdateStrategyFactory:
             return CheckOnlyUpdateStrategy()
 
         if context.app_names:
-            logger.debug(f"Creating UpdateSpecificAppsStrategy for apps: {context.app_names}")
+            logger.debug("Creating UpdateSpecificAppsStrategy for apps: %s", context.app_names)
             return UpdateSpecificAppsStrategy()
 
         logger.debug("Creating UpdateAllAppsStrategy")
