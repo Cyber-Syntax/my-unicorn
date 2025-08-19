@@ -328,6 +328,7 @@ class SelfUpdater:
 
             # 5) Clean up source_dir
             if source_dir.exists():
+                logger.info("Cleaning up source directory")
                 shutil.rmtree(source_dir)
 
             print("✅ Update successful!")
