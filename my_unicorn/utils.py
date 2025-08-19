@@ -130,11 +130,73 @@ def expand_template(template: str, variables: dict[str, Any]) -> str:
         return template
 
 
+def extract_version_from_package_string(package_string: str) -> str | None:
+    """Extract version from package identifier string.
+
+    Handles formats like:
+    - "@standardnotes/desktop@3.198.1" -> "3.198.1"
+    - "package@1.2.3" -> "1.2.3"
+    - "v1.2.3" -> "1.2.3"
+    - "1.2.3" -> "1.2.3"
+
+    Args:
+        package_string: Package string that may contain version
+
+    Returns:
+        Extracted version string or None if not found
+
+    """
+    if not package_string:
+        return None
+
+    # Handle package@version format
+    if "@" in package_string:
+        # Split by @ and take the last part (version)
+        parts = package_string.split("@")
+        if len(parts) >= 2:
+            version_part = parts[-1]
+            # Clean up the version part
+            version_part = version_part.strip()
+            if version_part:
+                return sanitize_version_string(version_part)
+
+    # Handle direct version strings
+    return sanitize_version_string(package_string)
+
+
+def sanitize_version_string(version: str) -> str:
+    """Sanitize version string by removing invalid characters and prefixes.
+
+    Args:
+        version: Raw version string
+
+    Returns:
+        Sanitized version string
+
+    """
+    if not version:
+        return ""
+
+    # Remove common prefixes
+    version = version.lstrip("v")
+
+    # Remove any remaining @ symbols that might be present
+    version = version.replace("@", "")
+
+    # Remove quotes and other problematic characters for JSON
+    version = version.strip("\"'")
+
+    # Remove any trailing/leading whitespace
+    version = version.strip()
+
+    return version
+
+
 def validate_version_string(version: str) -> bool:
     """Validate version string format.
 
     Args:
-        version: Version string to validate
+        version: Version string to validate (should be pre-sanitized)
 
     Returns:
         True if valid version format
@@ -143,12 +205,30 @@ def validate_version_string(version: str) -> bool:
     if not version:
         return False
 
-    # Remove common prefixes
+    # The version should already be sanitized, but ensure no prefixes
     version = version.lstrip("v")
 
     # Check semantic version pattern (major.minor.patch with optional pre-release)
     pattern = r"^\d+(\.\d+)*(-[a-zA-Z0-9.-]+)?$"
     return bool(re.match(pattern, version))
+
+
+def extract_and_validate_version(package_string: str) -> str | None:
+    """Extract and validate version from package string.
+
+    Combines extraction, sanitization, and validation in one function.
+
+    Args:
+        package_string: Package string that may contain version
+
+    Returns:
+        Valid version string or None if extraction/validation fails
+
+    """
+    extracted_version = extract_version_from_package_string(package_string)
+    if extracted_version and validate_version_string(extracted_version):
+        return extracted_version
+    return None
 
 
 def create_desktop_entry_name(app_name: str) -> str:

@@ -1,11 +1,13 @@
 """Tests for CatalogInstallStrategy: validation and install logic."""
 
-from unittest.mock import MagicMock
+import tempfile
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
 
-from my_unicorn.strategies.install import ValidationError
+from my_unicorn.strategies.install import InstallationError, ValidationError
 from my_unicorn.strategies.install_catalog import CatalogInstallStrategy
 
 
@@ -117,3 +119,536 @@ async def test_install_mixed_results(mocker, catalog_strategy):
     assert result[0]["success"]
     assert not result[1]["success"]
     assert "Install failed" in result[1]["error"]
+
+
+class TestCatalogInstallVerification:
+    """Test suite for the refactored verification logic in CatalogInstallStrategy."""
+
+    @pytest.fixture
+    def mock_verifier(self):
+        """Mock Verifier with configurable responses."""
+        verifier = MagicMock()
+        verifier.verify_digest = MagicMock()
+        verifier.verify_from_checksum_file = AsyncMock()
+        verifier.get_file_size.return_value = 1024
+        verifier.verify_size = MagicMock()
+        return verifier
+
+    @pytest.fixture
+    def mock_download_service(self):
+        """Mock DownloadService."""
+        service = MagicMock()
+        service.verify_file_size.return_value = True
+        return service
+
+    @pytest.fixture
+    def catalog_strategy_with_mocks(self):
+        """CatalogInstallStrategy with comprehensive mocks."""
+        catalog_manager = MagicMock()
+        config_manager = MagicMock()
+        github_client = MagicMock()
+        download_service = MagicMock()
+        storage_service = MagicMock()
+        session = MagicMock()
+
+        strategy = CatalogInstallStrategy(
+            catalog_manager=catalog_manager,
+            config_manager=config_manager,
+            github_client=github_client,
+            download_service=download_service,
+            storage_service=storage_service,
+            session=session,
+        )
+        return strategy
+
+    @pytest.mark.asyncio
+    async def test_perform_verification_skip_true_with_digest_available(
+        self, catalog_strategy_with_mocks, mock_verifier, mock_download_service
+    ):
+        """Test skip=true with digest available should use digest and update config."""
+        # Setup
+        verification_config = {
+            "digest": False,  # Catalog says don't use digest
+            "skip": True,  # Catalog says skip
+            "checksum_file": "",
+            "checksum_hash_type": "sha256",
+        }
+        asset = {
+            "digest": "sha256:good_digest",
+            "size": 1024,
+        }
+
+        with tempfile.NamedTemporaryFile() as tmp_file:
+            # Write some content to avoid zero-size file issues
+            tmp_file.write(b"test content for verification")
+            tmp_file.flush()
+            path = Path(tmp_file.name)
+
+            with patch("my_unicorn.verify.Verifier", return_value=mock_verifier):
+                # Test
+                result = await catalog_strategy_with_mocks._perform_verification(
+                    path, asset, {"verification": verification_config}, {"tag_name": "v1.0.0"}
+                )
+
+                # Verify digest verification was called
+                mock_verifier.verify_digest.assert_called_once_with("sha256:good_digest")
+
+                # Verify config was updated
+                assert result["updated_config"]["skip"] is False
+                assert result["updated_config"]["digest"] is True
+                assert "digest" in result["successful_methods"]
+
+    @pytest.mark.asyncio
+    async def test_perform_verification_skip_true_with_checksum_available(
+        self, catalog_strategy_with_mocks, mock_verifier, mock_download_service
+    ):
+        """Test skip=true with checksum file available should use checksum and update config."""
+        # Setup
+        verification_config = {
+            "digest": False,
+            "skip": True,
+            "checksum_file": "SHA256SUMS",
+            "checksum_hash_type": "sha256",
+        }
+        asset = {
+            "digest": "",  # No digest
+            "size": 1024,
+        }
+
+        with tempfile.NamedTemporaryFile() as tmp_file:
+            # Write some content to avoid zero-size file issues
+            tmp_file.write(b"test content for verification")
+            tmp_file.flush()
+            path = Path(tmp_file.name)
+
+            with patch("my_unicorn.verify.Verifier", return_value=mock_verifier):
+                catalog_strategy_with_mocks.download_service = mock_download_service
+
+                # Test
+                result = await catalog_strategy_with_mocks._perform_verification(
+                    path,
+                    asset,
+                    {"verification": verification_config, "owner": "test", "repo": "test"},
+                    {"tag_name": "v1.0.0"},
+                )
+
+                # Verify checksum verification was called
+                mock_verifier.verify_from_checksum_file.assert_called_once()
+
+                # Verify config was updated
+                assert result["updated_config"]["skip"] is False
+                assert "checksum_file" in result["successful_methods"]
+
+    @pytest.mark.asyncio
+    async def test_perform_verification_skip_true_no_strong_methods(
+        self, catalog_strategy_with_mocks, mock_verifier
+    ):
+        """Test skip=true with no strong verification methods should actually skip."""
+        # Setup
+        verification_config = {
+            "digest": False,
+            "skip": True,
+            "checksum_file": "",
+            "checksum_hash_type": "sha256",
+        }
+        asset = {
+            "digest": "",  # No digest
+            "size": 1024,
+        }
+
+        with tempfile.NamedTemporaryFile() as tmp_file:
+            # Write some content to avoid zero-size file issues
+            tmp_file.write(b"test content for verification")
+            tmp_file.flush()
+            path = Path(tmp_file.name)
+
+            with patch("my_unicorn.verify.Verifier", return_value=mock_verifier):
+                # Test
+                result = await catalog_strategy_with_mocks._perform_verification(
+                    path, asset, {"verification": verification_config}, {"tag_name": "v1.0.0"}
+                )
+
+                # Verify no verification methods were called
+                mock_verifier.verify_digest.assert_not_called()
+                mock_verifier.verify_from_checksum_file.assert_not_called()
+
+                # Verify config was not changed (skip still true)
+                assert result["updated_config"]["skip"] is True
+                assert not result["successful_methods"]
+
+    @pytest.mark.asyncio
+    async def test_perform_verification_skip_false_with_digest(
+        self, catalog_strategy_with_mocks, mock_verifier, mock_download_service
+    ):
+        """Test skip=false with digest available should use digest."""
+        # Setup
+        verification_config = {
+            "digest": True,
+            "skip": False,
+            "checksum_file": "",
+            "checksum_hash_type": "sha256",
+        }
+        asset = {
+            "digest": "sha256:good_digest",
+            "size": 1024,
+        }
+
+        with tempfile.NamedTemporaryFile() as tmp_file:
+            # Write some content to avoid zero-size file issues
+            tmp_file.write(b"test content for verification")
+            tmp_file.flush()
+            path = Path(tmp_file.name)
+
+            with patch("my_unicorn.verify.Verifier", return_value=mock_verifier):
+                # Test
+                result = await catalog_strategy_with_mocks._perform_verification(
+                    path, asset, {"verification": verification_config}, {"tag_name": "v1.0.0"}
+                )
+
+                # Verify digest verification was called
+                mock_verifier.verify_digest.assert_called_once_with("sha256:good_digest")
+
+                # Verify successful methods
+                assert "digest" in result["successful_methods"]
+
+    @pytest.mark.asyncio
+    async def test_perform_verification_digest_fails_checksum_succeeds(
+        self, catalog_strategy_with_mocks, mock_verifier, mock_download_service
+    ):
+        """Test digest failure falls back to checksum file verification."""
+        # Setup
+        verification_config = {
+            "digest": True,
+            "skip": False,
+            "checksum_file": "SHA256SUMS",
+            "checksum_hash_type": "sha256",
+        }
+        asset = {
+            "digest": "sha256:bad_digest",
+            "size": 1024,
+        }
+
+        # Make digest verification fail
+        mock_verifier.verify_digest.side_effect = ValueError("Digest verification failed")
+
+        with tempfile.NamedTemporaryFile() as tmp_file:
+            # Write some content to avoid zero-size file issues
+            tmp_file.write(b"test content for verification")
+            tmp_file.flush()
+            path = Path(tmp_file.name)
+
+            with patch("my_unicorn.verify.Verifier", return_value=mock_verifier):
+                catalog_strategy_with_mocks.download_service = mock_download_service
+
+                # Test
+                result = await catalog_strategy_with_mocks._perform_verification(
+                    path,
+                    asset,
+                    {"verification": verification_config, "owner": "test", "repo": "test"},
+                    {"tag_name": "v1.0.0"},
+                )
+
+                # Verify both methods were called
+                mock_verifier.verify_digest.assert_called_once_with("sha256:bad_digest")
+                mock_verifier.verify_from_checksum_file.assert_called_once()
+
+                # Verify fallback worked
+                assert "checksum_file" in result["successful_methods"]
+                assert "digest" not in result["successful_methods"]
+
+    @pytest.mark.asyncio
+    async def test_perform_verification_all_methods_fail(
+        self, catalog_strategy_with_mocks, mock_verifier, mock_download_service
+    ):
+        """Test all verification methods failing raises InstallationError."""
+        # Setup
+        verification_config = {
+            "digest": True,
+            "skip": False,
+            "checksum_file": "SHA256SUMS",
+            "checksum_hash_type": "sha256",
+        }
+        asset = {
+            "digest": "sha256:bad_digest",
+            "size": 1024,
+        }
+
+        # Make all verifications fail
+        mock_verifier.verify_digest.side_effect = ValueError("Digest failed")
+        mock_verifier.verify_from_checksum_file.side_effect = ValueError("Checksum failed")
+
+        with tempfile.NamedTemporaryFile() as tmp_file:
+            # Write some content to avoid zero-size file issues
+            tmp_file.write(b"test content for verification")
+            tmp_file.flush()
+            path = Path(tmp_file.name)
+
+            with patch("my_unicorn.verify.Verifier", return_value=mock_verifier):
+                catalog_strategy_with_mocks.download_service = mock_download_service
+
+                # Test - should raise InstallationError
+                with pytest.raises(
+                    InstallationError, match="Available verification methods failed"
+                ):
+                    await catalog_strategy_with_mocks._perform_verification(
+                        path,
+                        asset,
+                        {"verification": verification_config, "owner": "test", "repo": "test"},
+                        {"tag_name": "v1.0.0"},
+                    )
+
+    def test_get_updated_verification_config_with_successful_methods(
+        self, catalog_strategy_with_mocks
+    ):
+        """Test _get_updated_verification_config updates config based on successful verification."""
+        # Setup
+        catalog_config = {
+            "verification": {
+                "digest": False,
+                "skip": True,
+                "checksum_file": "",
+                "checksum_hash_type": "sha256",
+            }
+        }
+        verification_result = {
+            "successful_methods": {"digest": "sha256:test_hash"},
+            "updated_config": {
+                "digest": True,
+                "skip": False,
+                "checksum_file": "",
+                "checksum_hash_type": "sha256",
+            },
+        }
+
+        # Test
+        updated_config = catalog_strategy_with_mocks._get_updated_verification_config(
+            catalog_config, verification_result
+        )
+
+        # Verify updates
+        assert updated_config["digest"] is True
+        assert updated_config["skip"] is False
+        assert updated_config["checksum_file"] == ""
+        assert updated_config["checksum_hash_type"] == "sha256"
+
+    def test_get_updated_verification_config_no_verification_result(
+        self, catalog_strategy_with_mocks
+    ):
+        """Test _get_updated_verification_config with no verification result uses catalog defaults."""
+        # Setup
+        catalog_config = {
+            "verification": {
+                "digest": False,
+                "skip": True,
+                "checksum_file": "test.sha256",
+                "checksum_hash_type": "sha256",
+            }
+        }
+
+        # Test
+        updated_config = catalog_strategy_with_mocks._get_updated_verification_config(
+            catalog_config, None
+        )
+
+        # Verify original config is preserved
+        assert updated_config["digest"] is False
+        assert updated_config["skip"] is True
+        assert updated_config["checksum_file"] == "test.sha256"
+        assert updated_config["checksum_hash_type"] == "sha256"
+
+    def test_get_updated_verification_config_fallback_defaults(
+        self, catalog_strategy_with_mocks
+    ):
+        """Test _get_updated_verification_config with missing verification section uses fallback."""
+        # Setup - catalog config without verification section
+        catalog_config = {"owner": "test", "repo": "test"}
+
+        # Test
+        updated_config = catalog_strategy_with_mocks._get_updated_verification_config(
+            catalog_config, None
+        )
+
+        # Verify fallback defaults
+        assert updated_config["digest"] is True
+        assert updated_config["skip"] is False
+        assert updated_config["checksum_file"] == ""
+        assert updated_config["checksum_hash_type"] == "sha256"
+
+    @pytest.mark.asyncio
+    async def test_end_to_end_verification_with_config_update(
+        self, catalog_strategy_with_mocks, mock_verifier, mock_download_service
+    ):
+        """Integration test: End-to-end verification with config update behavior."""
+        # Setup - simulate outdated catalog with skip=true but digest available
+        app_config = {
+            "owner": "test_owner",
+            "repo": "test_repo",
+            "verification": {
+                "digest": False,  # Outdated catalog setting
+                "skip": True,  # Outdated catalog setting
+                "checksum_file": "",
+                "checksum_hash_type": "sha256",
+            },
+        }
+
+        asset = {
+            "digest": "sha256:discovered_digest",  # New digest from GitHub API
+            "size": 2048,
+        }
+
+        release_data = {"tag_name": "v2.0.0", "original_tag_name": "v2.0.0"}
+
+        # Mock the catalog manager to simulate saving updated config
+        saved_configs = {}
+        catalog_strategy_with_mocks.catalog_manager.save_app_config.side_effect = (
+            lambda app_name, config: saved_configs.update({app_name: config})
+        )
+
+        with tempfile.NamedTemporaryFile() as tmp_file:
+            # Write some content to avoid zero-size file issues
+            tmp_file.write(b"test content for verification")
+            tmp_file.flush()
+            path = Path(tmp_file.name)
+
+            with patch("my_unicorn.verify.Verifier", return_value=mock_verifier):
+                # Test verification method
+                verification_result = await catalog_strategy_with_mocks._perform_verification(
+                    path, asset, app_config, release_data
+                )
+
+                # Test config creation with verification updates
+                catalog_strategy_with_mocks._create_app_config(
+                    "test_app",
+                    path,
+                    app_config,
+                    release_data,
+                    Path("/fake/icons"),
+                    asset,
+                    verification_result,
+                )
+
+                # Verify the complete flow worked correctly
+                assert mock_verifier.verify_digest.called
+                assert verification_result["updated_config"]["skip"] is False
+                assert verification_result["updated_config"]["digest"] is True
+                assert "digest" in verification_result["successful_methods"]
+
+                # Verify the saved config was updated
+                assert "test_app" in saved_configs
+                saved_config = saved_configs["test_app"]
+                assert saved_config["verification"]["skip"] is False
+                assert saved_config["verification"]["digest"] is True
+                assert saved_config["appimage"]["digest"] == "sha256:discovered_digest"
+
+    @pytest.mark.asyncio
+    async def test_verification_fallback_chain_integration(
+        self, catalog_strategy_with_mocks, mock_verifier, mock_download_service
+    ):
+        """Integration test: Complete verification fallback chain."""
+        # Setup - digest fails, checksum succeeds
+        app_config = {
+            "owner": "test_owner",
+            "repo": "test_repo",
+            "verification": {
+                "digest": True,
+                "skip": False,
+                "checksum_file": "SHA256SUMS",
+                "checksum_hash_type": "sha256",
+            },
+        }
+
+        asset = {
+            "digest": "sha256:bad_digest",  # Will fail verification
+            "size": 2048,
+        }
+
+        release_data = {"tag_name": "v2.0.0", "original_tag_name": "v2.0.0"}
+
+        # Make digest fail but checksum succeed
+        mock_verifier.verify_digest.side_effect = ValueError("Digest mismatch")
+        # checksum verification succeeds by default (no side_effect)
+
+        with tempfile.NamedTemporaryFile() as tmp_file:
+            # Write some content to avoid zero-size file issues
+            tmp_file.write(b"test content for verification")
+            tmp_file.flush()
+            path = Path(tmp_file.name)
+
+            with patch("my_unicorn.verify.Verifier", return_value=mock_verifier):
+                catalog_strategy_with_mocks.download_service = mock_download_service
+
+                # Test complete fallback chain
+                verification_result = await catalog_strategy_with_mocks._perform_verification(
+                    path, asset, app_config, release_data
+                )
+
+                # Verify fallback behavior
+                assert mock_verifier.verify_digest.called
+                assert mock_verifier.verify_from_checksum_file.called
+
+                # Verify results show checksum success
+                assert "checksum_file" in verification_result["successful_methods"]
+                assert "digest" not in verification_result["successful_methods"]
+
+    def test_verification_config_priority_matrix(self, catalog_strategy_with_mocks):
+        """Test matrix of different catalog config combinations and expected behavior."""
+        test_cases = [
+            # (catalog_digest, catalog_skip, has_api_digest, has_checksum, expected_digest, expected_skip)
+            (False, True, True, False, True, False),  # Skip override with digest
+            (False, True, False, True, False, False),  # Skip override with checksum
+            (False, True, False, False, False, True),  # Actually skip (no strong methods)
+            (True, False, True, False, True, False),  # Normal digest usage
+            (False, False, True, False, True, False),  # Digest discovery
+            (True, True, True, False, True, False),  # Skip override with digest
+        ]
+
+        for (
+            catalog_digest,
+            catalog_skip,
+            has_api_digest,
+            has_checksum,
+            expected_digest,
+            expected_skip,
+        ) in test_cases:
+            catalog_config = {
+                "verification": {
+                    "digest": catalog_digest,
+                    "skip": catalog_skip,
+                    "checksum_file": "SHA256SUMS" if has_checksum else "",
+                    "checksum_hash_type": "sha256",
+                }
+            }
+
+            verification_result = {
+                "successful_methods": {},
+                "updated_config": {
+                    "digest": catalog_digest,
+                    "skip": catalog_skip,
+                    "checksum_file": catalog_config["verification"]["checksum_file"],
+                    "checksum_hash_type": "sha256",
+                },
+            }
+
+            # Simulate successful verification discovery
+            if has_api_digest:
+                verification_result["successful_methods"]["digest"] = "sha256:test"
+                verification_result["updated_config"]["digest"] = True
+                verification_result["updated_config"]["skip"] = False
+
+            if has_checksum and not has_api_digest:
+                verification_result["successful_methods"]["checksum_file"] = {}
+                verification_result["updated_config"]["skip"] = False
+
+            # Test config update logic
+            result = catalog_strategy_with_mocks._get_updated_verification_config(
+                catalog_config,
+                verification_result if verification_result["successful_methods"] else None,
+            )
+
+            # Verify expected outcomes
+            assert result["digest"] == expected_digest, (
+                f"Case: digest={catalog_digest}, skip={catalog_skip}, api_digest={has_api_digest}, checksum={has_checksum}"
+            )
+            assert result["skip"] == expected_skip, (
+                f"Case: digest={catalog_digest}, skip={catalog_skip}, api_digest={has_api_digest}, checksum={has_checksum}"
+            )

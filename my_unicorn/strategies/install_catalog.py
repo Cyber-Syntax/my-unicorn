@@ -10,6 +10,7 @@ from typing import Any
 from my_unicorn.download import IconAsset
 
 from ..logger import get_logger
+from ..utils import extract_and_validate_version
 from .install_url import InstallationError, InstallStrategy, ValidationError
 
 logger = get_logger(__name__)
@@ -193,9 +194,11 @@ class CatalogInstallStrategy(InstallStrategy):
 
                 # Verify download if requested
                 if kwargs.get("verify_downloads", True):
-                    await self._perform_verification(
+                    verification_result = await self._perform_verification(
                         download_path, appimage_asset, app_config, release_data
                     )
+                else:
+                    verification_result = None
 
                 # Move to install directory
                 final_path = self.storage_service.move_to_install_dir(download_path)
@@ -220,9 +223,15 @@ class CatalogInstallStrategy(InstallStrategy):
                 if app_config.get("icon"):
                     icon_path = await self._setup_catalog_icon(app_config, app_name, icon_dir)
 
-                # Create application configuration
+                # Create application configuration (pass verification result for config updates)
                 self._create_app_config(
-                    app_name, final_path, app_config, release_data, icon_dir, appimage_asset
+                    app_name,
+                    final_path,
+                    app_config,
+                    release_data,
+                    icon_dir,
+                    appimage_asset,
+                    verification_result,
                 )
 
                 # Create desktop entry to reflect any changes (icon, paths, etc.)
@@ -252,7 +261,7 @@ class CatalogInstallStrategy(InstallStrategy):
                     "path": str(final_path),
                     "name": final_path.name,
                     "source": "catalog",
-                    "version": release_data.get("tag_name"),
+                    "version": extract_and_validate_version(release_data.get("tag_name", "")),
                     "icon_path": str(icon_path) if icon_path else None,
                 }
 
@@ -363,7 +372,7 @@ class CatalogInstallStrategy(InstallStrategy):
         asset: dict[str, Any],
         app_config: dict[str, Any],
         release_data: dict[str, Any],
-    ) -> None:
+    ) -> dict[str, Any]:
         """Perform download verification based on catalog configuration.
 
         Args:
@@ -371,6 +380,9 @@ class CatalogInstallStrategy(InstallStrategy):
             asset: GitHub asset information
             app_config: Application configuration from catalog
             release_data: GitHub release data
+
+        Returns:
+            Dictionary containing successful verification methods and updated config
 
         Raises:
             InstallationError: If verification fails
@@ -381,28 +393,53 @@ class CatalogInstallStrategy(InstallStrategy):
         # Get verification configuration from catalog
         verification_config = app_config.get("verification", {})
 
-        # Skip verification if configured
-        if verification_config.get("skip", False):
-            logger.debug("⏭️ Verification skipped (configured in catalog)")
-            return
-
         logger.debug(f"🔍 Starting verification for {path.name}")
         verifier = Verifier(path)
         verification_passed = False
+        successful_methods = {}
+        updated_verification_config = verification_config.copy()
 
-        # Try digest verification first if enabled and available
-        if verification_config.get("digest", False) and asset.get("digest"):
+        # Detect available verification methods
+        has_digest = bool(asset.get("digest"))
+        has_checksum_file = bool(verification_config.get("checksum_file"))
+        catalog_skip = verification_config.get("skip", False)
+
+        logger.debug(
+            f"   Available methods: digest={has_digest}, checksum_file={has_checksum_file}"
+        )
+        logger.debug(f"   Catalog skip setting: {catalog_skip}")
+
+        # Only skip if configured AND no strong verification methods available
+        if catalog_skip and not has_digest and not has_checksum_file:
+            logger.debug(
+                "⏭️ Verification skipped (configured in catalog, no strong methods available)"
+            )
+            return {"successful_methods": {}, "updated_config": updated_verification_config}
+        elif catalog_skip and (has_digest or has_checksum_file):
+            logger.debug(
+                "🔄 Overriding catalog skip setting - strong verification methods available"
+            )
+            # Update config to reflect that we're now using verification
+            updated_verification_config["skip"] = False
+
+        # Try digest verification first if available (prioritize over catalog setting)
+        if has_digest:
             try:
-                logger.debug("🔐 Attempting digest verification")
+                logger.debug("🔐 Attempting digest verification (from GitHub API)")
+                if catalog_skip:
+                    logger.debug("   Note: Using digest despite catalog skip=true setting")
                 verifier.verify_digest(asset["digest"])
                 logger.debug("✅ Digest verification passed")
                 verification_passed = True
+                successful_methods["digest"] = asset["digest"]
+                # Enable digest verification in config for future use
+                updated_verification_config["digest"] = True
             except Exception as e:
                 logger.error(f"❌ Digest verification failed: {e}")
                 # Continue to try other verification methods
 
         # Try checksum file verification if configured and digest didn't pass
-        if not verification_passed and verification_config.get("checksum_file"):
+        if not verification_passed and has_checksum_file:
             checksum_file = verification_config["checksum_file"]
             hash_type = verification_config.get("checksum_hash_type", "sha256")
 
@@ -421,6 +458,11 @@ class CatalogInstallStrategy(InstallStrategy):
                 )
                 logger.debug("✅ Checksum file verification passed")
                 verification_passed = True
+                successful_methods["checksum_file"] = {
+                    "url": checksum_url,
+                    "hash_type": hash_type,
+                    "file": checksum_file,
+                }
             except Exception as e:
                 logger.error(f"❌ Checksum file verification failed: {e}")
                 # Continue to basic file size check
@@ -439,14 +481,23 @@ class CatalogInstallStrategy(InstallStrategy):
             if not verification_passed:
                 raise InstallationError("File verification failed")
 
-        # If we have verification methods configured but none passed, fail
-        if (
-            verification_config.get("digest", False)
-            or verification_config.get("checksum_file")
-        ) and not verification_passed:
-            raise InstallationError("Configured verification methods failed")
+        # If we have strong verification methods available but none passed, fail
+        if (has_digest or has_checksum_file) and not verification_passed:
+            available_methods = []
+            if has_digest:
+                available_methods.append("digest")
+            if has_checksum_file:
+                available_methods.append("checksum_file")
+            raise InstallationError(
+                f"Available verification methods failed: {', '.join(available_methods)}"
+            )
 
         logger.debug("✅ Verification completed")
+
+        return {
+            "successful_methods": successful_methods,
+            "updated_config": updated_verification_config,
+        }
 
     async def _setup_catalog_icon(
         self, app_config: dict[str, Any], app_name: str, icon_dir: Path
@@ -497,6 +548,7 @@ class CatalogInstallStrategy(InstallStrategy):
         release_data: dict[str, Any],
         icon_dir: Path,
         appimage_asset: dict[str, Any] | None = None,
+        verification_result: dict[str, Any] | None = None,
     ) -> None:
         """Create application configuration after successful installation.
 
@@ -507,6 +559,7 @@ class CatalogInstallStrategy(InstallStrategy):
             release_data: GitHub release data
             icon_dir: Directory where icons are stored
             appimage_asset: AppImage asset info for digest
+            verification_result: Result from verification with updated config
 
         """
         # Extract appimage config from catalog config
@@ -516,7 +569,8 @@ class CatalogInstallStrategy(InstallStrategy):
             "config_version": "1.0.0",
             "source": "catalog",
             "appimage": {
-                "version": release_data.get("tag_name", "unknown"),
+                "version": extract_and_validate_version(release_data.get("tag_name", ""))
+                or "unknown",
                 "name": app_path.name,
                 "rename": appimage_config.get("rename", app_name),
                 "name_template": appimage_config.get("name_template", ""),
@@ -527,14 +581,8 @@ class CatalogInstallStrategy(InstallStrategy):
             "owner": catalog_config.get("owner", ""),
             "repo": catalog_config.get("repo", ""),
             "github": catalog_config.get("github", {"repo": True, "prerelease": False}),
-            "verification": catalog_config.get(
-                "verification",
-                {
-                    "digest": True,
-                    "skip": False,
-                    "checksum_file": "",
-                    "checksum_hash_type": "sha256",
-                },
+            "verification": self._get_updated_verification_config(
+                catalog_config, verification_result
             ),
             "icon": catalog_config.get("icon", {}),
         }
@@ -553,7 +601,53 @@ class CatalogInstallStrategy(InstallStrategy):
                 config["icon"]["path"] = str(icon_path)
 
         self.catalog_manager.save_app_config(app_name, config)
-        logger.debug(f"📝 Saved configuration for {app_name}")
+
+        # Log verification config updates if any
+        if verification_result and verification_result.get("successful_methods"):
+            methods = list(verification_result["successful_methods"].keys())
+            logger.debug(
+                f"📝 Saved configuration for {app_name} with updated verification: {', '.join(methods)}"
+            )
+        else:
+            logger.debug(f"📝 Saved configuration for {app_name}")
+
+    def _get_updated_verification_config(
+        self, catalog_config: dict[str, Any], verification_result: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        """Get updated verification configuration based on successful verification methods.
+
+        Args:
+            catalog_config: Original catalog configuration
+            verification_result: Result from verification process
+
+        Returns:
+            Updated verification configuration
+
+        """
+        # Start with catalog default or fallback
+        verification_config = catalog_config.get(
+            "verification",
+            {
+                "digest": True,
+                "skip": False,
+                "checksum_file": "",
+                "checksum_hash_type": "sha256",
+            },
+        )
+
+        # Update based on verification results if available
+        if verification_result and verification_result.get("updated_config"):
+            updated_config = verification_result["updated_config"]
+            verification_config.update(updated_config)
+
+            # Log what was updated
+            if verification_result.get("successful_methods"):
+                methods = list(verification_result["successful_methods"].keys())
+                logger.debug(
+                    f"🔧 Updated verification config based on successful methods: {', '.join(methods)}"
+                )
+
+        return verification_config
 
     def _get_current_timestamp(self) -> str:
         """Get current timestamp as ISO string.

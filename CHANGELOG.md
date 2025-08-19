@@ -1,6 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.0.1-alpha
 ## v1.0.0-alpha
 ### BREAKING CHANGES
 This release written from scratch to simplify the code and maintainability. 
