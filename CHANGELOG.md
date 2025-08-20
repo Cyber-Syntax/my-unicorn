@@ -1,6 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.3.0-alpha
 ## v1.2.0-alpha
 ### CHANGES
 This release implement new icon extraction feature and implement new verfication service.
