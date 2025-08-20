@@ -1,8 +1,8 @@
 {
-    "owner": "anyproto",
-    "repo": "anytype-ts",
+    "owner": "FreeCAD",
+    "repo": "FreeCAD",
     "appimage": {
-        "rename": "anytype",
+        "rename": "freecad",
         "name_template": "",
         "characteristic_suffix": []
     },
@@ -19,6 +19,6 @@
     "icon": {
         "extraction": true,
         "url": "",
-        "name": "anytype.png"
+        "name": "freecad.png"
     }
 }

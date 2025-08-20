@@ -1,8 +1,8 @@
 {
-    "owner": "anyproto",
-    "repo": "anytype-ts",
+    "owner": "jgraph",
+    "repo": "drawio-desktop",
     "appimage": {
-        "rename": "anytype",
+        "rename": "drawio-desktop",
         "name_template": "",
         "characteristic_suffix": []
     },
@@ -19,6 +19,6 @@
     "icon": {
         "extraction": true,
         "url": "",
-        "name": "anytype.png"
+        "name": "drawio-desktop.png"
     }
 }

@@ -1,8 +1,8 @@
 {
-    "owner": "anyproto",
-    "repo": "anytype-ts",
+    "owner": "Legcord",
+    "repo": "Legcord",
     "appimage": {
-        "rename": "anytype",
+        "rename": "legcord",
         "name_template": "",
         "characteristic_suffix": []
     },
@@ -11,14 +11,14 @@
         "prerelease": false
     },
     "verification": {
-        "digest": true,
+        "digest": false,
         "skip": false,
-        "checksum_file": "",
+        "checksum_file": "latest-linux.yml",
         "checksum_hash_type": "sha256"
     },
     "icon": {
         "extraction": true,
         "url": "",
-        "name": "anytype.png"
+        "name": "legcord.png"
     }
 }
