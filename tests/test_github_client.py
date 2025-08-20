@@ -325,6 +325,49 @@ def test_detect_checksum_files_siyuan_example():
     assert "v3.2.1" in checksum_files[0].url
 
 
+def test_detect_checksum_files_appimage_patterns():
+    """Test detection of AppImage-specific checksum file patterns."""
+    assets = [
+        {
+            "name": "myapp.AppImage",
+            "browser_download_url": "https://example.com/myapp.AppImage",
+            "size": 12345,
+            "digest": "",
+        },
+        {
+            "name": "myapp.appimage.sha256",
+            "browser_download_url": "https://github.com/owner/repo/releases/download/v2.0.0/myapp.appimage.sha256",
+            "size": 64,
+            "digest": "",
+        },
+        {
+            "name": "myapp.appimage.sha512",
+            "browser_download_url": "https://github.com/owner/repo/releases/download/v2.0.0/myapp.appimage.sha512",
+            "size": 128,
+            "digest": "",
+        },
+        {
+            "name": "other-app.appimage.sha256",
+            "browser_download_url": "https://github.com/owner/repo/releases/download/v2.0.0/other-app.appimage.sha256",
+            "size": 64,
+            "digest": "",
+        },
+    ]
+
+    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v2.0.0")
+
+    assert len(checksum_files) == 3
+    detected_names = [cf.filename for cf in checksum_files]
+    assert "myapp.appimage.sha256" in detected_names
+    assert "myapp.appimage.sha512" in detected_names
+    assert "other-app.appimage.sha256" in detected_names
+
+    # All should be traditional format
+    for cf in checksum_files:
+        assert cf.format_type == "traditional"
+        assert "v2.0.0" in cf.url
+
+
 def test_checksum_file_info_dataclass():
     """Test ChecksumFileInfo dataclass creation and immutability."""
     info = ChecksumFileInfo(

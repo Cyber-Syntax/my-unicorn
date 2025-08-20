@@ -58,6 +58,8 @@ class GitHubReleaseFetcher:
         r".*\.sum$",
         r".*\.hash$",
         r".*\.digest$",
+        r".*appimage\.sha256$",
+        r".*appimage\.sha512$",
     ]
 
     def __init__(self, owner: str, repo: str, session: aiohttp.ClientSession) -> None:
