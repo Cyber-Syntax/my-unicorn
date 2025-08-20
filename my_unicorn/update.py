@@ -466,7 +466,9 @@ class UpdateManager:
                     icon_url = catalog_icon.get("url")
                     if not icon_filename:
                         icon_filename = catalog_icon.get("name")
-                    logger.debug(f"🎨 Using icon URL from catalog for {app_name}: {icon_url}")
+                    logger.debug(
+                        "🎨 Using icon URL from catalog for %s: %s", app_name, icon_url
+                    )
 
             # Process icon URL if we have one
             if icon_url:
@@ -493,7 +495,7 @@ class UpdateManager:
                         icon_filename=icon_filename,
                         icon_url=icon_url,
                     )
-                    logger.debug(f"🎨 Created icon asset for update: {icon_filename}")
+                    logger.debug("🎨 Created icon asset for update: %s", icon_filename)
 
             # If we still don't have an icon asset but the app should have an icon,
             # create one with a default filename for AppImage extraction to work
@@ -507,7 +509,9 @@ class UpdateManager:
                     icon_filename=icon_filename,
                     icon_url="",  # Empty URL means AppImage extraction only
                 )
-                logger.debug(f"🎨 Created icon asset for AppImage extraction: {icon_filename}")
+                logger.debug(
+                    "🎨 Created icon asset for AppImage extraction: %s", icon_filename
+                )
 
             # Initialize services for direct usage
             download_service = DownloadService(session)

@@ -202,7 +202,7 @@ def test_thread_local_progress_context_isolation():
             patch.object(logger.logger, "info") as mock_info,
         ):
             with logger.progress_context():
-                logger.info(f"deferred message from thread {thread_id}")
+                logger.info("deferred message from thread %s", thread_id)
                 # Messages should be deferred, not called immediately
                 results.append(("deferred", thread_id, mock_info.call_count))
             # After context, messages should be flushed
@@ -240,7 +240,7 @@ def test_deferred_messages_bounded():
         with logger.progress_context():
             # Add more messages than the maximum
             for i in range(MAX_DEFERRED_MESSAGES + 100):
-                logger.info(f"message {i}")
+                logger.info("message %s", i)
 
         # Only the most recent messages should be flushed
         assert mock_info.call_count == MAX_DEFERRED_MESSAGES

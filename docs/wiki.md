@@ -61,6 +61,7 @@ my-unicorn list --available
 
 # Remove apps
 my-unicorn remove appflowy --keep-config
+my-unicorn remove appflowy qownotes 
 
 # Show configuration
 my-unicorn config --show

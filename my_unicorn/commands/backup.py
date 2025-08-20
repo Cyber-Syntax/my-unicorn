@@ -287,7 +287,7 @@ class BackupHandler(BaseCommandHandler):
                 print(f"✅ Cleanup completed (keeping {max_backups} most recent backups)")
 
         except Exception as e:
-            logger.error(f"❌ Failed to cleanup backups: {e}")
+            logger.error("❌ Failed to cleanup backups: %s", e)
 
     async def _handle_info(self, app_name: str) -> None:
         """Handle show backup info operation.
@@ -343,7 +343,7 @@ class BackupHandler(BaseCommandHandler):
             print(f"  🔄 Max backups kept: {max_backups if max_backups > 0 else 'unlimited'}")
 
         except Exception as e:
-            logger.error(f"❌ Failed to get backup info for {app_name}: {e}")
+            logger.error("❌ Failed to get backup info for %s: %s", app_name, e)
 
     async def _handle_migrate(self) -> None:
         """Handle migration of old backup format."""
@@ -358,4 +358,4 @@ class BackupHandler(BaseCommandHandler):
                 print("ℹ️  No old backup files found to migrate")
 
         except Exception as e:
-            logger.error(f"❌ Failed to migrate old backups: {e}")
+            logger.error("❌ Failed to migrate old backups: %s", e)

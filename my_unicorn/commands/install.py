@@ -96,13 +96,13 @@ class InstallCommand:
         if not targets:
             raise ValidationError("No installation targets provided")
 
-        logger.info(f"🚀 Starting installation of {len(targets)} target(s)")
+        logger.info("🚀 Starting installation of %d target(s)", len(targets))
 
         # Separate targets into URLs and catalog apps
         url_targets, catalog_targets = self._separate_targets(targets)
 
         # Prepare options with defaults
-        #TODO: use the global setting for the concurrent option
+        # TODO: use the global setting for the concurrent option
         install_options = {
             "concurrent": options.get("concurrent", 3),
             "show_progress": options.get("show_progress", True),
@@ -115,12 +115,12 @@ class InstallCommand:
         results = []
 
         if url_targets:
-            logger.info(f"📡 Installing {len(url_targets)} URL(s)")
+            logger.info("📡 Installing %d URL(s)", len(url_targets))
             url_results = await self.url_strategy.install(url_targets, **install_options)
             results.extend(url_results)
 
         if catalog_targets:
-            logger.info(f"📚 Installing {len(catalog_targets)} catalog app(s)")
+            logger.info("📚 Installing %d catalog app(s)", len(catalog_targets))
             catalog_results = await self.catalog_strategy.install(
                 catalog_targets, **install_options
             )
@@ -195,7 +195,7 @@ class InstallCommand:
         logger.info("=" * 60)
 
         if successful:
-            logger.info(f"✅ Successfully installed ({len(successful)}):")
+            logger.info("✅ Successfully installed (%d):", len(successful))
             for result in successful:
                 target = result.get("target", "Unknown")
                 path = result.get("path", "Unknown")
@@ -209,14 +209,16 @@ class InstallCommand:
 
                 version_info = f" v{version}" if version else ""
                 source_info = f" [{source}]" if source != "unknown" else ""
-                logger.info(f"  • {target}{version_info} → {path}{source_info}{status_info}")
+                logger.info(
+                    "  • %s%s → %s%s%s", target, version_info, path, source_info, status_info
+                )
 
         if failed:
-            logger.info(f"\n❌ Failed installations ({len(failed)}):")
+            logger.info("\n❌ Failed installations (%d):", len(failed))
             for result in failed:
                 target = result.get("target", "Unknown")
                 error = result.get("error", "Unknown error")
-                logger.info(f"  • {target}: {error}")
+                logger.info("  • %s: %s", target, error)
 
         logger.info("=" * 60)
 
@@ -235,7 +237,7 @@ class InstallCommand:
         except ValidationError:
             raise
 
-        logger.debug(f"✅ Validated {len(targets)} target(s)")
+        logger.debug("✅ Validated %d target(s)", len(targets))
 
     async def cleanup_failed_installations(self, results: list[dict[str, Any]]) -> None:
         """Clean up any failed installations.
@@ -250,7 +252,7 @@ class InstallCommand:
             if path := result.get("path"):
                 file_path = Path(path)
                 if file_path.exists():
-                    logger.debug(f"🧹 Cleaning up failed installation: {file_path}")
+                    logger.debug("🧹 Cleaning up failed installation: %s", file_path)
                     self.storage_service.remove_file(file_path)
 
     def get_installation_stats(self, results: list[dict[str, Any]]) -> dict[str, int]:
@@ -349,10 +351,10 @@ class InstallHandler(BaseCommandHandler):
                     )
 
             except ValidationError as e:
-                logger.error(f"❌ Validation error: {e}")
+                logger.error("❌ Validation error: %s", e)
                 logger.info("💡 Use 'list --available' to see available catalog apps.")
             except Exception as e:
-                logger.error(f"❌ Installation failed: {e}")
+                logger.error("❌ Installation failed: %s", e)
 
     def _expand_comma_separated_targets(self, targets: list[str]) -> list[str]:
         """Expand comma-separated targets into individual targets.

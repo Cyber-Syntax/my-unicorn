@@ -240,7 +240,7 @@ class IconService:
                 current_config, catalog_entry
             )
 
-        logger.debug(f"🎨 Icon extraction for {app_name}: enabled={extraction_enabled}")
+        logger.debug("🎨 Icon extraction for %s: enabled=%s", app_name, extraction_enabled)
 
         dest_path = icon_dir / icon_config.icon_filename
         icon_source = "none"
@@ -284,7 +284,7 @@ class IconService:
                 f"source={icon_source}, extraction={updated_config['extraction']}"
             )
         else:
-            logger.warning(f"⚠️  No icon acquired for {app_name}")
+            logger.warning("⚠️  No icon acquired for %s", app_name)
 
         return IconResult(
             icon_path=result_icon_path,

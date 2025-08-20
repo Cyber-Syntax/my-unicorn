@@ -250,7 +250,7 @@ class DesktopEntry:
                         f"Desktop file content changed, updating: {desktop_file_path}"
                     )
                 else:
-                    logger.debug(f"Desktop file unchanged, skipping: {desktop_file_path}")
+                    logger.debug("Desktop file unchanged, skipping: %s", desktop_file_path)
                     return desktop_file_path
             except OSError:
                 # If we can't read the existing file, create a new one
@@ -266,9 +266,9 @@ class DesktopEntry:
                 os.chmod(desktop_file_path, 0o755)
 
                 if desktop_file_path.exists():
-                    logger.info(f"🖥️  Updated desktop entry: {desktop_file_path.name}")
+                    logger.info("🖥️  Updated desktop entry: %s", desktop_file_path.name)
                 else:
-                    logger.info(f"🖥️  Created desktop entry: {desktop_file_path.name}")
+                    logger.info("🖥️  Created desktop entry: %s", desktop_file_path.name)
                 return desktop_file_path
 
             except OSError as e:
@@ -303,7 +303,7 @@ class DesktopEntry:
         """
         existing_file = self.find_existing_desktop_file()
         if not existing_file:
-            logger.warning(f"No existing desktop file found for {self.app_name}")
+            logger.warning("No existing desktop file found for %s", self.app_name)
             return None
 
         # Update by recreating the file
@@ -319,11 +319,13 @@ class DesktopEntry:
             with open(existing_file, "w", encoding="utf-8") as f:
                 f.write(content)
 
-            logger.debug(f"Updated desktop file: {existing_file}")
+            logger.debug("Updated desktop file: %s", existing_file)
             return existing_file
 
         except OSError as e:
-            logger.error(f"Failed to update desktop file {existing_file}: {e}", exc_info=True)
+            logger.error(
+                "Failed to update desktop file %s: %s", existing_file, e, exc_info=True
+            )
             return None
 
     def remove_desktop_file(self) -> bool:
@@ -335,15 +337,17 @@ class DesktopEntry:
         """
         existing_file = self.find_existing_desktop_file()
         if not existing_file:
-            logger.debug(f"No desktop file found for {self.app_name}")
+            logger.debug("No desktop file found for %s", self.app_name)
             return False
 
         try:
             existing_file.unlink()
-            logger.debug(f"Removed desktop file: {existing_file}")
+            logger.debug("Removed desktop file: %s", existing_file)
             return True
         except OSError as e:
-            logger.error(f"Failed to remove desktop file {existing_file}: {e}", exc_info=True)
+            logger.error(
+                "Failed to remove desktop file %s: %s", existing_file, e, exc_info=True
+            )
             return False
 
     def _is_browser_app(self) -> bool:
@@ -433,9 +437,9 @@ class DesktopEntry:
 
         for field in important_fields:
             if existing_fields.get(field) != new_fields.get(field):
-                logger.debug(f"Desktop file field changed: {field}")
-                logger.debug(f"  Old: {existing_fields.get(field)}")
-                logger.debug(f"  New: {new_fields.get(field)}")
+                logger.debug("Desktop file field changed: %s", field)
+                logger.debug("  Old: %s", existing_fields.get(field))
+                logger.debug("  New: %s", new_fields.get(field))
                 return True
 
         return False
@@ -522,7 +526,7 @@ class DesktopEntry:
                 logger.debug("Desktop database refreshed")
                 return True
         except Exception as e:
-            logger.debug(f"Could not refresh desktop database: {e}")
+            logger.debug("Could not refresh desktop database: %s", e)
 
         return False
 

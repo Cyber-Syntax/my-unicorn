@@ -32,7 +32,7 @@ class StorageService:
             path: Path to file to make executable
 
         """
-        logger.debug(f"🔧 Making executable: {path.name}")
+        logger.debug("🔧 Making executable: %s", path.name)
         os.chmod(path, 0o755)
         logger.debug("✅ File permissions updated")
 
@@ -55,11 +55,11 @@ class StorageService:
 
         # If target exists, remove it
         if destination.exists():
-            logger.debug(f"🗑️  Removing existing file: {destination}")
+            logger.debug("🗑️  Removing existing file: %s", destination)
             destination.unlink()
 
         # Move file
-        logger.debug(f"📦 Moving file: {source} → {destination}")
+        logger.debug("📦 Moving file: %s → %s", source, destination)
         source.rename(destination)
         return destination
 
@@ -91,16 +91,16 @@ class StorageService:
         """
         new_path = current_path.parent / new_name
 
-        logger.debug(f"🏷️  Renaming file: {current_path.name} → {new_name}")
+        logger.debug("🏷️  Renaming file: %s → %s", current_path.name, new_name)
 
         if current_path.exists():
             # Remove target if it exists (for updates)
             if new_path.exists() and new_path != current_path:
-                logger.debug(f"🗑️  Removing existing file: {new_path}")
+                logger.debug("🗑️  Removing existing file: %s", new_path)
                 new_path.unlink()
 
             current_path.rename(new_path)
-            logger.debug(f"✅ Renamed to: {new_path}")
+            logger.debug("✅ Renamed to: %s", new_path)
 
         return new_path
 
@@ -145,11 +145,11 @@ class StorageService:
 
         """
         if path.exists():
-            logger.debug(f"🗑️  Removing file: {path}")
+            logger.debug("🗑️  Removing file: %s", path)
             path.unlink()
             logger.debug("✅ File removed")
 
-    #TODO: not used anymore
+    # TODO: not used anymore
     def cleanup_download(self, download_path: Path, install_path: Path) -> None:
         """Clean up downloaded files if they differ from install path.
 
@@ -184,9 +184,9 @@ class StorageService:
         # Create destination directory if it doesn't exist
         destination.parent.mkdir(parents=True, exist_ok=True)
 
-        logger.debug(f"📋 Copying file: {source} → {destination}")
+        logger.debug("📋 Copying file: %s → %s", source, destination)
         shutil.copy2(source, destination)
-        logger.debug(f"✅ File copied: {destination}")
+        logger.debug("✅ File copied: %s", destination)
 
         return destination
 
