@@ -40,7 +40,7 @@ class UpdateHandler(BaseCommandHandler):
 
             # Log the selected strategy for debugging
             strategy_name = UpdateStrategyFactory.get_strategy_name(context)
-            logger.debug(f"Selected strategy: {strategy_name}")
+            logger.debug("Selected strategy: %s", strategy_name)
 
             # Validate inputs using the strategy's validation logic
             if not strategy.validate_inputs(context):
@@ -53,10 +53,10 @@ class UpdateHandler(BaseCommandHandler):
             UpdateResultDisplay.display_summary(result)
 
             # Log final result for debugging
-            logger.debug(f"Update operation completed: {result.message}")
+            logger.debug("Update operation completed: %s", result.message)
 
         except Exception as e:
-            logger.error(f"Update command failed: {e}")
+            logger.error("Update command failed: %s", e)
             UpdateResultDisplay.display_error(f"Update operation failed: {e}")
 
     def _build_context(self, args: Namespace) -> UpdateContext:

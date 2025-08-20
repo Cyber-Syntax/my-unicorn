@@ -26,7 +26,7 @@ class RemoveHandler(BaseCommandHandler):
             app_config = self.config_manager.load_app_config(app_name)
             if not app_config:
                 print(f"❌ App '{app_name}' not found")
-                logger.debug(f"App config for '{app_name}' not found. Skipping removal.")
+                logger.debug("App config for '%s' not found. Skipping removal.", app_name)
                 return
 
             # Remove AppImage files
@@ -46,7 +46,7 @@ class RemoveHandler(BaseCommandHandler):
                 print(f"✅ Kept config for {app_name}")
 
         except Exception as e:
-            logger.error(f"Failed to remove {app_name}: {e}", exc_info=True)
+            logger.error("Failed to remove %s: %s", app_name, e, exc_info=True)
             print(f"❌ Failed to remove {app_name}: {e}")
 
     def _remove_appimage_files(self, app_config: dict, app_name: str) -> None:
@@ -64,7 +64,7 @@ class RemoveHandler(BaseCommandHandler):
             if path.exists():
                 path.unlink()
                 removed_files.append(str(path))
-                logger.debug(f"Unlinked file: {path}")
+                logger.debug("Removed file: %s", path)
 
         if removed_files:
             print(f"✅ Removed AppImage(s): {', '.join(removed_files)}")
@@ -82,8 +82,8 @@ class RemoveHandler(BaseCommandHandler):
             if remove_desktop_entry_for_app(app_name, self.config_manager):
                 print(f"✅ Removed desktop entry for {app_name}")
         except Exception as e:
-            logger.debug(f"Exception occurred while processing app '{app_name}': {e}")
-            logger.warning(f"⚠️  Failed to remove desktop entry: {e}")
+            logger.debug("Exception occurred while processing app '%s': %s", app_name, e)
+            logger.warning("⚠️  Failed to remove desktop entry: %s", e)
 
     def _remove_icon(self, app_config: dict) -> None:
         """Remove icon file if icon config is present."""

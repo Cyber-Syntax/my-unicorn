@@ -13,6 +13,7 @@ from ..github_client import (
     GitHubReleaseDetails,
     GitHubReleaseFetcher,
 )
+from ..icon import IconManager
 from ..logger import get_logger
 from ..utils import extract_and_validate_version
 from ..verify import Verifier
@@ -173,8 +174,35 @@ class URLInstallStrategy(InstallStrategy):
                 clean_name = self.storage_service.get_clean_appimage_name(repo_name.lower())
                 final_path = self.storage_service.rename_appimage(final_path, clean_name)
 
-                # we don't support icons on url installs yet
+                # Extract icon from AppImage
                 icon_path = None
+                from ..config import ConfigManager
+
+                config_manager = ConfigManager()
+                global_config = config_manager.load_global_config()
+                icon_dir = global_config["directory"]["icon"]
+
+                # Generate icon filename
+                icon_filename = f"{repo_name.lower()}.png"
+                icon_dest_path = icon_dir / icon_filename
+
+                # Use IconManager to extract icon from AppImage
+                icon_manager = IconManager(self.download_service)
+                icon_source = "none"
+                try:
+                    icon_path = await icon_manager.extract_icon_only(
+                        appimage_path=final_path,
+                        dest_path=icon_dest_path,
+                        app_name=repo_name.lower(),
+                    )
+                    if icon_path:
+                        icon_source = "extraction"
+                        logger.info("✅ Icon extracted for %s: %s", repo_name, icon_path)
+                    else:
+                        logger.info("ℹ️  No icon found in AppImage for %s", repo_name)
+                except Exception as e:
+                    logger.warning("⚠️  Failed to extract icon for %s: %s", repo_name, e)
+                    icon_path = None
 
                 # Create app configuration
                 await self._create_app_config(
@@ -185,12 +213,10 @@ class URLInstallStrategy(InstallStrategy):
                     release_data,
                     appimage_asset,
                     icon_path,
+                    icon_source,
                 )
 
-                # Get icon directory from global config
-                from ..config import ConfigManager
-
-                config_manager = ConfigManager()
+                # config_manager already initialized above
 
                 # Create desktop entry to reflect any changes (icon, paths, etc.)
                 try:
@@ -288,6 +314,7 @@ class URLInstallStrategy(InstallStrategy):
         release_data: GitHubReleaseDetails,
         appimage_asset: GitHubAsset,
         icon_path: Path | None,
+        icon_source: str = "none",
     ) -> None:
         """Create application configuration for URL-based installation.
 
@@ -299,6 +326,7 @@ class URLInstallStrategy(InstallStrategy):
             release_data: GitHub release data
             appimage_asset: AppImage asset information
             icon_path: Path to downloaded icon or None
+            icon_source: Source of icon (extraction, github, none)
 
         """
         from ..config import ConfigManager
@@ -335,15 +363,17 @@ class URLInstallStrategy(InstallStrategy):
                 "checksum_file": "",
                 "checksum_hash_type": "sha256",
             },
-            "icon": {},
+            "icon": {
+                "extraction": True,
+                "source": icon_source,
+                "url": "",
+            },
         }
 
-        # Add icon information if available
-        # We don't store the URL since icon only exists on catalog installs for now.
-        # TODO: Implement default icon.png for URL installs
+        # Add icon information if available (extracted from AppImage)
         if icon_path and icon_path.exists():
             config["icon"]["name"] = icon_path.name
-            config["icon"]["url"] = ""
+            config["icon"]["installed"] = True
             config["icon"]["path"] = str(icon_path)
 
         # Save the configuration

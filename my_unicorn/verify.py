@@ -35,11 +35,11 @@ class Verifier:
         """Log basic file information for debugging."""
         if self.file_path.exists():
             file_size = self.file_path.stat().st_size
-            logger.debug(f"📁 File info: {self.file_path.name}")
-            logger.debug(f"   Path: {self.file_path}")
-            logger.debug(f"   Size: {format_bytes(file_size)} ({file_size:,} bytes)")
+            logger.debug("📁 File info: %s", self.file_path.name)
+            logger.debug("   Path: %s", self.file_path)
+            logger.debug("   Size: %s (%s bytes)", format_bytes(file_size), f"{file_size:,}")
         else:
-            logger.warning(f"⚠️  File does not exist: {self.file_path}")
+            logger.warning("⚠️  File does not exist: %s", self.file_path)
 
     def verify_digest(self, expected_digest: str) -> None:
         """Verify file using GitHub API digest format.
@@ -51,8 +51,8 @@ class Verifier:
             ValueError: If digest format is invalid or verification fails
 
         """
-        logger.debug(f"🔍 Starting digest verification for {self.file_path.name}")
-        logger.debug(f"   Expected digest: {expected_digest}")
+        logger.debug("🔍 Starting digest verification for %s", self.file_path.name)
+        logger.debug("   Expected digest: %s", expected_digest)
 
         if not expected_digest:
             logger.error("❌ Digest cannot be empty")
@@ -60,33 +60,33 @@ class Verifier:
 
         algo, _, hash_value = expected_digest.partition(":")
         if not hash_value:
-            logger.error(f"❌ Invalid digest format: {expected_digest}")
+            logger.error("❌ Invalid digest format: %s", expected_digest)
             raise ValueError(f"Invalid digest format: {expected_digest}")
 
         if algo not in ["sha1", "sha256", "sha512", "md5"]:
-            logger.error(f"❌ Unsupported digest algorithm: {algo}")
+            logger.error("❌ Unsupported digest algorithm: %s", algo)
             raise ValueError(f"Unsupported digest algorithm: {algo}")
 
-        logger.debug(f"   Algorithm: {algo.upper()}")
-        logger.debug(f"   Expected hash: {hash_value}")
+        logger.debug("   Algorithm: %s", algo.upper())
+        logger.debug("   Expected hash: %s", hash_value)
 
-        logger.debug(f"🧮 Computing {algo.upper()} hash...")
+        logger.debug("🧮 Computing %s hash...", algo.upper())
         actual_hash = self.compute_hash(algo)  # type: ignore
-        logger.debug(f"   Computed hash: {actual_hash}")
+        logger.debug("   Computed hash: %s", actual_hash)
 
         if actual_hash.lower() != hash_value.lower():
             logger.error("❌ Digest verification FAILED!")
-            logger.error(f"   Expected: {hash_value}")
-            logger.error(f"   Actual:   {actual_hash}")
-            logger.error(f"   Algorithm: {algo.upper()}")
-            logger.error(f"   File: {self.file_path}")
+            logger.error("   Expected: %s", hash_value)
+            logger.error("   Actual:   %s", actual_hash)
+            logger.error("   Algorithm: %s", algo.upper())
+            logger.error("   File: %s", self.file_path)
             raise ValueError(
                 f"Digest mismatch!\nExpected: {hash_value}\nActual:   {actual_hash}"
             )
 
         logger.debug("✅ Digest verification PASSED!")
-        logger.debug(f"   Algorithm: {algo.upper()}")
-        logger.debug(f"   Hash: {actual_hash}")
+        logger.debug("   Algorithm: %s", algo.upper())
+        logger.debug("   Hash: %s", actual_hash)
 
     def verify_hash(self, expected_hash: str, hash_type: HashType) -> None:
         """Verify file using specific hash type.
@@ -102,25 +102,25 @@ class Verifier:
         logger.debug(
             f"🔍 Starting {hash_type.upper()} hash verification for {self.file_path.name}"
         )
-        logger.debug(f"   Expected hash: {expected_hash}")
+        logger.debug("   Expected hash: %s", expected_hash)
 
-        logger.debug(f"🧮 Computing {hash_type.upper()} hash...")
+        logger.debug("🧮 Computing %s hash...", hash_type.upper())
         actual_hash = self.compute_hash(hash_type)
-        logger.debug(f"   Computed hash: {actual_hash}")
+        logger.debug("   Computed hash: %s", actual_hash)
 
         if actual_hash.lower() != expected_hash.lower():
-            logger.error(f"❌ {hash_type.upper()} verification FAILED!")
-            logger.error(f"   Expected: {expected_hash}")
-            logger.error(f"   Actual:   {actual_hash}")
-            logger.error(f"   File: {self.file_path}")
+            logger.error("❌ %s verification FAILED!", hash_type.upper())
+            logger.error("   Expected: %s", expected_hash)
+            logger.error("   Actual:   %s", actual_hash)
+            logger.error("   File: %s", self.file_path)
             raise ValueError(
                 f"{hash_type.upper()} mismatch!\n"
                 f"Expected: {expected_hash}\n"
                 f"Actual:   {actual_hash}"
             )
 
-        logger.debug(f"✅ {hash_type.upper()} verification PASSED!")
-        logger.debug(f"   Hash: {actual_hash}")
+        logger.debug("✅ %s verification PASSED!", hash_type.upper())
+        logger.debug("   Hash: %s", actual_hash)
 
     def compute_hash(self, hash_type: HashType) -> str:
         """Compute hash of the file.
@@ -137,7 +137,7 @@ class Verifier:
 
         """
         if not self.file_path.exists():
-            logger.error(f"❌ File not found: {self.file_path}")
+            logger.error("❌ File not found: %s", self.file_path)
             raise FileNotFoundError(f"File not found: {self.file_path}")
 
         hash_algorithms = {

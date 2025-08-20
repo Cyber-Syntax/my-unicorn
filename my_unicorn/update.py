@@ -24,7 +24,6 @@ from .download import DownloadService, IconAsset
 from .github_client import GitHubAsset, GitHubReleaseDetails, GitHubReleaseFetcher
 from .logger import get_logger
 from .storage import StorageService
-from .verify import Verifier
 
 logger = get_logger(__name__)
 
@@ -88,6 +87,23 @@ class UpdateManager:
 
         # Initialize backup service
         self.backup_service = BackupService(self.config_manager, self.global_config)
+
+        # Initialize shared services - will be set when session is available
+        self.icon_service = None
+        self.verification_service = None
+
+    def _initialize_services(self, session: Any) -> None:
+        """Initialize shared services with HTTP session.
+
+        Args:
+            session: aiohttp session for downloads
+
+        """
+        from .services import IconService, VerificationService
+
+        download_service = DownloadService(session)
+        self.icon_service = IconService(download_service)
+        self.verification_service = VerificationService(download_service)
 
     def _select_best_appimage_by_source(
         self,
@@ -425,16 +441,37 @@ class UpdateManager:
             current_appimage_path = storage_dir / app_config["appimage"]["name"]
             if current_appimage_path.exists():
                 backup_path = self.backup_service.create_backup(
-                    current_appimage_path, backup_dir, update_info.current_version
+                    current_appimage_path, app_name, update_info.current_version
                 )
                 if backup_path:
                     logger.debug("💾 Backup created: %s", backup_path)
 
             # Download and install new version
             icon_asset = None
-            if app_config.get("icon") and app_config["icon"].get("url"):
-                icon_url = app_config["icon"]["url"]
+            icon_url = None
+            icon_filename = None
 
+            # Try to get icon info from app config first
+            if app_config.get("icon"):
+                icon_url = app_config["icon"].get("url")
+                icon_filename = app_config["icon"].get("name")
+
+            # If no icon URL in app config, try to get it from catalog
+            if not icon_url:
+                catalog_entry = self.config_manager.load_catalog_entry(
+                    app_config["repo"].lower()
+                )
+                if catalog_entry and catalog_entry.get("icon"):
+                    catalog_icon = catalog_entry.get("icon", {})
+                    icon_url = catalog_icon.get("url")
+                    if not icon_filename:
+                        icon_filename = catalog_icon.get("name")
+                    logger.debug(
+                        "🎨 Using icon URL from catalog for %s: %s", app_name, icon_url
+                    )
+
+            # Process icon URL if we have one
+            if icon_url:
                 # Check if icon URL is a path template (doesn't start with http)
                 if not icon_url.startswith("http"):
                     # Build full URL from path template
@@ -452,17 +489,35 @@ class UpdateManager:
                         # Skip icon download if template building fails
                         icon_url = None
 
-                # Only create icon asset if we have a valid URL
-                if icon_url:
+                # Create icon asset if we have both URL and filename
+                if icon_url and icon_filename:
                     icon_asset = IconAsset(
-                        icon_filename=app_config["icon"]["name"],
+                        icon_filename=icon_filename,
                         icon_url=icon_url,
                     )
+                    logger.debug("🎨 Created icon asset for update: %s", icon_filename)
+
+            # If we still don't have an icon asset but the app should have an icon,
+            # create one with a default filename for AppImage extraction to work
+            if not icon_asset and app_config.get("icon", {}).get("installed"):
+                if not icon_filename:
+                    # Generate default icon filename
+                    icon_filename = f"{app_name}.png"
+
+                # Create icon asset with empty URL (AppImage extraction only)
+                icon_asset = IconAsset(
+                    icon_filename=icon_filename,
+                    icon_url="",  # Empty URL means AppImage extraction only
+                )
+                logger.debug(
+                    "🎨 Created icon asset for AppImage extraction: %s", icon_filename
+                )
 
             # Initialize services for direct usage
             download_service = DownloadService(session)
+            self._initialize_services(session)
 
-            # Get clean name for renaming from catalog config if available
+            # Get catalog entry early for icon and renaming configuration
             catalog_entry = self.config_manager.load_catalog_entry(app_config["repo"].lower())
             rename_to = app_name  # fallback
             if catalog_entry and catalog_entry.get("appimage", {}).get("rename"):
@@ -482,11 +537,48 @@ class UpdateManager:
                 appimage_asset, download_path, show_progress=True
             )
 
-            # Download icon if requested
+            # Get icon using enhanced IconManager with extraction configuration
             icon_path = None
-            if bool(icon_asset):
-                icon_full_path = icon_dir / icon_asset["icon_filename"]
-                icon_path = await download_service.download_icon(icon_asset, icon_full_path)
+            updated_icon_config = None
+
+            # Check if icon setup should be attempted (with or without initial icon_asset)
+            should_setup_icon = (
+                bool(icon_asset)
+                or app_config.get("icon", {}).get("installed")
+                or (catalog_entry and catalog_entry.get("icon"))
+            )
+
+            if should_setup_icon:
+                # Create minimal icon_asset if one doesn't exist but icon setup is needed
+                if not icon_asset:
+                    # Try to get info from catalog or generate defaults
+                    icon_filename = None
+                    icon_url = ""
+
+                    if catalog_entry and catalog_entry.get("icon"):
+                        catalog_icon = catalog_entry.get("icon", {})
+                        icon_filename = catalog_icon.get("name")
+                        icon_url = catalog_icon.get("url", "")
+
+                    if not icon_filename:
+                        icon_filename = f"{app_name}.png"
+
+                    icon_asset = IconAsset(
+                        icon_filename=icon_filename,
+                        icon_url=icon_url,
+                    )
+                    logger.debug(
+                        f"🎨 Created icon asset from catalog/defaults: {icon_filename}"
+                    )
+
+                icon_path, updated_icon_config = await self._setup_update_icon(
+                    app_config=app_config,
+                    catalog_entry=catalog_entry,
+                    app_name=app_name,
+                    icon_dir=icon_dir,
+                    appimage_path=appimage_path,
+                    icon_asset=icon_asset,
+                )
 
             # Perform verification using priority-based approach (BEFORE renaming)
             verification_config = app_config.get("verification", {})
@@ -500,7 +592,6 @@ class UpdateManager:
                 owner,
                 repo,
                 update_info.original_tag_name,
-                download_service,
                 app_name,
             )
 
@@ -537,15 +628,22 @@ class UpdateManager:
             app_config["appimage"]["installed_date"] = datetime.now().isoformat()
             app_config["appimage"]["digest"] = stored_hash
 
-            # Track if icon was updated for desktop entry regeneration
+            # Update icon configuration with extraction settings and source tracking
             icon_updated = False
-            if icon_path:
+            if updated_icon_config:
                 previous_icon_status = app_config.get("icon", {}).get("installed", False)
                 if "icon" not in app_config:
-                    app_config["icon"] = {"url": "", "name": "", "installed": False}
-                # Store icon path in a separate field for backward compatibility
-                app_config["icon"]["installed"] = True
-                icon_updated = not previous_icon_status  # Icon was newly installed
+                    app_config["icon"] = {}
+
+                # Update icon config with new settings from update process
+                app_config["icon"].update(updated_icon_config)
+                icon_updated = not previous_icon_status or icon_path is not None
+
+                if icon_path:
+                    logger.debug(
+                        f"🎨 Icon updated for {app_name}: source={updated_icon_config.get('source', 'unknown')}, "
+                        f"extraction={updated_icon_config.get('extraction', False)}"
+                    )
 
             self.config_manager.save_app_config(app_name, app_config)
 
@@ -553,7 +651,7 @@ class UpdateManager:
             try:
                 self.backup_service.cleanup_old_backups(app_name)
             except Exception as e:
-                logger.warning(f"⚠️  Failed to cleanup old backups for {app_name}: {e}")
+                logger.warning("⚠️  Failed to cleanup old backups for %s: %s", app_name, e)
 
             # Update desktop entry to reflect any changes (icon, paths, etc.)
             try:
@@ -572,16 +670,67 @@ class UpdateManager:
                 )
                 # Desktop entry creation/update logging is handled by the desktop module
             except Exception as e:
-                logger.warning(f"⚠️  Failed to update desktop entry: {e}")
+                logger.warning("⚠️  Failed to update desktop entry: %s", e)
 
-            logger.debug(f"✅ Successfully updated {app_name} to {update_info.latest_version}")
+            logger.debug(
+                "✅ Successfully updated %s to %s", app_name, update_info.latest_version
+            )
             if stored_hash:
-                logger.debug(f"🔐 Updated stored hash: {stored_hash}")
+                logger.debug("🔐 Updated stored hash: %s", stored_hash)
             return True
 
         except Exception as e:
-            logger.error(f"Failed to update {app_name}: {e}")
+            logger.error("Failed to update %s: %s", app_name, e)
             return False
+
+    async def _setup_update_icon(
+        self,
+        app_config: Any,
+        catalog_entry: Any,
+        app_name: str,
+        icon_dir: Path,
+        appimage_path: Path,
+        icon_asset: IconAsset,
+    ) -> tuple[Path | None, dict[str, Any]]:
+        """Setup icon during update with extraction configuration management.
+
+        Args:
+            app_config: Current app configuration
+            catalog_entry: Catalog entry for the app (if available)
+            app_name: Application name
+            icon_dir: Directory where icons should be saved
+            appimage_path: Path to AppImage for icon extraction
+            icon_asset: Icon asset with filename and URL
+            download_service: Service for downloading icons
+
+        Returns:
+            Tuple of (Path to acquired icon or None, updated icon config)
+
+        """
+        from .services import IconConfig
+
+        current_icon_config = app_config.get("icon", {}) if app_config else {}
+
+        icon_config = IconConfig(
+            extraction_enabled=True,  # Will be determined by service
+            icon_url=icon_asset["icon_url"],
+            icon_filename=icon_asset["icon_filename"],
+            preserve_url_on_extraction=True,  # Preserve URL for future updates
+        )
+
+        if self.icon_service is None:
+            raise RuntimeError("Icon service not initialized")
+
+        result = await self.icon_service.acquire_icon(
+            icon_config=icon_config,
+            app_name=app_name,
+            icon_dir=icon_dir,
+            appimage_path=appimage_path,
+            current_config=current_icon_config,
+            catalog_entry=catalog_entry,
+        )
+
+        return result.icon_path, result.config
 
     async def _perform_update_verification(
         self,
@@ -591,7 +740,6 @@ class UpdateManager:
         owner: str,
         repo: str,
         tag_name: str,
-        download_service: Any,
         app_name: str,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Perform update verification using priority-based approach.
@@ -610,119 +758,26 @@ class UpdateManager:
             Tuple of (verification_results, updated_verification_config)
 
         """
-        verification_results = {}
-        updated_verification_config = verification_config.copy()
-        verification_passed = False
+        if self.verification_service is None:
+            raise RuntimeError("Verification service not initialized")
 
-        # Detect available verification methods
-        has_digest = bool(asset["digest"])
-        has_checksum_file = bool(verification_config.get("checksum_file"))
-        catalog_skip = verification_config.get("skip", False)
+        # Convert GitHubAsset to dict for service compatibility
+        asset_dict = {
+            "digest": getattr(asset, "digest", None),
+            "size": getattr(asset, "size", 0),
+        }
 
-        logger.debug(f"🔍 Starting verification for updated {app_name}")
-        logger.debug(
-            f"   Available methods: digest={has_digest}, checksum_file={has_checksum_file}"
+        result = await self.verification_service.verify_file(
+            file_path=path,
+            asset=asset_dict,
+            config=verification_config,
+            owner=owner,
+            repo=repo,
+            tag_name=tag_name,
+            app_name=app_name,
         )
-        logger.debug(f"   Catalog skip setting: {catalog_skip}")
 
-        # Only skip if configured AND no strong verification methods available
-        if catalog_skip and not has_digest and not has_checksum_file:
-            logger.debug(
-                "⏭️ Verification skipped (configured in app config, no strong methods available)"
-            )
-            return verification_results, updated_verification_config
-        elif catalog_skip and (has_digest or has_checksum_file):
-            logger.debug(
-                "🔄 Overriding app config skip setting - strong verification methods available"
-            )
-            # Update config to reflect that we're now using verification
-            updated_verification_config["skip"] = False
-
-        verifier = Verifier(path)
-
-        # Try digest verification first if available (prioritize over config setting)
-        if has_digest:
-            try:
-                logger.debug("🔐 Attempting digest verification (from GitHub API)")
-                if catalog_skip:
-                    logger.debug("   Note: Using digest despite app config skip=true setting")
-                verifier.verify_digest(asset["digest"])
-                verification_results["digest"] = {
-                    "passed": True,
-                    "hash": asset["digest"],
-                    "details": "GitHub API digest verification",
-                }
-                logger.debug("✅ Digest verification passed")
-                verification_passed = True
-                # Enable digest verification in config for future use
-                updated_verification_config["digest"] = True
-            except Exception as e:
-                logger.error(f"❌ Digest verification failed: {e}")
-                verification_results["digest"] = {
-                    "passed": False,
-                    "hash": asset["digest"],
-                    "details": str(e),
-                }
-
-        # Try checksum file verification if configured and digest didn't pass
-        if not verification_passed and has_checksum_file:
-            checksum_file = verification_config["checksum_file"]
-            hash_type = verification_config.get("checksum_hash_type", "sha256")
-            checksum_url = f"https://github.com/{owner}/{repo}/releases/download/{tag_name}/{checksum_file}"
-
-            try:
-                logger.debug(f"🔍 Verifying using checksum file: {checksum_file}")
-                # Use original filename for checksum verification
-                await verifier.verify_from_checksum_file(
-                    checksum_url, hash_type, download_service, path.name
-                )
-                computed_hash = verifier.compute_hash(hash_type)
-                verification_results["checksum_file"] = {
-                    "passed": True,
-                    "hash": f"{hash_type}:{computed_hash}",
-                    "details": f"Verified against {checksum_file}",
-                }
-                logger.debug("✅ Checksum file verification passed")
-                verification_passed = True
-            except Exception as e:
-                logger.error(f"❌ Checksum file verification failed: {e}")
-                verification_results["checksum_file"] = {
-                    "passed": False,
-                    "hash": "",
-                    "details": str(e),
-                }
-
-        # Basic file integrity check
-        try:
-            file_size = verifier.get_file_size()
-            expected_size = asset["size"]
-            if expected_size > 0:
-                verifier.verify_size(expected_size)
-            verification_results["size"] = {
-                "passed": True,
-                "details": f"File size: {file_size:,} bytes",
-            }
-        except Exception as e:
-            logger.warning(f"⚠️  Size verification failed: {e}")
-            verification_results["size"] = {"passed": False, "details": str(e)}
-            if not verification_passed:
-                # If no strong verification passed and size check failed, that's an error
-                if has_digest or has_checksum_file:
-                    raise Exception("File verification failed")
-
-        # If we have strong verification methods available but none passed, fail
-        if (has_digest or has_checksum_file) and not verification_passed:
-            available_methods = []
-            if has_digest:
-                available_methods.append("digest")
-            if has_checksum_file:
-                available_methods.append("checksum_file")
-            raise Exception(
-                f"Available verification methods failed: {', '.join(available_methods)}"
-            )
-
-        logger.debug("✅ Verification completed")
-        return verification_results, updated_verification_config
+        return result.methods, result.updated_config
 
     async def update_multiple_apps(
         self, app_names: list[str], force: bool = False
@@ -755,6 +810,6 @@ class UpdateManager:
                     app_name, success = result
                     results[app_name] = success
                 elif isinstance(result, Exception):
-                    logger.error(f"Update task failed: {result}")
+                    logger.error("Update task failed: %s", result)
 
         return results
