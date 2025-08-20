@@ -20,6 +20,7 @@
         "checksum_hash_type": "sha256"
     },
     "icon": {
+        "extraction": true,
         "url": "https://raw.githubusercontent.com/johannesjo/super-productivity/master/src/assets/icons/favicon-192x192.png",
         "name": "super-productivity.png"
     }

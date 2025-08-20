@@ -21,6 +21,7 @@
         "checksum_hash_type": "sha256"
     },
     "icon": {
+        "extraction": true,
         "url": "https://raw.githubusercontent.com/tagspaces/tagspaces/master/assets/icon.png",
         "name": "tagspaces.png"
     }

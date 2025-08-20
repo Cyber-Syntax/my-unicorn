@@ -1,0 +1,24 @@
+{
+    "appimage": {
+        "rename": "anytype",
+        "name_template": "",
+        "characteristic_suffix": []
+    },
+    "owner": "anyproto",
+    "repo": "anytype-ts",
+    "github": {
+        "repo": true,
+        "prerelease": false
+    },
+    "verification": {
+        "digest": true,
+        "skip": false,
+        "checksum_file": "",
+        "checksum_hash_type": "sha256"
+    },
+    "icon": {
+        "extraction": true,
+        "url": "",
+        "name": "anytype.png"
+    }
+}

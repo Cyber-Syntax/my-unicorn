@@ -21,6 +21,7 @@
         "checksum_hash_type": "sha256"
     },
     "icon": {
+        "extraction": true,
         "url": "https://raw.githubusercontent.com/logseq/logseq/master/resources/icons/logseq.png",
         "name": "logseq.png"
     }

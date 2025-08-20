@@ -20,6 +20,7 @@
         "checksum_hash_type": "sha256"
     },
     "icon": {
+        "extraction": true,
         "url": "https://raw.githubusercontent.com/zen-browser/desktop/dev/docs/assets/zen-black.svg",
         "name": "zen-browser.svg"
     }

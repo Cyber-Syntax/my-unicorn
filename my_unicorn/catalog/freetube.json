@@ -17,6 +17,7 @@
         "checksum_hash_type": "sha256"
     },
     "icon": {
+        "extraction": true,
         "url": "https://raw.githubusercontent.com/FreeTubeApp/FreeTube/development/_icons/icon.svg",
         "name": "freetube.svg"
     }

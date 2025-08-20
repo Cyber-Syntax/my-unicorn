@@ -1,8 +1,8 @@
 {
-    "owner": "pbek",
-    "repo": "QOwnNotes",
+    "owner": "endless-sky",
+    "repo": "endless-sky",
     "appimage": {
-        "rename": "qownnotes",
+        "rename": "endless-sky",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": ["x86_64.AppImage"]
     },
@@ -18,7 +18,7 @@
     },
     "icon": {
         "extraction": true,
-        "url": "https://raw.githubusercontent.com/pbek/QOwnNotes/develop/icons/icon.png",
-        "name": "qownnotes.png"
+        "url": "",
+        "name": "endless-sky.png"
     }
 }

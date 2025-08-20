@@ -20,6 +20,7 @@
         "checksum_hash_type": "sha256"
     },
     "icon": {
+        "extraction": true,
         "url": "https://raw.githubusercontent.com/Zettlr/Zettlr/master/resources/icons/png/256x256.png",
         "name": "zettlr.png"
     }
