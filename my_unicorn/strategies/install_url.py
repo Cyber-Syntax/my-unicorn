@@ -15,8 +15,8 @@ from ..github_client import (
 )
 from ..icon import IconManager
 from ..logger import get_logger
+from ..services.verification_service import VerificationService
 from ..utils import extract_and_validate_version
-from ..verify import Verifier
 from .install import InstallationError, InstallStrategy, ValidationError
 
 logger = get_logger(__name__)
@@ -161,7 +161,7 @@ class URLInstallStrategy(InstallStrategy):
                 # Verify download if requested
                 if kwargs.get("verify_downloads", True):
                     await self._perform_verification(
-                        download_path, appimage_asset, owner, repo_name
+                        download_path, appimage_asset, release_data, owner, repo_name
                     )
 
                 # Move to install directory
@@ -258,13 +258,19 @@ class URLInstallStrategy(InstallStrategy):
                 }
 
     async def _perform_verification(
-        self, path: Path, asset: GitHubAsset, owner: str, repo_name: str
+        self,
+        path: Path,
+        asset: GitHubAsset,
+        release_data: GitHubReleaseDetails,
+        owner: str,
+        repo_name: str,
     ) -> None:
-        """Perform download verification using available methods.
+        """Perform download verification using VerificationService with optimization.
 
         Args:
             path: Path to downloaded file
             asset: GitHub asset information
+            release_data: Full GitHub release data with all assets
             owner: Repository owner
             repo_name: Repository name
 
@@ -273,35 +279,63 @@ class URLInstallStrategy(InstallStrategy):
 
         """
         logger.debug("🔍 Starting verification for %s", path.name)
-        verifier = Verifier(path)
-        verification_passed = False
 
-        # Try digest verification first if available
-        if asset.get("digest"):
-            try:
-                logger.debug("🔐 Attempting digest verification")
-                verifier.verify_digest(asset["digest"])
-                logger.debug("✅ Digest verification passed")
-                verification_passed = True
-            except Exception as e:
-                logger.warning("⚠️ Digest verification failed: %s", e)
+        # Use VerificationService for comprehensive verification including optimized checksum files
+        verification_service = VerificationService(self.download_service)
 
-        # Always perform basic file size verification
+        # Convert GitHubReleaseDetails assets to the format expected by verification service
+        all_assets = []
+        for release_asset in release_data["assets"]:
+            all_assets.append(
+                {
+                    "name": release_asset.get("name", ""),
+                    "size": release_asset.get("size", 0),
+                    "browser_download_url": release_asset.get("browser_download_url", ""),
+                    "digest": release_asset.get("digest", ""),
+                }
+            )
+
+        # Create verification config
+        config = {
+            "skip": False,
+            "checksum_file": None,  # Let it auto-detect with prioritization
+            "checksum_hash_type": "sha256",
+            "digest_enabled": bool(asset.get("digest")),
+        }
+
+        # Convert asset to expected format
+        asset_data = {
+            "name": asset.get("name", ""),
+            "size": asset.get("size", 0),
+            "browser_download_url": asset.get("browser_download_url", ""),
+            "digest": asset.get("digest", ""),
+        }
+
         try:
-            expected_size = asset.get("size", 0)
-            if expected_size > 0:
-                if not self.download_service.verify_file_size(path, expected_size):
-                    if not verification_passed:
-                        raise InstallationError("File size verification failed")
-                    else:
-                        logger.warning("⚠️ File size verification failed, but digest passed")
-                else:
-                    logger.debug("✅ File size verification passed")
-            else:
-                logger.debug("⚠️ No expected file size available")
+            # Perform comprehensive verification with optimized checksum file prioritization
+            result = await verification_service.verify_file(
+                file_path=path,
+                asset=asset_data,
+                config=config,
+                owner=owner,
+                repo=repo_name,
+                tag_name=release_data["version"],
+                app_name=repo_name,
+                assets=all_assets,
+            )
+
+            if not result.passed:
+                raise InstallationError(
+                    "File verification failed - no verification methods succeeded"
+                )
+
+            # Log verification methods used
+            methods_used = list(result.methods.keys())
+            logger.debug("✅ Verification passed using methods: %s", ", ".join(methods_used))
+
         except Exception as e:
-            if not verification_passed:
-                raise InstallationError(f"File verification failed: {e}")
+            logger.error("❌ Verification failed: %s", e)
+            raise InstallationError(f"File verification failed: {e}")
 
         logger.debug("✅ Verification completed")
 

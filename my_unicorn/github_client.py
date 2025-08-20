@@ -58,6 +58,7 @@ class GitHubReleaseFetcher:
         r".*\.sum$",
         r".*\.hash$",
         r".*\.digest$",
+        r".*\.DIGEST$",
         r".*appimage\.sha256$",
         r".*appimage\.sha512$",
     ]
