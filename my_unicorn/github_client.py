@@ -293,7 +293,7 @@ class GitHubReleaseFetcher:
 
         """
         for asset in release_data["assets"]:
-            if asset["name"].endswith(".AppImage"):
+            if asset["name"].endswith(".AppImage") or asset["name"].endswith(".appimage"):
                 return asset
         return None
 
@@ -308,7 +308,9 @@ class GitHubReleaseFetcher:
 
         """
         return [
-            asset for asset in release_data["assets"] if asset["name"].endswith(".AppImage")
+            asset
+            for asset in release_data["assets"]
+            if asset["name"].endswith(".AppImage") or asset["name"].endswith(".appimage")
         ]
 
     def select_best_appimage(
