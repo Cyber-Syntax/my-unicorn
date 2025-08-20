@@ -19,6 +19,7 @@
         "checksum_hash_type": "sha256"
     },
     "icon": {
+        "extraction": true,
         "url": "",
         "name": "obsidian.png"
     }

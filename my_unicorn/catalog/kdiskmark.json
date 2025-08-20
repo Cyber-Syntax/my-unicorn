@@ -19,6 +19,7 @@
         "checksum_hash_type": "sha256"
     },
     "icon": {
+        "extraction": true,
         "url": "https://raw.githubusercontent.com/JonMagon/KDiskMark/master/data/icons/128-apps-kdiskmark.png",
         "name": "kdiskmark.png"
     }
