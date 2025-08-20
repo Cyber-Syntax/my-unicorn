@@ -67,19 +67,28 @@ class DownloadService:
 
                 dest.parent.mkdir(parents=True, exist_ok=True)
 
-                logger.debug(f"📥 Downloading {dest.name}")
-                logger.debug(f"   URL: {url}")
-                logger.debug(f"   Size: {total:,} bytes" if total > 0 else "   Size: Unknown")
+                logger.debug("📥 Downloading %s", dest.name)
+                logger.debug("   URL: %s", url)
+                logger.debug(
+                    "   Size: %s bytes" if total > 0 else "   Size: Unknown",
+                    f"{total:,}" if total > 0 else "",
+                )
 
                 if show_progress and total > 0:
                     await self._download_with_progress(
                         response, dest, total, success_color, description_prefix
                     )
+                else:
+                    # Download without progress bar
+                    with open(dest, "wb") as f:
+                        async for chunk in response.content.iter_chunked(8192):
+                            if chunk:
+                                f.write(chunk)
 
-                logger.debug(f"✅ Download completed: {dest}")
+                logger.debug("✅ Download completed: %s", dest)
 
         except Exception as e:
-            logger.error(f"❌ Download failed: {dest.name} - {e}")
+            logger.error("❌ Download failed: %s - %s", dest.name, e)
             raise
 
     async def _download_with_progress(
@@ -171,17 +180,26 @@ class DownloadService:
         """
         # Check if icon already exists
         if dest.exists():
-            logger.info(f"✅ Icon already exists: {dest}")
+            logger.info("✅ Icon already exists: %s", dest)
             return dest
 
         try:
             await self.download_file(
                 icon["icon_url"], dest, show_progress=False, description_prefix="🎨"
             )
-            logger.info(f"✅ Icon downloaded: {dest}")
+
+            # Verify the file was actually created and has content
+            if not dest.exists():
+                raise Exception(f"Downloaded file does not exist: {dest}")
+
+            file_size = dest.stat().st_size
+            if file_size == 0:
+                raise Exception(f"Downloaded file is empty: {dest}")
+
+            logger.info("✅ Icon downloaded: %s (%s bytes)", dest, f"{file_size:,}")
             return dest
         except Exception as e:
-            logger.error(f"❌ Failed to download icon: {e}")
+            logger.error("❌ Failed to download icon: %s", e)
             raise
 
     def verify_file_size(self, path: Path, expected_size: int) -> bool:
@@ -196,7 +214,7 @@ class DownloadService:
 
         """
         if not path.exists():
-            logger.error(f"❌ File not found for verification: {path}")
+            logger.error("❌ File not found for verification: %s", path)
             return False
 
         if expected_size <= 0:
@@ -205,11 +223,13 @@ class DownloadService:
 
         actual_size = path.stat().st_size
         if actual_size == expected_size:
-            logger.debug(f"✅ File size verification passed: {actual_size:,} bytes")
+            logger.debug("✅ File size verification passed: %s bytes", f"{actual_size:,}")
             return True
         else:
             logger.error(
-                f"❌ File size mismatch: expected {expected_size:,}, got {actual_size:,}"
+                "❌ File size mismatch: expected %s, got %s",
+                f"{expected_size:,}",
+                f"{actual_size:,}",
             )
             return False
 
@@ -246,17 +266,19 @@ class DownloadService:
                 content = await response.text()
 
                 logger.debug("📄 Checksum file downloaded successfully")
-                logger.debug(f"   Status: {response.status}")
-                logger.debug(f"   Content length: {len(content)} characters")
+                logger.debug("   Status: %s", response.status)
+                logger.debug("   Content length: %d characters", len(content))
                 logger.debug(
-                    f"   Content preview: {content[:200]}{'...' if len(content) > 200 else ''}"
+                    "   Content preview: %s%s",
+                    content[:200],
+                    "..." if len(content) > 200 else "",
                 )
 
                 return content
 
         except Exception as e:
-            logger.error(f"❌ Failed to download checksum file: {e}")
-            logger.error(f"   URL: {checksum_url}")
+            logger.error("❌ Failed to download checksum file: %s", e)
+            logger.error("   URL: %s", checksum_url)
             raise
 
 

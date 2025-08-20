@@ -7,9 +7,8 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from my_unicorn.download import IconAsset
-
 from ..logger import get_logger
+from ..services import IconConfig, IconService, VerificationService
 from ..utils import extract_and_validate_version
 from .install_url import InstallationError, InstallStrategy, ValidationError
 
@@ -50,6 +49,10 @@ class CatalogInstallStrategy(InstallStrategy):
         )
         self.catalog_manager = catalog_manager
         self.github_client = github_client
+
+        # Initialize shared services
+        self.icon_service = IconService(download_service)
+        self.verification_service = VerificationService(download_service)
 
     def validate_targets(self, targets: list[str]) -> None:
         """Validate that targets are valid catalog app names.
@@ -127,11 +130,11 @@ class CatalogInstallStrategy(InstallStrategy):
         """
         async with semaphore:
             try:
-                logger.info(f"🚀 Installing from catalog: {app_name}")
+                logger.info("🚀 Installing from catalog: %s", app_name)
 
                 # Get app configuration from catalog
                 app_config = self.catalog_manager.get_app_config(app_name)
-                logger.debug(f"App config for {app_name}: {app_config}")
+                logger.debug("App config for %s: %s", app_name, app_config)
                 if not app_config:
                     raise InstallationError(f"App configuration not found: {app_name}")
 
@@ -218,10 +221,15 @@ class CatalogInstallStrategy(InstallStrategy):
                 global_config = config_manager.load_global_config()
                 icon_dir = global_config["directory"]["icon"]
 
-                # Download icon if configured
+                # Get icon using new IconManager (AppImage extraction + GitHub fallback)
                 icon_path = None
-                if app_config.get("icon"):
-                    icon_path = await self._setup_catalog_icon(app_config, app_name, icon_dir)
+                updated_icon_config = {}
+                if (
+                    app_config.get("icon") or True
+                ):  # Always try extraction even without icon config
+                    icon_path, updated_icon_config = await self._setup_catalog_icon(
+                        app_config, app_name, icon_dir, final_path
+                    )
 
                 # Create application configuration (pass verification result for config updates)
                 self._create_app_config(
@@ -232,6 +240,7 @@ class CatalogInstallStrategy(InstallStrategy):
                     icon_dir,
                     appimage_asset,
                     verification_result,
+                    updated_icon_config,
                 )
 
                 # Create desktop entry to reflect any changes (icon, paths, etc.)
@@ -388,157 +397,79 @@ class CatalogInstallStrategy(InstallStrategy):
             InstallationError: If verification fails
 
         """
-        from ..verify import Verifier
-
         # Get verification configuration from catalog
         verification_config = app_config.get("verification", {})
 
-        logger.debug("🔍 Starting verification for %s", path.name)
-        verifier = Verifier(path)
-        verification_passed = False
-        successful_methods = {}
-        updated_verification_config = verification_config.copy()
-
-        # Detect available verification methods
-        has_digest = bool(asset.get("digest"))
-        has_checksum_file = bool(verification_config.get("checksum_file"))
-        catalog_skip = verification_config.get("skip", False)
-
-        logger.debug(
-            f"   Available methods: digest={has_digest}, checksum_file={has_checksum_file}"
+        # Get repository info
+        owner = app_config.get("owner", "")
+        repo = app_config.get("repo", "")
+        original_tag_name = release_data.get(
+            "original_tag_name", release_data.get("tag_name", "")
         )
-        logger.debug("   Catalog skip setting: %s", catalog_skip)
 
-        # Only skip if configured AND no strong verification methods available
-        if catalog_skip and not has_digest and not has_checksum_file:
-            logger.debug(
-                "⏭️ Verification skipped (configured in catalog, no strong methods available)"
-            )
-            return {"successful_methods": {}, "updated_config": updated_verification_config}
-        elif catalog_skip and (has_digest or has_checksum_file):
-            logger.debug(
-                "🔄 Overriding catalog skip setting - strong verification methods available"
-            )
-            # Update config to reflect that we're now using verification
-            updated_verification_config["skip"] = False
-
-        # Try digest verification first if available (prioritize over catalog setting)
-        if has_digest:
-            try:
-                logger.debug("🔐 Attempting digest verification (from GitHub API)")
-                if catalog_skip:
-                    logger.debug("   Note: Using digest despite catalog skip=true setting")
-                verifier.verify_digest(asset["digest"])
-                logger.debug("✅ Digest verification passed")
-                verification_passed = True
-                successful_methods["digest"] = asset["digest"]
-                # Enable digest verification in config for future use
-                updated_verification_config["digest"] = True
-            except Exception as e:
-                logger.error("❌ Digest verification failed: %s", e)
-                # Continue to try other verification methods
-
-        # Try checksum file verification if configured and digest didn't pass
-        if not verification_passed and has_checksum_file:
-            checksum_file = verification_config["checksum_file"]
-            hash_type = verification_config.get("checksum_hash_type", "sha256")
-
-            # Build checksum URL using original tag name (preserves 'v' prefix)
-            original_tag_name = release_data.get(
-                "original_tag_name", release_data.get("tag_name", "")
-            )
-            owner = app_config.get("owner", "")
-            repo = app_config.get("repo", "")
-            checksum_url = f"https://github.com/{owner}/{repo}/releases/download/{original_tag_name}/{checksum_file}"
-
-            try:
-                logger.debug("🔍 Attempting checksum file verification: %s", checksum_file)
-                await verifier.verify_from_checksum_file(
-                    checksum_url, hash_type, self.download_service, path.name
-                )
-                logger.debug("✅ Checksum file verification passed")
-                verification_passed = True
-                successful_methods["checksum_file"] = {
-                    "url": checksum_url,
-                    "hash_type": hash_type,
-                    "file": checksum_file,
-                }
-            except Exception as e:
-                logger.error("❌ Checksum file verification failed: %s", e)
-                # Continue to basic file size check
-
-        # Always perform basic file size verification
         try:
-            expected_size = asset.get("size", 0)
-            if expected_size > 0:
-                if not self.download_service.verify_file_size(path, expected_size):
-                    raise InstallationError("File size verification failed")
-                logger.debug("✅ File size verification passed")
-            else:
-                logger.debug("⚠️ No expected file size available, skipping size verification")
-        except Exception as e:
-            logger.error("❌ File size verification failed: %s", e)
-            if not verification_passed:
-                raise InstallationError("File verification failed")
-
-        # If we have strong verification methods available but none passed, fail
-        if (has_digest or has_checksum_file) and not verification_passed:
-            available_methods = []
-            if has_digest:
-                available_methods.append("digest")
-            if has_checksum_file:
-                available_methods.append("checksum_file")
-            raise InstallationError(
-                f"Available verification methods failed: {', '.join(available_methods)}"
+            result = await self.verification_service.verify_file(
+                file_path=path,
+                asset=asset,
+                config=verification_config,
+                owner=owner,
+                repo=repo,
+                tag_name=original_tag_name,
+                app_name=path.name,
             )
 
-        logger.debug("✅ Verification completed")
-
-        return {
-            "successful_methods": successful_methods,
-            "updated_config": updated_verification_config,
-        }
+            return {
+                "successful_methods": result.methods,
+                "updated_config": result.updated_config,
+            }
+        except Exception as e:
+            raise InstallationError(str(e)) from e
 
     async def _setup_catalog_icon(
-        self, app_config: dict[str, Any], app_name: str, icon_dir: Path
-    ) -> Path | None:
-        """Setup icon from catalog configuration.
+        self, app_config: dict[str, Any], app_name: str, icon_dir: Path, appimage_path: Path
+    ) -> tuple[Path | None, dict[str, Any]]:
+        """Setup icon from catalog configuration using shared IconService.
 
         Args:
             app_config: Application configuration
             app_name: Application name for icon filename
             icon_dir: Directory where icons should be saved
+            appimage_path: Path to AppImage for icon extraction
 
         Returns:
-            Path to downloaded icon or None
+            Tuple of (Path to acquired icon or None, updated icon config)
 
         """
-        icon_config = app_config.get("icon", {})
-        if not icon_config:
-            return None
+        icon_config_dict = app_config.get("icon", {})
 
-        icon_url = icon_config.get("url")
-        if not icon_url:
-            return None
+        # Check if extraction is enabled (default True)
+        extraction_enabled = icon_config_dict.get("extraction", True)
+        icon_url = icon_config_dict.get("url", "")
 
-        # Use the icon name from catalog config if available, otherwise generate one
-        icon_filename = icon_config.get("name")
+        # Generate filename if not provided
+        icon_filename = icon_config_dict.get("name")
         if not icon_filename:
-            icon_extension = icon_config.get("extension", "png")
-            icon_filename = f"{app_name}.{icon_extension}"
+            icon_filename = self.icon_service._generate_icon_filename(app_name, icon_url)
 
-        icon_asset: IconAsset = {
-            "icon_filename": icon_filename,
-            "icon_url": icon_url,
-        }
+        # Create icon configuration
 
-        icon_path = icon_dir / icon_filename
+        icon_config = IconConfig(
+            extraction_enabled=extraction_enabled,
+            icon_url=icon_url if icon_url else None,
+            icon_filename=icon_filename,
+            preserve_url_on_extraction=False,  # Clear URL on extraction for catalog
+        )
 
-        try:
-            return await self.download_service.download_icon(icon_asset, icon_path)
-        except Exception as e:
-            logger.warning("⚠️  Failed to download icon for %s: %s", app_name, e)
-            return None
+        # Use shared service to acquire icon
+        result = await self.icon_service.acquire_icon(
+            icon_config=icon_config,
+            app_name=app_name,
+            icon_dir=icon_dir,
+            appimage_path=appimage_path,
+            current_config=icon_config_dict,
+        )
+
+        return result.icon_path, result.config
 
     def _create_app_config(
         self,
@@ -549,6 +480,7 @@ class CatalogInstallStrategy(InstallStrategy):
         icon_dir: Path,
         appimage_asset: dict[str, Any] | None = None,
         verification_result: dict[str, Any] | None = None,
+        updated_icon_config: dict[str, Any] | None = None,
     ) -> None:
         """Create application configuration after successful installation.
 
@@ -584,21 +516,17 @@ class CatalogInstallStrategy(InstallStrategy):
             "verification": self._get_updated_verification_config(
                 catalog_config, verification_result
             ),
-            "icon": catalog_config.get("icon", {}),
+            "icon": updated_icon_config or catalog_config.get("icon", {}),
         }
 
         # Add icon path if available
-        icon_config = catalog_config.get("icon", {})
-        if icon_config:
-            # Use the icon name from catalog config
-            icon_filename = icon_config.get("name")
-            if not icon_filename:
-                icon_extension = icon_config.get("extension", "png")
-                icon_filename = f"{app_name}.{icon_extension}"
-
-            icon_path = icon_dir / icon_filename
-            if icon_path.exists():
-                config["icon"]["path"] = str(icon_path)
+        final_icon_config = updated_icon_config or catalog_config.get("icon", {})
+        if final_icon_config:
+            icon_filename = final_icon_config.get("name")
+            if icon_filename:
+                icon_path = icon_dir / icon_filename
+                if icon_path.exists():
+                    config["icon"]["path"] = str(icon_path)
 
         self.catalog_manager.save_app_config(app_name, config)
 
