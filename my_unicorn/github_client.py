@@ -4,6 +4,8 @@ This module handles communication with the GitHub API to fetch release
 information, extract AppImage assets, and manage GitHub-specific operations.
 """
 
+import re
+from dataclasses import dataclass
 from typing import Any, TypedDict, cast
 from urllib.parse import urlparse
 
@@ -28,8 +30,35 @@ class GitHubReleaseDetails(TypedDict):
     assets: list[GitHubAsset]
 
 
+@dataclass(slots=True, frozen=True)
+class ChecksumFileInfo:
+    """Information about detected checksum file."""
+
+    filename: str
+    url: str
+    format_type: str  # 'yaml' or 'traditional'
+
+
 class GitHubReleaseFetcher:
     """Fetches GitHub release information and extracts AppImage assets."""
+
+    # Common checksum file patterns to look for in GitHub releases
+    CHECKSUM_FILE_PATTERNS = [
+        r"latest-.*\.yml$",
+        r"latest-.*\.yaml$",
+        r".*checksums?\.txt$",
+        r".*checksums?\.yml$",
+        r".*checksums?\.yaml$",
+        r".*checksums?\.md5$",
+        r".*checksums?\.sha1$",
+        r".*checksums?\.sha256$",
+        r".*checksums?\.sha512$",
+        r"SHA\d+SUMS?(\.txt)?$",
+        r"MD5SUMS?(\.txt)?$",
+        r".*\.sum$",
+        r".*\.hash$",
+        r".*\.digest$",
+    ]
 
     def __init__(self, owner: str, repo: str, session: aiohttp.ClientSession) -> None:
         """Initialize the GitHub release fetcher.
@@ -69,6 +98,48 @@ class GitHubReleaseFetcher:
             return tag_name.lstrip("v")
 
         return normalized
+
+    @staticmethod
+    def detect_checksum_files(
+        assets: list[GitHubAsset],
+        tag_name: str,
+    ) -> list[ChecksumFileInfo]:
+        """Detect checksum files in GitHub release assets.
+
+        Args:
+            assets: List of GitHub release assets
+            tag_name: Release tag name
+
+        Returns:
+            List of detected checksum files with their info
+
+        """
+        checksum_files = []
+
+        for asset in assets:
+            asset_name = asset["name"]
+
+            # Check if asset matches any checksum file pattern
+            for pattern in GitHubReleaseFetcher.CHECKSUM_FILE_PATTERNS:
+                if re.search(pattern, asset_name, re.IGNORECASE):
+                    url = asset["browser_download_url"]
+
+                    # Determine format type
+                    format_type = (
+                        "yaml"
+                        if asset_name.lower().endswith((".yml", ".yaml"))
+                        else "traditional"
+                    )
+
+                    checksum_files.append(
+                        ChecksumFileInfo(filename=asset_name, url=url, format_type=format_type)
+                    )
+                    break
+
+        # Prioritize YAML files (like latest-linux.yml) first as they're often more reliable
+        checksum_files.sort(key=lambda x: (x.format_type != "yaml", x.filename))
+
+        return checksum_files
 
     async def fetch_latest_release(self) -> GitHubReleaseDetails:
         """Fetch the latest release information from GitHub API.

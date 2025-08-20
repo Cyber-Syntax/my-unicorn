@@ -416,6 +416,7 @@ class CatalogInstallStrategy(InstallStrategy):
                 repo=repo,
                 tag_name=original_tag_name,
                 app_name=path.name,
+                assets=release_data.get("assets", []),
             )
 
             return {

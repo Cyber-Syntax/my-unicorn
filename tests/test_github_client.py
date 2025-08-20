@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import pytest_asyncio
 
-from my_unicorn.github_client import GitHubClient, GitHubReleaseFetcher
+from my_unicorn.github_client import ChecksumFileInfo, GitHubClient, GitHubReleaseFetcher
 
 
 @pytest_asyncio.fixture
@@ -44,6 +44,300 @@ async def test_fetch_latest_release_success(mock_session):
         assert result["assets"][0]["browser_download_url"].endswith(".AppImage")
     elif "browser_download_url" in result:
         assert result["browser_download_url"].endswith(".AppImage")
+
+
+def test_detect_checksum_files_yaml_priority():
+    """Test that YAML checksum files are prioritized over traditional ones."""
+    assets = [
+        {
+            "name": "app.AppImage",
+            "browser_download_url": "https://example.com/app.AppImage",
+            "size": 12345,
+            "digest": "",
+        },
+        {
+            "name": "SHA256SUMS.txt",
+            "browser_download_url": "https://example.com/SHA256SUMS.txt",
+            "size": 567,
+            "digest": "",
+        },
+        {
+            "name": "latest-linux.yml",
+            "browser_download_url": "https://example.com/latest-linux.yml",
+            "size": 1234,
+            "digest": "",
+        },
+    ]
+
+    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v1.0.0")
+
+    assert len(checksum_files) == 2
+    # YAML should be first (prioritized)
+    assert checksum_files[0].filename == "latest-linux.yml"
+    assert checksum_files[0].format_type == "yaml"
+    assert checksum_files[0].url == "https://example.com/latest-linux.yml"
+
+    # Traditional should be second
+    assert checksum_files[1].filename == "SHA256SUMS.txt"
+    assert checksum_files[1].format_type == "traditional"
+    assert checksum_files[1].url == "https://example.com/SHA256SUMS.txt"
+
+
+def test_detect_checksum_files_multiple_patterns():
+    """Test detection of various checksum file patterns."""
+    assets = [
+        {
+            "name": "latest-windows.yml",
+            "browser_download_url": "https://example.com/latest-windows.yml",
+            "size": 1,
+            "digest": "",
+        },
+        {
+            "name": "latest-mac.yaml",
+            "browser_download_url": "https://example.com/latest-mac.yaml",
+            "size": 1,
+            "digest": "",
+        },
+        {
+            "name": "checksums.txt",
+            "browser_download_url": "https://example.com/checksums.txt",
+            "size": 1,
+            "digest": "",
+        },
+        {
+            "name": "SHA512SUMS",
+            "browser_download_url": "https://example.com/SHA512SUMS",
+            "size": 1,
+            "digest": "",
+        },
+        {
+            "name": "MD5SUMS",
+            "browser_download_url": "https://example.com/MD5SUMS",
+            "size": 1,
+            "digest": "",
+        },
+        {
+            "name": "app.sum",
+            "browser_download_url": "https://example.com/app.sum",
+            "size": 1,
+            "digest": "",
+        },
+        {
+            "name": "hashes.digest",
+            "browser_download_url": "https://example.com/hashes.digest",
+            "size": 1,
+            "digest": "",
+        },
+        {
+            "name": "regular-file.txt",
+            "browser_download_url": "https://example.com/regular-file.txt",
+            "size": 1,
+            "digest": "",
+        },
+    ]
+
+    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v1.0.0")
+
+    detected_names = [cf.filename for cf in checksum_files]
+
+    # Should detect all checksum files but not regular file
+    expected_checksum_files = [
+        "latest-windows.yml",
+        "latest-mac.yaml",
+        "checksums.txt",
+        "SHA512SUMS",
+        "MD5SUMS",
+        "app.sum",
+        "hashes.digest",
+    ]
+
+    for expected in expected_checksum_files:
+        assert expected in detected_names
+
+    assert "regular-file.txt" not in detected_names
+    assert len(checksum_files) == 7
+
+
+def test_detect_checksum_files_format_detection():
+    """Test proper format type detection for different file extensions."""
+    assets = [
+        {
+            "name": "latest-linux.yml",
+            "browser_download_url": "https://example.com/latest-linux.yml",
+            "size": 1,
+            "digest": "",
+        },
+        {
+            "name": "checksums.yaml",
+            "browser_download_url": "https://example.com/checksums.yaml",
+            "size": 1,
+            "digest": "",
+        },
+        {
+            "name": "SHA256SUMS.txt",
+            "browser_download_url": "https://example.com/SHA256SUMS.txt",
+            "size": 1,
+            "digest": "",
+        },
+        {
+            "name": "MD5SUMS",
+            "browser_download_url": "https://example.com/MD5SUMS",
+            "size": 1,
+            "digest": "",
+        },
+    ]
+
+    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v1.0.0")
+
+    # Check format types
+    format_map = {cf.filename: cf.format_type for cf in checksum_files}
+
+    assert format_map["latest-linux.yml"] == "yaml"
+    assert format_map["checksums.yaml"] == "yaml"
+    assert format_map["SHA256SUMS.txt"] == "traditional"
+    assert format_map["MD5SUMS"] == "traditional"
+
+
+def test_detect_checksum_files_case_insensitive():
+    """Test that checksum file detection is case insensitive."""
+    assets = [
+        {
+            "name": "LATEST-LINUX.YML",
+            "browser_download_url": "https://example.com/LATEST-LINUX.YML",
+            "size": 1,
+            "digest": "",
+        },
+        {
+            "name": "sha256sums.TXT",
+            "browser_download_url": "https://example.com/sha256sums.TXT",
+            "size": 1,
+            "digest": "",
+        },
+        {
+            "name": "CHECKSUMS.txt",
+            "browser_download_url": "https://example.com/CHECKSUMS.txt",
+            "size": 1,
+            "digest": "",
+        },
+    ]
+
+    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v1.0.0")
+
+    assert len(checksum_files) == 3
+    detected_names = [cf.filename for cf in checksum_files]
+    assert "LATEST-LINUX.YML" in detected_names
+    assert "sha256sums.TXT" in detected_names
+    assert "CHECKSUMS.txt" in detected_names
+
+
+def test_detect_checksum_files_empty_assets():
+    """Test checksum file detection with empty assets list."""
+    checksum_files = GitHubReleaseFetcher.detect_checksum_files([], "v1.0.0")
+    assert len(checksum_files) == 0
+
+
+def test_detect_checksum_files_no_checksum_files():
+    """Test checksum file detection when no checksum files are present."""
+    assets = [
+        {
+            "name": "app.AppImage",
+            "browser_download_url": "https://example.com/app.AppImage",
+            "size": 12345,
+            "digest": "",
+        },
+        {
+            "name": "readme.txt",
+            "browser_download_url": "https://example.com/readme.txt",
+            "size": 567,
+            "digest": "",
+        },
+        {
+            "name": "changelog.md",
+            "browser_download_url": "https://example.com/changelog.md",
+            "size": 890,
+            "digest": "",
+        },
+    ]
+
+    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v1.0.0")
+    assert len(checksum_files) == 0
+
+
+def test_detect_checksum_files_legcord_example():
+    """Test checksum file detection with real Legcord example."""
+    assets = [
+        {
+            "name": "Legcord-1.1.5-linux-x86_64.AppImage",
+            "browser_download_url": "https://github.com/Legcord/Legcord/releases/download/v1.1.5/Legcord-1.1.5-linux-x86_64.AppImage",
+            "size": 124457255,
+            "digest": "",
+        },
+        {
+            "name": "latest-linux.yml",
+            "browser_download_url": "https://github.com/Legcord/Legcord/releases/download/v1.1.5/latest-linux.yml",
+            "size": 1234,
+            "digest": "",
+        },
+        {
+            "name": "Legcord-1.1.5-linux-x86_64.rpm",
+            "browser_download_url": "https://github.com/Legcord/Legcord/releases/download/v1.1.5/Legcord-1.1.5-linux-x86_64.rpm",
+            "size": 82429221,
+            "digest": "",
+        },
+    ]
+
+    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v1.1.5")
+
+    assert len(checksum_files) == 1
+    assert checksum_files[0].filename == "latest-linux.yml"
+    assert checksum_files[0].format_type == "yaml"
+    assert "v1.1.5" in checksum_files[0].url
+
+
+def test_detect_checksum_files_siyuan_example():
+    """Test checksum file detection with real SiYuan example."""
+    assets = [
+        {
+            "name": "siyuan-3.2.1-linux.AppImage",
+            "browser_download_url": "https://github.com/siyuan-note/siyuan/releases/download/v3.2.1/siyuan-3.2.1-linux.AppImage",
+            "size": 123456789,
+            "digest": "",
+        },
+        {
+            "name": "SHA256SUMS.txt",
+            "browser_download_url": "https://github.com/siyuan-note/siyuan/releases/download/v3.2.1/SHA256SUMS.txt",
+            "size": 567,
+            "digest": "",
+        },
+        {
+            "name": "siyuan-3.2.1-linux.deb",
+            "browser_download_url": "https://github.com/siyuan-note/siyuan/releases/download/v3.2.1/siyuan-3.2.1-linux.deb",
+            "size": 987654321,
+            "digest": "",
+        },
+    ]
+
+    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v3.2.1")
+
+    assert len(checksum_files) == 1
+    assert checksum_files[0].filename == "SHA256SUMS.txt"
+    assert checksum_files[0].format_type == "traditional"
+    assert "v3.2.1" in checksum_files[0].url
+
+
+def test_checksum_file_info_dataclass():
+    """Test ChecksumFileInfo dataclass creation and immutability."""
+    info = ChecksumFileInfo(
+        filename="test.yml", url="https://example.com/test.yml", format_type="yaml"
+    )
+
+    assert info.filename == "test.yml"
+    assert info.url == "https://example.com/test.yml"
+    assert info.format_type == "yaml"
+
+    # Should be frozen (immutable)
+    with pytest.raises(AttributeError):
+        info.filename = "changed.yml"
 
 
 @pytest.mark.asyncio
