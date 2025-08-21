@@ -72,9 +72,11 @@ class UpdateSpecificAppsStrategy(UpdateStrategy):
         app_count = len(context.app_names)
         print(f"🔄 Updating {app_count} app(s): {', '.join(context.app_names)}")
 
-        # Check which apps actually need updates
+        # Check which apps actually need updates with progress tracking
         print("🔍 Checking for updates...")
-        update_infos = await context.update_manager.check_all_updates(context.app_names)
+        update_infos = await context.update_manager.check_all_updates_with_progress(
+            context.app_names
+        )
 
         # Detect if update_infos is empty due to authentication failure or other errors
         if not update_infos:

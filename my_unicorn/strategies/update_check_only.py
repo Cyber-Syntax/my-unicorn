@@ -60,8 +60,10 @@ class CheckOnlyUpdateStrategy(UpdateStrategy):
         """
         logger.debug("Executing check-only update strategy")
 
-        # Get update information for specified apps or all apps
-        update_infos = await context.update_manager.check_all_updates(context.app_names)
+        # Get update information for specified apps or all apps with spinner
+        update_infos = await context.update_manager.check_all_updates_with_status_spinner(
+            context.app_names
+        )
 
         if not update_infos:
             print("No installed apps found to check.")

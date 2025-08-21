@@ -61,10 +61,10 @@ class UpdateAllAppsStrategy(UpdateStrategy):
         installed_apps = context.config_manager.list_installed_apps()
         app_count = len(installed_apps)
 
-        print(f"🔄 Checking all {app_count} installed app(s) for updates...")
-
-        # Check which apps need updates
-        update_infos = await context.update_manager.check_all_updates(installed_apps)
+        # Check which apps need updates with simple spinner to avoid Rich conflicts
+        update_infos = await context.update_manager.check_all_updates_with_spinner(
+            installed_apps
+        )
         apps_to_update = [info for info in update_infos if info.has_update]
         apps_up_to_date = [info for info in update_infos if not info.has_update]
 

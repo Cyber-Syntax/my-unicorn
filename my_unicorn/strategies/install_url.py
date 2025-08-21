@@ -82,7 +82,13 @@ class URLInstallStrategy(InstallStrategy):
         """
         self.validate_targets(targets)
 
-        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
+        concurrent_limit = kwargs.get(
+            "concurrent", self.global_config["max_concurrent_downloads"]
+        )
+        logger.info(
+            "📡 URL install strategy using %d concurrent installations", concurrent_limit
+        )
+        semaphore = asyncio.Semaphore(concurrent_limit)
 
         tasks = [self._install_single_repo(semaphore, url, **kwargs) for url in targets]
 
@@ -281,7 +287,8 @@ class URLInstallStrategy(InstallStrategy):
         logger.debug("🔍 Starting verification for %s", path.name)
 
         # Use VerificationService for comprehensive verification including optimized checksum files
-        verification_service = VerificationService(self.download_service)
+        progress_service = getattr(self.download_service, "progress_service", None)
+        verification_service = VerificationService(self.download_service, progress_service)
 
         # Convert GitHubReleaseDetails assets to the format expected by verification service
         all_assets = []
@@ -309,7 +316,13 @@ class URLInstallStrategy(InstallStrategy):
             "size": asset.get("size", 0),
             "browser_download_url": asset.get("browser_download_url", ""),
             "digest": asset.get("digest", ""),
+            "checksum_hash_type": "sha256",
         }
+
+        # Create progress task for verification if available
+        progress_task_id = None
+        if progress_service and progress_service.is_active():
+            progress_task_id = await progress_service.create_verification_task(repo_name)
 
         try:
             # Perform comprehensive verification with optimized checksum file prioritization
@@ -322,6 +335,7 @@ class URLInstallStrategy(InstallStrategy):
                 tag_name=release_data["version"],
                 app_name=repo_name,
                 assets=all_assets,
+                progress_task_id=progress_task_id,
             )
 
             if not result.passed:
@@ -333,11 +347,11 @@ class URLInstallStrategy(InstallStrategy):
             methods_used = list(result.methods.keys())
             logger.debug("✅ Verification passed using methods: %s", ", ".join(methods_used))
 
+            logger.debug("✅ Verification completed")
+
         except Exception as e:
             logger.error("❌ Verification failed: %s", e)
             raise InstallationError(f"File verification failed: {e}")
-
-        logger.debug("✅ Verification completed")
 
     async def _create_app_config(
         self,

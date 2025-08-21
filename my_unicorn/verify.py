@@ -229,6 +229,24 @@ class Verifier:
         # Verify the hash
         self.verify_hash(expected_hash, hash_type)
 
+    def parse_checksum_file(
+        self, content: str, filename: str, hash_type: HashType
+    ) -> str | None:
+        """Parse checksum file to extract hash for specific file.
+
+        This is a public method that can be used by external services.
+
+        Args:
+            content: Content of the checksum file
+            filename: Target filename to find hash for
+            hash_type: Type of hash being used
+
+        Returns:
+            Hash value for the file or None if not found
+
+        """
+        return self._parse_checksum_file(content, filename, hash_type)
+
     def _parse_checksum_file(
         self, content: str, filename: str, hash_type: HashType
     ) -> str | None:
@@ -401,6 +419,20 @@ class Verifier:
         """Parse SHA256SUMS format line."""
         parts = line.split(None, 1)
         return parts[0], parts[1].strip("*")
+
+    def detect_hash_type_from_filename(self, filename: str) -> HashType:
+        """Detect hash type from checksum filename.
+
+        This is a public method that can be used by external services.
+
+        Args:
+            filename: Checksum file name
+
+        Returns:
+            Detected hash type (defaults to sha256)
+
+        """
+        return self._detect_hash_type_from_filename(filename)
 
     def _detect_hash_type_from_filename(self, filename: str) -> HashType:
         """Detect hash type from checksum filename.

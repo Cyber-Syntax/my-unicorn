@@ -287,7 +287,7 @@ class TestVerificationService:
         with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
-            mock_verifier._parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
+            mock_verifier.parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
             mock_verifier.compute_hash.return_value = LEGCORD_EXPECTED_HEX
 
             result = await verification_service._verify_checksum_file(

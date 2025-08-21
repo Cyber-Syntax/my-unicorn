@@ -10,6 +10,7 @@ from typing import Any
 import aiohttp
 
 from my_unicorn.download import DownloadService
+from my_unicorn.services.progress import ProgressService
 from my_unicorn.storage import StorageService
 
 from ..github_client import GitHubClient
@@ -52,27 +53,47 @@ class InstallCommand:
         self.install_dir = install_dir
         self.download_dir = download_dir or Path.cwd()
 
-        # Initialize services
-        self.download_service = DownloadService(session)
+        # Progress service will be created when needed
+        self.progress_service = None
+        self.download_service = None
         self.storage_service = StorageService(install_dir)
 
-        # Initialize strategies
-        self.catalog_strategy = CatalogInstallStrategy(
-            catalog_manager=catalog_manager,
-            config_manager=config_manager,
-            github_client=github_client,
-            download_service=self.download_service,
-            storage_service=self.storage_service,
-            session=session,
-        )
+        # Strategies will be initialized with progress service
+        self.catalog_strategy = None
+        self.url_strategy = None
 
-        self.url_strategy = URLInstallStrategy(
-            github_client=github_client,
-            config_manager=config_manager,
-            download_service=self.download_service,
-            storage_service=self.storage_service,
-            session=session,
-        )
+    def _initialize_services_with_progress(self, show_progress: bool) -> None:
+        """Initialize services with progress service if needed.
+
+        Args:
+            show_progress: Whether to enable progress display
+
+        """
+        if self.download_service is None:
+            # Create progress service if progress is enabled
+            if show_progress:
+                self.progress_service = ProgressService()
+                self.download_service = DownloadService(self.session, self.progress_service)
+            else:
+                self.download_service = DownloadService(self.session)
+
+            # Initialize strategies with the configured download service
+            self.catalog_strategy = CatalogInstallStrategy(
+                catalog_manager=self.catalog_manager,
+                config_manager=self.config_manager,
+                github_client=self.github_client,
+                download_service=self.download_service,
+                storage_service=self.storage_service,
+                session=self.session,
+            )
+
+            self.url_strategy = URLInstallStrategy(
+                github_client=self.github_client,
+                config_manager=self.config_manager,
+                download_service=self.download_service,
+                storage_service=self.storage_service,
+                session=self.session,
+            )
 
     async def execute(self, targets: list[str], **options: Any) -> list[dict[str, Any]]:
         """Execute installation command.
@@ -102,32 +123,75 @@ class InstallCommand:
         url_targets, catalog_targets = self._separate_targets(targets)
 
         # Prepare options with defaults
-        # TODO: use the global setting for the concurrent option
         install_options = {
-            "concurrent": options.get("concurrent", 3),
             "show_progress": options.get("show_progress", True),
             "verify_downloads": options.get("verify_downloads", True),
             "download_dir": self.download_dir,
             **options,
         }
 
-        # Execute installations using appropriate strategies
+        # Initialize services with progress configuration
+        show_progress = bool(install_options["show_progress"])
+        self._initialize_services_with_progress(show_progress)
+
+        # Calculate total operations for progress tracking
+        total_operations = len(targets)
+        if show_progress and self.progress_service:
+            # Each app typically has: download, verify, icon extraction, installation
+            total_operations = len(targets) * 4
+
+        # Execute installations with progress session
+        if show_progress and self.progress_service:
+            async with self.progress_service.session(total_operations):
+                results = await self._execute_installations(
+                    url_targets, catalog_targets, install_options
+                )
+        else:
+            results = await self._execute_installations(
+                url_targets, catalog_targets, install_options
+            )
+
+        # Print installation summary
+        self._print_installation_summary(results)
+
+        return results
+
+    async def _execute_installations(
+        self,
+        url_targets: list[str],
+        catalog_targets: list[str],
+        install_options: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Execute the actual installations.
+
+        Args:
+            url_targets: List of URL targets
+            catalog_targets: List of catalog targets
+            install_options: Installation options
+
+        Returns:
+            List of installation results
+
+        """
         results = []
 
         if url_targets:
             logger.info("📡 Installing %d URL(s)", len(url_targets))
-            url_results = await self.url_strategy.install(url_targets, **install_options)
+            if self.url_strategy:
+                url_results = await self.url_strategy.install(url_targets, **install_options)
+            else:
+                url_results = []
             results.extend(url_results)
 
         if catalog_targets:
             logger.info("📚 Installing %d catalog app(s)", len(catalog_targets))
-            catalog_results = await self.catalog_strategy.install(
-                catalog_targets, **install_options
-            )
+            if self.catalog_strategy:
+                catalog_results = await self.catalog_strategy.install(
+                    catalog_targets, **install_options
+                )
+            else:
+                catalog_results = []
             results.extend(catalog_results)
-
-        # Print installation summary
-        self._print_installation_summary(results)
 
         return results
 
@@ -159,234 +223,135 @@ class InstallCommand:
                 unknown_targets.append(target)
 
         if unknown_targets:
-            # Try to give helpful error message
-            if len(unknown_targets) == 1:
-                error_msg = f"Target '{unknown_targets[0]}' is not a valid URL or catalog application name."
-            else:
-                error_msg = (
-                    f"Unknown targets: {', '.join(unknown_targets)}. "
-                    f"Targets must be GitHub repository URLs or catalog application names."
-                )
-
-            # Add suggestion for catalog apps
-            if available_apps:
-                app_names = list(available_apps.keys())[:10]  # Show first 10
-                suggestion = f" Available catalog apps include: {', '.join(app_names)}"
-                if len(available_apps) > 10:
-                    suggestion += f" and {len(available_apps) - 10} more."
-                error_msg += suggestion
-
-            raise ValidationError(error_msg)
+            unknown_list = ", ".join(unknown_targets)
+            raise ValidationError(
+                f"Unknown applications or invalid URLs: {unknown_list}. "
+                f"Use 'my-unicorn list' to see available apps."
+            )
 
         return url_targets, catalog_targets
 
     def _print_installation_summary(self, results: list[dict[str, Any]]) -> None:
-        """Print summary of installation results.
+        """Print installation summary.
 
         Args:
             results: List of installation results
 
         """
-        successful = [r for r in results if r.get("success", False)]
-        failed = [r for r in results if not r.get("success", False)]
+        if not results:
+            logger.info("No installations completed")
+            return
 
-        logger.info("\n" + "=" * 60)
-        logger.info("📋 INSTALLATION SUMMARY")
-        logger.info("=" * 60)
+        successful = sum(1 for result in results if result.get("success", False))
+        total = len(results)
 
-        if successful:
-            logger.info("✅ Successfully installed (%d):", len(successful))
-            for result in successful:
-                target = result.get("target", "Unknown")
-                path = result.get("path", "Unknown")
-                source = result.get("source", "unknown")
-                version = result.get("version", "")
+        logger.info("📊 Installation Summary:")
+        logger.info("   Successful: %d/%d", successful, total)
 
-                status_info = ""
-                if result.get("status") == "already_installed":
-                    status_info = " (already installed)"
-                    print(f"{target} Already installed ")
+        if successful < total:
+            failed_apps = [
+                result.get("name", "Unknown")
+                for result in results
+                if not result.get("success", False)
+            ]
+            logger.warning("   Failed: %s", ", ".join(failed_apps))
 
-                version_info = f" v{version}" if version else ""
-                source_info = f" [{source}]" if source != "unknown" else ""
-                logger.info(
-                    "  • %s%s → %s%s%s", target, version_info, path, source_info, status_info
-                )
-
-        if failed:
-            logger.info("\n❌ Failed installations (%d):", len(failed))
-            for result in failed:
-                target = result.get("target", "Unknown")
+        for result in results:
+            app_name = result.get("name", "Unknown")
+            if result.get("success", False):
+                logger.info("   ✅ %s: Installation successful", app_name)
+            else:
                 error = result.get("error", "Unknown error")
-                logger.info("  • %s: %s", target, error)
-
-        logger.info("=" * 60)
-
-    def validate_targets(self, targets: list[str]) -> None:
-        """Validate all targets before installation.
-
-        Args:
-            targets: List of URLs or catalog application names
-
-        Raises:
-            ValidationError: If any targets are invalid
-
-        """
-        try:
-            self._separate_targets(targets)
-        except ValidationError:
-            raise
-
-        logger.debug("✅ Validated %d target(s)", len(targets))
-
-    async def cleanup_failed_installations(self, results: list[dict[str, Any]]) -> None:
-        """Clean up any failed installations.
-
-        Args:
-            results: List of installation results
-
-        """
-        failed_results = [r for r in results if not r.get("success", False)]
-
-        for result in failed_results:
-            if path := result.get("path"):
-                file_path = Path(path)
-                if file_path.exists():
-                    logger.debug("🧹 Cleaning up failed installation: %s", file_path)
-                    self.storage_service.remove_file(file_path)
-
-    def get_installation_stats(self, results: list[dict[str, Any]]) -> dict[str, int]:
-        """Get statistics about installation results.
-
-        Args:
-            results: List of installation results
-
-        Returns:
-            Dictionary with installation statistics
-
-        """
-        stats = {
-            "total": len(results),
-            "successful": len([r for r in results if r.get("success", False)]),
-            "failed": len([r for r in results if not r.get("success", False)]),
-            "url_installs": len([r for r in results if r.get("source") == "url"]),
-            "catalog_installs": len([r for r in results if r.get("source") == "catalog"]),
-            "already_installed": len(
-                [r for r in results if r.get("status") == "already_installed"]
-            ),
-        }
-
-        return stats
+                logger.error("   ❌ %s: %s", app_name, error)
 
 
 class InstallHandler(BaseCommandHandler):
-    """Handler for install command operations."""
+    """Handler for install command CLI interface."""
 
     async def execute(self, args: Namespace) -> None:
-        """Execute the install command.
+        """Execute install command.
 
         Args:
-            args: Command line arguments containing targets and options
+            args: Parsed command line arguments
 
         """
-        # Extract targets from args
-        targets = self._expand_comma_separated_targets(getattr(args, "targets", []))
+        try:
+            # Extract targets from args
+            targets = self._expand_comma_separated_targets(getattr(args, "targets", []))
 
-        if not targets:
-            logger.error("❌ No targets specified.")
-            logger.info("💡 Use 'list --available' to see available catalog apps.")
-            return
+            if not targets:
+                logger.error("❌ No targets specified.")
+                logger.info("💡 Use 'my-unicorn list' to see available catalog apps.")
+                return
 
-        # Get configuration
-        from ..config import ConfigManager
+            # Setup directories from config
+            self._ensure_directories()
+            install_dir = Path(self.global_config["directory"]["storage"])
+            download_dir = Path(self.global_config["directory"]["download"])
 
-        config_manager = ConfigManager()
-        config = config_manager._get_default_global_config()
+            # Create session with timeout configuration
+            timeout = aiohttp.ClientTimeout(total=1200, sock_read=60, sock_connect=30)
+            max_concurrent = self.global_config.get("max_concurrent_downloads", 3)
+            connector = aiohttp.TCPConnector(limit=10, limit_per_host=max_concurrent)
 
-        # Setup directories
-        install_dir = Path(config["directory"]["storage"])
-        download_dir = Path(config["directory"]["download"])
+            async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+                from ..github_client import GitHubClient
 
-        # Create session and initialize command
-        async with aiohttp.ClientSession() as session:
-            github_client = GitHubClient(session)
+                github_client = GitHubClient(session)
 
-            # Create catalog manager wrapper
-            catalog_manager = CatalogManagerAdapter(config_manager)
+                # Create catalog manager wrapper
+                catalog_manager = CatalogManagerAdapter(self.config_manager)
 
-            install_command = InstallCommand(
-                session=session,
-                github_client=github_client,
-                catalog_manager=catalog_manager,
-                config_manager=config_manager,
-                install_dir=install_dir,
-                download_dir=download_dir,
-            )
+                install_command = InstallCommand(
+                    session=session,
+                    github_client=github_client,
+                    catalog_manager=catalog_manager,
+                    config_manager=self.config_manager,
+                    install_dir=install_dir,
+                    download_dir=download_dir,
+                )
 
-            # Convert args to options
-            options = {
-                "concurrent": getattr(args, "concurrent", 3),
-                "show_progress": not getattr(args, "no_progress", False),
-                "verify_downloads": not getattr(args, "no_verify", False),
-                "force": getattr(args, "force", False),
-                "update": getattr(args, "update", False),
-            }
+                # Convert args to options
+                # The concurrency should come from CLI args, which already defaults to global config
+                concurrent_value = args.concurrency
 
-            try:
-                # Execute installation
+                options = {
+                    "concurrent": concurrent_value,
+                    "show_progress": True,  # Always show progress for install
+                    "verify_downloads": not getattr(args, "no_verify", False),
+                    "force": False,  # Install doesn't have force option
+                    "update": False,  # This is install, not update
+                }
+
+                # Log the concurrent value being used for debugging
+                logger.info("🔧 Install configuration:")
+                logger.info("   Max concurrent installations: %d", concurrent_value)
+                logger.info("   Max connections per host: %d", max_concurrent)
+                logger.info("   Show progress: %s", options["show_progress"])
+
                 results = await install_command.execute(targets, **options)
 
-                # Handle cleanup for failed installations
-                await install_command.cleanup_failed_installations(results)
+                # Check results and log appropriate messages
+                if not results:
+                    logger.error("No installations were attempted")
+                    return
 
-                # Print final stats
-                stats = install_command.get_installation_stats(results)
-                if stats["failed"] > 0:
-                    logger.error(
-                        f"❌ {stats['failed']} installation(s) failed out of {stats['total']}"
-                    )
+                failed_count = sum(1 for result in results if not result.get("success", False))
+                if failed_count > 0:
+                    logger.error("%d installation(s) failed", failed_count)
                 else:
-                    logger.info(
-                        f"✅ All {stats['successful']} installation(s) completed successfully!"
-                    )
+                    logger.info("All installations completed successfully")
 
-            except ValidationError as e:
-                logger.error("❌ Validation error: %s", e)
-                logger.info("💡 Use 'list --available' to see available catalog apps.")
-            except Exception as e:
-                logger.error("❌ Installation failed: %s", e)
-
-    def _expand_comma_separated_targets(self, targets: list[str]) -> list[str]:
-        """Expand comma-separated targets into individual targets.
-
-        Args:
-            targets: List of target strings that may contain commas
-
-        Returns:
-            List of individual targets
-
-        """
-        expanded = []
-        for target in targets:
-            # Split by comma and strip whitespace
-            parts = [part.strip() for part in target.split(",")]
-            expanded.extend(part for part in parts if part)
-
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_targets = []
-        for target in expanded:
-            if target not in seen:
-                seen.add(target)
-                unique_targets.append(target)
-
-        return unique_targets
+        except ValidationError as e:
+            logger.error("Validation error: %s", e)
+        except Exception as e:
+            logger.error("Installation failed: %s", e)
 
 
 class CatalogManagerAdapter:
     """Adapter to provide catalog manager interface for the installation system."""
 
-    def __init__(self, config_manager):
+    def __init__(self, config_manager: Any) -> None:
         """Initialize adapter with config manager.
 
         Args:
@@ -395,7 +360,7 @@ class CatalogManagerAdapter:
         """
         self.config_manager = config_manager
 
-    def get_available_apps(self) -> dict[str, dict]:
+    def get_available_apps(self) -> dict[str, dict[str, Any]]:
         """Get available apps from catalog.
 
         Returns:
@@ -409,7 +374,7 @@ class CatalogManagerAdapter:
                 apps[app_name] = config
         return apps
 
-    def get_app_config(self, app_name: str) -> dict | None:
+    def get_app_config(self, app_name: str) -> dict[str, Any] | None:
         """Get configuration for a specific app.
 
         Args:
@@ -421,7 +386,7 @@ class CatalogManagerAdapter:
         """
         return self.config_manager.load_catalog_entry(app_name)
 
-    def get_installed_app_config(self, app_name: str) -> dict | None:
+    def get_installed_app_config(self, app_name: str) -> dict[str, Any] | None:
         """Get installed app configuration.
 
         Args:
@@ -433,10 +398,10 @@ class CatalogManagerAdapter:
         """
         try:
             return self.config_manager.load_app_config(app_name)
-        except:
+        except Exception:
             return None
 
-    def save_app_config(self, app_name: str, config: dict) -> None:
+    def save_app_config(self, app_name: str, config: dict[str, Any]) -> None:
         """Save app configuration.
 
         Args:

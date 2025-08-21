@@ -17,6 +17,7 @@ except ImportError:
     Version = None
     InvalidVersion = None
 
+
 from .auth import GitHubAuthManager
 from .backup import BackupService
 from .config import AppConfig, ConfigManager
@@ -70,11 +71,12 @@ class UpdateInfo:
 class UpdateManager:
     """Manages updates for installed AppImages."""
 
-    def __init__(self, config_manager: ConfigManager | None = None):
+    def __init__(self, config_manager: ConfigManager | None = None, progress_service=None):
         """Initialize update manager.
 
         Args:
             config_manager: Configuration manager instance
+            progress_service: Optional progress service for tracking updates
 
         """
         self.config_manager = config_manager or ConfigManager()
@@ -87,6 +89,11 @@ class UpdateManager:
 
         # Initialize backup service
         self.backup_service = BackupService(self.config_manager, self.global_config)
+
+        # Initialize progress service
+        from my_unicorn.services.progress import get_progress_service
+
+        self.progress_service = progress_service or get_progress_service()
 
         # Initialize shared services - will be set when session is available
         self.icon_service = None
@@ -349,6 +356,189 @@ class UpdateManager:
 
         return update_infos
 
+    async def check_all_updates_with_spinner(
+        self, app_names: list[str] | None = None
+    ) -> list[UpdateInfo]:
+        """Check for updates for all or specified apps with simple text message.
+
+        Uses a simple text message to avoid Rich rendering conflicts with
+        the main progress session during updates.
+
+        Args:
+            app_names: List of app names to check, or None for all installed apps
+
+        Returns:
+            List of UpdateInfo objects
+
+        """
+        if app_names is None:
+            app_names = self.config_manager.list_installed_apps()
+
+        if not app_names:
+            logger.info("No installed apps found")
+            return []
+
+        # Simple text message to avoid Rich conflicts
+        print(f"🔄 Checking {len(app_names)} app(s) for updates...")
+        return await self._check_apps_without_spinner(app_names)
+
+    async def check_all_updates_with_status_spinner(
+        self, app_names: list[str] | None = None
+    ) -> list[UpdateInfo]:
+        """Check for updates with Rich Status spinner for check-only operations.
+
+        Uses Rich Status spinner which is safe for check-only operations that
+        don't have active progress sessions.
+
+        Args:
+            app_names: List of app names to check, or None for all installed apps
+
+        Returns:
+            List of UpdateInfo objects
+
+        """
+        if app_names is None:
+            app_names = self.config_manager.list_installed_apps()
+
+        if not app_names:
+            logger.info("No installed apps found")
+            return []
+
+        # Use Rich Status spinner for check-only operations (no progress session)
+        from rich.console import Console
+        from rich.status import Status
+
+        console = Console()
+        with Status(
+            f"Checking {len(app_names)} app(s) for updates...",
+            console=console,
+            spinner="dots",
+        ):
+            return await self._check_apps_without_spinner(app_names)
+
+    async def _check_apps_without_spinner(self, app_names: list[str]) -> list[UpdateInfo]:
+        """Internal method to check apps without any display wrapper."""
+        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
+        update_infos = []
+
+        async def check_with_semaphore(app_name: str) -> UpdateInfo | None:
+            async with semaphore:
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        result = await self.check_single_update(app_name, session)
+                    return result
+                except Exception as e:
+                    logger.error("Update check failed for %s: %s", app_name, e)
+                    return None
+
+        # Check all apps concurrently
+        tasks = [check_with_semaphore(app) for app in app_names]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process results
+        for result in results:
+            if isinstance(result, UpdateInfo):
+                update_infos.append(result)
+            elif isinstance(result, Exception):
+                logger.error("Update check failed: %s", result)
+
+        return update_infos
+
+    async def check_all_updates_with_progress(
+        self, app_names: list[str] | None = None
+    ) -> list[UpdateInfo]:
+        """Check for updates for all or specified apps with progress tracking.
+
+        This method creates progress tasks for each app being checked and updates them
+        as the checks complete. Should be called within an active progress session.
+
+        Args:
+            app_names: List of app names to check, or None for all installed apps
+
+        Returns:
+            List of UpdateInfo objects
+
+        """
+        if app_names is None:
+            app_names = self.config_manager.list_installed_apps()
+
+        if not app_names:
+            logger.info("No installed apps found")
+            return []
+
+        # Check if progress session is active for progress tracking
+        progress_enabled = self.progress_service.is_active()
+        check_tasks = {}  # Map app_name to progress task_id
+
+        # Create progress tasks for each app being checked
+        if progress_enabled:
+            for app_name in app_names:
+                try:
+                    task_id = await self.progress_service.create_update_task(app_name)
+                    await self.progress_service.update_task(
+                        task_id,
+                        completed=0.0,
+                        description=f"🔍 Checking {app_name} for updates...",
+                    )
+                    check_tasks[app_name] = task_id
+                except Exception:
+                    # If progress task creation fails, continue without progress for this app
+                    pass
+
+        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
+
+        async with aiohttp.ClientSession() as session:
+
+            async def check_with_semaphore_and_progress(app_name: str) -> UpdateInfo | None:
+                async with semaphore:
+                    try:
+                        # Update progress to show checking is in progress
+                        if progress_enabled and app_name in check_tasks:
+                            await self.progress_service.update_task(
+                                check_tasks[app_name],
+                                completed=50.0,
+                                description=f"🔍 Checking {app_name}...",
+                            )
+
+                        result = await self.check_single_update(app_name, session)
+
+                        # Update progress to show check completed
+                        if progress_enabled and app_name in check_tasks:
+                            if result and result.has_update:
+                                description = f"📦 {app_name} update available"
+                            else:
+                                description = f"✅ {app_name} is up to date"
+
+                            await self.progress_service.update_task(
+                                check_tasks[app_name], completed=100.0, description=description
+                            )
+                            await self.progress_service.finish_task(check_tasks[app_name])
+
+                        return result
+                    except Exception as e:
+                        # Handle errors and clean up progress
+                        if progress_enabled and app_name in check_tasks:
+                            await self.progress_service.update_task(
+                                check_tasks[app_name],
+                                completed=0.0,
+                                description=f"❌ Failed to check {app_name}",
+                            )
+                            await self.progress_service.finish_task(check_tasks[app_name])
+                        raise e
+
+            tasks = [check_with_semaphore_and_progress(app) for app in app_names]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Filter out None results and exceptions
+        update_infos = []
+        for result in results:
+            if isinstance(result, UpdateInfo):
+                update_infos.append(result)
+            elif isinstance(result, Exception):
+                logger.error("Update check failed: %s", result)
+
+        return update_infos
+
     # FIXME: too many branches
     async def update_single_app(
         self, app_name: str, session: aiohttp.ClientSession, force: bool = False
@@ -364,25 +554,61 @@ class UpdateManager:
             True if update was successful
 
         """
+        # Create progress task for this update (only if progress session is active)
+        update_task_id = None
+        progress_enabled = self.progress_service.is_active()
+
+        if progress_enabled:
+            try:
+                update_task_id = await self.progress_service.create_update_task(app_name)
+            except Exception:
+                # If progress task creation fails, disable progress for this update
+                progress_enabled = False
+
         try:
+            # Phase 1: Initial checks (0-15%)
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(
+                    update_task_id,
+                    completed=0.0,
+                    description=f"🔍 Checking {app_name} for updates...",
+                )
+
             app_config = self.config_manager.load_app_config(app_name)
             if not app_config:
                 logger.error("No config found for app: %s", app_name)
+                if progress_enabled and update_task_id:
+                    await self.progress_service.finish_task(update_task_id)
                 return False
 
             # Check for updates first
             update_info = await self.check_single_update(app_name, session)
             if not update_info:
                 logger.error("Failed to check updates for %s", app_name)
+                if progress_enabled and update_task_id:
+                    await self.progress_service.finish_task(update_task_id)
                 return False
+
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(update_task_id, completed=10.0)
 
             if not force and not update_info.has_update:
                 logger.debug("%s is already up to date", app_name)
+                if progress_enabled and update_task_id:
+                    await self.progress_service.update_task(
+                        update_task_id,
+                        completed=100.0,
+                        description=f"✅ {app_name} is up to date",
+                    )
+                    await self.progress_service.finish_task(update_task_id)
                 return True
 
             logger.debug(
                 f"Updating {app_name} from {update_info.current_version} to {update_info.latest_version}"
             )
+
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(update_task_id, completed=15.0)
 
             # Fetch latest release data
             owner = app_config["owner"]
@@ -431,6 +657,14 @@ class UpdateManager:
                 logger.error("No AppImage found for %s", app_name)
                 return False
 
+            # Phase 2: Setup and backup (15-30%)
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(
+                    update_task_id,
+                    completed=20.0,
+                    description=f"⚙️ Preparing {app_name} update...",
+                )
+
             # Set up paths
             storage_dir = self.global_config["directory"]["storage"]
             backup_dir = self.global_config["directory"]["backup"]
@@ -438,6 +672,11 @@ class UpdateManager:
             download_dir = self.global_config["directory"]["download"]
 
             # Create backup of current version
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(
+                    update_task_id, completed=25.0, description=f"💾 Backing up {app_name}..."
+                )
+
             current_appimage_path = storage_dir / app_config["appimage"]["name"]
             if current_appimage_path.exists():
                 backup_path = self.backup_service.create_backup(
@@ -445,6 +684,9 @@ class UpdateManager:
                 )
                 if backup_path:
                     logger.debug("💾 Backup created: %s", backup_path)
+
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(update_task_id, completed=30.0)
 
             # Download and install new version
             icon_asset = None
@@ -526,6 +768,12 @@ class UpdateManager:
                 # Fallback to app config for backward compatibility
                 rename_to = app_config["appimage"].get("rename", app_name)
 
+            # Phase 3: Download preparation (30-35%)
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(
+                    update_task_id, completed=30.0, description=f"📦 Downloading {app_name}..."
+                )
+
             # Setup download path
             filename = download_service.get_filename_from_url(
                 appimage_asset["browser_download_url"]
@@ -533,9 +781,16 @@ class UpdateManager:
             download_path = download_dir / filename
 
             # Download AppImage first (without renaming)
+            # Note: The actual download progress is handled separately by DownloadService
             appimage_path = await download_service.download_appimage(
                 appimage_asset, download_path, show_progress=True
             )
+
+            # Phase 4: Post-download processing (35-70%)
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(
+                    update_task_id, completed=35.0, description=f"⚙️ Processing {app_name}..."
+                )
 
             # Get icon using enhanced IconManager with extraction configuration
             icon_path = None
@@ -580,24 +835,85 @@ class UpdateManager:
                     icon_asset=icon_asset,
                 )
 
-            # Perform verification using priority-based approach (BEFORE renaming)
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(update_task_id, completed=50.0)
+
+            # Update progress for verification phase
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(
+                    update_task_id, completed=55.0, description=f"📦 Downloaded {app_name}"
+                )
+
+            # Create verification task in post-processing
+            verification_task_id = None
+            if progress_enabled:
+                verification_task_id = await self.progress_service.create_verification_task(
+                    appimage_path.name
+                )
+                await self.progress_service.update_task(
+                    verification_task_id,
+                    completed=0.0,
+                    description=f"🔍 Verifying {app_name}...",
+                )
+
             verification_config = app_config.get("verification", {})
-            (
-                verification_results,
-                updated_verification_config,
-            ) = await self._perform_update_verification(
-                appimage_path,
-                appimage_asset,
-                dict(verification_config),  # Cast to dict[str, Any]
-                owner,
-                repo,
-                update_info.original_tag_name,
-                app_name,
-            )
+            try:
+                (
+                    verification_results,
+                    updated_verification_config,
+                ) = await self._perform_update_verification(
+                    appimage_path,
+                    appimage_asset,
+                    dict(verification_config),  # Cast to dict[str, Any]
+                    owner,
+                    repo,
+                    update_info.original_tag_name,
+                    app_name,
+                )
+
+                if progress_enabled and verification_task_id:
+                    await self.progress_service.update_task(
+                        verification_task_id,
+                        completed=100.0,
+                        description=f"✅ Verified {app_name}",
+                    )
+                    await self.progress_service.finish_task(verification_task_id, success=True)
+
+            except Exception as e:
+                logger.error("Verification failed for %s: %s", app_name, e)
+                if progress_enabled and verification_task_id:
+                    await self.progress_service.update_task(
+                        verification_task_id,
+                        completed=0.0,
+                        description="❌ Verification failed",
+                    )
+                    await self.progress_service.finish_task(
+                        verification_task_id, success=False
+                    )
+                # Continue with update even if verification fails
+                verification_results = {}
+                updated_verification_config = {}
+
+            # Continue with remaining update steps
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(
+                    update_task_id,
+                    completed=65.0,
+                    description=f"📝 Updating {app_name} config...",
+                )
+
+            # Phase 5: Installation (70-90%)
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(
+                    update_task_id, completed=70.0, description=f"📁 Installing {app_name}..."
+                )
 
             # Now make executable and move to install directory
             self.storage_service.make_executable(appimage_path)
             appimage_path = self.storage_service.move_to_install_dir(appimage_path)
+
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(update_task_id, completed=80.0)
 
             # Finally rename to clean name using catalog configuration
             if rename_to:
@@ -677,9 +993,31 @@ class UpdateManager:
             )
             if stored_hash:
                 logger.debug("🔐 Updated stored hash: %s", stored_hash)
+
+            # Phase 6: Complete (100%)
+            if progress_enabled and update_task_id:
+                await self.progress_service.update_task(
+                    update_task_id,
+                    completed=100.0,
+                    description=f"✅ {app_name} updated successfully",
+                )
+                await self.progress_service.finish_task(update_task_id)
+
             return True
 
         except Exception as e:
+            # Make sure to finish the progress task on error
+            if progress_enabled and update_task_id:
+                try:
+                    await self.progress_service.update_task(
+                        update_task_id,
+                        completed=0.0,
+                        description=f"❌ {app_name} update failed",
+                    )
+                    await self.progress_service.finish_task(update_task_id)
+                except Exception:
+                    # If progress update fails, just continue with error logging
+                    pass
             logger.error("Failed to update %s: %s", app_name, e)
             return False
 

@@ -51,8 +51,10 @@ class CatalogInstallStrategy(InstallStrategy):
         self.github_client = github_client
 
         # Initialize shared services
-        self.icon_service = IconService(download_service)
-        self.verification_service = VerificationService(download_service)
+        # Get progress service from download service if available
+        progress_service = getattr(download_service, "progress_service", None)
+        self.icon_service = IconService(download_service, progress_service)
+        self.verification_service = VerificationService(download_service, progress_service)
 
     def validate_targets(self, targets: list[str]) -> None:
         """Validate that targets are valid catalog app names.
@@ -89,7 +91,13 @@ class CatalogInstallStrategy(InstallStrategy):
         """
         self.validate_targets(targets)
 
-        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
+        concurrent_limit = kwargs.get(
+            "concurrent", self.global_config["max_concurrent_downloads"]
+        )
+        logger.info(
+            "📚 Catalog install strategy using %d concurrent installations", concurrent_limit
+        )
+        semaphore = asyncio.Semaphore(concurrent_limit)
 
         tasks = [
             self._install_single_app(semaphore, app_name, **kwargs) for app_name in targets
@@ -198,7 +206,7 @@ class CatalogInstallStrategy(InstallStrategy):
                 # Verify download if requested
                 if kwargs.get("verify_downloads", True):
                     verification_result = await self._perform_verification(
-                        download_path, appimage_asset, app_config, release_data
+                        download_path, appimage_asset, app_config, release_data, **kwargs
                     )
                 else:
                     verification_result = None
@@ -228,7 +236,29 @@ class CatalogInstallStrategy(InstallStrategy):
                     app_config.get("icon") or True
                 ):  # Always try extraction even without icon config
                     icon_path, updated_icon_config = await self._setup_catalog_icon(
-                        app_config, app_name, icon_dir, final_path
+                        app_config, app_name, icon_dir, final_path, **kwargs
+                    )
+
+                # Create progress task for installation steps if progress is enabled
+                installation_task_id = None
+                if (
+                    kwargs.get("show_progress", False)
+                    and hasattr(self.download_service, "progress_service")
+                    and self.download_service.progress_service
+                    and self.download_service.progress_service.is_active()
+                ):
+                    installation_task_id = (
+                        await self.download_service.progress_service.create_installation_task(
+                            app_name
+                        )
+                    )
+
+                # Update progress - creating app configuration
+                if installation_task_id and self.download_service.progress_service:
+                    await self.download_service.progress_service.update_task(
+                        installation_task_id,
+                        completed=25.0,
+                        description=f"📁 Creating configuration for {app_name}...",
                     )
 
                 # Create application configuration (pass verification result for config updates)
@@ -242,6 +272,14 @@ class CatalogInstallStrategy(InstallStrategy):
                     verification_result,
                     updated_icon_config,
                 )
+
+                # Update progress - creating desktop entry
+                if installation_task_id and self.download_service.progress_service:
+                    await self.download_service.progress_service.update_task(
+                        installation_task_id,
+                        completed=75.0,
+                        description=f"📁 Creating desktop entry for {app_name}...",
+                    )
 
                 # Create desktop entry to reflect any changes (icon, paths, etc.)
                 try:
@@ -262,6 +300,14 @@ class CatalogInstallStrategy(InstallStrategy):
                 except Exception as e:
                     logger.warning("⚠️  Failed to update desktop entry: %s", e)
 
+                # Update progress - finalizing installation
+                if installation_task_id and self.download_service.progress_service:
+                    await self.download_service.progress_service.finish_task(
+                        installation_task_id,
+                        success=True,
+                        final_description=f"✅ {app_name} installation completed",
+                    )
+
                 logger.info("✅ Successfully installed from catalog: %s", final_path)
 
                 return {
@@ -275,6 +321,19 @@ class CatalogInstallStrategy(InstallStrategy):
                 }
 
             except Exception as e:
+                # Mark installation as failed if we have a progress task
+                if (
+                    "installation_task_id" in locals()
+                    and installation_task_id
+                    and hasattr(self.download_service, "progress_service")
+                    and self.download_service.progress_service
+                ):
+                    await self.download_service.progress_service.finish_task(
+                        installation_task_id,
+                        success=False,
+                        final_description=f"❌ {app_name} installation failed",
+                    )
+
                 logger.error("❌ Failed to install %s: %s", app_name, e)
                 import traceback
 
@@ -381,6 +440,7 @@ class CatalogInstallStrategy(InstallStrategy):
         asset: dict[str, Any],
         app_config: dict[str, Any],
         release_data: dict[str, Any],
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Perform download verification based on catalog configuration.
 
@@ -407,6 +467,19 @@ class CatalogInstallStrategy(InstallStrategy):
             "original_tag_name", release_data.get("tag_name", "")
         )
 
+        # Create progress task for verification if progress is enabled
+        progress_task_id = None
+        if (
+            kwargs.get("show_progress", False)
+            and self.verification_service.progress_service
+            and self.verification_service.progress_service.is_active()
+        ):
+            progress_task_id = (
+                await self.verification_service.progress_service.create_verification_task(
+                    path.stem
+                )
+            )
+
         try:
             result = await self.verification_service.verify_file(
                 file_path=path,
@@ -417,6 +490,7 @@ class CatalogInstallStrategy(InstallStrategy):
                 tag_name=original_tag_name,
                 app_name=path.name,
                 assets=release_data.get("assets", []),
+                progress_task_id=progress_task_id,
             )
 
             return {
@@ -427,7 +501,12 @@ class CatalogInstallStrategy(InstallStrategy):
             raise InstallationError(str(e)) from e
 
     async def _setup_catalog_icon(
-        self, app_config: dict[str, Any], app_name: str, icon_dir: Path, appimage_path: Path
+        self,
+        app_config: dict[str, Any],
+        app_name: str,
+        icon_dir: Path,
+        appimage_path: Path,
+        **kwargs: Any,
     ) -> tuple[Path | None, dict[str, Any]]:
         """Setup icon from catalog configuration using shared IconService.
 
@@ -461,6 +540,17 @@ class CatalogInstallStrategy(InstallStrategy):
             preserve_url_on_extraction=False,  # Clear URL on extraction for catalog
         )
 
+        # Create progress task for icon extraction if progress is enabled
+        progress_task_id = None
+        if (
+            kwargs.get("show_progress", False)
+            and self.icon_service.progress_service
+            and self.icon_service.progress_service.is_active()
+        ):
+            progress_task_id = (
+                await self.icon_service.progress_service.create_icon_extraction_task(app_name)
+            )
+
         # Use shared service to acquire icon
         result = await self.icon_service.acquire_icon(
             icon_config=icon_config,
@@ -468,6 +558,7 @@ class CatalogInstallStrategy(InstallStrategy):
             icon_dir=icon_dir,
             appimage_path=appimage_path,
             current_config=icon_config_dict,
+            progress_task_id=progress_task_id,
         )
 
         return result.icon_path, result.config
