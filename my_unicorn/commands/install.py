@@ -134,27 +134,126 @@ class InstallCommand:
         show_progress = bool(install_options["show_progress"])
         self._initialize_services_with_progress(show_progress)
 
-        # Calculate total operations for progress tracking
-        total_operations = len(targets)
-        if show_progress and self.progress_service:
-            # Each app typically has: download, verify, icon extraction, installation
-            total_operations = len(targets) * 4
+        # Check which apps actually need work before starting progress
+        (
+            urls_needing_work,
+            catalog_needing_work,
+            already_installed,
+        ) = await self._check_apps_needing_work(url_targets, catalog_targets, install_options)
 
-        # Execute installations with progress session
-        if show_progress and self.progress_service:
+        # Handle case where all apps are already installed
+        if already_installed and not urls_needing_work and not catalog_needing_work:
+            print(f"✅ All {len(already_installed)} specified app(s) are already installed:")
+            for app_name in already_installed:
+                print(f"   • {app_name}")
+
+            # Return success results for already installed apps
+            return [
+                {
+                    "target": app_name,
+                    "success": True,
+                    "path": "already_installed",
+                    "name": app_name,
+                    "source": "catalog",
+                    "status": "already_installed",
+                }
+                for app_name in already_installed
+            ]
+
+        # Print info about already installed apps if there are some
+        if already_installed:
+            print(f"ℹ️  Skipping {len(already_installed)} already installed app(s):")
+            for app_name in already_installed:
+                print(f"   • {app_name}")
+
+        # Calculate operations only for apps that need work
+        apps_needing_work = len(urls_needing_work) + len(catalog_needing_work)
+
+        # Execute installations with progress session only if there's work to do
+        if show_progress and self.progress_service and apps_needing_work > 0:
+            # Each app typically has: download, verify, icon extraction, installation
+            total_operations = apps_needing_work * 4
             async with self.progress_service.session(total_operations):
                 results = await self._execute_installations(
-                    url_targets, catalog_targets, install_options
+                    urls_needing_work, catalog_needing_work, install_options
                 )
         else:
             results = await self._execute_installations(
-                url_targets, catalog_targets, install_options
+                urls_needing_work, catalog_needing_work, install_options
             )
+
+        # Add already installed apps to results
+        already_installed_results = [
+            {
+                "target": app_name,
+                "success": True,
+                "path": "already_installed",
+                "name": app_name,
+                "source": "catalog",
+                "status": "already_installed",
+            }
+            for app_name in already_installed
+        ]
+        results.extend(already_installed_results)
 
         # Print installation summary
         self._print_installation_summary(results)
 
         return results
+
+    async def _check_apps_needing_work(
+        self,
+        url_targets: list[str],
+        catalog_targets: list[str],
+        install_options: dict[str, Any],
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Check which apps actually need installation work.
+
+        Args:
+            url_targets: List of URL targets
+            catalog_targets: List of catalog targets
+            install_options: Installation options
+
+        Returns:
+            Tuple of (urls_needing_work, catalog_needing_work, already_installed)
+
+        """
+        urls_needing_work = []
+        catalog_needing_work = []
+        already_installed = []
+
+        # For URLs, we currently don't have a way to check if they're installed
+        # So we assume all URLs need work
+        urls_needing_work = url_targets.copy()
+
+        # For catalog apps, check if they're already installed
+        for app_name in catalog_targets:
+            try:
+                # Get app config from catalog
+                app_config = self.catalog_manager.get_app_config(app_name)
+                if not app_config:
+                    catalog_needing_work.append(app_name)
+                    continue
+
+                # Check if app is already installed (unless force is specified)
+                if not install_options.get("force", False):
+                    installed_config = self.catalog_manager.get_installed_app_config(app_name)
+                    if installed_config:
+                        # Check if the installed app file still exists
+                        installed_path = Path(installed_config.get("installed_path", ""))
+                        if installed_path.exists():
+                            already_installed.append(app_name)
+                            continue
+
+                # App needs installation
+                catalog_needing_work.append(app_name)
+
+            except Exception as e:
+                logger.debug("Error checking installation status for %s: %s", app_name, e)
+                # On error, assume it needs installation
+                catalog_needing_work.append(app_name)
+
+        return urls_needing_work, catalog_needing_work, already_installed
 
     async def _execute_installations(
         self,
@@ -242,24 +341,41 @@ class InstallCommand:
             logger.info("No installations completed")
             return
 
-        successful = sum(1 for result in results if result.get("success", False))
+        # Categorize results
+        already_installed = [r for r in results if r.get("status") == "already_installed"]
+        newly_installed = [
+            r
+            for r in results
+            if r.get("success", False) and r.get("status") != "already_installed"
+        ]
+        failed = [r for r in results if not r.get("success", False)]
+
         total = len(results)
 
+        # Handle the case where all apps are already installed
+        if len(already_installed) == total:
+            logger.info("✅ All %d specified app(s) are already installed:", total)
+            for result in already_installed:
+                logger.info("   • %s", result.get("name", "Unknown"))
+            return
+
+        # Print summary for mixed results
         logger.info("📊 Installation Summary:")
-        logger.info("   Successful: %d/%d", successful, total)
+        if newly_installed:
+            logger.info("   Newly installed: %d", len(newly_installed))
+        if already_installed:
+            logger.info("   Already installed: %d", len(already_installed))
+        if failed:
+            logger.info("   Failed: %d", len(failed))
 
-        if successful < total:
-            failed_apps = [
-                result.get("name", "Unknown")
-                for result in results
-                if not result.get("success", False)
-            ]
-            logger.warning("   Failed: %s", ", ".join(failed_apps))
-
+        # Print detailed results
         for result in results:
             app_name = result.get("name", "Unknown")
             if result.get("success", False):
-                logger.info("   ✅ %s: Installation successful", app_name)
+                if result.get("status") == "already_installed":
+                    logger.info("   ℹ️  %s: Already installed", app_name)
+                else:
+                    logger.info("   ✅ %s: Installation successful", app_name)
             else:
                 error = result.get("error", "Unknown error")
                 logger.error("   ❌ %s: %s", app_name, error)

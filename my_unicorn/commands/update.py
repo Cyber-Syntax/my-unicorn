@@ -7,7 +7,6 @@ to provide clean separation of different update scenarios.
 from argparse import Namespace
 
 from ..logger import get_logger
-from ..services.progress import progress_session
 from ..strategies import (
     UpdateContext,
     UpdateResultDisplay,
@@ -51,8 +50,8 @@ class UpdateHandler(BaseCommandHandler):
             if context.check_only:
                 result = await strategy.execute(context)
             else:
-                async with progress_session():
-                    result = await strategy.execute(context)
+                # For update operations, the strategy will determine if progress UI is needed
+                result = await strategy.execute(context)
 
             # Display results using consistent formatting
             UpdateResultDisplay.display_summary(result)

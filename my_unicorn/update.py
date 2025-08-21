@@ -90,10 +90,8 @@ class UpdateManager:
         # Initialize backup service
         self.backup_service = BackupService(self.config_manager, self.global_config)
 
-        # Initialize progress service
-        from my_unicorn.services.progress import get_progress_service
-
-        self.progress_service = progress_service or get_progress_service()
+        # Store progress service parameter but don't cache global service
+        self._progress_service_param = progress_service
 
         # Initialize shared services - will be set when session is available
         self.icon_service = None
@@ -466,24 +464,7 @@ class UpdateManager:
             logger.info("No installed apps found")
             return []
 
-        # Check if progress session is active for progress tracking
-        progress_enabled = self.progress_service.is_active()
-        check_tasks = {}  # Map app_name to progress task_id
-
-        # Create progress tasks for each app being checked
-        if progress_enabled:
-            for app_name in app_names:
-                try:
-                    task_id = await self.progress_service.create_update_task(app_name)
-                    await self.progress_service.update_task(
-                        task_id,
-                        completed=0.0,
-                        description=f"🔍 Checking {app_name} for updates...",
-                    )
-                    check_tasks[app_name] = task_id
-                except Exception:
-                    # If progress task creation fails, continue without progress for this app
-                    pass
+        # Check updates without creating progress tasks (checking is quick preparation work)
 
         semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
 
@@ -492,38 +473,9 @@ class UpdateManager:
             async def check_with_semaphore_and_progress(app_name: str) -> UpdateInfo | None:
                 async with semaphore:
                     try:
-                        # Update progress to show checking is in progress
-                        if progress_enabled and app_name in check_tasks:
-                            await self.progress_service.update_task(
-                                check_tasks[app_name],
-                                completed=50.0,
-                                description=f"🔍 Checking {app_name}...",
-                            )
-
                         result = await self.check_single_update(app_name, session)
-
-                        # Update progress to show check completed
-                        if progress_enabled and app_name in check_tasks:
-                            if result and result.has_update:
-                                description = f"📦 {app_name} update available"
-                            else:
-                                description = f"✅ {app_name} is up to date"
-
-                            await self.progress_service.update_task(
-                                check_tasks[app_name], completed=100.0, description=description
-                            )
-                            await self.progress_service.finish_task(check_tasks[app_name])
-
                         return result
                     except Exception as e:
-                        # Handle errors and clean up progress
-                        if progress_enabled and app_name in check_tasks:
-                            await self.progress_service.update_task(
-                                check_tasks[app_name],
-                                completed=0.0,
-                                description=f"❌ Failed to check {app_name}",
-                            )
-                            await self.progress_service.finish_task(check_tasks[app_name])
                         raise e
 
             tasks = [check_with_semaphore_and_progress(app) for app in app_names]
@@ -554,61 +506,33 @@ class UpdateManager:
             True if update was successful
 
         """
-        # Create progress task for this update (only if progress session is active)
-        update_task_id = None
-        progress_enabled = self.progress_service.is_active()
+        # Get current progress service (not cached instance) for individual tasks
+        from my_unicorn.services.progress import get_progress_service
 
-        if progress_enabled:
-            try:
-                update_task_id = await self.progress_service.create_update_task(app_name)
-            except Exception:
-                # If progress task creation fails, disable progress for this update
-                progress_enabled = False
+        progress_service = self._progress_service_param or get_progress_service()
+        progress_enabled = progress_service.is_active()
 
         try:
-            # Phase 1: Initial checks (0-15%)
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(
-                    update_task_id,
-                    completed=0.0,
-                    description=f"🔍 Checking {app_name} for updates...",
-                )
+            # Phase 1: Initial checks
 
             app_config = self.config_manager.load_app_config(app_name)
             if not app_config:
                 logger.error("No config found for app: %s", app_name)
-                if progress_enabled and update_task_id:
-                    await self.progress_service.finish_task(update_task_id)
                 return False
 
             # Check for updates first
             update_info = await self.check_single_update(app_name, session)
             if not update_info:
                 logger.error("Failed to check updates for %s", app_name)
-                if progress_enabled and update_task_id:
-                    await self.progress_service.finish_task(update_task_id)
                 return False
-
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(update_task_id, completed=10.0)
 
             if not force and not update_info.has_update:
                 logger.debug("%s is already up to date", app_name)
-                if progress_enabled and update_task_id:
-                    await self.progress_service.update_task(
-                        update_task_id,
-                        completed=100.0,
-                        description=f"✅ {app_name} is up to date",
-                    )
-                    await self.progress_service.finish_task(update_task_id)
                 return True
 
             logger.debug(
                 f"Updating {app_name} from {update_info.current_version} to {update_info.latest_version}"
             )
-
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(update_task_id, completed=15.0)
 
             # Fetch latest release data
             owner = app_config["owner"]
@@ -657,13 +581,7 @@ class UpdateManager:
                 logger.error("No AppImage found for %s", app_name)
                 return False
 
-            # Phase 2: Setup and backup (15-30%)
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(
-                    update_task_id,
-                    completed=20.0,
-                    description=f"⚙️ Preparing {app_name} update...",
-                )
+            # Phase 2: Setup and backup
 
             # Set up paths
             storage_dir = self.global_config["directory"]["storage"]
@@ -672,10 +590,6 @@ class UpdateManager:
             download_dir = self.global_config["directory"]["download"]
 
             # Create backup of current version
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(
-                    update_task_id, completed=25.0, description=f"💾 Backing up {app_name}..."
-                )
 
             current_appimage_path = storage_dir / app_config["appimage"]["name"]
             if current_appimage_path.exists():
@@ -684,9 +598,6 @@ class UpdateManager:
                 )
                 if backup_path:
                     logger.debug("💾 Backup created: %s", backup_path)
-
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(update_task_id, completed=30.0)
 
             # Download and install new version
             icon_asset = None
@@ -768,11 +679,7 @@ class UpdateManager:
                 # Fallback to app config for backward compatibility
                 rename_to = app_config["appimage"].get("rename", app_name)
 
-            # Phase 3: Download preparation (30-35%)
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(
-                    update_task_id, completed=30.0, description=f"📦 Downloading {app_name}..."
-                )
+            # Phase 3: Download preparation
 
             # Setup download path
             filename = download_service.get_filename_from_url(
@@ -786,11 +693,7 @@ class UpdateManager:
                 appimage_asset, download_path, show_progress=True
             )
 
-            # Phase 4: Post-download processing (35-70%)
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(
-                    update_task_id, completed=35.0, description=f"⚙️ Processing {app_name}..."
-                )
+            # Phase 4: Post-download processing
 
             # Get icon using enhanced IconManager with extraction configuration
             icon_path = None
@@ -835,22 +738,13 @@ class UpdateManager:
                     icon_asset=icon_asset,
                 )
 
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(update_task_id, completed=50.0)
-
-            # Update progress for verification phase
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(
-                    update_task_id, completed=55.0, description=f"📦 Downloaded {app_name}"
-                )
-
             # Create verification task in post-processing
             verification_task_id = None
             if progress_enabled:
-                verification_task_id = await self.progress_service.create_verification_task(
+                verification_task_id = await progress_service.create_verification_task(
                     appimage_path.name
                 )
-                await self.progress_service.update_task(
+                await progress_service.update_task(
                     verification_task_id,
                     completed=0.0,
                     description=f"🔍 Verifying {app_name}...",
@@ -872,48 +766,48 @@ class UpdateManager:
                 )
 
                 if progress_enabled and verification_task_id:
-                    await self.progress_service.update_task(
+                    await progress_service.update_task(
                         verification_task_id,
                         completed=100.0,
                         description=f"✅ Verified {app_name}",
                     )
-                    await self.progress_service.finish_task(verification_task_id, success=True)
+                    await progress_service.finish_task(verification_task_id, success=True)
 
             except Exception as e:
                 logger.error("Verification failed for %s: %s", app_name, e)
                 if progress_enabled and verification_task_id:
-                    await self.progress_service.update_task(
+                    await progress_service.update_task(
                         verification_task_id,
                         completed=0.0,
                         description="❌ Verification failed",
                     )
-                    await self.progress_service.finish_task(
-                        verification_task_id, success=False
-                    )
+                    await progress_service.finish_task(verification_task_id, success=False)
                 # Continue with update even if verification fails
                 verification_results = {}
                 updated_verification_config = {}
 
             # Continue with remaining update steps
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(
-                    update_task_id,
-                    completed=65.0,
-                    description=f"📝 Updating {app_name} config...",
-                )
 
-            # Phase 5: Installation (70-90%)
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(
-                    update_task_id, completed=70.0, description=f"📁 Installing {app_name}..."
-                )
-
+            # Phase 5: Installation
             # Now make executable and move to install directory
             self.storage_service.make_executable(appimage_path)
             appimage_path = self.storage_service.move_to_install_dir(appimage_path)
 
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(update_task_id, completed=80.0)
+            # Create installation task for the actual installation phase
+            installation_task_id = None
+            if progress_enabled:
+                installation_task_id = await progress_service.create_installation_task(
+                    app_name
+                )
+                await progress_service.update_task(
+                    installation_task_id,
+                    completed=0.0,
+                    description=f"📁 Installing {app_name}...",
+                )
+
+            # Update installation progress
+            if progress_enabled and installation_task_id:
+                await progress_service.update_task(installation_task_id, completed=25.0)
 
             # Finally rename to clean name using catalog configuration
             if rename_to:
@@ -994,30 +888,20 @@ class UpdateManager:
             if stored_hash:
                 logger.debug("🔐 Updated stored hash: %s", stored_hash)
 
-            # Phase 6: Complete (100%)
-            if progress_enabled and update_task_id:
-                await self.progress_service.update_task(
-                    update_task_id,
+            # Complete installation task
+            if progress_enabled and installation_task_id:
+                await progress_service.update_task(
+                    installation_task_id,
                     completed=100.0,
-                    description=f"✅ {app_name} updated successfully",
+                    description=f"✅ Installed {app_name}",
                 )
-                await self.progress_service.finish_task(update_task_id)
+                await progress_service.finish_task(installation_task_id, success=True)
+
+            # Update completed successfully
 
             return True
 
         except Exception as e:
-            # Make sure to finish the progress task on error
-            if progress_enabled and update_task_id:
-                try:
-                    await self.progress_service.update_task(
-                        update_task_id,
-                        completed=0.0,
-                        description=f"❌ {app_name} update failed",
-                    )
-                    await self.progress_service.finish_task(update_task_id)
-                except Exception:
-                    # If progress update fails, just continue with error logging
-                    pass
             logger.error("Failed to update %s: %s", app_name, e)
             return False
 

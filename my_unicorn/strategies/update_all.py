@@ -91,10 +91,13 @@ class UpdateAllAppsStrategy(UpdateStrategy):
 
         print()  # Empty line for better spacing
 
-        # Perform updates with suppressed logging
-        results = await self._execute_updates(
-            context, [info.app_name for info in apps_to_update]
-        )
+        # Perform updates with progress session only when there are updates
+        from ..services.progress import progress_session
+
+        async with progress_session():
+            results = await self._execute_updates(
+                context, [info.app_name for info in apps_to_update]
+            )
 
         # Categorize results
         updated_apps: list[str] = []

@@ -140,6 +140,8 @@ class ProgressService:
         self._overall_task_id: TaskID | None = None
         self._tasks: dict[str, ProgressTask] = {}  # Use namespaced IDs as keys
         self._active: bool = False
+        self._ui_visible: bool = False  # Track if UI is currently shown
+        self._tasks_added: bool = False  # Track if any tasks have been added
         self._lock = asyncio.Lock()
 
         # Task ID tracking to prevent collisions
@@ -183,20 +185,19 @@ class ProgressService:
         return f"{type_prefix}_{counter}_{clean_name}"
 
     def _get_progress_for_type(self, progress_type: ProgressType) -> Progress:
-        """Get the appropriate Progress instance for the given type.
+        """Get the appropriate progress instance for the given type.
 
         Args:
             progress_type: Type of progress operation
 
         Returns:
-            Progress instance for the specified type
+            Progress instance for the type
 
         """
         if progress_type == ProgressType.DOWNLOAD:
             return self._download_progress
         else:
-            # All other types (VERIFICATION, ICON_EXTRACTION, INSTALLATION, UPDATE)
-            # use the combined post-processing progress
+            # UPDATE, VERIFICATION, ICON_EXTRACTION, INSTALLATION
             return self._post_processing_progress
 
     def _create_layout(self) -> Table:
@@ -261,6 +262,7 @@ class ProgressService:
                     completed=0,
                 )
 
+            # Create and start Live display immediately (disable lazy UI for debugging)
             layout = self._create_layout()
             self._live = Live(
                 layout,
@@ -269,8 +271,14 @@ class ProgressService:
             )
             self._live.start()
             self._active = True
+            self._ui_visible = True
+            self._tasks_added = True
 
             logger.debug("Progress session started with %d total operations", total_operations)
+
+    def _show_ui_if_needed(self) -> None:
+        """Show the UI if tasks have been added but UI is not yet visible."""
+        # UI is always shown immediately now (lazy UI disabled)
 
     async def stop_session(self) -> None:
         """Stop the progress display session."""
@@ -283,6 +291,8 @@ class ProgressService:
                 self._live = None
 
             self._active = False
+            self._ui_visible = False
+            self._tasks_added = False
             self._overall_task_id = None
 
             logger.debug("Progress session stopped")
@@ -335,6 +345,7 @@ class ProgressService:
             }
 
         # Step 2: Create Rich task outside the lock to prevent blocking
+        first_task = False
         if task_creation_data:
             progress_instance = self._get_progress_for_type(
                 task_creation_data["progress_type"]
@@ -384,6 +395,8 @@ class ProgressService:
                     self._post_processing_task_ids.add(task_creation_data["namespaced_id"])
                     # Ensure this task isn't in the other set (defensive programming)
                     self._download_task_ids.discard(task_creation_data["namespaced_id"])
+
+                # UI is always shown immediately now (lazy UI disabled)
 
             logger.debug(
                 "Added %s task: %s (total: %.1f)",
@@ -779,8 +792,8 @@ class ProgressService:
             None
 
         """
-        await self.start_session(total_operations)
         try:
+            await self.start_session(total_operations)
             yield
         finally:
             await self.stop_session()
@@ -824,13 +837,13 @@ class ProgressService:
         )
 
     async def create_verification_task(self, filename: str) -> str:
-        """Create a verification task with guaranteed Post-Processing section placement.
+        """Create a verification task.
 
         Args:
-            filename: Name of file being verified
+            filename: Name of the file being verified
 
         Returns:
-            Namespaced task ID for the verification
+            Task ID for tracking
 
         """
         return await self.add_task(
@@ -844,10 +857,10 @@ class ProgressService:
         """Create an icon extraction task.
 
         Args:
-            app_name: Name of the application
+            app_name: Name of the app for icon extraction
 
         Returns:
-            Namespaced task ID for the icon extraction
+            Task ID for tracking
 
         """
         return await self.add_task(
@@ -861,10 +874,10 @@ class ProgressService:
         """Create an installation task.
 
         Args:
-            app_name: Name of the application
+            app_name: Name of the app being installed
 
         Returns:
-            Namespaced task ID for the installation
+            Task ID for tracking
 
         """
         return await self.add_task(
@@ -878,17 +891,17 @@ class ProgressService:
         """Create an update task.
 
         Args:
-            app_name: Name of the application being updated
+            app_name: Name of the app being updated
 
         Returns:
-            Namespaced task ID for the update
+            Task ID for tracking
 
         """
         return await self.add_task(
             name=f"Updating {app_name}",
             progress_type=ProgressType.UPDATE,
             total=100.0,
-            description=f"🔄 Updating {app_name}...",
+            description=f"⬆️ Updating {app_name}...",
         )
 
     async def cleanup_stuck_tasks(self, timeout_seconds: float = 300.0) -> list[str]:
