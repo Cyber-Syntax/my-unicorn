@@ -385,7 +385,7 @@ class Verifier:
                 logger.debug("   Full filename in checksum: %s", file_name)
                 return hash_value
 
-        logger.warning("⚠️  Target file %s not found in traditional checksum file", filename)
+        logger.info("⚠️  Target file %s not found in traditional checksum file", filename)
         logger.debug("   Found %d entries:", len(found_entries))
         for hash_val, full_name, base_name in found_entries:
             logger.debug("      • %s (full: %s) -> %s...", base_name, full_name, hash_val[:16])
@@ -422,6 +422,8 @@ class Verifier:
             return "sha1"
         elif "md5" in filename_lower:
             return "md5"
+        elif filename_lower.endswith(".digest"):
+            return "sha256"  # .DIGEST files typically use sha256
         else:
             return "sha256"  # Default fallback
 

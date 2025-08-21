@@ -312,6 +312,77 @@ class VerificationService:
             f"https://github.com/{owner}/{repo}/releases/download/{tag_name}/{checksum_file}"
         )
 
+    def _prioritize_checksum_files(
+        self,
+        checksum_files: list[ChecksumFileInfo],
+        target_filename: str,
+    ) -> list[ChecksumFileInfo]:
+        """Prioritize checksum files to try the most relevant one first.
+
+        For a target file like 'app.AppImage', this will prioritize:
+        1. Exact match: 'app.AppImage.DIGEST'
+        2. Platform-specific: 'app.AppImage.sha256'
+        3. Generic files: 'checksums.txt', etc.
+
+        Args:
+            checksum_files: List of detected checksum files
+            target_filename: Name of the file being verified
+
+        Returns:
+            Reordered list with most relevant checksum files first
+
+        """
+        if not checksum_files:
+            return checksum_files
+
+        logger.debug(
+            "🔍 Prioritizing %d checksum files for target: %s",
+            len(checksum_files),
+            target_filename,
+        )
+
+        def get_priority(checksum_file: ChecksumFileInfo) -> tuple[int, str]:
+            """Get priority score for checksum file (lower = higher priority)."""
+            filename = checksum_file.filename
+
+            # Priority 1: Exact match (e.g., app.AppImage.DIGEST)
+            if (
+                filename == f"{target_filename}.DIGEST"
+                or filename == f"{target_filename}.digest"
+            ):
+                logger.debug("   📌 Priority 1 (exact .DIGEST): %s", filename)
+                return (1, filename)
+
+            # Priority 2: Platform-specific hash files (e.g., app.AppImage.sha256)
+            target_extensions = [".sha256", ".sha512", ".sha1", ".md5"]
+            for ext in target_extensions:
+                if filename == f"{target_filename}{ext}":
+                    logger.debug("   📌 Priority 2 (platform-specific): %s", filename)
+                    return (2, filename)
+
+            # Priority 3: YAML files (usually most comprehensive)
+            if checksum_file.format_type == "yaml":
+                logger.debug("   📌 Priority 3 (YAML): %s", filename)
+                return (3, filename)
+
+            # Priority 4: Other .DIGEST files (might contain multiple files)
+            if filename.lower().endswith((".digest",)):
+                logger.debug("   📌 Priority 4 (other .DIGEST): %s", filename)
+                return (4, filename)
+
+            # Priority 5: Generic checksum files
+            logger.debug("   📌 Priority 5 (generic): %s", filename)
+            return (5, filename)
+
+        # Sort by priority (lower number = higher priority)
+        prioritized = sorted(checksum_files, key=get_priority)
+
+        logger.debug("   📋 Final priority order:")
+        for i, cf in enumerate(prioritized, 1):
+            logger.debug("      %d. %s", i, cf.filename)
+
+        return prioritized
+
     async def verify_file(
         self,
         file_path: Path,
@@ -384,9 +455,12 @@ class VerificationService:
                     # Enable digest verification in config for future use
                     updated_config["digest"] = True
 
-        # Try checksum file verification for all detected files
+        # Try checksum file verification with smart prioritization
         if checksum_files:
-            for i, checksum_file in enumerate(checksum_files):
+            # Prioritize checksum files to try the most likely match first
+            prioritized_files = self._prioritize_checksum_files(checksum_files, file_path.name)
+
+            for i, checksum_file in enumerate(prioritized_files):
                 method_key = f"checksum_file_{i}" if i > 0 else "checksum_file"
 
                 checksum_result = await self._verify_checksum_file(
