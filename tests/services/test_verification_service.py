@@ -321,8 +321,8 @@ class TestVerificationService:
         with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
-            mock_verifier._detect_hash_type_from_filename.return_value = "sha256"
-            mock_verifier._parse_checksum_file.return_value = expected_hash
+            mock_verifier.detect_hash_type_from_filename.return_value = "sha256"
+            mock_verifier.parse_checksum_file.return_value = expected_hash
             mock_verifier.compute_hash.return_value = expected_hash
 
             result = await verification_service._verify_checksum_file(
@@ -351,7 +351,7 @@ class TestVerificationService:
         with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
-            mock_verifier._parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
+            mock_verifier.parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
             mock_verifier.compute_hash.return_value = "different_hash"
 
             result = await verification_service._verify_checksum_file(
@@ -379,7 +379,7 @@ class TestVerificationService:
         with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
-            mock_verifier._parse_checksum_file.return_value = None  # Not found
+            mock_verifier.parse_checksum_file.return_value = None  # Not found
 
             result = await verification_service._verify_checksum_file(
                 mock_verifier, checksum_file, "NonExistentFile.AppImage", "testapp"
@@ -460,7 +460,7 @@ class TestVerificationService:
         with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
-            mock_verifier._parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
+            mock_verifier.parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
             mock_verifier.compute_hash.return_value = LEGCORD_EXPECTED_HEX
             mock_verifier.get_file_size.return_value = 12
             mock_verifier.verify_size.return_value = None
@@ -511,7 +511,7 @@ class TestVerificationService:
                     return "3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef"
                 return None
 
-            mock_verifier._parse_checksum_file.side_effect = parse_side_effect
+            mock_verifier.parse_checksum_file.side_effect = parse_side_effect
             mock_verifier.compute_hash.return_value = (
                 "3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef"
             )
@@ -568,7 +568,7 @@ class TestVerificationService:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
             mock_verifier.verify_digest.side_effect = Exception("Digest failed")
-            mock_verifier._parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
+            mock_verifier.parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
             mock_verifier.compute_hash.return_value = "different_hash"  # Checksum fails
             mock_verifier.get_file_size.return_value = 12
             mock_verifier.verify_size.return_value = None
@@ -684,7 +684,7 @@ class TestVerificationService:
         with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
-            mock_verifier._parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
+            mock_verifier.parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
             mock_verifier.compute_hash.return_value = LEGCORD_EXPECTED_HEX
             mock_verifier.get_file_size.return_value = 12
             mock_verifier.verify_size.return_value = None

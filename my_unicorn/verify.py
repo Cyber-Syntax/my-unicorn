@@ -281,16 +281,63 @@ class Verifier:
         if not _YAML_AVAILABLE or yaml is None:
             return False
 
-        # Basic YAML detection heuristics
+        # Try to parse as YAML first - most reliable method
+        try:
+            data = yaml.safe_load(content)
+            # Valid YAML but check if it's structured data (not just plain text)
+            if isinstance(data, (dict, list)):
+                return True
+            # If it's just a string, it might be traditional checksum content
+            return False
+        except yaml.YAMLError:
+            # Fall back to heuristic detection
+            pass
+
+        # Basic YAML detection heuristics - be more strict
         lines = content.strip().split("\n")
+        yaml_indicators = 0
+        traditional_hash_indicators = 0
+
         for line in lines:
+            original_line = line
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            # Look for YAML key-value pairs or lists
-            if (":" in line and not line.startswith("-")) or line.startswith("- "):
-                return True
-        return False
+
+            # Check for traditional hash format patterns (hash followed by filename)
+            parts = line.split()
+            if len(parts) == 2 and len(parts[0]) in [32, 40, 64, 128]:  # Common hash lengths
+                # First part looks like a hex hash, second part like a filename
+                try:
+                    int(parts[0], 16)  # Valid hex string
+                    traditional_hash_indicators += 1
+                    continue
+                except ValueError:
+                    pass
+
+            # Look for YAML-specific structures
+            # YAML key-value pairs at root level
+            if ":" in line and not line.startswith("-") and " " not in line.split(":")[0]:
+                yaml_indicators += 1
+
+            # YAML list items with structured content
+            if line.startswith("- ") and (":" in line or len(line.split()) > 2):
+                yaml_indicators += 1
+
+            # Indented key-value pairs (YAML structure)
+            if (
+                original_line.startswith(("  ", "\t"))
+                and ":" in line
+                and not line.startswith("-")
+            ):
+                yaml_indicators += 1
+
+        # Prioritize traditional format detection
+        if traditional_hash_indicators > 0 and yaml_indicators == 0:
+            return False
+
+        # Strong YAML indicators required
+        return yaml_indicators >= 2
 
     def _parse_yaml_checksum_file(self, content: str, target_filename: str) -> str | None:
         """Parse YAML format checksum file (like latest-linux.yml).
