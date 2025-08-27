@@ -179,7 +179,9 @@ class CatalogInstallStrategy(InstallStrategy):
 
                 owner = release_config.get("owner")
                 repo = release_config.get("repo")
-                fetcher = GitHubReleaseFetcher(owner, repo, self.session)
+                # Get shared API task from github_client for progress tracking
+                shared_api_task_id = getattr(self.github_client, "shared_api_task_id", None)
+                fetcher = GitHubReleaseFetcher(owner, repo, self.session, shared_api_task_id)
 
                 appimage_asset = fetcher.select_best_appimage(
                     release_data, characteristic_suffix

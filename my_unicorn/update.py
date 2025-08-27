@@ -97,6 +97,9 @@ class UpdateManager:
         self.icon_service = None
         self.verification_service = None
 
+        # Shared API progress task ID for consolidated API progress tracking
+        self._shared_api_task_id: str | None = None
+
     def _initialize_services(self, session: Any) -> None:
         """Initialize shared services with HTTP session.
 
@@ -253,8 +256,11 @@ class UpdateManager:
                 logger.error("GitHub API disabled for %s (github.repo: false)", app_name)
                 return None
 
+            # TODO: This is making a duplicate API call!
+            # The same release data will be fetched again in update_single_app()
+            # This causes 2 API calls per app instead of 1
             # Fetch latest release
-            fetcher = GitHubReleaseFetcher(owner, repo, session)
+            fetcher = GitHubReleaseFetcher(owner, repo, session, self._shared_api_task_id)
             if should_use_prerelease:
                 logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
                 try:
@@ -565,7 +571,10 @@ class UpdateManager:
                 logger.error("GitHub API disabled for %s (github.repo: false)", app_name)
                 return False
 
-            fetcher = GitHubReleaseFetcher(owner, repo, session)
+            # TODO: DUPLICATE API CALL! This fetches the same release data already fetched in check_single_update()
+            # This is why we see 2-3 API calls per app instead of 1
+            # Should pass release_data from check phase instead of re-fetching
+            fetcher = GitHubReleaseFetcher(owner, repo, session, self._shared_api_task_id)
             if should_use_prerelease:
                 logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
                 release_data = await fetcher.fetch_latest_prerelease()
@@ -629,7 +638,11 @@ class UpdateManager:
                 if not icon_url.startswith("http"):
                     # Build full URL from path template
                     try:
-                        fetcher = GitHubReleaseFetcher(owner, repo, session)
+                        # TODO: This is a 3rd API call for icon URL building
+                        # Could be optimized or eliminated if icons are extracted from AppImage
+                        fetcher = GitHubReleaseFetcher(
+                            owner, repo, session, self._shared_api_task_id
+                        )
                         default_branch = await fetcher.get_default_branch()
                         icon_url = fetcher.build_icon_url(icon_url, default_branch)
                         logger.debug(

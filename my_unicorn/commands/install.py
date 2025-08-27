@@ -10,7 +10,6 @@ from typing import Any
 import aiohttp
 
 from my_unicorn.download import DownloadService
-from my_unicorn.services.progress import ProgressService
 from my_unicorn.storage import StorageService
 
 from ..github_client import GitHubClient
@@ -70,9 +69,11 @@ class InstallCommand:
 
         """
         if self.download_service is None:
-            # Create progress service if progress is enabled
+            # Use global progress service if progress is enabled
             if show_progress:
-                self.progress_service = ProgressService()
+                from ..services.progress import get_progress_service
+
+                self.progress_service = get_progress_service()
                 self.download_service = DownloadService(self.session, self.progress_service)
             else:
                 self.download_service = DownloadService(self.session)
@@ -174,9 +175,29 @@ class InstallCommand:
             # Each app typically has: download, verify, icon extraction, installation
             total_operations = apps_needing_work * 4
             async with self.progress_service.session(total_operations):
-                results = await self._execute_installations(
-                    urls_needing_work, catalog_needing_work, install_options
+                # Create minimal API progress task - let API calls drive the count
+                api_task_id = await self.progress_service.create_api_fetching_task(
+                    endpoint="GitHub API (fetching releases)",
+                    total_requests=1,
                 )
+
+                # Set shared API task for GitHub client
+                self.github_client.set_shared_api_task(api_task_id)
+
+                try:
+                    results = await self._execute_installations(
+                        urls_needing_work, catalog_needing_work, install_options
+                    )
+
+                    # Finish API progress task
+                    await self.progress_service.finish_task(api_task_id, success=True)
+                except Exception:
+                    # Finish API progress task with error
+                    await self.progress_service.finish_task(api_task_id, success=False)
+                    raise
+                finally:
+                    # Clean up shared task
+                    self.github_client.set_shared_api_task(None)
         else:
             results = await self._execute_installations(
                 urls_needing_work, catalog_needing_work, install_options

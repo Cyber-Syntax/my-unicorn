@@ -213,7 +213,7 @@ option3_threeapp() {
   setup_zettlr_config "0.1.0"
   setup_appflowy_config "0.1.0"
   cd "$APP_ROOT"
-  python3 run.py update --all || log "ERROR: update --all failed"
+  python3 run.py update || log "ERROR: update failed"
   log "Update all (three apps) test completed"
 }
 
@@ -221,7 +221,7 @@ option3_qownnotes() {
   log "=== Testing qownnotes Update ==="
   setup_qownnotes_config "0.1.0"
   cd "$APP_ROOT"
-  python3 run.py update --select qownnotes || log "ERROR: update --select qownnotes failed"
+  python3 run.py update qownnotes || log "ERROR: update qownnotes failed"
   log "qownnotes update test completed"
 }
 
@@ -229,7 +229,7 @@ option3_zettlr() {
   log "=== Testing zettlr Update ==="
   setup_zettlr_config "0.1.0"
   cd "$APP_ROOT"
-  python3 run.py update --select zettlr || log "ERROR: update --select zettlr failed"
+  python3 run.py update zettlr || log "ERROR: update zettlr failed"
   log "zettlr update test completed"
 }
 
@@ -238,7 +238,7 @@ option4_qownnotes() {
   log "=== Testing Selective Update (qownnotes) ==="
   setup_qownnotes_config "0.1.0"
   cd "$APP_ROOT"
-  python3 run.py update --select qownnotes || log "ERROR: update --select qownnotes failed"
+  python3 run.py update qownnotes || log "ERROR: update qownnotes failed"
   log "Selective update test completed"
 }
 
@@ -246,7 +246,7 @@ option4_zettlr() {
   log "=== Testing Selective Update (zettlr) ==="
   setup_zettlr_config "0.1.0"
   cd "$APP_ROOT"
-  python3 run.py update --select zettlr || log "ERROR: update --select zettlr failed"
+  python3 run.py update zettlr || log "ERROR: update zettlr failed"
   log "Selective update test completed"
 }
 
@@ -256,7 +256,7 @@ option4_threeapp() {
   setup_qownnotes_config "0.1.0"
   setup_zettlr_config "0.1.0"
   cd "$APP_ROOT"
-  python3 run.py update --select appflowy,qownnotes,zettlr || log "ERROR: update --select appflowy,qownnotes,zettlr failed"
+  python3 run.py update appflowy,qownnotes,zettlr || log "ERROR: update appflowy,qownnotes,zettlr failed"
   log "Selective update test for three apps completed"
 }
 

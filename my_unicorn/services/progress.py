@@ -51,6 +51,7 @@ class SpeedColumn(ProgressColumn):
 class ProgressType(Enum):
     """Types of progress operations."""
 
+    API_FETCHING = auto()
     DOWNLOAD = auto()
     VERIFICATION = auto()
     ICON_EXTRACTION = auto()
@@ -86,6 +87,7 @@ class ProgressConfig:
 
     refresh_per_second: int = 4
     show_overall: bool = False
+    show_api_fetching: bool = True
     show_downloads: bool = True
     show_post_processing: bool = True
 
@@ -109,6 +111,14 @@ class ProgressService:
         self.config = config or ProgressConfig()
 
         # Progress instances for different operation types with complete isolation
+        self._api_progress = Progress(
+            TextColumn("[bold cyan]{task.description}"),
+            BarColumn(bar_width=30),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("{task.completed:.0f}/{task.total:.0f} requests"),
+            console=self.console,
+        )
+
         self._download_progress = Progress(
             TextColumn("[bold blue]{task.description}"),
             BarColumn(bar_width=30),
@@ -146,6 +156,7 @@ class ProgressService:
 
         # Task ID tracking to prevent collisions
         self._task_counters: dict[ProgressType, int] = {
+            ProgressType.API_FETCHING: 0,
             ProgressType.DOWNLOAD: 0,
             ProgressType.VERIFICATION: 0,
             ProgressType.ICON_EXTRACTION: 0,
@@ -154,6 +165,7 @@ class ProgressService:
         }
 
         # Keep track of which tasks belong to which Progress instance
+        self._api_task_ids: set[str] = set()
         self._download_task_ids: set[str] = set()
         self._post_processing_task_ids: set[str] = set()
 
@@ -173,6 +185,7 @@ class ProgressService:
 
         # Create predictable, unique IDs
         type_prefix = {
+            ProgressType.API_FETCHING: "api",
             ProgressType.DOWNLOAD: "dl",
             ProgressType.VERIFICATION: "vf",
             ProgressType.ICON_EXTRACTION: "ic",
@@ -185,20 +198,20 @@ class ProgressService:
         return f"{type_prefix}_{counter}_{clean_name}"
 
     def _get_progress_for_type(self, progress_type: ProgressType) -> Progress:
-        """Get the appropriate progress instance for the given type.
+        """Get the appropriate Progress instance for a task type.
 
         Args:
-            progress_type: Type of progress operation
+            progress_type: Type of progress task
 
         Returns:
-            Progress instance for the type
+            Progress instance for the specified type
 
         """
-        if progress_type == ProgressType.DOWNLOAD:
+        if progress_type == ProgressType.API_FETCHING:
+            return self._api_progress
+        elif progress_type == ProgressType.DOWNLOAD:
             return self._download_progress
-        else:
-            # UPDATE, VERIFICATION, ICON_EXTRACTION, INSTALLATION
-            return self._post_processing_progress
+        return self._post_processing_progress
 
     def _create_layout(self) -> Table:
         """Create the Rich layout for all progress displays.
@@ -216,6 +229,16 @@ class ProgressService:
                     self._overall_progress,
                     title="[bold green]📊 Overall Progress",
                     border_style="green",
+                    padding=(1, 2),
+                )
+            )
+
+        if self.config.show_api_fetching:
+            layout.add_row(
+                Panel.fit(
+                    self._api_progress,
+                    title="[bold cyan]🌐 API Requests",
+                    border_style="cyan",
                     padding=(1, 2),
                 )
             )
@@ -279,6 +302,16 @@ class ProgressService:
     def _show_ui_if_needed(self) -> None:
         """Show the UI if tasks have been added but UI is not yet visible."""
         # UI is always shown immediately now (lazy UI disabled)
+
+    def _refresh_live_display(self) -> None:
+        """Refresh the Live display with current progress state."""
+        if self._live and self._live.is_started:
+            try:
+                updated_layout = self._create_layout()
+                self._live.update(updated_layout)
+                self._live.refresh()
+            except Exception as e:
+                logger.debug("Error refreshing live display: %s", e)
 
     async def stop_session(self) -> None:
         """Stop the progress display session."""
@@ -387,13 +420,20 @@ class ProgressService:
                 self._tasks[task_creation_data["namespaced_id"]] = task
 
                 # Track which Progress instance owns this task with proper validation
-                if task_creation_data["progress_type"] == ProgressType.DOWNLOAD:
+                if task_creation_data["progress_type"] == ProgressType.API_FETCHING:
+                    self._api_task_ids.add(task_creation_data["namespaced_id"])
+                    # Ensure this task isn't in the other sets (defensive programming)
+                    self._download_task_ids.discard(task_creation_data["namespaced_id"])
+                    self._post_processing_task_ids.discard(task_creation_data["namespaced_id"])
+                elif task_creation_data["progress_type"] == ProgressType.DOWNLOAD:
                     self._download_task_ids.add(task_creation_data["namespaced_id"])
-                    # Ensure this task isn't in the other set (defensive programming)
+                    # Ensure this task isn't in the other sets (defensive programming)
+                    self._api_task_ids.discard(task_creation_data["namespaced_id"])
                     self._post_processing_task_ids.discard(task_creation_data["namespaced_id"])
                 else:
                     self._post_processing_task_ids.add(task_creation_data["namespaced_id"])
-                    # Ensure this task isn't in the other set (defensive programming)
+                    # Ensure this task isn't in the other sets (defensive programming)
+                    self._api_task_ids.discard(task_creation_data["namespaced_id"])
                     self._download_task_ids.discard(task_creation_data["namespaced_id"])
 
                 # UI is always shown immediately now (lazy UI disabled)
@@ -443,29 +483,30 @@ class ProgressService:
                 return
 
             # Validate task type integrity
-            expected_section = (
-                "Downloads"
-                if task.progress_type == ProgressType.DOWNLOAD
-                else "Post-Processing"
-            )
-            if (
-                task.progress_type == ProgressType.DOWNLOAD
-                and namespaced_id not in self._download_task_ids
-            ):
-                logger.error(
-                    "Task type integrity violation: Download task %s not in download set!",
-                    task.name,
-                )
-                return
-            elif (
-                task.progress_type != ProgressType.DOWNLOAD
-                and namespaced_id not in self._post_processing_task_ids
-            ):
-                logger.error(
-                    "Task type integrity violation: Post-processing task %s not in post-processing set!",
-                    task.name,
-                )
-                return
+            if task.progress_type == ProgressType.API_FETCHING:
+                expected_section = "API Requests"
+                if namespaced_id not in self._api_task_ids:
+                    logger.error(
+                        "Task type integrity violation: API task %s not in API set!",
+                        task.name,
+                    )
+                    return
+            elif task.progress_type == ProgressType.DOWNLOAD:
+                expected_section = "Downloads"
+                if namespaced_id not in self._download_task_ids:
+                    logger.error(
+                        "Task type integrity violation: Download task %s not in download set!",
+                        task.name,
+                    )
+                    return
+            else:
+                expected_section = "Post-Processing"
+                if namespaced_id not in self._post_processing_task_ids:
+                    logger.error(
+                        "Task type integrity violation: Post-processing task %s not in post-processing set!",
+                        task.name,
+                    )
+                    return
 
             # Prepare update parameters
             update_kwargs = {}
@@ -519,6 +560,9 @@ class ProgressService:
                 progress_instance.update(
                     task_update_data["task_id"], **task_update_data["update_kwargs"]
                 )
+
+                # Refresh the Live display to show updates immediately
+                self._refresh_live_display()
 
                 logger.debug(
                     "Updated %s task %s in %s section: %.1f/%.1f",
@@ -652,6 +696,9 @@ class ProgressService:
                         task_total_update_data["task_id"],
                         completed=task_total_update_data["final_completed"],
                     )
+
+                    # Refresh the Live display to show updates immediately
+                    self._refresh_live_display()
             except Exception as e:
                 logger.error(
                     "Error updating task total for %s: %s", task_total_update_data["name"], e
@@ -745,6 +792,9 @@ class ProgressService:
                     description=task_finish_data["final_description"],
                 )
 
+                # Refresh the Live display to show updates immediately
+                self._refresh_live_display()
+
                 # Small delay to allow Rich to properly render the completion
                 # This is now outside the lock, so it won't block other operations
                 await asyncio.sleep(0.05)
@@ -818,6 +868,29 @@ class ProgressService:
 
         """
         return self._active
+
+    async def create_api_fetching_task(self, endpoint: str, total_requests: int = 100) -> str:
+        """Create an API fetching task.
+
+        Args:
+            endpoint: API endpoint being fetched (will be simplified for display)
+            total_requests: Total number of requests or percentage (default 100 for percentage)
+
+        Returns:
+            Namespaced task ID for the API fetch
+
+        """
+        # Simplify endpoint display - extract meaningful part
+        display_name = endpoint.split("/")[-1] if "/" in endpoint else endpoint
+        if "?" in display_name:
+            display_name = display_name.split("?")[0]
+
+        return await self.add_task(
+            name=f"Fetching {display_name}",
+            progress_type=ProgressType.API_FETCHING,
+            total=float(total_requests),
+            description=f"🌐 Fetching from API: {display_name}...",
+        )
 
     async def create_download_task(self, filename: str, size_mb: float) -> str:
         """Create a download task with guaranteed Downloads section placement.

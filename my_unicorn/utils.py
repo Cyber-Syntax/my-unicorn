@@ -411,3 +411,81 @@ def get_icon_path(icon_name: str, icon_dir: Path) -> Path:
 
     """
     return icon_dir / icon_name
+
+
+# API Progress Tracking Helpers
+
+
+def simplify_endpoint_for_display(endpoint: str) -> str:
+    """Simplify API endpoint URL for progress display.
+
+    Args:
+        endpoint: Full API endpoint URL
+
+    Returns:
+        Simplified endpoint name for display
+
+    """
+    if not endpoint:
+        return "api"
+
+    # Extract meaningful part from URL
+    if "://" in endpoint:
+        # Full URL - extract path
+        try:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(endpoint)
+            path = parsed.path.strip("/")
+            if path:
+                # Get the last meaningful part
+                parts = path.split("/")
+                meaningful_parts = [p for p in parts if p and not p.isdigit()]
+                if meaningful_parts:
+                    return meaningful_parts[-1]
+        except Exception:
+            pass
+
+    # Handle path-only endpoints
+    if "/" in endpoint:
+        parts = endpoint.strip("/").split("/")
+        # Remove query parameters
+        last_part = parts[-1].split("?")[0] if parts else "api"
+        return last_part if last_part else "api"
+
+    # Remove query parameters from simple strings
+    return endpoint.split("?")[0] if "?" in endpoint else endpoint
+
+
+def calculate_api_batch_size(total_requests: int, target_updates: int = 20) -> int:
+    """Calculate optimal batch size for API progress updates.
+
+    Args:
+        total_requests: Total number of API requests to make
+        target_updates: Target number of progress updates (default: 20)
+
+    Returns:
+        Optimal batch size for progress updates
+
+    """
+    if total_requests <= target_updates:
+        return 1
+
+    batch_size = total_requests // target_updates
+    return max(1, batch_size)
+
+
+def format_api_progress_description(endpoint: str, completed: int, total: int) -> str:
+    """Format API progress description with consistent styling.
+
+    Args:
+        endpoint: API endpoint being fetched
+        completed: Number of completed requests
+        total: Total number of requests
+
+    Returns:
+        Formatted progress description
+
+    """
+    simplified_name = simplify_endpoint_for_display(endpoint)
+    return f"🌐 Fetching {simplified_name}... ({completed}/{total})"

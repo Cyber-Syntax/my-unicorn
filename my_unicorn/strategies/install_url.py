@@ -137,7 +137,11 @@ class URLInstallStrategy(InstallStrategy):
                 owner, repo_name = parts[0], parts[1]
 
                 # Use GitHubReleaseFetcher for both fetching and asset selection
-                fetcher = GitHubReleaseFetcher(owner, repo_name, self.session)
+                # Get shared API task from github_client for progress tracking
+                shared_api_task_id = getattr(self.github_client, "shared_api_task_id", None)
+                fetcher = GitHubReleaseFetcher(
+                    owner, repo_name, self.session, shared_api_task_id
+                )
                 release_data = await fetcher.fetch_latest_release()
                 if not release_data:
                     raise InstallationError(f"No releases found for {owner}/{repo_name}")

@@ -13,7 +13,7 @@
         "prerelease": false
     },
     "verification": {
-        "digest": false,
+        "digest": true,
         "skip": true,
         "checksum_file": "",
         "checksum_hash_type": "sha256"

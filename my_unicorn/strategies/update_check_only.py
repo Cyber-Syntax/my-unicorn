@@ -60,10 +60,38 @@ class CheckOnlyUpdateStrategy(UpdateStrategy):
         """
         logger.debug("Executing check-only update strategy")
 
-        # Get update information for specified apps or all apps with spinner
-        update_infos = await context.update_manager.check_all_updates_with_status_spinner(
-            context.app_names
-        )
+        # Get update information for specified apps or all apps with progress session to show API calls
+        from ..services.progress import get_progress_service, progress_session
+
+        async with progress_session():
+            progress_service = get_progress_service()
+
+            # Get app names for progress calculation
+            app_names = context.app_names or context.config_manager.list_installed_apps()
+            app_count = len(app_names)
+
+            # Create shared API progress task for all GitHub API calls
+            api_task_id = await progress_service.create_api_fetching_task(
+                endpoint="GitHub API (checking updates)", total_requests=app_count
+            )
+
+            # Set shared task for update manager
+            context.update_manager._shared_api_task_id = api_task_id
+
+            try:
+                update_infos = await context.update_manager.check_all_updates_with_progress(
+                    context.app_names
+                )
+
+                # Finish API progress task
+                await progress_service.finish_task(api_task_id, success=True)
+            except Exception:
+                # Finish API progress task with error
+                await progress_service.finish_task(api_task_id, success=False)
+                raise
+            finally:
+                # Clean up shared task
+                context.update_manager._shared_api_task_id = None
 
         if not update_infos:
             print("No installed apps found to check.")

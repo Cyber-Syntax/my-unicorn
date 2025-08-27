@@ -64,19 +64,28 @@ def normalize_version_string(version_str: str) -> str:
 class SelfUpdater:
     """Handles self-updating of the my-unicorn package."""
 
-    def __init__(self, config_manager: ConfigManager, session: aiohttp.ClientSession) -> None:
+    def __init__(
+        self,
+        config_manager: ConfigManager,
+        session: aiohttp.ClientSession,
+        shared_api_task_id: str | None = None,
+    ) -> None:
         """Initialize the self-updater.
 
         Args:
             config_manager: Configuration manager instance
             session: aiohttp client session for API requests
+            shared_api_task_id: Optional shared API task ID for progress tracking
 
         """
         self.config_manager: ConfigManager = config_manager
         self.global_config: GlobalConfig = config_manager.load_global_config()
         self.session: aiohttp.ClientSession = session
         self.github_fetcher: GitHubReleaseFetcher = GitHubReleaseFetcher(
-            owner=GITHUB_OWNER, repo=GITHUB_REPO, session=session
+            owner=GITHUB_OWNER,
+            repo=GITHUB_REPO,
+            session=session,
+            shared_api_task_id=shared_api_task_id,
         )
 
     def get_current_version(self) -> str:
@@ -340,11 +349,14 @@ class SelfUpdater:
             return False
 
 
-async def get_self_updater(config_manager: ConfigManager | None = None) -> SelfUpdater:
+async def get_self_updater(
+    config_manager: ConfigManager | None = None, shared_api_task_id: str | None = None
+) -> SelfUpdater:
     """Get a SelfUpdater instance with proper session management.
 
     Args:
         config_manager: Optional config manager, will create one if not provided
+        shared_api_task_id: Optional shared API task ID for progress tracking
 
     Returns:
         Configured SelfUpdater instance
@@ -359,7 +371,7 @@ async def get_self_updater(config_manager: ConfigManager | None = None) -> SelfU
     timeout = aiohttp.ClientTimeout(total=30)
     session = aiohttp.ClientSession(timeout=timeout)
 
-    return SelfUpdater(config_manager, session)
+    return SelfUpdater(config_manager, session, shared_api_task_id)
 
 
 async def check_for_self_update() -> bool:
@@ -369,11 +381,28 @@ async def check_for_self_update() -> bool:
         True if update is available, False otherwise
 
     """
-    updater = await get_self_updater()
-    try:
-        return await updater.check_for_update()
-    finally:
-        await updater.session.close()
+    from .services.progress import get_progress_service, progress_session
+
+    async with progress_session():
+        progress_service = get_progress_service()
+
+        # Create shared API progress task for GitHub API calls
+        api_task_id = await progress_service.create_api_fetching_task(
+            endpoint="GitHub API", total_requests=1
+        )
+
+        updater = await get_self_updater(shared_api_task_id=api_task_id)
+        try:
+            result = await updater.check_for_update()
+            # Finish API progress task
+            await progress_service.finish_task(api_task_id, success=True)
+            return result
+        except Exception:
+            # Finish API progress task with error
+            await progress_service.finish_task(api_task_id, success=False)
+            raise
+        finally:
+            await updater.session.close()
 
 
 async def perform_self_update() -> bool:
@@ -383,14 +412,33 @@ async def perform_self_update() -> bool:
         True if update was successful, False otherwise
 
     """
-    updater = await get_self_updater()
-    try:
-        # First check if update is available
-        if await updater.check_for_update():
-            return await updater.perform_update()
-        return False
-    finally:
-        await updater.session.close()
+    from .services.progress import get_progress_service, progress_session
+
+    async with progress_session():
+        progress_service = get_progress_service()
+
+        # Create shared API progress task for GitHub API calls (check + potential update)
+        api_task_id = await progress_service.create_api_fetching_task(
+            endpoint="GitHub API", total_requests=1
+        )
+
+        updater = await get_self_updater(shared_api_task_id=api_task_id)
+        try:
+            # First check if update is available
+            if await updater.check_for_update():
+                # Finish API progress task after check
+                await progress_service.finish_task(api_task_id, success=True)
+                return await updater.perform_update()
+            else:
+                # Finish API progress task
+                await progress_service.finish_task(api_task_id, success=True)
+                return False
+        except Exception:
+            # Finish API progress task with error
+            await progress_service.finish_task(api_task_id, success=False)
+            raise
+        finally:
+            await updater.session.close()
 
 
 def display_current_version() -> None:
