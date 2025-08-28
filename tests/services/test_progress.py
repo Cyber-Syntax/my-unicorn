@@ -17,7 +17,7 @@ from rich.progress import Progress, TaskID
 from my_unicorn.services.progress import (
     ProgressConfig,
     ProgressService,
-    ProgressTask,
+    TaskInfo,
     ProgressType,
     SpeedColumn,
     get_progress_service,
@@ -89,13 +89,13 @@ class TestProgressType:
         assert actual_types == expected_types
 
 
-class TestProgressTask:
-    """Test cases for ProgressTask dataclass."""
+class TestTaskInfo:
+    """Test cases for TaskInfo dataclass."""
 
     def test_progress_task_creation(self) -> None:
-        """Test creating a ProgressTask with required fields."""
+        """Test creating a TaskInfo with required fields."""
         task_id = TaskID(1)
-        task = ProgressTask(
+        task = TaskInfo(
             task_id=task_id,
             namespaced_id="test_1_task",
             name="Test Task",
@@ -491,7 +491,7 @@ class TestProgressService:
 
             # Mock an old task by directly manipulating the task data
             old_task_id = "dl_2_old_file"
-            old_task = ProgressTask(
+            old_task = TaskInfo(
                 task_id=TaskID(2),
                 namespaced_id=old_task_id,
                 name="old_file",
@@ -520,7 +520,7 @@ class TestProgressService:
 
     def test_get_task_info_existing(self, progress_service: ProgressService) -> None:
         """Test getting info for existing task."""
-        task = ProgressTask(
+        task = TaskInfo(
             task_id=TaskID(1),
             namespaced_id="test_task",
             name="Test Task",
@@ -701,7 +701,7 @@ class TestProgressService:
     def test_speed_calculation_edge_cases(self, progress_service: ProgressService) -> None:
         """Test speed calculation with edge cases."""
         # Test zero time difference
-        task = ProgressTask(
+        task = TaskInfo(
             task_id=TaskID(1),
             namespaced_id="test_task",
             name="test",
