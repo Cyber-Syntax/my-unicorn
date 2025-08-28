@@ -227,7 +227,7 @@ class GitHubReleaseFetcher:
                 # Update shared progress if available
                 if self.shared_api_task_id and self.progress_service.is_active():
                     await self._update_shared_progress(
-                        f"Fetched latest release for {self.owner}/{self.repo}"
+                        "Fetched "
                     )
 
                 return GitHubReleaseDetails(

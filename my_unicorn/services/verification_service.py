@@ -582,7 +582,7 @@ class VerificationService:
                 await self.progress_service.finish_task(
                     progress_task_id,
                     success=True,
-                    final_description=f"✅ {app_name} verification completed",
+                    final_description=f"✅ {app_name} verification",
                 )
             else:
                 await self.progress_service.finish_task(

@@ -236,7 +236,7 @@ class CatalogInstallStrategy(InstallStrategy):
                         await self.download_service.progress_service.update_task(
                             post_processing_task_id,
                             completed=30.0,
-                            description=f"✅ {app_name} verification completed",
+                            description=f"✅ {app_name} verification",
                         )
 
                 # Move to install directory and make executable
@@ -280,7 +280,7 @@ class CatalogInstallStrategy(InstallStrategy):
                         await self.download_service.progress_service.update_task(
                             post_processing_task_id,
                             completed=70.0,
-                            description=f"✅ {app_name} icon extraction completed",
+                            description=f"✅ {app_name} icon extraction",
                         )
 
                 # Create app configuration (20% of post-processing)
@@ -330,7 +330,7 @@ class CatalogInstallStrategy(InstallStrategy):
                     await self.download_service.progress_service.finish_task(
                         post_processing_task_id,
                         success=True,
-                        final_description=f"✅ {app_name} post-processing completed",
+                        final_description=f"✅ {app_name}",
                     )
 
                 logger.info("✅ Successfully installed from catalog: %s", final_path)

@@ -177,7 +177,7 @@ class InstallCommand:
             async with self.progress_service.session(total_operations):
                 # Create minimal API progress task - let API calls drive the count
                 api_task_id = await self.progress_service.create_api_fetching_task(
-                    endpoint="GitHub API (fetching releases)",
+                    endpoint="API assets",
                     total_requests=1,
                 )
 

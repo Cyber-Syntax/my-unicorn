@@ -69,7 +69,7 @@ class UpdateAllAppsStrategy(UpdateStrategy):
 
             # Create minimal API progress task - let API calls drive the count
             api_task_id = await progress_service.create_api_fetching_task(
-                endpoint="GitHub API", total_requests=1
+                endpoint="API assets", total_requests=1
             )
 
             # Set shared task for update manager

@@ -84,7 +84,7 @@ class UpdateSpecificAppsStrategy(UpdateStrategy):
 
             # Create shared API progress task for all GitHub API calls
             api_task_id = await progress_service.create_api_fetching_task(
-                endpoint="GitHub API", total_requests=total_api_requests
+                endpoint="API assets", total_requests=total_api_requests
             )
 
             # Set shared task for update manager

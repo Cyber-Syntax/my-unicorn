@@ -754,7 +754,7 @@ class UpdateManager:
                     await progress_service.update_task(
                         post_processing_task_id,
                         completed=30.0,
-                        description=f"✅ {app_name} verification completed",
+                        description=f"✅ {app_name} verification",
                     )
 
             except Exception as e:
@@ -834,7 +834,7 @@ class UpdateManager:
                     await progress_service.update_task(
                         post_processing_task_id,
                         completed=70.0,
-                        description=f"✅ {app_name} icon setup completed",
+                        description=f"✅ {app_name} icon setup",
                     )
 
             # Update configuration (20% of post-processing)
@@ -925,7 +925,7 @@ class UpdateManager:
                 await progress_service.finish_task(
                     post_processing_task_id,
                     success=True,
-                    final_description=f"✅ {app_name} post-processing completed",
+                    final_description=f"✅ {app_name}",
                 )
 
             logger.debug(

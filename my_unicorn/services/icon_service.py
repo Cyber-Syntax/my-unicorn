@@ -329,7 +329,7 @@ class IconService:
                 await self.progress_service.update_task(
                     progress_task_id,
                     completed=40.0,
-                    description=f"🎨 Extracting icon from {app_name}...",
+                    description=f"🎨 Extracting icon from {app_name}",
                 )
 
             result_icon_path = await self._attempt_extraction(
@@ -383,7 +383,7 @@ class IconService:
                 await self.progress_service.finish_task(
                     progress_task_id,
                     success=True,
-                    final_description=f"✅ {app_name} icon extraction completed",
+                    final_description=f"✅ {app_name} icon extraction",
                 )
             else:
                 await self.progress_service.finish_task(

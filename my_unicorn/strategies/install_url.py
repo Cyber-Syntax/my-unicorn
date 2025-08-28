@@ -298,7 +298,7 @@ class URLInstallStrategy(InstallStrategy):
                     await progress_service.finish_task(
                         post_processing_task_id,
                         success=True,
-                        final_description=f"✅ {repo_name} post-processing completed",
+                        final_description=f"✅ {repo_name}",
                         final_total=100.0,
                     )
 

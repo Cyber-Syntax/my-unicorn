@@ -141,7 +141,6 @@ class ProgressService:
             TextColumn("[bold cyan]{task.description}"),
             BarColumn(bar_width=30),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TextColumn("{task.completed:.0f}/{task.total:.0f} requests"),
             console=self.console,
         )
 
@@ -616,8 +615,7 @@ class ProgressService:
             # Generate final description if not provided
             if final_description is None:
                 status_icon = "✅" if success else "❌"
-                status_text = "completed" if success else "failed"
-                final_description = f"{status_icon} {task.name} {status_text}"
+                final_description = f"{status_icon} {task.name}"
 
             task.description = final_description
             should_advance_overall = success

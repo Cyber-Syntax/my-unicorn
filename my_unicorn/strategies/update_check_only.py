@@ -72,7 +72,7 @@ class CheckOnlyUpdateStrategy(UpdateStrategy):
 
             # Create shared API progress task for all GitHub API calls
             api_task_id = await progress_service.create_api_fetching_task(
-                endpoint="GitHub API (checking updates)", total_requests=app_count
+                endpoint="API assets", total_requests=app_count
             )
 
             # Set shared task for update manager
