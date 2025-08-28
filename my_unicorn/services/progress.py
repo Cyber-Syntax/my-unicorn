@@ -113,7 +113,7 @@ class TaskInfo:
 
     # Speed tracking for downloads
     current_speed_mbps: float = 0.0
-    speed_history: deque[tuple[float, float]] = None  # (timestamp, speed) pairs
+    speed_history: deque[tuple[float, float]] | None = None  # (timestamp, speed) pairs
 
     def __post_init__(self) -> None:
         """Initialize speed history deque."""
@@ -169,14 +169,17 @@ class ProgressService:
             console=self.console,
         )
 
-        # State management with proper isolation
+        # State management with separate locks for better concurrency
         self._live: Live | None = None
         self._overall_task_id: TaskID | None = None
         self._tasks: dict[str, TaskInfo] = {}  # Use namespaced IDs as keys
         self._active: bool = False
         self._ui_visible: bool = False
         self._tasks_added: bool = False
-        self._lock = asyncio.Lock()
+
+        # Split locks for better performance
+        self._task_lock = asyncio.Lock()  # For task data operations
+        self._ui_lock = asyncio.Lock()  # For UI-related operations
 
         # Task ID tracking to prevent collisions
         self._task_counters: dict[ProgressType, int] = defaultdict(int)
@@ -233,53 +236,55 @@ class ProgressService:
         return self._post_processing_progress
 
     def _create_layout(self) -> Table:
-        """Create the Rich layout for all progress displays."""
+        """Create the Rich layout for all progress displays with optimized caching."""
         # Return cached layout if no updates pending
         if self._layout_cache is not None and not self._pending_ui_updates:
             return self._layout_cache
 
-        layout = Table.grid(padding=1)
-        layout.add_column()
-
-        if self.config.show_overall:
-            layout.add_row(
-                Panel.fit(
+        # Pre-create panels only once and cache them
+        if not hasattr(self, "_cached_panels"):
+            self._cached_panels = {
+                "overall": Panel.fit(
                     self._overall_progress,
                     title="[bold green]📊 Overall Progress",
                     border_style="green",
                     padding=(1, 2),
                 )
-            )
-
-        if self.config.show_api_fetching:
-            layout.add_row(
-                Panel.fit(
+                if self.config.show_overall
+                else None,
+                "api": Panel.fit(
                     self._api_progress,
                     title="[bold cyan]🌐 API Requests",
                     border_style="cyan",
                     padding=(1, 2),
                 )
-            )
-
-        if self.config.show_downloads:
-            layout.add_row(
-                Panel.fit(
+                if self.config.show_api_fetching
+                else None,
+                "downloads": Panel.fit(
                     self._download_progress,
                     title="[bold blue]📦 Downloads",
                     border_style="blue",
                     padding=(1, 2),
                 )
-            )
-
-        if self.config.show_post_processing:
-            layout.add_row(
-                Panel.fit(
+                if self.config.show_downloads
+                else None,
+                "processing": Panel.fit(
                     self._post_processing_progress,
                     title="[bold yellow]⚙️ Post-Processing",
                     border_style="yellow",
                     padding=(1, 2),
                 )
-            )
+                if self.config.show_post_processing
+                else None,
+            }
+
+        layout = Table.grid(padding=1)
+        layout.add_column()
+
+        # Add cached panels to layout
+        for panel in self._cached_panels.values():
+            if panel is not None:
+                layout.add_row(panel)
 
         # Cache layout and clear pending updates flag
         self._layout_cache = layout
@@ -319,7 +324,7 @@ class ProgressService:
 
     async def start_session(self, total_operations: int = 0) -> None:
         """Start a progress display session."""
-        async with self._lock:
+        async with self._ui_lock:
             if self._active:
                 logger.warning("Progress session already active")
                 return
@@ -351,7 +356,7 @@ class ProgressService:
 
     async def stop_session(self) -> None:
         """Stop the progress display session."""
-        async with self._lock:
+        async with self._ui_lock:
             if not self._active:
                 return
 
@@ -376,6 +381,8 @@ class ProgressService:
 
             # Clean up cached state
             self._layout_cache = None
+            if hasattr(self, "_cached_panels"):
+                delattr(self, "_cached_panels")
             self._generate_namespaced_id.cache_clear()
 
             logger.debug("Progress session stopped")
@@ -433,7 +440,7 @@ class ProgressService:
             last_update=current_time,
         )
 
-        async with self._lock:
+        async with self._task_lock:
             # Store task info in consolidated structure
             self._tasks[namespaced_id] = task_info
 
@@ -462,16 +469,21 @@ class ProgressService:
         return namespaced_id
 
     def _calculate_speed_optimized(self, task: TaskInfo, current_time: float) -> None:
-        """Calculate current download speed using historical data."""
+        """Calculate current download speed using optimized historical data algorithm."""
         if current_time - task.last_speed_update < self.config.speed_calculation_interval:
             return  # Skip if insufficient time has passed
+
+        # Ensure speed_history is initialized
+        if task.speed_history is None:
+            task.speed_history = deque(maxlen=10)
 
         # Add current measurement to history
         task.speed_history.append((current_time, task.completed))
         task.last_speed_update = current_time
 
-        # Calculate speed from oldest and newest measurements
-        if len(task.speed_history) >= 2:
+        # Calculate speed from oldest and newest measurements with minimum history
+        MIN_HISTORY_SIZE = 2
+        if len(task.speed_history) >= MIN_HISTORY_SIZE:
             old_time, old_completed = task.speed_history[0]
             new_time, new_completed = task.speed_history[-1]
 
@@ -479,7 +491,13 @@ class ProgressService:
             completed_diff = new_completed - old_completed
 
             if time_diff > 0 and completed_diff > 0:
-                task.current_speed_mbps = completed_diff / time_diff
+                # Use exponential moving average for smoother speed display
+                new_speed = completed_diff / time_diff
+                if task.current_speed_mbps > 0:
+                    # Smooth the speed with EMA (alpha = 0.3 for responsiveness)
+                    task.current_speed_mbps = 0.3 * new_speed + 0.7 * task.current_speed_mbps
+                else:
+                    task.current_speed_mbps = new_speed
             else:
                 task.current_speed_mbps = 0.0
 
@@ -495,7 +513,7 @@ class ProgressService:
             logger.warning("Cannot update task %s: Progress session not active", namespaced_id)
             return
 
-        async with self._lock:
+        async with self._task_lock:
             task = self._tasks.get(namespaced_id)
             if not task or task.is_finished:
                 return
@@ -546,7 +564,7 @@ class ProgressService:
         completed: float | None = None,
     ) -> None:
         """Update a task's total value and optionally its completion."""
-        async with self._lock:
+        async with self._task_lock:
             task = self._tasks.get(namespaced_id)
             if not task or task.is_finished:
                 return
@@ -579,7 +597,7 @@ class ProgressService:
         """Mark a task as finished with proper section isolation."""
         should_advance_overall = False
 
-        async with self._lock:
+        async with self._task_lock:
             task = self._tasks.get(namespaced_id)
             if not task or task.is_finished:
                 return
@@ -716,6 +734,87 @@ class ProgressService:
             total=100.0,
             description=f"⬆️ Updating {app_name}...",
         )
+
+    async def create_post_processing_task(self, app_name: str) -> str:
+        """Create a combined post-processing task for an AppImage.
+        
+        This combines verification, icon extraction, and installation into a single progress bar.
+        
+        Args:
+            app_name: Name of the application being processed
+            
+        Returns:
+            Task ID for the combined post-processing task
+        """
+        return await self.add_task(
+            name=f"{app_name} post-processing",
+            progress_type=ProgressType.INSTALLATION,  # Use INSTALLATION as the primary type
+            total=100.0,
+            description=f"⚙️ Processing {app_name}...",
+        )
+
+    async def cleanup_finished_tasks(self, max_finished_tasks: int = 50) -> int:
+        """Clean up finished tasks to prevent memory accumulation."""
+        if not self._active:
+            return 0
+
+        async with self._task_lock:
+            finished_tasks = [
+                (namespaced_id, task)
+                for namespaced_id, task in self._tasks.items()
+                if task.is_finished and task.success is not None
+            ]
+
+            # Keep only recent finished tasks
+            if len(finished_tasks) <= max_finished_tasks:
+                return 0
+
+            # Remove oldest finished tasks
+            finished_tasks.sort(key=lambda x: x[1].last_update)
+            tasks_to_remove = finished_tasks[:-max_finished_tasks]
+
+            removed_count = 0
+            for namespaced_id, task in tasks_to_remove:
+                # Remove from all tracking structures
+                if namespaced_id in self._tasks:
+                    del self._tasks[namespaced_id]
+
+                # Remove from task sets
+                self._task_sets[task.progress_type].discard(namespaced_id)
+
+                # Remove from legacy sets
+                if task.progress_type in {
+                    ProgressType.VERIFICATION,
+                    ProgressType.ICON_EXTRACTION,
+                    ProgressType.INSTALLATION,
+                    ProgressType.UPDATE,
+                }:
+                    self._post_processing_task_ids.discard(namespaced_id)
+
+                removed_count += 1
+
+            if removed_count > 0:
+                logger.debug("Cleaned up %d finished tasks", removed_count)
+
+            return removed_count
+
+    async def get_memory_usage_info(self) -> dict[str, int]:
+        """Get memory usage information for monitoring."""
+        async with self._task_lock:
+            cache_info = getattr(self._generate_namespaced_id, "cache_info", lambda: None)()
+            cache_entries = (cache_info and cache_info.currsize) or 0
+
+            return {
+                "total_tasks": len(self._tasks),
+                "active_tasks": sum(
+                    1 for task in self._tasks.values() if not task.is_finished
+                ),
+                "finished_tasks": sum(1 for task in self._tasks.values() if task.is_finished),
+                "api_tasks": len(self._task_sets[ProgressType.API_FETCHING]),
+                "download_tasks": len(self._task_sets[ProgressType.DOWNLOAD]),
+                "processing_tasks": len(self._post_processing_task_ids),
+                "cache_entries": cache_entries,
+            }
 
     async def cleanup_stuck_tasks(self, timeout_seconds: float = 300.0) -> list[str]:
         """Clean up tasks that haven't been updated recently."""

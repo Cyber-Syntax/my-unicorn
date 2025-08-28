@@ -425,12 +425,14 @@ class VerificationService:
         logger.debug("🔍 Starting verification for %s", app_name)
 
         # Create progress task if progress service is available but no task ID provided
+        create_own_task = False
         if (
             self.progress_service
             and progress_task_id is None
             and self.progress_service.is_active()
         ):
             progress_task_id = await self.progress_service.create_verification_task(app_name)
+            create_own_task = True
 
         # Update progress - starting verification
         if progress_task_id and self.progress_service:
@@ -455,8 +457,8 @@ class VerificationService:
             config, has_digest, has_checksum_files
         )
         if should_skip:
-            # Update progress - skipped
-            if progress_task_id and self.progress_service:
+            # Update progress - skipped (only finish task if we created it)
+            if progress_task_id and self.progress_service and create_own_task:
                 await self.progress_service.finish_task(
                     progress_task_id,
                     success=True,
@@ -547,8 +549,8 @@ class VerificationService:
 
         # If we have strong verification methods available but none passed, fail
         if strong_methods_available and not verification_passed:
-            # Update progress - verification failed
-            if progress_task_id and self.progress_service:
+            # Update progress - verification failed (only finish task if we created it)
+            if progress_task_id and self.progress_service and create_own_task:
                 await self.progress_service.finish_task(
                     progress_task_id,
                     success=False,
@@ -574,8 +576,8 @@ class VerificationService:
             not strong_methods_available and size_result["passed"]
         )
 
-        # Update progress - verification completed
-        if progress_task_id and self.progress_service:
+        # Update progress - verification completed (only finish task if we created it)
+        if progress_task_id and self.progress_service and create_own_task:
             if overall_passed:
                 await self.progress_service.finish_task(
                     progress_task_id,

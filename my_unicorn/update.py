@@ -24,6 +24,7 @@ from .config import AppConfig, ConfigManager
 from .download import DownloadService, IconAsset
 from .github_client import GitHubAsset, GitHubReleaseDetails, GitHubReleaseFetcher
 from .logger import get_logger
+from .services import IconService, VerificationService
 from .storage import StorageService
 
 logger = get_logger(__name__)
@@ -107,11 +108,11 @@ class UpdateManager:
             session: aiohttp session for downloads
 
         """
-        from .services import IconService, VerificationService
-
         download_service = DownloadService(session)
-        self.icon_service = IconService(download_service)
-        self.verification_service = VerificationService(download_service)
+        # Get progress service from download service if available
+        progress_service = getattr(download_service, "progress_service", None)
+        self.icon_service = IconService(download_service, progress_service)
+        self.verification_service = VerificationService(download_service, progress_service)
 
     def _select_best_appimage_by_source(
         self,
@@ -708,7 +709,77 @@ class UpdateManager:
 
             # Phase 4: Post-download processing
 
-            # Get icon using enhanced IconManager with extraction configuration
+            # Create combined post-processing task if progress is enabled
+            post_processing_task_id = None
+            if (
+                progress_enabled
+                and hasattr(download_service, "progress_service")
+                and download_service.progress_service
+                and download_service.progress_service.is_active()
+            ):
+                post_processing_task_id = (
+                    await download_service.progress_service.create_post_processing_task(
+                        app_name
+                    )
+                )
+
+            # Verify download if requested (20% of post-processing)
+            verification_results = {}
+            updated_verification_config = {}
+            verification_config = app_config.get("verification", {})
+            
+            if post_processing_task_id and progress_enabled:
+                await progress_service.update_task(
+                    post_processing_task_id,
+                    completed=10.0,
+                    description=f"🔍 Verifying {app_name}...",
+                )
+
+            try:
+                (
+                    verification_results,
+                    updated_verification_config,
+                ) = await self._perform_update_verification(
+                    appimage_path,
+                    appimage_asset,
+                    dict(verification_config),  # Cast to dict[str, Any]
+                    owner,
+                    repo,
+                    update_info.original_tag_name,
+                    app_name,
+                    progress_task_id=post_processing_task_id,
+                )
+
+                if post_processing_task_id and progress_enabled:
+                    await progress_service.update_task(
+                        post_processing_task_id,
+                        completed=30.0,
+                        description=f"✅ {app_name} verification completed",
+                    )
+
+            except Exception as e:
+                logger.error("Verification failed for %s: %s", app_name, e)
+                # Continue with update even if verification fails
+                verification_results = {}
+                updated_verification_config = {}
+
+            # Move to install directory and make executable (10% of post-processing)
+            if post_processing_task_id and progress_enabled:
+                await progress_service.update_task(
+                    post_processing_task_id,
+                    completed=40.0,
+                    description=f"� Moving {app_name} to install directory...",
+                )
+
+            self.storage_service.make_executable(appimage_path)
+            appimage_path = self.storage_service.move_to_install_dir(appimage_path)
+
+            # Finally rename to clean name using catalog configuration
+            if rename_to:
+                clean_name = self.storage_service.get_clean_appimage_name(rename_to)
+                appimage_path = self.storage_service.rename_appimage(appimage_path, clean_name)
+
+            # Handle icon setup (30% of post-processing)
             icon_path = None
             updated_icon_config = None
 
@@ -720,6 +791,13 @@ class UpdateManager:
             )
 
             if should_setup_icon:
+                if post_processing_task_id and progress_enabled:
+                    await progress_service.update_task(
+                        post_processing_task_id,
+                        completed=50.0,
+                        description=f"🎨 Setting up {app_name} icon...",
+                    )
+
                 # Create minimal icon_asset if one doesn't exist but icon setup is needed
                 if not icon_asset:
                     # Try to get info from catalog or generate defaults
@@ -749,83 +827,23 @@ class UpdateManager:
                     icon_dir=icon_dir,
                     appimage_path=appimage_path,
                     icon_asset=icon_asset,
+                    progress_task_id=post_processing_task_id,
                 )
 
-            # Create verification task in post-processing
-            verification_task_id = None
-            if progress_enabled:
-                verification_task_id = await progress_service.create_verification_task(
-                    appimage_path.name
-                )
-                await progress_service.update_task(
-                    verification_task_id,
-                    completed=0.0,
-                    description=f"🔍 Verifying {app_name}...",
-                )
-
-            verification_config = app_config.get("verification", {})
-            try:
-                (
-                    verification_results,
-                    updated_verification_config,
-                ) = await self._perform_update_verification(
-                    appimage_path,
-                    appimage_asset,
-                    dict(verification_config),  # Cast to dict[str, Any]
-                    owner,
-                    repo,
-                    update_info.original_tag_name,
-                    app_name,
-                )
-
-                if progress_enabled and verification_task_id:
+                if post_processing_task_id and progress_enabled:
                     await progress_service.update_task(
-                        verification_task_id,
-                        completed=100.0,
-                        description=f"✅ Verified {app_name}",
+                        post_processing_task_id,
+                        completed=70.0,
+                        description=f"✅ {app_name} icon setup completed",
                     )
-                    await progress_service.finish_task(verification_task_id, success=True)
 
-            except Exception as e:
-                logger.error("Verification failed for %s: %s", app_name, e)
-                if progress_enabled and verification_task_id:
-                    await progress_service.update_task(
-                        verification_task_id,
-                        completed=0.0,
-                        description="❌ Verification failed",
-                    )
-                    await progress_service.finish_task(verification_task_id, success=False)
-                # Continue with update even if verification fails
-                verification_results = {}
-                updated_verification_config = {}
-
-            # Continue with remaining update steps
-
-            # Phase 5: Installation
-            # Now make executable and move to install directory
-            self.storage_service.make_executable(appimage_path)
-            appimage_path = self.storage_service.move_to_install_dir(appimage_path)
-
-            # Create installation task for the actual installation phase
-            installation_task_id = None
-            if progress_enabled:
-                installation_task_id = await progress_service.create_installation_task(
-                    app_name
-                )
+            # Update configuration (20% of post-processing)
+            if post_processing_task_id and progress_enabled:
                 await progress_service.update_task(
-                    installation_task_id,
-                    completed=0.0,
-                    description=f"📁 Installing {app_name}...",
+                    post_processing_task_id,
+                    completed=80.0,
+                    description=f"📁 Creating configuration for {app_name}...",
                 )
-
-            # Update installation progress
-            if progress_enabled and installation_task_id:
-                await progress_service.update_task(installation_task_id, completed=25.0)
-
-            # Finally rename to clean name using catalog configuration
-            if rename_to:
-                clean_name = self.storage_service.get_clean_appimage_name(rename_to)
-                appimage_path = self.storage_service.rename_appimage(appimage_path, clean_name)
 
             # Store the computed hash from verification or GitHub digest
             stored_hash = ""
@@ -876,7 +894,14 @@ class UpdateManager:
             except Exception as e:
                 logger.warning("⚠️  Failed to cleanup old backups for %s: %s", app_name, e)
 
-            # Update desktop entry to reflect any changes (icon, paths, etc.)
+            # Create desktop entry (10% of post-processing)
+            if post_processing_task_id and progress_enabled:
+                await progress_service.update_task(
+                    post_processing_task_id,
+                    completed=90.0,
+                    description=f"📁 Creating desktop entry for {app_name}...",
+                )
+
             try:
                 try:
                     from .desktop import create_desktop_entry_for_app
@@ -895,26 +920,37 @@ class UpdateManager:
             except Exception as e:
                 logger.warning("⚠️  Failed to update desktop entry: %s", e)
 
+            # Finish post-processing task
+            if post_processing_task_id and progress_enabled:
+                await progress_service.finish_task(
+                    post_processing_task_id,
+                    success=True,
+                    final_description=f"✅ {app_name} post-processing completed",
+                )
+
             logger.debug(
                 "✅ Successfully updated %s to %s", app_name, update_info.latest_version
             )
             if stored_hash:
                 logger.debug("🔐 Updated stored hash: %s", stored_hash)
 
-            # Complete installation task
-            if progress_enabled and installation_task_id:
-                await progress_service.update_task(
-                    installation_task_id,
-                    completed=100.0,
-                    description=f"✅ Installed {app_name}",
-                )
-                await progress_service.finish_task(installation_task_id, success=True)
-
-            # Update completed successfully
-
             return True
 
         except Exception as e:
+            # Mark post-processing as failed if we have a progress task
+            if (
+                "post_processing_task_id" in locals()
+                and post_processing_task_id
+                and progress_enabled
+                and hasattr(download_service, "progress_service")
+                and download_service.progress_service
+            ):
+                await progress_service.finish_task(
+                    post_processing_task_id,
+                    success=False,
+                    final_description=f"❌ {app_name} post-processing failed",
+                )
+
             logger.error("Failed to update %s: %s", app_name, e)
             return False
 
@@ -926,17 +962,18 @@ class UpdateManager:
         icon_dir: Path,
         appimage_path: Path,
         icon_asset: IconAsset,
+        progress_task_id: str | None = None,
     ) -> tuple[Path | None, dict[str, Any]]:
-        """Setup icon during update with extraction configuration management.
+        """Setup icon from configuration using shared IconService.
 
         Args:
-            app_config: Current app configuration
-            catalog_entry: Catalog entry for the app (if available)
-            app_name: Application name
+            app_config: Application configuration
+            catalog_entry: Catalog entry if available
+            app_name: Application name for icon filename
             icon_dir: Directory where icons should be saved
             appimage_path: Path to AppImage for icon extraction
             icon_asset: Icon asset with filename and URL
-            download_service: Service for downloading icons
+            progress_task_id: Optional combined post-processing task ID
 
         Returns:
             Tuple of (Path to acquired icon or None, updated icon config)
@@ -948,7 +985,7 @@ class UpdateManager:
 
         icon_config = IconConfig(
             extraction_enabled=True,  # Will be determined by service
-            icon_url=icon_asset["icon_url"],
+            icon_url=icon_asset["icon_url"] if icon_asset["icon_url"] else None,
             icon_filename=icon_asset["icon_filename"],
             preserve_url_on_extraction=True,  # Preserve URL for future updates
         )
@@ -963,6 +1000,7 @@ class UpdateManager:
             appimage_path=appimage_path,
             current_config=current_icon_config,
             catalog_entry=catalog_entry,
+            progress_task_id=progress_task_id,
         )
 
         return result.icon_path, result.config
@@ -976,6 +1014,7 @@ class UpdateManager:
         repo: str,
         tag_name: str,
         app_name: str,
+        progress_task_id: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Perform update verification using priority-based approach.
 
@@ -1010,6 +1049,7 @@ class UpdateManager:
             repo=repo,
             tag_name=tag_name,
             app_name=app_name,
+            progress_task_id=progress_task_id,
         )
 
         return result.methods, result.updated_config

@@ -290,6 +290,7 @@ class IconService:
         current_config = current_config or {}
 
         # Create progress task if progress service is available but no task ID provided
+        create_own_task = False
         if (
             self.progress_service
             and progress_task_id is None
@@ -298,6 +299,7 @@ class IconService:
             progress_task_id = await self.progress_service.create_icon_extraction_task(
                 app_name
             )
+            create_own_task = True
 
         # Update progress - starting icon extraction
         if progress_task_id and self.progress_service:
@@ -375,8 +377,8 @@ class IconService:
             preserve_url_on_extraction=icon_config.preserve_url_on_extraction,
         )
 
-        # Update progress - completed
-        if progress_task_id and self.progress_service:
+        # Update progress - completed (only finish task if we created it)
+        if progress_task_id and self.progress_service and create_own_task:
             if result_icon_path:
                 await self.progress_service.finish_task(
                     progress_task_id,
