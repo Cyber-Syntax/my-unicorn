@@ -168,23 +168,49 @@ class URLInstallStrategy(InstallStrategy):
                     show_progress=kwargs.get("show_progress", True),
                 )
 
-                # Verify download if requested
+                # Prepare progress service for post-processing
+                progress_service = getattr(self.download_service, "progress_service", None)
+                post_processing_task_id = None
+                if (
+                    kwargs.get("show_progress", False)
+                    and progress_service
+                    and progress_service.is_active()
+                ):
+                    post_processing_task_id = await progress_service.create_post_processing_task(repo_name)
+
+                # Verification (20%)
                 if kwargs.get("verify_downloads", True):
+                    if post_processing_task_id:
+                        await progress_service.update_task(
+                            post_processing_task_id,
+                            completed=10.0,
+                            description=f"🔍 Verifying {repo_name}...",
+                        )
                     await self._perform_verification(
                         download_path, appimage_asset, release_data, owner, repo_name
                     )
+                    if post_processing_task_id:
+                        await progress_service.update_task(
+                            post_processing_task_id,
+                            completed=30.0,
+                            description=f"✅ {repo_name} verification completed",
+                        )
 
-                # Move to install directory
+                # Move to install directory (10%)
+                if post_processing_task_id:
+                    await progress_service.update_task(
+                        post_processing_task_id,
+                        completed=40.0,
+                        description=f"📁 Moving {repo_name} to install directory...",
+                    )
                 final_path = self.storage_service.move_to_install_dir(download_path)
-
-                # Make executable
                 self.storage_service.make_executable(final_path)
 
                 # Rename AppImage to clean name based on repo
                 clean_name = self.storage_service.get_clean_appimage_name(repo_name.lower())
                 final_path = self.storage_service.rename_appimage(final_path, clean_name)
 
-                # Extract icon from AppImage
+                # Extract icon (30%)
                 icon_path = None
                 from ..config import ConfigManager
 
@@ -196,9 +222,14 @@ class URLInstallStrategy(InstallStrategy):
                 icon_filename = f"{repo_name.lower()}.png"
                 icon_dest_path = icon_dir / icon_filename
 
-                # Use IconManager to extract icon from AppImage
                 icon_manager = IconManager(self.download_service)
                 icon_source = "none"
+                if post_processing_task_id:
+                    await progress_service.update_task(
+                        post_processing_task_id,
+                        completed=50.0,
+                        description=f"🎨 Extracting {repo_name} icon...",
+                    )
                 try:
                     icon_path = await icon_manager.extract_icon_only(
                         appimage_path=final_path,
@@ -213,8 +244,20 @@ class URLInstallStrategy(InstallStrategy):
                 except Exception as e:
                     logger.warning("⚠️  Failed to extract icon for %s: %s", repo_name, e)
                     icon_path = None
+                if post_processing_task_id:
+                    await progress_service.update_task(
+                        post_processing_task_id,
+                        completed=70.0,
+                        description=f"✅ {repo_name} icon extraction completed",
+                    )
 
-                # Create app configuration
+                # Create app configuration (10%)
+                if post_processing_task_id:
+                    await progress_service.update_task(
+                        post_processing_task_id,
+                        completed=80.0,
+                        description=f"📁 Creating configuration for {repo_name}...",
+                    )
                 await self._create_app_config(
                     repo_name.lower(),
                     final_path,
@@ -226,9 +269,13 @@ class URLInstallStrategy(InstallStrategy):
                     icon_source,
                 )
 
-                # config_manager already initialized above
-
-                # Create desktop entry to reflect any changes (icon, paths, etc.)
+                # Desktop entry (10%)
+                if post_processing_task_id:
+                    await progress_service.update_task(
+                        post_processing_task_id,
+                        completed=90.0,
+                        description=f"📁 Creating desktop entry for {repo_name}...",
+                    )
                 try:
                     try:
                         from ..desktop import create_desktop_entry_for_app
@@ -245,6 +292,15 @@ class URLInstallStrategy(InstallStrategy):
                     # Desktop entry creation/update logging is handled by the desktop module
                 except Exception as e:
                     logger.warning("⚠️  Failed to update desktop entry: %s", e)
+
+                # Finish post-processing task (100%)
+                if post_processing_task_id:
+                    await progress_service.finish_task(
+                        post_processing_task_id,
+                        success=True,
+                        final_description=f"✅ {repo_name} post-processing completed",
+                        final_total=100.0,
+                    )
 
                 logger.info("✅ Successfully installed: %s", final_path)
 
@@ -291,8 +347,8 @@ class URLInstallStrategy(InstallStrategy):
         logger.debug("🔍 Starting verification for %s", path.name)
 
         # Use VerificationService for comprehensive verification including optimized checksum files
-        progress_service = getattr(self.download_service, "progress_service", None)
-        verification_service = VerificationService(self.download_service, progress_service)
+        # Do not pass progress_service to VerificationService for URL installs
+        verification_service = VerificationService(self.download_service, None)
 
         # Convert GitHubReleaseDetails assets to the format expected by verification service
         all_assets = []
@@ -323,10 +379,8 @@ class URLInstallStrategy(InstallStrategy):
             "checksum_hash_type": "sha256",
         }
 
-        # Create progress task for verification if available
+        # Do not create or finish any verification progress task for URL installs
         progress_task_id = None
-        if progress_service and progress_service.is_active():
-            progress_task_id = await progress_service.create_verification_task(repo_name)
 
         try:
             # Perform comprehensive verification with optimized checksum file prioritization
@@ -339,7 +393,7 @@ class URLInstallStrategy(InstallStrategy):
                 tag_name=release_data["version"],
                 app_name=repo_name,
                 assets=all_assets,
-                progress_task_id=progress_task_id,
+                progress_task_id=None,  # Always None for URL installs
             )
 
             if not result.passed:
@@ -350,7 +404,6 @@ class URLInstallStrategy(InstallStrategy):
             # Log verification methods used
             methods_used = list(result.methods.keys())
             logger.debug("✅ Verification passed using methods: %s", ", ".join(methods_used))
-
             logger.debug("✅ Verification completed")
 
         except Exception as e:
