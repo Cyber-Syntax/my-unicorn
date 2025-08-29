@@ -518,6 +518,14 @@ class ProgressService:
                     pass
                 self._ui_update_task = None
 
+            # Ensure final UI update before stopping to show completion states
+            if self._live and self._pending_ui_updates:
+                try:
+                    self._refresh_live_display()
+                    await asyncio.sleep(0.05)  # Brief pause to ensure rendering
+                except Exception as e:
+                    logger.debug("Error in final UI update: %s", e)
+
             if self._live:
                 self._live.stop()
                 self._live = None
@@ -780,10 +788,11 @@ class ProgressService:
                 description=task.description,
             )
 
-            self._schedule_ui_update()
+            # Force immediate UI update for task completion to prevent race conditions
+            self._refresh_live_display()
 
-            # Small delay to allow Rich to properly render the completion
-            await asyncio.sleep(0.02)
+            # Longer delay to ensure completion state is rendered before session ends
+            await asyncio.sleep(0.15)
 
         except Exception as e:
             logger.error("Error updating progress for task %s: %s", task.name, e)
@@ -912,7 +921,8 @@ class ProgressService:
     async def create_post_processing_task(self, app_name: str) -> str:
         """Create a combined post-processing task for an AppImage.
 
-        This combines verification, icon extraction, and installation into a single progress bar.
+        This combines verification, icon extraction, and installation
+        into a single progress bar.
 
         Args:
             app_name: Name of the application being processed
