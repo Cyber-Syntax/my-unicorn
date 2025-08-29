@@ -234,20 +234,138 @@ class ProgressService:
         # Verification, icon extraction, installation, and update use post-processing
         return self._post_processing_progress
 
+    def _count_active_post_processing_tasks(self) -> int:
+        """Count active post-processing tasks for dynamic panel height calculation."""
+        post_processing_types = {
+            ProgressType.VERIFICATION,
+            ProgressType.ICON_EXTRACTION,
+            ProgressType.INSTALLATION,
+            ProgressType.UPDATE,
+        }
+        # Group tasks by app and count apps that have active tasks
+        app_has_active_task = set()
+        for task in self._tasks.values():
+            if task.progress_type in post_processing_types and not task.is_finished:
+                app_name = self._extract_app_name_from_task(task)
+                app_has_active_task.add(app_name)
+        return len(app_has_active_task)
+
+    def _create_filtered_post_processing_display(self, max_visible_tasks: int = 3) -> Progress:
+        """Create a Progress display showing one line per app (most recent task per app)."""
+        # Create a new Progress instance for filtered display
+        # Handle case where console might be None or mocked during testing
+        console_arg = self.console if hasattr(self.console, "get_time") else None
+        filtered_progress = Progress(
+            TextColumn("{task.description}"),
+            SpinnerColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            console=console_arg,
+        )
+
+        # Get all post-processing tasks (verification, icon extraction, installation, update)
+        post_processing_types = {
+            ProgressType.VERIFICATION,
+            ProgressType.ICON_EXTRACTION,
+            ProgressType.INSTALLATION,
+            ProgressType.UPDATE,
+        }
+
+        relevant_tasks = [
+            (namespaced_id, task)
+            for namespaced_id, task in self._tasks.items()
+            if task.progress_type in post_processing_types
+        ]
+
+        # Group tasks by app name (extract app name from task name/description)
+        app_tasks = {}
+        for namespaced_id, task in relevant_tasks:
+            app_name = self._extract_app_name_from_task(task)
+            if app_name not in app_tasks:
+                app_tasks[app_name] = []
+            app_tasks[app_name].append((namespaced_id, task))
+
+        # For each app, find the most recent task (by last_update time)
+        app_current_tasks = []
+        for app_name, tasks in app_tasks.items():
+            # Sort by last_update descending to get most recent first
+            tasks.sort(key=lambda x: x[1].last_update, reverse=True)
+            most_recent_task = tasks[0]  # Most recent task for this app
+            app_current_tasks.append((app_name, most_recent_task[0], most_recent_task[1]))
+
+        # Sort apps by priority: active tasks first, then by last update descending
+        app_current_tasks.sort(key=lambda x: (x[2].is_finished, -x[2].last_update))
+
+        # Add the most relevant app tasks to the filtered display (limit by max_visible_tasks)
+        for app_name, namespaced_id, task in app_current_tasks[:max_visible_tasks]:
+            # Create appropriate description with status indicator
+            if task.is_finished:
+                if task.success:
+                    status_icon = "✅"
+                else:
+                    status_icon = "❌"
+                # For finished tasks, show clean status
+                description = f"{status_icon} {app_name}"
+            else:
+                # Use original description for active tasks
+                description = task.description
+
+            # Add task to filtered progress with current state
+            task_id = filtered_progress.add_task(
+                description=description,
+                total=task.total,
+                completed=task.completed,
+                visible=True,
+            )
+
+            # Update the task to reflect current state
+            if task.is_finished:
+                filtered_progress.update(task_id, completed=task.total)
+
+        return filtered_progress
+
+    def _extract_app_name_from_task(self, task: TaskInfo) -> str:
+        """Extract app name from task name or description for grouping."""
+        # Task name patterns:
+        # "Verifying filename.AppImage" -> extract filename
+        # "app_name icon extraction" -> extract app_name
+        # "Installing app_name" -> extract app_name
+        # "Updating app_name" -> extract app_name
+        # "app_name post-processing" -> extract app_name
+
+        if "icon extraction" in task.name:
+            return task.name.replace(" icon extraction", "")
+        elif task.name.startswith("Installing "):
+            return task.name.replace("Installing ", "")
+        elif task.name.startswith("Updating "):
+            return task.name.replace("Updating ", "")
+        elif task.name.startswith("Verifying "):
+            # Extract filename without extension
+            filename = task.name.replace("Verifying ", "")
+            # Remove common extensions
+            for ext in [".AppImage", ".tar.gz", ".tar.xz", ".zip", ".deb", ".rpm"]:
+                if filename.endswith(ext):
+                    filename = filename[: -len(ext)]
+            return filename
+        elif " post-processing" in task.name:
+            return task.name.replace(" post-processing", "")
+        else:
+            # Fallback: use task name as-is
+            return task.name
+
     def _create_layout(self) -> Table:
         """Create the Rich layout for all progress displays with optimized caching."""
         # Return cached layout if no updates pending
         if self._layout_cache is not None and not self._pending_ui_updates:
             return self._layout_cache
 
-        # Pre-create panels only once and cache them
+        # Pre-create static panels only once and cache them
         if not hasattr(self, "_cached_panels"):
             self._cached_panels = {
                 "overall": Panel.fit(
                     self._overall_progress,
                     title="[bold green]📊 Overall Progress",
                     border_style="green",
-                    padding=(1, 2),
+                    padding=(0, 1),
                 )
                 if self.config.show_overall
                 else None,
@@ -255,7 +373,7 @@ class ProgressService:
                     self._api_progress,
                     title="[bold cyan]🌐 API Requests",
                     border_style="cyan",
-                    padding=(1, 2),
+                    padding=(0, 1),
                 )
                 if self.config.show_api_fetching
                 else None,
@@ -263,27 +381,57 @@ class ProgressService:
                     self._download_progress,
                     title="[bold blue]📦 Downloads",
                     border_style="blue",
-                    padding=(1, 2),
+                    padding=(0, 1),
                 )
                 if self.config.show_downloads
                 else None,
-                "processing": Panel.fit(
-                    self._post_processing_progress,
-                    title="[bold yellow]⚙️ Post-Processing",
-                    border_style="yellow",
-                    padding=(1, 2),
-                )
-                if self.config.show_post_processing
-                else None,
             }
 
-        layout = Table.grid(padding=1)
-        layout.add_column()
+        # Create post-processing panel dynamically with filtered task display
+        if self.config.show_post_processing:
+            # Calculate how many tasks can fit in the panel height
+            panel_height = max(5, self._count_active_post_processing_tasks() + 3)
+            max_visible_tasks = max(1, panel_height - 2)  # Account for top and bottom borders
 
-        # Add cached panels to layout
-        for panel in self._cached_panels.values():
-            if panel is not None:
-                layout.add_row(panel)
+            # Create filtered progress display showing most recent tasks
+            filtered_display = self._create_filtered_post_processing_display(max_visible_tasks)
+
+            processing_panel = Panel(
+                filtered_display,
+                title="[bold yellow]⚙️ Post-Processing",
+                border_style="yellow",
+                padding=(0, 1),
+                width=45,
+                height=panel_height,
+            )
+        else:
+            processing_panel = None
+
+        layout = Table.grid(padding=0)
+        layout.add_column()
+        # Add API and Post-Processing panels in a single row using a nested Table for tight layout
+        api_panel = self._cached_panels.get("api")
+        downloads_panel = self._cached_panels.get("downloads")
+        overall_panel = self._cached_panels.get("overall")
+
+        # Create a nested row for API + Post-Processing with no space
+        if api_panel and processing_panel:
+            row = Table.grid(padding=0)
+            row.add_column()
+            row.add_column()
+            row.add_row(api_panel, processing_panel)
+            layout.add_row(row)
+        elif api_panel:
+            layout.add_row(api_panel)
+        elif processing_panel:
+            layout.add_row(processing_panel)
+
+        # Downloads panel below
+        if downloads_panel:
+            layout.add_row(downloads_panel)
+        # Overall panel at the end if enabled
+        if overall_panel:
+            layout.add_row(overall_panel)
 
         # Cache layout and clear pending updates flag
         self._layout_cache = layout
@@ -724,6 +872,34 @@ class ProgressService:
             description=f"📁 Installing {app_name}...",
         )
 
+    async def create_verification_task(self, filename: str) -> str:
+        """Create a verification task."""
+        filename_only = Path(filename).name
+        return await self.add_task(
+            name=f"Verifying {filename_only}",
+            progress_type=ProgressType.VERIFICATION,
+            total=100.0,
+            description=f"🔍 Verifying {filename_only}...",
+        )
+
+    async def create_icon_extraction_task(self, app_name: str) -> str:
+        """Create an icon extraction task."""
+        return await self.add_task(
+            name=f"{app_name} icon extraction",
+            progress_type=ProgressType.ICON_EXTRACTION,
+            total=100.0,
+            description=f"🎨 Extracting {app_name} icon...",
+        )
+
+    async def create_installation_task(self, app_name: str) -> str:
+        """Create an installation task."""
+        return await self.add_task(
+            name=f"Installing {app_name}",
+            progress_type=ProgressType.INSTALLATION,
+            total=100.0,
+            description=f"📁 Installing {app_name}...",
+        )
+
     async def create_update_task(self, app_name: str) -> str:
         """Create an update task."""
         return await self.add_task(
@@ -735,14 +911,15 @@ class ProgressService:
 
     async def create_post_processing_task(self, app_name: str) -> str:
         """Create a combined post-processing task for an AppImage.
-        
+
         This combines verification, icon extraction, and installation into a single progress bar.
-        
+
         Args:
             app_name: Name of the application being processed
-            
+
         Returns:
             Task ID for the combined post-processing task
+
         """
         return await self.add_task(
             name=f"{app_name} post-processing",
