@@ -395,17 +395,6 @@ class CatalogInstallStrategy(InstallStrategy):
             self.catalog_manager.remove_app_config(app_name)
             return None
 
-        # Check for force reinstall
-        if kwargs.get("force", False):
-            logger.info("🔄 Force reinstalling %s", app_name)
-            return None
-
-        # Check for updates if update mode
-        if kwargs.get("update", False):
-            logger.info("🔄 Checking for updates for %s", app_name)
-            # TODO: Implement update check logic
-            return None
-
         logger.info("✅ %s is already installed at %s", app_name, existing_path)
         return existing_path
 

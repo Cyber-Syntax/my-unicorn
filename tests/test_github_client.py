@@ -387,7 +387,7 @@ def test_checksum_file_info_dataclass():
 async def test_fetch_latest_release_api_error(mock_session):
     """Test fetch_latest_release raises on API error."""
     fetcher = GitHubReleaseFetcher(
-        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session
+        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session, use_cache=False
     )
     mock_response = AsyncMock()
     mock_response.__aenter__.return_value = mock_response
@@ -403,7 +403,7 @@ async def test_fetch_latest_release_api_error(mock_session):
 async def test_fetch_latest_release_network_error(mock_session):
     """Test fetch_latest_release handles network error (e.g., connection lost)."""
     fetcher = GitHubReleaseFetcher(
-        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session
+        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session, use_cache=False
     )
     # Simulate aiohttp.ClientError (network error)
     import aiohttp
@@ -417,7 +417,7 @@ async def test_fetch_latest_release_network_error(mock_session):
 async def test_fetch_latest_release_timeout(mock_session):
     """Test fetch_latest_release handles timeout error."""
     fetcher = GitHubReleaseFetcher(
-        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session
+        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session, use_cache=False
     )
     import asyncio
 
