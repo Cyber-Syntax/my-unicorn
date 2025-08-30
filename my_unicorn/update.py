@@ -274,11 +274,17 @@ class UpdateManager:
                             owner,
                             repo,
                         )
-                        release_data = await fetcher.fetch_latest_release(ignore_cache=refresh_cache)
+                        # Use fallback logic to handle repositories with only prereleases
+                        release_data = await fetcher.fetch_latest_release_or_prerelease(
+                            prefer_prerelease=False, ignore_cache=refresh_cache
+                        )
                     else:
                         raise
             else:
-                release_data = await fetcher.fetch_latest_release(ignore_cache=refresh_cache)
+                # Use fallback logic to handle repositories with only prereleases
+                release_data = await fetcher.fetch_latest_release_or_prerelease(
+                    prefer_prerelease=False, ignore_cache=refresh_cache
+                )
 
             latest_version = release_data["version"]
             has_update = self._compare_versions(current_version, latest_version)
@@ -582,7 +588,10 @@ class UpdateManager:
                 logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
                 release_data = await fetcher.fetch_latest_prerelease()
             else:
-                release_data = await fetcher.fetch_latest_release()
+                # Use fallback logic to handle repositories with only prereleases
+                release_data = await fetcher.fetch_latest_release_or_prerelease(
+                    prefer_prerelease=False
+                )
 
             # Find AppImage asset using source-aware selection
             appimage_asset = self._select_best_appimage_by_source(

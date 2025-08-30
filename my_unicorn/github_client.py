@@ -415,7 +415,7 @@ class GitHubReleaseFetcher:
             raise
 
     async def fetch_latest_release_or_prerelease(
-        self, prefer_prerelease: bool = False
+        self, prefer_prerelease: bool = False, ignore_cache: bool = False
     ) -> GitHubReleaseDetails:
         """Fetch the latest release or prerelease based on preference.
 
@@ -425,6 +425,7 @@ class GitHubReleaseFetcher:
         Args:
             prefer_prerelease: If True, prefer prereleases over stable releases.
                               If False, prefer stable releases over prereleases.
+            ignore_cache: If True, bypass cache and fetch fresh data from API
 
         Returns:
             Release details for the best matching release
@@ -438,17 +439,17 @@ class GitHubReleaseFetcher:
         if prefer_prerelease:
             # First try prerelease cache, then stable cache as fallback
             try:
-                return await self.fetch_latest_prerelease()
-            except ValueError:
+                return await self.fetch_latest_prerelease(ignore_cache=ignore_cache)
+            except (ValueError, aiohttp.ClientResponseError):
                 # No prereleases found, try stable release
-                return await self.fetch_latest_release()
+                return await self.fetch_latest_release(ignore_cache=ignore_cache)
         else:
             # First try stable cache, then prerelease cache as fallback
             try:
-                return await self.fetch_latest_release()
-            except ValueError:
+                return await self.fetch_latest_release(ignore_cache=ignore_cache)
+            except (ValueError, aiohttp.ClientResponseError):
                 # No stable releases found, try prereleases
-                return await self.fetch_latest_prerelease()
+                return await self.fetch_latest_prerelease(ignore_cache=ignore_cache)
 
     def to_github_asset(self, asset: dict[str, Any]) -> GitHubAsset | None:
         """Convert GitHub API asset response to typed GitHubAsset.
@@ -759,7 +760,9 @@ class GitHubClient:
         """
         try:
             fetcher = GitHubReleaseFetcher(owner, repo, self.session, self.shared_api_task_id)
-            release_details = await fetcher.fetch_latest_release()
+            release_details = await fetcher.fetch_latest_release_or_prerelease(
+                prefer_prerelease=False
+            )
 
             # Use original tag name from the release details, fallback to version-based tag
             original_tag_name = (
