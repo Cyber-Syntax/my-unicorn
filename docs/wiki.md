@@ -127,7 +127,7 @@ my-unicorn backup --migrate
 > These dependencies are already installed when you used my-unicorn-installer.sh to install my-unicorn.
 
 ```bash
-pip install aiohttp uvloop tqdm keyring orjson packaging
+pip install aiohttp uvloop keyring orjson packaging rich
 ```
 
 ### Config Management

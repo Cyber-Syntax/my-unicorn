@@ -9,6 +9,7 @@ from typing import Any
 
 from my_unicorn.download import DownloadService
 from my_unicorn.github_client import ChecksumFileInfo, GitHubReleaseFetcher
+from my_unicorn.services.progress import ProgressService
 from my_unicorn.verify import Verifier
 
 logger = logging.getLogger(__name__)
@@ -36,14 +37,20 @@ class VerificationResult:
 class VerificationService:
     """Shared service for file verification with multiple methods."""
 
-    def __init__(self, download_service: DownloadService) -> None:
+    def __init__(
+        self,
+        download_service: DownloadService,
+        progress_service: ProgressService | None = None,
+    ) -> None:
         """Initialize verification service.
 
         Args:
             download_service: Service for downloading checksum files
+            progress_service: Optional progress service for tracking verification
 
         """
         self.download_service = download_service
+        self.progress_service = progress_service
 
     def _detect_available_methods(
         self,
@@ -221,10 +228,10 @@ class VerificationService:
                 hash_type = "sha512"
             else:
                 # For traditional files, detect hash type from filename
-                hash_type = verifier._detect_hash_type_from_filename(checksum_file.filename)
+                hash_type = verifier.detect_hash_type_from_filename(checksum_file.filename)
 
-            # Parse using the existing method that now handles both YAML and traditional formats
-            expected_hash = verifier._parse_checksum_file(content, target_filename, hash_type)
+            # Parse using the public method that handles both YAML and traditional formats
+            expected_hash = verifier.parse_checksum_file(content, target_filename, hash_type)
             if not expected_hash:
                 return {
                     "passed": False,
@@ -393,6 +400,7 @@ class VerificationService:
         tag_name: str,
         app_name: str,
         assets: list[dict[str, Any]] | None = None,
+        progress_task_id: Any | None = None,
     ) -> VerificationResult:
         """Perform comprehensive file verification.
 
@@ -405,6 +413,7 @@ class VerificationService:
             tag_name: Release tag name
             app_name: Application name for logging
             assets: All GitHub release assets (optional, enables auto-detection)
+            progress_task_id: Optional progress task ID for tracking
 
         Returns:
             VerificationResult with success status and methods used
@@ -414,6 +423,22 @@ class VerificationService:
 
         """
         logger.debug("🔍 Starting verification for %s", app_name)
+
+        # Create progress task if progress service is available but no task ID provided
+        create_own_task = False
+        if (
+            self.progress_service
+            and progress_task_id is None
+            and self.progress_service.is_active()
+        ):
+            progress_task_id = await self.progress_service.create_verification_task(app_name)
+            create_own_task = True
+
+        # Update progress - starting verification
+        if progress_task_id and self.progress_service:
+            await self.progress_service.update_task(
+                progress_task_id, completed=10.0, description=f"🔍 Analyzing {app_name}..."
+            )
 
         # Detect available methods (with backward compatibility)
         has_digest, checksum_files = self._detect_available_methods(
@@ -432,6 +457,13 @@ class VerificationService:
             config, has_digest, has_checksum_files
         )
         if should_skip:
+            # Update progress - skipped (only finish task if we created it)
+            if progress_task_id and self.progress_service and create_own_task:
+                await self.progress_service.finish_task(
+                    progress_task_id,
+                    success=True,
+                    final_description=f"✅ {app_name} verification skipped",
+                )
             return VerificationResult(
                 passed=True,
                 methods={},
@@ -443,8 +475,22 @@ class VerificationService:
         verification_methods = {}
         skip_configured = config.get("skip", False)
 
+        # Update progress - creating verifier
+        if progress_task_id and self.progress_service:
+            await self.progress_service.update_task(
+                progress_task_id, completed=25.0, description=f"🔍 Reading {app_name}..."
+            )
+
         # Try digest verification first if available
         if has_digest:
+            # Update progress - digest verification
+            if progress_task_id and self.progress_service:
+                await self.progress_service.update_task(
+                    progress_task_id,
+                    completed=40.0,
+                    description=f"🔍 Verifying digest for {app_name}...",
+                )
+
             digest_result = await self._verify_digest(
                 verifier, asset["digest"], app_name, skip_configured
             )
@@ -457,6 +503,14 @@ class VerificationService:
 
         # Try checksum file verification with smart prioritization
         if checksum_files:
+            # Update progress - checksum verification
+            if progress_task_id and self.progress_service:
+                await self.progress_service.update_task(
+                    progress_task_id,
+                    completed=60.0,
+                    description=f"🔍 Verifying checksum for {app_name}...",
+                )
+
             # Prioritize checksum files to try the most likely match first
             prioritized_files = self._prioritize_checksum_files(checksum_files, file_path.name)
 
@@ -479,6 +533,13 @@ class VerificationService:
                         break  # Stop trying other checksum files once one succeeds
 
         # Always perform basic file size verification
+        if progress_task_id and self.progress_service:
+            await self.progress_service.update_task(
+                progress_task_id,
+                completed=80.0,
+                description=f"🔍 Verifying file size for {app_name}...",
+            )
+
         expected_size = asset.get("size")
         size_result = self._verify_file_size(verifier, expected_size)
         verification_methods["size"] = size_result
@@ -488,6 +549,13 @@ class VerificationService:
 
         # If we have strong verification methods available but none passed, fail
         if strong_methods_available and not verification_passed:
+            # Update progress - verification failed (only finish task if we created it)
+            if progress_task_id and self.progress_service and create_own_task:
+                await self.progress_service.finish_task(
+                    progress_task_id,
+                    success=False,
+                    final_description=f"❌ {app_name} verification failed",
+                )
             available_methods = []
             if has_digest:
                 available_methods.append("digest")
@@ -507,6 +575,21 @@ class VerificationService:
         overall_passed = verification_passed or (
             not strong_methods_available and size_result["passed"]
         )
+
+        # Update progress - verification completed (only finish task if we created it)
+        if progress_task_id and self.progress_service and create_own_task:
+            if overall_passed:
+                await self.progress_service.finish_task(
+                    progress_task_id,
+                    success=True,
+                    final_description=f"✅ {app_name} verification",
+                )
+            else:
+                await self.progress_service.finish_task(
+                    progress_task_id,
+                    success=False,
+                    final_description=f"⚠️ {app_name} verification completed with warnings",
+                )
 
         if overall_passed:
             logger.debug("✅ Verification completed successfully")
