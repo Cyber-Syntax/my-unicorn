@@ -16,7 +16,8 @@ multidict==6.6.3
 orjson==3.11.1
 propcache==0.3.2
 pycparser==2.22
+PyYAML==6.0.2
 SecretStorage==3.3.3
-tqdm==4.67.1
+rich==14.1.0
 uvloop==0.21.0
 yarl==1.20.1

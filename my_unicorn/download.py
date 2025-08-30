@@ -1,19 +1,20 @@
 """Download service for handling AppImage and icon downloads.
 
 This module provides a service for downloading AppImage files and associated
-icons with progress tracking and basic verification.
+icons with progress tracking using the Rich progress service.
 """
 
+import asyncio
 from pathlib import Path
 from typing import TypedDict
 from urllib.parse import urlparse
 
 import aiohttp
-from tqdm.asyncio import tqdm
 
-from .auth import GitHubAuthManager
-from .github_client import GitHubAsset
-from .logger import get_logger
+from my_unicorn.auth import GitHubAuthManager
+from my_unicorn.github_client import GitHubAsset
+from my_unicorn.logger import get_logger
+from my_unicorn.services.progress import ProgressService, ProgressType, get_progress_service
 
 logger = get_logger(__name__)
 
@@ -28,22 +29,27 @@ class IconAsset(TypedDict):
 class DownloadService:
     """Service for downloading AppImage files and associated assets."""
 
-    def __init__(self, session: aiohttp.ClientSession) -> None:
+    def __init__(
+        self,
+        session: aiohttp.ClientSession,
+        progress_service: ProgressService | None = None,
+    ) -> None:
         """Initialize download service with HTTP session.
 
         Args:
             session: aiohttp session for downloads
+            progress_service: Optional progress service for tracking downloads
 
         """
         self.session = session
+        self.progress_service = progress_service or get_progress_service()
 
     async def download_file(
         self,
         url: str,
         dest: Path,
         show_progress: bool = False,
-        success_color: str = "green",
-        description_prefix: str = "📥",
+        progress_type: ProgressType = ProgressType.DOWNLOAD,
     ) -> None:
         """Download a file from URL to destination.
 
@@ -51,8 +57,7 @@ class DownloadService:
             url: URL to download from
             dest: Destination path
             show_progress: Whether to show progress bar
-            success_color: Color for successful download progress bar
-            description_prefix: Prefix for progress description
+            progress_type: Type of progress operation for categorization
 
         Raises:
             aiohttp.ClientError: If download fails
@@ -60,8 +65,11 @@ class DownloadService:
         """
         headers: dict[str, str] = GitHubAuthManager.apply_auth({})
 
+        # Set timeout for downloads (30 seconds per chunk, 10 minutes total)
+        timeout = aiohttp.ClientTimeout(total=600, sock_read=30)
+
         try:
-            async with self.session.get(url, headers=headers) as response:
+            async with self.session.get(url, headers=headers, timeout=timeout) as response:
                 response.raise_for_status()
                 total = int(response.headers.get("Content-Length", 0))
 
@@ -74,9 +82,12 @@ class DownloadService:
                     f"{total:,}" if total > 0 else "",
                 )
 
-                if show_progress and total > 0:
+                if show_progress and total > 0 and self.progress_service.is_active():
                     await self._download_with_progress(
-                        response, dest, total, success_color, description_prefix
+                        response,
+                        dest,
+                        total,
+                        progress_type,
                     )
                 else:
                     # Download without progress bar
@@ -96,47 +107,81 @@ class DownloadService:
         response: aiohttp.ClientResponse,
         dest: Path,
         total: int,
-        success_color: str,
-        description_prefix: str,
+        progress_type: ProgressType,
     ) -> None:
-        """Download file with progress bar."""
-        with logger.progress_context():
-            # Determine descriptions based on operation type
-            if success_color == "blue":
-                initial_desc = f"📦 {dest.name}"
-                final_desc = f"✅ {dest.name}"
-            else:
-                initial_desc = f"{description_prefix} {dest.name}"
-                final_desc = f"✅ {dest.name}"
+        """Download file with Rich progress tracking.
 
-            with (
-                open(dest, "wb") as f,
-                tqdm(
-                    total=total,
-                    unit="B",
-                    unit_scale=True,
-                    desc=initial_desc,
-                    leave=True,
-                    colour=success_color,
-                    bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
-                    ncols=100,
-                ) as pbar,
-            ):
-                try:
-                    async for chunk in response.content.iter_chunked(8192):
-                        if chunk:
-                            f.write(chunk)
-                            pbar.update(len(chunk))
-                    # Update to success state
-                    pbar.colour = "green"
-                    pbar.set_description(final_desc)
-                    pbar.refresh()
-                except Exception:
-                    # Update to failure state
-                    pbar.colour = "red"
-                    pbar.set_description(f"❌ {dest.name}")
-                    pbar.refresh()
-                    raise
+        Args:
+            response: HTTP response to read from
+            dest: Destination path for the file
+            total: Total file size in bytes
+            progress_type: Type of progress operation
+
+        """
+        # Convert bytes to MB for display
+        total_mb = total / (1024 * 1024)
+
+        # Create progress task
+        task_id = await self.progress_service.add_task(
+            name=dest.name,
+            progress_type=progress_type,
+            total=total_mb,
+        )
+
+        success = False
+        try:
+            downloaded_bytes = 0
+
+            chunk_count = 0
+            last_progress_update = 0.0
+
+            with open(dest, "wb") as f:
+                async for chunk in response.content.iter_chunked(8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded_bytes += len(chunk)
+                        chunk_count += 1
+
+                        # Update progress in MB (throttle updates to every 0.5 MB or every 100 chunks)
+                        downloaded_mb = downloaded_bytes / (1024 * 1024)
+                        if (downloaded_mb - last_progress_update >= 0.5) or (
+                            chunk_count % 100 == 0
+                        ):
+                            await self.progress_service.update_task(
+                                task_id,
+                                completed=downloaded_mb,
+                            )
+                            last_progress_update = downloaded_mb
+
+            # Always ensure final progress update with actual downloaded size
+            final_mb = downloaded_bytes / (1024 * 1024)
+
+            # Update the task total and completion to match actual download size
+            # This handles cases where Content-Length differs from actual size due to compression, etc.
+            await self.progress_service.update_task_total(
+                task_id, new_total=final_mb, completed=final_mb
+            )
+            success = True
+
+        except TimeoutError:
+            logger.error("❌ Download timed out: %s", dest.name)
+            raise Exception(f"Download timed out: {dest.name}")
+        except aiohttp.ClientError as e:
+            logger.error("❌ Network error during download: %s - %s", dest.name, e)
+            raise Exception(f"Network error: {e}")
+        except Exception as e:
+            logger.error("❌ Download failed during progress tracking: %s", e)
+            raise
+        finally:
+            # Mark task as finished with the actual final total for accurate percentage display
+            final_mb = downloaded_bytes / (1024 * 1024) if success else 0.0
+            await self.progress_service.finish_task(
+                task_id,
+                success=success,
+                final_total=final_mb if success else None,
+            )
+            # Give Rich time to properly update the display and prevent race conditions
+            await asyncio.sleep(0.2)
 
     async def download_appimage(
         self, asset: GitHubAsset, dest: Path, show_progress: bool = True
@@ -159,8 +204,7 @@ class DownloadService:
             asset["browser_download_url"],
             dest,
             show_progress=show_progress,
-            success_color="blue",
-            description_prefix="📦",
+            progress_type=ProgressType.DOWNLOAD,
         )
         return dest
 
@@ -185,7 +229,10 @@ class DownloadService:
 
         try:
             await self.download_file(
-                icon["icon_url"], dest, show_progress=False, description_prefix="🎨"
+                icon["icon_url"],
+                dest,
+                show_progress=False,  # Icons are usually small
+                progress_type=ProgressType.DOWNLOAD,
             )
 
             # Verify the file was actually created and has content

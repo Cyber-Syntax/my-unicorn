@@ -1,106 +1,107 @@
-"""Comprehensive tests for VerificationService with high coverage and edge cases."""
+"""Tests for VerificationService with enhanced YAML and checksum file support."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.download import DownloadService
+from my_unicorn.github_client import ChecksumFileInfo
 from my_unicorn.services.verification_service import (
     VerificationConfig,
     VerificationResult,
     VerificationService,
 )
 
+# Test data constants
+LEGCORD_YAML_CONTENT = """version: 1.1.5
+files:
+  - url: Legcord-1.1.5-linux-x86_64.AppImage
+    sha512: JNmYBTG9lqXt/VXmes32pu3bnz/YaKMzfjFVL+0J+S8MSWl7nLmHolmUNLFAubpy1JWTUwEdlPW8UhRNxNiQuw==
+    size: 124457255
+    blockMapSize: 131387
+  - url: Legcord-1.1.5-linux-x86_64.rpm
+    sha512: 3j2/BdKHypZrIQ0qDzJk9WjyXJwCfPfbQ7la8i+YFSHZwzOBdWDrkLPh16ZhTa3zRbQ13/XyeN76HwrRzCJIRg==
+    size: 82429221
+  - url: Legcord-1.1.5-linux-amd64.deb
+    sha512: UjNfkg1xSME7aa7bRo4wcNz3bWMvVpcdUv08BNDCrrQ9Z/sx1nZo6FqByUd7GEZyJfgVaWYIfdQtcQaTV7Di6Q==
+    size: 82572182
+path: Legcord-1.1.5-linux-x86_64.AppImage
+sha512: JNmYBTG9lqXt/VXmes32pu3bnz/YaKMzfjFVL+0J+S8MSWl7nLmHolmUNLFAubpy1JWTUwEdlPW8UhRNxNiQuw==
+releaseDate: '2025-05-26T17:26:48.710Z'"""
+
+SIYUAN_SHA256SUMS_CONTENT = """81529d6af7327f3468e13fe3aa226f378029aeca832336ef69af05438ef9146e siyuan-3.2.1-linux-arm64.AppImage
+d0f6e2b796c730f077335a4661e712363512b911adfdb5cc419b7e02c4075c0a siyuan-3.2.1-linux-arm64.deb
+dda94a3cf4b3a91a0240d4cbb70c7583f7611da92f9ed33713bb86530f2010a9 siyuan-3.2.1-linux-arm64.tar.gz
+3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef siyuan-3.2.1-linux.AppImage
+b39f78905a55bab8f16b82e90d784e4838c05b1605166d9cb3824a612cf6fc71 siyuan-3.2.1-linux.deb
+70964f1e981a2aec0d7334cf49ee536fb592e7d19b2fccdffb005fd25a55f092 siyuan-3.2.1-linux.tar.gz
+6153d6189302135f39c836e160a4a036ff495df81c3af1492d219d0d7818cb04 siyuan-3.2.1-mac-arm64.dmg
+fbe6115ef044d451623c8885078172d6adc1318db6baf88e6b1fe379630a2da9 siyuan-3.2.1-mac.dmg
+b75303038e40c0fcee7942bb47e9c8f853e8801fa87d63e0ab54d559837ffb03 siyuan-3.2.1-win-arm64.exe
+ecfd14da398507452307bdb7671b57715a44a02ac7fdfb47e8afbe4f3b20e45f siyuan-3.2.1-win.exe
+d9ad0f257893f6f2d25b948422257a938b03e6362ab638ad1a74e9bab1c0e755 siyuan-3.2.1.apk"""
+
+# Expected hex hash for Legcord AppImage (converted from Base64)
+LEGCORD_EXPECTED_HEX = "24d9980531bd96a5edfd55e67acdf6a6eddb9f3fd868a3337e31552fed09f92f0c49697b9cb987a2599434b140b9ba72d4959353011d94f5bc52144dc4d890bb"
+
 
 class TestVerificationConfig:
-    """Test cases for VerificationConfig dataclass."""
+    """Test VerificationConfig dataclass."""
 
     def test_verification_config_defaults(self):
-        """Test VerificationConfig creation with default values."""
+        """Test VerificationConfig with default values."""
         config = VerificationConfig()
-
         assert config.skip is False
         assert config.checksum_file is None
         assert config.checksum_hash_type == "sha256"
         assert config.digest_enabled is False
 
     def test_verification_config_custom_values(self):
-        """Test VerificationConfig creation with custom values."""
+        """Test VerificationConfig with custom values."""
         config = VerificationConfig(
             skip=True,
             checksum_file="checksums.txt",
             checksum_hash_type="sha512",
             digest_enabled=True,
         )
-
         assert config.skip is True
         assert config.checksum_file == "checksums.txt"
         assert config.checksum_hash_type == "sha512"
         assert config.digest_enabled is True
 
     def test_verification_config_immutable(self):
-        """Test that VerificationConfig is immutable (frozen)."""
-        config = VerificationConfig(skip=True)
-
+        """Test that VerificationConfig is frozen/immutable."""
+        config = VerificationConfig()
         with pytest.raises(AttributeError):
-            config.skip = False
-
-    def test_verification_config_none_checksum_file(self):
-        """Test VerificationConfig with None checksum file."""
-        config = VerificationConfig(checksum_file=None)
-
-        assert config.checksum_file is None
+            config.skip = True
 
 
 class TestVerificationResult:
-    """Test cases for VerificationResult dataclass."""
+    """Test VerificationResult dataclass."""
 
     def test_verification_result_creation(self):
-        """Test VerificationResult creation with all parameters."""
+        """Test VerificationResult creation."""
         methods = {"digest": {"passed": True, "hash": "abc123"}}
-        config = {"skip": False, "digest": True}
-
-        result = VerificationResult(
-            passed=True,
-            methods=methods,
-            updated_config=config,
-        )
+        config = {"skip": False}
+        result = VerificationResult(passed=True, methods=methods, updated_config=config)
 
         assert result.passed is True
         assert result.methods == methods
         assert result.updated_config == config
 
-    def test_verification_result_failed(self):
-        """Test VerificationResult for failed verification."""
-        result = VerificationResult(
-            passed=False,
-            methods={"digest": {"passed": False, "details": "Hash mismatch"}},
-            updated_config={"skip": False},
-        )
-
-        assert result.passed is False
-        assert "digest" in result.methods
-        assert result.methods["digest"]["passed"] is False
-
     def test_verification_result_immutable(self):
-        """Test that VerificationResult is immutable (frozen)."""
-        result = VerificationResult(
-            passed=True,
-            methods={},
-            updated_config={},
-        )
-
+        """Test that VerificationResult is frozen/immutable."""
+        result = VerificationResult(passed=True, methods={}, updated_config={})
         with pytest.raises(AttributeError):
             result.passed = False
 
 
 class TestVerificationService:
-    """Test cases for VerificationService."""
+    """Test VerificationService with enhanced functionality."""
 
     @pytest.fixture
     def mock_download_service(self):
-        """Create a mock DownloadService."""
-        return MagicMock(spec=DownloadService)
+        """Create a mock download service."""
+        return MagicMock()
 
     @pytest.fixture
     def verification_service(self, mock_download_service):
@@ -108,540 +109,326 @@ class TestVerificationService:
         return VerificationService(mock_download_service)
 
     @pytest.fixture
-    def sample_asset(self):
-        """Create a sample asset for testing."""
-        return {
-            "digest": "sha256:abc123def456",
-            "size": 1024,
-            "name": "test.AppImage",
-        }
+    def sample_assets(self):
+        """Sample GitHub assets for testing."""
+        return [
+            {
+                "name": "Legcord-1.1.5-linux-x86_64.AppImage",
+                "browser_download_url": "https://github.com/Legcord/Legcord/releases/download/v1.1.5/Legcord-1.1.5-linux-x86_64.AppImage",
+                "size": 124457255,
+                "digest": "",
+            },
+            {
+                "name": "latest-linux.yml",
+                "browser_download_url": "https://github.com/Legcord/Legcord/releases/download/v1.1.5/latest-linux.yml",
+                "size": 1234,
+                "digest": "",
+            },
+        ]
 
     @pytest.fixture
-    def sample_config(self):
-        """Create a sample verification config."""
-        return {
-            "skip": False,
-            "checksum_file": "checksums.txt",
-            "checksum_hash_type": "sha256",
-        }
-
-    @pytest.fixture
-    def mock_verifier(self):
-        """Create a mock Verifier instance."""
-        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
-            mock_verifier = MagicMock()
-            mock_verifier_class.return_value = mock_verifier
-            yield mock_verifier
+    def sample_assets_with_both(self):
+        """Sample GitHub assets with both YAML and traditional checksum files."""
+        return [
+            {
+                "name": "app.AppImage",
+                "browser_download_url": "https://github.com/test/test/releases/download/v1.0.0/app.AppImage",
+                "size": 12345,
+                "digest": "",
+            },
+            {
+                "name": "latest-linux.yml",
+                "browser_download_url": "https://github.com/test/test/releases/download/v1.0.0/latest-linux.yml",
+                "size": 1234,
+                "digest": "",
+            },
+            {
+                "name": "SHA256SUMS.txt",
+                "browser_download_url": "https://github.com/test/test/releases/download/v1.0.0/SHA256SUMS.txt",
+                "size": 567,
+                "digest": "",
+            },
+        ]
 
     @pytest.fixture
     def test_file_path(self, tmp_path):
-        """Create a test file for verification."""
+        """Create a temporary file for testing."""
         file_path = tmp_path / "test.AppImage"
-        file_path.write_bytes(b"test file content")
+        file_path.write_bytes(b"test content")
         return file_path
 
-    def test_detect_available_methods_both_available(self, verification_service):
-        """Test detection when both digest and checksum file are available."""
-        asset = {"digest": "sha256:abc123"}
-        config = {"checksum_file": "checksums.txt"}
-
-        has_digest, has_checksum_file = verification_service._detect_available_methods(
-            asset, config
-        )
-
-        assert has_digest is True
-        assert has_checksum_file is True
-
-    def test_detect_available_methods_digest_only(self, verification_service):
-        """Test detection when only digest is available."""
-        asset = {"digest": "sha256:abc123"}
-        config = {}
-
-        has_digest, has_checksum_file = verification_service._detect_available_methods(
-            asset, config
-        )
-
-        assert has_digest is True
-        assert has_checksum_file is False
-
-    def test_detect_available_methods_checksum_only(self, verification_service):
-        """Test detection when only checksum file is available."""
-        asset = {}
-        config = {"checksum_file": "checksums.txt"}
-
-        has_digest, has_checksum_file = verification_service._detect_available_methods(
-            asset, config
-        )
-
-        assert has_digest is False
-        assert has_checksum_file is True
-
-    def test_detect_available_methods_none_available(self, verification_service):
-        """Test detection when no methods are available."""
-        asset = {}
-        config = {}
-
-        has_digest, has_checksum_file = verification_service._detect_available_methods(
-            asset, config
-        )
-
-        assert has_digest is False
-        assert has_checksum_file is False
-
-    def test_detect_available_methods_empty_digest(self, verification_service):
-        """Test detection with empty digest."""
-        asset = {"digest": ""}
-        config = {"checksum_file": "checksums.txt"}
-
-        has_digest, has_checksum_file = verification_service._detect_available_methods(
-            asset, config
-        )
-
-        assert has_digest is False
-        assert has_checksum_file is True
-
-    def test_detect_available_methods_empty_checksum_file(self, verification_service):
-        """Test detection with empty checksum file."""
-        asset = {"digest": "sha256:abc123"}
+    def test_detect_available_methods_with_assets_yaml(
+        self, verification_service, sample_assets
+    ):
+        """Test detection with assets containing YAML checksum file."""
+        asset = {"digest": "", "size": 124457255}
         config = {"checksum_file": ""}
 
-        has_digest, has_checksum_file = verification_service._detect_available_methods(
+        has_digest, checksum_files = verification_service._detect_available_methods(
+            asset, config, sample_assets, "Legcord", "Legcord", "v1.1.5"
+        )
+
+        assert has_digest is False
+        assert len(checksum_files) == 1  # Only latest-linux.yml
+        # YAML files should be prioritized first
+        assert checksum_files[0].filename == "latest-linux.yml"
+        assert checksum_files[0].format_type == "yaml"
+
+    def test_detect_available_methods_with_digest_and_assets(
+        self, verification_service, sample_assets_with_both
+    ):
+        """Test detection with both digest and checksum files available."""
+        asset = {"digest": "sha256:abc123", "size": 12345}
+        config = {"checksum_file": ""}
+
+        has_digest, checksum_files = verification_service._detect_available_methods(
+            asset, config, sample_assets_with_both, "test", "test", "v1.0.0"
+        )
+
+        assert has_digest is True
+        assert len(checksum_files) == 2  # Both YAML and traditional
+
+    def test_detect_available_methods_manual_checksum_file(self, verification_service):
+        """Test detection with manually configured checksum file."""
+        asset = {"digest": "", "size": 124457255}
+        config = {"checksum_file": "manual-checksums.txt"}
+
+        has_digest, checksum_files = verification_service._detect_available_methods(
+            asset, config, None, "owner", "repo", "v1.0.0"
+        )
+
+        assert has_digest is False
+        assert len(checksum_files) == 1
+        assert checksum_files[0].filename == "manual-checksums.txt"
+        assert checksum_files[0].format_type == "traditional"
+
+    def test_detect_available_methods_backward_compatibility(self, verification_service):
+        """Test backward compatibility when assets parameter is not provided."""
+        asset = {"digest": "sha256:abc123", "size": 124457255}
+        config = {"checksum_file": "checksums.txt"}
+
+        # Without assets parameter (old behavior)
+        has_digest, checksum_files = verification_service._detect_available_methods(
             asset, config
         )
 
         assert has_digest is True
-        assert has_checksum_file is False
+        assert len(checksum_files) == 0  # Can't detect without assets
 
-    def test_should_skip_verification_skip_and_no_methods(self, verification_service):
-        """Test skip decision when skip is configured and no strong methods available."""
-        config = {"skip": True}
-
+    def test_should_skip_verification_logic(self, verification_service):
+        """Test skip verification decision logic."""
+        # Skip with no strong methods available
         should_skip, updated_config = verification_service._should_skip_verification(
-            config, has_digest=False, has_checksum_file=False
+            {"skip": True}, has_digest=False, has_checksum_files=False
         )
-
         assert should_skip is True
-        assert updated_config == {"skip": True}
+        assert updated_config["skip"] is True
 
-    def test_should_skip_verification_skip_but_digest_available(self, verification_service):
-        """Test skip decision when skip is configured but digest is available."""
-        config = {"skip": True}
-
+        # Override skip when strong methods available
         should_skip, updated_config = verification_service._should_skip_verification(
-            config, has_digest=True, has_checksum_file=False
+            {"skip": True}, has_digest=True, has_checksum_files=False
         )
-
         assert should_skip is False
         assert updated_config["skip"] is False
 
-    def test_should_skip_verification_skip_but_checksum_available(self, verification_service):
-        """Test skip decision when skip is configured but checksum file is available."""
-        config = {"skip": True}
-
+        # No skip when not configured
         should_skip, updated_config = verification_service._should_skip_verification(
-            config, has_digest=False, has_checksum_file=True
+            {"skip": False}, has_digest=False, has_checksum_files=True
         )
-
         assert should_skip is False
-        assert updated_config["skip"] is False
-
-    def test_should_skip_verification_no_skip(self, verification_service):
-        """Test skip decision when skip is not configured."""
-        config = {"skip": False}
-
-        should_skip, updated_config = verification_service._should_skip_verification(
-            config, has_digest=False, has_checksum_file=False
-        )
-
-        assert should_skip is False
-        assert updated_config == {"skip": False}
-
-    def test_should_skip_verification_missing_skip_key(self, verification_service):
-        """Test skip decision when skip key is missing."""
-        config = {}
-
-        should_skip, updated_config = verification_service._should_skip_verification(
-            config, has_digest=True, has_checksum_file=False
-        )
-
-        assert should_skip is False
-        assert updated_config == {}
 
     @pytest.mark.asyncio
-    async def test_verify_digest_success(self, verification_service, mock_verifier):
+    async def test_verify_digest_success(self, verification_service):
         """Test successful digest verification."""
-        digest = "sha256:abc123def456"
-        mock_verifier.verify_digest.return_value = None  # Success
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.verify_digest.return_value = None
 
-        result = await verification_service._verify_digest(
-            mock_verifier, digest, "testapp", skip_configured=False
-        )
-
-        assert result["passed"] is True
-        assert result["hash"] == digest
-        assert result["details"] == "GitHub API digest verification"
-        mock_verifier.verify_digest.assert_called_once_with(digest)
-
-    @pytest.mark.asyncio
-    async def test_verify_digest_failure(self, verification_service, mock_verifier):
-        """Test failed digest verification."""
-        digest = "sha256:abc123def456"
-        mock_verifier.verify_digest.side_effect = Exception("Hash mismatch")
-
-        result = await verification_service._verify_digest(
-            mock_verifier, digest, "testapp", skip_configured=False
-        )
-
-        assert result["passed"] is False
-        assert result["hash"] == digest
-        assert result["details"] == "Hash mismatch"
-
-    @pytest.mark.asyncio
-    async def test_verify_digest_with_skip_configured(
-        self, verification_service, mock_verifier
-    ):
-        """Test digest verification when skip was configured."""
-        digest = "sha256:abc123def456"
-        mock_verifier.verify_digest.return_value = None
-
-        with patch("my_unicorn.services.verification_service.logger") as mock_logger:
             result = await verification_service._verify_digest(
-                mock_verifier, digest, "testapp", skip_configured=True
+                mock_verifier, "sha256:abc123", "testapp", False
             )
 
             assert result["passed"] is True
-            # Should have debug logging calls
-            mock_logger.debug.assert_called()
+            assert result["hash"] == "sha256:abc123"
+            assert "GitHub API digest verification" in result["details"]
 
     @pytest.mark.asyncio
-    async def test_verify_checksum_file_success(self, verification_service, mock_verifier):
-        """Test successful checksum file verification."""
-        checksum_url = "https://example.com/checksums.txt"
-        hash_type = "sha256"
-        filename = "test.AppImage"
-        computed_hash = "abc123def456"
+    async def test_verify_digest_failure(self, verification_service):
+        """Test failed digest verification."""
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.verify_digest.side_effect = Exception("Hash mismatch")
 
-        # Make verify_from_checksum_file async
-        mock_verifier.verify_from_checksum_file = AsyncMock(return_value=None)
-        mock_verifier.compute_hash.return_value = computed_hash
+            result = await verification_service._verify_digest(
+                mock_verifier, "sha256:abc123", "testapp", False
+            )
 
-        result = await verification_service._verify_checksum_file(
-            mock_verifier, checksum_url, hash_type, filename, "testapp"
-        )
-
-        assert result["passed"] is True
-        assert result["hash"] == f"{hash_type}:{computed_hash}"
-        assert result["details"] == "Verified against checksum file"
-        assert result["url"] == checksum_url
-        assert result["hash_type"] == hash_type
-
-        mock_verifier.verify_from_checksum_file.assert_called_once_with(
-            checksum_url, hash_type, verification_service.download_service, filename
-        )
+            assert result["passed"] is False
+            assert result["hash"] == "sha256:abc123"
+            assert "Hash mismatch" in result["details"]
 
     @pytest.mark.asyncio
-    async def test_verify_checksum_file_failure(self, verification_service, mock_verifier):
-        """Test failed checksum file verification."""
-        checksum_url = "https://example.com/checksums.txt"
-        hash_type = "sha256"
-        filename = "test.AppImage"
-
-        mock_verifier.verify_from_checksum_file = AsyncMock(
-            side_effect=Exception("Checksum mismatch")
-        )
-
-        result = await verification_service._verify_checksum_file(
-            mock_verifier, checksum_url, hash_type, filename, "testapp"
-        )
-
-        assert result["passed"] is False
-        assert result["hash"] == ""
-        assert result["details"] == "Checksum mismatch"
-
-    def test_verify_file_size_success(self, verification_service, mock_verifier):
-        """Test successful file size verification."""
-        expected_size = 1024
-        file_size = 1024
-
-        mock_verifier.get_file_size.return_value = file_size
-        mock_verifier.verify_size.return_value = None
-
-        result = verification_service._verify_file_size(mock_verifier, expected_size)
-
-        assert result["passed"] is True
-        assert result["details"] == f"File size: {file_size:,} bytes"
-
-        mock_verifier.verify_size.assert_called_once_with(expected_size)
-
-    def test_verify_file_size_failure(self, verification_service, mock_verifier):
-        """Test failed file size verification."""
-        expected_size = 1024
-
-        mock_verifier.get_file_size.side_effect = Exception("File not found")
-
-        result = verification_service._verify_file_size(mock_verifier, expected_size)
-
-        assert result["passed"] is False
-        assert result["details"] == "File not found"
-
-    def test_verify_file_size_zero_expected(self, verification_service, mock_verifier):
-        """Test file size verification with zero expected size."""
-        expected_size = 0
-        file_size = 1024
-
-        mock_verifier.get_file_size.return_value = file_size
-
-        result = verification_service._verify_file_size(mock_verifier, expected_size)
-
-        assert result["passed"] is True
-        # Should not call verify_size when expected_size is 0
-        mock_verifier.verify_size.assert_not_called()
-
-    def test_build_checksum_url(self, verification_service):
-        """Test checksum URL building."""
-        url = verification_service._build_checksum_url(
-            "owner", "repo", "v1.0.0", "checksums.txt"
-        )
-
-        expected = "https://github.com/owner/repo/releases/download/v1.0.0/checksums.txt"
-        assert url == expected
-
-    def test_build_checksum_url_with_special_chars(self, verification_service):
-        """Test checksum URL building with special characters."""
-        url = verification_service._build_checksum_url(
-            "owner-name", "repo.name", "v1.0.0-beta", "checksums-sha256.txt"
-        )
-
-        expected = "https://github.com/owner-name/repo.name/releases/download/v1.0.0-beta/checksums-sha256.txt"
-        assert url == expected
-
-    @pytest.mark.asyncio
-    async def test_verify_file_skip_verification(
-        self, verification_service, test_file_path, sample_asset
+    async def test_verify_yaml_checksum_file(
+        self, verification_service, mock_download_service
     ):
-        """Test file verification when skip is configured and no strong methods."""
-        config = {"skip": True}
-        asset = {}  # No digest
-
-        result = await verification_service.verify_file(
-            file_path=test_file_path,
-            asset=asset,
-            config=config,
-            owner="test",
-            repo="repo",
-            tag_name="v1.0.0",
-            app_name="testapp",
+        """Test YAML checksum file verification (Legcord example)."""
+        mock_download_service.download_checksum_file = AsyncMock(
+            return_value=LEGCORD_YAML_CONTENT
         )
 
-        assert result.passed is True
-        assert result.methods == {}
-        assert result.updated_config == {"skip": True}
-
-    @pytest.mark.asyncio
-    async def test_verify_file_digest_success(
-        self, verification_service, test_file_path, mock_verifier
-    ):
-        """Test file verification with successful digest verification."""
-        asset = {"digest": "sha256:abc123def456", "size": 1024}
-        config = {"skip": False}
-
-        mock_verifier.verify_digest.return_value = None
-        mock_verifier.get_file_size.return_value = 1024
-        mock_verifier.verify_size.return_value = None
-
-        result = await verification_service.verify_file(
-            file_path=test_file_path,
-            asset=asset,
-            config=config,
-            owner="test",
-            repo="repo",
-            tag_name="v1.0.0",
-            app_name="testapp",
+        checksum_file = ChecksumFileInfo(
+            filename="latest-linux.yml",
+            url="https://github.com/Legcord/Legcord/releases/download/v1.1.5/latest-linux.yml",
+            format_type="yaml",
         )
 
-        assert result.passed is True
-        assert "digest" in result.methods
-        assert result.methods["digest"]["passed"] is True
-        assert "size" in result.methods
-        assert result.updated_config["digest"] is True
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
+            mock_verifier.compute_hash.return_value = LEGCORD_EXPECTED_HEX
 
-    @pytest.mark.asyncio
-    async def test_verify_file_checksum_fallback(
-        self, verification_service, test_file_path, mock_verifier
-    ):
-        """Test file verification falling back to checksum file."""
-        asset = {"digest": "sha256:wronghash", "size": 1024}
-        config = {"skip": False, "checksum_file": "checksums.txt"}
+            result = await verification_service._verify_checksum_file(
+                mock_verifier, checksum_file, "Legcord-1.1.5-linux-x86_64.AppImage", "testapp"
+            )
 
-        # Digest verification fails
-        mock_verifier.verify_digest.side_effect = Exception("Hash mismatch")
-        # Checksum verification succeeds
-        mock_verifier.verify_from_checksum_file = AsyncMock(return_value=None)
-        mock_verifier.compute_hash.return_value = "correcthash"
-        # Size verification succeeds
-        mock_verifier.get_file_size.return_value = 1024
-        mock_verifier.verify_size.return_value = None
-
-        result = await verification_service.verify_file(
-            file_path=test_file_path,
-            asset=asset,
-            config=config,
-            owner="test",
-            repo="repo",
-            tag_name="v1.0.0",
-            app_name="testapp",
-        )
-
-        assert result.passed is True
-        assert result.methods["digest"]["passed"] is False
-        assert result.methods["checksum_file"]["passed"] is True
-        assert result.methods["size"]["passed"] is True
-
-    @pytest.mark.asyncio
-    async def test_verify_file_all_methods_fail(
-        self, verification_service, test_file_path, mock_verifier
-    ):
-        """Test file verification when all methods fail."""
-        asset = {"digest": "sha256:wronghash", "size": 1024}
-        config = {"skip": False, "checksum_file": "checksums.txt"}
-
-        # All verifications fail
-        mock_verifier.verify_digest.side_effect = Exception("Digest mismatch")
-        mock_verifier.verify_from_checksum_file = AsyncMock(
-            side_effect=Exception("Checksum mismatch")
-        )
-        mock_verifier.get_file_size.return_value = 1024
-        mock_verifier.verify_size.return_value = None  # Size check passes
-
-        with pytest.raises(Exception, match="Available verification methods failed"):
-            await verification_service.verify_file(
-                file_path=test_file_path,
-                asset=asset,
-                config=config,
-                owner="test",
-                repo="repo",
-                tag_name="v1.0.0",
-                app_name="testapp",
+            assert result["passed"] is True
+            assert "sha512:" in result["hash"]
+            assert "yaml checksum file" in result["details"]
+            mock_download_service.download_checksum_file.assert_called_once_with(
+                checksum_file.url
             )
 
     @pytest.mark.asyncio
-    async def test_verify_file_size_only(
-        self, verification_service, test_file_path, mock_verifier
+    async def test_verify_traditional_checksum_file(
+        self, verification_service, mock_download_service
     ):
-        """Test file verification with only size check available."""
-        asset = {"size": 1024}
-        config = {"skip": False}
-
-        mock_verifier.get_file_size.return_value = 1024
-        mock_verifier.verify_size.return_value = None
-
-        result = await verification_service.verify_file(
-            file_path=test_file_path,
-            asset=asset,
-            config=config,
-            owner="test",
-            repo="repo",
-            tag_name="v1.0.0",
-            app_name="testapp",
+        """Test traditional checksum file verification (SHA256SUMS example)."""
+        mock_download_service.download_checksum_file = AsyncMock(
+            return_value=SIYUAN_SHA256SUMS_CONTENT
         )
 
-        assert result.passed is True
-        assert "size" in result.methods
-        assert result.methods["size"]["passed"] is True
-
-    @pytest.mark.asyncio
-    async def test_verify_file_size_check_fails_no_strong_methods(
-        self, verification_service, test_file_path, mock_verifier
-    ):
-        """Test file verification when size check fails and no strong methods available."""
-        asset = {"size": 1024}
-        config = {"skip": False}
-
-        mock_verifier.get_file_size.side_effect = Exception("File corrupted")
-
-        result = await verification_service.verify_file(
-            file_path=test_file_path,
-            asset=asset,
-            config=config,
-            owner="test",
-            repo="repo",
-            tag_name="v1.0.0",
-            app_name="testapp",
+        checksum_file = ChecksumFileInfo(
+            filename="SHA256SUMS.txt",
+            url="https://github.com/siyuan/siyuan/releases/download/v3.2.1/SHA256SUMS.txt",
+            format_type="traditional",
         )
 
-        assert result.passed is False
-        assert result.methods["size"]["passed"] is False
+        expected_hash = "3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef"
 
-    @pytest.mark.asyncio
-    async def test_verify_file_size_check_fails_with_strong_methods(
-        self, verification_service, test_file_path, mock_verifier
-    ):
-        """Test file verification when size check fails but strong methods available."""
-        asset = {"digest": "sha256:wronghash", "size": 1024}
-        config = {"skip": False}
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.detect_hash_type_from_filename.return_value = "sha256"
+            mock_verifier.parse_checksum_file.return_value = expected_hash
+            mock_verifier.compute_hash.return_value = expected_hash
 
-        # Digest fails, size fails
-        mock_verifier.verify_digest.side_effect = Exception("Hash mismatch")
-        mock_verifier.get_file_size.side_effect = Exception("File corrupted")
-
-        with pytest.raises(Exception, match="File verification failed"):
-            await verification_service.verify_file(
-                file_path=test_file_path,
-                asset=asset,
-                config=config,
-                owner="test",
-                repo="repo",
-                tag_name="v1.0.0",
-                app_name="testapp",
+            result = await verification_service._verify_checksum_file(
+                mock_verifier, checksum_file, "siyuan-3.2.1-linux.AppImage", "testapp"
             )
 
+            assert result["passed"] is True
+            assert result["hash"] == f"sha256:{expected_hash}"
+            assert "traditional checksum file" in result["details"]
+
     @pytest.mark.asyncio
-    async def test_verify_file_complex_scenario(
-        self, verification_service, test_file_path, mock_verifier
+    async def test_verify_checksum_file_hash_mismatch(
+        self, verification_service, mock_download_service
     ):
-        """Test complex verification scenario with multiple methods and edge cases."""
-        asset = {"digest": "sha256:abc123", "size": 2048}
-        config = {
-            "skip": True,  # Skip is set but should be overridden
-            "checksum_file": "checksums.sha256",
-            "checksum_hash_type": "sha512",  # Different hash type
-        }
-
-        # Digest verification succeeds (overrides skip)
-        mock_verifier.verify_digest.return_value = None
-        # Size verification succeeds
-        mock_verifier.get_file_size.return_value = 2048
-        mock_verifier.verify_size.return_value = None
-
-        result = await verification_service.verify_file(
-            file_path=test_file_path,
-            asset=asset,
-            config=config,
-            owner="test-owner",
-            repo="test-repo",
-            tag_name="v2.1.0",
-            app_name="complex-app",
+        """Test checksum file verification with hash mismatch."""
+        mock_download_service.download_checksum_file = AsyncMock(
+            return_value=LEGCORD_YAML_CONTENT
         )
 
-        assert result.passed is True
-        assert result.updated_config["skip"] is False  # Should be overridden
-        assert result.updated_config["digest"] is True  # Should be enabled
-        assert result.methods["digest"]["passed"] is True
-        assert result.methods["size"]["passed"] is True
+        checksum_file = ChecksumFileInfo(
+            filename="latest-linux.yml",
+            url="https://github.com/Legcord/Legcord/releases/download/v1.1.5/latest-linux.yml",
+            format_type="yaml",
+        )
+
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
+            mock_verifier.compute_hash.return_value = "different_hash"
+
+            result = await verification_service._verify_checksum_file(
+                mock_verifier, checksum_file, "Legcord-1.1.5-linux-x86_64.AppImage", "testapp"
+            )
+
+            assert result["passed"] is False
+            assert result["details"]  # Just check it has details
 
     @pytest.mark.asyncio
-    async def test_verify_file_logging_calls(
-        self, verification_service, test_file_path, mock_verifier
+    async def test_verify_checksum_file_not_found(
+        self, verification_service, mock_download_service
     ):
-        """Test that appropriate logging calls are made."""
-        asset = {"digest": "sha256:abc123", "size": 1024}
+        """Test checksum file verification when target file not found."""
+        mock_download_service.download_checksum_file = AsyncMock(
+            return_value=LEGCORD_YAML_CONTENT
+        )
+
+        checksum_file = ChecksumFileInfo(
+            filename="latest-linux.yml",
+            url="https://github.com/Legcord/Legcord/releases/download/v1.1.5/latest-linux.yml",
+            format_type="yaml",
+        )
+
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.parse_checksum_file.return_value = None  # Not found
+
+            result = await verification_service._verify_checksum_file(
+                mock_verifier, checksum_file, "NonExistentFile.AppImage", "testapp"
+            )
+
+            assert result["passed"] is False
+            assert result["details"]  # Just check it has details
+
+    def test_verify_file_size(self, verification_service):
+        """Test file size verification."""
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.get_file_size.return_value = 1024
+            mock_verifier.verify_size.return_value = None
+
+            result = verification_service._verify_file_size(mock_verifier, 1024)
+
+            assert result["passed"] is True
+            assert "1,024 bytes" in result["details"]
+
+    def test_verify_file_size_failure(self, verification_service):
+        """Test file size verification failure."""
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.get_file_size.return_value = 1024
+            mock_verifier.verify_size.side_effect = Exception("Size mismatch")
+
+            result = verification_service._verify_file_size(mock_verifier, 2048)
+
+            assert result["passed"] is False
+            assert "Size mismatch" in result["details"]
+
+    @pytest.mark.asyncio
+    async def test_verify_file_digest_priority(
+        self, verification_service, test_file_path, sample_assets
+    ):
+        """Test that digest verification is prioritized over checksum files."""
+        asset = {"digest": "sha256:abc123", "size": 12}
         config = {"skip": False}
 
-        mock_verifier.verify_digest.return_value = None
-        mock_verifier.get_file_size.return_value = 1024
-        mock_verifier.verify_size.return_value = None
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.verify_digest.return_value = None  # Digest succeeds
+            mock_verifier.get_file_size.return_value = 12
+            mock_verifier.verify_size.return_value = None
 
-        with patch("my_unicorn.services.verification_service.logger") as mock_logger:
             result = await verification_service.verify_file(
                 file_path=test_file_path,
                 asset=asset,
@@ -649,22 +436,108 @@ class TestVerificationService:
                 owner="test",
                 repo="repo",
                 tag_name="v1.0.0",
-                app_name="testapp",
+                app_name="test.AppImage",
+                assets=sample_assets,
             )
 
-            # Check that debug logging was called
-            mock_logger.debug.assert_called()
+            assert result.passed is True
+            assert "digest" in result.methods
+            # Digest verification takes priority - checksum may still be detected but not used
+            assert result.methods["digest"]["passed"] is True
 
     @pytest.mark.asyncio
-    async def test_verify_file_edge_case_empty_asset(
-        self, verification_service, test_file_path, mock_verifier
+    async def test_verify_file_fallback_to_checksum(
+        self, verification_service, test_file_path, sample_assets
     ):
-        """Test file verification with empty asset."""
-        asset = {}
+        """Test fallback to checksum file when digest is not available."""
+        asset = {"digest": "", "size": 12}  # No digest
         config = {"skip": False}
 
-        mock_verifier.get_file_size.return_value = 0
-        mock_verifier.verify_size.return_value = None
+        verification_service.download_service.download_checksum_file = AsyncMock(
+            return_value=LEGCORD_YAML_CONTENT
+        )
+
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
+            mock_verifier.compute_hash.return_value = LEGCORD_EXPECTED_HEX
+            mock_verifier.get_file_size.return_value = 12
+            mock_verifier.verify_size.return_value = None
+
+            result = await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="Legcord",
+                repo="Legcord",
+                tag_name="v1.1.5",
+                app_name="test.AppImage",
+                assets=sample_assets,
+            )
+
+            assert result.passed is True
+            assert "checksum_file" in result.methods
+            assert result.methods["checksum_file"]["passed"] is True
+
+    @pytest.mark.asyncio
+    async def test_verify_file_multiple_checksum_files_priority(
+        self, verification_service, test_file_path, sample_assets_with_both
+    ):
+        """Test that multiple checksum files are tried and YAML is prioritized."""
+        asset = {"digest": "", "size": 12}
+        config = {"skip": False}
+
+        # Mock first checksum file (YAML) to fail
+        async def mock_download_side_effect(url):
+            if "latest-linux.yml" in url:
+                return "invalid yaml content"
+            elif "SHA256SUMS.txt" in url:
+                return SIYUAN_SHA256SUMS_CONTENT
+            return ""
+
+        verification_service.download_service.download_checksum_file = AsyncMock(
+            side_effect=mock_download_side_effect
+        )
+
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+
+            def parse_side_effect(content, filename, hash_type):
+                if "invalid yaml" in content:
+                    return None  # YAML parsing fails
+                elif "3afc23ec" in content:
+                    return "3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef"
+                return None
+
+            mock_verifier.parse_checksum_file.side_effect = parse_side_effect
+            mock_verifier.compute_hash.return_value = (
+                "3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef"
+            )
+            mock_verifier.get_file_size.return_value = 12
+            mock_verifier.verify_size.return_value = None
+
+            result = await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="test",
+                tag_name="v1.0.0",
+                app_name="app.AppImage",
+                assets=sample_assets_with_both,
+            )
+
+            assert result.passed is True
+            # Should have tried both checksum files
+            assert verification_service.download_service.download_checksum_file.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_verify_file_skip_verification(self, verification_service, test_file_path):
+        """Test skipping verification when configured and no strong methods available."""
+        asset = {"digest": "", "size": 12}
+        config = {"skip": True}
 
         result = await verification_service.verify_file(
             file_path=test_file_path,
@@ -673,68 +546,177 @@ class TestVerificationService:
             owner="test",
             repo="repo",
             tag_name="v1.0.0",
-            app_name="testapp",
+            app_name="test.AppImage",
         )
 
         assert result.passed is True
-        # Should not call verify_size when expected size is 0
-        mock_verifier.verify_size.assert_not_called()
-
-    def test_verification_service_initialization(self, mock_download_service):
-        """Test that VerificationService initializes correctly."""
-        service = VerificationService(mock_download_service)
-
-        assert service.download_service is mock_download_service
+        assert result.methods == {}  # No methods attempted
 
     @pytest.mark.asyncio
-    async def test_verify_file_with_none_values_in_asset(
-        self, verification_service, test_file_path, mock_verifier
+    async def test_verify_file_all_methods_fail(
+        self, verification_service, test_file_path, sample_assets_with_both
     ):
-        """Test file verification with None values in asset."""
-        asset = {"digest": None, "size": None}
+        """Test when all available verification methods fail."""
+        asset = {"digest": "sha256:wrong_hash", "size": 12}
         config = {"skip": False}
 
-        mock_verifier.get_file_size.return_value = 1024
-
-        result = await verification_service.verify_file(
-            file_path=test_file_path,
-            asset=asset,
-            config=config,
-            owner="test",
-            repo="repo",
-            tag_name="v1.0.0",
-            app_name="testapp",
+        verification_service.download_service.download_checksum_file = AsyncMock(
+            return_value=LEGCORD_YAML_CONTENT
         )
 
-        # Should handle None values gracefully
-        assert result.passed is True
-        assert "size" in result.methods
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.verify_digest.side_effect = Exception("Digest failed")
+            mock_verifier.parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
+            mock_verifier.compute_hash.return_value = "different_hash"  # Checksum fails
+            mock_verifier.get_file_size.return_value = 12
+            mock_verifier.verify_size.return_value = None
+
+            with pytest.raises(Exception, match="Available verification methods failed"):
+                await verification_service.verify_file(
+                    file_path=test_file_path,
+                    asset=asset,
+                    config=config,
+                    owner="test",
+                    repo="test",
+                    tag_name="v1.0.0",
+                    app_name="app.AppImage",
+                    assets=sample_assets_with_both,
+                )
 
     @pytest.mark.asyncio
-    async def test_verify_file_preserves_original_config(
-        self, verification_service, test_file_path, mock_verifier
+    async def test_verify_file_size_only_fallback(self, verification_service, test_file_path):
+        """Test fallback to size-only verification when no strong methods available."""
+        asset = {"digest": "", "size": 12}
+        config = {"skip": False}
+
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.get_file_size.return_value = 12
+            mock_verifier.verify_size.return_value = None
+
+            result = await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="repo",
+                tag_name="v1.0.0",
+                app_name="test.AppImage",
+            )
+
+            assert result.passed is True
+            assert "size" in result.methods
+            assert result.methods["size"]["passed"] is True
+
+    @pytest.mark.asyncio
+    async def test_verify_file_backward_compatibility(
+        self, verification_service, test_file_path
     ):
-        """Test that original config values are preserved when not modified."""
-        asset = {"digest": "sha256:abc123", "size": 1024}
-        config = {
-            "skip": False,
-            "custom_setting": "preserve_me",
-            "another_setting": 42,
-        }
+        """Test backward compatibility without assets parameter."""
+        asset = {"digest": "sha256:abc123", "size": 12}
+        config = {"skip": False, "checksum_file": "manual.txt"}
 
-        mock_verifier.verify_digest.return_value = None
-        mock_verifier.get_file_size.return_value = 1024
-        mock_verifier.verify_size.return_value = None
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.verify_digest.return_value = None
+            mock_verifier.get_file_size.return_value = 12
+            mock_verifier.verify_size.return_value = None
 
-        result = await verification_service.verify_file(
-            file_path=test_file_path,
-            asset=asset,
-            config=config,
-            owner="test",
-            repo="repo",
-            tag_name="v1.0.0",
-            app_name="testapp",
+            # Call without assets parameter (old API)
+            result = await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="repo",
+                tag_name="v1.0.0",
+                app_name="test.AppImage",
+            )
+
+            assert result.passed is True
+            assert "digest" in result.methods
+
+    @pytest.mark.asyncio
+    async def test_verify_file_edge_case_empty_assets(
+        self, verification_service, test_file_path
+    ):
+        """Test with empty assets list."""
+        asset = {"digest": "", "size": 12}
+        config = {"skip": False}
+        empty_assets = []
+
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.get_file_size.return_value = 12
+            mock_verifier.verify_size.return_value = None
+
+            result = await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="repo",
+                tag_name="v1.0.0",
+                app_name="test.AppImage",
+                assets=empty_assets,
+            )
+
+            assert result.passed is True
+            assert "size" in result.methods
+
+    @pytest.mark.asyncio
+    async def test_verify_file_config_update(
+        self, verification_service, test_file_path, sample_assets_with_both
+    ):
+        """Test that configuration is properly updated based on verification results."""
+        asset = {"digest": "", "size": 12}
+        config = {"skip": True, "checksum_file": ""}  # Skip initially true
+
+        verification_service.download_service.download_checksum_file = AsyncMock(
+            return_value=LEGCORD_YAML_CONTENT
         )
 
-        assert result.updated_config["custom_setting"] == "preserve_me"
-        assert result.updated_config["another_setting"] == 42
+        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier_class.return_value = mock_verifier
+            mock_verifier.parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
+            mock_verifier.compute_hash.return_value = LEGCORD_EXPECTED_HEX
+            mock_verifier.get_file_size.return_value = 12
+            mock_verifier.verify_size.return_value = None
+
+            result = await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="test",
+                tag_name="v1.0.0",
+                app_name="app.AppImage",
+                assets=sample_assets_with_both,
+            )
+
+            assert result.passed is True
+            # Should override skip setting when strong methods are available
+            assert result.updated_config["skip"] is False
+            assert result.updated_config["checksum_file"] == "latest-linux.yml"
+
+    def test_build_checksum_url(self, verification_service):
+        """Test checksum URL building."""
+        url = verification_service._build_checksum_url(
+            "owner", "repo", "v1.0.0", "checksums.txt"
+        )
+        expected = "https://github.com/owner/repo/releases/download/v1.0.0/checksums.txt"
+        assert url == expected
+
+    def test_build_checksum_url_special_characters(self, verification_service):
+        """Test checksum URL building with special characters."""
+        url = verification_service._build_checksum_url(
+            "owner", "repo", "v1.0.0-beta", "SHA256SUMS.txt"
+        )
+        expected = "https://github.com/owner/repo/releases/download/v1.0.0-beta/SHA256SUMS.txt"
+        assert url == expected

@@ -61,40 +61,68 @@ class UpdateAllAppsStrategy(UpdateStrategy):
         installed_apps = context.config_manager.list_installed_apps()
         app_count = len(installed_apps)
 
-        print(f"🔄 Checking all {app_count} installed app(s) for updates...")
+        # Check which apps need updates and perform updates in single session
+        from ..services.progress import get_progress_service, progress_session
 
-        # Check which apps need updates
-        update_infos = await context.update_manager.check_all_updates(installed_apps)
-        apps_to_update = [info for info in update_infos if info.has_update]
-        apps_up_to_date = [info for info in update_infos if not info.has_update]
+        async with progress_session():
+            progress_service = get_progress_service()
 
-        if apps_up_to_date:
-            print(f"✅ {len(apps_up_to_date)} app(s) already up to date")
-
-        if not apps_to_update:
-            message = "All apps are up to date!"
-            print(message)
-            return UpdateResult(
-                success=True,
-                updated_apps=[],
-                failed_apps=[],
-                up_to_date_apps=[info.app_name for info in apps_up_to_date],
-                update_infos=update_infos,
-                message=message,
+            # Create minimal API progress task - let API calls drive the count
+            api_task_id = await progress_service.create_api_fetching_task(
+                endpoint="API assets", total_requests=1
             )
 
-        print(f"📦 Updating {len(apps_to_update)} app(s) that need updates...")
+            # Set shared task for update manager
+            context.update_manager._shared_api_task_id = api_task_id
 
-        # Show which apps will be updated
-        for info in apps_to_update:
-            print(f"   • {info.app_name}: {info.current_version} → {info.latest_version}")
+            try:
+                # Phase 1: Check for updates
+                update_infos = await context.update_manager.check_all_updates_with_progress(
+                    installed_apps
+                )
+                apps_to_update = [info for info in update_infos if info.has_update]
+                apps_up_to_date = [info for info in update_infos if not info.has_update]
 
-        print()  # Empty line for better spacing
+                if apps_up_to_date:
+                    print(f"✅ {len(apps_up_to_date)} app(s) already up to date")
 
-        # Perform updates with suppressed logging
-        results = await self._execute_updates(
-            context, [info.app_name for info in apps_to_update]
-        )
+                if not apps_to_update:
+                    message = "All apps are up to date!"
+                    print(message)
+                    # Finish API progress task
+                    await progress_service.finish_task(api_task_id, success=True)
+                    return UpdateResult(
+                        success=True,
+                        updated_apps=[],
+                        failed_apps=[],
+                        up_to_date_apps=[info.app_name for info in apps_up_to_date],
+                        update_infos=update_infos,
+                        message=message,
+                    )
+
+                # Show which apps will be updated
+                for info in apps_to_update:
+                    print(
+                        f"   • {info.app_name}: {info.current_version} → {info.latest_version}"
+                    )
+
+                print()  # Empty line for better spacing
+
+                # Phase 2: Perform updates (API progress task continues for additional GitHub calls)
+                results = await self._execute_updates(
+                    context, [info.app_name for info in apps_to_update]
+                )
+
+                # Finish API progress task
+                await progress_service.finish_task(api_task_id, success=True)
+
+            except Exception:
+                # Finish API progress task with error
+                await progress_service.finish_task(api_task_id, success=False)
+                raise
+            finally:
+                # Clean up shared task
+                context.update_manager._shared_api_task_id = None
 
         # Categorize results
         updated_apps: list[str] = []

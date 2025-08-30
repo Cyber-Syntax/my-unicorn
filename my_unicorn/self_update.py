@@ -21,6 +21,7 @@ from packaging import version
 from .config import ConfigManager, GlobalConfig
 from .github_client import GitHubReleaseFetcher
 from .logger import get_logger
+from .services.progress import ProgressType
 
 logger = get_logger(__name__)
 
@@ -64,19 +65,31 @@ def normalize_version_string(version_str: str) -> str:
 class SelfUpdater:
     """Handles self-updating of the my-unicorn package."""
 
-    def __init__(self, config_manager: ConfigManager, session: aiohttp.ClientSession) -> None:
+    def __init__(
+        self,
+        config_manager: ConfigManager,
+        session: aiohttp.ClientSession,
+        shared_api_task_id: str | None = None,
+        progress_service=None,
+    ) -> None:
         """Initialize the self-updater.
 
         Args:
             config_manager: Configuration manager instance
             session: aiohttp client session for API requests
+            shared_api_task_id: Optional shared API task ID for progress tracking
+            progress_service: Optional progress service for tracking operations
 
         """
         self.config_manager: ConfigManager = config_manager
         self.global_config: GlobalConfig = config_manager.load_global_config()
         self.session: aiohttp.ClientSession = session
+        self.progress_service = progress_service
         self.github_fetcher: GitHubReleaseFetcher = GitHubReleaseFetcher(
-            owner=GITHUB_OWNER, repo=GITHUB_REPO, session=session
+            owner=GITHUB_OWNER,
+            repo=GITHUB_REPO,
+            session=session,
+            shared_api_task_id=shared_api_task_id,
         )
 
     def get_current_version(self) -> str:
@@ -190,15 +203,14 @@ class SelfUpdater:
         # Get current version
         try:
             current_version_str = self.get_current_version()
+            logger.debug("Current version string: %s", current_version_str)
+            logger.debug("Latest version tag from GitHub: %s", latest_version_tag)
 
             # Normalize both versions for proper comparison
             current_normalized = normalize_version_string(
                 current_version_str.split("+")[0]  # Remove git info
             )
             latest_normalized = normalize_version_string(latest_version_tag)
-
-            print(f"Current version: {current_version_str}")
-            print(f"Latest version: {latest_version_tag}")
 
             logger.debug("Normalized current: %s", current_normalized)
             logger.debug("Normalized latest: %s", latest_normalized)
@@ -207,18 +219,18 @@ class SelfUpdater:
             current_version_obj = version.parse(current_normalized)
             latest_version_obj = version.parse(latest_normalized)
 
+            logger.debug("Version comparison objects:")
+            logger.debug("  Current: %s", current_version_obj)
+            logger.debug("  Latest: %s", latest_version_obj)
+
             if latest_version_obj > current_version_obj:
-                print("🆕 Updates are available!")
-                print(
-                    "Note: Your previous custom settings might be preserved, but please "
-                    + "backup important data."
-                )
+                logger.debug("Update available: latest > current")
                 return True
             elif latest_version_obj == current_version_obj:
-                print("✅ my-unicorn is up to date")
+                logger.debug("No update needed: versions are equal")
                 return False
             else:
-                print("💻 You are using a newer version")
+                logger.debug("No update needed: current > latest (dev version?)")
                 return False
 
         except (PackageNotFoundError, Exception) as e:
@@ -238,6 +250,18 @@ class SelfUpdater:
         source_dir = repo_dir / "source"
         installer = package_dir / "my-unicorn-installer.sh"
 
+        logger.debug("Starting self-update process")
+        logger.debug("Repository directory: %s", repo_dir)
+        logger.debug("Package directory: %s", package_dir)
+        logger.debug("Source directory: %s", source_dir)
+        logger.debug("Installer script: %s", installer)
+
+        # Track progress with proper progress types
+        download_task_id = None
+        file_task_id = None
+        install_task_id = None
+        cleanup_task_id = None
+
         try:
             # Ensure repo directory exists
             repo_dir.mkdir(parents=True, exist_ok=True)
@@ -245,12 +269,28 @@ class SelfUpdater:
             # 1) Prepare fresh source tree
             if source_dir.exists():
                 logger.info("Removing old source at %s", source_dir)
+                logger.debug(
+                    "Old source directory size: %s",
+                    source_dir.stat().st_size if source_dir.is_file() else "directory",
+                )
                 shutil.rmtree(source_dir)
+                logger.debug("Old source directory removed successfully")
             source_dir.mkdir(parents=True)
+            logger.debug("Created fresh source directory: %s", source_dir)
 
-            # 2) Clone into source_dir
+            # 2) Clone into source_dir with DOWNLOAD progress tracking
+            if self.progress_service:
+                download_task_id = await self.progress_service.add_task(
+                    name="Repository Clone",
+                    progress_type=ProgressType.DOWNLOAD,
+                    total=100.0,
+                    description="Cloning repository from GitHub...",
+                )
+
             logger.info("Cloning repository to %s", source_dir)
-            print("📥 Downloading latest version...")
+            logger.debug(
+                "Git clone command: git clone %s %s", f"{GITHUB_URL}.git", str(source_dir)
+            )
 
             clone_process = await asyncio.create_subprocess_exec(
                 "git",
@@ -261,48 +301,139 @@ class SelfUpdater:
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            _ = await clone_process.wait()
+            # Simulate progress during clone (since git clone doesn't provide easy progress parsing)
+            clone_task = asyncio.create_task(clone_process.wait())
+            if self.progress_service and download_task_id:
+                # Simulate clone progress
+                for progress in range(0, 101, 20):
+                    if clone_task.done():
+                        break
+                    await self.progress_service.update_task(
+                        download_task_id,
+                        completed=float(progress),
+                        description=f"Cloning repository... {progress}%",
+                    )
+                    await asyncio.sleep(0.5)
+
+            await clone_task
+
+            logger.debug(
+                "Git clone process completed with return code: %s", clone_process.returncode
+            )
+            if clone_process.returncode == 0:
+                logger.debug("Repository cloned successfully to %s", source_dir)
+                # Check if source directory has expected content
+                try:
+                    source_contents = list(source_dir.iterdir())
+                    logger.debug("Cloned repository contains %d items", len(source_contents))
+                    logger.debug(
+                        "Repository structure: %s", [item.name for item in source_contents]
+                    )
+                except Exception as e:
+                    logger.debug("Could not list source directory contents: %s", e)
+            else:
+                logger.debug("Git clone failed, will handle error")
+
+            if self.progress_service and download_task_id:
+                await self.progress_service.finish_task(
+                    download_task_id,
+                    success=clone_process.returncode == 0,
+                    final_description="Repository cloned successfully"
+                    if clone_process.returncode == 0
+                    else "Repository clone failed",
+                )
 
             if clone_process.returncode != 0:
                 logger.error("Git clone failed with return code %s", clone_process.returncode)
-                logger.error("Git clone failed")
                 print("❌ Failed to download repository")
                 return False
 
-            # 3) Copy over only the package code and scripts
+            # 3) Copy files with UPDATE progress tracking
+            if self.progress_service:
+                file_task_id = await self.progress_service.add_task(
+                    name="File Operations",
+                    progress_type=ProgressType.UPDATE,
+                    total=4.0,  # Number of items to copy
+                    description="Copying project files...",
+                )
+
             logger.info("Copying code + scripts to %s", package_dir)
+            logger.debug("Ensuring package directory exists: %s", package_dir)
             package_dir.mkdir(parents=True, exist_ok=True)
+            logger.debug("Package directory created/verified")
 
             # Copy over the package code, scripts, and installation files
-            for name in ("my_unicorn", "scripts", "pyproject.toml", "my-unicorn-installer.sh"):
+            files_to_copy = (
+                "my_unicorn",
+                "scripts",
+                "pyproject.toml",
+                "my-unicorn-installer.sh",
+            )
+            for idx, name in enumerate(files_to_copy):
                 src = source_dir / name
                 dst = package_dir / name
 
+                logger.debug("Processing file/directory: %s", name)
+                logger.debug("Source: %s", src)
+                logger.debug("Destination: %s", dst)
+
                 if not src.exists():
                     logger.warning("Source file/directory not found: %s", src)
+                    logger.debug("Skipping %s - source does not exist", name)
                     continue
+
+                if self.progress_service and file_task_id:
+                    await self.progress_service.update_task(
+                        file_task_id, completed=float(idx), description=f"Copying {name}..."
+                    )
 
                 # Remove the old directory/file (but preserve venv and other dirs)
                 if dst.exists():
+                    logger.debug("Destination exists, removing old: %s", dst)
                     if dst.is_dir():
+                        logger.debug("Removing old directory: %s", dst)
                         shutil.rmtree(dst)
                     else:
+                        logger.debug("Removing old file: %s", dst)
                         dst.unlink()
 
                 # Copy fresh
-                _ = shutil.copytree(src, dst) if src.is_dir() else shutil.copy2(src, dst)
+                if src.is_dir():
+                    logger.debug("Copying directory tree from %s to %s", src, dst)
+                    _ = shutil.copytree(src, dst)
+                    logger.debug("Directory copy completed for %s", name)
+                else:
+                    logger.debug("Copying file from %s to %s", src, dst)
+                    _ = shutil.copy2(src, dst)
+                    logger.debug("File copy completed for %s", name)
 
-            # 4) Make installer executable and invoke it in update mode
+            if self.progress_service and file_task_id:
+                await self.progress_service.finish_task(
+                    file_task_id, success=True, final_description="Files copied successfully"
+                )
+
+            # 4) Run installer with INSTALLATION progress tracking
             if not installer.exists():
                 logger.error("Installer script missing at %s", installer)
                 print("❌ Installer script not found.")
                 return False
 
             # Make installer executable
+            logger.debug("Setting installer script permissions: %s", installer)
             installer.chmod(0o755)
+            logger.debug("Installer script is now executable")
 
-            print("🚀 Running installer in UPDATE mode…")
+            if self.progress_service:
+                install_task_id = await self.progress_service.add_task(
+                    name="Self-Update Installation",
+                    progress_type=ProgressType.INSTALLATION,
+                    total=100.0,
+                    description="Running installer in UPDATE mode...",
+                )
 
+            logger.debug("Starting installer subprocess")
+            logger.debug("Command: bash %s update", str(installer))
+            logger.debug("Working directory: %s", str(package_dir))
             install_process = await asyncio.create_subprocess_exec(
                 "bash",
                 str(installer),
@@ -311,40 +442,134 @@ class SelfUpdater:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
+            logger.debug("Installer subprocess started with PID: %s", install_process.pid)
 
-            # Stream output in real-time
+            # Stream output and update progress
+            install_progress = 0.0
             if install_process.stdout:
                 while True:
                     line = await install_process.stdout.readline()
                     if not line:
                         break
-                    print(line.decode().strip())
+
+                    line_str = line.decode().strip()
+
+                    # Debug log all installer output for troubleshooting
+                    logger.debug("Installer output: %s", line_str)
+
+                    # Detailed logging for specific venv and installation operations
+                    if "virtual environment" in line_str.lower():
+                        logger.debug("VENV OPERATION: %s", line_str)
+                    elif "pip install" in line_str.lower():
+                        logger.debug("PIP INSTALL: %s", line_str)
+                    elif "installing" in line_str.lower():
+                        logger.debug("PACKAGE INSTALL: %s", line_str)
+                    elif "creating" in line_str.lower():
+                        logger.debug("CREATION STEP: %s", line_str)
+                    elif "updating" in line_str.lower():
+                        logger.debug("UPDATE STEP: %s", line_str)
+                    elif "complete" in line_str.lower():
+                        logger.debug("COMPLETION: %s", line_str)
+                    elif "error" in line_str.lower():
+                        logger.debug("ERROR OUTPUT: %s", line_str)
+                    elif "warning" in line_str.lower():
+                        logger.debug("WARNING OUTPUT: %s", line_str)
+
+                    # Update progress based on installer output
+                    if self.progress_service and install_task_id:
+                        # Estimate progress based on key installer stages
+                        if "Creating/updating virtual environment" in line_str:
+                            install_progress = 25.0
+                        elif "Installing my-unicorn" in line_str:
+                            install_progress = 75.0
+                        elif (
+                            "Update complete" in line_str
+                            or "Installation complete" in line_str
+                        ):
+                            install_progress = 100.0
+
+                        await self.progress_service.update_task(
+                            install_task_id,
+                            completed=install_progress,
+                            description=f"Installing... {install_progress:.0f}%",
+                        )
 
             _ = await install_process.wait()
+
+            logger.debug("Installer process completed")
+            logger.debug("Installer exit code: %s", install_process.returncode)
+            if install_process.returncode == 0:
+                logger.debug("Installation successful")
+            else:
+                logger.debug("Installation failed with code: %s", install_process.returncode)
+
+            if self.progress_service and install_task_id:
+                await self.progress_service.finish_task(
+                    install_task_id,
+                    success=install_process.returncode == 0,
+                    final_description="Installation completed successfully"
+                    if install_process.returncode == 0
+                    else "Installation failed",
+                )
 
             if install_process.returncode != 0:
                 print(f"❌ Installer exited with code {install_process.returncode}")
                 return False
 
-            # 5) Clean up source_dir
+            # 5) Clean up source_dir with UPDATE progress tracking
+            if self.progress_service:
+                cleanup_task_id = await self.progress_service.add_task(
+                    name="Cleanup",
+                    progress_type=ProgressType.UPDATE,
+                    total=1.0,
+                    description="Cleaning up temporary files...",
+                )
+
             if source_dir.exists():
                 logger.info("Cleaning up source directory")
+                logger.debug("Removing source directory: %s", source_dir)
+                try:
+                    dir_size = sum(
+                        f.stat().st_size for f in source_dir.rglob("*") if f.is_file()
+                    )
+                    logger.debug("Source directory size before cleanup: %d bytes", dir_size)
+                except Exception as e:
+                    logger.debug("Could not calculate source directory size: %s", e)
                 shutil.rmtree(source_dir)
+                logger.debug("Source directory cleanup completed")
 
-            print("✅ Update successful!")
+            if self.progress_service and cleanup_task_id:
+                await self.progress_service.update_task(cleanup_task_id, completed=1.0)
+                await self.progress_service.finish_task(
+                    cleanup_task_id, success=True, final_description="Cleanup completed"
+                )
+
+            logger.debug("Self-update completed successfully")
+            logger.debug("All operations completed: clone, file copy, installation, cleanup")
             return True
 
         except Exception as e:
+            # Finish any pending progress tasks with error
+            for task_id in [download_task_id, file_task_id, install_task_id, cleanup_task_id]:
+                if self.progress_service and task_id:
+                    await self.progress_service.finish_task(task_id, success=False)
+
             logger.exception("Update failed: %s", e)
             print(f"❌ Update failed: {e}")
             return False
 
 
-async def get_self_updater(config_manager: ConfigManager | None = None) -> SelfUpdater:
+async def get_self_updater(
+    config_manager: ConfigManager | None = None,
+    shared_api_task_id: str | None = None,
+    progress_service=None,
+) -> SelfUpdater:
     """Get a SelfUpdater instance with proper session management.
 
     Args:
         config_manager: Optional config manager, will create one if not provided
+        shared_api_task_id: Optional shared API task ID for progress tracking
+        progress_service: Optional progress service for tracking operations
 
     Returns:
         Configured SelfUpdater instance
@@ -359,7 +584,7 @@ async def get_self_updater(config_manager: ConfigManager | None = None) -> SelfU
     timeout = aiohttp.ClientTimeout(total=30)
     session = aiohttp.ClientSession(timeout=timeout)
 
-    return SelfUpdater(config_manager, session)
+    return SelfUpdater(config_manager, session, shared_api_task_id, progress_service)
 
 
 async def check_for_self_update() -> bool:
@@ -369,11 +594,30 @@ async def check_for_self_update() -> bool:
         True if update is available, False otherwise
 
     """
-    updater = await get_self_updater()
-    try:
-        return await updater.check_for_update()
-    finally:
-        await updater.session.close()
+    from .services.progress import get_progress_service, progress_session
+
+    async with progress_session():
+        progress_service = get_progress_service()
+
+        # Create shared API progress task for GitHub API calls
+        api_task_id = await progress_service.create_api_fetching_task(
+            endpoint="GitHub API", total_requests=1
+        )
+
+        updater = await get_self_updater(
+            shared_api_task_id=api_task_id, progress_service=progress_service
+        )
+        try:
+            result = await updater.check_for_update()
+            # Finish API progress task
+            await progress_service.finish_task(api_task_id, success=True)
+            return result
+        except Exception:
+            # Finish API progress task with error
+            await progress_service.finish_task(api_task_id, success=False)
+            raise
+        finally:
+            await updater.session.close()
 
 
 async def perform_self_update() -> bool:
@@ -383,14 +627,37 @@ async def perform_self_update() -> bool:
         True if update was successful, False otherwise
 
     """
-    updater = await get_self_updater()
-    try:
-        # First check if update is available
-        if await updater.check_for_update():
-            return await updater.perform_update()
-        return False
-    finally:
-        await updater.session.close()
+    from .services.progress import get_progress_service, progress_session
+
+    async with progress_session(
+        total_operations=5
+    ):  # API + Download + Files + Install + Cleanup
+        progress_service = get_progress_service()
+
+        # Create shared API progress task for GitHub API calls (check + potential update)
+        api_task_id = await progress_service.create_api_fetching_task(
+            endpoint="GitHub API", total_requests=1
+        )
+
+        updater = await get_self_updater(
+            shared_api_task_id=api_task_id, progress_service=progress_service
+        )
+        try:
+            # First check if update is available
+            if await updater.check_for_update():
+                # Finish API progress task after check
+                await progress_service.finish_task(api_task_id, success=True)
+                return await updater.perform_update()
+            else:
+                # Finish API progress task
+                await progress_service.finish_task(api_task_id, success=True)
+                return False
+        except Exception:
+            # Finish API progress task with error
+            await progress_service.finish_task(api_task_id, success=False)
+            raise
+        finally:
+            await updater.session.close()
 
 
 def display_current_version() -> None:

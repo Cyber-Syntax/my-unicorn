@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.5.1-alpha
+## v1.5.0-alpha
+# BREAKING CHANGES
+This release implement new library rich for progress bar instead of tqdm.
+Please update my-unicorn via `my-unicorn self-update` to get the latest version.
+
+## v1.4.0-alpha
+## v1.3.0-alpha
 ## v1.2.0-alpha
 ### CHANGES
 This release implement new icon extraction feature and implement new verfication service.

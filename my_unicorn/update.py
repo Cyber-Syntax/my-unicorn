@@ -17,12 +17,14 @@ except ImportError:
     Version = None
     InvalidVersion = None
 
+
 from .auth import GitHubAuthManager
 from .backup import BackupService
 from .config import AppConfig, ConfigManager
 from .download import DownloadService, IconAsset
 from .github_client import GitHubAsset, GitHubReleaseDetails, GitHubReleaseFetcher
 from .logger import get_logger
+from .services import IconService, VerificationService
 from .storage import StorageService
 
 logger = get_logger(__name__)
@@ -70,11 +72,12 @@ class UpdateInfo:
 class UpdateManager:
     """Manages updates for installed AppImages."""
 
-    def __init__(self, config_manager: ConfigManager | None = None):
+    def __init__(self, config_manager: ConfigManager | None = None, progress_service=None):
         """Initialize update manager.
 
         Args:
             config_manager: Configuration manager instance
+            progress_service: Optional progress service for tracking updates
 
         """
         self.config_manager = config_manager or ConfigManager()
@@ -88,9 +91,15 @@ class UpdateManager:
         # Initialize backup service
         self.backup_service = BackupService(self.config_manager, self.global_config)
 
+        # Store progress service parameter but don't cache global service
+        self._progress_service_param = progress_service
+
         # Initialize shared services - will be set when session is available
         self.icon_service = None
         self.verification_service = None
+
+        # Shared API progress task ID for consolidated API progress tracking
+        self._shared_api_task_id: str | None = None
 
     def _initialize_services(self, session: Any) -> None:
         """Initialize shared services with HTTP session.
@@ -99,11 +108,11 @@ class UpdateManager:
             session: aiohttp session for downloads
 
         """
-        from .services import IconService, VerificationService
-
         download_service = DownloadService(session)
-        self.icon_service = IconService(download_service)
-        self.verification_service = VerificationService(download_service)
+        # Get progress service from download service if available
+        progress_service = getattr(download_service, "progress_service", None)
+        self.icon_service = IconService(download_service, progress_service)
+        self.verification_service = VerificationService(download_service, progress_service)
 
     def _select_best_appimage_by_source(
         self,
@@ -248,8 +257,11 @@ class UpdateManager:
                 logger.error("GitHub API disabled for %s (github.repo: false)", app_name)
                 return None
 
+            # TODO: This is making a duplicate API call!
+            # The same release data will be fetched again in update_single_app()
+            # This causes 2 API calls per app instead of 1
             # Fetch latest release
-            fetcher = GitHubReleaseFetcher(owner, repo, session)
+            fetcher = GitHubReleaseFetcher(owner, repo, session, self._shared_api_task_id)
             if should_use_prerelease:
                 logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
                 try:
@@ -349,6 +361,143 @@ class UpdateManager:
 
         return update_infos
 
+    async def check_all_updates_with_spinner(
+        self, app_names: list[str] | None = None
+    ) -> list[UpdateInfo]:
+        """Check for updates for all or specified apps with simple text message.
+
+        Uses a simple text message to avoid Rich rendering conflicts with
+        the main progress session during updates.
+
+        Args:
+            app_names: List of app names to check, or None for all installed apps
+
+        Returns:
+            List of UpdateInfo objects
+
+        """
+        if app_names is None:
+            app_names = self.config_manager.list_installed_apps()
+
+        if not app_names:
+            logger.info("No installed apps found")
+            return []
+
+        # Simple text message to avoid Rich conflicts
+        print(f"🔄 Checking {len(app_names)} app(s) for updates...")
+        return await self._check_apps_without_spinner(app_names)
+
+    async def check_all_updates_with_status_spinner(
+        self, app_names: list[str] | None = None
+    ) -> list[UpdateInfo]:
+        """Check for updates with Rich Status spinner for check-only operations.
+
+        Uses Rich Status spinner which is safe for check-only operations that
+        don't have active progress sessions.
+
+        Args:
+            app_names: List of app names to check, or None for all installed apps
+
+        Returns:
+            List of UpdateInfo objects
+
+        """
+        if app_names is None:
+            app_names = self.config_manager.list_installed_apps()
+
+        if not app_names:
+            logger.info("No installed apps found")
+            return []
+
+        # Use Rich Status spinner for check-only operations (no progress session)
+        from rich.console import Console
+        from rich.status import Status
+
+        console = Console()
+        with Status(
+            f"Checking {len(app_names)} app(s) for updates...",
+            console=console,
+            spinner="dots",
+        ):
+            return await self._check_apps_without_spinner(app_names)
+
+    async def _check_apps_without_spinner(self, app_names: list[str]) -> list[UpdateInfo]:
+        """Internal method to check apps without any display wrapper."""
+        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
+        update_infos = []
+
+        async def check_with_semaphore(app_name: str) -> UpdateInfo | None:
+            async with semaphore:
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        result = await self.check_single_update(app_name, session)
+                    return result
+                except Exception as e:
+                    logger.error("Update check failed for %s: %s", app_name, e)
+                    return None
+
+        # Check all apps concurrently
+        tasks = [check_with_semaphore(app) for app in app_names]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process results
+        for result in results:
+            if isinstance(result, UpdateInfo):
+                update_infos.append(result)
+            elif isinstance(result, Exception):
+                logger.error("Update check failed: %s", result)
+
+        return update_infos
+
+    async def check_all_updates_with_progress(
+        self, app_names: list[str] | None = None
+    ) -> list[UpdateInfo]:
+        """Check for updates for all or specified apps with progress tracking.
+
+        This method creates progress tasks for each app being checked and updates them
+        as the checks complete. Should be called within an active progress session.
+
+        Args:
+            app_names: List of app names to check, or None for all installed apps
+
+        Returns:
+            List of UpdateInfo objects
+
+        """
+        if app_names is None:
+            app_names = self.config_manager.list_installed_apps()
+
+        if not app_names:
+            logger.info("No installed apps found")
+            return []
+
+        # Check updates without creating progress tasks (checking is quick preparation work)
+
+        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
+
+        async with aiohttp.ClientSession() as session:
+
+            async def check_with_semaphore_and_progress(app_name: str) -> UpdateInfo | None:
+                async with semaphore:
+                    try:
+                        result = await self.check_single_update(app_name, session)
+                        return result
+                    except Exception as e:
+                        raise e
+
+            tasks = [check_with_semaphore_and_progress(app) for app in app_names]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Filter out None results and exceptions
+        update_infos = []
+        for result in results:
+            if isinstance(result, UpdateInfo):
+                update_infos.append(result)
+            elif isinstance(result, Exception):
+                logger.error("Update check failed: %s", result)
+
+        return update_infos
+
     # FIXME: too many branches
     async def update_single_app(
         self, app_name: str, session: aiohttp.ClientSession, force: bool = False
@@ -364,7 +513,15 @@ class UpdateManager:
             True if update was successful
 
         """
+        # Get current progress service (not cached instance) for individual tasks
+        from my_unicorn.services.progress import get_progress_service
+
+        progress_service = self._progress_service_param or get_progress_service()
+        progress_enabled = progress_service.is_active()
+
         try:
+            # Phase 1: Initial checks
+
             app_config = self.config_manager.load_app_config(app_name)
             if not app_config:
                 logger.error("No config found for app: %s", app_name)
@@ -415,7 +572,10 @@ class UpdateManager:
                 logger.error("GitHub API disabled for %s (github.repo: false)", app_name)
                 return False
 
-            fetcher = GitHubReleaseFetcher(owner, repo, session)
+            # TODO: DUPLICATE API CALL! This fetches the same release data already fetched in check_single_update()
+            # This is why we see 2-3 API calls per app instead of 1
+            # Should pass release_data from check phase instead of re-fetching
+            fetcher = GitHubReleaseFetcher(owner, repo, session, self._shared_api_task_id)
             if should_use_prerelease:
                 logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
                 release_data = await fetcher.fetch_latest_prerelease()
@@ -431,6 +591,8 @@ class UpdateManager:
                 logger.error("No AppImage found for %s", app_name)
                 return False
 
+            # Phase 2: Setup and backup
+
             # Set up paths
             storage_dir = self.global_config["directory"]["storage"]
             backup_dir = self.global_config["directory"]["backup"]
@@ -438,6 +600,7 @@ class UpdateManager:
             download_dir = self.global_config["directory"]["download"]
 
             # Create backup of current version
+
             current_appimage_path = storage_dir / app_config["appimage"]["name"]
             if current_appimage_path.exists():
                 backup_path = self.backup_service.create_backup(
@@ -476,7 +639,11 @@ class UpdateManager:
                 if not icon_url.startswith("http"):
                     # Build full URL from path template
                     try:
-                        fetcher = GitHubReleaseFetcher(owner, repo, session)
+                        # TODO: This is a 3rd API call for icon URL building
+                        # Could be optimized or eliminated if icons are extracted from AppImage
+                        fetcher = GitHubReleaseFetcher(
+                            owner, repo, session, self._shared_api_task_id
+                        )
                         default_branch = await fetcher.get_default_branch()
                         icon_url = fetcher.build_icon_url(icon_url, default_branch)
                         logger.debug(
@@ -526,6 +693,8 @@ class UpdateManager:
                 # Fallback to app config for backward compatibility
                 rename_to = app_config["appimage"].get("rename", app_name)
 
+            # Phase 3: Download preparation
+
             # Setup download path
             filename = download_service.get_filename_from_url(
                 appimage_asset["browser_download_url"]
@@ -533,11 +702,84 @@ class UpdateManager:
             download_path = download_dir / filename
 
             # Download AppImage first (without renaming)
+            # Note: The actual download progress is handled separately by DownloadService
             appimage_path = await download_service.download_appimage(
                 appimage_asset, download_path, show_progress=True
             )
 
-            # Get icon using enhanced IconManager with extraction configuration
+            # Phase 4: Post-download processing
+
+            # Create combined post-processing task if progress is enabled
+            post_processing_task_id = None
+            if (
+                progress_enabled
+                and hasattr(download_service, "progress_service")
+                and download_service.progress_service
+                and download_service.progress_service.is_active()
+            ):
+                post_processing_task_id = (
+                    await download_service.progress_service.create_post_processing_task(
+                        app_name
+                    )
+                )
+
+            # Verify download if requested (20% of post-processing)
+            verification_results = {}
+            updated_verification_config = {}
+            verification_config = app_config.get("verification", {})
+            
+            if post_processing_task_id and progress_enabled:
+                await progress_service.update_task(
+                    post_processing_task_id,
+                    completed=10.0,
+                    description=f"🔍 Verifying {app_name}...",
+                )
+
+            try:
+                (
+                    verification_results,
+                    updated_verification_config,
+                ) = await self._perform_update_verification(
+                    appimage_path,
+                    appimage_asset,
+                    dict(verification_config),  # Cast to dict[str, Any]
+                    owner,
+                    repo,
+                    update_info.original_tag_name,
+                    app_name,
+                    progress_task_id=post_processing_task_id,
+                )
+
+                if post_processing_task_id and progress_enabled:
+                    await progress_service.update_task(
+                        post_processing_task_id,
+                        completed=30.0,
+                        description=f"✅ {app_name} verification",
+                    )
+
+            except Exception as e:
+                logger.error("Verification failed for %s: %s", app_name, e)
+                # Continue with update even if verification fails
+                verification_results = {}
+                updated_verification_config = {}
+
+            # Move to install directory and make executable (10% of post-processing)
+            if post_processing_task_id and progress_enabled:
+                await progress_service.update_task(
+                    post_processing_task_id,
+                    completed=40.0,
+                    description=f"� Moving {app_name} to install directory...",
+                )
+
+            self.storage_service.make_executable(appimage_path)
+            appimage_path = self.storage_service.move_to_install_dir(appimage_path)
+
+            # Finally rename to clean name using catalog configuration
+            if rename_to:
+                clean_name = self.storage_service.get_clean_appimage_name(rename_to)
+                appimage_path = self.storage_service.rename_appimage(appimage_path, clean_name)
+
+            # Handle icon setup (30% of post-processing)
             icon_path = None
             updated_icon_config = None
 
@@ -549,6 +791,13 @@ class UpdateManager:
             )
 
             if should_setup_icon:
+                if post_processing_task_id and progress_enabled:
+                    await progress_service.update_task(
+                        post_processing_task_id,
+                        completed=50.0,
+                        description=f"🎨 Setting up {app_name} icon...",
+                    )
+
                 # Create minimal icon_asset if one doesn't exist but icon setup is needed
                 if not icon_asset:
                     # Try to get info from catalog or generate defaults
@@ -578,31 +827,23 @@ class UpdateManager:
                     icon_dir=icon_dir,
                     appimage_path=appimage_path,
                     icon_asset=icon_asset,
+                    progress_task_id=post_processing_task_id,
                 )
 
-            # Perform verification using priority-based approach (BEFORE renaming)
-            verification_config = app_config.get("verification", {})
-            (
-                verification_results,
-                updated_verification_config,
-            ) = await self._perform_update_verification(
-                appimage_path,
-                appimage_asset,
-                dict(verification_config),  # Cast to dict[str, Any]
-                owner,
-                repo,
-                update_info.original_tag_name,
-                app_name,
-            )
+                if post_processing_task_id and progress_enabled:
+                    await progress_service.update_task(
+                        post_processing_task_id,
+                        completed=70.0,
+                        description=f"✅ {app_name} icon setup",
+                    )
 
-            # Now make executable and move to install directory
-            self.storage_service.make_executable(appimage_path)
-            appimage_path = self.storage_service.move_to_install_dir(appimage_path)
-
-            # Finally rename to clean name using catalog configuration
-            if rename_to:
-                clean_name = self.storage_service.get_clean_appimage_name(rename_to)
-                appimage_path = self.storage_service.rename_appimage(appimage_path, clean_name)
+            # Update configuration (20% of post-processing)
+            if post_processing_task_id and progress_enabled:
+                await progress_service.update_task(
+                    post_processing_task_id,
+                    completed=80.0,
+                    description=f"📁 Creating configuration for {app_name}...",
+                )
 
             # Store the computed hash from verification or GitHub digest
             stored_hash = ""
@@ -653,7 +894,14 @@ class UpdateManager:
             except Exception as e:
                 logger.warning("⚠️  Failed to cleanup old backups for %s: %s", app_name, e)
 
-            # Update desktop entry to reflect any changes (icon, paths, etc.)
+            # Create desktop entry (10% of post-processing)
+            if post_processing_task_id and progress_enabled:
+                await progress_service.update_task(
+                    post_processing_task_id,
+                    completed=90.0,
+                    description=f"📁 Creating desktop entry for {app_name}...",
+                )
+
             try:
                 try:
                     from .desktop import create_desktop_entry_for_app
@@ -672,14 +920,37 @@ class UpdateManager:
             except Exception as e:
                 logger.warning("⚠️  Failed to update desktop entry: %s", e)
 
+            # Finish post-processing task
+            if post_processing_task_id and progress_enabled:
+                await progress_service.finish_task(
+                    post_processing_task_id,
+                    success=True,
+                    final_description=f"✅ {app_name}",
+                )
+
             logger.debug(
                 "✅ Successfully updated %s to %s", app_name, update_info.latest_version
             )
             if stored_hash:
                 logger.debug("🔐 Updated stored hash: %s", stored_hash)
+
             return True
 
         except Exception as e:
+            # Mark post-processing as failed if we have a progress task
+            if (
+                "post_processing_task_id" in locals()
+                and post_processing_task_id
+                and progress_enabled
+                and hasattr(download_service, "progress_service")
+                and download_service.progress_service
+            ):
+                await progress_service.finish_task(
+                    post_processing_task_id,
+                    success=False,
+                    final_description=f"❌ {app_name} post-processing failed",
+                )
+
             logger.error("Failed to update %s: %s", app_name, e)
             return False
 
@@ -691,17 +962,18 @@ class UpdateManager:
         icon_dir: Path,
         appimage_path: Path,
         icon_asset: IconAsset,
+        progress_task_id: str | None = None,
     ) -> tuple[Path | None, dict[str, Any]]:
-        """Setup icon during update with extraction configuration management.
+        """Setup icon from configuration using shared IconService.
 
         Args:
-            app_config: Current app configuration
-            catalog_entry: Catalog entry for the app (if available)
-            app_name: Application name
+            app_config: Application configuration
+            catalog_entry: Catalog entry if available
+            app_name: Application name for icon filename
             icon_dir: Directory where icons should be saved
             appimage_path: Path to AppImage for icon extraction
             icon_asset: Icon asset with filename and URL
-            download_service: Service for downloading icons
+            progress_task_id: Optional combined post-processing task ID
 
         Returns:
             Tuple of (Path to acquired icon or None, updated icon config)
@@ -713,7 +985,7 @@ class UpdateManager:
 
         icon_config = IconConfig(
             extraction_enabled=True,  # Will be determined by service
-            icon_url=icon_asset["icon_url"],
+            icon_url=icon_asset["icon_url"] if icon_asset["icon_url"] else None,
             icon_filename=icon_asset["icon_filename"],
             preserve_url_on_extraction=True,  # Preserve URL for future updates
         )
@@ -728,6 +1000,7 @@ class UpdateManager:
             appimage_path=appimage_path,
             current_config=current_icon_config,
             catalog_entry=catalog_entry,
+            progress_task_id=progress_task_id,
         )
 
         return result.icon_path, result.config
@@ -741,6 +1014,7 @@ class UpdateManager:
         repo: str,
         tag_name: str,
         app_name: str,
+        progress_task_id: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Perform update verification using priority-based approach.
 
@@ -775,6 +1049,7 @@ class UpdateManager:
             repo=repo,
             tag_name=tag_name,
             app_name=app_name,
+            progress_task_id=progress_task_id,
         )
 
         return result.methods, result.updated_config

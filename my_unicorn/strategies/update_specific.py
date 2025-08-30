@@ -69,58 +69,91 @@ class UpdateSpecificAppsStrategy(UpdateStrategy):
         # At this point, app_names should not be None due to validation
         assert context.app_names is not None, "app_names should not be None after validation"
 
-        app_count = len(context.app_names)
-        print(f"🔄 Updating {app_count} app(s): {', '.join(context.app_names)}")
+        # Check which apps actually need updates and perform updates in single session
+        from ..services.progress import get_progress_service, progress_session
 
-        # Check which apps actually need updates
-        print("🔍 Checking for updates...")
-        update_infos = await context.update_manager.check_all_updates(context.app_names)
+        async with progress_session():
+            progress_service = get_progress_service()
 
-        # Detect if update_infos is empty due to authentication failure or other errors
-        if not update_infos:
-            message = (
-                "❌ Failed to check updates for specified apps. "
-                "This may be due to invalid GitHub Personal Access Token (PAT)."
-            )
-            return UpdateResult(
-                success=False,
-                updated_apps=[],
-                failed_apps=context.app_names if context.app_names else [],
-                up_to_date_apps=[],
-                update_infos=[],
-                message=message,
+            # Get app count for progress calculation
+            app_count = len(context.app_names) if context.app_names else 0
+
+            # Calculate total API requests: check phase + update phase (each app may need additional API calls)
+            # Conservatively estimate 2 API requests per app (1 for check, 1 for update download info)
+            total_api_requests = app_count * 2
+
+            # Create shared API progress task for all GitHub API calls
+            api_task_id = await progress_service.create_api_fetching_task(
+                endpoint="API assets", total_requests=total_api_requests
             )
 
-        apps_to_update = [info for info in update_infos if info.has_update]
-        apps_up_to_date = [info for info in update_infos if not info.has_update]
+            # Set shared task for update manager
+            context.update_manager._shared_api_task_id = api_task_id
 
-        if apps_up_to_date:
-            print(f"✅ {len(apps_up_to_date)} app(s) already up to date")
+            try:
+                # Phase 1: Check for updates
+                update_infos = await context.update_manager.check_all_updates_with_progress(
+                    context.app_names
+                )
 
-        if not apps_to_update:
-            message = "All specified apps are up to date!"
-            print(message)
-            return UpdateResult(
-                success=True,
-                updated_apps=[],
-                failed_apps=[],
-                up_to_date_apps=[info.app_name for info in apps_up_to_date],
-                update_infos=update_infos,
-                message=message,
-            )
+                # Detect if update_infos is empty due to authentication failure or other errors
+                if not update_infos:
+                    message = (
+                        "❌ Failed to check updates for specified apps. "
+                        "This may be due to invalid GitHub Personal Access Token (PAT)."
+                    )
+                    return UpdateResult(
+                        success=False,
+                        updated_apps=[],
+                        failed_apps=context.app_names if context.app_names else [],
+                        up_to_date_apps=[],
+                        update_infos=[],
+                        message=message,
+                    )
 
-        print(f"📦 Updating {len(apps_to_update)} app(s) that need updates...")
+                apps_to_update = [info for info in update_infos if info.has_update]
+                apps_up_to_date = [info for info in update_infos if not info.has_update]
 
-        # Show which apps will be updated
-        for info in apps_to_update:
-            print(f"   • {info.app_name}: {info.current_version} → {info.latest_version}")
+                if apps_up_to_date:
+                    print(f"✅ {len(apps_up_to_date)} app(s) already up to date")
 
-        print()  # Empty line for better spacing
+                if not apps_to_update:
+                    message = "All specified apps are up to date!"
+                    print(message)
+                    # Finish API progress task
+                    await progress_service.finish_task(api_task_id, success=True)
+                    return UpdateResult(
+                        success=True,
+                        updated_apps=[],
+                        failed_apps=[],
+                        up_to_date_apps=[info.app_name for info in apps_up_to_date],
+                        update_infos=update_infos,
+                        message=message,
+                    )
 
-        # Perform updates with suppressed logging
-        results = await self._execute_updates(
-            context, [info.app_name for info in apps_to_update]
-        )
+                # Show which apps will be updated
+                for info in apps_to_update:
+                    print(
+                        f"   • {info.app_name}: {info.current_version} → {info.latest_version}"
+                    )
+
+                print()  # Empty line for better spacing
+
+                # Phase 2: Perform updates (API progress task continues for additional GitHub calls)
+                results = await self._execute_updates(
+                    context, [info.app_name for info in apps_to_update]
+                )
+
+                # Finish API progress task
+                await progress_service.finish_task(api_task_id, success=True)
+
+            except Exception:
+                # Finish API progress task with error
+                await progress_service.finish_task(api_task_id, success=False)
+                raise
+            finally:
+                # Clean up shared task
+                context.update_manager._shared_api_task_id = None
 
         # Categorize results
         updated_apps: list[str] = []
