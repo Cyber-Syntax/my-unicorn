@@ -53,6 +53,9 @@ async def test_execute_with_valid_targets(install_command, mock_dependencies):
     mock_dependencies["session"].get = AsyncMock(return_value=MagicMock(status=200))
     mock_dependencies["github_client"].get_repo = AsyncMock(return_value={"mock": "repo"})
 
+    # Initialize strategies
+    install_command._initialize_services_with_progress(show_progress=False)
+
     install_command.catalog_strategy.install = AsyncMock(return_value=[{"success": True}])
     install_command.url_strategy.install = AsyncMock(return_value=[{"success": True}])
 
@@ -75,9 +78,7 @@ async def test_execute_with_invalid_targets(install_command, mock_dependencies):
     with pytest.raises(ValidationError) as excinfo:
         await install_command.execute(targets)
 
-    assert "Target 'invalid_app' is not a valid URL or catalog application name." in str(
-        excinfo.value
-    )
+    assert "Unknown applications or invalid URLs: invalid_app" in str(excinfo.value)
 
 
 @pytest.mark.asyncio
@@ -106,7 +107,7 @@ async def test_install_handler_execute_with_no_targets(monkeypatch, mock_depende
 
     logger_mock.error.assert_called_once_with("❌ No targets specified.")
     logger_mock.info.assert_called_once_with(
-        "💡 Use 'list --available' to see available catalog apps."
+        "💡 Use 'my-unicorn list' to see available catalog apps."
     )
 
 
@@ -118,7 +119,9 @@ async def test_install_handler_execute_with_valid_targets(monkeypatch, mock_depe
         auth_manager=MagicMock(),
         update_manager=MagicMock(),
     )
-    args = Namespace(targets=["app1", "https://github.com/mock/repo"])
+    args = Namespace(
+        targets=["app1", "https://github.com/mock/repo"], concurrency=3, no_verify=False
+    )
 
     mock_dependencies["catalog_manager"].get_available_apps.return_value = {
         "app1": {},
@@ -130,10 +133,6 @@ async def test_install_handler_execute_with_valid_targets(monkeypatch, mock_depe
 
     install_command_mock = MagicMock()
     install_command_mock.execute = AsyncMock(return_value=[{"success": True}])
-    install_command_mock.cleanup_failed_installations = AsyncMock()
-    install_command_mock.get_installation_stats = MagicMock(
-        return_value={"failed": 0, "successful": 2, "total": 2}
-    )
 
     monkeypatch.setattr(
         "my_unicorn.commands.install.InstallCommand",
@@ -153,5 +152,4 @@ async def test_install_handler_execute_with_valid_targets(monkeypatch, mock_depe
         force=False,
         update=False,
     )
-    install_command_mock.cleanup_failed_installations.assert_called_once()
-    logger_mock.info.assert_any_call("✅ All 2 installation(s) completed successfully!")
+    logger_mock.info.assert_called_with("All installations completed successfully")

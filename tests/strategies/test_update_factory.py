@@ -18,6 +18,7 @@ class DummyUpdateManager:
 
 def make_context(app_names=None, check_only=False):
     return UpdateContext(
+        refresh_cache=False,
         app_names=app_names,
         check_only=check_only,
         config_manager=DummyConfigManager(),

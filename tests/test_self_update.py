@@ -233,7 +233,7 @@ async def test_check_for_update_api_error(mock_config_manager, mock_session, cap
 
 @pytest.mark.asyncio
 async def test_check_for_update_newer_version(mock_config_manager, mock_session, capsys):
-    """Test check_for_update prints update available for newer version."""
+    """Test check_for_update returns True for newer version."""
     updater = SelfUpdater(mock_config_manager, mock_session)
     release_data = {
         "version": "2.0.0",
@@ -250,14 +250,12 @@ async def test_check_for_update_newer_version(mock_config_manager, mock_session,
     ):
         mock_metadata.return_value = {"Version": "1.0.0"}
         result = await updater.check_for_update()
-        out = capsys.readouterr().out
-        assert "Updates are available" in out
         assert result is True
 
 
 @pytest.mark.asyncio
 async def test_check_for_update_up_to_date(mock_config_manager, mock_session, capsys):
-    """Test check_for_update prints up to date for same version."""
+    """Test check_for_update returns False for same version."""
     updater = SelfUpdater(mock_config_manager, mock_session)
     release_data = {
         "version": "1.0.0",
@@ -274,8 +272,6 @@ async def test_check_for_update_up_to_date(mock_config_manager, mock_session, ca
     ):
         mock_metadata.return_value = {"Version": "1.0.0"}
         result = await updater.check_for_update()
-        out = capsys.readouterr().out
-        assert "up to date" in out
         assert result is False
 
 

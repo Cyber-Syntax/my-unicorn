@@ -87,8 +87,6 @@ def _set_progress_state(active: bool):
 class MyUnicornLogger:
     """Logger manager for my-unicorn application."""
 
-    __slots__ = ("_console_handler", "_file_handler", "_file_logging_setup", "_name", "logger")
-
     def __init__(self, name: str = "my-unicorn"):
         """Initialize logger with given name.
 

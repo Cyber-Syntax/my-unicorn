@@ -27,12 +27,16 @@ def patch_logger():
 
 
 @pytest_asyncio.fixture
-def patch_tqdm():
-    """Patch tqdm.asyncio.tqdm to avoid real progress bars."""
-    with patch("my_unicorn.download.tqdm") as mock_tqdm:
-        mock_bar = MagicMock()
-        mock_tqdm.return_value.__enter__.return_value = mock_bar
-        yield mock_tqdm
+def patch_progress_service():
+    """Patch progress service to avoid real progress bars."""
+    with patch("my_unicorn.download.get_progress_service") as mock_progress_service:
+        mock_service = MagicMock()
+        mock_service.add_task = AsyncMock(return_value="task-id")
+        mock_service.update_task = AsyncMock()
+        mock_service.update_task_total = AsyncMock()
+        mock_service.finish_task = AsyncMock()
+        mock_progress_service.return_value = mock_service
+        yield mock_service
 
 
 async def async_chunk_gen(chunks: list[bytes]):
@@ -41,7 +45,9 @@ async def async_chunk_gen(chunks: list[bytes]):
 
 
 @pytest.mark.asyncio
-async def test_download_file_success(tmp_file, mock_session, patch_logger, patch_tqdm):
+async def test_download_file_success(
+    tmp_file, mock_session, patch_logger, patch_progress_service
+):
     """Test DownloadService.download_file downloads file successfully."""
     content = b"hello world"
     mock_response = AsyncMock()
@@ -57,8 +63,6 @@ async def test_download_file_success(tmp_file, mock_session, patch_logger, patch
             url="http://example.com/file.bin",
             dest=tmp_file,
             show_progress=True,
-            success_color="green",
-            description_prefix="📥",
         )
 
     assert tmp_file.exists()
@@ -66,8 +70,10 @@ async def test_download_file_success(tmp_file, mock_session, patch_logger, patch
 
 
 @pytest.mark.asyncio
-async def test_download_file_error(tmp_file, mock_session, patch_logger, patch_tqdm):
-    """Test DownloadService.download_file raises on network error."""
+async def test_download_file_error(
+    tmp_file, mock_session, patch_logger, patch_progress_service
+):
+    """Test DownloadService.download_file handles error during download."""
     content = b"data"
     mock_response = AsyncMock()
     mock_response.__aenter__.return_value = mock_response
@@ -87,8 +93,10 @@ async def test_download_file_error(tmp_file, mock_session, patch_logger, patch_t
 
 
 @pytest.mark.asyncio
-async def test_download_appimage_success(tmp_file, mock_session, patch_logger, patch_tqdm):
-    """Test DownloadService.download_appimage delegates and returns path."""
+async def test_download_appimage_success(
+    tmp_file, mock_session, patch_logger, patch_progress_service
+):
+    """Test DownloadService.download_appimage downloads AppImage successfully."""
     asset = {"browser_download_url": "http://example.com/appimage"}
     content = b"appimage"
     mock_response = AsyncMock()
@@ -118,8 +126,10 @@ async def test_download_icon_exists(tmp_file, mock_session, patch_logger):
 
 
 @pytest.mark.asyncio
-async def test_download_icon_download(tmp_file, mock_session, patch_logger, patch_tqdm):
-    """Test DownloadService.download_icon downloads if icon does not exist."""
+async def test_download_icon_download(
+    tmp_file, mock_session, patch_logger, patch_progress_service
+):
+    """Test DownloadService.download_icon downloads icon file."""
     icon = {"icon_url": "http://example.com/icon", "icon_filename": tmp_file.name}
     # Patch download_file to simulate file writing
     with patch.object(
