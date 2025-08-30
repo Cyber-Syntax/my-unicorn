@@ -112,7 +112,10 @@ class URLInstallStrategy(InstallStrategy):
         return processed_results
 
     async def _install_single_repo(
-        self, semaphore: asyncio.Semaphore, repo_url: str, **kwargs: Any
+        self,
+        semaphore: asyncio.Semaphore,
+        repo_url: str,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Install from a GitHub repository URL.
 
@@ -137,12 +140,36 @@ class URLInstallStrategy(InstallStrategy):
                 owner, repo_name = parts[0], parts[1]
 
                 # Use GitHubReleaseFetcher for both fetching and asset selection
-                # Get shared API task from github_client for progress tracking
+                # Get shared API task ID from github_client for progress tracking
                 shared_api_task_id = getattr(self.github_client, "shared_api_task_id", None)
                 fetcher = GitHubReleaseFetcher(
                     owner, repo_name, self.session, shared_api_task_id
                 )
-                release_data = await fetcher.fetch_latest_release()
+
+                # Try to fetch latest release first, fallback to prereleases if needed
+                release_data = None
+                try:
+                    release_data = await fetcher.fetch_latest_release_or_prerelease(
+                        prefer_prerelease=False  # Still prefer stable if available
+                    )
+                    logger.info(
+                        "Found %s release for %s/%s: %s",
+                        "prerelease" if release_data.get("prerelease") else "release",
+                        owner,
+                        repo_name,
+                        release_data.get("version", "unknown"),
+                    )
+                except Exception as fallback_error:
+                    logger.error(
+                        "Failed to fetch any releases for %s/%s: %s",
+                        owner,
+                        repo_name,
+                        fallback_error,
+                    )
+                    raise InstallationError(
+                        f"No releases found for {owner}/{repo_name}: {fallback_error}"
+                    ) from fallback_error
+
                 if not release_data:
                     raise InstallationError(f"No releases found for {owner}/{repo_name}")
 
@@ -176,7 +203,9 @@ class URLInstallStrategy(InstallStrategy):
                     and progress_service
                     and progress_service.is_active()
                 ):
-                    post_processing_task_id = await progress_service.create_post_processing_task(repo_name)
+                    post_processing_task_id = (
+                        await progress_service.create_post_processing_task(repo_name)
+                    )
 
                 # Verification (20%)
                 if kwargs.get("verify_downloads", True):

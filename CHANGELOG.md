@@ -1,6 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.5.1-alpha
 ## v1.5.0-alpha
 # BREAKING CHANGES
 This release implement new library rich for progress bar instead of tqdm.
