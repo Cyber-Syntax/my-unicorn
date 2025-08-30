@@ -5,8 +5,6 @@ verification failures, icon extraction errors, and other progress bar issues.
 """
 
 import asyncio
-import time
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -17,9 +15,9 @@ from rich.progress import Progress, TaskID
 from my_unicorn.services.progress import (
     ProgressConfig,
     ProgressService,
-    TaskInfo,
     ProgressType,
     SpeedColumn,
+    TaskInfo,
     get_progress_service,
     progress_session,
     set_progress_service,
@@ -404,19 +402,6 @@ class TestProgressService:
             assert task.total == 10.0
 
     @pytest.mark.asyncio
-    async def test_create_download_task(self, progress_service: ProgressService) -> None:
-        """Test creating a download task."""
-        progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._download_progress, "add_task") as mock_add:
-            mock_add.return_value = TaskID(1)
-
-            task_id = await progress_service.create_download_task("file.zip", 100.5)
-
-            assert task_id is not None
-            task = progress_service._tasks[task_id]
-            assert task.progress_type == ProgressType.DOWNLOAD
-            assert task.total == 100.5
-
     @pytest.mark.asyncio
     async def test_create_verification_task(self, progress_service: ProgressService) -> None:
         """Test creating a verification task."""
@@ -444,79 +429,6 @@ class TestProgressService:
             assert task_id is not None
             task = progress_service._tasks[task_id]
             assert task.progress_type == ProgressType.ICON_EXTRACTION
-
-    @pytest.mark.asyncio
-    async def test_create_installation_task(self, progress_service: ProgressService) -> None:
-        """Test creating an installation task."""
-        progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._post_processing_progress, "add_task") as mock_add:
-            mock_add.return_value = TaskID(1)
-
-            task_id = await progress_service.create_installation_task("app")
-
-            assert task_id is not None
-            task = progress_service._tasks[task_id]
-            assert task.progress_type == ProgressType.INSTALLATION
-
-    @pytest.mark.asyncio
-    async def test_create_update_task(self, progress_service: ProgressService) -> None:
-        """Test creating an update task."""
-        progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._post_processing_progress, "add_task") as mock_add:
-            mock_add.return_value = TaskID(1)
-
-            task_id = await progress_service.create_update_task("app")
-
-            assert task_id is not None
-            task = progress_service._tasks[task_id]
-            assert task.progress_type == ProgressType.UPDATE
-
-    @pytest.mark.asyncio
-    async def test_cleanup_stuck_tasks(self, progress_service: ProgressService) -> None:
-        """Test cleanup of stuck tasks."""
-        progress_service._active = True  # Make active for this test
-        # Create tasks with different ages
-        current_time = time.time()
-
-        with (
-            patch.object(progress_service._download_progress, "add_task") as mock_add,
-            patch("time.time", return_value=current_time),
-        ):
-            mock_add.return_value = TaskID(1)
-
-            # Add a recent task
-            recent_task_id = await progress_service.add_task(
-                name="recent_file", progress_type=ProgressType.DOWNLOAD, total=100.0
-            )
-
-            # Mock an old task by directly manipulating the task data
-            old_task_id = "dl_2_old_file"
-            old_task = TaskInfo(
-                task_id=TaskID(2),
-                namespaced_id=old_task_id,
-                name="old_file",
-                progress_type=ProgressType.DOWNLOAD,
-                created_at=current_time - 3700,  # Over 1 hour old
-                last_update=current_time - 3700,  # Also set last_update to old time
-                total=100.0,
-                completed=50.0,  # Less than total so it's considered stuck
-            )
-            progress_service._tasks[old_task_id] = old_task
-            progress_service._download_task_ids.add(old_task_id)
-
-            with patch("time.time", return_value=current_time):
-                cleaned_count = await progress_service.cleanup_stuck_tasks(
-                    timeout_seconds=300.0
-                )
-
-            # cleanup_stuck_tasks returns a list of cleaned task IDs
-            assert len(cleaned_count) == 1
-            assert recent_task_id in progress_service._tasks
-            assert old_task_id in progress_service._tasks  # Task is finished, not removed
-            # Check that the stuck task was marked as failed
-            stuck_task = progress_service._tasks[old_task_id]
-            assert stuck_task.success is False
-            assert stuck_task.is_finished
 
     def test_get_task_info_existing(self, progress_service: ProgressService) -> None:
         """Test getting info for existing task."""
@@ -634,26 +546,6 @@ class TestProgressService:
             task = progress_service._tasks[task_id]
             assert task.success is False
             assert "extraction failed" in task.description.lower()
-
-    @pytest.mark.asyncio
-    async def test_installation_error(self, progress_service: ProgressService) -> None:
-        """Test handling installation errors."""
-        progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._post_processing_progress, "add_task") as mock_add:
-            mock_add.return_value = TaskID(1)
-
-            task_id = await progress_service.create_installation_task("problematic_app")
-
-            # Simulate installation failure
-            await progress_service.finish_task(
-                task_id,
-                success=False,
-                final_description="Installation failed: Insufficient permissions",
-            )
-
-            task = progress_service._tasks[task_id]
-            assert task.success is False
-            assert "installation failed" in task.description.lower()
 
     @pytest.mark.asyncio
     async def test_concurrent_task_updates(self, progress_service: ProgressService) -> None:
@@ -881,22 +773,6 @@ class TestErrorScenarios:
         assert api_id1.startswith("api_1_")
 
     @pytest.mark.asyncio
-    async def test_progress_with_path_objects(self, progress_service: ProgressService) -> None:
-        """Test progress service with Path objects."""
-        progress_service._active = True
-        with patch.object(progress_service._download_progress, "add_task") as mock_add:
-            mock_add.return_value = TaskID(1)
-
-            file_path = Path("/tmp/test.AppImage")
-            task_id = await progress_service.create_download_task(str(file_path), 30.0)
-
-            task_info = progress_service.get_task_info(task_id)
-            # The name should be the filename extracted from the path
-            assert task_info.name == file_path.name
-
-            await progress_service.finish_task(task_id, success=True)
-
-    @pytest.mark.asyncio
     async def test_progress_update_methods_comprehensive(
         self, progress_service: ProgressService
     ) -> None:
@@ -959,118 +835,3 @@ class TestErrorScenarios:
         # Test session cleanup
         await service.stop_session()
         assert not service.is_active()
-
-
-class TestProgressIntegration:
-    """Integration tests for progress service with realistic workflows."""
-
-    @pytest.mark.asyncio
-    async def test_realistic_download_simulation(self) -> None:
-        """Test realistic download progress simulation."""
-
-        async def simulate_download(service: ProgressService, filename: str, size_mb: float):
-            task_id = await service.create_download_task(filename, size_mb)
-
-            # Simulate chunked download
-            downloaded = 0.0
-            chunk_size = 0.5  # 0.5 MB chunks
-
-            while downloaded < size_mb:
-                chunk = min(chunk_size, size_mb - downloaded)
-                downloaded += chunk
-
-                await service.update_task(task_id, completed=downloaded)
-                await asyncio.sleep(0.001)  # Simulate network delay (reduced for test speed)
-
-            await service.finish_task(task_id, success=True)
-            return True
-
-        async with progress_session(total_operations=2) as service:
-            # Simulate two concurrent downloads
-            results = await asyncio.gather(
-                simulate_download(service, "firefox.AppImage", 2.0),  # Reduced size for speed
-                simulate_download(service, "vscode.AppImage", 3.0),
-            )
-
-            assert all(results)
-
-    @pytest.mark.asyncio
-    async def test_complete_app_workflow(self) -> None:
-        """Test complete application installation workflow."""
-
-        async def complete_workflow(service: ProgressService, app_name: str):
-            # Download phase
-            download_task = await service.create_download_task(f"{app_name}.AppImage", 10.0)
-            for i in range(0, 101, 20):  # Reduced iterations for speed
-                await service.update_task(download_task, completed=i * 0.1)
-                await asyncio.sleep(0.001)
-            await service.finish_task(download_task, success=True)
-
-            # Verification phase
-            verify_task = await service.create_verification_task(f"{app_name}.AppImage")
-            for i in range(0, 101, 25):
-                await service.update_task(verify_task, completed=i)
-                await asyncio.sleep(0.001)
-            await service.finish_task(verify_task, success=True)
-
-            # Icon extraction phase
-            icon_task = await service.create_icon_extraction_task(app_name)
-            for i in range(0, 101, 50):  # Reduced iterations for speed
-                await service.update_task(icon_task, completed=i)
-                await asyncio.sleep(0.001)
-            await service.finish_task(icon_task, success=True)
-
-            # Installation phase
-            install_task = await service.create_installation_task(app_name)
-            steps = [
-                ("Creating directories", 25),
-                ("Copying files", 50),
-                ("Creating desktop entry", 75),
-                ("Finalizing", 100),
-            ]
-
-            for description, progress in steps:
-                await service.update_task(
-                    install_task, completed=progress, description=f"🔧 {description}..."
-                )
-                await asyncio.sleep(0.001)
-
-            await service.finish_task(install_task, success=True)
-            return True
-
-        async with progress_session(total_operations=1) as service:
-            result = await complete_workflow(service, "TestApp")
-            assert result is True
-
-    @pytest.mark.asyncio
-    async def test_multiple_concurrent_workflow_tasks(self) -> None:
-        """Test handling multiple concurrent tasks of different types."""
-        service = ProgressService()
-        await service.start_session(total_operations=3)
-
-        # Create multiple tasks of different types
-        tasks = [
-            await service.create_download_task("app1.AppImage", 25.0),
-            await service.create_verification_task("app1.AppImage"),
-            await service.create_installation_task("App1"),
-        ]
-
-        # Update all tasks concurrently
-        update_tasks = [
-            service.update_task(tasks[0], completed=25.0),
-            service.update_task(tasks[1], completed=100.0),
-            service.update_task(tasks[2], completed=100.0),
-        ]
-        await asyncio.gather(*update_tasks)
-
-        # Finish all tasks
-        finish_tasks = [service.finish_task(task_id, success=True) for task_id in tasks]
-        await asyncio.gather(*finish_tasks)
-
-        # Verify all tasks completed successfully
-        for task_id in tasks:
-            task_info = service.get_task_info(task_id)
-            assert task_info.success is True
-            assert task_info.is_finished
-
-        await service.stop_session()

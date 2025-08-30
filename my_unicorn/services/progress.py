@@ -5,13 +5,13 @@ different types of operations with rich visual feedback using the Rich library.
 """
 
 import asyncio
+import contextlib
 import time
 from collections import defaultdict, deque
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from enum import Enum, auto
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -34,9 +34,13 @@ from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Performance optimization constants
+SPEED_CACHE_LIMIT = 100
+ID_CACHE_LIMIT = 1000
+
 
 class SpeedColumn(ProgressColumn):
-    """Custom column to display download speed."""
+    """Custom column to display download speed with optimized caching."""
 
     def __init__(self) -> None:
         """Initialize speed column with cache."""
@@ -59,7 +63,7 @@ class SpeedColumn(ProgressColumn):
             text = Text(f"{speed * 1024:.0f} KB/s", style="cyan")
 
         # Cache result with size limit to prevent unbounded growth
-        if len(self._speed_cache) < 100:
+        if len(self._speed_cache) < SPEED_CACHE_LIMIT:
             self._speed_cache[speed] = text
 
         return text
@@ -76,7 +80,7 @@ class ProgressType(Enum):
     UPDATE = auto()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ProgressConfig:
     """Configuration for progress display."""
 
@@ -91,7 +95,7 @@ class ProgressConfig:
     max_speed_history: int = 10  # Number of speed measurements to retain
 
 
-@dataclass
+@dataclass(slots=True)
 class TaskInfo:
     """Task information with all metadata in one structure."""
 
@@ -180,8 +184,9 @@ class ProgressService:
         self._task_lock = asyncio.Lock()  # For task data operations
         self._ui_lock = asyncio.Lock()  # For UI-related operations
 
-        # Task ID tracking to prevent collisions
+        # Task ID tracking to prevent collisions with optimized cache management
         self._task_counters: dict[ProgressType, int] = defaultdict(int)
+        self._id_cache: dict[tuple[ProgressType, str], str] = {}
 
         # Keep track of which tasks belong to which Progress instance
         self._task_sets: dict[ProgressType, set[str]] = {
@@ -203,9 +208,13 @@ class ProgressService:
         self._pending_ui_updates: bool = False
         self._ui_update_task: asyncio.Task | None = None
 
-    @lru_cache(maxsize=1000)
     def _generate_namespaced_id(self, progress_type: ProgressType, name: str) -> str:
-        """Generate a unique namespaced ID for a task."""
+        """Generate a unique namespaced ID for a task with optimized caching."""
+        # Check cache first
+        cache_key = (progress_type, name)
+        if cache_key in self._id_cache:
+            return self._id_cache[cache_key]
+
         self._task_counters[progress_type] += 1
         counter = self._task_counters[progress_type]
 
@@ -223,7 +232,17 @@ class ProgressService:
 
         # Sanitize name for use in ID
         clean_name = "".join(c for c in name if c.isalnum() or c in "-_.")[:20]
-        return f"{type_prefix}_{counter}_{clean_name}"
+        namespaced_id = f"{type_prefix}_{counter}_{clean_name}"
+
+        # Cache the result with size limit to prevent unbounded growth
+        if len(self._id_cache) < ID_CACHE_LIMIT:
+            self._id_cache[cache_key] = namespaced_id
+
+        return namespaced_id
+
+    def _clear_id_cache(self) -> None:
+        """Clear the ID generation cache."""
+        self._id_cache.clear()
 
     def _get_progress_for_type(self, progress_type: ProgressType) -> Progress:
         """Get the appropriate Progress instance for a task type."""
@@ -296,17 +315,12 @@ class ProgressService:
         app_current_tasks.sort(key=lambda x: (x[2].is_finished, -x[2].last_update))
 
         # Add the most relevant app tasks to the filtered display (limit by max_visible_tasks)
-        for app_name, namespaced_id, task in app_current_tasks[:max_visible_tasks]:
+        for app_name, _namespaced_id, task in app_current_tasks[:max_visible_tasks]:
             # Create appropriate description with status indicator
             if task.is_finished:
-                if task.success:
-                    status_icon = "✅"
-                else:
-                    status_icon = "❌"
-                # For finished tasks, show clean status
+                status_icon = "✅" if task.success else "❌"
                 description = f"{status_icon} {app_name}"
             else:
-                # Use original description for active tasks
                 description = task.description
 
             # Add task to filtered progress with current state
@@ -450,6 +464,26 @@ class ProgressService:
                 except Exception as e:
                     logger.debug("Error in batched UI update: %s", e)
 
+    async def _start_background_tasks(self) -> None:
+        """Start background tasks using optimized task management."""
+        if self.config.batch_ui_updates:
+            # For now, use standard asyncio.create_task for better compatibility
+            # TaskGroup requires more complex context management that can cause issues
+            self._ui_update_task = asyncio.create_task(self._batched_ui_update_loop())
+
+    async def _stop_background_tasks(self) -> None:
+        """Stop background tasks with optimized cleanup."""
+        if not self._ui_update_task:
+            return
+
+        # Optimized cleanup for all Python versions
+        if not self._ui_update_task.done():
+            self._ui_update_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._ui_update_task
+
+        self._ui_update_task = None
+
     def _schedule_ui_update(self) -> None:
         """Schedule a UI update based on configuration."""
         if self.config.batch_ui_updates:
@@ -470,7 +504,7 @@ class ProgressService:
                 logger.debug("Error refreshing live display: %s", e)
 
     async def start_session(self, total_operations: int = 0) -> None:
-        """Start a progress display session."""
+        """Start a progress display session with optimized task management."""
         async with self._ui_lock:
             if self._active:
                 logger.warning("Progress session already active")
@@ -495,28 +529,21 @@ class ProgressService:
             self._ui_visible = True
             self._tasks_added = True
 
-            # Start background UI update task if batching enabled
-            if self.config.batch_ui_updates:
-                self._ui_update_task = asyncio.create_task(self._batched_ui_update_loop())
+            # Start background tasks using optimized method
+            await self._start_background_tasks()
 
             logger.debug("Progress session started with %d total operations", total_operations)
 
     async def stop_session(self) -> None:
-        """Stop the progress display session."""
+        """Stop the progress display session with optimized cleanup."""
         async with self._ui_lock:
             if not self._active:
                 return
 
             self._active = False
 
-            # Cancel background UI update task
-            if self._ui_update_task and not self._ui_update_task.done():
-                self._ui_update_task.cancel()
-                try:
-                    await self._ui_update_task
-                except asyncio.CancelledError:
-                    pass
-                self._ui_update_task = None
+            # Stop background tasks with optimized cleanup
+            await self._stop_background_tasks()
 
             # Ensure final UI update before stopping to show completion states
             if self._live and self._pending_ui_updates:
@@ -538,7 +565,7 @@ class ProgressService:
             self._layout_cache = None
             if hasattr(self, "_cached_panels"):
                 delattr(self, "_cached_panels")
-            self._generate_namespaced_id.cache_clear()
+            self._clear_id_cache()
 
             logger.debug("Progress session stopped")
 
@@ -624,13 +651,14 @@ class ProgressService:
         return namespaced_id
 
     def _calculate_speed_optimized(self, task: TaskInfo, current_time: float) -> None:
-        """Calculate current download speed using optimized historical data algorithm."""
+        """Calculate current download speed using lock-free optimized algorithm."""
+        # Skip if insufficient time has passed (reduces frequent calculations)
         if current_time - task.last_speed_update < self.config.speed_calculation_interval:
-            return  # Skip if insufficient time has passed
+            return
 
         # Ensure speed_history is initialized
         if task.speed_history is None:
-            task.speed_history = deque(maxlen=10)
+            task.speed_history = deque(maxlen=self.config.max_speed_history)
 
         # Add current measurement to history
         task.speed_history.append((current_time, task.completed))
@@ -650,7 +678,10 @@ class ProgressService:
                 new_speed = completed_diff / time_diff
                 if task.current_speed_mbps > 0:
                     # Smooth the speed with EMA (alpha = 0.3 for responsiveness)
-                    task.current_speed_mbps = 0.3 * new_speed + 0.7 * task.current_speed_mbps
+                    alpha = 0.3
+                    task.current_speed_mbps = (
+                        alpha * new_speed + (1 - alpha) * task.current_speed_mbps
+                    )
                 else:
                     task.current_speed_mbps = new_speed
             else:
@@ -663,45 +694,62 @@ class ProgressService:
         advance: float | None = None,
         description: str | None = None,
     ) -> None:
-        """Update a progress task with strict type validation and speed calculation."""
+        """Update a progress task with optimized lock-reduced implementation."""
         if not self._active:
             logger.warning("Cannot update task %s: Progress session not active", namespaced_id)
             return
 
+        # Pre-calculate values outside the lock to minimize lock time
+        current_time = time.time()
+
+        # Fast path: check if task exists without lock first
+        task = self._tasks.get(namespaced_id)
+        if not task or task.is_finished:
+            return
+
+        # Prepare updates
+        old_completed = task.completed
+        needs_speed_calc = False
+
+        # Calculate new completed value
+        new_completed = task.completed
+        if completed is not None:
+            new_completed = max(0.0, min(completed, task.total))
+        elif advance is not None:
+            new_completed = max(0.0, min(task.completed + advance, task.total))
+
+        # Only acquire lock when we need to update
         async with self._task_lock:
+            # Re-check task state after acquiring lock
             task = self._tasks.get(namespaced_id)
             if not task or task.is_finished:
                 return
 
-            # Update task data
-            current_time = time.time()
-            old_completed = task.completed
-
-            if completed is not None:
-                task.completed = max(0.0, min(completed, task.total))
-
-            if advance is not None:
-                new_completed = task.completed + advance
-                task.completed = max(0.0, min(new_completed, task.total))
-
+            # Update task data atomically
+            task.completed = new_completed
             if description is not None:
                 task.description = description
-
             task.last_update = current_time
 
-            # Calculate speed for download tasks
-            update_kwargs: dict[str, Any] = {}
-            if task.progress_type == ProgressType.DOWNLOAD and task.completed != old_completed:
-                self._calculate_speed_optimized(task, current_time)
-                update_kwargs["speed"] = task.current_speed_mbps
+        # Mark for speed calculation if this is a download task with progress change
+        if task.progress_type == ProgressType.DOWNLOAD and new_completed != old_completed:
+            needs_speed_calc = True
 
-            # Prepare update parameters
-            if completed is not None:
-                update_kwargs["completed"] = task.completed
-            if advance is not None and task.completed != old_completed:
-                update_kwargs["advance"] = task.completed - old_completed
-            if description is not None:
-                update_kwargs["description"] = task.description
+        # Perform expensive operations outside the lock
+        update_kwargs: dict[str, Any] = {}
+
+        # Calculate speed outside lock if needed
+        if needs_speed_calc:
+            self._calculate_speed_optimized(task, current_time)
+            update_kwargs["speed"] = task.current_speed_mbps
+
+        # Prepare update parameters
+        if completed is not None:
+            update_kwargs["completed"] = new_completed
+        elif advance is not None and new_completed != old_completed:
+            update_kwargs["advance"] = new_completed - old_completed
+        if description is not None:
+            update_kwargs["description"] = task.description
 
         # Update Rich UI outside the lock
         if update_kwargs:
@@ -845,14 +893,6 @@ class ProgressService:
             description=f"🌐 Fetching from API: {display_name}...",
         )
 
-    async def create_download_task(self, filename: str, size_mb: float) -> str:
-        """Create a download task with guaranteed Downloads section placement."""
-        return await self.add_task(
-            name=Path(filename).name,
-            progress_type=ProgressType.DOWNLOAD,
-            total=size_mb,
-        )
-
     async def create_verification_task(self, filename: str) -> str:
         """Create a verification task."""
         filename_only = Path(filename).name
@@ -870,52 +910,6 @@ class ProgressService:
             progress_type=ProgressType.ICON_EXTRACTION,
             total=100.0,
             description=f"🎨 Extracting {app_name} icon...",
-        )
-
-    async def create_installation_task(self, app_name: str) -> str:
-        """Create an installation task."""
-        return await self.add_task(
-            name=f"Installing {app_name}",
-            progress_type=ProgressType.INSTALLATION,
-            total=100.0,
-            description=f"📁 Installing {app_name}...",
-        )
-
-    async def create_verification_task(self, filename: str) -> str:
-        """Create a verification task."""
-        filename_only = Path(filename).name
-        return await self.add_task(
-            name=f"Verifying {filename_only}",
-            progress_type=ProgressType.VERIFICATION,
-            total=100.0,
-            description=f"🔍 Verifying {filename_only}...",
-        )
-
-    async def create_icon_extraction_task(self, app_name: str) -> str:
-        """Create an icon extraction task."""
-        return await self.add_task(
-            name=f"{app_name} icon extraction",
-            progress_type=ProgressType.ICON_EXTRACTION,
-            total=100.0,
-            description=f"🎨 Extracting {app_name} icon...",
-        )
-
-    async def create_installation_task(self, app_name: str) -> str:
-        """Create an installation task."""
-        return await self.add_task(
-            name=f"Installing {app_name}",
-            progress_type=ProgressType.INSTALLATION,
-            total=100.0,
-            description=f"📁 Installing {app_name}...",
-        )
-
-    async def create_update_task(self, app_name: str) -> str:
-        """Create an update task."""
-        return await self.add_task(
-            name=f"Updating {app_name}",
-            progress_type=ProgressType.UPDATE,
-            total=100.0,
-            description=f"⬆️ Updating {app_name}...",
         )
 
     async def create_post_processing_task(self, app_name: str) -> str:
@@ -937,105 +931,6 @@ class ProgressService:
             total=100.0,
             description=f"⚙️ Processing {app_name}...",
         )
-
-    async def cleanup_finished_tasks(self, max_finished_tasks: int = 50) -> int:
-        """Clean up finished tasks to prevent memory accumulation."""
-        if not self._active:
-            return 0
-
-        async with self._task_lock:
-            finished_tasks = [
-                (namespaced_id, task)
-                for namespaced_id, task in self._tasks.items()
-                if task.is_finished and task.success is not None
-            ]
-
-            # Keep only recent finished tasks
-            if len(finished_tasks) <= max_finished_tasks:
-                return 0
-
-            # Remove oldest finished tasks
-            finished_tasks.sort(key=lambda x: x[1].last_update)
-            tasks_to_remove = finished_tasks[:-max_finished_tasks]
-
-            removed_count = 0
-            for namespaced_id, task in tasks_to_remove:
-                # Remove from all tracking structures
-                if namespaced_id in self._tasks:
-                    del self._tasks[namespaced_id]
-
-                # Remove from task sets
-                self._task_sets[task.progress_type].discard(namespaced_id)
-
-                # Remove from legacy sets
-                if task.progress_type in {
-                    ProgressType.VERIFICATION,
-                    ProgressType.ICON_EXTRACTION,
-                    ProgressType.INSTALLATION,
-                    ProgressType.UPDATE,
-                }:
-                    self._post_processing_task_ids.discard(namespaced_id)
-
-                removed_count += 1
-
-            if removed_count > 0:
-                logger.debug("Cleaned up %d finished tasks", removed_count)
-
-            return removed_count
-
-    async def get_memory_usage_info(self) -> dict[str, int]:
-        """Get memory usage information for monitoring."""
-        async with self._task_lock:
-            cache_info = getattr(self._generate_namespaced_id, "cache_info", lambda: None)()
-            cache_entries = (cache_info and cache_info.currsize) or 0
-
-            return {
-                "total_tasks": len(self._tasks),
-                "active_tasks": sum(
-                    1 for task in self._tasks.values() if not task.is_finished
-                ),
-                "finished_tasks": sum(1 for task in self._tasks.values() if task.is_finished),
-                "api_tasks": len(self._task_sets[ProgressType.API_FETCHING]),
-                "download_tasks": len(self._task_sets[ProgressType.DOWNLOAD]),
-                "processing_tasks": len(self._post_processing_task_ids),
-                "cache_entries": cache_entries,
-            }
-
-    async def cleanup_stuck_tasks(self, timeout_seconds: float = 300.0) -> list[str]:
-        """Clean up tasks that haven't been updated recently."""
-        if not self._active:
-            return []
-
-        current_time = time.time()
-        stuck_tasks = []
-
-        # Create snapshot to avoid modification during iteration
-        tasks_snapshot = list(self._tasks.items())
-
-        for namespaced_id, task in tasks_snapshot:
-            if task.is_finished or task.success is not None:
-                continue
-
-            time_since_update = current_time - task.last_update
-            time_since_creation = current_time - task.created_at
-
-            if (
-                time_since_update > timeout_seconds
-                and time_since_creation > timeout_seconds
-                and task.completed < task.total
-            ):
-                logger.warning(
-                    "🧹 Cleaning up stuck task: %s (no update for %.1fs)",
-                    task.name,
-                    time_since_update,
-                )
-
-                await self.finish_task(
-                    namespaced_id, success=False, final_description=f"❌ {task.name} timed out"
-                )
-                stuck_tasks.append(namespaced_id)
-
-        return stuck_tasks
 
 
 # Global progress service instance
