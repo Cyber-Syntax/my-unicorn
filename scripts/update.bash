@@ -10,27 +10,53 @@
 #   "batch_mode": true,
 #
 
-# Function to check updates
+set -euo pipefail
+
+UNICORN=~/.local/bin/my-unicorn
+
+# Ensure binary exists
+if [ ! -x "$UNICORN" ]; then
+  echo "Error: my-unicorn binary not found at $UNICORN"
+  exit 127
+fi
+
+# Function to determine update need apps and print them
+# basic notification function that show how many apps need update
 check_updates() {
-  ~/.local/bin/my-unicorn update --check-only
+  if ! output=$("$UNICORN" update --check-only 2>&1); then
+    echo "Error: Failed to check updates. Possible network issue."
+    echo "$output"
+    return 1
+  fi
+  echo "$output"
 }
 
 # Function to update all apps
 update() {
-  ~/.local/bin/my-unicorn update
-  
-  # Update qtile widget after update if Qtile is installed
+  if ! "$UNICORN" update; then
+    echo "Error: Update failed. Check your network connection or logs."
+    return 1
+  fi
+
   if command -v qtile >/dev/null 2>&1; then
-    qtile cmd-obj -o widget my-unicorn -f force_update || true
+    if ! qtile cmd-obj -o widget my-unicorn -f force_update; then
+      echo "Warning: Qtile widget update failed"
+    fi
   fi
 }
 
 # Function to determine update need apps and print them
-# basic notification function that show how many apps need update
 show_updates() {
-  local count=$(check_updates | grep -c '📦 Update available')
+  local output
+  if ! output=$(check_updates); then
+    echo "⚠️ Could not fetch update information."
+    return 1
+  fi
 
-  if [ "$count" = "0" ]; then
+  local count
+  count=$(echo "$output" | grep -c '📦 Update available' || true)
+
+  if [ "$count" -eq 0 ]; then
     echo "✅ Up-to-date"
   else
     echo "AppImage Updates: $count"
@@ -39,30 +65,29 @@ show_updates() {
 
 # help for CLI
 help() {
-  echo "Usage: $0 {update|check|notify|help}"
+  echo "Usage: $0 {update|check|help}"
   echo "--update   Update all of your downloaded AppImages"
   echo "--check    Display status of updates"
   echo "--help     Display this help message"
 }
 
 # Parse command line options
-case "$1" in
---check | "")
-  # Default action if no arguments provided
-  show_updates
-  ;;
---update)
-  update
-  ;;
---help | -h)
-  help
-  ;;
-*)
-  echo "Invalid option: $1"
-  echo ""
-  help
-  exit 1
-  ;;
+case "${1:-}" in
+  --check | "")
+    show_updates
+    ;;
+  --update)
+    update
+    ;;
+  --help | -h)
+    help
+    ;;
+  *)
+    echo "Invalid option: $1"
+    echo ""
+    help
+    exit 1
+    ;;
 esac
 
 exit 0
