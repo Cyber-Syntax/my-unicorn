@@ -9,6 +9,7 @@ validation to ensure data freshness while minimizing API calls.
 """
 
 import contextlib
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TypedDict
@@ -17,6 +18,7 @@ import orjson
 
 from my_unicorn.config import ConfigManager
 from my_unicorn.logger import get_logger
+from my_unicorn.utils import is_checksum_file
 
 logger = get_logger(__name__)
 
@@ -84,55 +86,9 @@ class ReleaseCacheManager:
             True if the file is a checksum for an AppImage, False otherwise
 
         """
-        import re
-
-        filename_lower = filename.lower()
-
-        # Special patterns for general checksum files (these usually contain checksums for multiple files)
-        general_checksum_patterns = [
-            r"latest-.*\.yml$",
-            r"latest-.*\.yaml$", 
-            r".*checksums?\.txt$",
-            r".*checksums?\.yml$",
-            r".*checksums?\.yaml$",
-            r"SHA\d+SUMS?(\.txt)?$",
-            r"MD5SUMS?(\.txt)?$",
-        ]
-
-        # Check for general checksum files first
-        for pattern in general_checksum_patterns:
-            if re.search(pattern, filename_lower, re.IGNORECASE):
-                logger.debug(f"File {filename} matches general checksum pattern {pattern}")
-                return True
-
-        # Define specific checksum file extensions that need base file checking
-        specific_extensions = [
-            ".sha256sum",
-            ".sha512sum", 
-            ".sha1sum",
-            ".md5sum",
-            ".digest",
-            ".sum",
-            ".hash",
-        ]
-
-        # Check for specific file checksums - only keep if the base file is an AppImage
-        for extension in specific_extensions:
-            if filename_lower.endswith(extension):
-                # Extract the base filename by removing the checksum extension
-                base_filename = filename_lower[:-len(extension)]
-                
-                # Check if the base filename is an AppImage
-                if self._is_appimage_file(base_filename):
-                    logger.debug(f"File {filename} is checksum for AppImage {base_filename}")
-                    return True
-                
-                # If it's not for an AppImage, don't keep this checksum file
-                logger.debug(f"File {filename} is checksum for non-AppImage {base_filename} - filtering out")
-                return False
-
-        logger.debug(f"File {filename} is not a checksum file")
-        return False
+        # Use the consolidated checksum file detection from utils
+        # with AppImage base file requirement for specific extensions
+        return is_checksum_file(filename, require_appimage_base=True)
 
     def _filter_relevant_assets(self, assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Filter assets to keep only AppImages and related checksum files.

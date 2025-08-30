@@ -15,7 +15,7 @@ from .auth import GitHubAuthManager, auth_manager
 from .logger import get_logger
 from .services.cache import get_cache_manager
 from .services.progress import get_progress_service
-from .utils import extract_and_validate_version
+from .utils import extract_and_validate_version, is_checksum_file, get_checksum_file_format_type
 
 logger = get_logger(__name__)
 
@@ -47,27 +47,6 @@ class ChecksumFileInfo:
 
 class GitHubReleaseFetcher:
     """Fetches GitHub release information and extracts AppImage assets."""
-
-    # Common checksum file patterns to look for in GitHub releases
-    CHECKSUM_FILE_PATTERNS = [
-        r"latest-.*\.yml$",
-        r"latest-.*\.yaml$",
-        r".*checksums?\.txt$",
-        r".*checksums?\.yml$",
-        r".*checksums?\.yaml$",
-        r".*checksums?\.md5$",
-        r".*checksums?\.sha1$",
-        r".*checksums?\.sha256$",
-        r".*checksums?\.sha512$",
-        r"SHA\d+SUMS?(\.txt)?$",
-        r"MD5SUMS?(\.txt)?$",
-        r".*\.sum$",
-        r".*\.hash$",
-        r".*\.digest$",
-        r".*\.DIGEST$",
-        r".*appimage\.sha256$",
-        r".*appimage\.sha512$",
-    ]
 
     def __init__(
         self,
@@ -186,22 +165,14 @@ class GitHubReleaseFetcher:
         for asset in assets:
             asset_name = asset["name"]
 
-            # Check if asset matches any checksum file pattern
-            for pattern in GitHubReleaseFetcher.CHECKSUM_FILE_PATTERNS:
-                if re.search(pattern, asset_name, re.IGNORECASE):
-                    url = asset["browser_download_url"]
+            # Use the consolidated checksum file detection from utils
+            if is_checksum_file(asset_name):
+                url = asset["browser_download_url"]
+                format_type = get_checksum_file_format_type(asset_name)
 
-                    # Determine format type
-                    format_type = (
-                        "yaml"
-                        if asset_name.lower().endswith((".yml", ".yaml"))
-                        else "traditional"
-                    )
-
-                    checksum_files.append(
-                        ChecksumFileInfo(filename=asset_name, url=url, format_type=format_type)
-                    )
-                    break
+                checksum_files.append(
+                    ChecksumFileInfo(filename=asset_name, url=url, format_type=format_type)
+                )
 
         # Prioritize YAML files (like latest-linux.yml) first as they're often more reliable
         checksum_files.sort(key=lambda x: (x.format_type != "yaml", x.filename))
