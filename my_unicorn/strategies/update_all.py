@@ -78,7 +78,7 @@ class UpdateAllAppsStrategy(UpdateStrategy):
             try:
                 # Phase 1: Check for updates
                 update_infos = await context.update_manager.check_all_updates_with_progress(
-                    installed_apps
+                    installed_apps, refresh_cache=context.refresh_cache
                 )
                 apps_to_update = [info for info in update_infos if info.has_update]
                 apps_up_to_date = [info for info in update_infos if not info.has_update]

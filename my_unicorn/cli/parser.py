@@ -85,6 +85,7 @@ Examples:
         self._add_list_command(subparsers)
         self._add_remove_command(subparsers)
         self._add_backup_command(subparsers)
+        self._add_cache_command(subparsers)
         self._add_auth_command(subparsers)
         self._add_config_command(subparsers)
 
@@ -149,9 +150,10 @@ Examples:
             help="Update installed AppImages",
             epilog="""
 Examples:
-  %(prog)s                    # Update all installed apps
-  %(prog)s appflowy joplin    # Update specific apps (without comma)
-  %(prog)s appflowy,joplin    # Update specific apps (with comma)
+  %(prog)s                         # Update all installed apps
+  %(prog)s appflowy joplin         # Update specific apps (without comma)
+  %(prog)s appflowy,joplin         # Update specific apps (with comma)
+  %(prog)s --check-only --refresh-cache  # Check updates bypassing cache
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
@@ -164,6 +166,11 @@ Examples:
             "--check-only",
             action="store_true",
             help="Only check for updates without installing",
+        )
+        update_parser.add_argument(
+            "--refresh-cache",
+            action="store_true",
+            help="Bypass cache and fetch fresh data from GitHub API (useful for automated scripts)",
         )
         update_parser.add_argument(
             "--verbose", action="store_true", help="Show detailed logging during update"
@@ -221,7 +228,7 @@ Examples:
     """,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
-        (remove_parser.add_argument("apps", nargs="+", help="Application names to remove"),)
+        remove_parser.add_argument("apps", nargs="+", help="Application names to remove")
         remove_parser.add_argument(
             "--keep-config", action="store_true", help="Keep configuration files"
         )
@@ -335,4 +342,37 @@ Examples:
         )
         config_group.add_argument(
             "--reset", action="store_true", help="Reset configuration to defaults"
+        )
+
+    def _add_cache_command(self, subparsers) -> None:
+        """Add cache command parser.
+
+        Args:
+            subparsers: The subparsers object to add the cache command to
+
+        """
+        cache_parser = subparsers.add_parser(
+            "cache", help="Manage release data cache for better performance"
+        )
+        
+        # Create subcommands for cache operations
+        cache_subparsers = cache_parser.add_subparsers(
+            dest="cache_action", help="Cache management actions", required=True
+        )
+        
+        # Clear command - remove cache entries
+        clear_parser = cache_subparsers.add_parser(
+            "clear", help="Clear cache entries"
+        )
+        clear_group = clear_parser.add_mutually_exclusive_group(required=True)
+        clear_group.add_argument(
+            "app_name", nargs="?", help="App name or owner/repo to clear (e.g., 'signal' or 'signalapp/Signal-Desktop')"
+        )
+        clear_group.add_argument(
+            "--all", action="store_true", help="Clear all cache entries"
+        )
+        
+        # Stats command - show cache statistics
+        cache_subparsers.add_parser(
+            "stats", help="Show cache statistics and storage info"
         )

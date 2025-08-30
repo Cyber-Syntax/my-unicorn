@@ -21,6 +21,7 @@ class UpdateContext:
 
     app_names: list[str] | None
     check_only: bool
+    refresh_cache: bool
     config_manager: ConfigManager
     update_manager: UpdateManager
 

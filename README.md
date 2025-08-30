@@ -1,24 +1,20 @@
-Türkçe Açıklama: [README.tr.md](README.tr.md)
+Turkish: [README.tr.md](README.tr.md)
 
 > [!CAUTION]
-> This project is in a **alpha phase** due to limited testing at this time.
->
-> **Important:** Follow the instructions in the **Releases section** when updating the script.
->
-> **Supported OS:** Currently, only Linux is supported.
+> - This project is in a **alpha phase** due to limited testing at this time.
+> - **Important:** Follow the instructions in the **Releases section** when updating the script.
+> - **Supported OS:** Currently, only Linux is supported.
 
 # **🦄 About my-unicorn**
 
 > [!NOTE]
-> I always frustrated with the manual AppImage update process and I created this project to automate the process.
->
-> This project introduces a Python-based CLI tool that treats AppImages like packages: installable, updatable,
-> and manageable via a simple interface.
-> Detailed information: [wiki.md](docs/wiki.md)
+> My Unicorn is a command-line tool to manage AppImages on Linux. It allows users to install, update, and manage AppImages from GitHub repositories easily. It's designed to simplify the process of handling AppImages, making it more convenient for users to keep their applications up-to-date.
+> - Detailed information: [wiki.md](docs/wiki.md)
 
 - **Supported Applications:**
-    - Super-Productivity, Siyuan, Joplin, Standard-notes, Logseq, QOwnNotes, Tagspaces, Zen-Browser, weektodo, Zettlr, HeroicGamesLauncher, KDiskMark, AppFlowy, Obsidian
+    - Super-Productivity, Siyuan, Joplin, Standard-notes, Logseq, QOwnNotes, Tagspaces, Zen-Browser, Zettlr, HeroicGamesLauncher, KDiskMark, AppFlowy, Obsidian
     - Applications without verification (developer doesn't provide hash):
+        - WeekToDo
         - FreeTube
             - Related issue: https://github.com/FreeTubeApp/FreeTube/issues/4720)
     - More can be found in the [catalog](my_unicorn/catalog/) folder.

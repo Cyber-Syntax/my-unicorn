@@ -14,7 +14,7 @@
         "digest": false,
         "skip": false,
         "checksum_file": "latest-linux.yml",
-        "checksum_hash_type": "sha256"
+        "checksum_hash_type": "sha512"
     },
     "icon": {
         "extraction": true,

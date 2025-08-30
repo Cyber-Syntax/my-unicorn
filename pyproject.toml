@@ -1,10 +1,10 @@
 [project]
 name = 'my-unicorn'
-version = '1.5.1-alpha'
+version = '1.6.0-alpha'
 maintainers = [{ name = "Cyber-Syntax" }]
 license = { text = "GPL-3.0-or-later" }
-description = 'It downloads/updates appimages via GitHub API. It also validates the appimage with SHA256 and SHA512.'
-keywords = ["package-manager", "appimage-downloader", "appimage-updater"]
+description = 'My Unicorn is a command-line tool to manage AppImages on Linux. It allows users to install, update, and manage AppImages from GitHub repositories easily. It is designed to simplify the process of handling AppImages, making it more convenient for users to keep their applications up-to-date.'
+keywords = ["appimage", "appimage-manager"]
 requires-python = ">= 3.12"
 dependencies = [
     "aiohttp>=3.12.2",

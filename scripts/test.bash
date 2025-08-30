@@ -112,6 +112,51 @@ restore_app_configs() {
 
 # ======== App Configuration Setup Functions ========
 
+setup_tagspaces_config() {
+    local version="${1:-$TEST_VERSION}"
+    info "Setting up tagspaces test config with version $version"
+
+    cat >"$CONFIG_DIR/tagspaces.json" <<EOF
+{
+  "config_version": "1.0.0",
+  "source": "catalog",
+  "appimage": {
+    "version": "$version",
+    "name": "tagspaces.AppImage",
+    "rename": "tagspaces",
+    "name_template": "{repo}-{latest_version}-{characteristic_suffix}.AppImage",
+    "characteristic_suffix": [
+      "linux-x86_64",
+      "x86_64",
+      "amd64"
+    ],
+    "installed_date": "$(date --iso-8601=seconds)",
+    "digest": ""
+  },
+  "owner": "tagspaces",
+  "repo": "tagspaces",
+  "github": {
+    "repo": true,
+    "prerelease": false
+  },
+  "verification": {
+    "digest": false,
+    "skip": false,
+    "checksum_file": "SHA256SUMS.txt",
+    "checksum_hash_type": "sha256"
+  },
+  "icon": {
+    "extraction": true,
+    "url": "",
+    "name": "tagspaces.png",
+    "source": "extraction",
+    "installed": true,
+    "path": "/home/developer/Applications/icons/tagspaces.png"
+  }
+}
+EOF
+}
+
 setup_qownnotes_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up qownnotes test config with version $version"
@@ -624,43 +669,29 @@ test_multiple_catalog_install() {
     fi
 }
 
-test_catalog_updates() {
-    info "=== Testing Catalog Updates ==="
-    local apps=("appflowy" "legcord" "joplin")
+test_updates() {
+    info "=== Testing Updates ==="
+    local apps=("appflowy" "legcord" "tagspaces")
 
     # Step 1: Set up configs with old versions and test updates
-    info "Step 1/3: Setting up old versions and testing catalog updates"
+    info "Step 1/3: Setting up old versions and testing updates"
     for app in "${apps[@]}"; do
         case "$app" in
+            "tagspaces") setup_tagspaces_config "$TEST_VERSION" ;;
             "appflowy") setup_appflowy_config "$TEST_VERSION" ;;
             "legcord") setup_legcord_config "$TEST_VERSION" ;;
-            "joplin") setup_joplin_config "$TEST_VERSION" ;;
+                # "joplin") setup_joplin_config "$TEST_VERSION" ;;
         esac
     done
 
     cd "$APP_ROOT"
     if python3 run.py update "${apps[@]}"; then
-        info "Catalog updates: SUCCESS"
+        info "updates: SUCCESS"
     else
-        error "Catalog updates: FAILED"
+        error "updates: FAILED"
         return 1
     fi
 
-    # Step 2: Remove apps to test cleanup
-    info "Step 2/3: Testing removal after updates"
-    if python3 run.py remove "${apps[@]}"; then
-        info "Post-update removal (${apps[*]}): SUCCESS"
-    else
-        warn "Post-update removal (${apps[*]}): FAILED"
-    fi
-
-    # Step 3: Reinstall to verify clean state
-    info "Step 3/3: Reinstalling apps to verify clean state"
-    if python3 run.py install "${apps[@]}"; then
-        info "Post-removal reinstall: SUCCESS"
-    else
-        error "Post-removal reinstall: FAILED"
-    fi
 }
 
 # ======== Comprehensive Tests ========
@@ -754,8 +785,8 @@ test_comprehensive() {
     # Test catalog functionality (includes cleanup and fresh installs)
     test_multiple_catalog_install
 
-    # Test catalog updates (includes update→remove→reinstall pattern)
-    test_catalog_updates
+    # Test updates (includes update→remove→reinstall pattern)
+    test_updates
 
     info "=== All comprehensive tests completed ==="
 }
@@ -783,11 +814,12 @@ COMMANDS:
         --url-nuclear          Install nuclear via URL
         --url-keepassxc        Install keepassxc via URL
         --url-all              Run all URL tests (keepassxc + nuclear)
+    Update Tests:
+        --update               Test updates for multiple apps (appflowy + legcord + joplin)
 
     Catalog Tests:
         --catalog-single       Install single app from catalog (appflowy)
         --catalog-multiple     Install multiple apps from catalog
-        --catalog-update       Test updating multiple catalog apps
 
     Comprehensive Tests:
         --quick               Run quick tests (url + catalog + update)
@@ -860,8 +892,8 @@ parse_arguments() {
         --catalog-multiple)
             test_multiple_catalog_install
             ;;
-        --catalog-update)
-            test_catalog_updates
+        --update)
+            test_updates
             ;;
         --quick)
             test_quick

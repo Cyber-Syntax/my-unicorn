@@ -75,7 +75,16 @@ class VerificationService:
             Tuple of (has_digest, checksum_files_list)
 
         """
-        has_digest = bool(asset.get("digest"))
+        digest_value = asset.get("digest", "")
+        has_digest = bool(digest_value and digest_value.strip())
+        digest_requested = config.get("digest", False)
+        
+        # Log digest availability vs configuration
+        if digest_requested and not has_digest:
+            logger.warning("⚠️  Digest verification requested but no digest available from GitHub API")
+            logger.debug("   📦 Asset digest field: '%s'", digest_value or "None")
+        elif has_digest:
+            logger.debug("✅ Digest available for verification: %s", digest_value[:16] + "...")
 
         # Check for manually configured checksum file
         manual_checksum_file = config.get("checksum_file")
@@ -95,8 +104,16 @@ class VerificationService:
                         filename=manual_checksum_file, url=url, format_type=format_type
                     )
                 )
-        elif assets and owner and repo and tag_name:
-            # Auto-detect checksum files from assets using GitHub client logic
+        elif (
+            assets 
+            and owner 
+            and repo 
+            and tag_name 
+            and not config.get("digest", False)
+        ):
+            # Auto-detect checksum files ONLY if digest verification is not explicitly enabled
+            # This prevents interference with apps that are configured to use digest verification
+            logger.debug("🔍 Auto-detecting checksum files (digest not explicitly enabled)")
             try:
                 # Convert assets to the format expected by GitHubReleaseFetcher
                 github_assets = []
@@ -119,6 +136,8 @@ class VerificationService:
                 )
             except Exception as e:
                 logger.warning("Failed to auto-detect checksum files: %s", e)
+        elif assets and config.get("digest", False):
+            logger.debug("ℹ️  Skipping auto-detection: digest verification explicitly enabled")
 
         return has_digest, checksum_files
 
@@ -176,17 +195,28 @@ class VerificationService:
         """
         try:
             logger.debug("🔐 Attempting digest verification (from GitHub API)")
+            logger.debug("   📄 AppImage file: %s", verifier.file_path.name)
+            logger.debug("   🔢 Expected digest: %s", digest)
             if skip_configured:
                 logger.debug("   Note: Using digest despite skip=true setting")
+            
+            # Get actual file hash to compare
+            actual_digest = verifier.compute_hash("sha256")  # Digest is usually SHA-256
+            logger.debug("   🧮 Computed digest: %s", actual_digest)
+            
             verifier.verify_digest(digest)
             logger.debug("✅ Digest verification passed")
+            logger.debug("   ✓ Digest match confirmed")
             return {
                 "passed": True,
                 "hash": digest,
+                "computed_hash": actual_digest,
                 "details": "GitHub API digest verification",
             }
         except Exception as e:
             logger.error("❌ Digest verification failed: %s", e)
+            logger.error("   Expected: %s", digest)
+            logger.error("   AppImage: %s", verifier.file_path.name)
             return {
                 "passed": False,
                 "hash": digest,
@@ -233,17 +263,35 @@ class VerificationService:
             # Parse using the public method that handles both YAML and traditional formats
             expected_hash = verifier.parse_checksum_file(content, target_filename, hash_type)
             if not expected_hash:
+                logger.error("❌ Checksum file verification FAILED - hash not found!")
+                logger.error("   📄 Checksum file: %s (%s format)", checksum_file.filename, checksum_file.format_type)
+                logger.error("   🔍 Looking for: %s", target_filename)
                 return {
                     "passed": False,
                     "hash": "",
                     "details": f"Hash not found for {target_filename} in checksum file",
                 }
 
+            logger.debug("🔍 Starting hash comparison for checksum file verification")
+            logger.debug("   📄 Checksum file: %s (%s format)", checksum_file.filename, checksum_file.format_type)
+            logger.debug("   🔍 Target file: %s", target_filename)
+            logger.debug("   📋 Expected hash (%s): %s", hash_type.upper(), expected_hash)
+
             # Compute actual hash and compare
             computed_hash = verifier.compute_hash(hash_type)
+            logger.debug("   🧮 Computed hash (%s): %s", hash_type.upper(), computed_hash)
 
-            if computed_hash.lower() == expected_hash.lower():
-                logger.debug("✅ Checksum file verification passed (%s)", hash_type)
+            # Perform comparison
+            hashes_match = computed_hash.lower() == expected_hash.lower()
+            logger.debug("   🔄 Hash comparison: %s == %s → %s", 
+                        computed_hash.lower()[:32] + "...", 
+                        expected_hash.lower()[:32] + "...", 
+                        "MATCH" if hashes_match else "MISMATCH")
+
+            if hashes_match:
+                logger.debug("✅ Checksum file verification PASSED! (%s)", hash_type.upper())
+                logger.debug("   📄 Checksum file: %s (%s format)", checksum_file.filename, checksum_file.format_type)
+                logger.debug("   ✓ Hash match confirmed")
                 return {
                     "passed": True,
                     "hash": f"{hash_type}:{computed_hash}",
@@ -252,9 +300,11 @@ class VerificationService:
                     "hash_type": hash_type,
                 }
             else:
-                logger.error(
-                    "❌ Hash mismatch: expected %s, got %s", expected_hash, computed_hash
-                )
+                logger.error("❌ Checksum file verification FAILED!")
+                logger.error("   📄 Checksum file: %s (%s format)", checksum_file.filename, checksum_file.format_type)
+                logger.error("   🔢 Expected hash: %s", expected_hash)
+                logger.error("   🧮 Computed hash: %s", computed_hash)
+                logger.error("   ❌ Hash mismatch detected")
                 return {
                     "passed": False,
                     "hash": f"{hash_type}:{computed_hash}",
@@ -423,6 +473,13 @@ class VerificationService:
 
         """
         logger.debug("🔍 Starting verification for %s", app_name)
+        logger.debug("   📋 Configuration: skip=%s, checksum_file='%s', digest_enabled=%s", 
+                    config.get("skip", False), 
+                    config.get("checksum_file", ""), 
+                    config.get("digest", False))
+        logger.debug("   📦 Asset digest: %s", asset.get("digest", "None"))
+        logger.debug("   📂 Assets provided: %s (%d items)", 
+                    bool(assets), len(assets) if assets else 0)
 
         # Create progress task if progress service is available but no task ID provided
         create_own_task = False
@@ -483,6 +540,8 @@ class VerificationService:
 
         # Try digest verification first if available
         if has_digest:
+            #FIXME: why is that not showed up on the logs?
+            logger.debug("🔐 Digest verification available - attempting...")
             # Update progress - digest verification
             if progress_task_id and self.progress_service:
                 await self.progress_service.update_task(
@@ -498,11 +557,20 @@ class VerificationService:
                 verification_methods["digest"] = digest_result
                 if digest_result["passed"]:
                     verification_passed = True
+                    logger.debug("✅ Digest verification succeeded")
                     # Enable digest verification in config for future use
                     updated_config["digest"] = True
+                else:
+                    logger.warning("❌ Digest verification failed")
+        else:
+            logger.debug("ℹ️  No digest available for verification")
 
         # Try checksum file verification with smart prioritization
         if checksum_files:
+            logger.debug("🔍 Checksum file verification available - found %d files", len(checksum_files))
+            for cf in checksum_files:
+                logger.debug("   📄 Available: %s (%s format)", cf.filename, cf.format_type)
+            
             # Update progress - checksum verification
             if progress_task_id and self.progress_service:
                 await self.progress_service.update_task(
@@ -515,6 +583,7 @@ class VerificationService:
             prioritized_files = self._prioritize_checksum_files(checksum_files, file_path.name)
 
             for i, checksum_file in enumerate(prioritized_files):
+                logger.debug("🔍 Attempting checksum verification with: %s", checksum_file.filename)
                 method_key = f"checksum_file_{i}" if i > 0 else "checksum_file"
 
                 checksum_result = await self._verify_checksum_file(
@@ -528,9 +597,14 @@ class VerificationService:
                     verification_methods[method_key] = checksum_result
                     if checksum_result["passed"]:
                         verification_passed = True
+                        logger.debug("✅ Checksum verification succeeded with: %s", checksum_file.filename)
                         # Update config with successful checksum file
                         updated_config["checksum_file"] = checksum_file.filename
                         break  # Stop trying other checksum files once one succeeds
+                    else:
+                        logger.warning("❌ Checksum verification failed with: %s", checksum_file.filename)
+        else:
+            logger.debug("ℹ️  No checksum files available for verification")
 
         # Always perform basic file size verification
         if progress_task_id and self.progress_service:
@@ -575,6 +649,15 @@ class VerificationService:
         overall_passed = verification_passed or (
             not strong_methods_available and size_result["passed"]
         )
+
+        # Log final verification summary
+        logger.debug("📊 Verification summary for %s:", app_name)
+        logger.debug("   🔐 Strong methods available: %s", strong_methods_available)
+        logger.debug("   ✅ Verification passed: %s", overall_passed)
+        logger.debug("   📋 Methods used: %s", list(verification_methods.keys()))
+        for method, result in verification_methods.items():
+            if method != "size":  # Size is always logged
+                logger.debug("      %s: %s", method, "✅ PASS" if result.get("passed") else "❌ FAIL")
 
         # Update progress - verification completed (only finish task if we created it)
         if progress_task_id and self.progress_service and create_own_task:

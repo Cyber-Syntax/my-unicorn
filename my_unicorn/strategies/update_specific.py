@@ -93,7 +93,7 @@ class UpdateSpecificAppsStrategy(UpdateStrategy):
             try:
                 # Phase 1: Check for updates
                 update_infos = await context.update_manager.check_all_updates_with_progress(
-                    context.app_names
+                    context.app_names, refresh_cache=context.refresh_cache
                 )
 
                 # Detect if update_infos is empty due to authentication failure or other errors
