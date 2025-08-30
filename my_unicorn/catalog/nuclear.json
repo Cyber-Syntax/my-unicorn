@@ -1,0 +1,25 @@
+{
+    "owner": "nukeop",
+    "repo": "nuclear",
+    "appimage": {
+      "rename": "nuclear",
+      "name_template": "",
+      "characteristic_suffix": []
+    },
+    "github": {
+      "repo": true,
+      "prerelease": false
+    },
+    "verification": {
+      "digest": true,
+      "skip": false,
+      "checksum_file": "",
+      "checksum_hash_type": "sha256"
+    },
+    "icon": {
+      "extraction": true,
+      "source": "extraction",
+      "url": "",
+      "name": "nuclear.png"
+    }
+}
