@@ -1,15 +1,41 @@
-# My Unicorn first stable release
+# My Unicorn Wiki 🦄
+
+> [!NOTE]
+> My Unicorn is a command-line tool to manage AppImages on Linux. It allows users to install, update, and manage AppImages from GitHub repositories easily. It's designed to simplify the process of handling AppImages, making it more convenient for users to keep their applications up-to-date.
 
 ## Features
 
-- Install via URL: Download and install AppImages directly from their GitHub repository URLs.
-- Install from Catalog: Install AppImages from a catalog of compatible applications.
-- Update Management: Backup/Remove existing AppImages and install the latest version. (Backup default enabled)
-- Token Management: Securely manage GitHub API tokens. Save them in the GNOME keyring for secure storage.
-- Backup Management: Create and manage backups of AppImages before updates.
-- Desktop Entry Creation: Automatically create desktop entry files for AppImages to integrate them into the system menu.
-- App Configuration: Use JSON configuration files to save AppImage version, appimage name for update checks.
-- Global Configuration: Manage global settings such as maximum concurrent updates, backup limits and more.
+- Install via URL: Install AppImages directly via GitHub repository URL.
+- Catalog Support:
+    - Predefined Catalog: A curated list of popular applications available for installation.
+    - Install from Catalog: Install AppImages with a simple name from a predefined catalog of popular applications.
+    - List Catalog: List all available applications in the catalog with descriptions.
+- Update Management: Update installed AppImages to the latest version available on GitHub.
+    - Check for Updates: Check for available updates without installing them.
+    - Selective Updates: Update specific applications or all installed applications.
+    - Update all: Update all installed AppImages with a single command.
+- Remove Appimages: Remove installed AppImages with options to keep or delete configuration files.
+- Token Management: Save and manage GitHub tokens for authenticated requests to avoid rate limiting.
+- Backup Management: Automatically create and manage backups of installed AppImages before updating.
+    - Backup Metadata: Maintain a metadata file for backups to track versions, creation dates, and file sizes.
+    - Backup Cleanup: Automatically clean up old backups based on user-defined retention policies.
+    - Backup Migration: Migrate old backup formats to the new metadata-based system.
+- Verification: Verify the integrity of downloaded AppImages using SHA256 or SHA512 checksums.
+- Concurrent Downloads: Support for multiple concurrent downloads to speed up the installation and update process.
+- Batch Mode: Non-interactive mode for automated scripts and cron jobs.
+- Logging: Detailed logging of operations for troubleshooting and auditing.
+- Desktop Entry Creation: Automatically create desktop entries for installed AppImages.
+- Icon Management: Extract icons from AppImages or download from specified URLs.
+- Progress Indicators: Visual progress bars for downloads and updates using the rich library.
+- Configuration Management: Store global and app-specific settings in configuration files for easy customization.
+    - App Configuration: Store app-specific configurations in JSON files for easy management such as version, name, and verification settings.
+    - Global Configuration: Store global settings in a configuration file for customization such as download directories, logging levels, and more.
+
+## Helper scripts
+- my-unicorn-installer.sh: A script to install my-unicorn and its dependencies.
+    - It sets up a virtual environment and installs the required Python packages.
+- venv-wrapper.bash: Wrapper script around my-unicorn using the python virtual environment
+- update.bash: A script to automate process of checking for updates and updating my-unicorn itself.
 
 ## 🛠️ Usage Examples
 
@@ -26,8 +52,9 @@ my-unicorn self-update
 ### Installation
 
 ```bash
-# Install via URL
+# Install via URL (Support concurrent installs)
 my-unicorn install https://github.com/johannesjo/super-productivity
+my-unicorn install https://github.com/nukeop/nuclear https://github.com/keepassxreboot/keepassxc/releases
 
 # Install from catalog
 my-unicorn install appflowy,qownotes
@@ -45,6 +72,7 @@ my-unicorn update --check-only
 
 # Update specific apps
 my-unicorn update appflowy,joplin
+my-unicorn update appflowy joplin
 
 # Update all installed apps
 my-unicorn update
@@ -61,7 +89,7 @@ my-unicorn list --available
 
 # Remove apps
 my-unicorn remove appflowy --keep-config
-my-unicorn remove appflowy qownotes 
+my-unicorn remove appflowy qownotes
 
 # Show configuration
 my-unicorn config --show
@@ -206,39 +234,42 @@ my-unicorn/my_unicorn/catalog/
 
 ```jsonc
 {
-    "owner": "AppFlowy-IO",
-    "repo": "AppFlowy",
-    "appimage": {
-        // default assigned to `repo` and only used for renaming the AppImage file. (good for `standardnotes/app` similar apps)
-        "rename": "AppFlowy",
-        "name_template": "{rename}-{latest_version}-linux-{characteristic_suffix}.AppImage",
-        // List of suffixes that are preferred for the AppImage filename. (e.g `x86_64`, `linux`, `Qt6`)
-        "characteristic_suffix": [""],
-    },
-    "github": {
-        // app installed from github repo
-        "repo": true,
-        // Beta/prerelease used to download the latest beta version of the appimage.
-        "prerelease": false,
-    },
-    "verification": {
-        // provided by the github api if the developer provides it.
-        "digest": true,
-        // Skipping the verification process.
-        "skip": false,
-        // file that contains the checksum of the downloaded file. (e.g "SHA256SUMS.txt", "latest-linux.yml")
-        "checksum_file": "",
-        // This is the hash type of the checksum file.
-        //         - sha256 example files: SHA256SUMS.txt, <appimage_name>.AppImage.sha256sum
-        //         - sha512 example files: latest-linux.yml, <appimage_name>.AppImage.sha512sum
-        "checksum_hash_type": "",
-    },
-    "icon": {
-        // direct link to an SVG image file hosted on GitHub's raw content server
-        "url": "https://raw.githubusercontent.com/AppFlowy-IO/AppFlowy/main/frontend/resources/flowy_icons/40x/app_logo.svg",
-        // used to name the icon file.
-        "name": "appflowy.svg",
-    },
+	"owner": "AppFlowy-IO",
+	"repo": "AppFlowy",
+	"appimage": {
+		// default assigned to `repo` and only used for renaming the AppImage file. (good for `standardnotes/app` similar apps)
+		"rename": "AppFlowy",
+		"name_template": "{rename}-{latest_version}-linux-{characteristic_suffix}.AppImage",
+		// List of suffixes that are preferred for the AppImage filename. (e.g `x86_64`, `linux`, `Qt6`)
+		"characteristic_suffix": [""]
+	},
+	"github": {
+		// app installed from github repo
+		"repo": true,
+		// Beta/prerelease used to download the latest beta version of the appimage.
+		"prerelease": false
+	},
+	"verification": {
+		// provided by the github api if the developer provides it.
+		"digest": true,
+		// Skipping the verification process.
+		"skip": false,
+		// file that contains the checksum of the downloaded file. (e.g "SHA256SUMS.txt", "latest-linux.yml")
+		"checksum_file": "",
+		// This is the hash type of the checksum file.
+		//         - sha256 example files: SHA256SUMS.txt, <appimage_name>.AppImage.sha256sum
+		//         - sha512 example files: latest-linux.yml, <appimage_name>.AppImage.sha512sum
+		"checksum_hash_type": ""
+	},
+	"icon": {
+		// icon extracted from the appimage after installation
+		"extraction": true,
+		// direct link to an SVG image file hosted on GitHub's raw content server
+		// url is here for only reference because when extraction is true, url is not used and left empty.
+		"url": "https://raw.githubusercontent.com/AppFlowy-IO/AppFlowy/main/frontend/resources/flowy_icons/40x/app_logo.svg",
+		// used to name the icon file.
+		"name": "appflowy.svg"
+	}
 }
 ```
 
@@ -274,44 +305,56 @@ my-unicorn/my_unicorn/catalog/
 
 ```jsonc
 {
-    // Configuration version for future migrations
-    "config_version": "1.0.0",
-    "appimage": {
-        // Latest installed version of the appimage
-        "version": "0.9.5",
-        "name": "appflowy.AppImage",
-        // used to rename installed appimage name (cleaning from version arch etc.)
-        "rename": "appflowy",
-        // template used on the appimage name
-        "name_template": "{rename}-{latest_version}-linux-{characteristic_suffix}.AppImage",
-        // suffix used on the appimage name
-        "characteristic_suffix": ["x86_64", "amd64"],
-        // installed date of the appimage
-        "installed_date": "2025-08-03T14:57:00.204029",
-        // digest algorithm used to verify the integrity of the appimage, provided by github api assets
-        "digest": "sha256:bd8b9374ec9c59fa98b08080fa7f96696d135e6173213d039939f94cc757c587",
-    },
-    "owner": "AppFlowy-IO",
-    "repo": "AppFlowy",
-    "github": {
-        "repo": true,
-        "prerelease": false,
-    },
-    "verification": {
-        // Verify the appimage with digest algorithm
-        "digest": true,
-        // skip verification
-        "skip": false,
-        // checksum file used to verify the integrity of the appimage
-        "checksum_file": "",
-        // hash type used to verify the integrity of the appimage
-        "checksum_hash_type": "sha256",
-    },
-    "icon": {
-        "url": "https://raw.githubusercontent.com/AppFlowy-IO/AppFlowy/main/frontend/resources/flowy_icons/40x/app_logo.svg",
-        "name": "appflowy.svg",
-        "installed": true,
-    },
+	// Configuration version for future migrations
+	"config_version": "1.0.0",
+	// source of installation (catalog or url)
+	"source": "catalog",
+	"appimage": {
+		// Latest installed version of the appimage
+		"version": "0.9.5",
+		"name": "appflowy.AppImage",
+		// used to rename installed appimage name (cleaning from version arch etc.)
+		"rename": "appflowy",
+		// template used on the appimage name
+		"name_template": "{rename}-{latest_version}-linux-{characteristic_suffix}.AppImage",
+		// suffix used on the appimage name
+		"characteristic_suffix": ["x86_64", "amd64"],
+		// installed date of the appimage
+		"installed_date": "2025-08-03T14:57:00.204029",
+		// digest algorithm used to verify the integrity of the appimage, provided by github api assets
+		"digest": "sha256:bd8b9374ec9c59fa98b08080fa7f96696d135e6173213d039939f94cc757c587"
+	},
+	"owner": "AppFlowy-IO",
+	"repo": "AppFlowy",
+	"github": {
+		"repo": true,
+		"prerelease": false
+	},
+	"verification": {
+		// Verify the appimage with digest algorithm
+		"digest": true,
+		// skip verification
+		"skip": false,
+		// checksum file used to verify the integrity of the appimage
+		"checksum_file": "",
+		// hash type used to verify the integrity of the appimage
+		"checksum_hash_type": "sha256"
+	},
+	"icon": {
+		// icon extracted from the appimage after installation
+		"extraction": true,
+		// direct link to an SVG image file hosted on GitHub's raw content server
+		// url is here for only reference because when extraction is true, url is not used and left empty.
+		"url": "https://raw.githubusercontent.com/AppFlowy-IO/AppFlowy/main/frontend/resources/flowy_icons/40x/app_logo.svg",
+		// used to name the icon file.
+		"name": "appflowy.svg",
+		// source of the icon (extraction or url)
+		"source": "extraction",
+		// icon installed status
+		"installed": true,
+		// path to the installed icon
+		"path": "/home/developer/Applications/icons/appflowy.svg"
+	}
 }
 ```
 
@@ -319,34 +362,75 @@ Example joplin.json:
 
 ```json
 {
-    "config_version": "1.0.0",
-    "appimage": {
-        "version": "v3.3.13",
-        "name": "joplin.AppImage",
-        "rename": "joplin",
-        "name_template": "{rename}-{latest_version}.AppImage",
-        "characteristic_suffix": [""],
-        "installed_date": "2025-08-03T13:43:58.526732",
-        "digest": "sha256:22ff90b3846e2d2c9b2722d325fffa84775e362af9a4567a9fa8672e27c5a5bd"
-    },
-    "owner": "laurent22",
-    "repo": "joplin",
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "prerelease": false,
-        "skip": false,
-        "checksum_file": "latest-linux.yml",
-        "checksum_hash_type": "sha512"
-    },
-    "icon": {
-        "url": "https://raw.githubusercontent.com/laurent22/joplin/dev/Assets/LinuxIcons/256x256.png",
-        "name": "joplin.png",
-        "installed": true
-    }
+	"config_version": "1.0.0",
+	"source": "catalog",
+	"appimage": {
+		"version": "3.3.13",
+		"name": "joplin.AppImage",
+		"rename": "joplin",
+		"name_template": "{rename}-{latest_version}.AppImage",
+		"characteristic_suffix": [""],
+		"installed_date": "2025-08-30T13:01:35.442363",
+		"digest": "sha256:22ff90b3846e2d2c9b2722d325fffa84775e362af9a4567a9fa8672e27c5a5bd"
+	},
+	"owner": "laurent22",
+	"repo": "joplin",
+	"github": {
+		"repo": true,
+		"prerelease": false
+	},
+	"verification": {
+		"digest": true,
+		"skip": false,
+		"checksum_file": "latest-linux.yml",
+		"checksum_hash_type": "sha256"
+	},
+	"icon": {
+		"extraction": true,
+		"url": "",
+		"name": "joplin.png",
+		"source": "extraction",
+		"installed": true,
+		"path": "/home/developer/Applications/icons/joplin.png"
+	}
+}
+```
+
+Example nuclear.json (installed via URL):
+
+```json
+{
+	"config_version": "1.0.0",
+	"source": "url",
+	"appimage": {
+		"version": "0.6.48",
+		"name": "nuclear.AppImage",
+		"rename": "nuclear",
+		"name_template": "",
+		"characteristic_suffix": [],
+		"installed_date": "2025-08-30T12:38:28.387230",
+		"digest": "sha256:937a8658f9fe3b891acecaeb64060722f4abae2c7d2cd9e726064626a9496c91"
+	},
+	"owner": "nukeop",
+	"repo": "nuclear",
+	"github": {
+		"repo": true,
+		"prerelease": false
+	},
+	"verification": {
+		"digest": true,
+		"skip": false,
+		"checksum_file": "",
+		"checksum_hash_type": "sha256"
+	},
+	"icon": {
+		"extraction": true,
+		"source": "extraction",
+		"url": "",
+		"name": "nuclear.png",
+		"installed": true,
+		"path": "/home/developer/Applications/icons/nuclear.png"
+	}
 }
 ```
 
@@ -373,28 +457,30 @@ Example joplin.json:
 
 ```json
 {
-    "versions": {
-        "1.9.1": {
-            "created": "2025-08-19T14:36:49.868125",
-            "filename": "obsidian-1.9.1.AppImage",
-            "sha256": "24471d25ed4d7d797a20a8ddf7b81ec43ae337f9ce495514dfdbb893307472b7",
-            "size": 125682911
-        },
-        "1.9.10": {
-            "created": "2025-08-19T14:01:21.787195",
-            "filename": "obsidian-1.9.10.AppImage",
-            "sha256": "24471d25ed4d7d797a20a8ddf7b81ec43ae337f9ce495514dfdbb893307472b7",
-            "size": 125682911
-        }
-    }
+	"versions": {
+		"1.9.1": {
+			"created": "2025-08-19T14:36:49.868125",
+			"filename": "obsidian-1.9.1.AppImage",
+			"sha256": "24471d25ed4d7d797a20a8ddf7b81ec43ae337f9ce495514dfdbb893307472b7",
+			"size": 125682911
+		},
+		"1.9.10": {
+			"created": "2025-08-19T14:01:21.787195",
+			"filename": "obsidian-1.9.10.AppImage",
+			"sha256": "24471d25ed4d7d797a20a8ddf7b81ec43ae337f9ce495514dfdbb893307472b7",
+			"size": 125682911
+		}
+	}
 }
 ```
 
-## Remove the package:
-
+## Uninstallation:
+### Global Uninstallation
 > [!TIP]
 > This would remove the package if you installed globally.
 
 ```bash
 pip uninstall my-unicorn
 ```
+### Local(venv) Uninstallation
+- [ ] Work in progress

@@ -226,9 +226,7 @@ class GitHubReleaseFetcher:
 
                 # Update shared progress if available
                 if self.shared_api_task_id and self.progress_service.is_active():
-                    await self._update_shared_progress(
-                        "Fetched "
-                    )
+                    await self._update_shared_progress("Fetched ")
 
                 return GitHubReleaseDetails(
                     owner=self.owner,
@@ -382,57 +380,75 @@ class GitHubReleaseFetcher:
             ValueError: If no releases are found
 
         """
-        url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases"
-        headers = GitHubAuthManager.apply_auth({})
+        try:
+            url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases"
+            headers = GitHubAuthManager.apply_auth({})
 
-        async with self.session.get(url=url, headers=headers) as response:
-            response.raise_for_status()
+            async with self.session.get(url=url, headers=headers) as response:
+                response.raise_for_status()
 
-            # Update rate limit information
-            self.auth_manager.update_rate_limit_info(dict(response.headers))
+                # Update rate limit information
+                self.auth_manager.update_rate_limit_info(dict(response.headers))
 
-            data = await response.json()
+                data = await response.json()
 
-            if not data:
-                raise ValueError(f"No releases found for {self.owner}/{self.repo}")
+                # Update shared progress if available
+                if self.shared_api_task_id and self.progress_service.is_active():
+                    release_type = "prereleases" if prefer_prerelease else "releases"
+                    await self._update_shared_progress(
+                        f"Fetched {release_type} for {self.owner}/{self.repo}"
+                    )
 
-            # Separate stable releases and prereleases
-            stable_releases = [
-                release for release in data if not release.get("prerelease", False)
-            ]
-            prereleases = [release for release in data if release.get("prerelease", False)]
+                if not data:
+                    raise ValueError(f"No releases found for {self.owner}/{self.repo}")
 
-            # Choose based on preference and availability
-            if prefer_prerelease:
-                # Prefer prereleases, fallback to stable if no prereleases
-                chosen_release = (
-                    prereleases[0]
-                    if prereleases
-                    else (stable_releases[0] if stable_releases else None)
+                # Separate stable releases and prereleases
+                stable_releases = [
+                    release for release in data if not release.get("prerelease", False)
+                ]
+                prereleases = [release for release in data if release.get("prerelease", False)]
+
+                # Choose based on preference and availability
+                if prefer_prerelease:
+                    # Prefer prereleases, fallback to stable if no prereleases
+                    chosen_release = (
+                        prereleases[0]
+                        if prereleases
+                        else (stable_releases[0] if stable_releases else None)
+                    )
+                else:
+                    # Prefer stable releases, fallback to prereleases if no stable releases
+                    chosen_release = (
+                        stable_releases[0]
+                        if stable_releases
+                        else (prereleases[0] if prereleases else None)
+                    )
+
+                if not chosen_release:
+                    raise ValueError(
+                        f"No suitable releases found for {self.owner}/{self.repo}"
+                    )
+
+                return GitHubReleaseDetails(
+                    owner=self.owner,
+                    repo=self.repo,
+                    version=self._normalize_version(chosen_release.get("tag_name", "")),
+                    prerelease=chosen_release.get("prerelease", False),
+                    assets=[
+                        asset_obj
+                        for asset in chosen_release.get("assets", [])
+                        if (asset_obj := self.to_github_asset(asset)) is not None
+                    ],
+                    original_tag_name=chosen_release.get("tag_name", ""),
                 )
-            else:
-                # Prefer stable releases, fallback to prereleases if no stable releases
-                chosen_release = (
-                    stable_releases[0]
-                    if stable_releases
-                    else (prereleases[0] if prereleases else None)
+
+        except Exception:
+            # Update shared progress with error if available
+            if self.shared_api_task_id and self.progress_service.is_active():
+                await self._update_shared_progress(
+                    f"Failed to fetch releases for {self.owner}/{self.repo}"
                 )
-
-            if not chosen_release:
-                raise ValueError(f"No suitable releases found for {self.owner}/{self.repo}")
-
-            return GitHubReleaseDetails(
-                owner=self.owner,
-                repo=self.repo,
-                version=self._normalize_version(chosen_release.get("tag_name", "")),
-                prerelease=chosen_release.get("prerelease", False),
-                assets=[
-                    asset_obj
-                    for asset in chosen_release.get("assets", [])
-                    if (asset_obj := self.to_github_asset(asset)) is not None
-                ],
-                original_tag_name=chosen_release.get("tag_name", ""),
-            )
+            raise
 
     def to_github_asset(self, asset: dict[str, Any]) -> GitHubAsset | None:
         """Convert GitHub API asset response to typed GitHubAsset.
