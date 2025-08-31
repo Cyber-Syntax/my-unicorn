@@ -9,9 +9,9 @@ from typing import Any
 
 import aiohttp
 
+from my_unicorn.config import ConfigManager
 from my_unicorn.download import DownloadService
 from my_unicorn.storage import StorageService
-from my_unicorn.config import ConfigManager
 
 
 class InstallStrategy(ABC):
@@ -22,7 +22,7 @@ class InstallStrategy(ABC):
         download_service: DownloadService,
         storage_service: StorageService,
         session: aiohttp.ClientSession,
-        config_manager: ConfigManager
+        config_manager: ConfigManager,
     ) -> None:
         """Initialize strategy with required services.
 

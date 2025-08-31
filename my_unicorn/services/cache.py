@@ -9,7 +9,6 @@ validation to ensure data freshness while minimizing API calls.
 """
 
 import contextlib
-import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TypedDict
@@ -76,7 +75,7 @@ class ReleaseCacheManager:
         """Check if filename is a checksum file for an AppImage.
 
         This method checks if the file is a checksum file AND if it's specifically
-        a checksum for an AppImage file. This prevents keeping checksums for 
+        a checksum for an AppImage file. This prevents keeping checksums for
         irrelevant files like tar.xz, zip, dmg, etc.
 
         Args:
@@ -125,17 +124,19 @@ class ReleaseCacheManager:
                 logger.debug("Including AppImage checksum file: %s", filename)
                 continue
 
-            # Log what we're filtering out for debugging  
+            # Log what we're filtering out for debugging
             logger.debug("Filtering out non-AppImage asset: %s", filename)
 
         # Count AppImages vs checksums for better logging
-        appimage_count = sum(1 for asset in relevant_assets if self._is_appimage_file(asset.get("name", "")))
+        appimage_count = sum(
+            1 for asset in relevant_assets if self._is_appimage_file(asset.get("name", ""))
+        )
         checksum_count = len(relevant_assets) - appimage_count
 
         logger.debug(
             "Asset filtering: %d -> %d assets (%d AppImages + %d AppImage checksums)",
             len(assets),
-            len(relevant_assets), 
+            len(relevant_assets),
             appimage_count,
             checksum_count,
         )

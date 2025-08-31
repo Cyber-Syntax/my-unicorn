@@ -213,10 +213,8 @@ class CatalogInstallStrategy(InstallStrategy):
                     and self.download_service.progress_service
                     and self.download_service.progress_service.is_active()
                 ):
-                    post_processing_task_id = (
-                        await self.download_service.progress_service.create_post_processing_task(
-                            app_name
-                        )
+                    post_processing_task_id = await self.download_service.progress_service.create_post_processing_task(
+                        app_name
                     )
 
                 # Verify download if requested (20% of post-processing)
@@ -229,8 +227,12 @@ class CatalogInstallStrategy(InstallStrategy):
                             description=f"🔍 Verifying {app_name}...",
                         )
                     verification_result = await self._perform_verification(
-                        download_path, appimage_asset, app_config, release_data,
-                        post_processing_task_id=post_processing_task_id, **kwargs
+                        download_path,
+                        appimage_asset,
+                        app_config,
+                        release_data,
+                        post_processing_task_id=post_processing_task_id,
+                        **kwargs,
                     )
                     if post_processing_task_id and self.download_service.progress_service:
                         await self.download_service.progress_service.update_task(
@@ -265,7 +267,9 @@ class CatalogInstallStrategy(InstallStrategy):
                 # Extract icon (30% of post-processing)
                 icon_path = None
                 updated_icon_config = {}
-                if app_config.get("icon") or True:  # Always try extraction even without icon config
+                if (
+                    app_config.get("icon") or True
+                ):  # Always try extraction even without icon config
                     if post_processing_task_id and self.download_service.progress_service:
                         await self.download_service.progress_service.update_task(
                             post_processing_task_id,
@@ -273,8 +277,12 @@ class CatalogInstallStrategy(InstallStrategy):
                             description=f"🎨 Extracting {app_name} icon...",
                         )
                     icon_path, updated_icon_config = await self._setup_catalog_icon(
-                        app_config, app_name, icon_dir, final_path,
-                        post_processing_task_id=post_processing_task_id, **kwargs
+                        app_config,
+                        app_name,
+                        icon_dir,
+                        final_path,
+                        post_processing_task_id=post_processing_task_id,
+                        **kwargs,
                     )
                     if post_processing_task_id and self.download_service.progress_service:
                         await self.download_service.progress_service.update_task(

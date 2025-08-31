@@ -354,25 +354,21 @@ Examples:
         cache_parser = subparsers.add_parser(
             "cache", help="Manage release data cache for better performance"
         )
-        
+
         # Create subcommands for cache operations
         cache_subparsers = cache_parser.add_subparsers(
             dest="cache_action", help="Cache management actions", required=True
         )
-        
+
         # Clear command - remove cache entries
-        clear_parser = cache_subparsers.add_parser(
-            "clear", help="Clear cache entries"
-        )
+        clear_parser = cache_subparsers.add_parser("clear", help="Clear cache entries")
         clear_group = clear_parser.add_mutually_exclusive_group(required=True)
         clear_group.add_argument(
-            "app_name", nargs="?", help="App name or owner/repo to clear (e.g., 'signal' or 'signalapp/Signal-Desktop')"
+            "app_name",
+            nargs="?",
+            help="App name or owner/repo to clear (e.g., 'signal' or 'signalapp/Signal-Desktop')",
         )
-        clear_group.add_argument(
-            "--all", action="store_true", help="Clear all cache entries"
-        )
-        
+        clear_group.add_argument("--all", action="store_true", help="Clear all cache entries")
+
         # Stats command - show cache statistics
-        cache_subparsers.add_parser(
-            "stats", help="Show cache statistics and storage info"
-        )
+        cache_subparsers.add_parser("stats", help="Show cache statistics and storage info")

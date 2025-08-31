@@ -266,7 +266,9 @@ class UpdateManager:
             if should_use_prerelease:
                 logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
                 try:
-                    release_data = await fetcher.fetch_latest_prerelease(ignore_cache=refresh_cache)
+                    release_data = await fetcher.fetch_latest_prerelease(
+                        ignore_cache=refresh_cache
+                    )
                 except ValueError as e:
                     if "No prereleases found" in str(e):
                         logger.warning(
@@ -487,7 +489,9 @@ class UpdateManager:
             async def check_with_semaphore_and_progress(app_name: str) -> UpdateInfo | None:
                 async with semaphore:
                     try:
-                        result = await self.check_single_update(app_name, session, refresh_cache=refresh_cache)
+                        result = await self.check_single_update(
+                            app_name, session, refresh_cache=refresh_cache
+                        )
                         return result
                     except Exception as e:
                         raise e
@@ -736,16 +740,24 @@ class UpdateManager:
             # Verify download if requested (20% of post-processing)
             verification_results = {}
             updated_verification_config = {}
-            
+
             # Load verification config from catalog if available, otherwise from app config
             verification_config = {}
             if catalog_entry and catalog_entry.get("verification"):
                 verification_config = catalog_entry["verification"]
-                logger.debug("📋 Using catalog verification config for %s: %s", app_name, verification_config)
+                logger.debug(
+                    "📋 Using catalog verification config for %s: %s",
+                    app_name,
+                    verification_config,
+                )
             else:
                 verification_config = app_config.get("verification", {})
-                logger.debug("📋 Using app config verification config for %s: %s", app_name, verification_config)
-            
+                logger.debug(
+                    "📋 Using app config verification config for %s: %s",
+                    app_name,
+                    verification_config,
+                )
+
             if post_processing_task_id and progress_enabled:
                 await progress_service.update_task(
                     post_processing_task_id,
@@ -1055,12 +1067,12 @@ class UpdateManager:
         logger.debug("🔍 _perform_update_verification called for %s", app_name)
         logger.debug("   📋 Verification config: %s", verification_config)
         logger.debug("   📦 Asset digest: %s", asset.get("digest", "None"))
-        
+
         if self.verification_service is None:
             raise RuntimeError("Verification service not initialized")
 
         logger.debug("🔄 About to call VerificationService.verify_file()")
-        
+
         # Convert GitHubAsset to dict for service compatibility
         asset_dict = {
             "digest": asset.get("digest", ""),
@@ -1077,7 +1089,7 @@ class UpdateManager:
             logger.debug("   - asset_dict: %s", asset_dict)
             logger.debug("   - config: %s", verification_config)
             logger.debug("   - assets_list: %d items", len(assets_list))
-            
+
             result = await self.verification_service.verify_file(
                 file_path=path,
                 asset=asset_dict,
@@ -1089,17 +1101,18 @@ class UpdateManager:
                 assets=assets_list,
                 progress_task_id=progress_task_id,
             )
-            
+
             logger.debug("✅ VerificationService.verify_file() completed successfully")
             logger.debug("   - result.passed: %s", result.passed)
             logger.debug("   - result.methods: %s", list(result.methods.keys()))
-            
+
             return result.methods, result.updated_config
-            
+
         except Exception as e:
             logger.error("❌ VerificationService.verify_file() failed: %s", e)
             logger.error("   - Exception type: %s", type(e).__name__)
             import traceback
+
             logger.debug("   - Traceback: %s", traceback.format_exc())
             raise
 

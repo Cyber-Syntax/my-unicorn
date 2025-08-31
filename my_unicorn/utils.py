@@ -439,7 +439,7 @@ CHECKSUM_FILE_PATTERNS = [
 # Specific checksum file extensions that require base file checking
 SPECIFIC_CHECKSUM_EXTENSIONS = [
     ".sha256sum",
-    ".sha512sum", 
+    ".sha512sum",
     ".sha1sum",
     ".md5sum",
     ".digest",
@@ -453,7 +453,7 @@ def is_checksum_file(filename: str, require_appimage_base: bool = False) -> bool
 
     Args:
         filename: Name of the file to check
-        require_appimage_base: If True, for specific extensions, only return True 
+        require_appimage_base: If True, for specific extensions, only return True
                              if the base file (without checksum extension) is an AppImage
 
     Returns:
@@ -475,9 +475,9 @@ def is_checksum_file(filename: str, require_appimage_base: bool = False) -> bool
         if filename_lower.endswith(extension):
             if not require_appimage_base:
                 return True
-            
+
             # Extract the base filename by removing the checksum extension
-            base_filename = filename_lower[:-len(extension)]
+            base_filename = filename_lower[: -len(extension)]
             return is_appimage_file(base_filename)
 
     return False

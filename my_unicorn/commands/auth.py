@@ -97,7 +97,7 @@ class AuthHandler(BaseCommandHandler):
             # Show additional rate limit details if available
             self._display_additional_rate_limit_details(rate_limit_data, remaining)
         else:
-            print("   ℹ️  Unable to fetch rate limit information")
+            print("Unable to fetch rate limit information")
 
     def _display_reset_time(self, reset_in: int) -> None:
         """Display formatted reset time."""

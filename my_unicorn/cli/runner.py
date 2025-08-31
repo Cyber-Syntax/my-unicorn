@@ -68,9 +68,7 @@ class CLIRunner:
             "backup": BackupHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
-            "cache": CacheHandler(
-                self.config_manager, self.auth_manager, self.update_manager
-            ),
+            "cache": CacheHandler(self.config_manager, self.auth_manager, self.update_manager),
             "auth": AuthHandler(self.config_manager, self.auth_manager, self.update_manager),
             "config": ConfigHandler(
                 self.config_manager, self.auth_manager, self.update_manager
