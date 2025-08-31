@@ -208,6 +208,7 @@ class URLInstallStrategy(InstallStrategy):
                     )
 
                 # Verification (20%)
+                verification_result = None
                 if kwargs.get("verify_downloads", True):
                     if post_processing_task_id:
                         await progress_service.update_task(
@@ -215,7 +216,7 @@ class URLInstallStrategy(InstallStrategy):
                             completed=10.0,
                             description=f"🔍 Verifying {repo_name}...",
                         )
-                    await self._perform_verification(
+                    verification_result = await self._perform_verification(
                         download_path, appimage_asset, release_data, owner, repo_name
                     )
                     if post_processing_task_id:
@@ -296,6 +297,7 @@ class URLInstallStrategy(InstallStrategy):
                     appimage_asset,
                     icon_path,
                     icon_source,
+                    verification_result,
                 )
 
                 # Desktop entry (10%)
@@ -359,7 +361,7 @@ class URLInstallStrategy(InstallStrategy):
         release_data: GitHubReleaseDetails,
         owner: str,
         repo_name: str,
-    ) -> None:
+    ) -> Any:
         """Perform download verification using VerificationService with optimization.
 
         Args:
@@ -369,13 +371,17 @@ class URLInstallStrategy(InstallStrategy):
             owner: Repository owner
             repo_name: Repository name
 
+        Returns:
+            VerificationResult containing verification details and updated config
+
         Raises:
             InstallationError: If verification fails
 
         """
         logger.debug("🔍 Starting verification for %s", path.name)
 
-        # Use VerificationService for comprehensive verification including optimized checksum files
+        # Use VerificationService for comprehensive verification including
+        # optimized checksum files
         # Do not pass progress_service to VerificationService for URL installs
         verification_service = VerificationService(self.download_service, None)
 
@@ -409,7 +415,6 @@ class URLInstallStrategy(InstallStrategy):
         }
 
         # Do not create or finish any verification progress task for URL installs
-        progress_task_id = None
 
         try:
             # Perform comprehensive verification with optimized checksum file prioritization
@@ -435,9 +440,11 @@ class URLInstallStrategy(InstallStrategy):
             logger.debug("✅ Verification passed using methods: %s", ", ".join(methods_used))
             logger.debug("✅ Verification completed")
 
+            return result
+
         except Exception as e:
             logger.error("❌ Verification failed: %s", e)
-            raise InstallationError(f"File verification failed: {e}")
+            raise InstallationError(f"File verification failed: {e}") from e
 
     async def _create_app_config(
         self,
@@ -449,6 +456,7 @@ class URLInstallStrategy(InstallStrategy):
         appimage_asset: GitHubAsset,
         icon_path: Path | None,
         icon_source: str = "none",
+        verification_result: Any = None,
     ) -> None:
         """Create application configuration for URL-based installation.
 
@@ -461,6 +469,7 @@ class URLInstallStrategy(InstallStrategy):
             appimage_asset: AppImage asset information
             icon_path: Path to downloaded icon or None
             icon_source: Source of icon (extraction, github, none)
+            verification_result: VerificationResult from verification process
 
         """
         from ..config import ConfigManager
@@ -471,6 +480,11 @@ class URLInstallStrategy(InstallStrategy):
         stored_hash = ""
         if appimage_asset.get("digest"):
             stored_hash = appimage_asset["digest"]
+
+        # Extract checksum file information from verification result
+        checksum_file = ""
+        if verification_result and verification_result.updated_config:
+            checksum_file = verification_result.updated_config.get("checksum_file", "")
 
         config = {
             "config_version": "1.0.0",
@@ -489,12 +503,12 @@ class URLInstallStrategy(InstallStrategy):
             "repo": repo_name,
             "github": {
                 "repo": True,
-                "prerelease": False,
+                "prerelease": release_data.get("prerelease", False),
             },
             "verification": {
                 "digest": bool(appimage_asset.get("digest")),
                 "skip": False,
-                "checksum_file": "",
+                "checksum_file": checksum_file,  # Use actual checksum file from verification
                 "checksum_hash_type": "sha256",
             },
             "icon": {

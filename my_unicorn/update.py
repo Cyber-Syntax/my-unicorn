@@ -301,7 +301,6 @@ class UpdateManager:
 
         except Exception as e:
             # Improved error handling for GitHub authentication errors
-            import aiohttp
 
             if (
                 isinstance(e, aiohttp.client_exceptions.ClientResponseError)

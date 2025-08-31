@@ -87,7 +87,7 @@ cleanup_test_environment() {
 backup_app_configs() {
     info "Backing up existing app configurations"
 
-    local apps=("qownnotes" "nuclear" "keepassxc" "appflowy" "legcord" "joplin" "zettlr")
+    local apps=("keepassxc" "legcord""zettlr")
 
     for app in "${apps[@]}"; do
         if [[ -f "$CONFIG_DIR/$app.json" ]]; then
@@ -928,11 +928,11 @@ main() {
     # Initialize test environment
     init_test_environment
 
-    # Backup existing configs
-    backup_app_configs
+    # # Backup existing configs
+    # backup_app_configs
 
-    # Set up cleanup trap
-    trap 'restore_app_configs; cleanup_test_environment' EXIT
+    # # Set up cleanup trap
+    # trap 'restore_app_configs; cleanup_test_environment' EXIT
 
     # Parse and execute command
     parse_arguments "$@"
