@@ -4,7 +4,10 @@ This module handles the removal of installed AppImages, including cleanup of
 associated files like desktop entries, icons, and configuration data.
 """
 
+import shutil
 from argparse import Namespace
+from pathlib import Path
+
 from my_unicorn.config import AppConfig
 
 from ..logger import get_logger
@@ -36,6 +39,7 @@ class RemoveHandler(BaseCommandHandler):
             # Remove associated cache
             try:
                 from ..services.cache import get_cache_manager
+
                 owner = app_config.get("owner")
                 repo = app_config.get("repo")
                 if owner and repo:
@@ -46,6 +50,20 @@ class RemoveHandler(BaseCommandHandler):
                     logger.debug("Owner/repo not found in config; skipping cache removal.")
             except Exception as cache_exc:
                 logger.warning("⚠️ Failed to remove cache for %s: %s", app_name, cache_exc)
+
+            # Remove all backups and metadata
+            try:
+                backup_base = self.global_config["directory"]["backup"]
+                backup_dir = Path(backup_base) / app_name
+                if backup_dir.exists():
+                    shutil.rmtree(backup_dir)
+                    print(f"✅ Removed all backups and metadata for {app_name}")
+                else:
+                    logger.debug(
+                        "No backup directory found for %s; skipping backup removal.", app_name
+                    )
+            except Exception as backup_exc:
+                logger.warning("⚠️ Failed to remove backups for %s: %s", app_name, backup_exc)
 
             # Remove desktop entry
             self._remove_desktop_entry(app_name)
