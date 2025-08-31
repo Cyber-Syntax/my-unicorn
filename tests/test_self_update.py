@@ -26,7 +26,12 @@ def mock_session():
 
 def test_get_current_version_success(mock_config_manager, mock_session):
     """Test SelfUpdater.get_current_version returns version string."""
-    with patch("my_unicorn.self_update.metadata") as mock_metadata:
+    with (
+        patch("my_unicorn.self_update.metadata") as mock_metadata,
+        patch("my_unicorn.github_client.auth_manager") as mock_auth_manager,
+    ):
+        # Ensure auth_manager is properly mocked as a regular Mock, not AsyncMock
+        mock_auth_manager.update_rate_limit_info = MagicMock()
         mock_metadata.return_value = {"Version": "1.2.3"}
         updater = SelfUpdater(mock_config_manager, mock_session)
         version = updater.get_current_version()
@@ -35,7 +40,12 @@ def test_get_current_version_success(mock_config_manager, mock_session):
 
 def test_get_current_version_package_not_found(mock_config_manager, mock_session):
     """Test SelfUpdater.get_current_version raises PackageNotFoundError."""
-    with patch("my_unicorn.self_update.metadata", side_effect=PackageNotFoundError):
+    with (
+        patch("my_unicorn.self_update.metadata", side_effect=PackageNotFoundError),
+        patch("my_unicorn.github_client.auth_manager") as mock_auth_manager,
+    ):
+        # Ensure auth_manager is properly mocked as a regular Mock, not AsyncMock
+        mock_auth_manager.update_rate_limit_info = MagicMock()
         updater = SelfUpdater(mock_config_manager, mock_session)
         with pytest.raises(PackageNotFoundError):
             updater.get_current_version()

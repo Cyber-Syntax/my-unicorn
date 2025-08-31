@@ -27,6 +27,8 @@ def test_main_keyboard_interrupt(monkeypatch):
     called = {}
 
     def fake_run(coro):
+        # Properly close the coroutine to avoid RuntimeWarning
+        coro.close()
         raise KeyboardInterrupt
 
     monkeypatch.setattr("my_unicorn.main.uvloop.install", lambda: None)
@@ -50,6 +52,8 @@ def test_main_exception(monkeypatch):
     called = {}
 
     def fake_run(coro):
+        # Properly close the coroutine to avoid RuntimeWarning
+        coro.close()
         raise RuntimeError("fail")
 
     monkeypatch.setattr("my_unicorn.main.uvloop.install", lambda: None)

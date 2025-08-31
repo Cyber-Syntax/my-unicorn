@@ -392,7 +392,8 @@ async def test_fetch_latest_release_api_error(mock_session):
     mock_response = AsyncMock()
     mock_response.__aenter__.return_value = mock_response
     mock_response.status = 404
-    mock_response.raise_for_status.side_effect = Exception("Not Found")
+    # Make raise_for_status a regular Mock, not async
+    mock_response.raise_for_status = MagicMock(side_effect=Exception("Not Found"))
     mock_session.get.return_value = mock_response
 
     with pytest.raises(Exception):
@@ -491,6 +492,8 @@ async def test_check_rate_limit(mock_session):
     mock_response = AsyncMock()
     mock_response.__aenter__.return_value = mock_response
     mock_response.status = 200
+    # Make raise_for_status a regular Mock, not async
+    mock_response.raise_for_status = MagicMock()
     mock_response.json = AsyncMock(
         return_value={
             "resources": {"core": {"limit": 5000, "remaining": 4999, "reset": 1234567890}}
@@ -538,6 +541,8 @@ async def test_check_rate_limit_malformed_response(mock_session):
     mock_response = AsyncMock()
     mock_response.__aenter__.return_value = mock_response
     mock_response.status = 200
+    # Make raise_for_status a regular Mock, not async
+    mock_response.raise_for_status = MagicMock()
     # Simulate malformed response: None
     mock_response.json = AsyncMock(return_value=None)
     mock_session.get.return_value = mock_response
