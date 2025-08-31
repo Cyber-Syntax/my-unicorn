@@ -32,6 +32,7 @@
     - Global Configuration: Store global settings in a configuration file for customization such as download directories, logging levels, and more.
 
 ## Helper scripts
+
 - my-unicorn-installer.sh: A script to install my-unicorn and its dependencies.
     - It sets up a virtual environment and installs the required Python packages.
 - venv-wrapper.bash: Wrapper script around my-unicorn using the python virtual environment
@@ -64,13 +65,18 @@ my-unicorn install appflowy qownotes
 my-unicorn install appflowy --no-icon --no-verify
 ```
 
-### Updates
+### Updates & Cache
 
 ```bash
-# Check for updates without installation
+# Check for updates without installation from cache (it creates cache if not exists)
 my-unicorn update --check-only
+# --refresh-cache: Bypass cache and fetch latest release data from GitHub (forces cache refresh)
+my-unicorn update --check-only --refresh-cache
 
-# Update specific apps
+# This example shows how to force refresh cache and update a specific app.
+py run.py update qownnotes --refresh-cache
+
+# Update specific apps (it creates cache if not exists)
 my-unicorn update appflowy,joplin
 my-unicorn update appflowy joplin
 
@@ -78,7 +84,18 @@ my-unicorn update appflowy joplin
 my-unicorn update
 ```
 
-### Management
+```bash
+# Remove all cache related with qownnotes
+my-unicorn cache clear qownnotes
+
+# Remove all cache
+my-unicorn cache clear --all 
+
+# Show cache stats
+my-unicorn cache --stats
+```
+
+### Catalog & Configuration
 
 ```bash
 # List installed apps
@@ -156,6 +173,38 @@ my-unicorn backup --migrate
 
 ```bash
 pip install aiohttp uvloop keyring orjson packaging rich
+```
+
+### Cache Management
+
+Example zen browser cache:
+
+```bash
+{
+  "cached_at": "2025-08-30T16:55:48.294102+00:00",
+  "ttl_hours": 24,
+  "release_data": {
+    "owner": "zen-browser",
+    "repo": "desktop",
+    "version": "1.15.2b",
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "zen-aarch64.AppImage",
+        "digest": "sha256:d0417f900e1e3af6a13e201cab54e35c4f50200292fef2c613e867de33c0d326",
+        "size": 96831888,
+        "browser_download_url": "https://github.com/zen-browser/desktop/releases/download/1.15.2b/zen-aarch64.AppImage"
+      },
+      {
+        "name": "zen-x86_64.AppImage",
+        "digest": "sha256:9035c485921102f77fdfaa37536200fd7ce61ec9ae8f694c0f472911df182cbd",
+        "size": 109846928,
+        "browser_download_url": "https://github.com/zen-browser/desktop/releases/download/1.15.2b/zen-x86_64.AppImage"
+      }
+    ],
+    "original_tag_name": "1.15.2b"
+  }
+}
 ```
 
 ### Config Management

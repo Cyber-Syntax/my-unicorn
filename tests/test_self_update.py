@@ -26,7 +26,12 @@ def mock_session():
 
 def test_get_current_version_success(mock_config_manager, mock_session):
     """Test SelfUpdater.get_current_version returns version string."""
-    with patch("my_unicorn.self_update.metadata") as mock_metadata:
+    with (
+        patch("my_unicorn.self_update.metadata") as mock_metadata,
+        patch("my_unicorn.github_client.auth_manager") as mock_auth_manager,
+    ):
+        # Ensure auth_manager is properly mocked as a regular Mock, not AsyncMock
+        mock_auth_manager.update_rate_limit_info = MagicMock()
         mock_metadata.return_value = {"Version": "1.2.3"}
         updater = SelfUpdater(mock_config_manager, mock_session)
         version = updater.get_current_version()
@@ -35,7 +40,12 @@ def test_get_current_version_success(mock_config_manager, mock_session):
 
 def test_get_current_version_package_not_found(mock_config_manager, mock_session):
     """Test SelfUpdater.get_current_version raises PackageNotFoundError."""
-    with patch("my_unicorn.self_update.metadata", side_effect=PackageNotFoundError):
+    with (
+        patch("my_unicorn.self_update.metadata", side_effect=PackageNotFoundError),
+        patch("my_unicorn.github_client.auth_manager") as mock_auth_manager,
+    ):
+        # Ensure auth_manager is properly mocked as a regular Mock, not AsyncMock
+        mock_auth_manager.update_rate_limit_info = MagicMock()
         updater = SelfUpdater(mock_config_manager, mock_session)
         with pytest.raises(PackageNotFoundError):
             updater.get_current_version()
@@ -233,7 +243,7 @@ async def test_check_for_update_api_error(mock_config_manager, mock_session, cap
 
 @pytest.mark.asyncio
 async def test_check_for_update_newer_version(mock_config_manager, mock_session, capsys):
-    """Test check_for_update prints update available for newer version."""
+    """Test check_for_update returns True for newer version."""
     updater = SelfUpdater(mock_config_manager, mock_session)
     release_data = {
         "version": "2.0.0",
@@ -250,14 +260,12 @@ async def test_check_for_update_newer_version(mock_config_manager, mock_session,
     ):
         mock_metadata.return_value = {"Version": "1.0.0"}
         result = await updater.check_for_update()
-        out = capsys.readouterr().out
-        assert "Updates are available" in out
         assert result is True
 
 
 @pytest.mark.asyncio
 async def test_check_for_update_up_to_date(mock_config_manager, mock_session, capsys):
-    """Test check_for_update prints up to date for same version."""
+    """Test check_for_update returns False for same version."""
     updater = SelfUpdater(mock_config_manager, mock_session)
     release_data = {
         "version": "1.0.0",
@@ -274,8 +282,6 @@ async def test_check_for_update_up_to_date(mock_config_manager, mock_session, ca
     ):
         mock_metadata.return_value = {"Version": "1.0.0"}
         result = await updater.check_for_update()
-        out = capsys.readouterr().out
-        assert "up to date" in out
         assert result is False
 
 

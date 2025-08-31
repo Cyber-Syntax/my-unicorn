@@ -413,6 +413,91 @@ def get_icon_path(icon_name: str, icon_dir: Path) -> Path:
     return icon_dir / icon_name
 
 
+# Checksum File Pattern Matching
+
+# Comprehensive checksum file patterns consolidated from github_client.py and cache.py
+CHECKSUM_FILE_PATTERNS = [
+    r"latest-.*\.yml$",
+    r"latest-.*\.yaml$",
+    r".*checksums?\.txt$",
+    r".*checksums?\.yml$",
+    r".*checksums?\.yaml$",
+    r".*checksums?\.md5$",
+    r".*checksums?\.sha1$",
+    r".*checksums?\.sha256$",
+    r".*checksums?\.sha512$",
+    r"SHA\d+SUMS?(\.txt)?$",
+    r"MD5SUMS?(\.txt)?$",
+    r".*\.sum$",
+    r".*\.hash$",
+    r".*\.digest$",
+    r".*\.DIGEST$",
+    r".*appimage\.sha256$",
+    r".*appimage\.sha512$",
+]
+
+# Specific checksum file extensions that require base file checking
+SPECIFIC_CHECKSUM_EXTENSIONS = [
+    ".sha256sum",
+    ".sha512sum", 
+    ".sha1sum",
+    ".md5sum",
+    ".digest",
+    ".sum",
+    ".hash",
+]
+
+
+def is_checksum_file(filename: str, require_appimage_base: bool = False) -> bool:
+    """Check if filename is a checksum file.
+
+    Args:
+        filename: Name of the file to check
+        require_appimage_base: If True, for specific extensions, only return True 
+                             if the base file (without checksum extension) is an AppImage
+
+    Returns:
+        True if the file is a checksum file
+
+    """
+    if not filename:
+        return False
+
+    filename_lower = filename.lower()
+
+    # Check general checksum patterns first (these are always considered checksum files)
+    for pattern in CHECKSUM_FILE_PATTERNS:
+        if re.match(pattern, filename_lower, re.IGNORECASE):
+            return True
+
+    # Check specific checksum extensions
+    for extension in SPECIFIC_CHECKSUM_EXTENSIONS:
+        if filename_lower.endswith(extension):
+            if not require_appimage_base:
+                return True
+            
+            # Extract the base filename by removing the checksum extension
+            base_filename = filename_lower[:-len(extension)]
+            return is_appimage_file(base_filename)
+
+    return False
+
+
+def get_checksum_file_format_type(filename: str) -> str:
+    """Determine the format type of a checksum file.
+
+    Args:
+        filename: Checksum filename
+
+    Returns:
+        Format type: "yaml" or "traditional"
+
+    """
+    if filename.lower().endswith((".yml", ".yaml")):
+        return "yaml"
+    return "traditional"
+
+
 # API Progress Tracking Helpers
 
 

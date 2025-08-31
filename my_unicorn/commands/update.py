@@ -81,6 +81,7 @@ class UpdateHandler(BaseCommandHandler):
         return UpdateContext(
             app_names=app_names,
             check_only=getattr(args, "check_only", False),
+            refresh_cache=getattr(args, "refresh_cache", False),
             config_manager=self.config_manager,
             update_manager=self.update_manager,
         )

@@ -62,8 +62,8 @@ async def test_update_handler_executes_strategy_success(update_handler):
         mock_strategy.validate_inputs.assert_called_once_with(mock_context)
         mock_strategy.execute.assert_awaited_once_with(mock_context)
         mock_display_summary.assert_called_once_with(mock_result)
-        mock_logger.debug.assert_any_call("Selected strategy: MockStrategy")
-        mock_logger.debug.assert_any_call("Update operation completed: Update completed")
+        mock_logger.debug.assert_any_call("Selected strategy: %s", "MockStrategy")
+        mock_logger.debug.assert_any_call("Update operation completed: %s", "Update completed")
 
 
 @pytest.mark.asyncio

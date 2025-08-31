@@ -121,11 +121,13 @@ def mock_app_config():
     }
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def mock_logger():
     """Mock logger to avoid log output during tests."""
     from unittest.mock import patch
 
-    with patch("my_unicorn.services.icon_service.logger"):
-        with patch("my_unicorn.services.verification_service.logger"):
-            yield
+    with (
+        patch("my_unicorn.services.icon_service.logger"),
+        patch("my_unicorn.services.verification_service.logger"),
+    ):
+        yield

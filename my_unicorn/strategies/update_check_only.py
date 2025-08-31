@@ -80,7 +80,7 @@ class CheckOnlyUpdateStrategy(UpdateStrategy):
 
             try:
                 update_infos = await context.update_manager.check_all_updates_with_progress(
-                    context.app_names
+                    context.app_names, refresh_cache=context.refresh_cache
                 )
 
                 # Finish API progress task

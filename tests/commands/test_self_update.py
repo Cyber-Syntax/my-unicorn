@@ -5,6 +5,7 @@ including checking for updates and performing updates.
 """
 
 from argparse import Namespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -21,8 +22,11 @@ async def test_execute_check_only_update_available(mocker) -> None:
     auth_manager = GitHubAuthManager()
     update_manager = UpdateManager(config_manager)
     handler = SelfUpdateHandler(config_manager, auth_manager, update_manager)
-    # Patch the underlying SelfUpdater.check_for_update to simulate update available
-    mocker.patch("my_unicorn.repo.SelfUpdater.check_for_update", return_value=True)
+    # Patch the underlying check_for_self_update to simulate update available
+    mocker.patch(
+        "my_unicorn.commands.self_update.check_for_self_update",
+        new=AsyncMock(return_value=True),
+    )
     args = Namespace(check_only=True)
     print_mock = mocker.patch("builtins.print")
     await handler.execute(args)
@@ -37,7 +41,10 @@ async def test_execute_check_only_no_update(mocker) -> None:
     auth_manager = GitHubAuthManager()
     update_manager = UpdateManager(config_manager)
     handler = SelfUpdateHandler(config_manager, auth_manager, update_manager)
-    mocker.patch("my_unicorn.repo.SelfUpdater.check_for_update", return_value=False)
+    mocker.patch(
+        "my_unicorn.commands.self_update.check_for_self_update",
+        new=AsyncMock(return_value=False),
+    )
     args = Namespace(check_only=True)
     print_mock = mocker.patch("builtins.print")
     await handler.execute(args)
@@ -84,7 +91,10 @@ async def test_execute_perform_update_no_update(mocker) -> None:
     auth_manager = GitHubAuthManager()
     update_manager = UpdateManager(config_manager)
     handler = SelfUpdateHandler(config_manager, auth_manager, update_manager)
-    mocker.patch("my_unicorn.repo.SelfUpdater.check_for_update", return_value=False)
+    mocker.patch(
+        "my_unicorn.commands.self_update.check_for_self_update",
+        new=AsyncMock(return_value=False),
+    )
     args = Namespace(check_only=False)
     print_mock = mocker.patch("builtins.print")
     await handler.execute(args)

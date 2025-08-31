@@ -35,6 +35,7 @@ def test_validate_inputs_no_installed_apps(context_and_strategy, capsys):
     context = UpdateContext(
         app_names=None,
         check_only=False,
+        refresh_cache=False,
         config_manager=config_manager,
         update_manager=update_manager,
     )
@@ -51,6 +52,7 @@ def test_validate_inputs_with_installed_apps(context_and_strategy):
     context = UpdateContext(
         app_names=None,
         check_only=False,
+        refresh_cache=False,
         config_manager=config_manager,
         update_manager=update_manager,
     )
@@ -65,6 +67,7 @@ def test_validate_inputs_warns_on_app_names_and_check_only(context_and_strategy,
     context = UpdateContext(
         app_names=["AppOne"],
         check_only=True,
+        refresh_cache=False,
         config_manager=config_manager,
         update_manager=update_manager,
     )
@@ -80,7 +83,7 @@ async def test_execute_all_up_to_date(context_and_strategy, capsys):
     """Test execute returns correct result when all apps are up to date."""
     config_manager, update_manager, strategy = context_and_strategy
     config_manager.list_installed_apps.return_value = ["AppOne", "AppTwo"]
-    update_manager.check_all_updates = AsyncMock(
+    update_manager.check_all_updates_with_progress = AsyncMock(
         return_value=[
             make_update_info("AppOne", False, "1.0", "1.0"),
             make_update_info("AppTwo", False, "2.0", "2.0"),
@@ -90,6 +93,7 @@ async def test_execute_all_up_to_date(context_and_strategy, capsys):
     context = UpdateContext(
         app_names=None,
         check_only=False,
+        refresh_cache=False,
         config_manager=config_manager,
         update_manager=update_manager,
     )
@@ -109,7 +113,7 @@ async def test_execute_some_updated(context_and_strategy, capsys):
     """Test execute returns correct result when some apps are updated."""
     config_manager, update_manager, strategy = context_and_strategy
     config_manager.list_installed_apps.return_value = ["AppOne", "AppTwo"]
-    update_manager.check_all_updates = AsyncMock(
+    update_manager.check_all_updates_with_progress = AsyncMock(
         return_value=[
             make_update_info("AppOne", True, "1.0", "2.0"),
             make_update_info("AppTwo", False, "2.0", "2.0"),
@@ -119,6 +123,7 @@ async def test_execute_some_updated(context_and_strategy, capsys):
     context = UpdateContext(
         app_names=None,
         check_only=False,
+        refresh_cache=False,
         config_manager=config_manager,
         update_manager=update_manager,
     )
@@ -130,8 +135,8 @@ async def test_execute_some_updated(context_and_strategy, capsys):
     assert result.up_to_date_apps == ["AppTwo"]
     assert "Successfully updated 1 out of 2 app(s)" in result.message
     captured = capsys.readouterr()
-    assert "Checking all 2 installed app(s) for updates..." in captured.out
-    assert "Updating 1 app(s) that need updates..." in captured.out
+    assert "Successfully updated 1 out of 2 app(s)" in result.message
+    assert "✅ 1 app(s) already up to date" in captured.out
     assert "AppOne: 1.0 → 2.0" in captured.out
 
 
@@ -140,7 +145,7 @@ async def test_execute_some_failed(context_and_strategy, capsys):
     """Test execute returns correct result when some apps fail to update."""
     config_manager, update_manager, strategy = context_and_strategy
     config_manager.list_installed_apps.return_value = ["AppOne", "AppTwo"]
-    update_manager.check_all_updates = AsyncMock(
+    update_manager.check_all_updates_with_progress = AsyncMock(
         return_value=[
             make_update_info("AppOne", True, "1.0", "2.0"),
             make_update_info("AppTwo", True, "2.0", "3.0"),
@@ -152,6 +157,7 @@ async def test_execute_some_failed(context_and_strategy, capsys):
     context = UpdateContext(
         app_names=None,
         check_only=False,
+        refresh_cache=False,
         config_manager=config_manager,
         update_manager=update_manager,
     )

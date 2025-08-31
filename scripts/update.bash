@@ -23,7 +23,7 @@ fi
 # Function to determine update need apps and print them
 # basic notification function that show how many apps need update
 check_updates() {
-  if ! output=$("$UNICORN" update --check-only 2>&1); then
+  if ! output=$("$UNICORN" update --check-only --refresh-cache 2>&1); then
     echo "Error: Failed to check updates. Possible network issue."
     echo "$output"
     return 1

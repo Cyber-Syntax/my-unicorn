@@ -206,13 +206,14 @@ class UpdateManager:
             return latest_clean > current_clean
 
     async def check_single_update(
-        self, app_name: str, session: aiohttp.ClientSession
+        self, app_name: str, session: aiohttp.ClientSession, refresh_cache: bool = False
     ) -> UpdateInfo | None:
         """Check for updates for a single app.
 
         Args:
             app_name: Name of the app to check
             session: aiohttp session
+            refresh_cache: If True, bypass cache and fetch fresh data from API
 
         Returns:
             UpdateInfo object or None if app not found
@@ -265,7 +266,7 @@ class UpdateManager:
             if should_use_prerelease:
                 logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
                 try:
-                    release_data = await fetcher.fetch_latest_prerelease()
+                    release_data = await fetcher.fetch_latest_prerelease(ignore_cache=refresh_cache)
                 except ValueError as e:
                     if "No prereleases found" in str(e):
                         logger.warning(
@@ -273,11 +274,17 @@ class UpdateManager:
                             owner,
                             repo,
                         )
-                        release_data = await fetcher.fetch_latest_release()
+                        # Use fallback logic to handle repositories with only prereleases
+                        release_data = await fetcher.fetch_latest_release_or_prerelease(
+                            prefer_prerelease=False, ignore_cache=refresh_cache
+                        )
                     else:
                         raise
             else:
-                release_data = await fetcher.fetch_latest_release()
+                # Use fallback logic to handle repositories with only prereleases
+                release_data = await fetcher.fetch_latest_release_or_prerelease(
+                    prefer_prerelease=False, ignore_cache=refresh_cache
+                )
 
             latest_version = release_data["version"]
             has_update = self._compare_versions(current_version, latest_version)
@@ -294,7 +301,6 @@ class UpdateManager:
 
         except Exception as e:
             # Improved error handling for GitHub authentication errors
-            import aiohttp
 
             if (
                 isinstance(e, aiohttp.client_exceptions.ClientResponseError)
@@ -450,7 +456,7 @@ class UpdateManager:
         return update_infos
 
     async def check_all_updates_with_progress(
-        self, app_names: list[str] | None = None
+        self, app_names: list[str] | None = None, refresh_cache: bool = False
     ) -> list[UpdateInfo]:
         """Check for updates for all or specified apps with progress tracking.
 
@@ -459,6 +465,7 @@ class UpdateManager:
 
         Args:
             app_names: List of app names to check, or None for all installed apps
+            refresh_cache: If True, bypass cache and fetch fresh data from API
 
         Returns:
             List of UpdateInfo objects
@@ -480,7 +487,7 @@ class UpdateManager:
             async def check_with_semaphore_and_progress(app_name: str) -> UpdateInfo | None:
                 async with semaphore:
                     try:
-                        result = await self.check_single_update(app_name, session)
+                        result = await self.check_single_update(app_name, session, refresh_cache=refresh_cache)
                         return result
                     except Exception as e:
                         raise e
@@ -580,7 +587,10 @@ class UpdateManager:
                 logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
                 release_data = await fetcher.fetch_latest_prerelease()
             else:
-                release_data = await fetcher.fetch_latest_release()
+                # Use fallback logic to handle repositories with only prereleases
+                release_data = await fetcher.fetch_latest_release_or_prerelease(
+                    prefer_prerelease=False
+                )
 
             # Find AppImage asset using source-aware selection
             appimage_asset = self._select_best_appimage_by_source(
@@ -726,7 +736,15 @@ class UpdateManager:
             # Verify download if requested (20% of post-processing)
             verification_results = {}
             updated_verification_config = {}
-            verification_config = app_config.get("verification", {})
+            
+            # Load verification config from catalog if available, otherwise from app config
+            verification_config = {}
+            if catalog_entry and catalog_entry.get("verification"):
+                verification_config = catalog_entry["verification"]
+                logger.debug("📋 Using catalog verification config for %s: %s", app_name, verification_config)
+            else:
+                verification_config = app_config.get("verification", {})
+                logger.debug("📋 Using app config verification config for %s: %s", app_name, verification_config)
             
             if post_processing_task_id and progress_enabled:
                 await progress_service.update_task(
@@ -747,6 +765,7 @@ class UpdateManager:
                     repo,
                     update_info.original_tag_name,
                     app_name,
+                    release_data=release_data,
                     progress_task_id=post_processing_task_id,
                 )
 
@@ -1014,6 +1033,7 @@ class UpdateManager:
         repo: str,
         tag_name: str,
         app_name: str,
+        release_data: dict[str, Any] | None = None,
         progress_task_id: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Perform update verification using priority-based approach.
@@ -1032,27 +1052,56 @@ class UpdateManager:
             Tuple of (verification_results, updated_verification_config)
 
         """
+        logger.debug("🔍 _perform_update_verification called for %s", app_name)
+        logger.debug("   📋 Verification config: %s", verification_config)
+        logger.debug("   📦 Asset digest: %s", asset.get("digest", "None"))
+        
         if self.verification_service is None:
             raise RuntimeError("Verification service not initialized")
 
+        logger.debug("🔄 About to call VerificationService.verify_file()")
+        
         # Convert GitHubAsset to dict for service compatibility
         asset_dict = {
-            "digest": getattr(asset, "digest", None),
-            "size": getattr(asset, "size", 0),
+            "digest": asset.get("digest", ""),
+            "size": asset.get("size", 0),
         }
 
-        result = await self.verification_service.verify_file(
-            file_path=path,
-            asset=asset_dict,
-            config=verification_config,
-            owner=owner,
-            repo=repo,
-            tag_name=tag_name,
-            app_name=app_name,
-            progress_task_id=progress_task_id,
-        )
+        # Extract assets list from release_data if available
+        assets_list = []
+        if release_data and "assets" in release_data:
+            assets_list = release_data["assets"]
 
-        return result.methods, result.updated_config
+        try:
+            logger.debug("🔍 Calling VerificationService.verify_file() with:")
+            logger.debug("   - asset_dict: %s", asset_dict)
+            logger.debug("   - config: %s", verification_config)
+            logger.debug("   - assets_list: %d items", len(assets_list))
+            
+            result = await self.verification_service.verify_file(
+                file_path=path,
+                asset=asset_dict,
+                config=verification_config,
+                owner=owner,
+                repo=repo,
+                tag_name=tag_name,
+                app_name=app_name,
+                assets=assets_list,
+                progress_task_id=progress_task_id,
+            )
+            
+            logger.debug("✅ VerificationService.verify_file() completed successfully")
+            logger.debug("   - result.passed: %s", result.passed)
+            logger.debug("   - result.methods: %s", list(result.methods.keys()))
+            
+            return result.methods, result.updated_config
+            
+        except Exception as e:
+            logger.error("❌ VerificationService.verify_file() failed: %s", e)
+            logger.error("   - Exception type: %s", type(e).__name__)
+            import traceback
+            logger.debug("   - Traceback: %s", traceback.format_exc())
+            raise
 
     async def update_multiple_apps(
         self, app_names: list[str], force: bool = False

@@ -112,7 +112,9 @@ class Verifier:
 
         """
         logger.debug(
-            f"🔍 Starting {hash_type.upper()} hash verification for {self.file_path.name}"
+            "🔍 Starting %s hash verification for %s",
+            hash_type.upper(),
+            self.file_path.name,
         )
         logger.debug("   Expected hash: %s", expected_hash)
 
@@ -177,7 +179,9 @@ class Verifier:
         computed_hash = hasher.hexdigest()
 
         logger.debug(
-            f"   Processed: {format_bytes(bytes_processed)} ({bytes_processed:,} bytes)"
+            "   Processed: %s (%d bytes)",
+            format_bytes(bytes_processed),
+            bytes_processed,
         )
         logger.debug("   Hash: %s", computed_hash)
 
@@ -559,7 +563,9 @@ class Verifier:
         """
         logger.debug("🔍 Verifying file size for %s", self.file_path.name)
         logger.debug(
-            f"   Expected size: {format_bytes(expected_size)} ({expected_size:,} bytes)"
+            "   Expected size: %s (%d bytes)",
+            format_bytes(expected_size),
+            expected_size,
         )
 
         actual_size = self.get_file_size()
