@@ -93,10 +93,10 @@ class IconConfig(TypedDict):
 class AppConfig(TypedDict):
     """Per-application configuration."""
 
-    config_version: str
-    appimage: AppImageConfig
     owner: str
     repo: str
+    config_version: str
+    appimage: AppImageConfig
     github: GitHubConfig
     verification: VerificationConfig
     icon: IconConfig

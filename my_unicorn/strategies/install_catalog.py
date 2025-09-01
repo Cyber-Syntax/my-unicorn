@@ -599,18 +599,18 @@ class CatalogInstallStrategy(InstallStrategy):
         config = {
             "config_version": "1.0.0",
             "source": "catalog",
+            "owner": catalog_config.get("owner", ""),
+            "repo": catalog_config.get("repo", ""),
             "appimage": {
-                "version": extract_and_validate_version(release_data.get("tag_name", ""))
-                or "unknown",
-                "name": app_path.name,
                 "rename": appimage_config.get("rename", app_name),
                 "name_template": appimage_config.get("name_template", ""),
                 "characteristic_suffix": appimage_config.get("characteristic_suffix", []),
+                "version": extract_and_validate_version(release_data.get("tag_name", ""))
+                or "unknown",
+                "name": app_path.name,
                 "installed_date": self._get_current_timestamp(),
                 "digest": appimage_asset.get("digest", "") if appimage_asset else "",
             },
-            "owner": catalog_config.get("owner", ""),
-            "repo": catalog_config.get("repo", ""),
             "github": catalog_config.get("github", {"repo": True, "prerelease": False}),
             "verification": self._get_updated_verification_config(
                 catalog_config, verification_result

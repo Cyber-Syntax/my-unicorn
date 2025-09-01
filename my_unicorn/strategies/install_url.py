@@ -489,18 +489,18 @@ class URLInstallStrategy(InstallStrategy):
         config = {
             "config_version": "1.0.0",
             "source": "url",
+            "owner": owner,
+            "repo": repo_name,
             "appimage": {
-                "version": extract_and_validate_version(release_data.get("version", ""))
-                or "unknown",
-                "name": app_path.name,
                 "rename": app_name,
                 "name_template": "",
                 "characteristic_suffix": [],
+                "version": extract_and_validate_version(release_data.get("version", ""))
+                or "unknown",
+                "name": app_path.name,
                 "installed_date": self._get_current_timestamp(),
                 "digest": stored_hash,
             },
-            "owner": owner,
-            "repo": repo_name,
             "github": {
                 "repo": True,
                 "prerelease": release_data.get("prerelease", False),
@@ -513,16 +513,13 @@ class URLInstallStrategy(InstallStrategy):
             },
             "icon": {
                 "extraction": True,
-                "source": icon_source,
                 "url": "",
+                "name": icon_path.name if icon_path and icon_path.exists() else "",
+                "source": icon_source,
+                "installed": bool(icon_path and icon_path.exists()),
+                "path": str(icon_path) if icon_path and icon_path.exists() else "",
             },
         }
-
-        # Add icon information if available (extracted from AppImage)
-        if icon_path and icon_path.exists():
-            config["icon"]["name"] = icon_path.name
-            config["icon"]["installed"] = True
-            config["icon"]["path"] = str(icon_path)
 
         # Save the configuration
         try:
