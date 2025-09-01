@@ -14,7 +14,7 @@ Requirements:
 
 import configparser
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, cast
 
 import orjson
 
@@ -102,7 +102,7 @@ class AppConfig(TypedDict):
     icon: IconConfig
 
 
-class AppImageConfig(TypedDict):
+class CatalogAppImageConfig(TypedDict):
     """AppImage configuration within catalog entry."""
 
     rename: str
@@ -115,7 +115,7 @@ class CatalogEntry(TypedDict):
 
     owner: str
     repo: str
-    appimage: AppImageConfig
+    appimage: CatalogAppImageConfig
     verification: VerificationConfig
     icon: IconConfig | None
 
@@ -253,6 +253,15 @@ class ConfigManager:
         else:
             config_dict = config
 
+        # Helper function to safely get scalar config values
+        def get_scalar_config(key: str, default: str | int) -> str | int:
+            """Get a scalar config value, ensuring it's not a dict."""
+            value = config_dict.get(key, default)
+            if isinstance(value, dict):
+                # This shouldn't happen for scalar values, but use default if it does
+                return default
+            return value
+
         # Convert directory paths (only from explicit directory section)
         directory_config: dict[str, Path] = {}
         directory_dict = config_dict.get("directory", {})
@@ -286,18 +295,20 @@ class ConfigManager:
         )
 
         # Get batch mode value
-        batch_mode_str = config_dict.get("batch_mode", "true")
+        batch_mode_str = get_scalar_config("batch_mode", "true")
         batch_mode = (
             batch_mode_str.lower() == "true" if isinstance(batch_mode_str, str) else True
         )
 
         return GlobalConfig(
-            config_version=str(config_dict.get("config_version", self.DEFAULT_CONFIG_VERSION)),
-            max_concurrent_downloads=int(config_dict.get("max_concurrent_downloads", 5)),
-            max_backup=int(config_dict.get("max_backup", 1)),
+            config_version=str(
+                get_scalar_config("config_version", self.DEFAULT_CONFIG_VERSION)
+            ),
+            max_concurrent_downloads=int(get_scalar_config("max_concurrent_downloads", 5)),
+            max_backup=int(get_scalar_config("max_backup", 1)),
             batch_mode=batch_mode,
-            locale=str(config_dict.get("locale", "en_US")),
-            log_level=str(config_dict.get("log_level", "INFO")),
+            locale=str(get_scalar_config("locale", "en_US")),
+            log_level=str(get_scalar_config("log_level", "INFO")),
             network=network_config,
             directory=DirectoryConfig(**directory_config),
         )
@@ -325,7 +336,7 @@ class ConfigManager:
         # Directory section
         parser["directory"] = {key: str(path) for key, path in config["directory"].items()}
 
-        with open(self.settings_file, "w") as f:
+        with open(self.settings_file, "w", encoding="utf-8") as f:
             parser.write(f)
 
     def load_app_config(self, app_name: str) -> AppConfig | None:
@@ -340,7 +351,7 @@ class ConfigManager:
 
             # Migrate old 'hash' field to 'digest' field
             config_data = self._migrate_app_config(config_data)
-            return config_data
+            return cast(AppConfig, config_data)
         except (Exception, OSError) as e:
             raise ValueError(f"Failed to load app config for {app_name}: {e}") from e
 

@@ -40,16 +40,15 @@ def test_remove_token_success(monkeypatch, auth_manager, capsys):
 
 
 def test_remove_token_failure(monkeypatch, auth_manager, capsys):
-    """Test remove_token handles PasswordDeleteError."""
+    """Test remove_token handles general Exception when deleting token."""
 
     class DummyError(Exception):
-        pass
+        """Dummy exception for simulating keyring delete failure."""
 
     monkeypatch.setattr("keyring.delete_password", MagicMock(side_effect=DummyError))
-    monkeypatch.setattr("keyring.errors.PasswordDeleteError", DummyError)
     auth_manager.remove_token()
     captured = capsys.readouterr()
-    assert "No token found to remove" in captured.out
+    assert "Error removing token from keyring" in captured.out
 
 
 def test_get_token(monkeypatch, auth_manager):

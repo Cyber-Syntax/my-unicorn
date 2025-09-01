@@ -63,9 +63,7 @@ class IconService:
     def _get_icon_manager(self) -> IconManager:
         """Get cached icon manager instance."""
         if self._icon_manager_cache is None:
-            self._icon_manager_cache = IconManager(
-                self.download_service, enable_extraction=True
-            )
+            self._icon_manager_cache = IconManager(enable_extraction=True)
         return self._icon_manager_cache
 
     @staticmethod

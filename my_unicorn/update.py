@@ -18,13 +18,15 @@ except ImportError:
     InvalidVersion = None
 
 
+from my_unicorn.services.icon_service import IconService
+from my_unicorn.services.verification_service import VerificationService
+
 from .auth import GitHubAuthManager
 from .backup import BackupService
 from .config import AppConfig, ConfigManager
 from .download import DownloadService, IconAsset
 from .github_client import GitHubAsset, GitHubReleaseDetails, GitHubReleaseFetcher
 from .logger import get_logger
-from .services import IconService, VerificationService
 from .storage import StorageService
 
 logger = get_logger(__name__)

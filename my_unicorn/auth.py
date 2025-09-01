@@ -64,8 +64,8 @@ class GitHubAuthManager:
         try:
             keyring.delete_password(GitHubAuthManager.GITHUB_KEY_NAME, "token")
             print("🗑️ Token removed from keyring.")
-        except keyring.errors.PasswordDeleteError:
-            print("❌ No token found to remove.")
+        except Exception as e:
+            print("❌ Error removing token from keyring: %s", e)
 
     @staticmethod
     def get_token() -> str | None:

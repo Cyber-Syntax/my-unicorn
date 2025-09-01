@@ -1,7 +1,7 @@
 """Download service for handling AppImage and icon downloads.
 
 This module provides a service for downloading AppImage files and associated
-icons with progress tracking using the Rich progress service.
+icons with progress tracking using the Rich library.
 """
 
 import asyncio

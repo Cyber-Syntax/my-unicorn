@@ -252,7 +252,7 @@ class URLInstallStrategy(InstallStrategy):
                 icon_filename = f"{repo_name.lower()}.png"
                 icon_dest_path = icon_dir / icon_filename
 
-                icon_manager = IconManager(self.download_service)
+                icon_manager = IconManager()
                 icon_source = "none"
                 if post_processing_task_id:
                     await progress_service.update_task(

@@ -259,20 +259,6 @@ def create_desktop_entry_name(app_name: str) -> str:
 
     return f"{name}.desktop"
 
-
-def is_appimage_file(filename: str) -> bool:
-    """Check if filename is an AppImage.
-
-    Args:
-        filename: Filename to check
-
-    Returns:
-        True if filename ends with .AppImage
-
-    """
-    return filename.lower().endswith(".appimage")
-
-
 def extract_version_from_filename(filename: str) -> str | None:
     """Extract version from AppImage filename.
 

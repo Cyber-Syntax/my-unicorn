@@ -221,9 +221,7 @@ class TestIconService:
             )
 
             assert result == mock_icon_path
-            mock_icon_manager_class.assert_called_once_with(
-                icon_service.download_service, enable_extraction=True
-            )
+            mock_icon_manager_class.assert_called_once_with(enable_extraction=True)
             mock_icon_manager.extract_icon_only.assert_called_once_with(
                 appimage_path=mock_paths["appimage_path"],
                 dest_path=mock_paths["dest_path"],

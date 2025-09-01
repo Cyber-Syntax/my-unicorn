@@ -1,10 +1,10 @@
 """Tests for AppImage icon extraction functionality."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from my_unicorn.download import DownloadService, IconAsset
+# Removed unused DownloadService, IconAsset imports
 from my_unicorn.icon import AppImageIconExtractor, IconExtractionError, IconManager
 
 
@@ -261,116 +261,16 @@ class TestIconManager:
     """Test cases for IconManager."""
 
     @pytest.fixture
-    def mock_download_service(self):
-        """Create a mock DownloadService."""
-        return MagicMock(spec=DownloadService)
+    def icon_manager(self) -> IconManager:
+        """Create an IconManager instance with extraction enabled."""
+        return IconManager(enable_extraction=True)
 
-    @pytest.fixture
-    def icon_manager(self, mock_download_service):
-        """Create an IconManager instance."""
-        return IconManager(mock_download_service, enable_extraction=True)
-
-    @pytest.fixture
-    def mock_icon_asset(self):
-        """Create a mock IconAsset."""
-        return IconAsset(icon_filename="test.png", icon_url="https://example.com/icon.png")
-
-    async def test_get_icon_existing_file(self, icon_manager, tmp_path):
-        """Test that existing icons are not re-downloaded."""
-        existing_icon = tmp_path / "existing.png"
-        existing_icon.write_bytes(b"existing icon")
-
-        result = await icon_manager.get_icon(
-            appimage_path=None, icon_asset=None, dest_path=existing_icon, app_name="testapp"
-        )
-
-        assert result == existing_icon
-
-    @patch("my_unicorn.icon.AppImageIconExtractor.extract_icon")
-    async def test_get_icon_extraction_success(self, mock_extract, icon_manager, tmp_path):
-        """Test successful AppImage icon extraction."""
-        appimage_path = tmp_path / "test.AppImage"
-        appimage_path.write_bytes(b"mock appimage")
-
-        dest_path = tmp_path / "icon.png"
-        extracted_icon = tmp_path / "extracted.png"
-        extracted_icon.write_bytes(b"extracted icon")
-
-        mock_extract.return_value = extracted_icon
-
-        result = await icon_manager.get_icon(
-            appimage_path=appimage_path,
-            icon_asset=None,
-            dest_path=dest_path,
-            app_name="testapp",
-        )
-
-        assert result == extracted_icon
-        mock_extract.assert_called_once_with(appimage_path, dest_path, "testapp")
-
-    @patch("my_unicorn.icon.AppImageIconExtractor.extract_icon")
-    async def test_get_icon_extraction_failure_fallback(
-        self, mock_extract, icon_manager, tmp_path, mock_icon_asset
-    ):
-        """Test fallback to GitHub download when extraction fails."""
-        appimage_path = tmp_path / "test.AppImage"
-        appimage_path.write_bytes(b"mock appimage")
-
-        dest_path = tmp_path / "icon.png"
-        downloaded_icon = tmp_path / "downloaded.png"
-
-        # Mock extraction failure
-        mock_extract.return_value = None
-
-        # Mock successful download
-        icon_manager.download_service.download_icon = AsyncMock(return_value=downloaded_icon)
-
-        result = await icon_manager.get_icon(
-            appimage_path=appimage_path,
-            icon_asset=mock_icon_asset,
-            dest_path=dest_path,
-            app_name="testapp",
-        )
-
-        assert result == downloaded_icon
-        icon_manager.download_service.download_icon.assert_called_once()
-
-    @patch("my_unicorn.icon.AppImageIconExtractor.extract_icon")
-    async def test_get_icon_both_methods_fail(
-        self, mock_extract, icon_manager, tmp_path, mock_icon_asset
-    ):
-        """Test when both extraction and download fail."""
-        appimage_path = tmp_path / "test.AppImage"
-        appimage_path.write_bytes(b"mock appimage")
-
-        dest_path = tmp_path / "icon.png"
-
-        # Mock extraction failure
-        mock_extract.return_value = None
-
-        # Mock download failure
-        icon_manager.download_service.download_icon = AsyncMock(
-            side_effect=Exception("Download failed")
-        )
-
-        result = await icon_manager.get_icon(
-            appimage_path=appimage_path,
-            icon_asset=mock_icon_asset,
-            dest_path=dest_path,
-            app_name="testapp",
-        )
-
-        assert result is None
-
-    async def test_extract_icon_only_disabled(self, mock_download_service, tmp_path):
+    async def test_extract_icon_only_disabled(self, tmp_path):
         """Test extract_icon_only when extraction is disabled."""
-        icon_manager = IconManager(mock_download_service, enable_extraction=False)
-
+        icon_manager = IconManager(enable_extraction=False)
         appimage_path = tmp_path / "test.AppImage"
         dest_path = tmp_path / "icon.png"
-
         result = await icon_manager.extract_icon_only(appimage_path, dest_path, "testapp")
-
         assert result is None
 
     @patch("my_unicorn.icon.AppImageIconExtractor.extract_icon")
@@ -379,40 +279,16 @@ class TestIconManager:
         appimage_path = tmp_path / "test.AppImage"
         dest_path = tmp_path / "icon.png"
         extracted_icon = tmp_path / "extracted.png"
-
         mock_extract.return_value = extracted_icon
-
         result = await icon_manager.extract_icon_only(appimage_path, dest_path, "testapp")
-
         assert result == extracted_icon
 
     def test_set_extraction_enabled(self, icon_manager):
         """Test enabling/disabling extraction."""
         icon_manager.set_extraction_enabled(False)
         assert not icon_manager.enable_extraction
-
         icon_manager.set_extraction_enabled(True)
         assert icon_manager.enable_extraction
-
-    async def test_get_icon_no_appimage_path(self, icon_manager, tmp_path, mock_icon_asset):
-        """Test get_icon when no AppImage path is provided."""
-        dest_path = tmp_path / "icon.png"
-        downloaded_icon = tmp_path / "downloaded.png"
-
-        # Mock successful download
-        icon_manager.download_service.download_icon = AsyncMock(return_value=downloaded_icon)
-
-        result = await icon_manager.get_icon(
-            appimage_path=None,
-            icon_asset=mock_icon_asset,
-            dest_path=dest_path,
-            app_name="testapp",
-        )
-
-        assert result == downloaded_icon
-        icon_manager.download_service.download_icon.assert_called_once_with(
-            mock_icon_asset, dest_path
-        )
 
 
 class TestIconExtractionError:

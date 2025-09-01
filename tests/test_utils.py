@@ -116,13 +116,6 @@ def test_create_desktop_entry_name_normalizes():
     assert utils.create_desktop_entry_name("") == "appimage.desktop"
 
 
-def test_is_appimage_file_true_false():
-    """Test is_appimage_file detects .AppImage extension."""
-    assert utils.is_appimage_file("foo.AppImage")
-    assert utils.is_appimage_file("bar.appimage")
-    assert not utils.is_appimage_file("baz.txt")
-
-
 def test_extract_version_from_filename_patterns():
     """Test extract_version_from_filename extracts version."""
     assert utils.extract_version_from_filename("foo-v1.2.3.AppImage") == "1.2.3"
