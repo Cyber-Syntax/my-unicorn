@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from my_unicorn.download import DownloadService
 from my_unicorn.github_client import ChecksumFileInfo, GitHubReleaseFetcher
+from my_unicorn.logger import get_logger
 from my_unicorn.services.progress import ProgressService
 from my_unicorn.verify import Verifier
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__, enable_file_logging=True)
 
 
 @dataclass(slots=True, frozen=True)

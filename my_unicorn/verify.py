@@ -6,7 +6,7 @@ checksum file parsing, and hash computation for downloaded AppImages.
 
 import hashlib
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from .download import DownloadService
@@ -586,63 +586,3 @@ class Verifier:
 
         logger.debug("✅ File size verification PASSED!")
         logger.debug("   Size: %s (%d bytes)", format_bytes(actual_size), actual_size)
-
-
-class VerificationConfig:
-    """Configuration for verification operations."""
-
-    def __init__(
-        self,
-        digest: bool = True,
-        skip: bool = False,
-        checksum_file: str = "",
-        checksum_hash_type: HashType = "sha256",
-        verify_size: bool = True,
-    ):
-        """Initialize verification configuration.
-
-        Args:
-            digest: Whether to verify using GitHub API digest
-            skip: Whether to skip all verification
-            checksum_file: URL or filename of checksum file
-            checksum_hash_type: Hash type used in checksum file
-            verify_size: Whether to verify file size
-
-        """
-        self.digest = digest
-        self.skip = skip
-        self.checksum_file = checksum_file
-        self.checksum_hash_type = checksum_hash_type
-        self.verify_size = verify_size
-
-        logger.debug("🔧 Verification config initialized:")
-        logger.debug("   Digest verification: %s", digest)
-        logger.debug("   Skip verification: %s", skip)
-        logger.debug("   Checksum file: %s", checksum_file or "None")
-        logger.debug("   Checksum hash type: %s", checksum_hash_type)
-        logger.debug("   Verify size: %s", verify_size)
-
-    # TODO: is it better to save verify_size to app specific config file?
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "VerificationConfig":
-        """Create VerificationConfig from dictionary.
-
-        Args:
-            data: Configuration dictionary
-
-        Returns:
-            VerificationConfig instance
-
-        """
-        config = cls(
-            digest=data.get("digest", True),
-            skip=data.get("skip", False),
-            checksum_file=data.get("checksum_file", ""),
-            checksum_hash_type=data.get("checksum_hash_type", "sha256"),
-            verify_size=data.get("verify_size", True),
-        )
-
-        logger.debug("🔧 VerificationConfig created from dict:")
-        logger.debug("   Source data: %s", data)
-
-        return config

@@ -5,7 +5,6 @@ renaming, moving, creating backups, and other storage-related tasks.
 """
 
 import os
-import shutil
 from pathlib import Path
 
 from .logger import get_logger
@@ -136,60 +135,3 @@ class StorageService:
         if clean_name.lower().endswith((".appimage", ".AppImage")):
             clean_name = clean_name[:-9]  # Remove .AppImage or .appimage
         return clean_name
-
-    def remove_file(self, path: Path) -> None:
-        """Remove a file if it exists.
-
-        Args:
-            path: Path to file to remove
-
-        """
-        if path.exists():
-            logger.debug("🗑️  Removing file: %s", path)
-            path.unlink()
-            logger.debug("✅ File removed")
-
-    # TODO: not used anymore
-    def cleanup_download(self, download_path: Path, install_path: Path) -> None:
-        """Clean up downloaded files if they differ from install path.
-
-        Args:
-            download_path: Path to downloaded file
-            install_path: Path to installed file
-
-        """
-        if download_path.exists() and download_path != install_path:
-            self.remove_file(download_path)
-
-    def ensure_directory(self, path: Path) -> None:
-        """Ensure directory exists, creating it if necessary.
-
-        Args:
-            path: Directory path to ensure
-
-        """
-        path.mkdir(parents=True, exist_ok=True)
-
-    def copy_file(self, source: Path, destination: Path) -> Path:
-        """Copy file from source to destination.
-
-        Args:
-            source: Source file path
-            destination: Destination file path
-
-        Returns:
-            Destination path
-
-        """
-        # Create destination directory if it doesn't exist
-        destination.parent.mkdir(parents=True, exist_ok=True)
-
-        logger.debug("📋 Copying file: %s → %s", source, destination)
-        shutil.copy2(source, destination)
-        logger.debug("✅ File copied: %s", destination)
-
-        return destination
-
-
-class StorageError(Exception):
-    """Raised when storage operations fail."""
