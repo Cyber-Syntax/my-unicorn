@@ -425,7 +425,16 @@ class VerificationService:
                 return (1, filename)
 
             # Priority 2: Platform-specific hash files (e.g., app.AppImage.sha256)
-            target_extensions = [".sha256", ".sha512", ".sha1", ".md5"]
+            target_extensions = [
+                ".sha256",
+                ".sha512",
+                ".sha1",
+                ".md5",
+                ".sha256sum",
+                ".sha512sum",
+                ".sha1sum",
+                ".md5sum",
+            ]
             for ext in target_extensions:
                 if filename == f"{target_filename}{ext}":
                     logger.debug("   📌 Priority 2 (platform-specific): %s", filename)
@@ -442,8 +451,18 @@ class VerificationService:
                 return (4, filename)
 
             # Priority 5: Generic checksum files
-            logger.debug("   📌 Priority 5 (generic): %s", filename)
-            return (5, filename)
+            # Deprioritize experimental/beta/alpha versions by adding penalty
+            penalty = 0
+            lower_filename = filename.lower()
+            if any(
+                variant in lower_filename
+                for variant in ["experimental", "beta", "alpha", "preview", "rc", "dev"]
+            ):
+                penalty = 10  # Push experimental versions to lower priority
+                logger.debug("   📌 Priority 5 (generic + experimental penalty): %s", filename)
+            else:
+                logger.debug("   📌 Priority 5 (generic): %s", filename)
+            return (5 + penalty, filename)
 
         # Sort by priority (lower number = higher priority)
         prioritized = sorted(checksum_files, key=get_priority)
@@ -598,8 +617,17 @@ class VerificationService:
                     description=f"🔍 Verifying checksum for {app_name}...",
                 )
 
+            # Use original asset name for checksum lookups (not the local renamed file)
+            original_asset_name = asset.get("name", file_path.name)
+            logger.debug(
+                "🔍 Using original asset name for checksum verification: %s",
+                original_asset_name,
+            )
+
             # Prioritize checksum files to try the most likely match first
-            prioritized_files = self._prioritize_checksum_files(checksum_files, file_path.name)
+            prioritized_files = self._prioritize_checksum_files(
+                checksum_files, original_asset_name
+            )
 
             for i, checksum_file in enumerate(prioritized_files):
                 logger.debug(
@@ -610,7 +638,7 @@ class VerificationService:
                 checksum_result = await self._verify_checksum_file(
                     verifier,
                     checksum_file,
-                    file_path.name,
+                    original_asset_name,  # Use original asset name for checksum lookup
                     app_name,
                 )
 
