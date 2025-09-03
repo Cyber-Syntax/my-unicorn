@@ -18,6 +18,9 @@ from typing import TypedDict, cast
 
 import orjson
 
+# Module-level constants
+DEFAULT_CONFIG_VERSION: str = "1.0.0"
+
 
 class NetworkConfig(TypedDict):
     """Network configuration options."""
@@ -120,64 +123,122 @@ class CatalogEntry(TypedDict):
     icon: IconConfig | None
 
 
-class ConfigManager:
-    """Manages global and app-specific configurations."""
+class DirectoryManager:
+    """Manages directory operations and path resolution."""
 
-    DEFAULT_CONFIG_VERSION: str = "1.0.0"
-
-    def __init__(self, config_dir: Path | None = None):
-        """Initialize configuration manager.
+    def __init__(
+        self, config_dir: Path | None = None, catalog_dir: Path | None = None
+    ) -> None:
+        """Initialize directory manager.
 
         Args:
             config_dir: Optional custom config directory. Defaults to ~/.config/my-unicorn/
+            catalog_dir: Optional custom catalog directory. Defaults to bundled catalog.
 
         """
-        self.config_dir: Path = config_dir or Path.home() / ".config" / "my-unicorn"
-        self.settings_file: Path = self.config_dir / "settings.conf"
-        self.apps_dir: Path = self.config_dir / "apps"
-        # Use bundled catalog directory instead of user config catalog
-        self.catalog_dir: Path = Path(__file__).parent / "catalog"
+        self._config_dir: Path = config_dir or Path.home() / ".config" / "my-unicorn"
+        self._settings_file: Path = self._config_dir / "settings.conf"
+        self._apps_dir: Path = self._config_dir / "apps"
+        # Use provided catalog directory or bundled catalog directory
+        self._catalog_dir: Path = catalog_dir or Path(__file__).parent / "catalog"
 
-        # Ensure directories exist
-        self._ensure_directories()
+    @property
+    def config_dir(self) -> Path:
+        """Get the configuration directory path."""
+        return self._config_dir
 
-        # Validate bundled catalog exists
-        self._validate_catalog_directory()
+    @property
+    def settings_file(self) -> Path:
+        """Get the settings file path."""
+        return self._settings_file
 
-    def _ensure_directories(self) -> None:
-        """Create necessary directories if they don't exist."""
+    @property
+    def apps_dir(self) -> Path:
+        """Get the apps configuration directory path."""
+        return self._apps_dir
+
+    @property
+    def catalog_dir(self) -> Path:
+        """Get the catalog directory path."""
+        return self._catalog_dir
+
+    def expand_path(self, path_str: str) -> Path:
+        """Expand and resolve path with ~ and relative path support.
+
+        Args:
+            path_str: Path string to expand
+
+        Returns:
+            Expanded and resolved Path
+
+        """
+        return Path(path_str).expanduser().resolve()
+
+    def ensure_user_directories(self) -> None:
+        """Create necessary user directories if they don't exist."""
         # Only create user config directories, catalog is bundled
-        for directory in [self.config_dir, self.apps_dir]:
+        for directory in [self._config_dir, self._apps_dir]:
             directory.mkdir(parents=True, exist_ok=True)
 
-    def _validate_catalog_directory(self) -> None:
-        """Validate that the bundled catalog directory exists and contains apps."""
-        if not self.catalog_dir.exists():
+    def validate_catalog_directory(self) -> None:
+        """Validate that the bundled catalog directory exists and contains apps.
+
+        Raises:
+            FileNotFoundError: If catalog directory or files don't exist
+            NotADirectoryError: If catalog path is not a directory
+
+        """
+        if not self._catalog_dir.exists():
             raise FileNotFoundError(
-                f"Bundled catalog directory not found: {self.catalog_dir}\n"
+                f"Bundled catalog directory not found: {self._catalog_dir}\n"
                 "This indicates a packaging or installation issue."
             )
 
-        if not self.catalog_dir.is_dir():
-            raise NotADirectoryError(f"Catalog path is not a directory: {self.catalog_dir}")
+        if not self._catalog_dir.is_dir():
+            raise NotADirectoryError(f"Catalog path is not a directory: {self._catalog_dir}")
 
         # Check if catalog has any JSON files
-        catalog_files = list(self.catalog_dir.glob("*.json"))
+        catalog_files = list(self._catalog_dir.glob("*.json"))
         if not catalog_files:
             raise FileNotFoundError(
-                f"No catalog entries found in: {self.catalog_dir}\n"
+                f"No catalog entries found in: {self._catalog_dir}\n"
                 "Expected to find *.json files with app catalog entries."
             )
 
-    def _expand_path(self, path_str: str) -> Path:
-        """Expand and resolve path with ~ and relative path support."""
-        return Path(path_str).expanduser().resolve()
+    def ensure_directories_from_config(self, config: GlobalConfig) -> None:
+        """Ensure all directories from config exist.
 
-    def _get_default_global_config(self) -> dict[str, str | dict[str, str]]:
-        """Get default global configuration values."""
+        Args:
+            config: Global configuration containing directory paths
+
+        """
+        for directory in config["directory"].values():
+            if isinstance(directory, Path):
+                directory.mkdir(parents=True, exist_ok=True)
+
+
+class GlobalConfigManager:
+    """Manages global INI configuration."""
+
+    def __init__(self, directory_manager: DirectoryManager) -> None:
+        """Initialize global config manager.
+
+        Args:
+            directory_manager: Directory manager for path operations
+
+        """
+        self.directory_manager = directory_manager
+
+    def get_default_global_config(self) -> dict[str, str | dict[str, str]]:
+        """Get default global configuration values.
+
+        Returns:
+            Default configuration dictionary
+
+        """
         home = Path.home()
         return {
-            "config_version": self.DEFAULT_CONFIG_VERSION,
+            "config_version": DEFAULT_CONFIG_VERSION,
             "max_concurrent_downloads": "5",
             "max_backup": "1",
             "batch_mode": "true",
@@ -191,19 +252,24 @@ class ConfigManager:
                 "storage": str(home / "Applications"),
                 "backup": str(home / "Applications" / "backups"),
                 "icon": str(home / "Applications" / "icons"),
-                "settings": str(self.config_dir),
-                "logs": str(self.config_dir / "logs"),
-                "cache": str(self.config_dir / "cache"),
-                "tmp": str(self.config_dir / "tmp"),
+                "settings": str(self.directory_manager.config_dir),
+                "logs": str(self.directory_manager.config_dir / "logs"),
+                "cache": str(self.directory_manager.config_dir / "cache"),
+                "tmp": str(self.directory_manager.config_dir / "tmp"),
             },
         }
 
     def load_global_config(self) -> GlobalConfig:
-        """Load global configuration from INI file."""
+        """Load global configuration from INI file.
+
+        Returns:
+            Loaded global configuration
+
+        """
         config = configparser.ConfigParser()
 
         # Set defaults
-        defaults = self._get_default_global_config()
+        defaults = self.get_default_global_config()
         # Convert nested dicts to flat structure for configparser
         flat_defaults = {}
         for key, value in defaults.items():
@@ -221,18 +287,57 @@ class ConfigManager:
                     config.set(key, subkey, str(subvalue))
 
         # Read user config if it exists
-        if self.settings_file.exists():
-            config.read(self.settings_file)
+        if self.directory_manager.settings_file.exists():
+            config.read(self.directory_manager.settings_file)
         else:
             # Create default config file
             self.save_global_config(self._convert_to_global_config(defaults))
 
         return self._convert_to_global_config(config)
 
+    def save_global_config(self, config: GlobalConfig) -> None:
+        """Save global configuration to INI file.
+
+        Args:
+            config: Global configuration to save
+
+        """
+        parser = configparser.ConfigParser()
+
+        # Main section
+        parser["DEFAULT"] = {
+            "config_version": config["config_version"],
+            "max_concurrent_downloads": str(config["max_concurrent_downloads"]),
+            "max_backup": str(config["max_backup"]),
+            "batch_mode": str(config["batch_mode"]).lower(),
+            "locale": config["locale"],
+            "log_level": config["log_level"],
+        }
+
+        # Network section
+        parser["network"] = {
+            "retry_attempts": str(config["network"]["retry_attempts"]),
+            "timeout_seconds": str(config["network"]["timeout_seconds"]),
+        }
+
+        # Directory section
+        parser["directory"] = {key: str(path) for key, path in config["directory"].items()}
+
+        with open(self.directory_manager.settings_file, "w", encoding="utf-8") as f:
+            parser.write(f)
+
     def _convert_to_global_config(
         self, config: configparser.ConfigParser | dict[str, str | dict[str, str]]
     ) -> GlobalConfig:
-        """Convert configparser or dict to typed GlobalConfig."""
+        """Convert configparser or dict to typed GlobalConfig.
+
+        Args:
+            config: Configuration to convert
+
+        Returns:
+            Typed global configuration
+
+        """
         if isinstance(config, configparser.ConfigParser):
             config_dict: dict[str, str | dict[str, str]] = {}
 
@@ -281,7 +386,7 @@ class ConfigManager:
             }
             for key, value in directory_dict.items():
                 if isinstance(value, str) and key in known_dir_keys:
-                    directory_config[key] = self._expand_path(value)
+                    directory_config[key] = self.directory_manager.expand_path(value)
 
         # Get network config
         network_dict = config_dict.get("network", {})
@@ -301,47 +406,62 @@ class ConfigManager:
         )
 
         return GlobalConfig(
-            config_version=str(
-                get_scalar_config("config_version", self.DEFAULT_CONFIG_VERSION)
-            ),
+            config_version=str(get_scalar_config("config_version", DEFAULT_CONFIG_VERSION)),
             max_concurrent_downloads=int(get_scalar_config("max_concurrent_downloads", 5)),
             max_backup=int(get_scalar_config("max_backup", 1)),
             batch_mode=batch_mode,
             locale=str(get_scalar_config("locale", "en_US")),
             log_level=str(get_scalar_config("log_level", "INFO")),
             network=network_config,
-            directory=DirectoryConfig(**directory_config),
+            directory=DirectoryConfig(
+                repo=directory_config.get(
+                    "repo", Path.home() / ".local" / "share" / "my-unicorn-repo"
+                ),
+                package=directory_config.get(
+                    "package", Path.home() / ".local" / "share" / "my-unicorn"
+                ),
+                download=directory_config.get("download", Path.home() / "Downloads"),
+                storage=directory_config.get("storage", Path.home() / "Applications"),
+                backup=directory_config.get(
+                    "backup", Path.home() / "Applications" / "backups"
+                ),
+                icon=directory_config.get("icon", Path.home() / "Applications" / "icons"),
+                settings=directory_config.get("settings", self.directory_manager.config_dir),
+                logs=directory_config.get("logs", self.directory_manager.config_dir / "logs"),
+                cache=directory_config.get(
+                    "cache", self.directory_manager.config_dir / "cache"
+                ),
+                tmp=directory_config.get("tmp", self.directory_manager.config_dir / "tmp"),
+            ),
         )
 
-    def save_global_config(self, config: GlobalConfig) -> None:
-        """Save global configuration to INI file."""
-        parser = configparser.ConfigParser()
 
-        # Main section
-        parser["DEFAULT"] = {
-            "config_version": config["config_version"],
-            "max_concurrent_downloads": str(config["max_concurrent_downloads"]),
-            "max_backup": str(config["max_backup"]),
-            "batch_mode": str(config["batch_mode"]).lower(),
-            "locale": config["locale"],
-            "log_level": config["log_level"],
-        }
+class AppConfigManager:
+    """Manages app-specific JSON configurations."""
 
-        # Network section
-        parser["network"] = {
-            "retry_attempts": str(config["network"]["retry_attempts"]),
-            "timeout_seconds": str(config["network"]["timeout_seconds"]),
-        }
+    def __init__(self, directory_manager: DirectoryManager) -> None:
+        """Initialize app config manager.
 
-        # Directory section
-        parser["directory"] = {key: str(path) for key, path in config["directory"].items()}
+        Args:
+            directory_manager: Directory manager for path operations
 
-        with open(self.settings_file, "w", encoding="utf-8") as f:
-            parser.write(f)
+        """
+        self.directory_manager = directory_manager
 
     def load_app_config(self, app_name: str) -> AppConfig | None:
-        """Load app-specific configuration."""
-        app_file = self.apps_dir / f"{app_name}.json"
+        """Load app-specific configuration.
+
+        Args:
+            app_name: Name of the application
+
+        Returns:
+            App configuration or None if not found
+
+        Raises:
+            ValueError: If config file is invalid
+
+        """
+        app_file = self.directory_manager.apps_dir / f"{app_name}.json"
         if not app_file.exists():
             return None
 
@@ -354,6 +474,53 @@ class ConfigManager:
             return cast(AppConfig, config_data)
         except (Exception, OSError) as e:
             raise ValueError(f"Failed to load app config for {app_name}: {e}") from e
+
+    def save_app_config(self, app_name: str, config: AppConfig) -> None:
+        """Save app-specific configuration.
+
+        Args:
+            app_name: Name of the application
+            config: App configuration to save
+
+        Raises:
+            ValueError: If config cannot be saved
+
+        """
+        app_file = self.directory_manager.apps_dir / f"{app_name}.json"
+
+        try:
+            with open(app_file, "wb") as f:
+                f.write(orjson.dumps(config, option=orjson.OPT_INDENT_2))
+        except OSError as e:
+            raise ValueError(f"Failed to save app config for {app_name}: {e}") from e
+
+    def list_installed_apps(self) -> list[str]:
+        """Get list of installed apps.
+
+        Returns:
+            List of installed application names
+
+        """
+        if not self.directory_manager.apps_dir.exists():
+            return []
+
+        return [f.stem for f in self.directory_manager.apps_dir.glob("*.json") if f.is_file()]
+
+    def remove_app_config(self, app_name: str) -> bool:
+        """Remove app configuration file.
+
+        Args:
+            app_name: Name of the application
+
+        Returns:
+            True if file was removed, False if it didn't exist
+
+        """
+        app_file = self.directory_manager.apps_dir / f"{app_name}.json"
+        if app_file.exists():
+            app_file.unlink()
+            return True
+        return False
 
     def _migrate_app_config(self, config_data: dict) -> dict:
         """Migrate old config format to new format.
@@ -372,57 +539,141 @@ class ConfigManager:
 
         return config_data
 
-    def save_app_config(self, app_name: str, config: AppConfig) -> None:
-        """Save app-specific configuration."""
-        app_file = self.apps_dir / f"{app_name}.json"
 
-        try:
-            with open(app_file, "wb") as f:
-                f.write(orjson.dumps(config, option=orjson.OPT_INDENT_2))
-        except OSError as e:
-            raise ValueError(f"Failed to save app config for {app_name}: {e}") from e
+class CatalogManager:
+    """Manages catalog entries for available applications."""
+
+    def __init__(self, directory_manager: DirectoryManager) -> None:
+        """Initialize catalog manager.
+
+        Args:
+            directory_manager: Directory manager for path operations
+
+        """
+        self.directory_manager = directory_manager
 
     def load_catalog_entry(self, app_name: str) -> CatalogEntry | None:
-        """Load catalog entry for an app from bundled catalog."""
-        catalog_file = self.catalog_dir / f"{app_name}.json"
+        """Load catalog entry for an app from bundled catalog.
+
+        Args:
+            app_name: Name of the application
+
+        Returns:
+            Catalog entry or None if not found
+
+        Raises:
+            ValueError: If catalog entry is invalid
+
+        """
+        catalog_file = self.directory_manager.catalog_dir / f"{app_name}.json"
         if not catalog_file.exists():
             return None
 
         try:
             with open(catalog_file, "rb") as f:
-                return orjson.loads(f.read())
+                return cast(CatalogEntry, orjson.loads(f.read()))
         except (Exception, OSError) as e:
             raise ValueError(f"Failed to load catalog entry for {app_name}: {e}") from e
 
-    def list_installed_apps(self) -> list[str]:
-        """Get list of installed apps."""
-        if not self.apps_dir.exists():
-            return []
-
-        return [f.stem for f in self.apps_dir.glob("*.json") if f.is_file()]
-
     def list_catalog_apps(self) -> list[str]:
-        """Get list of available apps in bundled catalog."""
-        if not self.catalog_dir.exists():
-            # This should not happen if _validate_catalog_directory() passed
+        """Get list of available apps in bundled catalog.
+
+        Returns:
+            List of available application names
+
+        """
+        if not self.directory_manager.catalog_dir.exists():
+            # This should not happen if validate_catalog_directory() passed
             return []
 
-        return [f.stem for f in self.catalog_dir.glob("*.json") if f.is_file()]
+        return [
+            f.stem for f in self.directory_manager.catalog_dir.glob("*.json") if f.is_file()
+        ]
 
-    def remove_app_config(self, app_name: str) -> bool:
-        """Remove app configuration file."""
-        app_file = self.apps_dir / f"{app_name}.json"
-        if app_file.exists():
-            app_file.unlink()
-            return True
-        return False
+
+class ConfigManager:
+    """Facade that coordinates all configuration managers."""
+
+    DEFAULT_CONFIG_VERSION: str = DEFAULT_CONFIG_VERSION  # Maintain backward compatibility
+
+    def __init__(
+        self, config_dir: Path | None = None, catalog_dir: Path | None = None
+    ) -> None:
+        """Initialize configuration manager.
+
+        Args:
+            config_dir: Optional custom config directory. Defaults to ~/.config/my-unicorn/
+            catalog_dir: Optional custom catalog directory. Defaults to bundled catalog.
+
+        """
+        self.directory_manager = DirectoryManager(config_dir, catalog_dir)
+        self.global_config_manager = GlobalConfigManager(self.directory_manager)
+        self.app_config_manager = AppConfigManager(self.directory_manager)
+        self.catalog_manager = CatalogManager(self.directory_manager)
+
+        # Initialize directories and validation
+        self.directory_manager.ensure_user_directories()
+        self.directory_manager.validate_catalog_directory()
+
+    # Directory manager delegates
+    @property
+    def config_dir(self) -> Path:
+        """Get the configuration directory path."""
+        return self.directory_manager.config_dir
+
+    @property
+    def settings_file(self) -> Path:
+        """Get the settings file path."""
+        return self.directory_manager.settings_file
+
+    @property
+    def apps_dir(self) -> Path:
+        """Get the apps configuration directory path."""
+        return self.directory_manager.apps_dir
+
+    @property
+    def catalog_dir(self) -> Path:
+        """Get the catalog directory path."""
+        return self.directory_manager.catalog_dir
 
     def ensure_directories_from_config(self, config: GlobalConfig) -> None:
         """Ensure all directories from config exist."""
-        for directory in config["directory"].values():
-            if isinstance(directory, Path):
-                directory.mkdir(parents=True, exist_ok=True)
+        self.directory_manager.ensure_directories_from_config(config)
 
+    # Global config manager delegates
+    def load_global_config(self) -> GlobalConfig:
+        """Load global configuration from INI file."""
+        return self.global_config_manager.load_global_config()
+
+    def save_global_config(self, config: GlobalConfig) -> None:
+        """Save global configuration to INI file."""
+        self.global_config_manager.save_global_config(config)
+
+    # App config manager delegates
+    def load_app_config(self, app_name: str) -> AppConfig | None:
+        """Load app-specific configuration."""
+        return self.app_config_manager.load_app_config(app_name)
+
+    def save_app_config(self, app_name: str, config: AppConfig) -> None:
+        """Save app-specific configuration."""
+        self.app_config_manager.save_app_config(app_name, config)
+
+    def list_installed_apps(self) -> list[str]:
+        """Get list of installed apps."""
+        return self.app_config_manager.list_installed_apps()
+
+    def remove_app_config(self, app_name: str) -> bool:
+        """Remove app configuration file."""
+        return self.app_config_manager.remove_app_config(app_name)
+
+    # Catalog manager delegates
+    def load_catalog_entry(self, app_name: str) -> CatalogEntry | None:
+        """Load catalog entry for an app from bundled catalog."""
+        return self.catalog_manager.load_catalog_entry(app_name)
+
+    def list_catalog_apps(self) -> list[str]:
+        """Get list of available apps in bundled catalog."""
+        return self.catalog_manager.list_catalog_apps()
 
 # Global instance for easy access
 config_manager = ConfigManager()
