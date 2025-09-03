@@ -3,7 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.verify import VerificationConfig, Verifier
+from my_unicorn.services.verification_service import VerificationConfig
+from my_unicorn.verify import Verifier
 
 # Test data constants
 LEGCORD_YAML_CONTENT = """version: 1.1.5
@@ -471,30 +472,26 @@ def test_verify_size_mismatch(tmp_path: Path, patch_logger):
 
 
 def test_verification_config_init_and_from_dict():
-    """Test VerificationConfig construction and from_dict."""
+    """Test VerificationConfig construction."""
     config = VerificationConfig(
-        digest=True,
+        digest_enabled=True,
         skip=False,
         checksum_file="foo.txt",
         checksum_hash_type="sha256",
-        verify_size=True,
     )
-    assert config.digest is True
+    assert config.digest_enabled is True
     assert config.skip is False
     assert config.checksum_file == "foo.txt"
     assert config.checksum_hash_type == "sha256"
-    assert config.verify_size is True
 
-    data = {
-        "digest": False,
-        "skip": True,
-        "checksum_file": "bar.txt",
-        "checksum_hash_type": "md5",
-        "verify_size": False,
-    }
-    config2 = VerificationConfig.from_dict(data)
-    assert config2.digest is False
+    # Test with different values
+    config2 = VerificationConfig(
+        digest_enabled=False,
+        skip=True,
+        checksum_file="bar.txt",
+        checksum_hash_type="sha512",
+    )
+    assert config2.digest_enabled is False
     assert config2.skip is True
     assert config2.checksum_file == "bar.txt"
-    assert config2.checksum_hash_type == "md5"
-    assert config2.verify_size is False
+    assert config2.checksum_hash_type == "sha512"

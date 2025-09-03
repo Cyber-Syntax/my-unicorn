@@ -259,6 +259,7 @@ def create_desktop_entry_name(app_name: str) -> str:
 
     return f"{name}.desktop"
 
+
 def extract_version_from_filename(filename: str) -> str | None:
     """Extract version from AppImage filename.
 
@@ -468,6 +469,7 @@ def is_checksum_file(filename: str, require_appimage_base: bool = False) -> bool
 
     return False
 
+
 def is_appimage_file(filename: str) -> bool:
     """Check if filename is an AppImage.
 
@@ -479,6 +481,7 @@ def is_appimage_file(filename: str) -> bool:
 
     """
     return filename.lower().endswith(".appimage")
+
 
 def get_checksum_file_format_type(filename: str) -> str:
     """Determine the format type of a checksum file.

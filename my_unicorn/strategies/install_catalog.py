@@ -4,15 +4,79 @@ This module implements the strategy for installing AppImages from the applicatio
 """
 
 import asyncio
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+from my_unicorn.services.icon_service import IconConfig, IconService
+from my_unicorn.services.verification_service import VerificationService
+
+from ..github_client import GitHubAsset, GitHubReleaseDetails
 from ..logger import get_logger
-from ..services import IconConfig, IconService, VerificationService
 from ..utils import extract_and_validate_version
-from .install_url import InstallationError, InstallStrategy, ValidationError
+from .install import (
+    InstallationError,
+    InstallStrategy,
+    ValidationError,
+)
 
 logger = get_logger(__name__)
+
+
+# Catalog-specific progress tracking constants
+class CatalogProgressSteps:
+    """Constants for catalog-specific progress tracking percentages."""
+
+    VERIFICATION_START = 10.0
+    VERIFICATION_COMPLETE = 30.0
+    MOVE_TO_INSTALL = 40.0
+    ICON_START = 50.0
+    ICON_COMPLETE = 70.0
+    CONFIG_CREATE = 80.0
+    DESKTOP_ENTRY = 90.0
+
+
+@dataclass(frozen=True, slots=True)
+class InstallationContext:
+    """Context for a single catalog-based installation."""
+
+    app_name: str
+    download_path: Path
+    app_config: dict[str, Any]
+    release_data: dict[str, Any]
+    appimage_asset: GitHubAsset
+    post_processing_task_id: str | None = None
+    final_path: Path | None = None
+
+    @property
+    def owner(self) -> str:
+        """Get repository owner from app config."""
+        return str(self.app_config.get("owner", ""))
+
+    @property
+    def repo(self) -> str:
+        """Get repository name from app config."""
+        return str(self.app_config.get("repo", ""))
+
+    @property
+    def verification_config(self) -> dict[str, Any]:
+        """Get verification configuration from app config."""
+        config = self.app_config.get("verification", {})
+        return dict(config) if isinstance(config, dict) else {}
+
+
+@dataclass(frozen=True, slots=True)
+class AppConfigData:
+    """Configuration data for creating app configuration."""
+
+    app_name: str
+    app_path: Path
+    catalog_config: dict[str, Any]
+    release_data: dict[str, Any]
+    icon_dir: Path
+    appimage_asset: GitHubAsset | None = None
+    verification_result: dict[str, Any] | None = None
+    updated_icon_config: dict[str, Any] | None = None
 
 
 class CatalogInstallStrategy(InstallStrategy):
@@ -23,7 +87,6 @@ class CatalogInstallStrategy(InstallStrategy):
         catalog_manager: Any,
         config_manager: Any,
         github_client: Any,
-        *args: Any,
         **kwargs: Any,
     ) -> None:
         """Initialize catalog install strategy.
@@ -55,6 +118,20 @@ class CatalogInstallStrategy(InstallStrategy):
         progress_service = getattr(download_service, "progress_service", None)
         self.icon_service = IconService(download_service, progress_service)
         self.verification_service = VerificationService(download_service, progress_service)
+        # progress_tracker is already initialized in base class
+
+    def _get_icon_directory(self) -> Path:
+        """Get icon directory from global configuration.
+
+        Returns:
+            Path to the icon directory
+
+        """
+        from ..config import ConfigManager
+
+        config_manager = ConfigManager()
+        global_config = config_manager.load_global_config()
+        return global_config["directory"]["icon"]
 
     def validate_targets(self, targets: list[str]) -> None:
         """Validate that targets are valid catalog app names.
@@ -122,6 +199,282 @@ class CatalogInstallStrategy(InstallStrategy):
 
         return processed_results
 
+    async def _setup_installation_context(
+        self, app_name: str, **kwargs: Any
+    ) -> InstallationContext:
+        """Set up the installation context for a single app.
+
+        Args:
+            app_name: Name of application to install
+            **kwargs: Installation options
+
+        Returns:
+            Installation context with app configuration and release data
+
+        Raises:
+            InstallationError: If setup fails
+
+        """
+        logger.info("🚀 Installing from catalog: %s", app_name)
+
+        # Get app configuration from catalog
+        app_config = self.catalog_manager.get_app_config(app_name)
+        logger.debug("App config for %s: %s", app_name, app_config)
+        if not app_config:
+            raise InstallationError(f"App configuration not found: {app_name}")
+
+        # Get release configuration
+        release_config = self._get_release_config(app_config)
+        logger.debug("Release config: %s", release_config)
+
+        # Fetch release data from GitHub
+        logger.info("📡 Fetching release data for %s", app_name)
+        release_data = await self._fetch_release_data(release_config)
+        logger.debug("Release data: %s", release_data)
+
+        # Find AppImage asset using characteristic_suffix from catalog config
+        characteristic_suffix = app_config.get("appimage", {}).get("characteristic_suffix", [])
+
+        # Create a GitHubReleaseFetcher to use its select_best_appimage method
+        from ..github_client import GitHubReleaseFetcher
+
+        owner = release_config.get("owner")
+        repo = release_config.get("repo")
+
+        if not isinstance(owner, str) or not isinstance(repo, str):
+            raise InstallationError(f"Invalid owner/repo in release config for {app_name}")
+
+        # Get shared API task from github_client for progress tracking
+        shared_api_task_id = getattr(self.github_client, "shared_api_task_id", None)
+        fetcher = GitHubReleaseFetcher(owner, repo, self.session, shared_api_task_id)
+
+        appimage_asset = fetcher.select_best_appimage(
+            cast(GitHubReleaseDetails, release_data), characteristic_suffix
+        )
+        if not appimage_asset:
+            raise InstallationError(
+                f"No AppImage found for {app_name} with "
+                f"characteristic_suffix: {characteristic_suffix}"
+            )
+
+        # Setup paths
+        download_dir = kwargs.get("download_dir", Path.cwd())
+        filename = self.download_service.get_filename_from_url(
+            appimage_asset["browser_download_url"]
+        )
+        download_path = download_dir / filename
+
+        # Create combined post-processing task if progress is enabled
+        post_processing_task_id = None
+        if (
+            kwargs.get("show_progress", False)
+            and hasattr(self.download_service, "progress_service")
+            and self.download_service.progress_service
+            and self.download_service.progress_service.is_active()
+        ):
+            post_processing_task_id = (
+                await self.download_service.progress_service.create_post_processing_task(
+                    app_name
+                )
+            )
+
+        return InstallationContext(
+            app_name=app_name,
+            app_config=app_config,
+            release_data=release_data,
+            appimage_asset=appimage_asset,
+            download_path=download_path,
+            post_processing_task_id=post_processing_task_id,
+        )
+
+    async def _download_and_verify_appimage(
+        self, context: InstallationContext, **kwargs: Any
+    ) -> tuple[Path, dict[str, Any] | None]:
+        """Download and verify AppImage.
+
+        Args:
+            context: Installation context
+            **kwargs: Installation options
+
+        Returns:
+            Tuple of (Path to downloaded AppImage, verification result)
+
+        Raises:
+            InstallationError: If download or verification fails
+
+        """
+        # Download AppImage
+        appimage_path = await self.download_service.download_appimage(
+            context.appimage_asset,
+            context.download_path,
+            show_progress=kwargs.get("show_progress", True),
+        )
+
+        # Verify download if requested (20% of post-processing)
+        verification_result = None
+        if kwargs.get("verify_downloads", True):
+            await self.progress_tracker.update_progress(
+                context.post_processing_task_id,
+                CatalogProgressSteps.VERIFICATION_START,
+                f"🔍 Verifying {context.app_name}...",
+            )
+
+            verification_result = await self._perform_verification(
+                context,
+                post_processing_task_id=context.post_processing_task_id,
+                **kwargs,
+            )
+
+            await self.progress_tracker.update_progress(
+                context.post_processing_task_id,
+                CatalogProgressSteps.VERIFICATION_COMPLETE,
+                f"✅ {context.app_name} verification",
+            )
+
+        return appimage_path, verification_result
+
+    async def _process_appimage_installation(
+        self, context: InstallationContext, appimage_path: Path, **_kwargs: Any
+    ) -> Path:
+        """Process AppImage installation (move, rename, make executable).
+
+        Args:
+            context: Installation context
+            appimage_path: Path to downloaded AppImage
+            **kwargs: Installation options
+
+        Returns:
+            Final path of installed AppImage
+
+        """
+        # Move to install directory and make executable
+        await self.progress_tracker.update_progress(
+            context.post_processing_task_id,
+            CatalogProgressSteps.MOVE_TO_INSTALL,
+            f"📁 Moving {context.app_name} to install directory...",
+        )
+
+        final_path = self.storage_service.move_to_install_dir(appimage_path)
+        self.storage_service.make_executable(final_path)
+
+        # Handle renaming based on catalog config
+        if rename_config := context.app_config.get("appimage", {}).get("rename"):
+            clean_name = self.storage_service.get_clean_appimage_name(rename_config)
+            final_path = self.storage_service.rename_appimage(final_path, clean_name)
+
+        return final_path
+
+    async def _setup_application_assets(
+        self, context: InstallationContext, final_path: Path, **kwargs: Any
+    ) -> tuple[Path | None, dict[str, Any]]:
+        """Set up application assets (icon, config).
+
+        Args:
+            context: Installation context
+            final_path: Final path of installed AppImage
+            **kwargs: Installation options
+
+        Returns:
+            Tuple of (icon path, updated icon config)
+
+        """
+        # Extract icon (30% of post-processing)
+        icon_path = None
+        updated_icon_config: dict[str, Any] = {}
+        if context.app_config.get("icon") or True:  # Always try extraction
+            await self.progress_tracker.update_progress(
+                context.post_processing_task_id,
+                CatalogProgressSteps.ICON_START,
+                f"🎨 Extracting {context.app_name} icon...",
+            )
+
+            icon_path, updated_icon_config = await self._setup_catalog_icon(
+                context,
+                final_path,
+                **kwargs,
+            )
+
+            await self.progress_tracker.update_progress(
+                context.post_processing_task_id,
+                CatalogProgressSteps.ICON_COMPLETE,
+                f"✅ {context.app_name} icon extraction",
+            )
+
+        return icon_path, updated_icon_config
+
+    async def _create_application_config(
+        self,
+        context: InstallationContext,
+        final_path: Path,
+        verification_result: dict[str, Any] | None,
+        updated_icon_config: dict[str, Any],
+    ) -> None:
+        """Create application configuration.
+
+        Args:
+            context: Installation context
+            final_path: Final path of installed AppImage
+            verification_result: Verification results
+            updated_icon_config: Updated icon configuration
+
+        """
+        # Get icon directory from global config
+        icon_dir = self._get_icon_directory()
+
+        # Create app configuration
+        await self.progress_tracker.update_progress(
+            context.post_processing_task_id,
+            CatalogProgressSteps.CONFIG_CREATE,
+            f"📁 Creating configuration for {context.app_name}...",
+        )
+
+        self._create_app_config(
+            AppConfigData(
+                app_name=context.app_name,
+                app_path=final_path,
+                catalog_config=context.app_config,
+                release_data=context.release_data,
+                icon_dir=icon_dir,
+                appimage_asset=context.appimage_asset,
+                verification_result=verification_result,
+                updated_icon_config=updated_icon_config,
+            )
+        )
+
+    async def _create_desktop_integration(
+        self, context: InstallationContext, final_path: Path, icon_path: Path | None
+    ) -> None:
+        """Create desktop entry for the application.
+
+        Args:
+            context: Installation context
+            final_path: Final path of installed AppImage
+            icon_path: Path to application icon
+
+        """
+        await self.progress_tracker.update_progress(
+            context.post_processing_task_id,
+            CatalogProgressSteps.DESKTOP_ENTRY,
+            f"📁 Creating desktop entry for {context.app_name}...",
+        )
+
+        try:
+            from ..config import ConfigManager
+            from ..desktop import create_desktop_entry_for_app
+
+            config_manager = ConfigManager()
+            create_desktop_entry_for_app(
+                app_name=context.app_name,
+                appimage_path=final_path,
+                icon_path=icon_path,
+                comment=f"{context.app_name.title()} AppImage Application",
+                categories=["Utility"],
+                config_manager=config_manager,
+            )
+            # Desktop entry creation/update logging is handled by the desktop module
+        except Exception as e:
+            logger.warning("⚠️  Failed to update desktop entry: %s", e)
+
     async def _install_single_app(
         self, semaphore: asyncio.Semaphore, app_name: str, **kwargs: Any
     ) -> dict[str, Any]:
@@ -138,254 +491,151 @@ class CatalogInstallStrategy(InstallStrategy):
         """
         async with semaphore:
             try:
-                logger.info("🚀 Installing from catalog: %s", app_name)
-
-                # Get app configuration from catalog
-                app_config = self.catalog_manager.get_app_config(app_name)
-                logger.debug("App config for %s: %s", app_name, app_config)
-                if not app_config:
-                    raise InstallationError(f"App configuration not found: {app_name}")
-
-                # Check for existing installation
-                existing_path = await self._handle_existing_installation(
-                    app_name, app_config, **kwargs
-                )
+                # Check for existing installation first
+                existing_path = await self._handle_existing_installation(app_name, **kwargs)
                 if existing_path:
-                    return {
-                        "target": app_name,
-                        "success": True,
-                        "path": str(existing_path),
-                        "name": existing_path.name,
-                        "source": "catalog",
-                        "status": "already_installed",
-                    }
+                    return self._build_existing_installation_result(app_name, existing_path)
 
-                # Get release configuration
-                release_config = self._get_release_config(app_config)
-                logger.debug("Release config: %s", release_config)
+                # Set up installation context
+                context = await self._setup_installation_context(app_name, **kwargs)
 
-                # Fetch release data from GitHub
-                logger.info("📡 Fetching release data for %s", app_name)
-                release_data = await self._fetch_release_data(release_config)
-                logger.debug("Release data: %s", release_data)
-
-                # Find AppImage asset using characteristic_suffix from catalog config
-                characteristic_suffix = app_config.get("appimage", {}).get(
-                    "characteristic_suffix", []
+                # Download and verify AppImage
+                appimage_path, verification_result = await self._download_and_verify_appimage(
+                    context, **kwargs
                 )
 
-                # Create a GitHubReleaseFetcher to use its select_best_appimage method
-                from ..github_client import GitHubReleaseFetcher
-
-                owner = release_config.get("owner")
-                repo = release_config.get("repo")
-                # Get shared API task from github_client for progress tracking
-                shared_api_task_id = getattr(self.github_client, "shared_api_task_id", None)
-                fetcher = GitHubReleaseFetcher(owner, repo, self.session, shared_api_task_id)
-
-                appimage_asset = fetcher.select_best_appimage(
-                    release_data, characteristic_suffix
-                )
-                if not appimage_asset:
-                    raise InstallationError(
-                        f"No AppImage found for {app_name} with characteristic_suffix: {characteristic_suffix}"
-                    )
-
-                # Setup paths
-                download_dir = kwargs.get("download_dir", Path.cwd())
-                filename = self.download_service.get_filename_from_url(
-                    appimage_asset["browser_download_url"]
-                )
-                download_path = download_dir / filename
-
-                # Download AppImage
-                appimage_path = await self.download_service.download_appimage(
-                    appimage_asset,
-                    download_path,
-                    show_progress=kwargs.get("show_progress", True),
+                # Process installation (move, rename, make executable)
+                final_path = await self._process_appimage_installation(
+                    context, appimage_path, **kwargs
                 )
 
-                # Create combined post-processing task if progress is enabled
-                post_processing_task_id = None
-                if (
-                    kwargs.get("show_progress", False)
-                    and hasattr(self.download_service, "progress_service")
-                    and self.download_service.progress_service
-                    and self.download_service.progress_service.is_active()
-                ):
-                    post_processing_task_id = await self.download_service.progress_service.create_post_processing_task(
-                        app_name
-                    )
-
-                # Verify download if requested (20% of post-processing)
-                verification_result = None
-                if kwargs.get("verify_downloads", True):
-                    if post_processing_task_id and self.download_service.progress_service:
-                        await self.download_service.progress_service.update_task(
-                            post_processing_task_id,
-                            completed=10.0,
-                            description=f"🔍 Verifying {app_name}...",
-                        )
-                    verification_result = await self._perform_verification(
-                        download_path,
-                        appimage_asset,
-                        app_config,
-                        release_data,
-                        post_processing_task_id=post_processing_task_id,
-                        **kwargs,
-                    )
-                    if post_processing_task_id and self.download_service.progress_service:
-                        await self.download_service.progress_service.update_task(
-                            post_processing_task_id,
-                            completed=30.0,
-                            description=f"✅ {app_name} verification",
-                        )
-
-                # Move to install directory and make executable
-                if post_processing_task_id and self.download_service.progress_service:
-                    await self.download_service.progress_service.update_task(
-                        post_processing_task_id,
-                        completed=40.0,
-                        description=f"📁 Moving {app_name} to install directory...",
-                    )
-
-                final_path = self.storage_service.move_to_install_dir(download_path)
-                self.storage_service.make_executable(final_path)
-
-                # Handle renaming based on catalog config
-                if rename_config := app_config.get("appimage", {}).get("rename"):
-                    clean_name = self.storage_service.get_clean_appimage_name(rename_config)
-                    final_path = self.storage_service.rename_appimage(final_path, clean_name)
-
-                # Get icon directory from global config (needed for both icon download and config creation)
-                from ..config import ConfigManager
-
-                config_manager = ConfigManager()
-                global_config = config_manager.load_global_config()
-                icon_dir = global_config["directory"]["icon"]
-
-                # Extract icon (30% of post-processing)
-                icon_path = None
-                updated_icon_config = {}
-                if (
-                    app_config.get("icon") or True
-                ):  # Always try extraction even without icon config
-                    if post_processing_task_id and self.download_service.progress_service:
-                        await self.download_service.progress_service.update_task(
-                            post_processing_task_id,
-                            completed=50.0,
-                            description=f"🎨 Extracting {app_name} icon...",
-                        )
-                    icon_path, updated_icon_config = await self._setup_catalog_icon(
-                        app_config,
-                        app_name,
-                        icon_dir,
-                        final_path,
-                        post_processing_task_id=post_processing_task_id,
-                        **kwargs,
-                    )
-                    if post_processing_task_id and self.download_service.progress_service:
-                        await self.download_service.progress_service.update_task(
-                            post_processing_task_id,
-                            completed=70.0,
-                            description=f"✅ {app_name} icon extraction",
-                        )
-
-                # Create app configuration (20% of post-processing)
-                if post_processing_task_id and self.download_service.progress_service:
-                    await self.download_service.progress_service.update_task(
-                        post_processing_task_id,
-                        completed=80.0,
-                        description=f"📁 Creating configuration for {app_name}...",
-                    )
-
-                self._create_app_config(
-                    app_name,
-                    final_path,
-                    app_config,
-                    release_data,
-                    icon_dir,
-                    appimage_asset,
-                    verification_result,
-                    updated_icon_config,
+                # Set up application assets (icon)
+                icon_path, updated_icon_config = await self._setup_application_assets(
+                    context, final_path, **kwargs
                 )
 
-                # Create desktop entry (20% of post-processing)
-                if post_processing_task_id and self.download_service.progress_service:
-                    await self.download_service.progress_service.update_task(
-                        post_processing_task_id,
-                        completed=90.0,
-                        description=f"📁 Creating desktop entry for {app_name}...",
-                    )
+                # Create application configuration
+                await self._create_application_config(
+                    context, final_path, verification_result, updated_icon_config
+                )
 
-                try:
-                    from ..desktop import create_desktop_entry_for_app
+                # Create desktop integration
+                await self._create_desktop_integration(context, final_path, icon_path)
 
-                    desktop_path = create_desktop_entry_for_app(
-                        app_name=app_name,
-                        appimage_path=final_path,
-                        icon_path=icon_path,
-                        comment=f"{app_name.title()} AppImage Application",
-                        categories=["Utility"],
-                        config_manager=config_manager,
-                    )
-                    # Desktop entry creation/update logging is handled by the desktop module
-                except Exception as e:
-                    logger.warning("⚠️  Failed to update desktop entry: %s", e)
-
-                # Finish post-processing task
-                if post_processing_task_id and self.download_service.progress_service:
-                    await self.download_service.progress_service.finish_task(
-                        post_processing_task_id,
-                        success=True,
-                        final_description=f"✅ {app_name}",
-                    )
+                # Finish progress tracking
+                await self.progress_tracker.finish_progress(
+                    context.post_processing_task_id,
+                    success=True,
+                    final_description=f"✅ {app_name}",
+                )
 
                 logger.info("✅ Successfully installed from catalog: %s", final_path)
-
-                return {
-                    "target": app_name,
-                    "success": True,
-                    "path": str(final_path),
-                    "name": final_path.name,
-                    "source": "catalog",
-                    "version": extract_and_validate_version(release_data.get("tag_name", "")),
-                    "icon_path": str(icon_path) if icon_path else None,
-                }
+                return self._build_success_result(context, final_path, icon_path)
 
             except Exception as e:
-                # Mark post-processing as failed if we have a progress task
-                if (
-                    "post_processing_task_id" in locals()
-                    and post_processing_task_id
-                    and hasattr(self.download_service, "progress_service")
-                    and self.download_service.progress_service
-                ):
-                    await self.download_service.progress_service.finish_task(
-                        post_processing_task_id,
-                        success=False,
-                        final_description=f"❌ {app_name} post-processing failed",
-                    )
+                await self._handle_installation_error(app_name, e, **kwargs)
+                return self._build_error_result(app_name, str(e))
 
-                logger.error("❌ Failed to install %s: %s", app_name, e)
-                import traceback
+    def _build_existing_installation_result(
+        self, app_name: str, existing_path: Path
+    ) -> dict[str, Any]:
+        """Build result dict for existing installation.
 
-                logger.debug("Full traceback: %s", traceback.format_exc())
-                return {
-                    "target": app_name,
-                    "success": False,
-                    "error": str(e),
-                    "path": None,
-                }
+        Args:
+            app_name: Application name
+            existing_path: Path to existing installation
+
+        Returns:
+            Result dictionary for existing installation
+
+        """
+        return {
+            "target": app_name,
+            "success": True,
+            "path": str(existing_path),
+            "name": existing_path.name,
+            "source": "catalog",
+            "status": "already_installed",
+        }
+
+    def _build_success_result(
+        self, context: InstallationContext, final_path: Path, icon_path: Path | None
+    ) -> dict[str, Any]:
+        """Build result dict for successful installation.
+
+        Args:
+            context: Installation context
+            final_path: Final path of installed application
+            icon_path: Path to application icon
+
+        Returns:
+            Result dictionary for successful installation
+
+        """
+        return {
+            "target": context.app_name,
+            "success": True,
+            "path": str(final_path),
+            "name": final_path.name,
+            "source": "catalog",
+            "version": extract_and_validate_version(context.release_data.get("tag_name", "")),
+            "icon_path": str(icon_path) if icon_path else None,
+        }
+
+    def _build_error_result(self, app_name: str, error_message: str) -> dict[str, Any]:
+        """Build result dict for failed installation.
+
+        Args:
+            app_name: Application name
+            error_message: Error message
+
+        Returns:
+            Result dictionary for failed installation
+
+        """
+        return {
+            "target": app_name,
+            "success": False,
+            "error": error_message,
+            "path": None,
+        }
+
+    async def _handle_installation_error(
+        self, app_name: str, error: Exception, **kwargs: Any
+    ) -> None:
+        """Handle installation errors with proper logging and progress cleanup.
+
+        Args:
+            app_name: Application name
+            error: Exception that occurred
+            **kwargs: Installation options
+
+        """
+        # Mark post-processing as failed if we have a progress task
+        post_processing_task_id = kwargs.get("post_processing_task_id")
+        if (
+            post_processing_task_id
+            and hasattr(self.download_service, "progress_service")
+            and self.download_service.progress_service
+        ):
+            await self.progress_tracker.finish_progress(
+                post_processing_task_id,
+                success=False,
+                final_description=f"❌ {app_name} post-processing failed",
+            )
+
+        logger.error("❌ Failed to install %s: %s", app_name, error)
+        import traceback
+
+        logger.debug("Full traceback: %s", traceback.format_exc())
 
     async def _handle_existing_installation(
-        self, app_name: str, app_config: dict[str, Any], **kwargs: Any
+        self, app_name: str, **_kwargs: Any
     ) -> Path | None:
         """Handle existing installation if present.
 
         Args:
             app_name: Application name
-            app_config: Application configuration from catalog
             **kwargs: Installation options
 
         Returns:
@@ -422,7 +672,19 @@ class CatalogInstallStrategy(InstallStrategy):
             "tag": app_config.get("tag"),  # Optional specific tag
         }
 
-    async def _fetch_release_data(self, release_config: dict[str, Any]) -> dict[str, Any]:
+    def _get_repository_info(self, context: InstallationContext) -> tuple[str, str]:
+        """Extract repository owner and name from context.
+
+        Args:
+            context: Installation context
+
+        Returns:
+            Tuple of (owner, repo)
+
+        """
+        return context.owner, context.repo
+
+    async def _fetch_release_data(self, release_config: dict[str, Any]) -> Any:
         """Fetch release data from GitHub.
 
         Args:
@@ -454,25 +716,18 @@ class CatalogInstallStrategy(InstallStrategy):
             return release_data
 
         except Exception as e:
-            raise InstallationError(f"Failed to fetch release data: {e}")
+            raise InstallationError(f"Failed to fetch release data: {e}") from e
 
     async def _perform_verification(
         self,
-        path: Path,
-        asset: dict[str, Any],
-        app_config: dict[str, Any],
-        release_data: dict[str, Any],
-        post_processing_task_id: str | None = None,
-        **kwargs: Any,
+        context: InstallationContext,
+        **_kwargs: Any,
     ) -> dict[str, Any]:
         """Perform download verification based on catalog configuration.
 
         Args:
-            path: Path to downloaded file
-            asset: GitHub asset information
-            app_config: Application configuration from catalog
-            release_data: GitHub release data
-            post_processing_task_id: Optional combined post-processing task ID
+            context: Installation context containing all needed data
+            **kwargs: Additional keyword arguments
 
         Returns:
             Dictionary containing successful verification methods and updated config
@@ -481,29 +736,24 @@ class CatalogInstallStrategy(InstallStrategy):
             InstallationError: If verification fails
 
         """
-        # Get verification configuration from catalog
-        verification_config = app_config.get("verification", {})
-
-        # Get repository info
-        owner = app_config.get("owner", "")
-        repo = app_config.get("repo", "")
-        original_tag_name = release_data.get(
-            "original_tag_name", release_data.get("tag_name", "")
+        # Get original tag name from release data
+        original_tag_name = context.release_data.get(
+            "original_tag_name", context.release_data.get("tag_name", "")
         )
 
-        # Use the passed post-processing task ID instead of creating a new one
-        progress_task_id = post_processing_task_id
+        # Use the post-processing task ID from context
+        progress_task_id = context.post_processing_task_id
 
         try:
             result = await self.verification_service.verify_file(
-                file_path=path,
-                asset=asset,
-                config=verification_config,
-                owner=owner,
-                repo=repo,
+                file_path=context.download_path,
+                asset=dict(context.appimage_asset),
+                config=context.verification_config,
+                owner=context.owner,
+                repo=context.repo,
                 tag_name=original_tag_name,
-                app_name=path.name,
-                assets=release_data.get("assets", []),
+                app_name=context.download_path.name,
+                assets=context.release_data.get("assets", []),
                 progress_task_id=progress_task_id,
             )
 
@@ -516,27 +766,22 @@ class CatalogInstallStrategy(InstallStrategy):
 
     async def _setup_catalog_icon(
         self,
-        app_config: dict[str, Any],
-        app_name: str,
-        icon_dir: Path,
+        context: InstallationContext,
         appimage_path: Path,
-        post_processing_task_id: str | None = None,
-        **kwargs: Any,
+        **_kwargs: Any,
     ) -> tuple[Path | None, dict[str, Any]]:
-        """Setup icon from catalog configuration using shared IconService.
+        """Set up icon from catalog configuration using shared IconService.
 
         Args:
-            app_config: Application configuration
-            app_name: Application name for icon filename
-            icon_dir: Directory where icons should be saved
+            context: Installation context containing all needed data
             appimage_path: Path to AppImage for icon extraction
-            post_processing_task_id: Optional combined post-processing task ID
+            **kwargs: Additional keyword arguments
 
         Returns:
             Tuple of (Path to acquired icon or None, updated icon config)
 
         """
-        icon_config_dict = app_config.get("icon", {})
+        icon_config_dict = context.app_config.get("icon", {})
 
         # Check if extraction is enabled (default True)
         extraction_enabled = icon_config_dict.get("extraction", True)
@@ -545,7 +790,17 @@ class CatalogInstallStrategy(InstallStrategy):
         # Generate filename if not provided
         icon_filename = icon_config_dict.get("name")
         if not icon_filename:
-            icon_filename = self.icon_service._generate_icon_filename(app_name, icon_url)
+            # Generate filename based on app name and URL
+            if icon_url:
+                # Try to extract extension from URL
+                from urllib.parse import urlparse
+
+                parsed_url = urlparse(icon_url)
+                url_path = Path(parsed_url.path)
+                icon_extension = url_path.suffix or ".png"
+            else:
+                icon_extension = ".png"
+            icon_filename = f"{context.app_name}{icon_extension}"
 
         # Create icon configuration
         icon_config = IconConfig(
@@ -555,13 +810,16 @@ class CatalogInstallStrategy(InstallStrategy):
             preserve_url_on_extraction=False,  # Clear URL on extraction for catalog
         )
 
-        # Use the passed post-processing task ID instead of creating a new one
-        progress_task_id = post_processing_task_id
+        # Get icon directory
+        icon_dir = self._get_icon_directory()
+
+        # Use the post-processing task ID from context
+        progress_task_id = context.post_processing_task_id
 
         # Use shared service to acquire icon
         result = await self.icon_service.acquire_icon(
             icon_config=icon_config,
-            app_name=app_name,
+            app_name=context.app_name,
             icon_dir=icon_dir,
             appimage_path=appimage_path,
             current_config=icon_config_dict,
@@ -570,77 +828,76 @@ class CatalogInstallStrategy(InstallStrategy):
 
         return result.icon_path, result.config
 
-    def _create_app_config(
-        self,
-        app_name: str,
-        app_path: Path,
-        catalog_config: dict[str, Any],
-        release_data: dict[str, Any],
-        icon_dir: Path,
-        appimage_asset: dict[str, Any] | None = None,
-        verification_result: dict[str, Any] | None = None,
-        updated_icon_config: dict[str, Any] | None = None,
-    ) -> None:
+    def _create_app_config(self, config_data: AppConfigData) -> None:
         """Create application configuration after successful installation.
 
         Args:
-            app_name: Application name
-            app_path: Path to installed application
-            catalog_config: Original catalog configuration
-            release_data: GitHub release data
-            icon_dir: Directory where icons are stored
-            appimage_asset: AppImage asset info for digest
-            verification_result: Result from verification with updated config
+            config_data: Configuration data containing all necessary information
 
         """
         # Extract appimage config from catalog config
-        appimage_config = catalog_config.get("appimage", {})
+        appimage_config = config_data.catalog_config.get("appimage", {})
 
         config = {
             "config_version": "1.0.0",
             "source": "catalog",
-            "owner": catalog_config.get("owner", ""),
-            "repo": catalog_config.get("repo", ""),
+            "owner": config_data.catalog_config.get("owner", ""),
+            "repo": config_data.catalog_config.get("repo", ""),
             "appimage": {
-                "rename": appimage_config.get("rename", app_name),
+                "rename": appimage_config.get("rename", config_data.app_name),
                 "name_template": appimage_config.get("name_template", ""),
                 "characteristic_suffix": appimage_config.get("characteristic_suffix", []),
-                "version": extract_and_validate_version(release_data.get("tag_name", ""))
+                "version": extract_and_validate_version(
+                    config_data.release_data.get("tag_name", "")
+                )
                 or "unknown",
-                "name": app_path.name,
+                "name": config_data.app_path.name,
                 "installed_date": self._get_current_timestamp(),
-                "digest": appimage_asset.get("digest", "") if appimage_asset else "",
+                "digest": (
+                    config_data.appimage_asset.get("digest", "")
+                    if config_data.appimage_asset
+                    else ""
+                ),
             },
-            "github": catalog_config.get("github", {"repo": True, "prerelease": False}),
-            "verification": self._get_updated_verification_config(
-                catalog_config, verification_result
+            "github": config_data.catalog_config.get(
+                "github", {"repo": True, "prerelease": False}
             ),
-            "icon": updated_icon_config or catalog_config.get("icon", {}),
+            "verification": self._get_updated_verification_config(
+                config_data.catalog_config, config_data.verification_result
+            ),
+            "icon": (
+                config_data.updated_icon_config or config_data.catalog_config.get("icon", {})
+            ),
         }
 
         # Add icon path if available
-        final_icon_config = updated_icon_config or catalog_config.get("icon", {})
+        final_icon_config = config_data.updated_icon_config or config_data.catalog_config.get(
+            "icon", {}
+        )
         if final_icon_config:
             icon_filename = final_icon_config.get("name")
             if icon_filename:
-                icon_path = icon_dir / icon_filename
+                icon_path = config_data.icon_dir / icon_filename
                 if icon_path.exists():
                     config["icon"]["path"] = str(icon_path)
 
-        self.catalog_manager.save_app_config(app_name, config)
+        self.catalog_manager.save_app_config(config_data.app_name, config)
 
         # Log verification config updates if any
-        if verification_result and verification_result.get("successful_methods"):
-            methods = list(verification_result["successful_methods"].keys())
+        if config_data.verification_result and config_data.verification_result.get(
+            "successful_methods"
+        ):
+            methods = list(config_data.verification_result["successful_methods"].keys())
             logger.debug(
-                f"📝 Saved configuration for {app_name} with updated verification: {', '.join(methods)}"
+                f"📝 Saved configuration for {config_data.app_name} with "
+                f"updated verification: {', '.join(methods)}"
             )
         else:
-            logger.debug("📝 Saved configuration for %s", app_name)
+            logger.debug("📝 Saved configuration for %s", config_data.app_name)
 
     def _get_updated_verification_config(
         self, catalog_config: dict[str, Any], verification_result: dict[str, Any] | None
-    ) -> dict[str, Any]:
+    ) -> Any:
         """Get updated verification configuration based on successful verification methods.
 
         Args:
@@ -671,7 +928,8 @@ class CatalogInstallStrategy(InstallStrategy):
             if verification_result.get("successful_methods"):
                 methods = list(verification_result["successful_methods"].keys())
                 logger.debug(
-                    f"🔧 Updated verification config based on successful methods: {', '.join(methods)}"
+                    f"🔧 Updated verification config based on successful methods: "
+                    f"{', '.join(methods)}"
                 )
 
         return verification_config

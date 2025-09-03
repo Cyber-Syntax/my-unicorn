@@ -675,5 +675,6 @@ class ConfigManager:
         """Get list of available apps in bundled catalog."""
         return self.catalog_manager.list_catalog_apps()
 
+
 # Global instance for easy access
 config_manager = ConfigManager()

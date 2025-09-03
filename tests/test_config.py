@@ -1,6 +1,5 @@
 """Tests for ConfigManager: global config, app config, catalog, and directory logic."""
 
-from pathlib import Path
 from typing import cast
 
 import orjson
@@ -21,9 +20,9 @@ def config_dir(tmp_path):
     """Provide a temporary config directory for ConfigManager."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
-    # Create dummy catalog directory with one app
-    catalog_dir = Path(__file__).parent.parent / "my_unicorn" / "catalog"
-    catalog_dir.mkdir(exist_ok=True)
+    # Create temporary catalog directory with one app in the test environment
+    catalog_dir = tmp_path / "catalog"
+    catalog_dir.mkdir()
     dummy_catalog = catalog_dir / "dummyapp.json"
     dummy_catalog.write_bytes(
         orjson.dumps(
@@ -35,13 +34,21 @@ def config_dir(tmp_path):
                     "name_template": "",
                     "characteristic_suffix": [],
                 },
+                "github": {
+                    "repo": True,
+                    "prerelease": False,
+                },
                 "verification": {
                     "digest": False,
                     "skip": False,
                     "checksum_file": "",
                     "checksum_hash_type": "sha256",
                 },
-                "icon": None,
+                "icon": {
+                    "extraction": False,
+                    "url": "",
+                    "name": "dummy.png",
+                },
             }
         )
     )
@@ -49,10 +56,10 @@ def config_dir(tmp_path):
 
 
 @pytest.fixture
-def config_manager(config_dir):
-    """ConfigManager instance using temporary config_dir."""
-    # Use the bundled catalog directory for tests
-    catalog_dir = Path(__file__).parent.parent / "my_unicorn" / "catalog"
+def config_manager(config_dir, tmp_path):
+    """ConfigManager instance using temporary config_dir and catalog_dir."""
+    # Use the temporary catalog directory for tests
+    catalog_dir = tmp_path / "catalog"
     return ConfigManager(config_dir, catalog_dir)
 
 
@@ -334,13 +341,21 @@ def test_catalog_manager(config_dir):
             "name_template": "",
             "characteristic_suffix": [],
         },
+        "github": {
+            "repo": True,
+            "prerelease": False,
+        },
         "verification": {
             "digest": False,
             "skip": False,
             "checksum_file": "",
             "checksum_hash_type": "sha256",
         },
-        "icon": None,
+        "icon": {
+            "extraction": False,
+            "url": "",
+            "name": "testapp.png",
+        },
     }
 
     test_catalog_file = catalog_dir / "testapp.json"
@@ -377,9 +392,26 @@ def test_config_manager_facade_integration(config_dir):
             {
                 "owner": "integration",
                 "repo": "test",
-                "appimage": {"rename": "integration_test"},
-                "verification": {"digest": False, "skip": False},
-                "icon": None,
+                "appimage": {
+                    "rename": "integration_test",
+                    "name_template": "",
+                    "characteristic_suffix": [],
+                },
+                "github": {
+                    "repo": True,
+                    "prerelease": False,
+                },
+                "verification": {
+                    "digest": False,
+                    "skip": False,
+                    "checksum_file": "",
+                    "checksum_hash_type": "sha256",
+                },
+                "icon": {
+                    "extraction": False,
+                    "url": "",
+                    "name": "integration_test.png",
+                },
             }
         )
     )

@@ -167,7 +167,7 @@ setup_qownnotes_config() {
     "source": "catalog",
     "appimage": {
         "version": "$version",
-        "name": "qownnotes-$version-x86_64.AppImage",
+        "name": "qownnotes.AppImage",
         "rename": "qownnotes",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": [
@@ -210,7 +210,7 @@ setup_nuclear_config() {
     "source": "url",
     "appimage": {
         "version": "$version",
-        "name": "nuclear-$version.AppImage",
+        "name": "nuclear.AppImage",
         "rename": "nuclear",
         "name_template": "",
         "characteristic_suffix": [],
@@ -250,7 +250,7 @@ setup_keepassxc_config() {
     "source": "url",
     "appimage": {
         "version": "$version",
-        "name": "keepassxc-$version-x86_64.AppImage",
+        "name": "keepassxc.AppImage",
         "rename": "keepassxc",
         "name_template": "",
         "characteristic_suffix": [],
@@ -290,7 +290,7 @@ setup_appflowy_config() {
     "source": "catalog",
     "appimage": {
         "version": "$version",
-        "name": "appflowy-$version-linux-x86_64.AppImage",
+        "name": "appflowy.AppImage",
         "rename": "appflowy",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": [
@@ -332,7 +332,7 @@ setup_legcord_config() {
     "source": "catalog",
     "appimage": {
         "version": "$version",
-        "name": "legcord-$version.AppImage",
+        "name": "legcord.AppImage",
         "rename": "legcord",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": [
@@ -374,7 +374,7 @@ setup_joplin_config() {
     "source": "catalog",
     "appimage": {
         "version": "$version",
-        "name": "joplin-$version.AppImage",
+        "name": "joplin.AppImage",
         "rename": "joplin",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": [
@@ -694,6 +694,31 @@ test_updates() {
 
 }
 
+test_updates_all() {
+    info "=== Testing Updates All ==="
+    local apps=("appflowy" "legcord" "tagspaces")
+
+    # Step 1: Set up configs with old versions and test updates all
+    info "Step 1/3: Setting up old versions and testing updates all"
+    for app in "${apps[@]}"; do
+        case "$app" in
+            "tagspaces") setup_tagspaces_config "$TEST_VERSION" ;;
+            "appflowy") setup_appflowy_config "$TEST_VERSION" ;;
+            "legcord") setup_legcord_config "$TEST_VERSION" ;;
+                # "joplin") setup_joplin_config "$TEST_VERSION" ;;
+        esac
+    done
+
+    cd "$APP_ROOT"
+    if python3 run.py update; then
+        info "updates_all: SUCCESS"
+    else
+        error "updates_all: FAILED"
+        return 1
+    fi
+
+}
+
 # ======== Comprehensive Tests ========
 
 test_all_qownnotes() {
@@ -816,6 +841,7 @@ COMMANDS:
         --url-all              Run all URL tests (keepassxc + nuclear)
     Update Tests:
         --update               Test updates for multiple apps (appflowy + legcord + joplin)
+        --update-all           Test updates for all apps
 
     Catalog Tests:
         --catalog-single       Install single app from catalog (appflowy)
@@ -894,6 +920,9 @@ parse_arguments() {
             ;;
         --update)
             test_updates
+            ;;
+        --update-all)
+            test_updates_all
             ;;
         --quick)
             test_quick

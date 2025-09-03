@@ -139,3 +139,91 @@ class UpdateStrategy(ABC):
                 print(f"   • {app} (did you mean: {', '.join(suggestions)}?)")
             else:
                 print(f"   • {app}")
+
+    async def _execute_updates(
+        self, context: UpdateContext, app_names: list[str]
+    ) -> dict[str, bool]:
+        """Execute updates with temporarily suppressed console logging.
+
+        Args:
+            context: Update context with dependencies
+            app_names: List of app names to update
+
+        Returns:
+            Dictionary mapping app names to success status
+
+        """
+        from ..logger import get_logger
+
+        logger = get_logger(__name__)
+
+        # Temporarily suppress console logging during downloads
+        logger.set_console_level_temporarily("ERROR")
+
+        try:
+            return await context.update_manager.update_multiple_apps(app_names)
+        finally:
+            # Restore normal logging
+            logger.restore_console_level()
+
+    def _categorize_update_results(
+        self, results: dict[str, bool]
+    ) -> tuple[list[str], list[str]]:
+        """Categorize update results into successful and failed apps.
+
+        Args:
+            results: Dictionary mapping app names to success status
+
+        Returns:
+            Tuple of (updated_apps, failed_apps)
+
+        """
+        updated_apps: list[str] = []
+        failed_apps: list[str] = []
+
+        for app_name, success in results.items():
+            if success:
+                updated_apps.append(app_name)
+            else:
+                failed_apps.append(app_name)
+
+        return updated_apps, failed_apps
+
+    async def _execute_with_api_progress(
+        self, context: UpdateContext, operation_name: str, total_requests: int, operation_func
+    ):
+        """Execute an operation with API progress tracking.
+
+        Args:
+            context: Update context with dependencies
+            operation_name: Name for the operation (e.g., "API assets")
+            total_requests: Estimated total API requests
+            operation_func: Async function to execute within progress context
+
+        Returns:
+            Result of the operation_func
+
+        """
+        from ..services.progress import get_progress_service, progress_session
+
+        async with progress_session():
+            progress_service = get_progress_service()
+
+            # Create shared API progress task
+            api_task_id = await progress_service.create_api_fetching_task(
+                endpoint=operation_name, total_requests=total_requests
+            )
+
+            # Set shared task for update manager
+            context.update_manager._shared_api_task_id = api_task_id
+
+            try:
+                result = await operation_func()
+                await progress_service.finish_task(api_task_id, success=True)
+                return result
+            except Exception:
+                await progress_service.finish_task(api_task_id, success=False)
+                raise
+            finally:
+                # Clean up shared task
+                context.update_manager._shared_api_task_id = None

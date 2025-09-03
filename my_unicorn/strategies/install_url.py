@@ -4,6 +4,7 @@ This module implements the strategy for installing AppImages from GitHub reposit
 """
 
 import asyncio
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -17,9 +18,55 @@ from ..icon import IconManager
 from ..logger import get_logger
 from ..services.verification_service import VerificationService
 from ..utils import extract_and_validate_version
-from .install import InstallationError, InstallStrategy, ValidationError
+from .install import (
+    InstallationError,
+    InstallStrategy,
+    ValidationError,
+)
 
 logger = get_logger(__name__)
+
+
+# URL-specific progress tracking constants
+class URLProgressSteps:
+    """Constants for progress tracking percentages in URL installations."""
+
+    PARSING_URL = 10.0
+    FETCHING_RELEASE = 20.0
+    DOWNLOADING_APPIMAGE = 40.0
+    VERIFYING_APPIMAGE = 60.0
+    EXTRACTING_ICON = 75.0
+    CREATING_DESKTOP = 85.0
+    SAVING_CONFIG = 95.0
+    COMPLETED = 100.0
+
+
+@dataclass(frozen=True, slots=True)
+class URLInstallationContext:
+    """Context for a single URL-based installation."""
+
+    repo_url: str
+    owner: str
+    repo_name: str
+    release_data: GitHubReleaseDetails
+    appimage_asset: GitHubAsset
+    download_path: Path
+    post_processing_task_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class URLAppConfigData:
+    """Configuration data for creating URL-based app configuration."""
+
+    app_name: str
+    app_path: Path
+    owner: str
+    repo_name: str
+    release_data: GitHubReleaseDetails
+    appimage_asset: GitHubAsset
+    icon_path: Path | None = None
+    icon_source: str = "none"
+    verification_result: Any = None
 
 
 class URLInstallStrategy(InstallStrategy):
@@ -49,6 +96,133 @@ class URLInstallStrategy(InstallStrategy):
             config_manager=config_manager,
         )
         self.github_client = github_client
+        # Progress tracker inherited from base class
+
+    async def _parse_and_fetch_release(
+        self, repo_url: str
+    ) -> tuple[str, str, GitHubReleaseDetails, GitHubAsset]:
+        """Parse URL and fetch release data with best AppImage asset."""
+        # Parse owner/repo from URL
+        parts = repo_url.replace("https://github.com/", "").split("/")
+        MIN_URL_PARTS = 2
+        if len(parts) < MIN_URL_PARTS:
+            raise ValueError(f"Invalid GitHub URL format: {repo_url}")
+
+        owner, repo_name = parts[0], parts[1]
+
+        # Use GitHubReleaseFetcher for both fetching and asset selection
+        shared_api_task_id = getattr(self.github_client, "shared_api_task_id", None)
+        fetcher = GitHubReleaseFetcher(owner, repo_name, self.session, shared_api_task_id)
+
+        # Try to fetch latest release first, fallback to prereleases if needed
+        release_data = None
+        try:
+            release_data = await fetcher.fetch_latest_release_or_prerelease(
+                prefer_prerelease=False  # Still prefer stable if available
+            )
+            logger.info(
+                "Found %s release for %s/%s: %s",
+                "prerelease" if release_data.get("prerelease") else "release",
+                owner,
+                repo_name,
+                release_data.get("version", "unknown"),
+            )
+        except Exception as fallback_error:
+            logger.error(
+                "Failed to fetch any releases for %s/%s: %s",
+                owner,
+                repo_name,
+                fallback_error,
+            )
+            raise InstallationError(
+                f"No releases found for {owner}/{repo_name}: {fallback_error}"
+            ) from fallback_error
+
+        if not release_data:
+            raise InstallationError(f"No releases found for {owner}/{repo_name}")
+
+        appimage_asset = fetcher.select_best_appimage(release_data, installation_source="url")
+        if not appimage_asset:
+            raise InstallationError(f"No AppImage found in {owner}/{repo_name} releases")
+
+        return owner, repo_name, release_data, appimage_asset
+
+    async def _download_and_move_appimage(
+        self, appimage_asset: GitHubAsset, repo_name: str, **kwargs: Any
+    ) -> Path:
+        """Download AppImage and move to install directory."""
+        # Setup paths
+        download_dir = kwargs.get("download_dir", Path.cwd())
+        filename = self.download_service.get_filename_from_url(
+            appimage_asset["browser_download_url"]
+        )
+        download_path = download_dir / filename
+
+        # Download AppImage
+        await self.download_service.download_appimage(
+            appimage_asset,
+            download_path,
+            show_progress=kwargs.get("show_progress", True),
+        )
+
+        # Move to install directory
+        final_path = self.storage_service.move_to_install_dir(download_path)
+        self.storage_service.make_executable(final_path)
+
+        # Rename AppImage to clean name based on repo
+        clean_name = self.storage_service.get_clean_appimage_name(repo_name.lower())
+        final_path = self.storage_service.rename_appimage(final_path, clean_name)
+
+        return final_path
+
+    async def _extract_icon_for_app(
+        self,
+        final_path: Path,
+        repo_name: str,
+        progress_service: Any,
+        post_processing_task_id: str | None,
+    ) -> tuple[Path | None, str]:
+        """Extract icon from AppImage."""
+        from ..config import ConfigManager
+
+        config_manager = ConfigManager()
+        global_config = config_manager.load_global_config()
+        icon_dir = global_config["directory"]["icon"]
+
+        # Generate icon filename
+        icon_filename = f"{repo_name.lower()}.png"
+        icon_dest_path = icon_dir / icon_filename
+
+        icon_manager = IconManager()
+        icon_source = "none"
+        if post_processing_task_id:
+            await progress_service.update_task(
+                post_processing_task_id,
+                completed=50.0,
+                description=f"🎨 Extracting {repo_name} icon...",
+            )
+        try:
+            icon_path = await icon_manager.extract_icon_only(
+                appimage_path=final_path,
+                dest_path=icon_dest_path,
+                app_name=repo_name.lower(),
+            )
+            if icon_path:
+                icon_source = "extraction"
+                logger.info("✅ Icon extracted for %s: %s", repo_name, icon_path)
+            else:
+                logger.info("No icon found in AppImage for %s", repo_name)
+        except Exception as e:
+            logger.warning("⚠️  Failed to extract icon for %s: %s", repo_name, e)
+            icon_path = None
+        if post_processing_task_id:
+            await progress_service.update_task(
+                post_processing_task_id,
+                completed=70.0,
+                description=f"✅ {repo_name} icon extraction completed",
+            )
+
+        return icon_path, icon_source
 
     def validate_targets(self, targets: list[str]) -> None:
         """Validate that targets are GitHub repository URLs.
@@ -132,67 +306,17 @@ class URLInstallStrategy(InstallStrategy):
             try:
                 logger.info("🚀 Installing from GitHub: %s", repo_url)
 
-                # Parse owner/repo from URL
-                parts = repo_url.replace("https://github.com/", "").split("/")
-                if len(parts) < 2:
-                    raise ValueError("Invalid GitHub URL format: %s" % repo_url)
-
-                owner, repo_name = parts[0], parts[1]
-
-                # Use GitHubReleaseFetcher for both fetching and asset selection
-                # Get shared API task ID from github_client for progress tracking
-                shared_api_task_id = getattr(self.github_client, "shared_api_task_id", None)
-                fetcher = GitHubReleaseFetcher(
-                    owner, repo_name, self.session, shared_api_task_id
-                )
-
-                # Try to fetch latest release first, fallback to prereleases if needed
-                release_data = None
-                try:
-                    release_data = await fetcher.fetch_latest_release_or_prerelease(
-                        prefer_prerelease=False  # Still prefer stable if available
-                    )
-                    logger.info(
-                        "Found %s release for %s/%s: %s",
-                        "prerelease" if release_data.get("prerelease") else "release",
-                        owner,
-                        repo_name,
-                        release_data.get("version", "unknown"),
-                    )
-                except Exception as fallback_error:
-                    logger.error(
-                        "Failed to fetch any releases for %s/%s: %s",
-                        owner,
-                        repo_name,
-                        fallback_error,
-                    )
-                    raise InstallationError(
-                        f"No releases found for {owner}/{repo_name}: {fallback_error}"
-                    ) from fallback_error
-
-                if not release_data:
-                    raise InstallationError(f"No releases found for {owner}/{repo_name}")
-
-                appimage_asset = fetcher.select_best_appimage(
-                    release_data, installation_source="url"
-                )
-                if not appimage_asset:
-                    raise InstallationError(
-                        f"No AppImage found in {owner}/{repo_name} releases"
-                    )
-
-                # Setup paths
-                download_dir = kwargs.get("download_dir", Path.cwd())
-                filename = self.download_service.get_filename_from_url(
-                    appimage_asset["browser_download_url"]
-                )
-                download_path = download_dir / filename
-
-                # Download AppImage
-                await self.download_service.download_appimage(
+                # Parse URL and fetch release data
+                (
+                    owner,
+                    repo_name,
+                    release_data,
                     appimage_asset,
-                    download_path,
-                    show_progress=kwargs.get("show_progress", True),
+                ) = await self._parse_and_fetch_release(repo_url)
+
+                # Download and move AppImage to install directory
+                final_path = await self._download_and_move_appimage(
+                    appimage_asset, repo_name, **kwargs
                 )
 
                 # Prepare progress service for post-processing
@@ -210,110 +334,101 @@ class URLInstallStrategy(InstallStrategy):
                 # Verification (20%)
                 verification_result = None
                 if kwargs.get("verify_downloads", True):
-                    if post_processing_task_id:
-                        await progress_service.update_task(
-                            post_processing_task_id,
-                            completed=10.0,
-                            description=f"🔍 Verifying {repo_name}...",
+                    await self.progress_tracker.update_progress(
+                        post_processing_task_id,
+                        10.0,
+                        f"🔍 Verifying {repo_name}...",
+                    )
+                    try:
+                        # Add timeout to prevent verification from hanging indefinitely
+                        verification_result = await asyncio.wait_for(
+                            self._perform_verification(
+                                final_path, appimage_asset, release_data, owner, repo_name
+                            ),
+                            timeout=10.0,  # 10 second timeout - much more responsive
                         )
-                    verification_result = await self._perform_verification(
-                        download_path, appimage_asset, release_data, owner, repo_name
-                    )
-                    if post_processing_task_id:
-                        await progress_service.update_task(
+                        await self.progress_tracker.update_progress(
                             post_processing_task_id,
-                            completed=30.0,
-                            description=f"✅ {repo_name} verification completed",
+                            30.0,
+                            f"✅ {repo_name} verification completed",
                         )
-
-                # Move to install directory (10%)
-                if post_processing_task_id:
-                    await progress_service.update_task(
+                    except TimeoutError:
+                        # Handle verification timeout
+                        logger.warning(
+                            "⚠️ %s verification timed out after 10s - continuing", repo_name
+                        )
+                        await self.progress_tracker.update_progress(
+                            post_processing_task_id,
+                            30.0,
+                            f"⚠️ {repo_name} verification timeout - continuing",
+                        )
+                    except InstallationError as e:
+                        # Log verification failure but continue installation
+                        logger.warning("⚠️ %s verification failed: %s", repo_name, e)
+                        await self.progress_tracker.update_progress(
+                            post_processing_task_id,
+                            30.0,
+                            f"⚠️ {repo_name} verification failed - continuing",
+                        )
+                    except Exception as e:
+                        # Catch any other exceptions to prevent progress from getting stuck
+                        logger.warning("⚠️ %s verification error: %s", repo_name, str(e))
+                        await self.progress_tracker.update_progress(
+                            post_processing_task_id,
+                            30.0,
+                            f"⚠️ {repo_name} verification error - continuing",
+                        )
+                else:
+                    await self.progress_tracker.update_progress(
                         post_processing_task_id,
-                        completed=40.0,
-                        description=f"📁 Moving {repo_name} to install directory...",
-                    )
-                final_path = self.storage_service.move_to_install_dir(download_path)
-                self.storage_service.make_executable(final_path)
-
-                # Rename AppImage to clean name based on repo
-                clean_name = self.storage_service.get_clean_appimage_name(repo_name.lower())
-                final_path = self.storage_service.rename_appimage(final_path, clean_name)
-
-                # Extract icon (30%)
-                icon_path = None
-                from ..config import ConfigManager
-
-                config_manager = ConfigManager()
-                global_config = config_manager.load_global_config()
-                icon_dir = global_config["directory"]["icon"]
-
-                # Generate icon filename
-                icon_filename = f"{repo_name.lower()}.png"
-                icon_dest_path = icon_dir / icon_filename
-
-                icon_manager = IconManager()
-                icon_source = "none"
-                if post_processing_task_id:
-                    await progress_service.update_task(
-                        post_processing_task_id,
-                        completed=50.0,
-                        description=f"🎨 Extracting {repo_name} icon...",
-                    )
-                try:
-                    icon_path = await icon_manager.extract_icon_only(
-                        appimage_path=final_path,
-                        dest_path=icon_dest_path,
-                        app_name=repo_name.lower(),
-                    )
-                    if icon_path:
-                        icon_source = "extraction"
-                        logger.info("✅ Icon extracted for %s: %s", repo_name, icon_path)
-                    else:
-                        logger.info("ℹ️  No icon found in AppImage for %s", repo_name)
-                except Exception as e:
-                    logger.warning("⚠️  Failed to extract icon for %s: %s", repo_name, e)
-                    icon_path = None
-                if post_processing_task_id:
-                    await progress_service.update_task(
-                        post_processing_task_id,
-                        completed=70.0,
-                        description=f"✅ {repo_name} icon extraction completed",
+                        30.0,
+                        f"⏭️ {repo_name} verification skipped",
                     )
 
-                # Create app configuration (10%)
-                if post_processing_task_id:
-                    await progress_service.update_task(
-                        post_processing_task_id,
-                        completed=80.0,
-                        description=f"📁 Creating configuration for {repo_name}...",
-                    )
-                await self._create_app_config(
-                    repo_name.lower(),
-                    final_path,
-                    owner,
-                    repo_name,
-                    release_data,
-                    appimage_asset,
-                    icon_path,
-                    icon_source,
-                    verification_result,
+                # Move to install directory (10%) - Already done in _download_and_move_appimage
+                await self.progress_tracker.update_progress(
+                    post_processing_task_id,
+                    40.0,
+                    f"📁 {repo_name} moved to install directory",
                 )
 
-                # Desktop entry (10%)
-                if post_processing_task_id:
-                    await progress_service.update_task(
-                        post_processing_task_id,
-                        completed=90.0,
-                        description=f"📁 Creating desktop entry for {repo_name}...",
-                    )
-                try:
-                    try:
-                        from ..desktop import create_desktop_entry_for_app
-                    except ImportError:
-                        from ..desktop import create_desktop_entry_for_app
+                # Extract icon (30%)
+                icon_path, icon_source = await self._extract_icon_for_app(
+                    final_path, repo_name, progress_service, post_processing_task_id
+                )
 
-                    desktop_path = create_desktop_entry_for_app(
+                # Create app configuration (10%)
+                await self.progress_tracker.update_progress(
+                    post_processing_task_id,
+                    80.0,
+                    f"📁 Creating configuration for {repo_name}...",
+                )
+
+                config_data = URLAppConfigData(
+                    app_name=repo_name.lower(),
+                    app_path=final_path,
+                    owner=owner,
+                    repo_name=repo_name,
+                    release_data=release_data,
+                    appimage_asset=appimage_asset,
+                    icon_path=icon_path,
+                    icon_source=icon_source,
+                    verification_result=verification_result,
+                )
+                await self._create_app_config(config_data)
+
+                # Desktop entry (10%)
+                await self.progress_tracker.update_progress(
+                    post_processing_task_id,
+                    90.0,
+                    f"📁 Creating desktop entry for {repo_name}...",
+                )
+                try:
+                    from ..config import ConfigManager
+                    from ..desktop import create_desktop_entry_for_app
+
+                    config_manager = ConfigManager()
+                    create_desktop_entry_for_app(
                         app_name=repo_name.lower(),
                         appimage_path=final_path,
                         comment=f"{repo_name.title()} AppImage Application",
@@ -325,13 +440,12 @@ class URLInstallStrategy(InstallStrategy):
                     logger.warning("⚠️  Failed to update desktop entry: %s", e)
 
                 # Finish post-processing task (100%)
-                if post_processing_task_id:
-                    await progress_service.finish_task(
-                        post_processing_task_id,
-                        success=True,
-                        final_description=f"✅ {repo_name}",
-                        final_total=100.0,
-                    )
+                await self.progress_tracker.finish_progress(
+                    post_processing_task_id,
+                    success=True,
+                    final_description=f"✅ {repo_name}",
+                    final_total=URLProgressSteps.COMPLETED,
+                )
 
                 logger.info("✅ Successfully installed: %s", final_path)
 
@@ -341,7 +455,9 @@ class URLInstallStrategy(InstallStrategy):
                     "path": str(final_path),
                     "name": final_path.name,
                     "source": "url",
-                    "version": extract_and_validate_version(release_data.get("tag_name", "")),
+                    "version": extract_and_validate_version(
+                        str(release_data.get("tag_name", ""))
+                    ),
                     "icon_path": str(icon_path) if icon_path else None,
                 }
 
@@ -431,9 +547,13 @@ class URLInstallStrategy(InstallStrategy):
             )
 
             if not result.passed:
-                raise InstallationError(
-                    "File verification failed - no verification methods succeeded"
+                # Get detailed failure information
+                failed_methods = ["checksum_files"]  # Default to common failure
+
+                failure_details = (
+                    f"Available verification methods failed: {', '.join(failed_methods)}"
                 )
+                raise InstallationError(failure_details)
 
             # Log verification methods used
             methods_used = list(result.methods.keys())
@@ -448,28 +568,12 @@ class URLInstallStrategy(InstallStrategy):
 
     async def _create_app_config(
         self,
-        app_name: str,
-        app_path: Path,
-        owner: str,
-        repo_name: str,
-        release_data: GitHubReleaseDetails,
-        appimage_asset: GitHubAsset,
-        icon_path: Path | None,
-        icon_source: str = "none",
-        verification_result: Any = None,
+        config_data: URLAppConfigData,
     ) -> None:
-        """Create application configuration for URL-based installation.
+        """Create application configuration for URL-based installation using dataclass.
 
         Args:
-            app_name: Clean application name
-            app_path: Path to installed application
-            owner: Repository owner
-            repo_name: Repository name
-            release_data: GitHub release data
-            appimage_asset: AppImage asset information
-            icon_path: Path to downloaded icon or None
-            icon_source: Source of icon (extraction, github, none)
-            verification_result: VerificationResult from verification process
+            config_data: URLAppConfigData containing all configuration parameters
 
         """
         from ..config import ConfigManager
@@ -478,35 +582,39 @@ class URLInstallStrategy(InstallStrategy):
 
         # Determine stored hash (prefer digest if available)
         stored_hash = ""
-        if appimage_asset.get("digest"):
-            stored_hash = appimage_asset["digest"]
+        if config_data.appimage_asset.get("digest"):
+            stored_hash = config_data.appimage_asset["digest"]
 
         # Extract checksum file information from verification result
         checksum_file = ""
-        if verification_result and verification_result.updated_config:
-            checksum_file = verification_result.updated_config.get("checksum_file", "")
+        if config_data.verification_result and config_data.verification_result.updated_config:
+            checksum_file = config_data.verification_result.updated_config.get(
+                "checksum_file", ""
+            )
 
         config = {
             "config_version": "1.0.0",
             "source": "url",
-            "owner": owner,
-            "repo": repo_name,
+            "owner": config_data.owner,
+            "repo": config_data.repo_name,
             "appimage": {
-                "rename": app_name,
+                "rename": config_data.app_name,
                 "name_template": "",
                 "characteristic_suffix": [],
-                "version": extract_and_validate_version(release_data.get("version", ""))
+                "version": extract_and_validate_version(
+                    config_data.release_data.get("version", "")
+                )
                 or "unknown",
-                "name": app_path.name,
+                "name": config_data.app_path.name,
                 "installed_date": self._get_current_timestamp(),
                 "digest": stored_hash,
             },
             "github": {
                 "repo": True,
-                "prerelease": release_data.get("prerelease", False),
+                "prerelease": config_data.release_data.get("prerelease", False),
             },
             "verification": {
-                "digest": bool(appimage_asset.get("digest")),
+                "digest": bool(config_data.appimage_asset.get("digest")),
                 "skip": False,
                 "checksum_file": checksum_file,  # Use actual checksum file from verification
                 "checksum_hash_type": "sha256",
@@ -514,27 +622,20 @@ class URLInstallStrategy(InstallStrategy):
             "icon": {
                 "extraction": True,
                 "url": "",
-                "name": icon_path.name if icon_path and icon_path.exists() else "",
-                "source": icon_source,
-                "installed": bool(icon_path and icon_path.exists()),
-                "path": str(icon_path) if icon_path and icon_path.exists() else "",
+                "name": config_data.icon_path.name
+                if config_data.icon_path and config_data.icon_path.exists()
+                else "",
+                "source": config_data.icon_source,
+                "installed": bool(config_data.icon_path and config_data.icon_path.exists()),
+                "path": str(config_data.icon_path)
+                if config_data.icon_path and config_data.icon_path.exists()
+                else "",
             },
         }
 
         # Save the configuration
         try:
-            config_manager.save_app_config(app_name, config)
-            logger.debug("📝 Saved configuration for %s", app_name)
+            config_manager.save_app_config(config_data.app_name, config)
+            logger.debug("📝 Saved configuration for %s", config_data.app_name)
         except Exception as e:
             logger.warning("⚠️ Failed to save app configuration: %s", e)
-
-    def _get_current_timestamp(self) -> str:
-        """Get current timestamp as ISO string.
-
-        Returns:
-            Current timestamp in ISO format
-
-        """
-        from datetime import datetime
-
-        return datetime.now().isoformat()

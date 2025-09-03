@@ -2,13 +2,15 @@
 
 import tempfile
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
 
+from my_unicorn.github_client import GitHubAsset
 from my_unicorn.strategies.install import InstallationError, ValidationError
-from my_unicorn.strategies.install_catalog import CatalogInstallStrategy
+from my_unicorn.strategies.install_catalog import CatalogInstallStrategy, InstallationContext
 
 
 @pytest.fixture
@@ -166,36 +168,94 @@ class TestCatalogInstallVerification:
 
         return strategy
 
+    def _create_installation_context(
+        self,
+        app_name: str = "test-app",
+        download_path: Path | None = None,
+        app_config: dict[str, Any] | None = None,
+        release_data: dict[str, Any] | None = None,
+        appimage_asset: dict[str, Any] | None = None,
+    ) -> InstallationContext:
+        """Create InstallationContext for tests."""
+        if download_path is None:
+            download_path = Path("/tmp/test.AppImage")
+
+        if app_config is None:
+            app_config = {
+                "owner": "test-owner",
+                "repo": "test-repo",
+                "verification": {
+                    "digest": False,
+                    "skip": True,
+                    "checksum_file": "",
+                    "checksum_hash_type": "sha256",
+                },
+            }
+
+        if release_data is None:
+            release_data = {"tag_name": "v1.0.0", "original_tag_name": "v1.0.0"}
+
+        if appimage_asset is None:
+            appimage_asset = {
+                "name": "test.AppImage",
+                "digest": "sha256:good_digest",
+                "size": 1024,
+                "browser_download_url": "https://example.com/test.AppImage",
+            }
+
+        # Cast the dict to GitHubAsset since it matches the required fields
+        typed_asset: GitHubAsset = appimage_asset  # type: ignore
+
+        return InstallationContext(
+            app_name=app_name,
+            app_config=app_config,
+            release_data=release_data,
+            appimage_asset=typed_asset,
+            download_path=download_path,
+            post_processing_task_id=None,
+        )
+
     @pytest.mark.asyncio
     async def test_perform_verification_skip_true_with_digest_available(
         self, catalog_strategy_with_mocks, mock_verifier, mock_download_service
     ):
         """Test skip=true with digest available should use digest and update config."""
-        # Setup
-        verification_config = {
-            "digest": False,  # Catalog says don't use digest
-            "skip": True,  # Catalog says skip
-            "checksum_file": "",
-            "checksum_hash_type": "sha256",
-        }
-        asset = {
-            "digest": "sha256:good_digest",
-            "size": 1024,
-        }
-
         with tempfile.NamedTemporaryFile() as tmp_file:
             # Write some content to avoid zero-size file issues
             tmp_file.write(b"test content for verification")
             tmp_file.flush()
-            path = Path(tmp_file.name)
+            download_path = Path(tmp_file.name)
+
+            # Setup context with specific verification config and asset
+            app_config = {
+                "owner": "test-owner",
+                "repo": "test-repo",
+                "verification": {
+                    "digest": False,  # Catalog says don't use digest
+                    "skip": True,  # Catalog says skip
+                    "checksum_file": "",
+                    "checksum_hash_type": "sha256",
+                },
+            }
+
+            appimage_asset = {
+                "name": "test.AppImage",
+                "digest": "sha256:good_digest",
+                "size": 1024,
+                "browser_download_url": "https://example.com/test.AppImage",
+            }
+
+            context = self._create_installation_context(
+                download_path=download_path,
+                app_config=app_config,
+                appimage_asset=appimage_asset,
+            )
 
             with patch(
                 "my_unicorn.services.verification_service.Verifier", return_value=mock_verifier
             ):
                 # Test
-                result = await catalog_strategy_with_mocks._perform_verification(
-                    path, asset, {"verification": verification_config}, {"tag_name": "v1.0.0"}
-                )
+                result = await catalog_strategy_with_mocks._perform_verification(context)
 
                 # Verify digest verification was called
                 mock_verifier.verify_digest.assert_called_once_with("sha256:good_digest")
@@ -210,23 +270,36 @@ class TestCatalogInstallVerification:
         self, catalog_strategy_with_mocks, mock_verifier, mock_download_service
     ):
         """Test skip=true with checksum file available should use checksum and update config."""
-        # Setup
-        verification_config = {
-            "digest": False,
-            "skip": True,
-            "checksum_file": "SHA256SUMS",
-            "checksum_hash_type": "sha256",
-        }
-        asset = {
-            "digest": "",  # No digest
-            "size": 1024,
-        }
-
         with tempfile.NamedTemporaryFile() as tmp_file:
             # Write some content to avoid zero-size file issues
             tmp_file.write(b"test content for verification")
             tmp_file.flush()
-            path = Path(tmp_file.name)
+            download_path = Path(tmp_file.name)
+
+            # Setup context
+            app_config = {
+                "owner": "test",
+                "repo": "test",
+                "verification": {
+                    "digest": False,
+                    "skip": True,
+                    "checksum_file": "SHA256SUMS",
+                    "checksum_hash_type": "sha256",
+                },
+            }
+
+            appimage_asset = {
+                "name": "test.AppImage",
+                "digest": "",  # No digest
+                "size": 1024,
+                "browser_download_url": "https://example.com/test.AppImage",
+            }
+
+            context = self._create_installation_context(
+                download_path=download_path,
+                app_config=app_config,
+                appimage_asset=appimage_asset,
+            )
 
             # Mock the verification service's verify_file method
             from my_unicorn.services.verification_service import VerificationResult
@@ -246,12 +319,7 @@ class TestCatalogInstallVerification:
                 catalog_strategy_with_mocks.download_service = mock_download_service
 
                 # Test
-                result = await catalog_strategy_with_mocks._perform_verification(
-                    path,
-                    asset,
-                    {"verification": verification_config, "owner": "test", "repo": "test"},
-                    {"tag_name": "v1.0.0"},
-                )
+                result = await catalog_strategy_with_mocks._perform_verification(context)
 
                 # Verify config was updated
                 assert result["updated_config"]["skip"] is False
@@ -262,31 +330,42 @@ class TestCatalogInstallVerification:
         self, catalog_strategy_with_mocks, mock_verifier
     ):
         """Test skip=true with no strong verification methods should actually skip."""
-        # Setup
-        verification_config = {
-            "digest": False,
-            "skip": True,
-            "checksum_file": "",
-            "checksum_hash_type": "sha256",
-        }
-        asset = {
-            "digest": "",  # No digest
-            "size": 1024,
-        }
-
         with tempfile.NamedTemporaryFile() as tmp_file:
             # Write some content to avoid zero-size file issues
             tmp_file.write(b"test content for verification")
             tmp_file.flush()
-            path = Path(tmp_file.name)
+            download_path = Path(tmp_file.name)
+
+            # Setup context
+            app_config = {
+                "owner": "test",
+                "repo": "test",
+                "verification": {
+                    "digest": False,
+                    "skip": True,
+                    "checksum_file": "",
+                    "checksum_hash_type": "sha256",
+                },
+            }
+
+            appimage_asset = {
+                "name": "test.AppImage",
+                "digest": "",  # No digest
+                "size": 1024,
+                "browser_download_url": "https://example.com/test.AppImage",
+            }
+
+            context = self._create_installation_context(
+                download_path=download_path,
+                app_config=app_config,
+                appimage_asset=appimage_asset,
+            )
 
             with patch(
                 "my_unicorn.services.verification_service.Verifier", return_value=mock_verifier
             ):
                 # Test
-                result = await catalog_strategy_with_mocks._perform_verification(
-                    path, asset, {"verification": verification_config}, {"tag_name": "v1.0.0"}
-                )
+                result = await catalog_strategy_with_mocks._perform_verification(context)
 
                 # Verify no verification methods were called
                 mock_verifier.verify_digest.assert_not_called()
@@ -301,31 +380,42 @@ class TestCatalogInstallVerification:
         self, catalog_strategy_with_mocks, mock_verifier, mock_download_service
     ):
         """Test skip=false with digest available should use digest."""
-        # Setup
-        verification_config = {
-            "digest": True,
-            "skip": False,
-            "checksum_file": "",
-            "checksum_hash_type": "sha256",
-        }
-        asset = {
-            "digest": "sha256:good_digest",
-            "size": 1024,
-        }
-
         with tempfile.NamedTemporaryFile() as tmp_file:
             # Write some content to avoid zero-size file issues
             tmp_file.write(b"test content for verification")
             tmp_file.flush()
-            path = Path(tmp_file.name)
+            download_path = Path(tmp_file.name)
+
+            # Setup context
+            app_config = {
+                "owner": "test",
+                "repo": "test",
+                "verification": {
+                    "digest": True,
+                    "skip": False,
+                    "checksum_file": "",
+                    "checksum_hash_type": "sha256",
+                },
+            }
+
+            appimage_asset = {
+                "name": "test.AppImage",
+                "digest": "sha256:good_digest",
+                "size": 1024,
+                "browser_download_url": "https://example.com/test.AppImage",
+            }
+
+            context = self._create_installation_context(
+                download_path=download_path,
+                app_config=app_config,
+                appimage_asset=appimage_asset,
+            )
 
             with patch(
                 "my_unicorn.services.verification_service.Verifier", return_value=mock_verifier
             ):
                 # Test
-                result = await catalog_strategy_with_mocks._perform_verification(
-                    path, asset, {"verification": verification_config}, {"tag_name": "v1.0.0"}
-                )
+                result = await catalog_strategy_with_mocks._perform_verification(context)
 
                 # Verify digest verification was called
                 mock_verifier.verify_digest.assert_called_once_with("sha256:good_digest")
@@ -338,23 +428,36 @@ class TestCatalogInstallVerification:
         self, catalog_strategy_with_mocks, mock_verifier, mock_download_service
     ):
         """Test digest failure falls back to checksum file verification."""
-        # Setup
-        verification_config = {
-            "digest": True,
-            "skip": False,
-            "checksum_file": "SHA256SUMS",
-            "checksum_hash_type": "sha256",
-        }
-        asset = {
-            "digest": "sha256:bad_digest",
-            "size": 1024,
-        }
-
         with tempfile.NamedTemporaryFile() as tmp_file:
             # Write some content to avoid zero-size file issues
             tmp_file.write(b"test content for verification")
             tmp_file.flush()
-            path = Path(tmp_file.name)
+            download_path = Path(tmp_file.name)
+
+            # Setup context
+            app_config = {
+                "owner": "test",
+                "repo": "test",
+                "verification": {
+                    "digest": True,
+                    "skip": False,
+                    "checksum_file": "SHA256SUMS",
+                    "checksum_hash_type": "sha256",
+                },
+            }
+
+            appimage_asset = {
+                "name": "test.AppImage",
+                "digest": "sha256:bad_digest",
+                "size": 1024,
+                "browser_download_url": "https://example.com/test.AppImage",
+            }
+
+            context = self._create_installation_context(
+                download_path=download_path,
+                app_config=app_config,
+                appimage_asset=appimage_asset,
+            )
 
             # Mock verification service to simulate digest failure but checksum success
             from my_unicorn.services.verification_service import VerificationResult
@@ -374,12 +477,7 @@ class TestCatalogInstallVerification:
                 catalog_strategy_with_mocks.download_service = mock_download_service
 
                 # Test
-                result = await catalog_strategy_with_mocks._perform_verification(
-                    path,
-                    asset,
-                    {"verification": verification_config, "owner": "test", "repo": "test"},
-                    {"tag_name": "v1.0.0"},
-                )
+                result = await catalog_strategy_with_mocks._perform_verification(context)
 
                 # Verify fallback worked
                 assert "checksum_file" in result["successful_methods"]
@@ -389,27 +487,40 @@ class TestCatalogInstallVerification:
         self, catalog_strategy_with_mocks, mock_verifier, mock_download_service
     ):
         """Test all verification methods failing raises InstallationError."""
-        # Setup
-        verification_config = {
-            "digest": True,
-            "skip": False,
-            "checksum_file": "SHA256SUMS",
-            "checksum_hash_type": "sha256",
-        }
-        asset = {
-            "digest": "sha256:bad_digest",
-            "size": 1024,
-        }
-
-        # Make all verifications fail
-        mock_verifier.verify_digest.side_effect = ValueError("Digest failed")
-        mock_verifier.verify_from_checksum_file.side_effect = ValueError("Checksum failed")
-
         with tempfile.NamedTemporaryFile() as tmp_file:
             # Write some content to avoid zero-size file issues
             tmp_file.write(b"test content for verification")
             tmp_file.flush()
-            path = Path(tmp_file.name)
+            download_path = Path(tmp_file.name)
+
+            # Setup context
+            app_config = {
+                "owner": "test",
+                "repo": "test",
+                "verification": {
+                    "digest": True,
+                    "skip": False,
+                    "checksum_file": "SHA256SUMS",
+                    "checksum_hash_type": "sha256",
+                },
+            }
+
+            appimage_asset = {
+                "name": "test.AppImage",
+                "digest": "sha256:bad_digest",
+                "size": 1024,
+                "browser_download_url": "https://example.com/test.AppImage",
+            }
+
+            context = self._create_installation_context(
+                download_path=download_path,
+                app_config=app_config,
+                appimage_asset=appimage_asset,
+            )
+
+            # Make all verifications fail
+            mock_verifier.verify_digest.side_effect = ValueError("Digest failed")
+            mock_verifier.verify_from_checksum_file.side_effect = ValueError("Checksum failed")
 
             with patch(
                 "my_unicorn.services.verification_service.Verifier", return_value=mock_verifier
@@ -420,12 +531,7 @@ class TestCatalogInstallVerification:
                 with pytest.raises(
                     InstallationError, match="Available verification methods failed"
                 ):
-                    await catalog_strategy_with_mocks._perform_verification(
-                        path,
-                        asset,
-                        {"verification": verification_config, "owner": "test", "repo": "test"},
-                        {"tag_name": "v1.0.0"},
-                    )
+                    await catalog_strategy_with_mocks._perform_verification(context)
 
     def test_get_updated_verification_config_with_successful_methods(
         self, catalog_strategy_with_mocks
@@ -521,9 +627,11 @@ class TestCatalogInstallVerification:
             },
         }
 
-        asset = {
+        appimage_asset = {
+            "name": "test.AppImage",
             "digest": "sha256:discovered_digest",  # New digest from GitHub API
             "size": 2048,
+            "browser_download_url": "https://example.com/test.AppImage",
         }
 
         release_data = {"tag_name": "v2.0.0", "original_tag_name": "v2.0.0"}
@@ -538,26 +646,40 @@ class TestCatalogInstallVerification:
             # Write some content to avoid zero-size file issues
             tmp_file.write(b"test content for verification")
             tmp_file.flush()
-            path = Path(tmp_file.name)
+            download_path = Path(tmp_file.name)
+
+            context = self._create_installation_context(
+                download_path=download_path,
+                app_config=app_config,
+                appimage_asset=appimage_asset,
+                release_data=release_data,
+            )
 
             with patch(
                 "my_unicorn.services.verification_service.Verifier", return_value=mock_verifier
             ):
                 # Test verification method
                 verification_result = await catalog_strategy_with_mocks._perform_verification(
-                    path, asset, app_config, release_data
+                    context
                 )
 
                 # Test config creation with verification updates
-                catalog_strategy_with_mocks._create_app_config(
-                    "test_app",
-                    path,
-                    app_config,
-                    release_data,
-                    Path("/fake/icons"),
-                    asset,
-                    verification_result,
+                from my_unicorn.strategies.install_catalog import AppConfigData
+
+                # Cast the dict to GitHubAsset since it matches the required fields
+                typed_appimage_asset: GitHubAsset = appimage_asset  # type: ignore
+
+                config_data = AppConfigData(
+                    app_name="test_app",
+                    app_path=download_path,
+                    catalog_config=app_config,
+                    release_data=release_data,
+                    icon_dir=Path("/fake/icons"),
+                    appimage_asset=typed_appimage_asset,
+                    verification_result=verification_result,
                 )
+
+                catalog_strategy_with_mocks._create_app_config(config_data)
 
                 # Verify the complete flow worked correctly
                 assert mock_verifier.verify_digest.called
@@ -589,9 +711,11 @@ class TestCatalogInstallVerification:
             },
         }
 
-        asset = {
+        appimage_asset = {
+            "name": "test.AppImage",
             "digest": "sha256:bad_digest",  # Will fail verification
             "size": 2048,
+            "browser_download_url": "https://example.com/test.AppImage",
         }
 
         release_data = {"tag_name": "v2.0.0", "original_tag_name": "v2.0.0"}
@@ -600,7 +724,14 @@ class TestCatalogInstallVerification:
             # Write some content to avoid zero-size file issues
             tmp_file.write(b"test content for verification")
             tmp_file.flush()
-            path = Path(tmp_file.name)
+            download_path = Path(tmp_file.name)
+
+            context = self._create_installation_context(
+                download_path=download_path,
+                app_config=app_config,
+                appimage_asset=appimage_asset,
+                release_data=release_data,
+            )
 
             # Mock verification service to return successful checksum verification
             from my_unicorn.services.verification_service import VerificationResult
@@ -621,7 +752,7 @@ class TestCatalogInstallVerification:
 
                 # Test complete fallback chain
                 verification_result = await catalog_strategy_with_mocks._perform_verification(
-                    path, asset, app_config, release_data
+                    context
                 )
 
                 # Verify results show checksum success

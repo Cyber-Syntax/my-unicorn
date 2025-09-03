@@ -1,4 +1,4 @@
-"""Icon management system for AppImages 
+"""Icon management system for AppImages
 
 This module provides comprehensive icon handling by first attempting to extract
 icons directly from AppImage files.
@@ -399,9 +399,7 @@ class AppImageIconExtractor:
 class IconManager:
     """Manages icon acquisition from AppImages with GitHub fallback."""
 
-    def __init__(
-        self, enable_extraction: bool = True
-    ) -> None:
+    def __init__(self, enable_extraction: bool = True) -> None:
         """Initialize icon manager.
 
         Args:
