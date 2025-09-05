@@ -1,18 +1,25 @@
+"""Tests for the logger module."""
+
 import logging
+import logging.handlers
 from unittest.mock import patch
 
 import pytest
 
-from my_unicorn.logger import ColoredFormatter, MyUnicornLogger, get_logger
+from my_unicorn.logger import ColoredFormatter, MyUnicornLogger, get_logger, clear_logger_state
 
 
 @pytest.fixture
 def logger_name():
+    """Return test logger name."""
     return "test-logger"
 
 
 @pytest.fixture
 def logger_instance(logger_name):
+    """Create a fresh logger instance for testing."""
+    # Clear any existing state first
+    clear_logger_state()
     # Always create a fresh logger for isolation
     return MyUnicornLogger(logger_name)
 
