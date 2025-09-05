@@ -487,7 +487,7 @@ class TestUpdateManager:
                 )
                 mock_status.return_value.__exit__ = MagicMock(return_value=None)
 
-                result = await update_manager.check_all_updates_with_status_spinner()
+                result = await update_manager.check_all_updates_with_spinner()
 
                 assert len(result) == 1
                 assert result[0] == update_info

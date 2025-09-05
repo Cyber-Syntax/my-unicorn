@@ -4,9 +4,13 @@ This module provides functions for formatting and displaying update results
 in a consistent manner across all update strategies.
 """
 
+from typing import TYPE_CHECKING
+
 from ..logger import get_logger
-from ..update import UpdateInfo
-from .update import UpdateResult
+
+if TYPE_CHECKING:
+    from ..update import UpdateInfo
+    from .update import UpdateResult
 
 logger = get_logger(__name__)
 
@@ -15,7 +19,7 @@ class UpdateResultDisplay:
     """Utility class for displaying update results consistently."""
 
     @staticmethod
-    def display_summary(result: UpdateResult) -> None:
+    def display_summary(result: "UpdateResult") -> None:
         """Display a comprehensive summary of update results.
 
         Args:
@@ -32,7 +36,7 @@ class UpdateResultDisplay:
             UpdateResultDisplay._display_check_summary(result)
 
     @staticmethod
-    def _display_update_summary(result: UpdateResult) -> None:
+    def _display_update_summary(result: "UpdateResult") -> None:
         """Display summary for actual update operations.
 
         Args:
@@ -63,7 +67,7 @@ class UpdateResultDisplay:
             print(f"❌ {failed_count} app(s) failed to update")
 
     @staticmethod
-    def _display_check_summary(result: UpdateResult) -> None:
+    def _display_check_summary(result: "UpdateResult") -> None:
         """Display summary for check-only operations.
 
         Args:
@@ -87,7 +91,7 @@ class UpdateResultDisplay:
             print(f"\n{result.message}")
 
     @staticmethod
-    def display_detailed_results(result: UpdateResult) -> None:
+    def display_detailed_results(result: "UpdateResult") -> None:
         """Display detailed results including version information.
 
         Args:
@@ -109,7 +113,7 @@ class UpdateResultDisplay:
             print(f"{info.app_name:<20} {status:<20} {version_info:<25}")
 
     @staticmethod
-    def _get_app_status(info: UpdateInfo, result: UpdateResult) -> str:
+    def _get_app_status(info: "UpdateInfo", result: "UpdateResult") -> str:
         """Get the status string for an app.
 
         Args:
@@ -130,7 +134,7 @@ class UpdateResultDisplay:
             return "✅ Up to date"
 
     @staticmethod
-    def _format_version_info(info: UpdateInfo) -> str:
+    def _format_version_info(info: "UpdateInfo") -> str:
         """Format version information for display.
 
         Args:
@@ -151,7 +155,7 @@ class UpdateResultDisplay:
         return version_str
 
     @staticmethod
-    def _find_app_info(app_name: str, update_infos: list[UpdateInfo]) -> UpdateInfo | None:
+    def _find_app_info(app_name: str, update_infos: list["UpdateInfo"]) -> "UpdateInfo | None":
         """Find UpdateInfo for a specific app.
 
         Args:

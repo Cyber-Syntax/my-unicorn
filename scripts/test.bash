@@ -120,9 +120,9 @@ setup_tagspaces_config() {
 {
   "config_version": "1.0.0",
   "source": "catalog",
+  "owner": "tagspaces",
+  "repo": "tagspaces",
   "appimage": {
-    "version": "$version",
-    "name": "tagspaces.AppImage",
     "rename": "tagspaces",
     "name_template": "{repo}-{latest_version}-{characteristic_suffix}.AppImage",
     "characteristic_suffix": [
@@ -130,11 +130,11 @@ setup_tagspaces_config() {
       "x86_64",
       "amd64"
     ],
+    "version": "$version",
+    "name": "tagspaces.AppImage",
     "installed_date": "$(date --iso-8601=seconds)",
     "digest": ""
   },
-  "owner": "tagspaces",
-  "repo": "tagspaces",
   "github": {
     "repo": true,
     "prerelease": false
@@ -147,7 +147,7 @@ setup_tagspaces_config() {
   },
   "icon": {
     "extraction": true,
-    "url": "",
+    "url": null,
     "name": "tagspaces.png",
     "source": "extraction",
     "installed": true,
@@ -165,20 +165,20 @@ setup_qownnotes_config() {
 {
     "config_version": "1.0.0",
     "source": "catalog",
+    "owner": "pbek",
+    "repo": "QOwnNotes",
     "appimage": {
-        "version": "$version",
-        "name": "qownnotes.AppImage",
         "rename": "qownnotes",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": [
             "x86_64.AppImage",
             "x86_64-Qt6.AppImage"
         ],
+        "version": "$version",
+        "name": "qownnotes.AppImage",
         "installed_date": "$(date --iso-8601=seconds)",
         "digest": ""
     },
-    "owner": "pbek",
-    "repo": "QOwnNotes",
     "github": {
         "repo": true,
         "prerelease": false
@@ -194,7 +194,8 @@ setup_qownnotes_config() {
         "url": "https://raw.githubusercontent.com/pbek/QOwnNotes/develop/icons/icon.png",
         "name": "qownnotes.png",
         "source": "extraction",
-        "installed": false
+        "installed": true,
+        "path": "/home/developer/Applications/icons/qownnotes.png"
     }
 }
 EOF
@@ -208,17 +209,17 @@ setup_nuclear_config() {
 {
     "config_version": "1.0.0",
     "source": "url",
+    "owner": "nukeop",
+    "repo": "nuclear",
     "appimage": {
-        "version": "$version",
-        "name": "nuclear.AppImage",
         "rename": "nuclear",
         "name_template": "",
         "characteristic_suffix": [],
+        "version": "$version",
+        "name": "nuclear.AppImage",
         "installed_date": "$(date --iso-8601=seconds)",
         "digest": ""
     },
-    "owner": "nukeop",
-    "repo": "nuclear",
     "github": {
         "repo": true,
         "prerelease": false
@@ -231,10 +232,14 @@ setup_nuclear_config() {
     },
     "icon": {
         "extraction": true,
-        "url": "",
+        "url": null,
         "name": "nuclear.png",
         "source": "extraction",
-        "installed": false
+        "installed": true,
+        "path": "/home/developer/Applications/icons/nuclear.png"
+    },
+    "url_metadata": {
+        "target_url": "https://github.com/nukeop/nuclear"
     }
 }
 EOF
@@ -248,17 +253,17 @@ setup_keepassxc_config() {
 {
     "config_version": "1.0.0",
     "source": "url",
+    "owner": "keepassxreboot",
+    "repo": "keepassxc",
     "appimage": {
-        "version": "$version",
-        "name": "keepassxc.AppImage",
         "rename": "keepassxc",
         "name_template": "",
         "characteristic_suffix": [],
+        "version": "$version",
+        "name": "keepassxc.AppImage",
         "installed_date": "$(date --iso-8601=seconds)",
         "digest": ""
     },
-    "owner": "keepassxreboot",
-    "repo": "keepassxc",
     "github": {
         "repo": true,
         "prerelease": false
@@ -271,10 +276,14 @@ setup_keepassxc_config() {
     },
     "icon": {
         "extraction": true,
-        "url": "",
+        "url": null,
         "name": "keepassxc.png",
         "source": "extraction",
-        "installed": false
+        "installed": true,
+        "path": "/home/developer/Applications/icons/keepassxc.png"
+    },
+    "url_metadata": {
+        "target_url": "https://github.com/keepassxreboot/keepassxc"
     }
 }
 EOF
@@ -288,19 +297,19 @@ setup_appflowy_config() {
 {
     "config_version": "1.0.0",
     "source": "catalog",
+    "owner": "appflowy-io",
+    "repo": "appflowy",
     "appimage": {
-        "version": "$version",
-        "name": "appflowy.AppImage",
         "rename": "appflowy",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": [
             "linux-x86_64.AppImage"
         ],
+        "version": "$version",
+        "name": "appflowy.AppImage",
         "installed_date": "$(date --iso-8601=seconds)",
         "digest": ""
     },
-    "owner": "appflowy-io",
-    "repo": "appflowy",
     "github": {
         "repo": true,
         "prerelease": false
@@ -313,10 +322,11 @@ setup_appflowy_config() {
     },
     "icon": {
         "extraction": true,
-        "url": "",
+        "url": null,
         "name": "appflowy.png",
         "source": "extraction",
-        "installed": false
+        "installed": true,
+        "path": "/home/developer/Applications/icons/appflowy.png"
     }
 }
 EOF
@@ -330,19 +340,19 @@ setup_legcord_config() {
 {
     "config_version": "1.0.0",
     "source": "catalog",
+    "owner": "legcord",
+    "repo": "legcord",
     "appimage": {
-        "version": "$version",
-        "name": "legcord.AppImage",
         "rename": "legcord",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": [
             ".AppImage"
         ],
+        "version": "$version",
+        "name": "legcord.AppImage",
         "installed_date": "$(date --iso-8601=seconds)",
         "digest": ""
     },
-    "owner": "legcord",
-    "repo": "legcord",
     "github": {
         "repo": true,
         "prerelease": false
@@ -355,10 +365,11 @@ setup_legcord_config() {
     },
     "icon": {
         "extraction": true,
-        "url": "",
+        "url": null,
         "name": "legcord.png",
         "source": "extraction",
-        "installed": false
+        "installed": true,
+        "path": "/home/developer/Applications/icons/legcord.png"
     }
 }
 EOF
@@ -372,19 +383,19 @@ setup_joplin_config() {
 {
     "config_version": "1.0.0",
     "source": "catalog",
+    "owner": "laurent22",
+    "repo": "joplin",
     "appimage": {
-        "version": "$version",
-        "name": "joplin.AppImage",
         "rename": "joplin",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": [
             ".AppImage"
         ],
+        "version": "$version",
+        "name": "joplin.AppImage",
         "installed_date": "$(date --iso-8601=seconds)",
         "digest": ""
     },
-    "owner": "laurent22",
-    "repo": "joplin",
     "github": {
         "repo": true,
         "prerelease": false
@@ -397,10 +408,11 @@ setup_joplin_config() {
     },
     "icon": {
         "extraction": true,
-        "url": "",
+        "url": null,
         "name": "joplin.png",
         "source": "extraction",
-        "installed": false
+        "installed": true,
+        "path": "/home/developer/Applications/icons/joplin.png"
     }
 }
 EOF
