@@ -141,12 +141,28 @@ class InstallTemplate(ABC):
                 verified_result = await self._verify_appimage(
                     downloaded_path, context, **kwargs
                 )
+
+                # Check if verification failed and abort installation
+                if verified_result is None or not verified_result.get("passed", True):
+                    error_msg = (
+                        verified_result.get("error", "Verification failed")
+                        if verified_result
+                        else "Verification failed"
+                    )
+                    raise InstallationError(
+                        f"Available verification methods failed: {error_msg}"
+                    )
+
                 final_path = await self._move_to_install_directory(
                     downloaded_path, context, **kwargs
                 )
                 icon_result = await self._extract_icon(final_path, context, **kwargs)
                 config_result = await self._create_app_configuration(
-                    final_path, context, icon_result, verification_result=verified_result, **kwargs
+                    final_path,
+                    context,
+                    icon_result,
+                    verification_result=verified_result,
+                    **kwargs,
                 )
                 desktop_result = await self._create_desktop_entry(
                     final_path, context, config_result, **kwargs
@@ -251,12 +267,12 @@ class InstallTemplate(ABC):
             # URL context
             owner = context.owner
             repo = context.repo_name
-            tag_name = getattr(context, "release_data", {}).get("tag_name", "unknown")
+            tag_name = getattr(context, "release_data", {}).get("original_tag_name", "unknown")
         elif hasattr(context, "app_config"):
             # Catalog context
             owner = context.app_config.get("owner", "unknown")
             repo = context.app_config.get("repo", "unknown")
-            tag_name = getattr(context, "release_data", {}).get("tag_name", "unknown")
+            tag_name = getattr(context, "release_data", {}).get("original_tag_name", "unknown")
         else:
             # Fallback - skip verification if we don't have enough info
             logger.warning("Skipping verification for %s: insufficient context", app_name)
