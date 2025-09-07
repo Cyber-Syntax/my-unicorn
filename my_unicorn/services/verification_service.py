@@ -34,6 +34,8 @@ class VerificationResult:
     updated_config: dict[str, Any]
 
 
+# TODO: might be better to make this as a factory or facade
+# and delegate verification logic to specific strategy classes
 class VerificationService:
     """Shared service for file verification with multiple methods."""
 
@@ -52,6 +54,7 @@ class VerificationService:
         self.download_service = download_service
         self.progress_service = progress_service
 
+    # FIXME: too many arguments
     def _detect_available_methods(
         self,
         asset: dict[str, Any],
@@ -283,7 +286,7 @@ class VerificationService:
 
             # Compute actual hash and compare
             computed_hash = verifier.compute_hash(hash_type)
-            logger.debug("   🧮 Computed hash (%s): %s", hash_type.upper(), computed_hash)
+            logger.debug("   🧮 Computied hash (%s): %s", hash_type.upper(), computed_hash)
 
             # Perform comparison
             hashes_match = computed_hash.lower() == expected_hash.lower()
@@ -333,33 +336,6 @@ class VerificationService:
                 "details": str(e),
             }
 
-    def _verify_file_size(
-        self,
-        verifier: Verifier,
-        expected_size: int | None,
-    ) -> dict[str, Any]:
-        """Perform file size verification.
-
-        Args:
-            verifier: Verifier instance
-            expected_size: Expected file size in bytes (can be None)
-
-        Returns:
-            Verification result dict
-
-        """
-        try:
-            file_size = verifier.get_file_size()
-            if expected_size is not None and expected_size > 0:
-                verifier.verify_size(expected_size)
-            return {
-                "passed": True,
-                "details": f"File size: {file_size:,} bytes",
-            }
-        except Exception as e:
-            logger.warning("⚠️  Size verification failed: %s", e)
-            return {"passed": False, "details": str(e)}
-
     def _build_checksum_url(
         self,
         owner: str,
@@ -383,6 +359,8 @@ class VerificationService:
             f"https://github.com/{owner}/{repo}/releases/download/{tag_name}/{checksum_file}"
         )
 
+    # TODO: Better to make a new class for prioritizing
+    # might be moveable to github client or a new class
     def _prioritize_checksum_files(
         self,
         checksum_files: list[ChecksumFileInfo],
@@ -473,6 +451,7 @@ class VerificationService:
 
         return prioritized
 
+    # FIXME: to many branches, statements, arguments
     async def verify_file(
         self,
         file_path: Path,
@@ -576,7 +555,6 @@ class VerificationService:
 
         # Try digest verification first if available
         if has_digest:
-            # FIXME: why is that not showed up on the logs?
             logger.debug("🔐 Digest verification available - attempting...")
             # Update progress - digest verification
             if progress_task_id and self.progress_service:
@@ -660,18 +638,6 @@ class VerificationService:
         else:
             logger.debug("ℹ️  No checksum files available for verification")
 
-        # Always perform basic file size verification
-        if progress_task_id and self.progress_service:
-            await self.progress_service.update_task(
-                progress_task_id,
-                completed=80.0,
-                description=f"🔍 Verifying file size for {app_name}...",
-            )
-
-        expected_size = asset.get("size")
-        size_result = self._verify_file_size(verifier, expected_size)
-        verification_methods["size"] = size_result
-
         # Determine overall verification result
         strong_methods_available = has_digest or has_checksum_files
 
@@ -693,16 +659,8 @@ class VerificationService:
                 f"Available verification methods failed: {', '.join(available_methods)}"
             )
 
-        # If no strong methods and size check failed, that's also an error
-        if not strong_methods_available and not size_result["passed"]:
-            raise Exception(
-                "File verification failed - no strong verification methods available and size check failed"
-            )
-
-        # Success if any strong method passed, or if no strong methods but size passed
-        overall_passed = verification_passed or (
-            not strong_methods_available and size_result["passed"]
-        )
+        # Success if any strong method passed
+        overall_passed = verification_passed
 
         # Log final verification summary
         logger.debug("📊 Verification summary for %s:", app_name)
@@ -710,10 +668,9 @@ class VerificationService:
         logger.debug("   ✅ Verification passed: %s", overall_passed)
         logger.debug("   📋 Methods used: %s", list(verification_methods.keys()))
         for method, result in verification_methods.items():
-            if method != "size":  # Size is always logged
-                logger.debug(
-                    "      %s: %s", method, "✅ PASS" if result.get("passed") else "❌ FAIL"
-                )
+            logger.debug(
+                "      %s: %s", method, "✅ PASS" if result.get("passed") else "❌ FAIL"
+            )
 
         # Update progress - verification completed (only finish task if we created it)
         if progress_task_id and self.progress_service and create_own_task:

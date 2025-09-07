@@ -4,15 +4,17 @@ This module provides various verification methods including digest verification,
 checksum file parsing, and hash computation for downloaded AppImages.
 """
 
+import base64
 import hashlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from .logger import get_logger
+from .utils import format_bytes
+
 if TYPE_CHECKING:
     from .download import DownloadService
 
-from .logger import get_logger
-from .utils import format_bytes
 
 # Try to import yaml for YAML checksum file support
 try:
@@ -23,13 +25,12 @@ except ImportError:
     yaml = None  # type: ignore
     _YAML_AVAILABLE = False
 
-# Import base64 for hash conversion
-import base64
 
 HashType = Literal["sha1", "sha256", "sha512", "md5"]
 logger = get_logger(__name__)
 
 
+#TODO: move the functions to their corresponding classes
 class Verifier:
     """Handles verification of downloaded AppImage files."""
 
@@ -471,6 +472,7 @@ class Verifier:
         parts = line.split(None, 1)
         return parts[0], parts[1].strip("*")
 
+    #TODO: is that necessary to make global func for private func?
     def detect_hash_type_from_filename(self, filename: str) -> HashType:
         """Detect hash type from checksum filename.
 
@@ -535,54 +537,3 @@ class Verifier:
         except Exception as e:
             logger.error("❌ Failed to convert Base64 hash to hex: %s", e)
             raise ValueError(f"Invalid Base64 hash: {base64_hash}") from e
-
-    def get_file_size(self) -> int:
-        """Get size of the file in bytes.
-
-        Returns:
-            File size in bytes
-
-        Raises:
-            FileNotFoundError: If file doesn't exist
-
-        """
-        if not self.file_path.exists():
-            raise FileNotFoundError(f"File not found: {self.file_path}")
-
-        return self.file_path.stat().st_size
-
-    def verify_size(self, expected_size: int) -> None:
-        """Verify file size matches expected size.
-
-        Args:
-            expected_size: Expected file size in bytes
-
-        Raises:
-            ValueError: If size doesn't match
-
-        """
-        logger.debug("🔍 Verifying file size for %s", self.file_path.name)
-        logger.debug(
-            "   Expected size: %s (%d bytes)",
-            format_bytes(expected_size),
-            expected_size,
-        )
-
-        actual_size = self.get_file_size()
-        logger.debug("   Actual size: %s (%d bytes)", format_bytes(actual_size), actual_size)
-
-        if actual_size != expected_size:
-            logger.error("❌ File size verification FAILED!")
-            logger.error(
-                "   Expected: %s (%d bytes)", format_bytes(expected_size), expected_size
-            )
-            logger.error("   Actual: %s (%d bytes)", format_bytes(actual_size), actual_size)
-            logger.error("   Difference: %+d bytes", actual_size - expected_size)
-            raise ValueError(
-                f"File size mismatch!\n"
-                f"Expected: {expected_size} bytes\n"
-                f"Actual:   {actual_size} bytes"
-            )
-
-        logger.debug("✅ File size verification PASSED!")
-        logger.debug("   Size: %s (%d bytes)", format_bytes(actual_size), actual_size)

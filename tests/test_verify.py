@@ -436,41 +436,6 @@ def test_parse_checksum_file_generic(tmp_path: Path, patch_logger):
     assert result == hashval
 
 
-def test_get_file_size(tmp_path: Path, patch_logger):
-    """Test Verifier.get_file_size returns correct size."""
-    file = tmp_path / "file.bin"
-    data = b"abcde"
-    file.write_bytes(data)
-    verifier = Verifier(file)
-    assert verifier.get_file_size() == len(data)
-
-
-def test_get_file_size_not_found(tmp_path: Path, patch_logger):
-    """Test Verifier.get_file_size raises if file missing."""
-    file = tmp_path / "nofile.bin"
-    verifier = Verifier(file)
-    with pytest.raises(FileNotFoundError):
-        verifier.get_file_size()
-
-
-def test_verify_size_success(tmp_path: Path, patch_logger):
-    """Test Verifier.verify_size passes if size matches."""
-    file = tmp_path / "file.bin"
-    data = b"abc"
-    file.write_bytes(data)
-    verifier = Verifier(file)
-    verifier.verify_size(len(data))  # Should not raise
-
-
-def test_verify_size_mismatch(tmp_path: Path, patch_logger):
-    """Test Verifier.verify_size raises if size mismatches."""
-    file = tmp_path / "file.bin"
-    file.write_bytes(b"abc")
-    verifier = Verifier(file)
-    with pytest.raises(ValueError):
-        verifier.verify_size(10)
-
-
 def test_verification_config_init_and_from_dict():
     """Test VerificationConfig construction."""
     config = VerificationConfig(

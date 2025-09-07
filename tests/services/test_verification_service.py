@@ -388,32 +388,6 @@ class TestVerificationService:
             assert result["passed"] is False
             assert result["details"]  # Just check it has details
 
-    def test_verify_file_size(self, verification_service):
-        """Test file size verification."""
-        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
-            mock_verifier = MagicMock()
-            mock_verifier_class.return_value = mock_verifier
-            mock_verifier.get_file_size.return_value = 1024
-            mock_verifier.verify_size.return_value = None
-
-            result = verification_service._verify_file_size(mock_verifier, 1024)
-
-            assert result["passed"] is True
-            assert "1,024 bytes" in result["details"]
-
-    def test_verify_file_size_failure(self, verification_service):
-        """Test file size verification failure."""
-        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
-            mock_verifier = MagicMock()
-            mock_verifier_class.return_value = mock_verifier
-            mock_verifier.get_file_size.return_value = 1024
-            mock_verifier.verify_size.side_effect = Exception("Size mismatch")
-
-            result = verification_service._verify_file_size(mock_verifier, 2048)
-
-            assert result["passed"] is False
-            assert "Size mismatch" in result["details"]
-
     @pytest.mark.asyncio
     async def test_verify_file_digest_priority(
         self, verification_service, test_file_path, sample_assets
@@ -426,8 +400,6 @@ class TestVerificationService:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
             mock_verifier.verify_digest.return_value = None  # Digest succeeds
-            mock_verifier.get_file_size.return_value = 12
-            mock_verifier.verify_size.return_value = None
 
             result = await verification_service.verify_file(
                 file_path=test_file_path,
@@ -462,8 +434,6 @@ class TestVerificationService:
             mock_verifier_class.return_value = mock_verifier
             mock_verifier.parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
             mock_verifier.compute_hash.return_value = LEGCORD_EXPECTED_HEX
-            mock_verifier.get_file_size.return_value = 12
-            mock_verifier.verify_size.return_value = None
 
             result = await verification_service.verify_file(
                 file_path=test_file_path,
@@ -515,8 +485,6 @@ class TestVerificationService:
             mock_verifier.compute_hash.return_value = (
                 "3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef"
             )
-            mock_verifier.get_file_size.return_value = 12
-            mock_verifier.verify_size.return_value = None
 
             result = await verification_service.verify_file(
                 file_path=test_file_path,
@@ -570,8 +538,6 @@ class TestVerificationService:
             mock_verifier.verify_digest.side_effect = Exception("Digest failed")
             mock_verifier.parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
             mock_verifier.compute_hash.return_value = "different_hash"  # Checksum fails
-            mock_verifier.get_file_size.return_value = 12
-            mock_verifier.verify_size.return_value = None
 
             with pytest.raises(Exception, match="Available verification methods failed"):
                 await verification_service.verify_file(
@@ -586,32 +552,6 @@ class TestVerificationService:
                 )
 
     @pytest.mark.asyncio
-    async def test_verify_file_size_only_fallback(self, verification_service, test_file_path):
-        """Test fallback to size-only verification when no strong methods available."""
-        asset = {"digest": "", "size": 12}
-        config = {"skip": False}
-
-        with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
-            mock_verifier = MagicMock()
-            mock_verifier_class.return_value = mock_verifier
-            mock_verifier.get_file_size.return_value = 12
-            mock_verifier.verify_size.return_value = None
-
-            result = await verification_service.verify_file(
-                file_path=test_file_path,
-                asset=asset,
-                config=config,
-                owner="test",
-                repo="repo",
-                tag_name="v1.0.0",
-                app_name="test.AppImage",
-            )
-
-            assert result.passed is True
-            assert "size" in result.methods
-            assert result.methods["size"]["passed"] is True
-
-    @pytest.mark.asyncio
     async def test_verify_file_backward_compatibility(
         self, verification_service, test_file_path
     ):
@@ -623,8 +563,6 @@ class TestVerificationService:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
             mock_verifier.verify_digest.return_value = None
-            mock_verifier.get_file_size.return_value = 12
-            mock_verifier.verify_size.return_value = None
 
             # Call without assets parameter (old API)
             result = await verification_service.verify_file(
@@ -644,7 +582,7 @@ class TestVerificationService:
     async def test_verify_file_edge_case_empty_assets(
         self, verification_service, test_file_path
     ):
-        """Test with empty assets list."""
+        """Test with empty assets list - should fail without verification methods."""
         asset = {"digest": "", "size": 12}
         config = {"skip": False}
         empty_assets = []
@@ -652,9 +590,8 @@ class TestVerificationService:
         with patch("my_unicorn.services.verification_service.Verifier") as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
-            mock_verifier.get_file_size.return_value = 12
-            mock_verifier.verify_size.return_value = None
 
+            # Should fail because no verification methods are available
             result = await verification_service.verify_file(
                 file_path=test_file_path,
                 asset=asset,
@@ -666,8 +603,8 @@ class TestVerificationService:
                 assets=empty_assets,
             )
 
-            assert result.passed is True
-            assert "size" in result.methods
+            assert result.passed is False
+            assert result.methods == {}
 
     @pytest.mark.asyncio
     async def test_verify_file_config_update(
@@ -686,9 +623,6 @@ class TestVerificationService:
             mock_verifier_class.return_value = mock_verifier
             mock_verifier.parse_checksum_file.return_value = LEGCORD_EXPECTED_HEX
             mock_verifier.compute_hash.return_value = LEGCORD_EXPECTED_HEX
-            mock_verifier.get_file_size.return_value = 12
-            mock_verifier.verify_size.return_value = None
-
             result = await verification_service.verify_file(
                 file_path=test_file_path,
                 asset=asset,
