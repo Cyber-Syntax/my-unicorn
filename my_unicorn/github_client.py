@@ -699,6 +699,7 @@ class GitHubReleaseFetcher:
             if asset["name"].endswith(".AppImage") or asset["name"].endswith(".appimage")
         ]
 
+    #FIXME: too many branches
     def select_best_appimage(
         self,
         release_data: GitHubReleaseDetails,
@@ -792,6 +793,8 @@ class GitHubReleaseFetcher:
         # Fallback: return first candidate
         return candidates[0]
 
+    #FIXME: unused, move the auth or make this to check the available rate status
+    # and use in the github api requests to prevent limit errors
     async def check_rate_limit(self) -> dict[str, Any]:
         """Check current rate limit status.
 
@@ -807,6 +810,7 @@ class GitHubReleaseFetcher:
             data = await response.json()
             return data
 
+    #FIXME: unused? checkout parser.py or url install template method
     @staticmethod
     def parse_repo_url(repo_url: str) -> tuple[str, str]:
         """Parse GitHub repository URL to extract owner and repo.
@@ -864,6 +868,7 @@ class GitHubReleaseFetcher:
                     f"Fetched default branch for {self.owner}/{self.repo}"
                 )
 
+            #FIXME: return str not Any
             return data.get("default_branch", "main")
 
     def build_icon_url(self, icon_path: str, branch: str | None = None) -> str:

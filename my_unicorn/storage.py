@@ -7,11 +7,12 @@ renaming, moving, creating backups, and other storage-related tasks.
 import os
 from pathlib import Path
 
-from .logger import get_logger
+from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
 
 
+# TODO: Rename the class as FileOps or AppimageFileOps to represent much meaningful for python.
 class StorageService:
     """Service for handling file system operations."""
 

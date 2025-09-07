@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from my_unicorn.logger import get_logger
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -10,6 +9,7 @@ from typing import Any, Final
 
 from my_unicorn.download import DownloadService, IconAsset
 from my_unicorn.icon import IconManager
+from my_unicorn.logger import get_logger
 from my_unicorn.services.progress import ProgressService
 
 logger = get_logger(__name__)

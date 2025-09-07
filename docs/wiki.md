@@ -30,6 +30,7 @@
 - Configuration Management: Store global and app-specific settings in configuration files for easy customization.
     - App Configuration: Store app-specific configurations in JSON files for easy management such as version, name, and verification settings.
     - Global Configuration: Store global settings in a configuration file for customization such as download directories, logging levels, and more.
+- Cache Management: Handle caching of API assets and metadata to improve performance and reduce redundant API requests.
 
 ## Helper scripts
 
@@ -283,42 +284,42 @@ my-unicorn/my_unicorn/catalog/
 
 ```jsonc
 {
-	"owner": "AppFlowy-IO",
-	"repo": "AppFlowy",
-	"appimage": {
-		// default assigned to `repo` and only used for renaming the AppImage file. (good for `standardnotes/app` similar apps)
-		"rename": "AppFlowy",
-		"name_template": "{rename}-{latest_version}-linux-{characteristic_suffix}.AppImage",
-		// List of suffixes that are preferred for the AppImage filename. (e.g `x86_64`, `linux`, `Qt6`)
-		"characteristic_suffix": [""]
-	},
-	"github": {
-		// app installed from github repo
-		"repo": true,
-		// Beta/prerelease used to download the latest beta version of the appimage.
-		"prerelease": false
-	},
-	"verification": {
-		// provided by the github api if the developer provides it.
-		"digest": true,
-		// Skipping the verification process.
-		"skip": false,
-		// file that contains the checksum of the downloaded file. (e.g "SHA256SUMS.txt", "latest-linux.yml")
-		"checksum_file": "",
-		// This is the hash type of the checksum file.
-		//         - sha256 example files: SHA256SUMS.txt, <appimage_name>.AppImage.sha256sum
-		//         - sha512 example files: latest-linux.yml, <appimage_name>.AppImage.sha512sum
-		"checksum_hash_type": ""
-	},
-	"icon": {
-		// icon extracted from the appimage after installation
-		"extraction": true,
-		// direct link to an SVG image file hosted on GitHub's raw content server
-		// url is here for only reference because when extraction is true, url is not used and left empty.
-		"url": "https://raw.githubusercontent.com/AppFlowy-IO/AppFlowy/main/frontend/resources/flowy_icons/40x/app_logo.svg",
-		// used to name the icon file.
-		"name": "appflowy.svg"
-	}
+ "owner": "AppFlowy-IO",
+ "repo": "AppFlowy",
+ "appimage": {
+  // default assigned to `repo` and only used for renaming the AppImage file. (good for `standardnotes/app` similar apps)
+  "rename": "AppFlowy",
+  "name_template": "{rename}-{latest_version}-linux-{characteristic_suffix}.AppImage",
+  // List of suffixes that are preferred for the AppImage filename. (e.g `x86_64`, `linux`, `Qt6`)
+  "characteristic_suffix": [""]
+ },
+ "github": {
+  // app installed from github repo
+  "repo": true,
+  // Beta/prerelease used to download the latest beta version of the appimage.
+  "prerelease": false
+ },
+ "verification": {
+  // provided by the github api if the developer provides it.
+  "digest": true,
+  // Skipping the verification process.
+  "skip": false,
+  // file that contains the checksum of the downloaded file. (e.g "SHA256SUMS.txt", "latest-linux.yml")
+  "checksum_file": "",
+  // This is the hash type of the checksum file.
+  //         - sha256 example files: SHA256SUMS.txt, <appimage_name>.AppImage.sha256sum
+  //         - sha512 example files: latest-linux.yml, <appimage_name>.AppImage.sha512sum
+  "checksum_hash_type": ""
+ },
+ "icon": {
+  // icon extracted from the appimage after installation
+  "extraction": true,
+  // direct link to an SVG image file hosted on GitHub's raw content server
+  // url is here for only reference because when extraction is true, url is not used and left empty.
+  "url": "https://raw.githubusercontent.com/AppFlowy-IO/AppFlowy/main/frontend/resources/flowy_icons/40x/app_logo.svg",
+  // used to name the icon file.
+  "name": "appflowy.svg"
+ }
 }
 ```
 
@@ -354,56 +355,56 @@ my-unicorn/my_unicorn/catalog/
 
 ```jsonc
 {
-	// Configuration version for future migrations
-	"config_version": "1.0.0",
-	// source of installation (catalog or url)
-	"source": "catalog",
-	"appimage": {
-		// Latest installed version of the appimage
-		"version": "0.9.5",
-		"name": "appflowy.AppImage",
-		// used to rename installed appimage name (cleaning from version arch etc.)
-		"rename": "appflowy",
-		// template used on the appimage name
-		"name_template": "{rename}-{latest_version}-linux-{characteristic_suffix}.AppImage",
-		// suffix used on the appimage name
-		"characteristic_suffix": ["x86_64", "amd64"],
-		// installed date of the appimage
-		"installed_date": "2025-08-03T14:57:00.204029",
-		// digest algorithm used to verify the integrity of the appimage, provided by github api assets
-		"digest": "sha256:bd8b9374ec9c59fa98b08080fa7f96696d135e6173213d039939f94cc757c587"
-	},
-	"owner": "AppFlowy-IO",
-	"repo": "AppFlowy",
-	"github": {
-		"repo": true,
-		"prerelease": false
-	},
-	"verification": {
-		// Verify the appimage with digest algorithm
-		"digest": true,
-		// skip verification
-		"skip": false,
-		// checksum file used to verify the integrity of the appimage
-		"checksum_file": "",
-		// hash type used to verify the integrity of the appimage
-		"checksum_hash_type": "sha256"
-	},
-	"icon": {
-		// icon extracted from the appimage after installation
-		"extraction": true,
-		// direct link to an SVG image file hosted on GitHub's raw content server
-		// url is here for only reference because when extraction is true, url is not used and left empty.
-		"url": "https://raw.githubusercontent.com/AppFlowy-IO/AppFlowy/main/frontend/resources/flowy_icons/40x/app_logo.svg",
-		// used to name the icon file.
-		"name": "appflowy.svg",
-		// source of the icon (extraction or url)
-		"source": "extraction",
-		// icon installed status
-		"installed": true,
-		// path to the installed icon
-		"path": "/home/developer/Applications/icons/appflowy.svg"
-	}
+ // Configuration version for future migrations
+ "config_version": "1.0.0",
+ // source of installation (catalog or url)
+ "source": "catalog",
+ "appimage": {
+  // Latest installed version of the appimage
+  "version": "0.9.5",
+  "name": "appflowy.AppImage",
+  // used to rename installed appimage name (cleaning from version arch etc.)
+  "rename": "appflowy",
+  // template used on the appimage name
+  "name_template": "{rename}-{latest_version}-linux-{characteristic_suffix}.AppImage",
+  // suffix used on the appimage name
+  "characteristic_suffix": ["x86_64", "amd64"],
+  // installed date of the appimage
+  "installed_date": "2025-08-03T14:57:00.204029",
+  // digest algorithm used to verify the integrity of the appimage, provided by github api assets
+  "digest": "sha256:bd8b9374ec9c59fa98b08080fa7f96696d135e6173213d039939f94cc757c587"
+ },
+ "owner": "AppFlowy-IO",
+ "repo": "AppFlowy",
+ "github": {
+  "repo": true,
+  "prerelease": false
+ },
+ "verification": {
+  // Verify the appimage with digest algorithm
+  "digest": true,
+  // skip verification
+  "skip": false,
+  // checksum file used to verify the integrity of the appimage
+  "checksum_file": "",
+  // hash type used to verify the integrity of the appimage
+  "checksum_hash_type": "sha256"
+ },
+ "icon": {
+  // icon extracted from the appimage after installation
+  "extraction": true,
+  // direct link to an SVG image file hosted on GitHub's raw content server
+  // url is here for only reference because when extraction is true, url is not used and left empty.
+  "url": "https://raw.githubusercontent.com/AppFlowy-IO/AppFlowy/main/frontend/resources/flowy_icons/40x/app_logo.svg",
+  // used to name the icon file.
+  "name": "appflowy.svg",
+  // source of the icon (extraction or url)
+  "source": "extraction",
+  // icon installed status
+  "installed": true,
+  // path to the installed icon
+  "path": "/home/developer/Applications/icons/appflowy.svg"
+ }
 }
 ```
 
@@ -411,37 +412,37 @@ Example joplin.json:
 
 ```json
 {
-	"config_version": "1.0.0",
-	"source": "catalog",
-	"appimage": {
-		"version": "3.3.13",
-		"name": "joplin.AppImage",
-		"rename": "joplin",
-		"name_template": "{rename}-{latest_version}.AppImage",
-		"characteristic_suffix": [""],
-		"installed_date": "2025-08-30T13:01:35.442363",
-		"digest": "sha256:22ff90b3846e2d2c9b2722d325fffa84775e362af9a4567a9fa8672e27c5a5bd"
-	},
-	"owner": "laurent22",
-	"repo": "joplin",
-	"github": {
-		"repo": true,
-		"prerelease": false
-	},
-	"verification": {
-		"digest": true,
-		"skip": false,
-		"checksum_file": "latest-linux.yml",
-		"checksum_hash_type": "sha256"
-	},
-	"icon": {
-		"extraction": true,
-		"url": "",
-		"name": "joplin.png",
-		"source": "extraction",
-		"installed": true,
-		"path": "/home/developer/Applications/icons/joplin.png"
-	}
+ "config_version": "1.0.0",
+ "source": "catalog",
+ "appimage": {
+  "version": "3.3.13",
+  "name": "joplin.AppImage",
+  "rename": "joplin",
+  "name_template": "{rename}-{latest_version}.AppImage",
+  "characteristic_suffix": [""],
+  "installed_date": "2025-08-30T13:01:35.442363",
+  "digest": "sha256:22ff90b3846e2d2c9b2722d325fffa84775e362af9a4567a9fa8672e27c5a5bd"
+ },
+ "owner": "laurent22",
+ "repo": "joplin",
+ "github": {
+  "repo": true,
+  "prerelease": false
+ },
+ "verification": {
+  "digest": true,
+  "skip": false,
+  "checksum_file": "latest-linux.yml",
+  "checksum_hash_type": "sha256"
+ },
+ "icon": {
+  "extraction": true,
+  "url": "",
+  "name": "joplin.png",
+  "source": "extraction",
+  "installed": true,
+  "path": "/home/developer/Applications/icons/joplin.png"
+ }
 }
 ```
 
@@ -449,37 +450,37 @@ Example nuclear.json (installed via URL):
 
 ```json
 {
-	"config_version": "1.0.0",
-	"source": "url",
-	"appimage": {
-		"version": "0.6.48",
-		"name": "nuclear.AppImage",
-		"rename": "nuclear",
-		"name_template": "",
-		"characteristic_suffix": [],
-		"installed_date": "2025-08-30T12:38:28.387230",
-		"digest": "sha256:937a8658f9fe3b891acecaeb64060722f4abae2c7d2cd9e726064626a9496c91"
-	},
-	"owner": "nukeop",
-	"repo": "nuclear",
-	"github": {
-		"repo": true,
-		"prerelease": false
-	},
-	"verification": {
-		"digest": true,
-		"skip": false,
-		"checksum_file": "",
-		"checksum_hash_type": "sha256"
-	},
-	"icon": {
-		"extraction": true,
-		"source": "extraction",
-		"url": "",
-		"name": "nuclear.png",
-		"installed": true,
-		"path": "/home/developer/Applications/icons/nuclear.png"
-	}
+ "config_version": "1.0.0",
+ "source": "url",
+ "appimage": {
+  "version": "0.6.48",
+  "name": "nuclear.AppImage",
+  "rename": "nuclear",
+  "name_template": "",
+  "characteristic_suffix": [],
+  "installed_date": "2025-08-30T12:38:28.387230",
+  "digest": "sha256:937a8658f9fe3b891acecaeb64060722f4abae2c7d2cd9e726064626a9496c91"
+ },
+ "owner": "nukeop",
+ "repo": "nuclear",
+ "github": {
+  "repo": true,
+  "prerelease": false
+ },
+ "verification": {
+  "digest": true,
+  "skip": false,
+  "checksum_file": "",
+  "checksum_hash_type": "sha256"
+ },
+ "icon": {
+  "extraction": true,
+  "source": "extraction",
+  "url": "",
+  "name": "nuclear.png",
+  "installed": true,
+  "path": "/home/developer/Applications/icons/nuclear.png"
+ }
 }
 ```
 
@@ -506,30 +507,34 @@ Example nuclear.json (installed via URL):
 
 ```json
 {
-	"versions": {
-		"1.9.1": {
-			"created": "2025-08-19T14:36:49.868125",
-			"filename": "obsidian-1.9.1.AppImage",
-			"sha256": "24471d25ed4d7d797a20a8ddf7b81ec43ae337f9ce495514dfdbb893307472b7",
-			"size": 125682911
-		},
-		"1.9.10": {
-			"created": "2025-08-19T14:01:21.787195",
-			"filename": "obsidian-1.9.10.AppImage",
-			"sha256": "24471d25ed4d7d797a20a8ddf7b81ec43ae337f9ce495514dfdbb893307472b7",
-			"size": 125682911
-		}
-	}
+ "versions": {
+  "1.9.1": {
+   "created": "2025-08-19T14:36:49.868125",
+   "filename": "obsidian-1.9.1.AppImage",
+   "sha256": "24471d25ed4d7d797a20a8ddf7b81ec43ae337f9ce495514dfdbb893307472b7",
+   "size": 125682911
+  },
+  "1.9.10": {
+   "created": "2025-08-19T14:01:21.787195",
+   "filename": "obsidian-1.9.10.AppImage",
+   "sha256": "24471d25ed4d7d797a20a8ddf7b81ec43ae337f9ce495514dfdbb893307472b7",
+   "size": 125682911
+  }
+ }
 }
 ```
 
-## Uninstallation:
+## Uninstallation
+
 ### Global Uninstallation
+>
 > [!TIP]
 > This would remove the package if you installed globally.
 
 ```bash
 pip uninstall my-unicorn
 ```
+
 ### Local(venv) Uninstallation
+
 - [ ] Work in progress

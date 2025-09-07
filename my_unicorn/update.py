@@ -216,7 +216,9 @@ class UpdateManager:
 
             # DEBUG: Log source immediately after loading from disk
             original_source = app_config.get("source", "NOT_SET")
-            logger.debug(f"🔍 DEBUG: Source immediately after loading config from disk: {original_source}")
+            logger.debug(
+                f"🔍 DEBUG: Source immediately after loading config from disk: {original_source}"
+            )
             logger.debug(f"🔍 DEBUG: Full app_config keys: {list(app_config.keys())}")
 
             current_version = app_config["appimage"]["version"]
@@ -604,7 +606,9 @@ class UpdateManager:
             return None
 
         # DEBUG: Log original source at UpdateContext creation
-        logger.debug(f"🔍 DEBUG: Creating UpdateContext for {app_name} with original source: {app_config.get('source', 'NOT_SET')}")
+        logger.debug(
+            f"🔍 DEBUG: Creating UpdateContext for {app_name} with original source: {app_config.get('source', 'NOT_SET')}"
+        )
 
         return UpdateContext(
             owner=owner,
@@ -1155,29 +1159,44 @@ class UpdateManager:
         stored_hash = self._get_stored_hash(verification_results, asset_context.appimage_asset)
 
         # DEBUG: Track source field throughout update process
-        logger.debug(f"🔍 DEBUG: Source before verification config update: {update_context.app_config.get('source', 'NOT_SET')}")
-        logger.debug(f"🔍 DEBUG: updated_verification_config contents: {updated_verification_config}")
-        logger.debug(f"🔍 DEBUG: Type of updated_verification_config: {type(updated_verification_config)}")
-        
+        logger.debug(
+            f"🔍 DEBUG: Source before verification config update: {update_context.app_config.get('source', 'NOT_SET')}"
+        )
+        logger.debug(
+            f"🔍 DEBUG: updated_verification_config contents: {updated_verification_config}"
+        )
+        logger.debug(
+            f"🔍 DEBUG: Type of updated_verification_config: {type(updated_verification_config)}"
+        )
+
         # CRITICAL DEBUG: Check if updated_verification_config contains a source field
-        if updated_verification_config and 'source' in updated_verification_config:
-            logger.error(f"🚨 BUG FOUND: updated_verification_config contains source field: {updated_verification_config['source']}")
-            logger.error(f"🚨 This will overwrite root source! Current source: {update_context.app_config.get('source', 'NOT_SET')}")
+        if updated_verification_config and "source" in updated_verification_config:
+            logger.error(
+                f"🚨 BUG FOUND: updated_verification_config contains source field: {updated_verification_config['source']}"
+            )
+            logger.error(
+                f"🚨 This will overwrite root source! Current source: {update_context.app_config.get('source', 'NOT_SET')}"
+            )
 
         # Update verification config based on what was actually used
         if updated_verification_config:
             if "verification" not in update_context.app_config:
                 update_context.app_config["verification"] = {}
-            
+
             # CRITICAL FIX: If the bug is that updated_verification_config contains root-level fields,
             # we need to filter them out before updating the verification section
-            filtered_verification_config = {k: v for k, v in updated_verification_config.items() 
-                                           if k not in ['source', 'owner', 'repo', 'appimage', 'icon', 'github']}
-            
+            filtered_verification_config = {
+                k: v
+                for k, v in updated_verification_config.items()
+                if k not in ["source", "owner", "repo", "appimage", "icon", "github"]
+            }
+
             if filtered_verification_config != updated_verification_config:
-                logger.warning(f"🔧 FILTERED out root-level fields from verification config: "
-                            f"Original: {updated_verification_config}, Filtered: {filtered_verification_config}")
-            
+                logger.warning(
+                    f"🔧 FILTERED out root-level fields from verification config: "
+                    f"Original: {updated_verification_config}, Filtered: {filtered_verification_config}"
+                )
+
             update_context.app_config["verification"].update(filtered_verification_config)
             logger.debug(
                 f"🔧 Updated verification config for {update_context.app_name} "
@@ -1185,7 +1204,9 @@ class UpdateManager:
             )
 
         # DEBUG: Track source field after verification update
-        logger.debug(f"🔍 DEBUG: Source after verification config update: {update_context.app_config.get('source', 'NOT_SET')}")
+        logger.debug(
+            f"🔍 DEBUG: Source after verification config update: {update_context.app_config.get('source', 'NOT_SET')}"
+        )
 
         # Update app config
         update_context.app_config["appimage"]["version"] = (
@@ -1196,7 +1217,9 @@ class UpdateManager:
         update_context.app_config["appimage"]["digest"] = stored_hash
 
         # DEBUG: Track source field after appimage updates
-        logger.debug(f"🔍 DEBUG: Source after appimage config update: {update_context.app_config.get('source', 'NOT_SET')}")
+        logger.debug(
+            f"🔍 DEBUG: Source after appimage config update: {update_context.app_config.get('source', 'NOT_SET')}"
+        )
 
         # Update icon configuration with extraction settings and source tracking
         if updated_icon_config:
@@ -1219,7 +1242,9 @@ class UpdateManager:
                 )
 
         # DEBUG: Track source field before final save
-        logger.debug(f"🔍 DEBUG: Final source before save: {update_context.app_config.get('source', 'NOT_SET')}")
+        logger.debug(
+            f"🔍 DEBUG: Final source before save: {update_context.app_config.get('source', 'NOT_SET')}"
+        )
 
         self.config_manager.save_app_config(update_context.app_name, update_context.app_config)
 

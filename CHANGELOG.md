@@ -1,6 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.7.0-alpha
 ## v1.6.0-alpha
 # BREAKING CHANGES
 This release introduces a comprehensive caching mechanism for GitHub release data, enhancing performance and reducing redundant API calls. The caching system is designed to store release information persistently, with a configurable time-to-live (TTL) to ensure data freshness. Additionally, the release includes significant improvements to the logging capabilities of the verification service, providing detailed insights into the verification process and asset handling.
