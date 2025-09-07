@@ -9,11 +9,11 @@ import hashlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from .logger import get_logger
-from .utils import format_bytes
+from ..logger import get_logger
+from ..utils import format_bytes
 
 if TYPE_CHECKING:
-    from .download import DownloadService
+    from ..download import DownloadService
 
 
 # Try to import yaml for YAML checksum file support

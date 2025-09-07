@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.services.verification_service import VerificationConfig
-from my_unicorn.verify import Verifier
+from my_unicorn.verification.verification_service import VerificationConfig
+from my_unicorn.verification.verify import Verifier
 
 # Test data constants
 LEGCORD_YAML_CONTENT = """version: 1.1.5
@@ -45,7 +45,7 @@ LEGCORD_BASE64_HASH = (
 @pytest.fixture
 def patch_logger():
     """Patch get_logger to avoid real logging output."""
-    with patch("my_unicorn.verify.get_logger") as mock_logger:
+    with patch("my_unicorn.verification.verify.get_logger") as mock_logger:
         yield mock_logger
 
 
@@ -123,7 +123,7 @@ def test_is_yaml_content(tmp_path: Path, patch_logger):
     assert verifier._is_yaml_content("just some random text") is False
 
 
-@patch("my_unicorn.verify._YAML_AVAILABLE", False)
+@patch("my_unicorn.verification.verify._YAML_AVAILABLE", False)
 def test_is_yaml_content_no_yaml_available(tmp_path: Path, patch_logger):
     """Test YAML detection when PyYAML is not available."""
     file = tmp_path / "file.bin"
@@ -192,7 +192,7 @@ def test_parse_yaml_checksum_file_not_found(tmp_path: Path, patch_logger):
     assert hash_value is None
 
 
-@patch("my_unicorn.verify._YAML_AVAILABLE", False)
+@patch("my_unicorn.verification.verify._YAML_AVAILABLE", False)
 def test_parse_yaml_checksum_file_no_yaml(tmp_path: Path, patch_logger):
     """Test YAML parsing when PyYAML is not available."""
     file = tmp_path / "file.bin"

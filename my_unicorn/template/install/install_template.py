@@ -227,7 +227,7 @@ class InstallTemplate(ABC):
         # Get verification service from context or create it
         verification_service = getattr(self, "_verification_service", None)
         if not verification_service:
-            from ...services.verification_service import VerificationService
+            from ...verification.verification_service import VerificationService
 
             progress_service = getattr(self.download_service, "progress_service", None)
             verification_service = VerificationService(self.download_service, progress_service)

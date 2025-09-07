@@ -20,15 +20,15 @@ def __getattr__(name):
 
         return IconService
     elif name == "VerificationConfig":
-        from .verification_service import VerificationConfig
+        from ..verification.verification_service import VerificationConfig
 
         return VerificationConfig
     elif name == "VerificationResult":
-        from .verification_service import VerificationResult
+        from ..verification.verification_service import VerificationResult
 
         return VerificationResult
     elif name == "VerificationService":
-        from .verification_service import VerificationService
+        from ..verification.verification_service import VerificationService
 
         return VerificationService
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
