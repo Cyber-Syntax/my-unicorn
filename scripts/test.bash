@@ -4,7 +4,7 @@
 # This script provides a comprehensive CLI testing framework for my-unicorn,
 # combining URL installs, catalog installs, updates, and all core functionality.
 #
-# Author: my-unicorn development team
+# Author: Cyber-Syntax
 # License: Same as my-unicorn project
 
 set -o errexit -o nounset -o pipefail
@@ -112,6 +112,7 @@ restore_app_configs() {
 
 # ======== App Configuration Setup Functions ========
 
+# Use Checksum_file + Digest 
 setup_tagspaces_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up tagspaces test config with version $version"
@@ -157,6 +158,7 @@ setup_tagspaces_config() {
 EOF
 }
 
+# Digest test
 setup_qownnotes_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up qownnotes test config with version $version"
@@ -201,6 +203,7 @@ setup_qownnotes_config() {
 EOF
 }
 
+# URL test + digest
 setup_nuclear_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up nuclear test config with version $version"
@@ -245,6 +248,7 @@ setup_nuclear_config() {
 EOF
 }
 
+# URL test + checksum_file test via x.AppImage.DIGEST file
 setup_keepassxc_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up keepassxc test config with version $version"
@@ -289,6 +293,7 @@ setup_keepassxc_config() {
 EOF
 }
 
+# Catalog + Digest
 setup_appflowy_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up appflowy test config with version $version"
@@ -332,6 +337,7 @@ setup_appflowy_config() {
 EOF
 }
 
+# Checksumfile
 setup_legcord_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up legcord test config with version $version"
@@ -358,7 +364,7 @@ setup_legcord_config() {
         "prerelease": false
     },
     "verification": {
-        "digest": true,
+        "digest": false,
         "skip": false,
         "checksum_file": "",
         "checksum_hash_type": "sha256"
@@ -375,6 +381,7 @@ setup_legcord_config() {
 EOF
 }
 
+# Digest + Checksum_file
 setup_joplin_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up joplin test config with version $version"
@@ -681,9 +688,14 @@ test_multiple_catalog_install() {
     fi
 }
 
+#Testing Updates
+# appflowy: Catalog + digest
+# legcord: Catalog + checksum_file via latest-linux.yml
+# keepassxc: URL + checksum_file via x.AppImage.DIGEST
+# tagspaces: Catalog + Digest and checksum_file via SHA256SUMS.txt
 test_updates() {
     info "=== Testing Updates ==="
-    local apps=("appflowy" "legcord" "tagspaces")
+    local apps=("appflowy" "legcord" "tagspaces" "keepassxc")
 
     # Step 1: Set up configs with old versions and test updates
     info "Step 1/3: Setting up old versions and testing updates"
@@ -692,7 +704,7 @@ test_updates() {
             "tagspaces") setup_tagspaces_config "$TEST_VERSION" ;;
             "appflowy") setup_appflowy_config "$TEST_VERSION" ;;
             "legcord") setup_legcord_config "$TEST_VERSION" ;;
-                # "joplin") setup_joplin_config "$TEST_VERSION" ;;
+            "keepassxc") setup_keepassxc_config "$TEST_VERSION" ;;
         esac
     done
 
