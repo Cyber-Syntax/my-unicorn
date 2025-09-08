@@ -6,7 +6,13 @@ from unittest.mock import patch
 
 import pytest
 
-from my_unicorn.logger import ColoredFormatter, MyUnicornLogger, get_logger, clear_logger_state
+from my_unicorn.logger import (
+    ColoredFormatter,
+    CustomRotatingFileHandler,
+    MyUnicornLogger,
+    clear_logger_state,
+    get_logger,
+)
 
 
 @pytest.fixture
@@ -96,11 +102,11 @@ def test_setup_file_logging_creates_file_handler(tmp_path, logger_name):
     log_file = tmp_path / "my-unicorn.log"
     logger_instance = MyUnicornLogger(logger_name)
     logger_instance.setup_file_logging(log_file, level="DEBUG")
-    # Should have a file handler with correct level
+    # Should have a file handler with correct level (now using CustomRotatingFileHandler)
     file_handlers = [
         h
         for h in logger_instance.logger.handlers
-        if isinstance(h, logging.handlers.RotatingFileHandler)
+        if isinstance(h, logging.handlers.RotatingFileHandler | CustomRotatingFileHandler)
     ]
     assert file_handlers
     assert file_handlers[0].level == logging.DEBUG

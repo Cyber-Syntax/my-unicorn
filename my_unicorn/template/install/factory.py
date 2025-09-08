@@ -17,27 +17,6 @@ class InstallTemplateFactory:
     """Factory for creating install templates based on target type."""
 
     @staticmethod
-    def determine_install_type(targets: list[str]) -> str:
-        """Determine install type from targets.
-
-        Args:
-            targets: List of installation targets
-
-        Returns:
-            Install type: 'catalog', 'url', or 'mixed'
-
-        """
-        url_count = sum(1 for target in targets if target.startswith("https://github.com/"))
-        catalog_count = len(targets) - url_count
-
-        if url_count > 0 and catalog_count > 0:
-            return "mixed"
-        elif url_count > 0:
-            return "url"
-        else:
-            return "catalog"
-
-    @staticmethod
     def create_template(install_type: str, **dependencies: Any) -> Any:
         """Create appropriate install template.
 
@@ -99,23 +78,3 @@ class InstallTemplateFactory:
             session=dependencies["session"],
             config_manager=config_manager,
         )
-
-    @staticmethod
-    def separate_targets_by_type(targets: list[str]) -> tuple[list[str], list[str]]:
-        """Separate targets into URL and catalog types.
-
-        Args:
-            targets: List of installation targets
-
-        Returns:
-            Tuple of (url_targets, catalog_targets)
-
-        """
-        url_targets = [
-            target for target in targets if target.startswith("https://github.com/")
-        ]
-        catalog_targets = [
-            target for target in targets if not target.startswith("https://github.com/")
-        ]
-
-        return url_targets, catalog_targets

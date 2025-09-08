@@ -1309,7 +1309,7 @@ class UpdateManager:
         icon_asset: IconAsset,
         progress_task_id: str | None = None,
     ) -> tuple[Path | None, dict[str, Any]]:
-        """Setup icon from configuration using shared IconService.
+        """Extract icon from AppImage or install from github.
 
         Args:
             app_config: Application configuration

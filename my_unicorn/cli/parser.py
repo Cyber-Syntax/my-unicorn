@@ -44,11 +44,12 @@ class CLIParser:
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-  # Install from catalog (comma-separated)
+  # Install from catalog (comma-separated or space-separated)
   %(prog)s install appflowy,joplin,obsidian
+  %(prog)s install appflowy joplin obsidian
 
-  # Install from GitHub repository URL
-  %(prog)s install https://github.com/pbek/QOwnNotes
+  # Install from GitHub repository URL (Concurrent)
+  %(prog)s install https://github.com/pbek/QOwnNotes https://github.com/AppFlowy-IO/AppFlowy
 
   # Update appimages
   %(prog)s update appflowy,joplin
@@ -63,7 +64,7 @@ Examples:
   %(prog)s list                # Show installed appimages
   %(prog)s list --available    # Available appimages via catalog installation
 
-  # Auth Token Management
+  # Auth Token Management (use keyring library, only gnome-keyring tested)
   %(prog)s auth --save-token
   %(prog)s auth --remove-token
   %(prog)s auth --status
@@ -104,11 +105,12 @@ Examples:
   # Install single app from catalog
   %(prog)s obsidian
 
-  # Install multiple apps (comma-separated)
+  # Install multiple apps (comma-separated or space-separated)
   %(prog)s appflowy,joplin,obsidian
+  %(prog)s appflowy joplin obsidian
 
-  # Install from GitHub repository URL
-  %(prog)s https://github.com/pbek/QOwnNotes
+  # Install from GitHub repository URL (Concurrent)
+  %(prog)s https://github.com/pbek/QOwnNotes https://github.com/AppFlowy-IO/AppFlowy
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )

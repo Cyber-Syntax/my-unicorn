@@ -85,7 +85,7 @@ class VerificationConfig(TypedDict):
     checksum_hash_type: str
 
 
-class IconConfig(TypedDict):
+class IconAsset(TypedDict):
     """Icon configuration."""
 
     url: str
@@ -102,7 +102,7 @@ class AppConfig(TypedDict):
     appimage: AppImageConfig
     github: GitHubConfig
     verification: VerificationConfig
-    icon: IconConfig
+    icon: IconAsset
 
 
 class CatalogAppImageConfig(TypedDict):
@@ -120,7 +120,7 @@ class CatalogEntry(TypedDict):
     repo: str
     appimage: CatalogAppImageConfig
     verification: VerificationConfig
-    icon: IconConfig | None
+    icon: IconAsset | None
 
 
 class DirectoryManager:
