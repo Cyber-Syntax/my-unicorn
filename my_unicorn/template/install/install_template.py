@@ -318,6 +318,38 @@ class InstallTemplate(ABC):
                 "updated_config": {},
             }
 
+    def _handle_appimage_renaming(self, appimage_path: Path, context: Any) -> Path:
+        """Handle AppImage renaming based on configuration (similar to update command).
+
+        Args:
+            appimage_path: Current AppImage path
+            context: Install context containing app configuration
+
+        Returns:
+            Path to renamed AppImage with proper .AppImage extension
+
+        """
+        app_name = getattr(context, "app_name", appimage_path.stem)
+
+        # Get rename configuration from catalog entry or app config
+        rename_to = app_name  # fallback
+
+        # Try to get rename from catalog entry first
+        catalog_entry = getattr(context, "catalog_entry", None)
+        if catalog_entry and catalog_entry.get("appimage", {}).get("rename"):
+            rename_to = catalog_entry["appimage"]["rename"]
+        else:
+            # Fallback to app config for backward compatibility
+            app_config = getattr(context, "app_config", {})
+            if app_config and "appimage" in app_config:
+                rename_to = app_config["appimage"].get("rename", app_name)
+
+        if rename_to:
+            clean_name = self.storage_service.get_clean_appimage_name(rename_to)
+            appimage_path = self.storage_service.rename_appimage(appimage_path, clean_name)
+
+        return appimage_path
+
     async def _move_to_install_directory(
         self, app_path: Path, context: Any, **kwargs: Any
     ) -> Path:
@@ -330,7 +362,11 @@ class InstallTemplate(ABC):
             post_processing_task_id, 50.0, f"📁 Moving {app_name} to install directory..."
         )
 
-        final_path = self.storage_service.move_to_install_dir(app_path, app_name)
+        # First move to install directory with original name
+        moved_path = self.storage_service.move_to_install_dir(app_path)
+
+        # Then handle proper AppImage renaming similar to update command
+        final_path = self._handle_appimage_renaming(moved_path, context)
 
         await self.progress_tracker.update_progress(
             post_processing_task_id, 60.0, f"📦 {app_name} installed"

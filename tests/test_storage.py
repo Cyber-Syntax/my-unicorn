@@ -97,3 +97,41 @@ def test_get_clean_appimage_name_removes_extension():
     assert service.get_clean_appimage_name("foo.AppImage") == "foo"
     assert service.get_clean_appimage_name("bar.appimage") == "bar"
     assert service.get_clean_appimage_name("baz") == "baz"
+
+
+def test_install_update_naming_consistency(tmp_path: Path, install_dir: Path, patch_logger):
+    """Test that install and update commands produce consistent AppImage naming."""
+    service = StorageService(install_dir)
+
+    # Simulate what install command should do (after the fix)
+    # 1. Move file to install directory
+    original_file = tmp_path / "joplin-1.2.3.AppImage"
+    original_file.write_text("appimage content", encoding="utf-8")
+
+    # Step 1: Move to install dir (what install template does first)
+    moved_file = service.move_to_install_dir(original_file)
+
+    # Step 2: Apply renaming with .AppImage extension (what _handle_appimage_renaming does)
+    clean_name = service.get_clean_appimage_name("joplin")
+    final_file = service.rename_appimage(moved_file, clean_name)
+
+    # Verify install produces .AppImage extension
+    assert final_file.name == "joplin.AppImage"
+    assert final_file.exists()
+    assert final_file.read_text(encoding="utf-8") == "appimage content"
+
+    # Simulate what update command would do
+    # Create another version to "update" from
+    old_file = install_dir / "joplin-old.AppImage"
+    old_file.write_text("old content", encoding="utf-8")
+
+    # Update command renaming (same logic as install now)
+    clean_name_update = service.get_clean_appimage_name("joplin")
+    updated_file = service.rename_appimage(old_file, clean_name_update)
+
+    # Verify update also produces .AppImage extension
+    assert updated_file.name == "joplin.AppImage"
+
+    # Both install and update should produce the same naming pattern
+    assert final_file.name == updated_file.name
+    print(f"✅ Install and update both create: {final_file.name}")
