@@ -1,6 +1,6 @@
 [project]
 name = 'my-unicorn'
-version = '1.7.0-alpha'
+version = '1.7.1-alpha'
 maintainers = [{ name = "Cyber-Syntax" }]
 license = { text = "GPL-3.0-or-later" }
 description = 'My Unicorn is a command-line tool to manage AppImages on Linux. It allows users to install, update, and manage AppImages from GitHub repositories easily. It is designed to simplify the process of handling AppImages, making it more convenient for users to keep their applications up-to-date.'
@@ -60,6 +60,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["my_unicorn*"]
+exclude = ["autocomplete*", "tests*", "scripts*", "docs*", "examples*"]
 
 [tool.coverage.paths]
 source = ["my_unicorn"]
