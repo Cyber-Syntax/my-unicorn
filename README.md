@@ -1,6 +1,7 @@
 Turkish: [README.tr.md](README.tr.md)
 
 > [!CAUTION]
+>
 > - This project is in a **alpha phase** due to limited testing at this time.
 > - **Important:** Follow the instructions in the **Releases section** when updating the script.
 > - **Supported OS:** Currently, only Linux is supported.
@@ -9,6 +10,7 @@ Turkish: [README.tr.md](README.tr.md)
 
 > [!NOTE]
 > My Unicorn is a command-line tool to manage AppImages on Linux. It allows users to install, update, and manage AppImages from GitHub repositories easily. It's designed to simplify the process of handling AppImages, making it more convenient for users to keep their applications up-to-date.
+>
 > - Detailed information: [wiki.md](docs/wiki.md)
 
 - **Supported Applications:**
@@ -16,7 +18,7 @@ Turkish: [README.tr.md](README.tr.md)
     - Applications without verification (developer doesn't provide hash):
         - WeekToDo
         - FreeTube
-            - Related issue: https://github.com/FreeTubeApp/FreeTube/issues/4720)
+            - Related issue: <https://github.com/FreeTubeApp/FreeTube/issues/4720>)
     - More can be found in the [catalog](my_unicorn/catalog/) folder.
 - **Supported hash types:**
     - sha256, sha512
@@ -40,13 +42,24 @@ Turkish: [README.tr.md](README.tr.md)
     sh my-unicorn-installer.sh install
     ```
 
-3. Start using my-unicorn:
+3. Add autocomplete (optional):
+
+    ```bash
+    # auto-detect your shell and install autocomplete
+    sh my-unicorn-installer.sh autocomplete
+
+    # or manually add autocomplete for bash or zsh
+    sh my-unicorn-installer.sh autocomplete bash
+    sh my-unicorn-installer.sh autocomplete zsh
+    ```
+
+4. Start using my-unicorn:
 
     ```bash
     my-unicorn --help # to see the command options
     ```
 
-## For using uncompatible apps (installing with URL):
+## For using uncompatible apps (installing with URL)
 
 > [!IMPORTANT]
 > If you want to install an uncompatible app, you'll need to know some information about the application.
