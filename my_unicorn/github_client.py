@@ -4,7 +4,6 @@ This module handles communication with the GitHub API to fetch release
 information, extract AppImage assets, and manage GitHub-specific operations.
 """
 
-import re
 from dataclasses import dataclass
 from typing import Any, TypedDict, cast
 from urllib.parse import urlparse
@@ -17,8 +16,8 @@ from .services.cache import get_cache_manager
 from .services.progress import get_progress_service
 from .utils import (
     extract_and_validate_version,
-    is_checksum_file,
     get_checksum_file_format_type,
+    is_checksum_file,
 )
 
 logger = get_logger(__name__)
@@ -198,6 +197,7 @@ class GitHubReleaseFetcher:
 
         Raises:
             aiohttp.ClientError: If there are actual API/network errors
+
         """
         try:
             # Check cache first (unless bypassed)
@@ -289,6 +289,7 @@ class GitHubReleaseFetcher:
 
         Raises:
             aiohttp.ClientError: If there are actual API/network errors
+
         """
         try:
             # Check cache first (unless bypassed)
@@ -699,7 +700,7 @@ class GitHubReleaseFetcher:
             if asset["name"].endswith(".AppImage") or asset["name"].endswith(".appimage")
         ]
 
-    #FIXME: too many branches
+    # FIXME: too many branches
     def select_best_appimage(
         self,
         release_data: GitHubReleaseDetails,
@@ -793,7 +794,7 @@ class GitHubReleaseFetcher:
         # Fallback: return first candidate
         return candidates[0]
 
-    #FIXME: unused, move the auth or make this to check the available rate status
+    # FIXME: unused, move the auth or make this to check the available rate status
     # and use in the github api requests to prevent limit errors
     async def check_rate_limit(self) -> dict[str, Any]:
         """Check current rate limit status.
@@ -810,7 +811,7 @@ class GitHubReleaseFetcher:
             data = await response.json()
             return data
 
-    #FIXME: unused? checkout parser.py or url install template method
+    # FIXME: unused? checkout parser.py or url install template method
     @staticmethod
     def parse_repo_url(repo_url: str) -> tuple[str, str]:
         """Parse GitHub repository URL to extract owner and repo.
@@ -868,7 +869,7 @@ class GitHubReleaseFetcher:
                     f"Fetched default branch for {self.owner}/{self.repo}"
                 )
 
-            #FIXME: return str not Any
+            # FIXME: return str not Any
             return data.get("default_branch", "main")
 
     def build_icon_url(self, icon_path: str, branch: str | None = None) -> str:

@@ -163,8 +163,12 @@ class SelfUpdater:
             if e.status == HTTP_FORBIDDEN:
                 logger.error("GitHub API rate limit exceeded")
                 print(
-                    "GitHub Rate limit exceeded. Please try again later within 1 hour "
-                    + "or use different network/VPN."
+                    "".join(
+                        [
+                            "GitHub Rate limit exceeded. Please try again later ",
+                            "within 1 hour or use different network/VPN.",
+                        ]
+                    )
                 )
             else:
                 logger.error("GitHub API error: %s", e)
@@ -195,8 +199,12 @@ class SelfUpdater:
         if not latest_version_tag:
             logger.error("Malformed release data - no tag_name found")
             print(
-                "Malformed release data! Reinstall manually or "
-                + "open an issue on GitHub for help!"
+                "".join(
+                    [
+                        "Malformed release data! Reinstall manually or ",
+                        "open an issue on GitHub for help!",
+                    ]
+                )
             )
             return False
 
