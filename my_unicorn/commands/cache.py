@@ -23,6 +23,7 @@ class CacheHandler(BaseCommandHandler):
 
     Note:
         Cache refresh is handled by the update command (--refresh-cache flag).
+
     """
 
     async def execute(self, args: Namespace) -> None:
@@ -33,6 +34,7 @@ class CacheHandler(BaseCommandHandler):
 
         Raises:
             SystemExit: On unknown action or error.
+
         """
         try:
             if args.cache_action == "clear":
@@ -57,6 +59,7 @@ class CacheHandler(BaseCommandHandler):
 
         Raises:
             SystemExit: If neither --all nor app name is specified.
+
         """
         cache_manager = get_cache_manager()
         if args.all:
@@ -79,6 +82,7 @@ class CacheHandler(BaseCommandHandler):
 
         Raises:
             SystemExit: On error.
+
         """
         cache_manager = get_cache_manager()
         try:
@@ -114,6 +118,7 @@ class CacheHandler(BaseCommandHandler):
 
         Raises:
             SystemExit: If app config not found.
+
         """
         if "/" in app_name:
             owner, repo = app_name.split("/", 1)

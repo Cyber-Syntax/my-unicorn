@@ -23,32 +23,43 @@ class AuthHandler(BaseCommandHandler):
     async def execute(self, args: Namespace) -> None:
         """Execute the auth command."""
         if args.save_token:
+            logger.info("Saving GitHub token...")
             await self._save_token()
         elif args.remove_token:
+            logger.info("Removing GitHub token...")
             await self._remove_token()
         elif args.status:
+            logger.debug("Checking GitHub authentication status...")
             await self._show_status()
 
     async def _save_token(self) -> None:
         """Save GitHub authentication token."""
         try:
             GitHubAuthManager.save_token()
+            logger.info("GitHub token saved successfully.")
         except ValueError as e:
+            logger.error(f"Failed to save token: {e}")
             print(f"❌ {e}")
             sys.exit(1)
 
     async def _remove_token(self) -> None:
         """Remove GitHub authentication token."""
-        GitHubAuthManager.remove_token()
+        try:
+            GitHubAuthManager.remove_token()
+            logger.info("GitHub token removed from keyring.")
+        except Exception as e:
+            logger.error(f"Error removing token: {e}")
 
     async def _show_status(self) -> None:
         """Show authentication status and rate limit information."""
         if not self.auth_manager.is_authenticated():
+            logger.info("No GitHub token configured.")
             print("❌ No GitHub token configured")
             print("Use 'my-unicorn auth --save-token' to configure authentication")
             return
 
         print("✅ GitHub token is configured")
+        logger.debug("GitHub token is configured. Fetching rate limit info...")
 
         # Get fresh rate limit information
         rate_limit_data = await self._fetch_fresh_rate_limit()
@@ -67,8 +78,10 @@ class AuthHandler(BaseCommandHandler):
                 ) as response:
                     response.raise_for_status()
                     self.auth_manager.update_rate_limit_info(dict(response.headers))
+                    logger.debug("Fetched fresh rate limit info from GitHub API.")
                     return await response.json()
         except Exception as e:
+            logger.warning(f"Failed to fetch fresh rate limit info: {e}")
             print(f"   ⚠️  Failed to fetch fresh rate limit info: {e}")
             return None
 
@@ -97,7 +110,7 @@ class AuthHandler(BaseCommandHandler):
             # Show additional rate limit details if available
             self._display_additional_rate_limit_details(rate_limit_data, remaining)
         else:
-            print("   ℹ️  Unable to fetch rate limit information")
+            print("Unable to fetch rate limit information")
 
     def _display_reset_time(self, reset_in: int) -> None:
         """Display formatted reset time."""

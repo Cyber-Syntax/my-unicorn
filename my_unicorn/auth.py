@@ -5,6 +5,7 @@ to ensure API requests are properly authenticated and don't exceed limits.
 """
 
 import getpass
+import re
 import time
 
 import keyring
@@ -37,10 +38,63 @@ def setup_keyring() -> None:
 setup_keyring()
 
 
+def validate_github_token(token) -> bool:
+    """Validate GitHub token format.
+
+    Supports both legacy and new token formats:
+    - Legacy: 40 hexadecimal characters (classic personal access tokens)
+    - New prefixed formats:
+        - ghp_ for Personal Access Tokens
+        - gho_ for OAuth Access tokens
+        - ghu_ for GitHub App user-to-server tokens
+        - ghs_ for GitHub App server-to-server tokens
+        - ghr_ for GitHub App refresh tokens
+        - github_pat_ for GitHub CLI PATs
+
+    Parameters
+    ----------
+    token : Any
+        The GitHub token to validate. Should be a string, but accepts any type.
+
+    Returns
+    -------
+    bool
+        True if token format is valid, False otherwise.
+
+    """
+    if not token or not isinstance(token, str):
+        return False
+
+    token = token.strip()
+
+    # Check for empty token
+    if not token:
+        return False
+
+    # Legacy token format: 40 hexadecimal characters
+    if re.match(r"^[a-f0-9]{40}$", token):
+        return True
+
+    # New prefixed token formats
+    # Character set: [A-Za-z0-9_]
+    # Support up to 255 characters as per GitHub announcement
+    prefixed_patterns = [
+        r"^ghp_[A-Za-z0-9_]{36,251}$",  # Personal Access Tokens
+        r"^gho_[A-Za-z0-9_]{36,251}$",  # OAuth Access tokens
+        r"^ghu_[A-Za-z0-9_]{36,251}$",  # GitHub App user-to-server tokens
+        r"^ghs_[A-Za-z0-9_]{36,251}$",  # GitHub App server-to-server tokens
+        r"^ghr_[A-Za-z0-9_]{36,251}$",  # GitHub App refresh tokens
+        r"^github_pat_[A-Za-z0-9_]{36,243}$",  # GitHub CLI PATs
+    ]
+
+    return any(re.match(pattern, token) for pattern in prefixed_patterns)
+
+
 class GitHubAuthManager:
     """Manages GitHub authentication tokens and rate limiting."""
 
     GITHUB_KEY_NAME: str = "my-unicorn-github-token"
+    RATE_LIMIT_THRESHOLD: int = 10  # Minimum remaining requests before waiting
 
     def __init__(self):
         """Initialize the auth manager with rate limit tracking."""
@@ -51,34 +105,52 @@ class GitHubAuthManager:
     @staticmethod
     def save_token() -> None:
         """Prompt user for GitHub token and save it securely."""
-        token: str = getpass.getpass(prompt="Enter your GitHub token (input hidden): ")
-        if not token.strip():
-            raise ValueError("Token cannot be empty")
+        try:
+            token: str = getpass.getpass(prompt="Enter your GitHub token (input hidden): ")
+            if not token.strip():
+                logger.error("Attempted to save an empty GitHub token.")
+                raise ValueError("Token cannot be empty")
 
-        keyring.set_password(GitHubAuthManager.GITHUB_KEY_NAME, "token", token)
-        print("✅ Token securely saved to keyring.")
+            # Validate token format before saving
+            if not validate_github_token(token):
+                logger.error("Invalid GitHub token format provided.")
+                raise ValueError("Invalid GitHub token format. Must be a valid GitHub token.")
+
+            keyring.set_password(GitHubAuthManager.GITHUB_KEY_NAME, "token", token)
+            logger.info("GitHub token saved successfully.")
+        except Exception as e:
+            logger.error(f"Failed to save GitHub token to keyring: {e}")
+            raise
 
     @staticmethod
     def remove_token() -> None:
         """Remove GitHub token from keyring."""
         try:
             keyring.delete_password(GitHubAuthManager.GITHUB_KEY_NAME, "token")
-            print("🗑️ Token removed from keyring.")
-        except keyring.errors.PasswordDeleteError:
-            print("❌ No token found to remove.")
+        except Exception as e:
+            logger.error(f"Error removing GitHub token from keyring: {e}")
+            raise
 
     @staticmethod
     def get_token() -> str | None:
         """Retrieve GitHub token from keyring."""
-        return keyring.get_password(GitHubAuthManager.GITHUB_KEY_NAME, "token")
+        try:
+            return keyring.get_password(GitHubAuthManager.GITHUB_KEY_NAME, "token")
+        except Exception as e:
+            logger.error(f"Failed to retrieve GitHub token from keyring: {e}")
+            return None
 
     @staticmethod
     def apply_auth(headers: dict[str, str]) -> dict[str, str]:
         """Apply GitHub authentication to request headers."""
-        token: str | None = GitHubAuthManager.get_token()
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-        return headers
+        try:
+            token: str | None = GitHubAuthManager.get_token()
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+            return headers
+        except Exception as e:
+            logger.error(f"Failed to apply GitHub authentication to headers: {e}")
+            return headers
 
     def update_rate_limit_info(self, headers: dict[str, str]) -> None:
         """Update rate limit information from response headers."""
@@ -87,9 +159,10 @@ class GitHubAuthManager:
             self._remaining_requests = int(headers.get("X-RateLimit-Remaining", 0))
             self._rate_limit_reset = int(headers.get("X-RateLimit-Reset", 0))
             self._last_check_time = time.time()
-        except (ValueError, TypeError):
-            # Invalid headers, ignore
-            pass
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid rate limit headers received: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error updating rate limit info: {e}")
 
     def get_rate_limit_status(self) -> dict[str, int | None]:
         """Get current rate limit status."""
@@ -115,7 +188,7 @@ class GitHubAuthManager:
             return False
 
         # Wait if we have very few requests remaining
-        return self._remaining_requests < 10
+        return self._remaining_requests < self.RATE_LIMIT_THRESHOLD
 
     def get_wait_time(self) -> int:
         """Get recommended wait time in seconds."""
@@ -132,6 +205,13 @@ class GitHubAuthManager:
         """Check if we have a valid token stored."""
         token = self.get_token()
         return token is not None and len(token.strip()) > 0
+
+    def is_token_valid(self) -> bool:
+        """Check if the stored token has a valid format."""
+        token = self.get_token()
+        if token is None:
+            return False
+        return validate_github_token(token)
 
 
 # Global instance for easy access

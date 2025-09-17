@@ -7,11 +7,7 @@ to provide clean separation of different update scenarios.
 from argparse import Namespace
 
 from ..logger import get_logger
-from ..strategies import (
-    UpdateContext,
-    UpdateResultDisplay,
-    UpdateStrategyFactory,
-)
+from ..models import UpdateContext, UpdateResultDisplay
 from .base import BaseCommandHandler
 
 logger = get_logger(__name__)
@@ -36,15 +32,17 @@ class UpdateHandler(BaseCommandHandler):
             context = self._build_context(args)
 
             # Select and create the appropriate strategy
-            strategy = UpdateStrategyFactory.create_strategy(context)
+            # strategy = UpdateStrategyFactory.create_strategy(context)
+            from ..template import UpdateTemplateFactory
+            strategy = UpdateTemplateFactory.create_template(context)
 
             # Log the selected strategy for debugging
-            strategy_name = UpdateStrategyFactory.get_strategy_name(context)
+            strategy_name = UpdateTemplateFactory.get_template_name(context)
             logger.debug("Selected strategy: %s", strategy_name)
 
             # Validate inputs using the strategy's validation logic
-            if not strategy.validate_inputs(context):
-                return
+            # if not strategy.validate_inputs(context):
+            #     return
 
             # Execute the strategy - only use progress session for actual updates, not check-only
             if context.check_only:

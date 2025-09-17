@@ -4,7 +4,7 @@
 # This script provides a comprehensive CLI testing framework for my-unicorn,
 # combining URL installs, catalog installs, updates, and all core functionality.
 #
-# Author: my-unicorn development team
+# Author: Cyber-Syntax
 # License: Same as my-unicorn project
 
 set -o errexit -o nounset -o pipefail
@@ -112,6 +112,7 @@ restore_app_configs() {
 
 # ======== App Configuration Setup Functions ========
 
+# Use Checksum_file + Digest 
 setup_tagspaces_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up tagspaces test config with version $version"
@@ -120,9 +121,9 @@ setup_tagspaces_config() {
 {
   "config_version": "1.0.0",
   "source": "catalog",
+  "owner": "tagspaces",
+  "repo": "tagspaces",
   "appimage": {
-    "version": "$version",
-    "name": "tagspaces.AppImage",
     "rename": "tagspaces",
     "name_template": "{repo}-{latest_version}-{characteristic_suffix}.AppImage",
     "characteristic_suffix": [
@@ -130,11 +131,11 @@ setup_tagspaces_config() {
       "x86_64",
       "amd64"
     ],
+    "version": "$version",
+    "name": "tagspaces.AppImage",
     "installed_date": "$(date --iso-8601=seconds)",
     "digest": ""
   },
-  "owner": "tagspaces",
-  "repo": "tagspaces",
   "github": {
     "repo": true,
     "prerelease": false
@@ -147,7 +148,7 @@ setup_tagspaces_config() {
   },
   "icon": {
     "extraction": true,
-    "url": "",
+    "url": null,
     "name": "tagspaces.png",
     "source": "extraction",
     "installed": true,
@@ -157,6 +158,7 @@ setup_tagspaces_config() {
 EOF
 }
 
+# Digest test
 setup_qownnotes_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up qownnotes test config with version $version"
@@ -165,20 +167,20 @@ setup_qownnotes_config() {
 {
     "config_version": "1.0.0",
     "source": "catalog",
+    "owner": "pbek",
+    "repo": "QOwnNotes",
     "appimage": {
-        "version": "$version",
-        "name": "qownnotes-$version-x86_64.AppImage",
         "rename": "qownnotes",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": [
             "x86_64.AppImage",
             "x86_64-Qt6.AppImage"
         ],
+        "version": "$version",
+        "name": "qownnotes.AppImage",
         "installed_date": "$(date --iso-8601=seconds)",
         "digest": ""
     },
-    "owner": "pbek",
-    "repo": "QOwnNotes",
     "github": {
         "repo": true,
         "prerelease": false
@@ -194,12 +196,14 @@ setup_qownnotes_config() {
         "url": "https://raw.githubusercontent.com/pbek/QOwnNotes/develop/icons/icon.png",
         "name": "qownnotes.png",
         "source": "extraction",
-        "installed": false
+        "installed": true,
+        "path": "/home/developer/Applications/icons/qownnotes.png"
     }
 }
 EOF
 }
 
+# URL test + digest
 setup_nuclear_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up nuclear test config with version $version"
@@ -208,17 +212,17 @@ setup_nuclear_config() {
 {
     "config_version": "1.0.0",
     "source": "url",
+    "owner": "nukeop",
+    "repo": "nuclear",
     "appimage": {
-        "version": "$version",
-        "name": "nuclear-$version.AppImage",
         "rename": "nuclear",
         "name_template": "",
         "characteristic_suffix": [],
+        "version": "$version",
+        "name": "nuclear.AppImage",
         "installed_date": "$(date --iso-8601=seconds)",
         "digest": ""
     },
-    "owner": "nukeop",
-    "repo": "nuclear",
     "github": {
         "repo": true,
         "prerelease": false
@@ -231,15 +235,20 @@ setup_nuclear_config() {
     },
     "icon": {
         "extraction": true,
-        "url": "",
+        "url": null,
         "name": "nuclear.png",
         "source": "extraction",
-        "installed": false
+        "installed": true,
+        "path": "/home/developer/Applications/icons/nuclear.png"
+    },
+    "url_metadata": {
+        "target_url": "https://github.com/nukeop/nuclear"
     }
 }
 EOF
 }
 
+# URL test + checksum_file test via x.AppImage.DIGEST file
 setup_keepassxc_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up keepassxc test config with version $version"
@@ -248,17 +257,17 @@ setup_keepassxc_config() {
 {
     "config_version": "1.0.0",
     "source": "url",
+    "owner": "keepassxreboot",
+    "repo": "keepassxc",
     "appimage": {
-        "version": "$version",
-        "name": "keepassxc-$version-x86_64.AppImage",
         "rename": "keepassxc",
         "name_template": "",
         "characteristic_suffix": [],
+        "version": "$version",
+        "name": "keepassxc.AppImage",
         "installed_date": "$(date --iso-8601=seconds)",
         "digest": ""
     },
-    "owner": "keepassxreboot",
-    "repo": "keepassxc",
     "github": {
         "repo": true,
         "prerelease": false
@@ -271,15 +280,20 @@ setup_keepassxc_config() {
     },
     "icon": {
         "extraction": true,
-        "url": "",
+        "url": null,
         "name": "keepassxc.png",
         "source": "extraction",
-        "installed": false
+        "installed": true,
+        "path": "/home/developer/Applications/icons/keepassxc.png"
+    },
+    "url_metadata": {
+        "target_url": "https://github.com/keepassxreboot/keepassxc"
     }
 }
 EOF
 }
 
+# Catalog + Digest
 setup_appflowy_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up appflowy test config with version $version"
@@ -288,19 +302,19 @@ setup_appflowy_config() {
 {
     "config_version": "1.0.0",
     "source": "catalog",
+    "owner": "appflowy-io",
+    "repo": "appflowy",
     "appimage": {
-        "version": "$version",
-        "name": "appflowy-$version-linux-x86_64.AppImage",
         "rename": "appflowy",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": [
             "linux-x86_64.AppImage"
         ],
+        "version": "$version",
+        "name": "appflowy.AppImage",
         "installed_date": "$(date --iso-8601=seconds)",
         "digest": ""
     },
-    "owner": "appflowy-io",
-    "repo": "appflowy",
     "github": {
         "repo": true,
         "prerelease": false
@@ -313,15 +327,17 @@ setup_appflowy_config() {
     },
     "icon": {
         "extraction": true,
-        "url": "",
+        "url": null,
         "name": "appflowy.png",
         "source": "extraction",
-        "installed": false
+        "installed": true,
+        "path": "/home/developer/Applications/icons/appflowy.png"
     }
 }
 EOF
 }
 
+# Checksumfile
 setup_legcord_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up legcord test config with version $version"
@@ -330,40 +346,42 @@ setup_legcord_config() {
 {
     "config_version": "1.0.0",
     "source": "catalog",
+    "owner": "legcord",
+    "repo": "legcord",
     "appimage": {
-        "version": "$version",
-        "name": "legcord-$version.AppImage",
         "rename": "legcord",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": [
             ".AppImage"
         ],
+        "version": "$version",
+        "name": "legcord.AppImage",
         "installed_date": "$(date --iso-8601=seconds)",
         "digest": ""
     },
-    "owner": "legcord",
-    "repo": "legcord",
     "github": {
         "repo": true,
         "prerelease": false
     },
     "verification": {
-        "digest": true,
+        "digest": false,
         "skip": false,
         "checksum_file": "",
         "checksum_hash_type": "sha256"
     },
     "icon": {
         "extraction": true,
-        "url": "",
+        "url": null,
         "name": "legcord.png",
         "source": "extraction",
-        "installed": false
+        "installed": true,
+        "path": "/home/developer/Applications/icons/legcord.png"
     }
 }
 EOF
 }
 
+# Digest + Checksum_file
 setup_joplin_config() {
     local version="${1:-$TEST_VERSION}"
     info "Setting up joplin test config with version $version"
@@ -372,19 +390,19 @@ setup_joplin_config() {
 {
     "config_version": "1.0.0",
     "source": "catalog",
+    "owner": "laurent22",
+    "repo": "joplin",
     "appimage": {
-        "version": "$version",
-        "name": "joplin-$version.AppImage",
         "rename": "joplin",
         "name_template": "{repo}-{characteristic_suffix}.AppImage",
         "characteristic_suffix": [
             ".AppImage"
         ],
+        "version": "$version",
+        "name": "joplin.AppImage",
         "installed_date": "$(date --iso-8601=seconds)",
         "digest": ""
     },
-    "owner": "laurent22",
-    "repo": "joplin",
     "github": {
         "repo": true,
         "prerelease": false
@@ -397,10 +415,11 @@ setup_joplin_config() {
     },
     "icon": {
         "extraction": true,
-        "url": "",
+        "url": null,
         "name": "joplin.png",
         "source": "extraction",
-        "installed": false
+        "installed": true,
+        "path": "/home/developer/Applications/icons/joplin.png"
     }
 }
 EOF
@@ -669,12 +688,42 @@ test_multiple_catalog_install() {
     fi
 }
 
+#Testing Updates
+# appflowy: Catalog + digest
+# legcord: Catalog + checksum_file via latest-linux.yml
+# keepassxc: URL + checksum_file via x.AppImage.DIGEST
+# tagspaces: Catalog + Digest and checksum_file via SHA256SUMS.txt
 test_updates() {
     info "=== Testing Updates ==="
-    local apps=("appflowy" "legcord" "tagspaces")
+    local apps=("appflowy" "legcord" "tagspaces" "keepassxc")
 
     # Step 1: Set up configs with old versions and test updates
     info "Step 1/3: Setting up old versions and testing updates"
+    for app in "${apps[@]}"; do
+        case "$app" in
+            "tagspaces") setup_tagspaces_config "$TEST_VERSION" ;;
+            "appflowy") setup_appflowy_config "$TEST_VERSION" ;;
+            "legcord") setup_legcord_config "$TEST_VERSION" ;;
+            "keepassxc") setup_keepassxc_config "$TEST_VERSION" ;;
+        esac
+    done
+
+    cd "$APP_ROOT"
+    if python3 run.py update "${apps[@]}"; then
+        info "updates: SUCCESS"
+    else
+        error "updates: FAILED"
+        return 1
+    fi
+
+}
+
+test_updates_all() {
+    info "=== Testing Updates All ==="
+    local apps=("appflowy" "legcord" "tagspaces")
+
+    # Step 1: Set up configs with old versions and test updates all
+    info "Step 1/3: Setting up old versions and testing updates all"
     for app in "${apps[@]}"; do
         case "$app" in
             "tagspaces") setup_tagspaces_config "$TEST_VERSION" ;;
@@ -685,10 +734,10 @@ test_updates() {
     done
 
     cd "$APP_ROOT"
-    if python3 run.py update "${apps[@]}"; then
-        info "updates: SUCCESS"
+    if python3 run.py update; then
+        info "updates_all: SUCCESS"
     else
-        error "updates: FAILED"
+        error "updates_all: FAILED"
         return 1
     fi
 
@@ -816,6 +865,7 @@ COMMANDS:
         --url-all              Run all URL tests (keepassxc + nuclear)
     Update Tests:
         --update               Test updates for multiple apps (appflowy + legcord + joplin)
+        --update-all           Test updates for all apps
 
     Catalog Tests:
         --catalog-single       Install single app from catalog (appflowy)
@@ -894,6 +944,9 @@ parse_arguments() {
             ;;
         --update)
             test_updates
+            ;;
+        --update-all)
+            test_updates_all
             ;;
         --quick)
             test_quick

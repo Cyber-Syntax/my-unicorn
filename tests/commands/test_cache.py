@@ -174,9 +174,9 @@ class TestCacheHandler:
 
             mock_cache_manager.get_cache_stats.assert_called_once()
             mock_logger.info.assert_any_call("📁 Cache Directory: %s", "/tmp/cache/releases")
-            # Check for corrupted emoji in actual implementation
-            mock_logger.info.assert_any_call("� Total Entries: %d", 5)
-            mock_logger.info.assert_any_call("� TTL Hours: %d", 24)
+            # Check for log entries without emojis (actual implementation)
+            mock_logger.info.assert_any_call("Total Entries: %d", 5)
+            mock_logger.info.assert_any_call("TTL Hours: %d", 24)
 
     @pytest.mark.asyncio
     async def test_execute_stats_with_entries(self, cache_handler, mock_cache_manager, capsys):

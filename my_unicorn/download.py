@@ -1,7 +1,7 @@
 """Download service for handling AppImage and icon downloads.
 
 This module provides a service for downloading AppImage files and associated
-icons with progress tracking using the Rich progress service.
+icons with progress tracking using the Rich library.
 """
 
 import asyncio
@@ -248,38 +248,7 @@ class DownloadService:
         except Exception as e:
             logger.error("❌ Failed to download icon: %s", e)
             raise
-
-    def verify_file_size(self, path: Path, expected_size: int) -> bool:
-        """Verify downloaded file size matches expected.
-
-        Args:
-            path: Path to verify
-            expected_size: Expected file size in bytes
-
-        Returns:
-            True if verification passes
-
-        """
-        if not path.exists():
-            logger.error("❌ File not found for verification: %s", path)
-            return False
-
-        if expected_size <= 0:
-            logger.debug("ℹ️  No expected size available, skipping size verification")
-            return True
-
-        actual_size = path.stat().st_size
-        if actual_size == expected_size:
-            logger.debug("✅ File size verification passed: %s bytes", f"{actual_size:,}")
-            return True
-        else:
-            logger.error(
-                "❌ File size mismatch: expected %s, got %s",
-                f"{expected_size:,}",
-                f"{actual_size:,}",
-            )
-            return False
-
+   
     def get_filename_from_url(self, url: str) -> str:
         """Extract filename from URL.
 

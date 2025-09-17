@@ -1,36 +1,36 @@
 [project]
 name = 'my-unicorn'
-version = '1.6.0-alpha'
+version = '1.7.0-alpha'
 maintainers = [{ name = "Cyber-Syntax" }]
 license = { text = "GPL-3.0-or-later" }
 description = 'My Unicorn is a command-line tool to manage AppImages on Linux. It allows users to install, update, and manage AppImages from GitHub repositories easily. It is designed to simplify the process of handling AppImages, making it more convenient for users to keep their applications up-to-date.'
 keywords = ["appimage", "appimage-manager"]
 requires-python = ">= 3.12"
 dependencies = [
-    "aiohttp>=3.12.10, <4.0.0",
-    "rich>=14.1.0",
-    "asyncio>=3.12.1",
-    "orjson>=3.11.1",
-    "uvloop>=0.21.0",
-    "keyring>=25.6.0",
-    "packaging>=25.0",
-    "PyYAML>=6.0.2",
+  "aiohttp>=3.12.10, <4.0.0",
+  "rich>=14.1.0",
+  "asyncio>=3.12.1",
+  "orjson>=3.11.1",
+  "uvloop>=0.21.0",
+  "keyring>=25.6.0",
+  "packaging>=25.0",
+  "PyYAML>=6.0.2",
 ]
 
 readme = { file = "README.md", content-type = "text/markdown" }
 classifiers = [
-    "Development Status :: 3 - Alpha",
+  "Development Status :: 3 - Alpha",
 
-    # Audience Developers, linux users...
-    "Intended Audience :: Developers, Linux Users",
-    "Environment :: Console",
+  # Audience Developers, linux users...
+  "Intended Audience :: Developers, Linux Users",
+  "Environment :: Console",
 
-    # 3.12 is the minimum supported version.
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
+  # 3.12 is the minimum supported version.
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
 
-    # Currently, we only support linux, but we can add more platforms later.
-    "Operating System :: POSIX :: Linux",
+  # Currently, we only support linux, but we can add more platforms later.
+  "Operating System :: POSIX :: Linux",
 ]
 
 [project.scripts]
@@ -45,12 +45,12 @@ documentation = "https://github.com/Cyber-Syntax/my-unicorn#readme"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.3.4",
-    "pytest-cov>=6.0.0",
-    "pytest-mock>=3.14.0",
-    "pip-review>=1.3.0",
-    "pytest-asyncio>=0.22.0",
-    "aioresponses>=0.7.8",
+  "pytest>=8.3.4",
+  "pytest-cov>=6.0.0",
+  "pytest-mock>=3.14.0",
+  "pip-review>=1.3.0",
+  "pytest-asyncio>=0.22.0",
+  "aioresponses>=0.7.8",
 ]
 
 [build-system]
@@ -66,9 +66,7 @@ source = ["my_unicorn"]
 
 [tool.pytest.ini_options]
 minversion = "8.3.4"
-addopts = [
-    "-ra -q --strict-markers --import-mode=importlib",
-]
+addopts = ["-ra -q --strict-markers --import-mode=importlib"]
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
@@ -81,33 +79,33 @@ pythonpath = [".", "my_unicorn"]
 include = ["pyproject.toml"]
 # Exclude a variety of commonly ignored directories.
 exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".ipynb_checkpoints",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pyenv",
-    ".pytest_cache",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    ".vscode",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "site-packages",
-    "venv",
-    "__init__.py",
+  ".bzr",
+  ".direnv",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".hg",
+  ".ipynb_checkpoints",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pyenv",
+  ".pytest_cache",
+  ".pytype",
+  ".ruff_cache",
+  ".svn",
+  ".tox",
+  ".venv",
+  ".vscode",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "site-packages",
+  "venv",
+  "__init__.py",
 ]
 
 line-length = 95
@@ -149,36 +147,45 @@ fixable = ["ALL"]
 # Allow unused variables when underscore-prefixed.
 # dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 select = [
-    "E",   # pycodestyle (error)
-    "D",   # test pycodestyle
-    "F",   # pyflakes
-    "B",   # bugbear
-    "B9",
-    "C4",  # flake8-comprehensions
-    "SIM", # flake8-simplify
-    "I",   # isort
-    "UP",  # pyupgrade
-    "PIE", # flake8-pie
-    "PGH", # pygrep-hooks
-    "PYI", # flake8-pyi
-    "W",   # pycodestyle warnings
-    "UP",  # pyupgrade
-    "PL",  # pylint
-    "RUF", # ruff-specific rules
+  "E",   # pycodestyle (error)
+  "D",   # test pycodestyle
+  "F",   # pyflakes
+  "B",   # bugbear
+  "B9",
+  "C4",  # flake8-comprehensions
+  "SIM", # flake8-simplify
+  "I",   # isort
+  "UP",  # pyupgrade
+  "PIE", # flake8-pie
+  "PGH", # pygrep-hooks
+  "PYI", # flake8-pyi
+  "W",   # pycodestyle warnings
+  "UP",  # pyupgrade
+  "PL",  # pylint
+  "RUF", # ruff-specific rules
 ]
 
 ignore = [
-    # only relevant if you run a script with `python -0`,
-    # which seems unlikely for any of the scripts in this repo
-    "B011",
-    # Leave it to the formatter to split long lines and
-    # the judgement of all of us.
-    # "E501"
+  # only relevant if you run a script with `python -0`,
+  # which seems unlikely for any of the scripts in this repo
+  "B011",
+  # Leave it to the formatter to split long lines and
+  # the judgement of all of us.
+  # "E501"
 ]
 
 [tool.ruff.lint.pycodestyle]
-max-line-length = 95
+max-line-length = 79
 
 [tool.coverage.run]
 source = ["my_unicorn"]
 omit = ["tests/*", "scripts/*"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+# exclude = [
+#     '^file1\.py$',  # TOML literal string (single-quotes, no escaping necessary)
+#     "^file2\\.py$", # TOML basic string (double-quotes, backslash and other characters need escaping)
+# ]

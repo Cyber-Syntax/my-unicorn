@@ -1,6 +1,6 @@
 """Install command for AppImage installations.
 
-This module provides installation from both catalog apps and direct URLs using the Command pattern.
+This module provides installation from both catalog apps and direct URLs using the Template Method pattern.
 """
 
 from argparse import Namespace
@@ -14,16 +14,15 @@ from my_unicorn.storage import StorageService
 
 from ..github_client import GitHubClient
 from ..logger import get_logger
-from ..strategies.install import ValidationError
-from ..strategies.install_catalog import CatalogInstallStrategy
-from ..strategies.install_url import URLInstallStrategy
+from ..models import ValidationError
+from ..template.install import InstallTemplateFactory
 from .base import BaseCommandHandler
 
 logger = get_logger(__name__)
 
 
 class InstallCommand:
-    """Command for installing AppImages from catalog or direct URLs."""
+    """Command for installing AppImages from catalog or direct URLs using Template Method pattern."""
 
     def __init__(
         self,
@@ -52,14 +51,10 @@ class InstallCommand:
         self.install_dir = install_dir
         self.download_dir = download_dir or Path.cwd()
 
-        # Progress service will be created when needed
-        self.progress_service = None
-        self.download_service = None
+        # Progress and download services will be created when needed
+        self.progress_service: Any = None
+        self.download_service: Any = None
         self.storage_service = StorageService(install_dir)
-
-        # Strategies will be initialized with progress service
-        self.catalog_strategy = None
-        self.url_strategy = None
 
     def _initialize_services_with_progress(self, show_progress: bool) -> None:
         """Initialize services with progress service if needed.
@@ -77,24 +72,6 @@ class InstallCommand:
                 self.download_service = DownloadService(self.session, self.progress_service)
             else:
                 self.download_service = DownloadService(self.session)
-
-            # Initialize strategies with the configured download service
-            self.catalog_strategy = CatalogInstallStrategy(
-                catalog_manager=self.catalog_manager,
-                config_manager=self.config_manager,
-                github_client=self.github_client,
-                download_service=self.download_service,
-                storage_service=self.storage_service,
-                session=self.session,
-            )
-
-            self.url_strategy = URLInstallStrategy(
-                github_client=self.github_client,
-                config_manager=self.config_manager,
-                download_service=self.download_service,
-                storage_service=self.storage_service,
-                session=self.session,
-            )
 
     async def execute(self, targets: list[str], **options: Any) -> list[dict[str, Any]]:
         """Execute installation command.
@@ -282,7 +259,7 @@ class InstallCommand:
         catalog_targets: list[str],
         install_options: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        """Execute the actual installations.
+        """Execute the actual installations using template method pattern.
 
         Args:
             url_targets: List of URL targets
@@ -293,24 +270,34 @@ class InstallCommand:
             List of installation results
 
         """
-        results = []
+        results: list[dict[str, Any]] = []
 
+        # Create shared dependencies for templates
+        dependencies = {
+            "download_service": self.download_service,
+            "storage_service": self.storage_service,
+            "session": self.session,
+            "config_manager": self.config_manager,
+            "github_client": self.github_client,
+            "catalog_manager": self.catalog_manager,
+        }
+
+        # Install URL targets if any
         if url_targets:
             logger.info("📡 Installing %d URL(s)", len(url_targets))
-            if self.url_strategy:
-                url_results = await self.url_strategy.install(url_targets, **install_options)
-            else:
-                url_results = []
+            url_template = InstallTemplateFactory.create_template("url", **dependencies)
+            url_results = await url_template.install(url_targets, **install_options)
             results.extend(url_results)
 
+        # Install catalog targets if any
         if catalog_targets:
             logger.info("📚 Installing %d catalog app(s)", len(catalog_targets))
-            if self.catalog_strategy:
-                catalog_results = await self.catalog_strategy.install(
-                    catalog_targets, **install_options
-                )
-            else:
-                catalog_results = []
+            catalog_template = InstallTemplateFactory.create_template(
+                "catalog", **dependencies
+            )
+            catalog_results = await catalog_template.install(
+                catalog_targets, **install_options
+            )
             results.extend(catalog_results)
 
         return results

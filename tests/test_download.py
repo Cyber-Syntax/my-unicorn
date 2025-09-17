@@ -144,24 +144,6 @@ async def test_download_icon_download(
     assert tmp_file.read_bytes() == b"icondata"
 
 
-def test_verify_file_size_match(tmp_file):
-    """Test verify_file_size returns True if size matches."""
-    tmp_file.write_bytes(b"12345")
-    from my_unicorn.download import DownloadService
-
-    service = DownloadService(MagicMock())
-    assert service.verify_file_size(tmp_file, 5) is True
-
-
-def test_verify_file_size_mismatch(tmp_file):
-    """Test verify_file_size returns False if size mismatches."""
-    tmp_file.write_bytes(b"12345")
-    from my_unicorn.download import DownloadService
-
-    service = DownloadService(MagicMock())
-    assert service.verify_file_size(tmp_file, 10) is False
-
-
 def test_get_filename_from_url():
     """Test get_filename_from_url extracts filename."""
     from my_unicorn.download import DownloadService

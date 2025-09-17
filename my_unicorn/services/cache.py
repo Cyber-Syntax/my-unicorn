@@ -9,7 +9,6 @@ validation to ensure data freshness while minimizing API calls.
 """
 
 import contextlib
-import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TypedDict
@@ -18,7 +17,7 @@ import orjson
 
 from my_unicorn.config import ConfigManager
 from my_unicorn.logger import get_logger
-from my_unicorn.utils import is_checksum_file
+from my_unicorn.utils import is_appimage_file, is_checksum_file
 
 logger = get_logger(__name__)
 
@@ -60,24 +59,14 @@ class ReleaseCacheManager:
         # Ensure cache directory exists
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    def _is_appimage_file(self, filename: str) -> bool:
-        """Check if filename is an AppImage file.
-
-        Args:
-            filename: Name of the file to check
-
-        Returns:
-            True if the file is an AppImage
-
-        """
-        return filename.lower().endswith((".appimage",))
-
     def _is_checksum_file(self, filename: str) -> bool:
         """Check if filename is a checksum file for an AppImage.
 
         This method checks if the file is a checksum file AND if it's specifically
-        a checksum for an AppImage file. This prevents keeping checksums for 
+        a checksum for an AppImage file. This prevents keeping checksums for
         irrelevant files like tar.xz, zip, dmg, etc.
+
+        Use the consolidated checksum file detection from utils.
 
         Args:
             filename: Name of the file to check
@@ -86,9 +75,21 @@ class ReleaseCacheManager:
             True if the file is a checksum for an AppImage, False otherwise
 
         """
-        # Use the consolidated checksum file detection from utils
-        # with AppImage base file requirement for specific extensions
         return is_checksum_file(filename, require_appimage_base=True)
+
+    def _is_appimage_file(self, filename: str) -> bool:
+        """Check if filename is an AppImage file.
+
+        Use the consolidated AppImage file detection from utils.
+
+        Args:
+            filename: Name of the file to check
+
+        Returns:
+            True if the file is an AppImage, False otherwise
+
+        """
+        return is_appimage_file(filename)
 
     def _filter_relevant_assets(self, assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Filter assets to keep only AppImages and related checksum files.
@@ -125,17 +126,19 @@ class ReleaseCacheManager:
                 logger.debug("Including AppImage checksum file: %s", filename)
                 continue
 
-            # Log what we're filtering out for debugging  
+            # Log what we're filtering out for debugging
             logger.debug("Filtering out non-AppImage asset: %s", filename)
 
         # Count AppImages vs checksums for better logging
-        appimage_count = sum(1 for asset in relevant_assets if self._is_appimage_file(asset.get("name", "")))
+        appimage_count = sum(
+            1 for asset in relevant_assets if self._is_appimage_file(asset.get("name", ""))
+        )
         checksum_count = len(relevant_assets) - appimage_count
 
         logger.debug(
             "Asset filtering: %d -> %d assets (%d AppImages + %d AppImage checksums)",
             len(assets),
-            len(relevant_assets), 
+            len(relevant_assets),
             appimage_count,
             checksum_count,
         )

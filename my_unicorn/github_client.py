@@ -4,7 +4,6 @@ This module handles communication with the GitHub API to fetch release
 information, extract AppImage assets, and manage GitHub-specific operations.
 """
 
-import re
 from dataclasses import dataclass
 from typing import Any, TypedDict, cast
 from urllib.parse import urlparse
@@ -15,7 +14,11 @@ from .auth import GitHubAuthManager, auth_manager
 from .logger import get_logger
 from .services.cache import get_cache_manager
 from .services.progress import get_progress_service
-from .utils import extract_and_validate_version, is_checksum_file, get_checksum_file_format_type
+from .utils import (
+    extract_and_validate_version,
+    get_checksum_file_format_type,
+    is_checksum_file,
+)
 
 logger = get_logger(__name__)
 
@@ -179,19 +182,22 @@ class GitHubReleaseFetcher:
 
         return checksum_files
 
-    async def _try_fetch_stable_release(self, ignore_cache: bool = False) -> GitHubReleaseDetails | None:
+    async def _try_fetch_stable_release(
+        self, ignore_cache: bool = False
+    ) -> GitHubReleaseDetails | None:
         """Try to fetch the latest stable release, returning None if not found.
-        
+
         This is a helper method that doesn't raise exceptions for expected "no releases" scenarios.
-        
+
         Args:
             ignore_cache: If True, bypass cache and fetch fresh data from API
-            
+
         Returns:
             Release details if found, None if no stable releases exist
-            
+
         Raises:
             aiohttp.ClientError: If there are actual API/network errors
+
         """
         try:
             # Check cache first (unless bypassed)
@@ -200,7 +206,9 @@ class GitHubReleaseFetcher:
                     self.owner, self.repo, cache_type="stable"
                 )
                 if cached_data:
-                    logger.debug("Using cached stable release data for %s/%s", self.owner, self.repo)
+                    logger.debug(
+                        "Using cached stable release data for %s/%s", self.owner, self.repo
+                    )
                     # Convert cached data back to GitHubReleaseDetails
                     return GitHubReleaseDetails(
                         owner=cached_data["owner"],
@@ -218,14 +226,14 @@ class GitHubReleaseFetcher:
                 if response.status == 404:
                     # Repository not found or no releases - this is expected for some apps
                     return None
-                    
+
                 response.raise_for_status()
 
                 # Update rate limit information
                 self.auth_manager.update_rate_limit_info(dict(response.headers))
 
                 data = await response.json()
-                
+
                 # Check if this is actually a prerelease (some repos only have prereleases)
                 if data.get("prerelease", False):
                     return None
@@ -266,19 +274,22 @@ class GitHubReleaseFetcher:
             # Re-raise actual errors (network issues, etc.)
             raise
 
-    async def _try_fetch_prerelease(self, ignore_cache: bool = False) -> GitHubReleaseDetails | None:
+    async def _try_fetch_prerelease(
+        self, ignore_cache: bool = False
+    ) -> GitHubReleaseDetails | None:
         """Try to fetch the latest prerelease, returning None if not found.
-        
+
         This is a helper method that doesn't raise exceptions for expected "no releases" scenarios.
-        
+
         Args:
             ignore_cache: If True, bypass cache and fetch fresh data from API
-            
+
         Returns:
             Release details if found, None if no prereleases exist
-            
+
         Raises:
             aiohttp.ClientError: If there are actual API/network errors
+
         """
         try:
             # Check cache first (unless bypassed)
@@ -287,7 +298,9 @@ class GitHubReleaseFetcher:
                     self.owner, self.repo, cache_type="prerelease"
                 )
                 if cached_data:
-                    logger.debug("Using cached prerelease data for %s/%s", self.owner, self.repo)
+                    logger.debug(
+                        "Using cached prerelease data for %s/%s", self.owner, self.repo
+                    )
                     # Convert cached data back to GitHubReleaseDetails
                     return GitHubReleaseDetails(
                         owner=cached_data["owner"],
@@ -306,7 +319,7 @@ class GitHubReleaseFetcher:
                 if response.status == 404:
                     # Repository not found or no releases
                     return None
-                    
+
                 response.raise_for_status()
 
                 # Update rate limit information
@@ -483,7 +496,9 @@ class GitHubReleaseFetcher:
                 )
             raise
 
-    async def fetch_latest_prerelease(self, ignore_cache: bool = False) -> GitHubReleaseDetails:
+    async def fetch_latest_prerelease(
+        self, ignore_cache: bool = False
+    ) -> GitHubReleaseDetails:
         """Fetch the latest prerelease from GitHub API.
 
         This method is useful for apps like FreeTube that only provide prereleases.
@@ -601,7 +616,7 @@ class GitHubReleaseFetcher:
             result = await self._try_fetch_prerelease(ignore_cache=ignore_cache)
             if result is not None:
                 return result
-                
+
             # Fallback to stable release
             result = await self._try_fetch_stable_release(ignore_cache=ignore_cache)
             if result is not None:
@@ -611,7 +626,7 @@ class GitHubReleaseFetcher:
             result = await self._try_fetch_stable_release(ignore_cache=ignore_cache)
             if result is not None:
                 return result
-                
+
             # Fallback to prerelease
             result = await self._try_fetch_prerelease(ignore_cache=ignore_cache)
             if result is not None:
@@ -685,6 +700,7 @@ class GitHubReleaseFetcher:
             if asset["name"].endswith(".AppImage") or asset["name"].endswith(".appimage")
         ]
 
+    # FIXME: too many branches
     def select_best_appimage(
         self,
         release_data: GitHubReleaseDetails,
@@ -778,6 +794,8 @@ class GitHubReleaseFetcher:
         # Fallback: return first candidate
         return candidates[0]
 
+    # FIXME: unused, move the auth or make this to check the available rate status
+    # and use in the github api requests to prevent limit errors
     async def check_rate_limit(self) -> dict[str, Any]:
         """Check current rate limit status.
 
@@ -793,6 +811,7 @@ class GitHubReleaseFetcher:
             data = await response.json()
             return data
 
+    # FIXME: unused? checkout parser.py or url install template method
     @staticmethod
     def parse_repo_url(repo_url: str) -> tuple[str, str]:
         """Parse GitHub repository URL to extract owner and repo.
@@ -850,6 +869,7 @@ class GitHubReleaseFetcher:
                     f"Fetched default branch for {self.owner}/{self.repo}"
                 )
 
+            # FIXME: return str not Any
             return data.get("default_branch", "main")
 
     def build_icon_url(self, icon_path: str, branch: str | None = None) -> str:

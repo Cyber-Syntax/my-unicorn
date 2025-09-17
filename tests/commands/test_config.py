@@ -10,10 +10,30 @@ from my_unicorn.commands.config import ConfigHandler
 def mock_config_manager():
     called = {}
 
-    class DummyConfigManager:
+    class DummyGlobalConfigManager:
         def __init__(self):
             self.default = {"mock": "default"}
             self.converted = {"mock": "converted"}
+
+        def get_default_global_config(self):
+            called["get_default"] = True
+            return self.default
+
+        def _convert_to_global_config(self, data):
+            called["converted_data"] = data
+            called["converted"] = self.converted
+            return self.converted
+
+    class DummyDirectoryManager:
+        def __init__(self):
+            from pathlib import Path
+
+            self.settings_file = Path("/tmp/dummy_settings.conf")
+
+    class DummyConfigManager:
+        def __init__(self):
+            self.global_config_manager = DummyGlobalConfigManager()
+            self.directory_manager = DummyDirectoryManager()
             called["saved"] = False
 
         def load_global_config(self):
@@ -29,15 +49,6 @@ def mock_config_manager():
                     "backup": "/tmp/backup",
                 },
             }
-
-        def _get_default_global_config(self):
-            called["get_default"] = True
-            return self.default
-
-        def _convert_to_global_config(self, data):
-            called["converted_data"] = data
-            called["converted"] = self.converted
-            return self.converted
 
         def save_global_config(self, config):
             called["saved"] = True
@@ -77,13 +88,22 @@ async def test_execute_reset(monkeypatch, handler, capsys):
     h, called = handler
     args = Namespace(show=False, reset=True)
 
+    # Mock file operations using monkeypatch
+    def mock_exists(self):
+        return True
+
+    def mock_unlink(self):
+        called["file_deleted"] = True
+
+    # Patch the Path methods
+    monkeypatch.setattr("pathlib.Path.exists", mock_exists)
+    monkeypatch.setattr("pathlib.Path.unlink", mock_unlink)
+
     await h.execute(args)
 
     captured = capsys.readouterr()
     assert "✅ Configuration reset to defaults" in captured.out
-    assert called["get_default"] is True
-    assert called["saved"] is True
-    assert called["saved_config"] == called["converted"]
+    assert called["file_deleted"] is True
 
 
 @pytest.mark.asyncio
