@@ -7,6 +7,7 @@ parsed arguments to the appropriate command handlers.
 import sys
 from argparse import Namespace
 
+from .. import __version__
 from ..auth import auth_manager
 from ..commands.auth import AuthHandler
 from ..commands.backup import BackupHandler
@@ -81,6 +82,11 @@ class CLIRunner:
             # Parse command-line arguments
             parser = CLIParser(self.global_config)
             args = parser.parse_args()
+
+            # Global: --version should print package version and exit early.
+            if getattr(args, "version", False):
+                print(__version__)
+                return
 
             # Validate command
             if not args.command:
