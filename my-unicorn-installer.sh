@@ -201,7 +201,7 @@ install_bash_completion() {
         echo "source \"$bash_autocomplete_src\"" >> ~/.bashrc
         echo "Bash completion added to ~/.bashrc"
     else
-        print_warning "Bash completion already exists in ~/.bashrc"
+        echo "Bash completion already exists in ~/.bashrc"
     fi
 }
 
