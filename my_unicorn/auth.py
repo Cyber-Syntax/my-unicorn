@@ -107,9 +107,28 @@ class GitHubAuthManager:
         """Prompt user for GitHub token and save it securely."""
         try:
             token: str = getpass.getpass(prompt="Enter your GitHub token (input hidden): ")
-            if not token.strip():
+            if token is None:
+                logger.error("No input received for GitHub token.")
+                raise ValueError("Token cannot be empty")
+
+            # Normalize input by stripping surrounding whitespace so accidental
+            # spaces don't cause validation/confirmation mismatches. GitHub
+            # tokens do not include leading/trailing whitespace in normal use.
+            token = token.strip()
+            if not token:
                 logger.error("Attempted to save an empty GitHub token.")
                 raise ValueError("Token cannot be empty")
+
+            # Confirm token input
+            confirm_token: str = getpass.getpass(prompt="Confirm your GitHub token: ")
+            if confirm_token is None:
+                logger.error("No input received for GitHub token confirmation.")
+                raise ValueError("Token confirmation does not match")
+
+            confirm_token = confirm_token.strip()
+            if token != confirm_token:
+                logger.error("GitHub token confirmation does not match.")
+                raise ValueError("Token confirmation does not match")
 
             # Validate token format before saving
             if not validate_github_token(token):
@@ -118,8 +137,11 @@ class GitHubAuthManager:
 
             keyring.set_password(GitHubAuthManager.GITHUB_KEY_NAME, "token", token)
             logger.info("GitHub token saved successfully.")
+        except (EOFError, KeyboardInterrupt) as e:
+            logger.error("GitHub token input aborted: %s", e)
+            raise ValueError("Token input aborted by user") from e
         except Exception as e:
-            logger.error(f"Failed to save GitHub token to keyring: {e}")
+            logger.error("Failed to save GitHub token to keyring: %s", e)
             raise
 
     @staticmethod
