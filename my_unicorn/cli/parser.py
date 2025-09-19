@@ -29,6 +29,9 @@ class CLIParser:
 
         """
         parser = self._create_main_parser()
+        # Global flags such as --version should be available before
+        # subcommands are added so they can be handled early by the runner.
+        self._add_global_options(parser)
         self._add_subcommands(parser)
         return parser.parse_args()
 
@@ -70,6 +73,34 @@ Examples:
   %(prog)s auth --status
             """,
         )
+
+    def _add_global_options(self, parser: argparse.ArgumentParser) -> None:
+        """Add global options to the main parser.
+
+        This includes the --version flag which prints the package version
+        and exits. We avoid using -v here to prevent conflict with
+        subcommand --verbose flags.
+
+        """
+        # Use a long form flag only to avoid colliding with -v / --verbose
+        # commonly used by subcommands.
+        try:
+            # Import package version lazily to avoid heavier imports or
+            # potential import cycles during CLI initialization in tests.
+            from my_unicorn import __version__
+
+            parser.add_argument(
+                "--version",
+                action="store_true",
+                help=f"Show my-unicorn version ({__version__}) and exit",
+            )
+        except ImportError:
+            # If import fails (very rare in development), still offer the flag.
+            parser.add_argument(
+                "--version",
+                action="store_true",
+                help="Show my-unicorn version and exit",
+            )
 
     def _add_subcommands(self, parser: argparse.ArgumentParser) -> None:
         """Add all subcommands to the parser.
