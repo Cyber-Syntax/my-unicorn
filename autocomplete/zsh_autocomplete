@@ -11,7 +11,7 @@ _my_unicorn() {
     commands=(
         'install:Install AppImages from catalog or URLs'
         'update:Update installed AppImages'
-        'upgrade:Upgrade my-unicorn (replaces self-update)'
+        'upgrade:Upgrade my-unicorn itself'
         'list:List installed AppImages'
         'remove:Remove installed AppImages'
         'backup:Manage AppImage backups and restore'

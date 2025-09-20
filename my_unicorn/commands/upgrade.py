@@ -1,7 +1,7 @@
 """Upgrade command handler for my-unicorn CLI.
 
-This module provides the CLI handler for the new `upgrade` command which
-replaces the old `self-update` verb.
+This module provides the CLI handler for the `upgrade` command,
+which checks for and performs upgrades of the my-unicorn tool.
 """
 
 from argparse import Namespace
@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 
 
 class UpgradeHandler(BaseCommandHandler):
-    """Handler for upgrade command operations (replaces self-update)."""
+    """Handler for upgrade command operations."""
 
     async def execute(self, args: Namespace) -> None:
         """Execute the upgrade command.

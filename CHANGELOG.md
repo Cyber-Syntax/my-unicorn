@@ -1,6 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.8.0-alpha
 ## v1.7.4-alpha
 ## v1.7.3-alpha
 ## v1.7.2-alpha
