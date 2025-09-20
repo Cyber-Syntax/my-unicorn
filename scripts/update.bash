@@ -22,6 +22,16 @@ if [ ! -x "$UNICORN" ]; then
   exit 127
 fi
 
+# my-unicorn new version check command
+check_upgrade() {
+  if ! output="$("$UNICORN" upgrade --check-only --refresh-cache 2>&1)"; then
+    echo "Error: Failed to check for updates. Possible network issue."
+    echo "$output"
+    return 1
+  fi
+  echo "$output"
+}
+
 # Function to determine update need apps and print them
 check_updates() {
   if ! output=$("$UNICORN" update --check-only --refresh-cache 2>&1); then

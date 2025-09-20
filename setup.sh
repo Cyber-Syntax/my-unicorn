@@ -177,8 +177,12 @@ setup_autocomplete() {
   if [[ -x "$helper" ]]; then
     echo "🔁 Setting up autocomplete..."
     bash "$helper"
+  # call install_myunicorn to get the new autocomplete folder, else fail
+  elif [[ -x "$(script_dir)/scripts/autocomplete.bash" ]]; then
+    echo "🔁 Installing my-unicorn to get the new autocomplete folder..."
+    install_my_unicorn
   else
-    echo "⚠️  Autocomplete script not found, skipping"
+    echo "❌ Autocomplete helper script not found or not executable"
     return 1
   fi
 }
@@ -200,10 +204,12 @@ install_my_unicorn() {
   echo "Run 'my-unicorn --help' to get started."
 }
 
-# Update only the virtual environment, keep existing files
+# Update virtual environment and source files to get new features
 update_my_unicorn() {
   echo "=== Updating my-unicorn ==="
+  copy_source_to_install_dir
   setup_venv
+  install_wrapper
   setup_autocomplete
   echo "✅ Update complete."
 }

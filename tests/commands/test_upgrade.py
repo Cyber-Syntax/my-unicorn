@@ -29,7 +29,9 @@ async def test_execute_check_only_update_available(mocker) -> None:
     print_mock = mocker.patch("builtins.print")
     await handler.execute(args)
     print_mock.assert_any_call("🔍 Checking for my-unicorn upgrade...")
-    print_mock.assert_any_call("\nRun 'my-unicorn upgrade' to install the upgrade.")
+    print_mock.assert_any_call(
+        "\nRun 'my-unicorn upgrade' to install the upgrade."
+    )
 
 
 @pytest.mark.asyncio
@@ -55,10 +57,10 @@ async def test_execute_perform_update_success(mocker) -> None:
     update_manager = UpdateManager(config_manager)
     handler = UpgradeHandler(config_manager, auth_manager, update_manager)
 
-    async def fake_check_for_self_update():
+    async def fake_check_for_self_update(refresh_cache: bool = False):
         return True
 
-    async def fake_perform_self_update():
+    async def fake_perform_self_update(refresh_cache: bool = False):
         return True
 
     mocker.patch(
@@ -99,10 +101,10 @@ async def test_execute_perform_update_failure(mocker) -> None:
     update_manager = UpdateManager(config_manager)
     handler = UpgradeHandler(config_manager, auth_manager, update_manager)
 
-    async def fake_check_for_self_update():
+    async def fake_check_for_self_update(refresh_cache: bool = False):
         return True
 
-    async def fake_perform_self_update():
+    async def fake_perform_self_update(refresh_cache: bool = False):
         return False
 
     mocker.patch(
@@ -116,4 +118,6 @@ async def test_execute_perform_update_failure(mocker) -> None:
     args = Namespace(check_only=False)
     print_mock = mocker.patch("builtins.print")
     await handler.execute(args)
-    print_mock.assert_any_call("❌ Upgrade failed. Please try again or update manually.")
+    print_mock.assert_any_call(
+        "❌ Upgrade failed. Please try again or update manually."
+    )

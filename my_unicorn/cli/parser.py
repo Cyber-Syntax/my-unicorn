@@ -219,8 +219,9 @@ Examples:
             help="Upgrade my-unicorn cli",
             epilog="""
 Examples:
-  %(prog)s --check-only    # Check for upgrades only
-  %(prog)s                 # Upgrade if available
+  %(prog)s --check-only                 # Check for upgrades only
+  %(prog)s --check-only --refresh-cache # Check for upgrades bypassing cache
+  %(prog)s                              # Upgrade if available
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
@@ -228,6 +229,12 @@ Examples:
             "--check-only",
             action="store_true",
             help="Only check for upgrades without installing",
+        )
+        upgrade_parser.add_argument(
+            "--refresh-cache",
+            action="store_true",
+            help="Bypass cache and fetch fresh data from GitHub API "
+            "(useful for automated scripts)",
         )
 
     def _add_list_command(self, subparsers) -> None:

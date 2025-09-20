@@ -199,8 +199,13 @@ class SelfUpdater:
             logger.exception("Failed to get version: %s", e)
             print(f"Error: {e}")
 
-    async def get_latest_release(self) -> dict[str, Any] | None:
+    async def get_latest_release(
+        self, refresh_cache: bool = False
+    ) -> dict[str, Any] | None:
         """Get the latest release information from GitHub API.
+
+        Args:
+            refresh_cache: Whether to bypass cache and fetch fresh data
 
         Returns:
             Release information or None if failed
@@ -211,7 +216,7 @@ class SelfUpdater:
             # TODO: Change to prefer_prerelease=False when we have stable releases
             release_data = (
                 await self.github_fetcher.fetch_latest_release_or_prerelease(
-                    prefer_prerelease=True
+                    prefer_prerelease=True, ignore_cache=refresh_cache
                 )
             )
 
@@ -248,8 +253,11 @@ class SelfUpdater:
             print(f"Error connecting to GitHub: {e}")
             return None
 
-    async def check_for_update(self) -> bool:
+    async def check_for_update(self, refresh_cache: bool = False) -> bool:
         """Check if a new release is available from the GitHub repo.
+
+        Args:
+            refresh_cache: Whether to bypass cache and fetch fresh data
 
         Returns:
             True if update is available, False otherwise
@@ -258,7 +266,7 @@ class SelfUpdater:
         logger.info("Checking for updates...")
 
         # Get latest release info
-        latest_release = await self.get_latest_release()
+        latest_release = await self.get_latest_release(refresh_cache)
         if not latest_release:
             return False
 
@@ -689,8 +697,11 @@ async def get_self_updater(
     return SelfUpdater(config_manager, session, simple_progress)
 
 
-async def check_for_self_update() -> bool:
+async def check_for_self_update(refresh_cache: bool = False) -> bool:
     """Check for self-updates.
+
+    Args:
+        refresh_cache: Whether to bypass cache and fetch fresh data
 
     Returns:
         True if update is available, False otherwise
@@ -698,13 +709,16 @@ async def check_for_self_update() -> bool:
     """
     updater = await get_self_updater()
     try:
-        return await updater.check_for_update()
+        return await updater.check_for_update(refresh_cache)
     finally:
         await updater.session.close()
 
 
-async def perform_self_update() -> bool:
+async def perform_self_update(refresh_cache: bool = False) -> bool:
     """Perform self-update.
+
+    Args:
+        refresh_cache: Whether to bypass cache and fetch fresh data
 
     Returns:
         True if update was successful, False otherwise
@@ -713,7 +727,7 @@ async def perform_self_update() -> bool:
     updater = await get_self_updater()
     try:
         # First check if update is available
-        if await updater.check_for_update():
+        if await updater.check_for_update(refresh_cache):
             return await updater.perform_update()
         else:
             return False
