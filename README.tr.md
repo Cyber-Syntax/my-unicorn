@@ -1,7 +1,7 @@
 English Description: [README.md](README.md)
 
 > [!CAUTION]
-> Bu proje sınırlı testlerden dolayı şu anlık **alpha aşamasındadır**. 
+> Bu proje sınırlı testlerden dolayı şu anlık **alpha aşamasındadır**.
 >
 > **Önemli:** Script’i güncellerken **Releases** bölümündeki talimatları takip edin.
 >
@@ -10,15 +10,15 @@ English Description: [README.md](README.md)
 ## **🦄 my-unicorn Hakkında**
 
 > [!NOTE]
-> Manuel AppImage güncelleme sürecinden yılmıştım, süreci otomatikleştirmek için bu projeyi oluşturdum. 
+> Manuel AppImage güncelleme sürecinden yılmıştım, süreci otomatikleştirmek için bu projeyi oluşturdum.
 >
-> Detaylı bilgi: [wiki.md](docs/wiki.md) 
+> Detaylı bilgi: [wiki.md](docs/wiki.md)
 
 - **Desteklenen Uygulamalar:**
     - Super-Productivity, Siyuan, Joplin, Standard-notes, Logseq, QOwnNotes, Tagspaces, Zen-Browser, weektodo, Zettlr
     - Doğrulaması olmayan uygulamalar (yazılımcıları hash sağlamıyor):
         - FreeTube
-            - Bağlantılı sorun: https://github.com/FreeTubeApp/FreeTube/issues/4720)
+            - Bağlantılı sorun: <https://github.com/FreeTubeApp/FreeTube/issues/4720>)
         - AppFlowy
         - Obsidian
     - Daha fazlası [apps](my_unicorn/apps/) klasöründe bulunabilir.
@@ -41,10 +41,10 @@ English Description: [README.md](README.md)
 
     ```bash
     cd my-unicorn &
-    sh my-unicorn-installer.sh install
+    sh setup.sh install
     ```
-    
-## Paketi kaldır:
+
+## Paketi kaldır
 
 > [!TIP]
 > Eğer paketi küresel olarak yüklediyseniz, aşağıdaki komutu kullanarak kaldırabilirsiniz:
@@ -55,7 +55,7 @@ English Description: [README.md](README.md)
 
 # Nasıl Kullanılır?
 
-## Paket olarak kullanım:
+## Paket olarak kullanım
 
 ```bash
 my-unicorn --help # to see the command options
@@ -91,25 +91,24 @@ my-unicorn migrate --clean # Migrate configuration files
 my-unicorn migrate --force # Migrate configuration without confirmation
 ```
 
-
-## Desteklenmeyen uygulamalar için (URL ile kurulum):
+## Desteklenmeyen uygulamalar için (URL ile kurulum)
 
 > [!IMPORTANT]
 > Eğer desteklenmeyen bir uygulamayı kurmak istiyorsanız, uygulama hakkında bazı bilgilere sahip olmanız gerekecektir.
 
 - **GitHub URL:** Uygulamanın GitHub depo adresi (örn. `https://github.com/johannesjo/super-productivity`).
 - Hash türü ve Hash dosya adı otamatik olarak tespit edilir. Eğer uygulamanın uyumluluğu yoksa veya hata oluşursa aşağıdaki bilgileri sağlamanız gerekecek:
-   - **Hash türü:** Hash türünü belirtin (örn. super-productivity için sha512).
-   - **Hash doğrulama sorunları:** Eğer hash doğrulama başarısız olursa, hash'i manuel olarak JSON dosyasına ekleyebilirsiniz:
-     - En son hash bilgisini GitHub sürüm sayfasında bulabilirsiniz (örn. [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
-     - Örnekler için [apps](my_unicorn/apps/) klasörüne bakabilirsiniz.
+    - **Hash türü:** Hash türünü belirtin (örn. super-productivity için sha512).
+    - **Hash doğrulama sorunları:** Eğer hash doğrulama başarısız olursa, hash'i manuel olarak JSON dosyasına ekleyebilirsiniz:
+        - En son hash bilgisini GitHub sürüm sayfasında bulabilirsiniz (örn. [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
+        - Örnekler için [apps](my_unicorn/apps/) klasörüne bakabilirsiniz.
 
 # **🙏 Bu Projeye Destek Olun**
 
 - **GitHub üzerinde yıldız ⭐** vererek desteğinizi gösterebilirsiniz, böylece kodlama yolculuğumda motive olmamı sağlar!
 - **Test:** Eğer betiği test eder ve karşılaştığınız herhangi bir sorun hakkında geri bildirim sağlayabilirseniz harika olur.
 - **💖 Projeyi Destekle:** Çalışmalarımı desteklemek ve projeler yapmaya devam etmemi sağlamak istersen, bana sponsor olmayı düşünebilirsin:
-  - [![Sponsor Ol](https://img.shields.io/badge/Sponsor-💖-brightgreen)](https://github.com/sponsors/Cyber-Syntax)
+    - [![Sponsor Ol](https://img.shields.io/badge/Sponsor-💖-brightgreen)](https://github.com/sponsors/Cyber-Syntax)
 
 ## **🤝 Katkı Sağlama**
 

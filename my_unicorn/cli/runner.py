@@ -6,8 +6,8 @@ parsed arguments to the appropriate command handlers.
 
 import sys
 from argparse import Namespace
+from importlib.metadata import PackageNotFoundError, metadata
 
-from .. import __version__
 from ..auth import auth_manager
 from ..commands.auth import AuthHandler
 from ..commands.backup import BackupHandler
@@ -16,8 +16,8 @@ from ..commands.config import ConfigHandler
 from ..commands.install import InstallHandler
 from ..commands.list import ListHandler
 from ..commands.remove import RemoveHandler
-from ..commands.self_update import SelfUpdateHandler
 from ..commands.update import UpdateHandler
+from ..commands.upgrade import UpgradeHandler
 from ..config import ConfigManager
 from ..logger import get_logger
 from ..update import UpdateManager
@@ -59,18 +59,24 @@ class CLIRunner:
             "update": UpdateHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
-            "self-update": SelfUpdateHandler(
+            "upgrade": UpgradeHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
-            "list": ListHandler(self.config_manager, self.auth_manager, self.update_manager),
+            "list": ListHandler(
+                self.config_manager, self.auth_manager, self.update_manager
+            ),
             "remove": RemoveHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
             "backup": BackupHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
-            "cache": CacheHandler(self.config_manager, self.auth_manager, self.update_manager),
-            "auth": AuthHandler(self.config_manager, self.auth_manager, self.update_manager),
+            "cache": CacheHandler(
+                self.config_manager, self.auth_manager, self.update_manager
+            ),
+            "auth": AuthHandler(
+                self.config_manager, self.auth_manager, self.update_manager
+            ),
             "config": ConfigHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
@@ -85,12 +91,27 @@ class CLIRunner:
 
             # Global: --version should print package version and exit early.
             if getattr(args, "version", False):
-                print(__version__)
+                try:
+                    # Use the same metadata approach as upgrade module
+                    package_metadata = metadata("my-unicorn")
+                    version_str = package_metadata["Version"]
+                    # Handle version with git info for better readability
+                    if "+" in version_str:
+                        numbered_version, git_version = version_str.split(
+                            "+", 1
+                        )
+                        print(f"{numbered_version} (git: {git_version})")
+                    else:
+                        print(version_str)
+                except PackageNotFoundError:
+                    print("Version information not available")
                 return
 
             # Validate command
             if not args.command:
-                print("❌ No command specified. Use --help for usage information.")
+                print(
+                    "❌ No command specified. Use --help for usage information."
+                )
                 sys.exit(1)
 
             # Route to appropriate command handler

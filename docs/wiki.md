@@ -34,21 +34,21 @@
 
 ## Helper scripts
 
-- my-unicorn-installer.sh: A script to install my-unicorn and its dependencies.
+- setup.sh: A script to install my-unicorn and its dependencies.
     - It sets up a virtual environment and installs the required Python packages.
 - venv-wrapper.bash: Wrapper script around my-unicorn using the python virtual environment
 - update.bash: A script to automate process of checking for updates and updating my-unicorn itself.
 
 ## 🛠️ Usage Examples
 
-### my-unicorn self-update
+### my-unicorn upgrade
 
 ```bash
-# Check for update
-my-unicorn self-update --check-only
+# Check for upgrade
+my-unicorn upgrade --check-only
 
-# Update my-unicorn
-my-unicorn self-update
+# Upgrade my-unicorn
+my-unicorn upgrade
 ```
 
 ### Installation
@@ -170,7 +170,7 @@ my-unicorn backup --migrate
 ### Required Dependencies
 
 > [!TIP]
-> These dependencies are already installed when you used my-unicorn-installer.sh to install my-unicorn.
+> These dependencies are already installed when you used setup.sh to install my-unicorn.
 
 ```bash
 pip install aiohttp uvloop keyring orjson packaging rich

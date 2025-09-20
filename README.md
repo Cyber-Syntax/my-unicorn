@@ -39,18 +39,18 @@ Turkish: [README.tr.md](README.tr.md)
 
     ```bash
     cd my-unicorn &
-    sh my-unicorn-installer.sh install
+    sh setup.sh install
     ```
 
 3. Add autocomplete (optional):
 
     ```bash
     # auto-detect your shell and install autocomplete
-    sh my-unicorn-installer.sh autocomplete
+    sh setup.sh autocomplete
 
     # or manually add autocomplete for bash or zsh
-    sh my-unicorn-installer.sh autocomplete bash
-    sh my-unicorn-installer.sh autocomplete zsh
+    sh setup.sh autocomplete bash
+    sh setup.sh autocomplete zsh
     ```
 
 4. Start using my-unicorn:

@@ -1,6 +1,19 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.8.0-alpha
+### BREAKING CHANGES
+This release removes the `self-update` command to use `upgrade` command instead for better clarity and consistency. Also, upgrade command now removed the rich progress bar and use simple text-based progress updates to improve performance and reduce resource consumption.
+
+### Migration guide
+Please update manually with setup.sh script. Run the following commands in your terminal:
+
+```bash
+git clone https://github.com/Cyber-Syntax/my-unicorn.git
+cd my-unicorn
+./setup.sh
+```
+
 ## v1.7.4-alpha
 ## v1.7.3-alpha
 ## v1.7.2-alpha
