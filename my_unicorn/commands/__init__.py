@@ -11,6 +11,7 @@ from .install import InstallHandler
 from .list import ListHandler
 from .remove import RemoveHandler
 from .update import UpdateHandler
+from .upgrade import UpgradeHandler
 
 __all__ = [
     "BaseCommandHandler",
@@ -20,4 +21,5 @@ __all__ = [
     "ListHandler",
     "RemoveHandler",
     "UpdateHandler",
+    "UpgradeHandler",
 ]

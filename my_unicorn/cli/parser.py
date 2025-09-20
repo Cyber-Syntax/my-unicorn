@@ -59,9 +59,9 @@ Examples:
   %(prog)s update appflowy joplin
   %(prog)s update
 
-  # my-unicorn update and check
-  %(prog)s self-update --check-only
-  %(prog)s self-update
+      # my-unicorn upgrade and check
+  %(prog)s upgrade --check-only
+  %(prog)s upgrade
 
   # Other commands
   %(prog)s list                # Show installed appimages
@@ -113,7 +113,7 @@ Examples:
 
         self._add_install_command(subparsers)
         self._add_update_command(subparsers)
-        self._add_self_update_command(subparsers)
+        self._add_upgrade_command(subparsers)
         self._add_list_command(subparsers)
         self._add_remove_command(subparsers)
         self._add_backup_command(subparsers)
@@ -209,27 +209,27 @@ Examples:
             "--verbose", action="store_true", help="Show detailed logging during update"
         )
 
-    def _add_self_update_command(self, subparsers) -> None:
-        """Add self-update command parser.
+    def _add_upgrade_command(self, subparsers) -> None:
+        """Add upgrade command parser.
 
         Args:
-            subparsers: The subparsers object to add the self-update command to
+            subparsers: The subparsers object to add the upgrade command to
 
         """
-        self_update_parser = subparsers.add_parser(
-            "self-update",
-            help="Update my-unicorn itself from GitHub",
+        upgrade_parser = subparsers.add_parser(
+            "upgrade",
+            help="Upgrade my-unicorn cli",
             epilog="""
 Examples:
-  %(prog)s --check-only    # Check for updates only
-  %(prog)s                 # Update if available
+  %(prog)s --check-only    # Check for upgrades only
+  %(prog)s                 # Upgrade if available
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
-        self_update_parser.add_argument(
+        upgrade_parser.add_argument(
             "--check-only",
             action="store_true",
-            help="Only check for updates without installing",
+            help="Only check for upgrades without installing",
         )
 
     def _add_list_command(self, subparsers) -> None:

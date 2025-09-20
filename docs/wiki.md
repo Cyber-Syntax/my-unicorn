@@ -41,14 +41,14 @@
 
 ## 🛠️ Usage Examples
 
-### my-unicorn self-update
+### my-unicorn upgrade
 
 ```bash
-# Check for update
-my-unicorn self-update --check-only
+# Check for upgrade
+my-unicorn upgrade --check-only
 
-# Update my-unicorn
-my-unicorn self-update
+# Upgrade my-unicorn
+my-unicorn upgrade
 ```
 
 ### Installation

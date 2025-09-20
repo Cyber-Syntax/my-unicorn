@@ -67,14 +67,14 @@ def test_update_command_with_check_only(cli_parser):
 
 
 def test_self_update_command(cli_parser):
-    with patch("sys.argv", ["my-unicorn", "self-update"]):
+    with patch("sys.argv", ["my-unicorn", "upgrade"]):
         args = cli_parser.parse_args()
-        assert args.command == "self-update"
+        assert args.command == "upgrade"
         assert not args.check_only
 
 
 def test_self_update_with_check(cli_parser):
-    with patch("sys.argv", ["my-unicorn", "self-update", "--check-only"]):
+    with patch("sys.argv", ["my-unicorn", "upgrade", "--check-only"]):
         args = cli_parser.parse_args()
         assert args.check_only
 

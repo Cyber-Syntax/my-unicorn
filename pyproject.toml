@@ -67,7 +67,7 @@ source = ["my_unicorn"]
 
 [tool.pytest.ini_options]
 minversion = "8.3.4"
-addopts = ["-ra -q --strict-markers --import-mode=importlib"]
+addopts = ["-r a -q -v --strict-markers"]
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
@@ -109,7 +109,7 @@ exclude = [
   "__init__.py",
 ]
 
-line-length = 95
+line-length = 79
 indent-width = 4
 
 [tool.ruff.format]

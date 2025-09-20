@@ -16,8 +16,8 @@ from ..commands.config import ConfigHandler
 from ..commands.install import InstallHandler
 from ..commands.list import ListHandler
 from ..commands.remove import RemoveHandler
-from ..commands.self_update import SelfUpdateHandler
 from ..commands.update import UpdateHandler
+from ..commands.upgrade import UpgradeHandler
 from ..config import ConfigManager
 from ..logger import get_logger
 from ..update import UpdateManager
@@ -59,7 +59,7 @@ class CLIRunner:
             "update": UpdateHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
-            "self-update": SelfUpdateHandler(
+            "upgrade": UpgradeHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
             "list": ListHandler(self.config_manager, self.auth_manager, self.update_manager),

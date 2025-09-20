@@ -11,7 +11,7 @@ _my_unicorn() {
     commands=(
         'install:Install AppImages from catalog or URLs'
         'update:Update installed AppImages'
-        'self-update:Update my-unicorn itself from GitHub'
+        'upgrade:Upgrade my-unicorn (replaces self-update)'
         'list:List installed AppImages'
         'remove:Remove installed AppImages'
         'backup:Manage AppImage backups and restore'
@@ -52,9 +52,9 @@ _my_unicorn() {
                         '--help[Show help information]' \
                         '1:app app:_files'
                     ;;
-                self-update)
+                upgrade)
                     _arguments \
-                        '(--check-only)--check-only[Only check for updates without installing]' \
+                        '(--check-only)--check-only[Only check for upgrades without installing]' \
                         '--help[Show help information]' \
                         '1:app app:_files'
                     ;;

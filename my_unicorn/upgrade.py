@@ -1,12 +1,12 @@
 #!/usr/bin/python3
-"""Self-update functionality for my-unicorn package from GitHub.
+"""my-unicorn cli upgrade module.
 
 This module handles updating the my-unicorn package itself by fetching
 the latest release from GitHub, cloning the repository, and running
 the installer script in update mode.
 
 TODO: Switch to stable releases only when we publish stable versions
-Currently using latest releases (including prereleases) until stable releases are available.
+Currently using prereleases until stable releases are available.
 """
 
 import asyncio
@@ -146,7 +146,7 @@ class SelfUpdater:
             logger.info("Fetching latest release from GitHub...")
             # TODO: Change to prefer_prerelease=False when we have stable releases
             release_data = await self.github_fetcher.fetch_latest_release_or_prerelease(
-                prefer_prerelease=True  # Currently using prereleases until stable releases available
+                prefer_prerelease=True
             )
 
             logger.info("Found latest release: %s", release_data.get("version", "unknown"))
@@ -258,7 +258,7 @@ class SelfUpdater:
         source_dir = repo_dir / "source"
         installer = package_dir / "my-unicorn-installer.sh"
 
-        logger.debug("Starting self-update process")
+        logger.debug("Starting upgrade to my-unicorn...")
         logger.debug("Repository directory: %s", repo_dir)
         logger.debug("Package directory: %s", package_dir)
         logger.debug("Source directory: %s", source_dir)
@@ -433,7 +433,7 @@ class SelfUpdater:
 
             if self.progress_service:
                 install_task_id = await self.progress_service.add_task(
-                    name="Self-Update Installation",
+                    name="Upgrade cli Installation",
                     progress_type=ProgressType.INSTALLATION,
                     total=100.0,
                     description="Running installer in UPDATE mode...",
