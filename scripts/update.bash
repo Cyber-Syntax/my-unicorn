@@ -3,9 +3,11 @@
 # This would be update only that if you have their configs
 # in the ~/.config/my-unicorn/apps directory.
 # You need to install the apps first to use this script.
-
-# Make sure you set to update without any user interaction.
-# in the ~/.config/my-unicorn/settings.conf file.
+#
+# Make sure you enabled batch mode if you want to run this
+# script in an automated fashion (e.g. via cron or a window
+# manager autostart). Batch mode already defaults to true
+# in the ~/.config/my-unicorn/settings.conf file. 
 #
 #   "batch_mode": true,
 #
@@ -30,6 +32,69 @@ check_upgrade() {
     return 1
   fi
   echo "$output"
+}
+
+# Notify user about CLI upgrade using machine-friendly output so power
+# users / WMs can handle notifications their own way.
+notify_cli_upgrade() {
+  local title="$1"
+  local body="$2"
+
+  # Print a machine-friendly notification line so power-users and
+  # window managers can consume it (for example via a log-watcher or
+  # a startup hook). Keep a simple format that is easy to grep.
+  printf 'MY-UNICORN-NOTIFY: %s\n%s\n' "$title" "$body"
+
+  # Also try to trigger a Qtile widget refresh if present. This is
+  # left as-is for users using Qtile who want an immediate widget update.
+  if command -v qtile >/dev/null 2>&1; then
+    qtile cmd-obj -o widget my-unicorn -f force_update >/dev/null 2>&1 || true
+  fi
+}
+
+# Show CLI upgrade status to user and send notification if an upgrade exists
+show_cli_upgrade() {
+  local output
+  if ! output=$(check_upgrade); then
+    echo "⚠️ Could not check CLI upgrade information."
+    return 1
+  fi
+
+  # Detect common 'no update' responses (allow spaces or hyphens):
+  # examples: "no new version", "up to date", "up-to-date", "already at version"
+  if echo "$output" | grep -qiE 'no (new|updates?|upgrade)|up[ -]?to[ -]?date|already( at| )?version|nothing to (do|update)|no updates found|no update available'; then
+    echo "✅ CLI up-to-date"
+    return 0
+  fi
+
+  # Try to extract a semantic version from the output (best-effort)
+  local new_version
+  new_version=$(echo "$output" | grep -Eo '([0-9]+\.){1,3}[0-9]+' | head -n1 || true)
+
+  echo "⬆️ CLI update available"
+  if [ -n "$new_version" ]; then
+    echo "New version: $new_version"
+    notify_cli_upgrade "my-unicorn CLI update available" "New version: $new_version"
+  else
+    # Fallback to printing entire output and notify with full text
+    echo "$output"
+    notify_cli_upgrade "my-unicorn CLI update available" "$output"
+  fi
+}
+
+# Perform CLI upgrade (run the CLI's upgrade command). This may prompt
+# interactively depending on the user's my-unicorn settings; callers that
+# want fully automated behavior should ensure batch mode is enabled in
+# ~/.config/my-unicorn/settings.conf or provide appropriate CLI flags.
+upgrade_cli() {
+  echo "Upgrading my-unicorn CLI..."
+  if ! "$UNICORN" upgrade; then
+    echo "Error: CLI upgrade failed. Check logs or run '$UNICORN upgrade' manually."
+    return 1
+  fi
+
+  echo "✅ CLI upgraded successfully"
+  notify_cli_upgrade "my-unicorn CLI upgraded" "Upgrade completed"
 }
 
 # Function to determine update need apps and print them
@@ -144,8 +209,10 @@ help() {
   echo ""
   echo "Options:"
   echo "  --check           Display status of updates (default)"
-  echo "  --update-all      Update all of your downloaded AppImages"
+  echo "  --update-all      Update all of your downloaded AppImages (concurrent)"
   echo "  --update-outdated Update only outdated AppImages (concurrent)"
+  echo "  --check-cli       Check for my-unicorn CLI updates"
+  echo "  --upgrade-cli     Run the my-unicorn CLI upgrade command (may be interactive)"
   echo "  --help, -h        Display this help message"
   echo ""
   echo "Examples:"
@@ -159,11 +226,17 @@ case "${1:-}" in
   --check | "")
     show_updates
     ;;
+  --check-cli)
+    show_cli_upgrade
+    ;;
   --update-all)
     update_all
     ;;
   --update-outdated)
     update_outdated
+    ;;
+  --upgrade-cli)
+    upgrade_cli
     ;;
   --help | -h)
     help
