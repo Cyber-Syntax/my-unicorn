@@ -14,7 +14,7 @@
     },
     "verification": {
         "digest": true,
-        "skip": true,
+        "skip": false,
         "checksum_file": "",
         "checksum_hash_type": "sha256"
     },
