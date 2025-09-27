@@ -1,6 +1,33 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.8.0-alpha
+### BREAKING CHANGES
+This release removes the `self-update` command to use `upgrade` command instead for better clarity and consistency. Also, upgrade command now removed the rich progress bar and use simple text-based progress updates to improve performance and reduce resource consumption.
+
+### Migration guide
+Please update manually with setup.sh script. Run the following commands in your terminal:
+
+```bash
+git clone https://github.com/Cyber-Syntax/my-unicorn.git
+cd my-unicorn
+./setup.sh
+```
+
+## v1.7.4-alpha
+## v1.7.3-alpha
+## v1.7.2-alpha
+## v1.7.1-alpha
+## v1.7.0-alpha
+# CHANGES
+This release refactors the codebase for improved code readability, maintainability and performance.
+
+- Removed size verification logic which it was not best practice to verify app integrity.
+
+## v1.6.0-alpha
+# BREAKING CHANGES
+This release introduces a comprehensive caching mechanism for GitHub release data, enhancing performance and reducing redundant API calls. The caching system is designed to store release information persistently, with a configurable time-to-live (TTL) to ensure data freshness. Additionally, the release includes significant improvements to the logging capabilities of the verification service, providing detailed insights into the verification process and asset handling.
+
 ## v1.5.1-alpha
 ## v1.5.0-alpha
 # BREAKING CHANGES

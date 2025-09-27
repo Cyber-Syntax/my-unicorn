@@ -1,0 +1,123 @@
+#compdef my-unicorn
+
+# my-unicorn zsh completion script
+# Add this to your zsh completions directory or source it in your .zshrc
+
+_my_unicorn() {
+    local -a commands
+    local state line
+    
+    # Define available commands
+    commands=(
+        'install:Install AppImages from catalog or URLs'
+        'update:Update installed AppImages'
+        'upgrade:Upgrade my-unicorn itself'
+        'list:List installed AppImages'
+        'remove:Remove installed AppImages'
+        'backup:Manage AppImage backups and restore'
+        'cache:Manage release data cache for better performance'
+        'auth:Manage GitHub authentication'
+        'config:Manage configuration'
+    )
+
+    _arguments -C \
+        '1: :->command' \
+        '*: :->args' \
+        && return 0
+
+    case $state in
+        command)
+            _describe 'my-unicorn commands' commands
+            _values 'global options' \
+                '--help[Show help information]' \
+                '--version[Show version information]'
+            ;;
+        args)
+            case ${line[1]} in
+                install)
+                    _arguments \
+                        '(--concurrency --no-icon --no-verify --no-desktop --verbose)--concurrency[Maximum number of parallel installs]:number:' \
+                        '(--concurrency --no-icon --no-verify --no-desktop --verbose)--no-icon[Skip downloading application icons]' \
+                        '(--concurrency --no-icon --no-verify --no-desktop --verbose)--no-verify[Skip AppImage verification]' \
+                        '(--concurrency --no-icon --no-verify --no-desktop --verbose)--no-desktop[Skip desktop entry creation]' \
+                        '(--concurrency --no-icon --no-verify --no-desktop --verbose)--verbose[Show detailed logging during installation]' \
+                        '--help[Show help information]' \
+                        '1:app app:_files'
+                    ;;
+                update)
+                    _arguments \
+                        '(--check-only --refresh-cache --verbose)--check-only[Only check for updates without installing]' \
+                        '(--check-only --refresh-cache --verbose)--refresh-cache[Bypass cache and fetch fresh data from GitHub API]' \
+                        '(--check-only --refresh-cache --verbose)--verbose[Show detailed logging during update]' \
+                        '--help[Show help information]' \
+                        '1:app app:_files'
+                    ;;
+                upgrade)
+                    _arguments \
+                        '(--check-only)--check-only[Only check for upgrades without installing]' \
+                        '--help[Show help information]' \
+                        '1:app app:_files'
+                    ;;
+                list)
+                    _arguments \
+                        '(--available)--available[Show available applications from catalog]' \
+                        '--help[Show help information]' \
+                        '1:app app:_files'
+                    ;;
+                remove)
+                    _arguments \
+                        '(--keep-config)--keep-config[Keep configuration files]' \
+                        '--help[Show help information]' \
+                        "1:app app:_files"
+                    ;;
+                backup)
+                    _arguments \
+                        '(--restore-last --restore-version --list-backups --cleanup --info --migrate)--restore-last[Restore the latest backup version]' \
+                        '(--restore-last --restore-version --list-backups --cleanup --info --migrate)--restore-version[Restore a specific version]:version:' \
+                        '(--restore-last --restore-version --list-backups --cleanup --info --migrate)--list-backups[List available backups for the specified app]' \
+                        '(--restore-last --restore-version --list-backups --cleanup --info --migrate)--cleanup[Clean up old backups according to max_backup setting]' \
+                        '(--restore-last --restore-version --list-backups --cleanup --info --migrate)--info[Show detailed backup information]' \
+                        '(--restore-last --restore-version --list-backups --cleanup --info --migrate)--migrate[Migrate old backup files to new folder-based format]' \
+                        '--help[Show help information]' \
+                        '1:app app:_files'
+                    ;;
+                cache)
+                    local -a cache_commands
+                    cache_commands=(
+                        'clear:Clear cache entries'
+                        'stats:Show cache statistics and storage info'
+                    )
+                    
+                    if [[ ${#line} -eq 2 ]]; then
+                        _describe 'cache commands' cache_commands
+                        _values 'cache options' '--help[Show help information]'
+                    elif [[ ${line[2]} == "clear" ]]; then
+                        _arguments \
+                            '--all[Clear all cache entries]' \
+                            '--help[Show help information]' \
+                            '1:app app:_files'
+                    elif [[ ${line[2]} == "stats" ]]; then
+                        _arguments '--help[Show help information]'
+                    fi
+                    ;;
+                auth)
+                    _arguments \
+                        '(--save-token --remove-token --status)--save-token[Save GitHub authentication token]' \
+                        '(--save-token --remove-token --status)--remove-token[Remove GitHub authentication token]' \
+                        '(--save-token --remove-token --status)--status[Show authentication status]' \
+                        '--help[Show help information]' \
+                        '1:app app:_files'
+                    ;;
+                config)
+                    _arguments \
+                        '(--show --reset)--show[Show current configuration]' \
+                        '(--show --reset)--reset[Reset configuration to defaults]' \
+                        '--help[Show help information]' \
+                        '1:app app:_files'
+                    ;;
+            esac
+            ;;
+    esac
+
+    return 0
+}

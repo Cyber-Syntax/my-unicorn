@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# my-unicorn bash completion script
+# Source this file to enable tab completion for my-unicorn command
+
+_my_unicorn_completion() {
+    local cur prev commands
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    
+    # Available commands
+    commands="install update upgrade list remove backup cache auth config"
+    
+    # Global options
+    local global_opts="--help --version"
+    
+    # Command-specific options
+    local install_opts="--concurrency --no-icon --no-verify --no-desktop --verbose --help"
+    local update_opts="--check-only --refresh-cache --verbose --help"
+    local upgrade_opts="--check-only --help"
+    local list_opts="--available --help"
+    local remove_opts="--keep-config --help"
+    local backup_opts="--restore-last --restore-version --list-backups --cleanup --info --migrate --help"
+    local cache_opts="clear stats --help"
+    local cache_clear_opts="--all --help"
+    local auth_opts="--save-token --remove-token --status --help"
+    local config_opts="--show --reset --help"
+    
+    # If we're completing the first argument (command)
+    if [[ ${COMP_CWORD} -eq 1 ]]; then
+        mapfile -t COMPREPLY < <(compgen -W "${commands} ${global_opts}" -- "${cur}")
+        return 0
+    fi
+    
+    # Get the command being used
+    local command="${COMP_WORDS[1]}"
+    
+    case "${command}" in
+        install)
+            case "${prev}" in
+                --concurrency)
+                    # Numeric value expected
+                    COMPREPLY=()
+                    ;;
+                *)
+                    if [[ ${cur} == -* ]]; then
+                        mapfile -t COMPREPLY < <(compgen -W "${install_opts}" -- "${cur}")
+                    else
+                        # Complete with app names or URLs
+                        COMPREPLY=()
+                    fi
+                    ;;
+            esac
+            ;;
+        update)
+            if [[ ${cur} == -* ]]; then
+                mapfile -t COMPREPLY < <(compgen -W "${update_opts}" -- "${cur}")
+            else
+                # Complete with installed app names
+                COMPREPLY=()
+            fi
+            ;;
+        upgrade)
+            mapfile -t COMPREPLY < <(compgen -W "${upgrade_opts}" -- "${cur}")
+            ;;
+        list)
+            mapfile -t COMPREPLY < <(compgen -W "${list_opts}" -- "${cur}")
+            ;;
+        remove)
+            if [[ ${cur} == -* ]]; then
+                mapfile -t COMPREPLY < <(compgen -W "${remove_opts}" -- "${cur}")
+            else
+                # Complete with installed app names
+                COMPREPLY=()
+            fi
+            ;;
+        backup)
+            case "${prev}" in
+                --restore-version)
+                    # Version string expected
+                    COMPREPLY=()
+                    ;;
+                *)
+                    if [[ ${cur} == -* ]]; then
+                        mapfile -t COMPREPLY < <(compgen -W "${backup_opts}" -- "${cur}")
+                    else
+                        # Complete with app names
+                        COMPREPLY=()
+                    fi
+                    ;;
+            esac
+            ;;
+        cache)
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+                mapfile -t COMPREPLY < <(compgen -W "${cache_opts}" -- "${cur}")
+            elif [[ ${COMP_WORDS[2]} == "clear" ]]; then
+                if [[ ${cur} == -* ]]; then
+                    mapfile -t COMPREPLY < <(compgen -W "${cache_clear_opts}" -- "${cur}")
+                else
+                    # Complete with app names
+                    COMPREPLY=()
+                fi
+            fi
+            ;;
+        auth)
+            mapfile -t COMPREPLY < <(compgen -W "${auth_opts}" -- "${cur}")
+            ;;
+        config)
+            mapfile -t COMPREPLY < <(compgen -W "${config_opts}" -- "${cur}")
+            ;;
+        *)
+            COMPREPLY=()
+            ;;
+    esac
+    
+    return 0
+}
+
+# Register the completion function
+complete -F _my_unicorn_completion my-unicorn

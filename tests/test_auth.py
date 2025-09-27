@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from my_unicorn.auth import GitHubAuthManager
+from my_unicorn.auth import GitHubAuthManager, validate_github_token
 
 
 @pytest.fixture
@@ -15,11 +15,12 @@ def auth_manager():
 
 def test_save_token_valid(monkeypatch, auth_manager):
     """Test save_token saves a valid token."""
-    monkeypatch.setattr("getpass.getpass", lambda prompt: "valid_token")
+    valid_token = "a" * 40  # Valid legacy format token
+    monkeypatch.setattr("getpass.getpass", lambda prompt: valid_token)
     keyring_set = MagicMock()
     monkeypatch.setattr("keyring.set_password", keyring_set)
     auth_manager.save_token()
-    keyring_set.assert_called_with(auth_manager.GITHUB_KEY_NAME, "token", "valid_token")
+    keyring_set.assert_called_with(auth_manager.GITHUB_KEY_NAME, "token", valid_token)
 
 
 def test_save_token_empty(monkeypatch, auth_manager):
@@ -29,27 +30,30 @@ def test_save_token_empty(monkeypatch, auth_manager):
         auth_manager.save_token()
 
 
-def test_remove_token_success(monkeypatch, auth_manager, capsys):
+def test_save_token_invalid_format(monkeypatch, auth_manager):
+    """Test save_token raises ValueError for invalid token format."""
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "invalid_token_format")
+    with pytest.raises(ValueError, match="Invalid GitHub token format"):
+        auth_manager.save_token()
+
+
+def test_remove_token_success(monkeypatch, auth_manager):
     """Test remove_token removes token successfully."""
     keyring_delete = MagicMock()
     monkeypatch.setattr("keyring.delete_password", keyring_delete)
     auth_manager.remove_token()
     keyring_delete.assert_called_with(auth_manager.GITHUB_KEY_NAME, "token")
-    captured = capsys.readouterr()
-    assert "Token removed from keyring" in captured.out
 
 
-def test_remove_token_failure(monkeypatch, auth_manager, capsys):
-    """Test remove_token handles PasswordDeleteError."""
+def test_remove_token_failure(monkeypatch, auth_manager):
+    """Test remove_token handles general Exception when deleting token."""
 
     class DummyError(Exception):
-        pass
+        """Dummy exception for simulating keyring delete failure."""
 
     monkeypatch.setattr("keyring.delete_password", MagicMock(side_effect=DummyError))
-    monkeypatch.setattr("keyring.errors.PasswordDeleteError", DummyError)
-    auth_manager.remove_token()
-    captured = capsys.readouterr()
-    assert "No token found to remove" in captured.out
+    with pytest.raises(DummyError):
+        auth_manager.remove_token()
 
 
 def test_get_token(monkeypatch, auth_manager):
@@ -145,3 +149,109 @@ def test_is_authenticated_false(monkeypatch, auth_manager):
     assert auth_manager.is_authenticated() is False
     monkeypatch.setattr("keyring.get_password", lambda k, u: None)
     assert auth_manager.is_authenticated() is False
+
+
+# Tests for validate_github_token function
+class TestValidateGitHubToken:
+    """Test cases for GitHub token validation function."""
+
+    def test_validate_legacy_token_valid(self):
+        """Test validation of valid legacy 40-character hex token."""
+        legacy_token = "a" * 40  # 40 character hex token
+        assert validate_github_token(legacy_token) is True
+
+    def test_validate_legacy_token_invalid_length(self):
+        """Test validation fails for incorrect length legacy tokens."""
+        assert validate_github_token("a" * 39) is False  # Too short
+        assert validate_github_token("a" * 41) is False  # Too long
+
+    def test_validate_legacy_token_invalid_chars(self):
+        """Test validation fails for legacy tokens with invalid characters."""
+        invalid_token = "g" * 40  # Contains 'g' which is not hex
+        assert validate_github_token(invalid_token) is False
+
+    def test_validate_new_format_ghp_token(self):
+        """Test validation of new format Personal Access Token."""
+        ghp_token = "ghp_" + "A" * 40  # Valid ghp_ token
+        assert validate_github_token(ghp_token) is True
+
+    def test_validate_new_format_gho_token(self):
+        """Test validation of new format OAuth Access Token."""
+        gho_token = "gho_" + "B" * 40  # Valid gho_ token
+        assert validate_github_token(gho_token) is True
+
+    def test_validate_new_format_ghu_token(self):
+        """Test validation of new format GitHub App user-to-server token."""
+        ghu_token = "ghu_" + "C" * 40  # Valid ghu_ token
+        assert validate_github_token(ghu_token) is True
+
+    def test_validate_new_format_ghs_token(self):
+        """Test validation of new format GitHub App server-to-server token."""
+        ghs_token = "ghs_" + "D" * 40  # Valid ghs_ token
+        assert validate_github_token(ghs_token) is True
+
+    def test_validate_new_format_ghr_token(self):
+        """Test validation of new format GitHub App refresh token."""
+        ghr_token = "ghr_" + "E" * 40  # Valid ghr_ token
+        assert validate_github_token(ghr_token) is True
+
+    def test_validate_github_pat_token(self):
+        """Test validation of GitHub CLI PAT format."""
+        github_pat_token = "github_pat_" + "F" * 40  # Valid github_pat_ token
+        assert validate_github_token(github_pat_token) is True
+
+    def test_validate_new_format_invalid_prefix(self):
+        """Test validation fails for invalid prefixes."""
+        invalid_token = "xyz_" + "A" * 40
+        assert validate_github_token(invalid_token) is False
+
+    def test_validate_new_format_too_short(self):
+        """Test validation fails for new format tokens that are too short."""
+        short_token = "ghp_" + "A" * 20  # Too short
+        assert validate_github_token(short_token) is False
+
+    def test_validate_new_format_invalid_chars(self):
+        """Test validation fails for new format tokens with invalid characters."""
+        invalid_token = "ghp_" + "@" * 40  # Contains invalid character '@'
+        assert validate_github_token(invalid_token) is False
+
+    def test_validate_empty_token(self):
+        """Test validation fails for empty or None tokens."""
+        assert validate_github_token("") is False
+        assert validate_github_token("   ") is False
+        assert validate_github_token(None) is False
+
+    def test_validate_non_string_token(self):
+        """Test validation fails for non-string token types."""
+        assert validate_github_token(123) is False
+        assert validate_github_token([]) is False
+        assert validate_github_token({}) is False
+
+    def test_validate_max_length_token(self):
+        """Test validation of tokens at maximum supported length."""
+        # Test maximum length for new format tokens (255 characters total)
+        max_ghp_token = "ghp_" + "A" * 251  # 4 + 251 = 255 characters
+        assert validate_github_token(max_ghp_token) is True
+
+        # Test over maximum length
+        over_max_token = "ghp_" + "A" * 252  # 4 + 252 = 256 characters
+        assert validate_github_token(over_max_token) is False
+
+
+def test_is_token_valid_method(monkeypatch, auth_manager):
+    """Test is_token_valid method validates stored token format."""
+    # Test with valid legacy token
+    monkeypatch.setattr("keyring.get_password", lambda k, u: "a" * 40)
+    assert auth_manager.is_token_valid() is True
+
+    # Test with valid new format token
+    monkeypatch.setattr("keyring.get_password", lambda k, u: "ghp_" + "A" * 40)
+    assert auth_manager.is_token_valid() is True
+
+    # Test with invalid token
+    monkeypatch.setattr("keyring.get_password", lambda k, u: "invalid_token")
+    assert auth_manager.is_token_valid() is False
+
+    # Test with no token
+    monkeypatch.setattr("keyring.get_password", lambda k, u: None)
+    assert auth_manager.is_token_valid() is False

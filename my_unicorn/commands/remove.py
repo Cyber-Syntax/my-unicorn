@@ -4,7 +4,11 @@ This module handles the removal of installed AppImages, including cleanup of
 associated files like desktop entries, icons, and configuration data.
 """
 
+import shutil
 from argparse import Namespace
+from pathlib import Path
+
+from my_unicorn.config import AppConfig
 
 from ..logger import get_logger
 from .base import BaseCommandHandler
@@ -32,6 +36,35 @@ class RemoveHandler(BaseCommandHandler):
             # Remove AppImage files
             self._remove_appimage_files(app_config, app_name)
 
+            # Remove associated cache
+            try:
+                from ..services.cache import get_cache_manager
+
+                owner = app_config.get("owner")
+                repo = app_config.get("repo")
+                if owner and repo:
+                    cache_manager = get_cache_manager()
+                    await cache_manager.clear_cache(owner, repo)
+                    print(f"✅ Removed cache for {owner}/{repo}")
+                else:
+                    logger.debug("Owner/repo not found in config; skipping cache removal.")
+            except Exception as cache_exc:
+                logger.warning("⚠️ Failed to remove cache for %s: %s", app_name, cache_exc)
+
+            # Remove all backups and metadata
+            try:
+                backup_base = self.global_config["directory"]["backup"]
+                backup_dir = Path(backup_base) / app_name
+                if backup_dir.exists():
+                    shutil.rmtree(backup_dir)
+                    print(f"✅ Removed all backups and metadata for {app_name}")
+                else:
+                    logger.debug(
+                        "No backup directory found for %s; skipping backup removal.", app_name
+                    )
+            except Exception as backup_exc:
+                logger.warning("⚠️ Failed to remove backups for %s: %s", app_name, backup_exc)
+
             # Remove desktop entry
             self._remove_desktop_entry(app_name)
 
@@ -49,7 +82,7 @@ class RemoveHandler(BaseCommandHandler):
             logger.error("Failed to remove %s: %s", app_name, e, exc_info=True)
             print(f"❌ Failed to remove {app_name}: {e}")
 
-    def _remove_appimage_files(self, app_config: dict, app_name: str) -> None:
+    def _remove_appimage_files(self, app_config: AppConfig, app_name: str) -> None:
         """Remove AppImage files from storage directory."""
         storage_dir = self.global_config["directory"]["storage"]
         appimage_path = storage_dir / app_config["appimage"]["name"]
@@ -85,7 +118,7 @@ class RemoveHandler(BaseCommandHandler):
             logger.debug("Exception occurred while processing app '%s': %s", app_name, e)
             logger.warning("⚠️  Failed to remove desktop entry: %s", e)
 
-    def _remove_icon(self, app_config: dict) -> None:
+    def _remove_icon(self, app_config: AppConfig) -> None:
         """Remove icon file if icon config is present."""
         icon_config = app_config.get("icon", {})
         icon_name = icon_config.get("name")

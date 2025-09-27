@@ -4,14 +4,8 @@ This module provides common utility functions used across the application
 including path operations, string manipulation, and validation helpers.
 """
 
-import platform
 import re
 from pathlib import Path
-from typing import Any
-from urllib.parse import urlparse
-
-# TODO: Some of these functions are not used in the codebase,
-# so determine which ones are necessary and remove the rest.
 
 
 def sanitize_filename(filename: str) -> str:
@@ -39,30 +33,10 @@ def sanitize_filename(filename: str) -> str:
     return sanitized.strip()
 
 
-# TODO: We probably not need to use this because most of the appimages
-# we might keep arm64 for macos support for future
-# windows and linux would be amd64
-def get_system_architecture() -> str:
-    """Get system architecture string.
-
-    Returns:
-        Architecture string (x86_64, aarch64, etc.)
-
-    """
-    machine = platform.machine().lower()
-
-    # Normalize architecture names
-    arch_mapping = {
-        "amd64": "x86_64",
-        "x64": "x86_64",
-        "arm64": "aarch64",
-        "armv7l": "armhf",
-    }
-
-    return arch_mapping.get(machine, machine)
+BYTES_PER_UNIT = 1024.0
 
 
-def format_bytes(size: int) -> str:
+def format_bytes(size: float) -> str:
     """Format byte size in human readable format.
 
     Args:
@@ -73,61 +47,10 @@ def format_bytes(size: int) -> str:
 
     """
     for unit in ["B", "KB", "MB", "GB", "TB"]:
-        if size < 1024.0:
+        if size < BYTES_PER_UNIT:
             return f"{size:.1f} {unit}"
-        size /= 1024.0
+        size /= BYTES_PER_UNIT
     return f"{size:.1f} PB"
-
-
-def is_valid_github_repo(repo: str) -> bool:
-    """Check if string is a valid GitHub repository format.
-
-    Args:
-        repo: Repository string to validate
-
-    Returns:
-        True if valid GitHub repo format
-
-    """
-    # Check owner/repo format
-    if "/" in repo and not repo.startswith("http"):
-        parts = repo.split("/")
-        if len(parts) == 2 and all(part.strip() for part in parts):
-            # Basic validation for GitHub username/repo rules
-            for part in parts:
-                if not re.match(r"^[a-zA-Z0-9._-]+$", part):
-                    return False
-            return True
-
-    # Check full GitHub URL
-    if repo.startswith("http"):
-        try:
-            parsed = urlparse(repo)
-            if parsed.hostname == "github.com":
-                path_parts = parsed.path.strip("/").split("/")
-                if len(path_parts) >= 2:
-                    return all(part.strip() for part in path_parts[:2])
-        except Exception:
-            pass
-
-    return False
-
-
-def expand_template(template: str, variables: dict[str, Any]) -> str:
-    """Expand template string with variables.
-
-    Args:
-        template: Template string with {variable} placeholders
-        variables: Dictionary of variables to substitute
-
-    Returns:
-        Expanded template string
-
-    """
-    try:
-        return template.format(**variables)
-    except (KeyError, ValueError):
-        return template
 
 
 def extract_version_from_package_string(package_string: str) -> str | None:
@@ -260,6 +183,76 @@ def create_desktop_entry_name(app_name: str) -> str:
     return f"{name}.desktop"
 
 
+# Checksum File Pattern Matching
+
+# Comprehensive checksum file patterns consolidated from github_client.py and cache.py
+CHECKSUM_FILE_PATTERNS = [
+    r"latest-.*\.yml$",
+    r"latest-.*\.yaml$",
+    r".*checksums?\.txt$",
+    r".*checksums?\.yml$",
+    r".*checksums?\.yaml$",
+    r".*checksums?\.md5$",
+    r".*checksums?\.sha1$",
+    r".*checksums?\.sha256$",
+    r".*checksums?\.sha512$",
+    r"SHA\d+SUMS?(\.txt)?$",
+    r"MD5SUMS?(\.txt)?$",
+    r".*\.sum$",
+    r".*\.hash$",
+    r".*\.digest$",
+    r".*\.DIGEST$",
+    r".*appimage\.sha256$",
+    r".*appimage\.sha512$",
+]
+
+# Specific checksum file extensions that require base file checking
+SPECIFIC_CHECKSUM_EXTENSIONS = [
+    ".sha256sum",
+    ".sha512sum",
+    ".sha1sum",
+    ".md5sum",
+    ".digest",
+    ".sum",
+    ".hash",
+]
+
+
+def is_checksum_file(filename: str, require_appimage_base: bool = False) -> bool:
+    """Check if filename is a checksum file.
+
+    Args:
+        filename: Name of the file to check
+        require_appimage_base: If True, for specific extensions, only return True
+                             if the base file (without checksum extension) is an AppImage
+
+    Returns:
+        True if the file is a checksum file
+
+    """
+    if not filename:
+        return False
+
+    filename_lower = filename.lower()
+
+    # Check general checksum patterns first (these are always considered checksum files)
+    for pattern in CHECKSUM_FILE_PATTERNS:
+        if re.match(pattern, filename_lower, re.IGNORECASE):
+            return True
+
+    # Check specific checksum extensions
+    for extension in SPECIFIC_CHECKSUM_EXTENSIONS:
+        if filename_lower.endswith(extension):
+            if not require_appimage_base:
+                return True
+
+            # Extract the base filename by removing the checksum extension
+            base_filename = filename_lower[: -len(extension)]
+            return is_appimage_file(base_filename)
+
+    return False
+
+
 def is_appimage_file(filename: str) -> bool:
     """Check if filename is an AppImage.
 
@@ -273,219 +266,16 @@ def is_appimage_file(filename: str) -> bool:
     return filename.lower().endswith(".appimage")
 
 
-def extract_version_from_filename(filename: str) -> str | None:
-    """Extract version from AppImage filename.
+def get_checksum_file_format_type(filename: str) -> str:
+    """Determine the format type of a checksum file.
 
     Args:
-        filename: AppImage filename
+        filename: Checksum filename
 
     Returns:
-        Extracted version or None if not found
+        Format type: "yaml" or "traditional"
 
     """
-    # Common version patterns in filenames
-    patterns = [
-        r"v?(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?)",  # v1.2.3 or 1.2.3
-        r"(\d+\.\d+(?:\.\d+)?)",  # 1.2 or 1.2.3
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, filename)
-        if match:
-            version = match.group(1)
-            # Strip .AppImage/.appimage if present at end of version
-            if version.lower().endswith(".appimage"):
-                version = version[:-9]
-            return version
-
-    return None
-
-
-def safe_path_join(base: Path, *parts: str) -> Path:
-    """Safely join path parts, preventing directory traversal.
-
-    Args:
-        base: Base path
-        parts: Path parts to join
-
-    Returns:
-        Safely joined path
-
-    Raises:
-        ValueError: If path traversal is detected
-
-    """
-    result = base
-
-    for part in parts:
-        if ".." in part or part.startswith("/"):
-            raise ValueError(f"Unsafe path component: {part}")
-        result = result / part
-
-    # Ensure result is within base directory
-    try:
-        result.resolve().relative_to(base.resolve())
-    except ValueError:
-        raise ValueError("Path traversal detected")
-
-    return result
-
-
-def parse_content_disposition(header: str) -> str | None:
-    """Parse filename from Content-Disposition header.
-
-    Args:
-        header: Content-Disposition header value
-
-    Returns:
-        Extracted filename or None
-
-    """
-    if not header:
-        return None
-
-    # Look for filename parameter
-    match = re.search(r"filename\*?=([^;]+)", header)
-    if match:
-        filename = match.group(1).strip("\"'")
-        # Handle RFC 5987 encoding
-        if filename.startswith("UTF-8''"):
-            filename = filename[7:]
-        return filename
-
-    return None
-
-
-def is_safe_filename(filename: str) -> bool:
-    """Check if filename is safe for filesystem operations.
-
-    Args:
-        filename: Filename to check
-
-    Returns:
-        True if filename is safe
-
-    """
-    if not filename or filename in (".", ".."):
-        return False
-
-    # Check for invalid characters
-    invalid_chars = '<>:"/\\|?*'
-    if any(char in filename for char in invalid_chars):
-        return False
-
-    # Check for control characters
-    if any(ord(char) < 32 for char in filename):
-        return False
-
-    return True
-
-
-def check_icon_exists(icon_name: str, icon_dir: Path) -> bool:
-    """Check if icon file already exists.
-
-    Args:
-        icon_name: Name of the icon file
-        icon_dir: Directory where icons are stored
-
-    Returns:
-        True if icon file exists
-
-    """
-    if not icon_name or not icon_dir:
-        return False
-
-    icon_path = icon_dir / icon_name
-    return icon_path.exists() and icon_path.is_file()
-
-
-def get_icon_path(icon_name: str, icon_dir: Path) -> Path:
-    """Get the full path to an icon file.
-
-    Args:
-        icon_name: Name of the icon file
-        icon_dir: Directory where icons are stored
-
-    Returns:
-        Full path to the icon file
-
-    """
-    return icon_dir / icon_name
-
-
-# API Progress Tracking Helpers
-
-
-def simplify_endpoint_for_display(endpoint: str) -> str:
-    """Simplify API endpoint URL for progress display.
-
-    Args:
-        endpoint: Full API endpoint URL
-
-    Returns:
-        Simplified endpoint name for display
-
-    """
-    if not endpoint:
-        return "api"
-
-    # Extract meaningful part from URL
-    if "://" in endpoint:
-        # Full URL - extract path
-        try:
-            from urllib.parse import urlparse
-
-            parsed = urlparse(endpoint)
-            path = parsed.path.strip("/")
-            if path:
-                # Get the last meaningful part
-                parts = path.split("/")
-                meaningful_parts = [p for p in parts if p and not p.isdigit()]
-                if meaningful_parts:
-                    return meaningful_parts[-1]
-        except Exception:
-            pass
-
-    # Handle path-only endpoints
-    if "/" in endpoint:
-        parts = endpoint.strip("/").split("/")
-        # Remove query parameters
-        last_part = parts[-1].split("?")[0] if parts else "api"
-        return last_part if last_part else "api"
-
-    # Remove query parameters from simple strings
-    return endpoint.split("?")[0] if "?" in endpoint else endpoint
-
-
-def calculate_api_batch_size(total_requests: int, target_updates: int = 20) -> int:
-    """Calculate optimal batch size for API progress updates.
-
-    Args:
-        total_requests: Total number of API requests to make
-        target_updates: Target number of progress updates (default: 20)
-
-    Returns:
-        Optimal batch size for progress updates
-
-    """
-    if total_requests <= target_updates:
-        return 1
-
-    batch_size = total_requests // target_updates
-    return max(1, batch_size)
-
-
-def format_api_progress_description(endpoint: str, completed: int, total: int) -> str:
-    """Format API progress description with consistent styling.
-
-    Args:
-        endpoint: API endpoint being fetched
-        completed: Number of completed requests
-        total: Total number of requests
-
-    Returns:
-        Formatted progress description
-
-    """
-    simplified_name = simplify_endpoint_for_display(endpoint)
-    return f"🌐 Fetching {simplified_name}... ({completed}/{total})"
+    if filename.lower().endswith((".yml", ".yaml")):
+        return "yaml"
+    return "traditional"

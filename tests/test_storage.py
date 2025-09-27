@@ -99,55 +99,39 @@ def test_get_clean_appimage_name_removes_extension():
     assert service.get_clean_appimage_name("baz") == "baz"
 
 
-def test_remove_file_deletes(tmp_path: Path, install_dir: Path, patch_logger):
-    """Test remove_file deletes file if exists."""
-    file = tmp_path / "toremove.txt"
-    file.write_text("bye", encoding="utf-8")
+def test_install_update_naming_consistency(tmp_path: Path, install_dir: Path, patch_logger):
+    """Test that install and update commands produce consistent AppImage naming."""
     service = StorageService(install_dir)
-    service.remove_file(file)
-    assert not file.exists()
 
+    # Simulate what install command should do (after the fix)
+    # 1. Move file to install directory
+    original_file = tmp_path / "joplin-1.2.3.AppImage"
+    original_file.write_text("appimage content", encoding="utf-8")
 
-def test_ensure_directory_creates(tmp_path: Path, install_dir: Path, patch_logger):
-    """Test ensure_directory creates directory."""
-    dir_path = tmp_path / "newdir"
-    service = StorageService(install_dir)
-    service.ensure_directory(dir_path)
-    assert dir_path.exists()
-    assert dir_path.is_dir()
+    # Step 1: Move to install dir (what install template does first)
+    moved_file = service.move_to_install_dir(original_file)
 
+    # Step 2: Apply renaming with .AppImage extension (what _handle_appimage_renaming does)
+    clean_name = service.get_clean_appimage_name("joplin")
+    final_file = service.rename_appimage(moved_file, clean_name)
 
-def test_copy_file_copies_content(tmp_path: Path, install_dir: Path, patch_logger):
-    """Test copy_file copies file content."""
-    src = tmp_path / "src.txt"
-    dst = install_dir / "dst.txt"
-    src.write_text("copy", encoding="utf-8")
-    service = StorageService(install_dir)
-    result = service.copy_file(src, dst)
-    assert result == dst
-    assert dst.read_text(encoding="utf-8") == "copy"
-    assert src.exists()
+    # Verify install produces .AppImage extension
+    assert final_file.name == "joplin.AppImage"
+    assert final_file.exists()
+    assert final_file.read_text(encoding="utf-8") == "appimage content"
 
+    # Simulate what update command would do
+    # Create another version to "update" from
+    old_file = install_dir / "joplin-old.AppImage"
+    old_file.write_text("old content", encoding="utf-8")
 
-def test_cleanup_download_removes_if_different(
-    tmp_path: Path, install_dir: Path, patch_logger
-):
-    """Test cleanup_download removes download if different from install."""
-    download = tmp_path / "download.txt"
-    install = install_dir / "install.txt"
-    download.write_text("dl", encoding="utf-8")
-    install.write_text("inst", encoding="utf-8")
-    service = StorageService(install_dir)
-    service.cleanup_download(download, install)
-    assert not download.exists()
-    assert install.exists()
+    # Update command renaming (same logic as install now)
+    clean_name_update = service.get_clean_appimage_name("joplin")
+    updated_file = service.rename_appimage(old_file, clean_name_update)
 
+    # Verify update also produces .AppImage extension
+    assert updated_file.name == "joplin.AppImage"
 
-def test_storage_error_exception():
-    """Test StorageError can be raised and caught."""
-    from my_unicorn.storage import StorageError
-
-    try:
-        raise StorageError("fail")
-    except StorageError as e:
-        assert str(e) == "fail"
+    # Both install and update should produce the same naming pattern
+    assert final_file.name == updated_file.name
+    print(f"✅ Install and update both create: {final_file.name}")

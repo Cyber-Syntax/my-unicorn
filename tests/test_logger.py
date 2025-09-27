@@ -1,18 +1,31 @@
+"""Tests for the logger module."""
+
 import logging
+import logging.handlers
 from unittest.mock import patch
 
 import pytest
 
-from my_unicorn.logger import ColoredFormatter, MyUnicornLogger, get_logger
+from my_unicorn.logger import (
+    ColoredFormatter,
+    CustomRotatingFileHandler,
+    MyUnicornLogger,
+    clear_logger_state,
+    get_logger,
+)
 
 
 @pytest.fixture
 def logger_name():
+    """Return test logger name."""
     return "test-logger"
 
 
 @pytest.fixture
 def logger_instance(logger_name):
+    """Create a fresh logger instance for testing."""
+    # Clear any existing state first
+    clear_logger_state()
     # Always create a fresh logger for isolation
     return MyUnicornLogger(logger_name)
 
@@ -89,11 +102,11 @@ def test_setup_file_logging_creates_file_handler(tmp_path, logger_name):
     log_file = tmp_path / "my-unicorn.log"
     logger_instance = MyUnicornLogger(logger_name)
     logger_instance.setup_file_logging(log_file, level="DEBUG")
-    # Should have a file handler with correct level
+    # Should have a file handler with correct level (now using CustomRotatingFileHandler)
     file_handlers = [
         h
         for h in logger_instance.logger.handlers
-        if isinstance(h, logging.handlers.RotatingFileHandler)
+        if isinstance(h, logging.handlers.RotatingFileHandler | CustomRotatingFileHandler)
     ]
     assert file_handlers
     assert file_handlers[0].level == logging.DEBUG

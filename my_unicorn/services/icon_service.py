@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -10,9 +9,10 @@ from typing import Any, Final
 
 from my_unicorn.download import DownloadService, IconAsset
 from my_unicorn.icon import IconManager
+from my_unicorn.logger import get_logger
 from my_unicorn.services.progress import ProgressService
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Constants for performance
 DEFAULT_ICON_EXTENSION: Final[str] = "png"
@@ -63,9 +63,7 @@ class IconService:
     def _get_icon_manager(self) -> IconManager:
         """Get cached icon manager instance."""
         if self._icon_manager_cache is None:
-            self._icon_manager_cache = IconManager(
-                self.download_service, enable_extraction=True
-            )
+            self._icon_manager_cache = IconManager(enable_extraction=True)
         return self._icon_manager_cache
 
     @staticmethod

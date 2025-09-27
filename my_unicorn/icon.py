@@ -1,8 +1,7 @@
-"""Icon management system for AppImages with fallback to GitHub downloads.
+"""Icon management system for AppImages
 
 This module provides comprehensive icon handling by first attempting to extract
-icons directly from AppImage files, and falling back to GitHub downloads if
-extraction fails or is disabled.
+icons directly from AppImage files.
 """
 
 import asyncio
@@ -12,7 +11,6 @@ import tempfile
 from pathlib import Path
 from typing import ClassVar
 
-from .download import DownloadService, IconAsset
 from .logger import get_logger
 
 logger = get_logger(__name__)
@@ -401,80 +399,15 @@ class AppImageIconExtractor:
 class IconManager:
     """Manages icon acquisition from AppImages with GitHub fallback."""
 
-    def __init__(
-        self, download_service: DownloadService, enable_extraction: bool = True
-    ) -> None:
+    def __init__(self, enable_extraction: bool = True) -> None:
         """Initialize icon manager.
 
         Args:
-            download_service: Service for downloading icons from URLs
             enable_extraction: Whether to enable AppImage icon extraction
 
         """
-        self.download_service: DownloadService = download_service
         self.enable_extraction: bool = enable_extraction
         self.extractor: AppImageIconExtractor = AppImageIconExtractor()
-
-    async def get_icon(
-        self,
-        appimage_path: Path | None,
-        icon_asset: IconAsset | None,
-        dest_path: Path,
-        app_name: str,
-    ) -> Path | None:
-        """Get icon for an application, trying AppImage extraction first.
-
-        Args:
-            appimage_path: Path to AppImage file (for extraction)
-            icon_asset: Icon asset for GitHub download (fallback)
-            dest_path: Final destination for the icon
-            app_name: Application name
-
-        Returns:
-            Path to acquired icon or None if all methods failed
-
-        """
-        # Skip if icon already exists
-        if dest_path.exists():
-            logger.info("✅ Icon already exists: %s", dest_path)
-            return dest_path
-
-        # Try AppImage extraction first
-        if self.enable_extraction and appimage_path and appimage_path.exists():
-            try:
-                logger.info("🔍 Attempting to extract icon from AppImage: %s", app_name)
-                extracted_icon = await self.extractor.extract_icon(
-                    appimage_path, dest_path, app_name
-                )
-                if extracted_icon:
-                    logger.info("✅ Icon extracted from AppImage: %s", extracted_icon)
-                    return extracted_icon
-                else:
-                    logger.info(
-                        "ℹ️  No icon found in AppImage, falling back to GitHub download"
-                    )
-            except IconExtractionError as e:
-                error_msg = str(e)
-                if self.extractor.is_recoverable_error(error_msg):
-                    logger.info("ℹ️  Using GitHub fallback due to: %s", error_msg)
-                else:
-                    logger.warning("⚠️  AppImage icon extraction failed: %s", e)
-                    logger.info("ℹ️  Falling back to GitHub download")
-
-        # Fallback to GitHub download (only if icon_asset has a valid URL)
-        if icon_asset and icon_asset["icon_url"]:
-            try:
-                logger.info("📥 Downloading icon from GitHub: %s", app_name)
-                downloaded_icon = await self.download_service.download_icon(
-                    icon_asset, dest_path
-                )
-                logger.info("✅ Icon downloaded from GitHub: %s", downloaded_icon)
-                return downloaded_icon
-            except Exception as e:
-                logger.error("❌ Failed to download icon from GitHub: %s", e)
-
-        logger.warning("⚠️  Could not acquire icon for %s", app_name)
-        return None
 
     async def extract_icon_only(
         self, appimage_path: Path, dest_path: Path, app_name: str
