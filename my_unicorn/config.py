@@ -13,6 +13,7 @@ Requirements:
 """
 
 import configparser
+import logging
 from pathlib import Path
 from typing import TypedDict, cast
 
@@ -235,6 +236,10 @@ class GlobalConfigManager:
 
         """
         self.directory_manager = directory_manager
+        # Import migration module here to avoid circular imports
+        from my_unicorn.config_migration import ConfigMigration
+
+        self.migration = ConfigMigration(directory_manager)
 
     def get_default_global_config(self) -> dict[str, str | dict[str, str]]:
         """Get default global configuration values.
@@ -274,32 +279,71 @@ class GlobalConfigManager:
             Loaded global configuration
 
         """
-        config = configparser.ConfigParser()
-
-        # Set defaults
         defaults = self.get_default_global_config()
-        # Convert nested dicts to flat structure for configparser
-        flat_defaults = {}
-        for key, value in defaults.items():
-            if isinstance(value, dict):
-                # Skip nested dicts for configparser defaults
-                continue
-            flat_defaults[key] = str(value)
-        config.read_dict({"DEFAULT": flat_defaults})
-
-        # Add sections for nested configs
-        for key, value in defaults.items():
-            if isinstance(value, dict):
-                config.add_section(key)
-                for subkey, subvalue in value.items():
-                    config.set(key, subkey, str(subvalue))
 
         # Read user config if it exists
         if self.directory_manager.settings_file.exists():
+            # Create a config parser with only user settings first
+            user_config = configparser.ConfigParser()
+            user_config.read(self.directory_manager.settings_file)
+
+            # Perform migration if needed (no circular import)
+            if not self.migration.migrate_if_needed(user_config, defaults):
+                # Migration failed, fall back to defaults
+                logging.getLogger(__name__).warning(
+                    "Migration failed, using default configuration"
+                )
+                self.save_global_config(
+                    self._convert_to_global_config(defaults)
+                )
+                # Re-read after saving defaults
+                user_config.clear()
+                user_config.read(self.directory_manager.settings_file)
+
+            # Now set up config with defaults and user values
+            config = configparser.ConfigParser()
+
+            # Set defaults
+            flat_defaults = {}
+            for key, value in defaults.items():
+                if isinstance(value, dict):
+                    # Skip nested dicts for configparser defaults
+                    continue
+                flat_defaults[key] = str(value)
+            config.read_dict({"DEFAULT": flat_defaults})
+
+            # Add sections for nested configs
+            for key, value in defaults.items():
+                if isinstance(value, dict):
+                    config.add_section(key)
+                    for subkey, subvalue in value.items():
+                        config.set(key, subkey, str(subvalue))
+
+            # Override with user settings
             config.read(self.directory_manager.settings_file)
         else:
-            # Create default config file
+            # Create default config file and set up config
             self.save_global_config(self._convert_to_global_config(defaults))
+
+            config = configparser.ConfigParser()
+            # Convert nested dicts to flat structure for configparser
+            flat_defaults = {}
+            for key, value in defaults.items():
+                if isinstance(value, dict):
+                    # Skip nested dicts for configparser defaults
+                    continue
+                flat_defaults[key] = str(value)
+            config.read_dict({"DEFAULT": flat_defaults})
+
+            # Add sections for nested configs
+            for key, value in defaults.items():
+                if isinstance(value, dict):
+                    config.add_section(key)
+                    for subkey, subvalue in value.items():
+                        config.set(key, subkey, str(subvalue))
+
+        # After config loading, replay migration messages to logger
+        self.migration.replay_messages_to_logger()
 
         return self._convert_to_global_config(config)
 
