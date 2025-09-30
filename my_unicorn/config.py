@@ -19,7 +19,7 @@ from typing import TypedDict, cast
 import orjson
 
 # Module-level constants
-DEFAULT_CONFIG_VERSION: str = "1.0.0"
+DEFAULT_CONFIG_VERSION: str = "1.0.1"
 
 
 class NetworkConfig(TypedDict):
@@ -53,6 +53,7 @@ class GlobalConfig(TypedDict):
     batch_mode: bool
     locale: str
     log_level: str
+    console_log_level: str
     network: NetworkConfig
     directory: DirectoryConfig
 
@@ -136,11 +137,15 @@ class DirectoryManager:
             catalog_dir: Optional custom catalog directory. Defaults to bundled catalog.
 
         """
-        self._config_dir: Path = config_dir or Path.home() / ".config" / "my-unicorn"
+        self._config_dir: Path = (
+            config_dir or Path.home() / ".config" / "my-unicorn"
+        )
         self._settings_file: Path = self._config_dir / "settings.conf"
         self._apps_dir: Path = self._config_dir / "apps"
         # Use provided catalog directory or bundled catalog directory
-        self._catalog_dir: Path = catalog_dir or Path(__file__).parent / "catalog"
+        self._catalog_dir: Path = (
+            catalog_dir or Path(__file__).parent / "catalog"
+        )
 
     @property
     def config_dir(self) -> Path:
@@ -195,7 +200,9 @@ class DirectoryManager:
             )
 
         if not self._catalog_dir.is_dir():
-            raise NotADirectoryError(f"Catalog path is not a directory: {self._catalog_dir}")
+            raise NotADirectoryError(
+                f"Catalog path is not a directory: {self._catalog_dir}"
+            )
 
         # Check if catalog has any JSON files
         catalog_files = list(self._catalog_dir.glob("*.json"))
@@ -244,6 +251,7 @@ class GlobalConfigManager:
             "batch_mode": "true",
             "locale": "en_US",
             "log_level": "INFO",
+            "console_log_level": "WARNING",
             "network": {"retry_attempts": "3", "timeout_seconds": "10"},
             "directory": {
                 "repo": str(home / ".local" / "share" / "my-unicorn-repo"),
@@ -307,11 +315,14 @@ class GlobalConfigManager:
         # Main section
         parser["DEFAULT"] = {
             "config_version": config["config_version"],
-            "max_concurrent_downloads": str(config["max_concurrent_downloads"]),
+            "max_concurrent_downloads": str(
+                config["max_concurrent_downloads"]
+            ),
             "max_backup": str(config["max_backup"]),
             "batch_mode": str(config["batch_mode"]).lower(),
             "locale": config["locale"],
             "log_level": config["log_level"],
+            "console_log_level": config["console_log_level"],
         }
 
         # Network section
@@ -321,13 +332,18 @@ class GlobalConfigManager:
         }
 
         # Directory section
-        parser["directory"] = {key: str(path) for key, path in config["directory"].items()}
+        parser["directory"] = {
+            key: str(path) for key, path in config["directory"].items()
+        }
 
-        with open(self.directory_manager.settings_file, "w", encoding="utf-8") as f:
+        with open(
+            self.directory_manager.settings_file, "w", encoding="utf-8"
+        ) as f:
             parser.write(f)
 
     def _convert_to_global_config(
-        self, config: configparser.ConfigParser | dict[str, str | dict[str, str]]
+        self,
+        config: configparser.ConfigParser | dict[str, str | dict[str, str]],
     ) -> GlobalConfig:
         """Convert configparser or dict to typed GlobalConfig.
 
@@ -346,9 +362,9 @@ class GlobalConfigManager:
                 section_dict = {}
                 for key in config.options(section_name):
                     # Only get keys that are explicitly in this section, not from DEFAULT
-                    if config.has_option(section_name, key) and not config.has_option(
-                        "DEFAULT", key
-                    ):
+                    if config.has_option(
+                        section_name, key
+                    ) and not config.has_option("DEFAULT", key):
                         section_dict[key] = config.get(section_name, key)
                 config_dict[section_name] = section_dict
 
@@ -386,7 +402,9 @@ class GlobalConfigManager:
             }
             for key, value in directory_dict.items():
                 if isinstance(value, str) and key in known_dir_keys:
-                    directory_config[key] = self.directory_manager.expand_path(value)
+                    directory_config[key] = self.directory_manager.expand_path(
+                        value
+                    )
 
         # Get network config
         network_dict = config_dict.get("network", {})
@@ -402,36 +420,58 @@ class GlobalConfigManager:
         # Get batch mode value
         batch_mode_str = get_scalar_config("batch_mode", "true")
         batch_mode = (
-            batch_mode_str.lower() == "true" if isinstance(batch_mode_str, str) else True
+            batch_mode_str.lower() == "true"
+            if isinstance(batch_mode_str, str)
+            else True
         )
 
         return GlobalConfig(
-            config_version=str(get_scalar_config("config_version", DEFAULT_CONFIG_VERSION)),
-            max_concurrent_downloads=int(get_scalar_config("max_concurrent_downloads", 5)),
+            config_version=str(
+                get_scalar_config("config_version", DEFAULT_CONFIG_VERSION)
+            ),
+            max_concurrent_downloads=int(
+                get_scalar_config("max_concurrent_downloads", 5)
+            ),
             max_backup=int(get_scalar_config("max_backup", 1)),
             batch_mode=batch_mode,
             locale=str(get_scalar_config("locale", "en_US")),
             log_level=str(get_scalar_config("log_level", "INFO")),
+            console_log_level=str(
+                get_scalar_config("console_log_level", "WARNING")
+            ),
             network=network_config,
             directory=DirectoryConfig(
                 repo=directory_config.get(
-                    "repo", Path.home() / ".local" / "share" / "my-unicorn-repo"
+                    "repo",
+                    Path.home() / ".local" / "share" / "my-unicorn-repo",
                 ),
                 package=directory_config.get(
                     "package", Path.home() / ".local" / "share" / "my-unicorn"
                 ),
-                download=directory_config.get("download", Path.home() / "Downloads"),
-                storage=directory_config.get("storage", Path.home() / "Applications"),
+                download=directory_config.get(
+                    "download", Path.home() / "Downloads"
+                ),
+                storage=directory_config.get(
+                    "storage", Path.home() / "Applications"
+                ),
                 backup=directory_config.get(
                     "backup", Path.home() / "Applications" / "backups"
                 ),
-                icon=directory_config.get("icon", Path.home() / "Applications" / "icons"),
-                settings=directory_config.get("settings", self.directory_manager.config_dir),
-                logs=directory_config.get("logs", self.directory_manager.config_dir / "logs"),
+                icon=directory_config.get(
+                    "icon", Path.home() / "Applications" / "icons"
+                ),
+                settings=directory_config.get(
+                    "settings", self.directory_manager.config_dir
+                ),
+                logs=directory_config.get(
+                    "logs", self.directory_manager.config_dir / "logs"
+                ),
                 cache=directory_config.get(
                     "cache", self.directory_manager.config_dir / "cache"
                 ),
-                tmp=directory_config.get("tmp", self.directory_manager.config_dir / "tmp"),
+                tmp=directory_config.get(
+                    "tmp", self.directory_manager.config_dir / "tmp"
+                ),
             ),
         )
 
@@ -473,7 +513,9 @@ class AppConfigManager:
             config_data = self._migrate_app_config(config_data)
             return cast(AppConfig, config_data)
         except (Exception, OSError) as e:
-            raise ValueError(f"Failed to load app config for {app_name}: {e}") from e
+            raise ValueError(
+                f"Failed to load app config for {app_name}: {e}"
+            ) from e
 
     def save_app_config(self, app_name: str, config: AppConfig) -> None:
         """Save app-specific configuration.
@@ -492,7 +534,9 @@ class AppConfigManager:
             with open(app_file, "wb") as f:
                 f.write(orjson.dumps(config, option=orjson.OPT_INDENT_2))
         except OSError as e:
-            raise ValueError(f"Failed to save app config for {app_name}: {e}") from e
+            raise ValueError(
+                f"Failed to save app config for {app_name}: {e}"
+            ) from e
 
     def list_installed_apps(self) -> list[str]:
         """Get list of installed apps.
@@ -504,7 +548,11 @@ class AppConfigManager:
         if not self.directory_manager.apps_dir.exists():
             return []
 
-        return [f.stem for f in self.directory_manager.apps_dir.glob("*.json") if f.is_file()]
+        return [
+            f.stem
+            for f in self.directory_manager.apps_dir.glob("*.json")
+            if f.is_file()
+        ]
 
     def remove_app_config(self, app_name: str) -> bool:
         """Remove app configuration file.
@@ -573,7 +621,9 @@ class CatalogManager:
             with open(catalog_file, "rb") as f:
                 return cast(CatalogEntry, orjson.loads(f.read()))
         except (Exception, OSError) as e:
-            raise ValueError(f"Failed to load catalog entry for {app_name}: {e}") from e
+            raise ValueError(
+                f"Failed to load catalog entry for {app_name}: {e}"
+            ) from e
 
     def list_catalog_apps(self) -> list[str]:
         """Get list of available apps in bundled catalog.
@@ -587,14 +637,18 @@ class CatalogManager:
             return []
 
         return [
-            f.stem for f in self.directory_manager.catalog_dir.glob("*.json") if f.is_file()
+            f.stem
+            for f in self.directory_manager.catalog_dir.glob("*.json")
+            if f.is_file()
         ]
 
 
 class ConfigManager:
     """Facade that coordinates all configuration managers."""
 
-    DEFAULT_CONFIG_VERSION: str = DEFAULT_CONFIG_VERSION  # Maintain backward compatibility
+    DEFAULT_CONFIG_VERSION: str = (
+        DEFAULT_CONFIG_VERSION  # Maintain backward compatibility
+    )
 
     def __init__(
         self, config_dir: Path | None = None, catalog_dir: Path | None = None
@@ -607,7 +661,9 @@ class ConfigManager:
 
         """
         self.directory_manager = DirectoryManager(config_dir, catalog_dir)
-        self.global_config_manager = GlobalConfigManager(self.directory_manager)
+        self.global_config_manager = GlobalConfigManager(
+            self.directory_manager
+        )
         self.app_config_manager = AppConfigManager(self.directory_manager)
         self.catalog_manager = CatalogManager(self.directory_manager)
 
