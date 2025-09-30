@@ -19,8 +19,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from my_unicorn.config import DirectoryManager
 
-# Import constants without importing main config classes
-DEFAULT_CONFIG_VERSION = "1.0.1"
+# Import from centralized constants module
+from my_unicorn.constants import CONFIG_VERSION
 
 
 class ConfigMigration:
@@ -87,9 +87,7 @@ class ConfigMigration:
             True if migration is needed
 
         """
-        return (
-            self._compare_versions(current_version, DEFAULT_CONFIG_VERSION) < 0
-        )
+        return self._compare_versions(current_version, CONFIG_VERSION) < 0
 
     def _compare_versions(self, version1: str, version2: str) -> int:
         """Compare two semantic version strings.
@@ -142,28 +140,34 @@ class ConfigMigration:
 
         """
         try:
-            # Create backup before migration
-            self._create_config_backup()
             self._collect_message("INFO", "Starting configuration migration")
 
-            # Get defaults and merge missing fields
+            # Check if any fields actually need to be added/changed
             fields_added = self._merge_missing_fields(user_config, defaults)
+            current_version = user_config.get(
+                "DEFAULT", "config_version", fallback="1.0.0"
+            )
+            version_needs_update = current_version != CONFIG_VERSION
 
-            if not fields_added:
+            # If no fields need to be added and version is current, no
+            # migration needed
+            if not fields_added and not version_needs_update:
                 self._collect_message(
                     "INFO", "No migration needed - configuration is up to date"
                 )
                 return True
 
-            # Update config version
-            user_config.set(
-                "DEFAULT", "config_version", DEFAULT_CONFIG_VERSION
-            )
-            self._collect_message(
-                "INFO",
-                "Updated configuration version to %s",
-                DEFAULT_CONFIG_VERSION,
-            )
+            # Only create backup if we're actually going to make changes
+            self._create_config_backup()
+
+            # Update config version if needed
+            if version_needs_update:
+                user_config.set("DEFAULT", "config_version", CONFIG_VERSION)
+                self._collect_message(
+                    "INFO",
+                    "Updated configuration version to %s",
+                    CONFIG_VERSION,
+                )
 
             # Validate merged configuration
             if not self._validate_merged_config(user_config):
@@ -173,11 +177,15 @@ class ConfigMigration:
                 self._restore_backup()
                 return False
 
-            # Save migrated configuration
-            with open(
-                self.directory_manager.settings_file, "w", encoding="utf-8"
-            ) as f:
-                user_config.write(f)
+            # Save migrated configuration using the new comment-aware method
+            # We need to import here to avoid circular imports
+            from my_unicorn.config import GlobalConfigManager
+
+            temp_manager = GlobalConfigManager(self.directory_manager)
+            migrated_config = temp_manager._convert_to_global_config(
+                user_config
+            )
+            temp_manager.save_global_config(migrated_config)
 
             self._collect_message(
                 "INFO", "Configuration migration completed successfully"

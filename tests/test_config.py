@@ -7,14 +7,15 @@ import orjson
 import pytest
 
 from my_unicorn.config import (
-    DEFAULT_CONFIG_VERSION,
     AppConfig,
     AppConfigManager,
     CatalogManager,
+    CommentAwareConfigParser,
     ConfigManager,
     DirectoryManager,
     GlobalConfigManager,
 )
+from my_unicorn.constants import CONFIG_VERSION
 
 
 @pytest.fixture
@@ -214,6 +215,104 @@ def test_ensure_directories_from_config(config_manager, tmp_path):
     config_manager.ensure_directories_from_config(config)
     for d in dirs.values():
         assert d.exists()
+
+
+def test_directory_creation_without_comments(config_manager, tmp_path):
+    """Test that directories are created without inline comments in names.
+
+    This test prevents regression of the bug where directories were created
+    with comment text in their names (e.g., 'logs  # Log files directory').
+    """
+    # Load config (this will create and save a default config with comments)
+    config_manager.load_global_config()
+
+    # Verify the config file was saved correctly
+    config_content = config_manager.settings_file.read_text()
+    assert "logs = " in config_content
+    assert "cache = " in config_content
+    # Only config_version should have inline comment
+    assert "# DO NOT MODIFY - Config format version" in config_content
+
+    # Reload config to simulate the full save/load cycle
+    config_reloaded = config_manager.load_global_config()
+
+    # Verify that directory paths are clean (no comments)
+    for key, path in config_reloaded["directory"].items():
+        path_str = str(path)
+        assert "  #" not in path_str, (
+            f"Directory path '{key}' contains comment: {path_str}"
+        )
+        assert "# " not in path_str, (
+            f"Directory path '{key}' contains comment: {path_str}"
+        )
+
+    # Create directories using the config
+    config_manager.ensure_directories_from_config(config_reloaded)
+
+    # Verify that actual directories created do not have comments in names
+    config_dir = config_manager.config_dir
+    if config_dir.exists():
+        for item in config_dir.iterdir():
+            if item.is_dir():
+                dir_name = item.name
+                assert "  #" not in dir_name, (
+                    f"Directory created with comment in name: '{dir_name}'"
+                )
+                assert "# " not in dir_name, (
+                    f"Directory created with comment in name: '{dir_name}'"
+                )
+
+    # Test with specific directory paths that should be created
+    test_dirs = ["logs", "cache", "tmp"]
+    for dir_name in test_dirs:
+        expected_path = config_dir / dir_name
+        if expected_path.exists():
+            expected_name = expected_path.name
+            assert expected_name == dir_name, (
+                f"Expected '{dir_name}', got '{expected_name}'"
+            )
+            # Ensure no directory with comments exists
+            comment_variations = [
+                f"{dir_name}  # Log files directory",
+                f"{dir_name}  # Cache directory",
+                f"{dir_name}  # Temporary files directory",
+            ]
+            for bad_name in comment_variations:
+                bad_path = config_dir / bad_name
+                assert not bad_path.exists(), (
+                    f"Found directory with comment in name: '{bad_name}'"
+                )
+
+
+def test_comment_stripping_configparser(config_manager):
+    """Test that CommentAwareConfigParser correctly strips inline comments."""
+    # Create a config file with inline comments
+    config_content = """[DEFAULT]
+batch_mode = true  # Non-interactive mode
+
+[directory]
+logs = /test/logs  # Log files directory
+cache = /test/cache  # Cache directory
+tmp = /test/tmp  # Temporary files directory
+"""
+
+    # Write the config content to a temporary file
+    test_config_file = config_manager.config_dir / "test_config.conf"
+    test_config_file.write_text(config_content)
+
+    # Load with CommentAwareConfigParser
+    parser = CommentAwareConfigParser()
+    parser.read(test_config_file)
+
+    # Verify that comments are stripped from values
+    assert parser.get("DEFAULT", "batch_mode") == "true"
+    assert parser.get("directory", "logs") == "/test/logs"
+    assert parser.get("directory", "cache") == "/test/cache"
+    assert parser.get("directory", "tmp") == "/test/tmp"
+
+    # Verify that the raw config content contains comments
+    assert "# Log files directory" in config_content
+    assert "# Cache directory" in config_content
 
 
 # Tests for refactored specialized manager classes
@@ -527,7 +626,7 @@ def test_needs_migration(config_dir):
     assert manager.migration._needs_migration("0.9.9") is True
 
     # Current version is same as default
-    assert manager.migration._needs_migration(DEFAULT_CONFIG_VERSION) is False
+    assert manager.migration._needs_migration(CONFIG_VERSION) is False
 
     # Current version is newer than default (shouldn't happen)
     assert manager.migration._needs_migration("2.0.0") is False
@@ -656,7 +755,7 @@ storage = /custom/storage
     config = manager.load_global_config()
 
     # Verify configuration was migrated
-    assert config["config_version"] == "1.0.1"  # Should be updated
+    assert config["config_version"] == "1.0.2"  # Should be updated
     assert config["locale"] == "fr_FR"  # User value preserved
     assert config["max_backup"] == 3  # User value preserved
     assert config["network"]["retry_attempts"] == 5  # User value preserved
@@ -717,7 +816,7 @@ def test_migration_with_new_config_file(config_dir):
     config = manager.load_global_config()
 
     # Should create default configuration
-    assert config["config_version"] == "1.0.1"
+    assert config["config_version"] == "1.0.2"
     assert config["locale"] == "en_US"
     assert manager.directory_manager.settings_file.exists()
 
@@ -726,9 +825,9 @@ def test_migration_no_changes_needed(config_dir):
     """Test migration when configuration is already up to date."""
     manager = GlobalConfigManager(DirectoryManager(config_dir))
 
-    # Create current configuration file with hardcoded values
+    # Create current configuration file with all required fields
     complete_config_content = """[DEFAULT]
-config_version = 1.0.1
+config_version = 1.0.2
 max_concurrent_downloads = 5
 max_backup = 1
 batch_mode = true
@@ -743,6 +842,14 @@ timeout_seconds = 10
 [directory]
 repo = /tmp/test-repo
 package = /tmp/test-package
+download = /tmp/downloads
+storage = /tmp/storage
+backup = /tmp/backup
+icon = /tmp/icons
+settings = /tmp/settings
+logs = /tmp/logs
+cache = /tmp/cache
+tmp = /tmp/tmp
 """
 
     manager.directory_manager.settings_file.write_text(complete_config_content)
@@ -751,8 +858,193 @@ package = /tmp/test-package
     config = manager.load_global_config()
 
     # Verify no migration was performed (version stays the same)
-    assert config["config_version"] == "1.0.1"
+    assert config["config_version"] == "1.0.2"
 
     # No backup should be created for up-to-date config
     # Note: There might be backup files from other tests, so we just check
     # that loading didn't create additional unnecessary backups
+
+
+def test_config_file_with_comments(config_dir, tmp_path):
+    """Test that configuration files are saved with user-friendly comments."""
+    catalog_dir = tmp_path / "catalog"
+    catalog_dir.mkdir(exist_ok=True)
+    config_manager = ConfigManager(config_dir, catalog_dir)
+
+    # Load and save config to create file with comments
+    config = config_manager.load_global_config()
+    config_manager.save_global_config(config)
+
+    # Read the raw file content to check for comments
+    settings_file = config_manager.settings_file
+    content = settings_file.read_text(encoding="utf-8")
+
+    # Check for header comment
+    assert "My-Unicorn AppImage Installer Configuration" in content
+    assert "Last updated:" in content
+    assert "Configuration version:" in content
+
+    # Check for section comments
+    assert "MAIN CONFIGURATION" in content
+    assert "NETWORK CONFIGURATION" in content
+    assert "DIRECTORY PATHS" in content
+
+    # Check for inline comments - only config_version should have one
+    assert "# DO NOT MODIFY - Config format version" in content
+    # Other fields should not have inline comments
+    assert "# Max simultaneous downloads" not in content
+    assert "# Number of backup copies to keep" not in content
+    assert "# Download retry attempts" not in content
+    assert "# AppImage metadata repository" not in content
+
+    # Verify that configuration can still be loaded correctly
+    loaded_config = config_manager.load_global_config()
+    assert loaded_config == config
+
+
+def test_comment_stripping_functionality(config_dir, tmp_path):
+    """Test that inline comments are properly stripped when loading config."""
+    catalog_dir = tmp_path / "catalog"
+    catalog_dir.mkdir(exist_ok=True)
+    config_manager = ConfigManager(config_dir, catalog_dir)
+
+    # Create a config file with comments manually
+    settings_file = config_manager.settings_file
+    settings_file.parent.mkdir(parents=True, exist_ok=True)
+
+    config_content = """[DEFAULT]
+max_concurrent_downloads = 10  # Max simultaneous downloads
+max_backup = 3  # Number of backup copies to keep
+batch_mode = false  # Non-interactive mode
+
+[network]
+retry_attempts = 5  # Download retry attempts
+timeout_seconds = 30  # Request timeout in seconds
+
+[directory]
+download = /tmp/downloads  # Temporary download location
+"""
+
+    settings_file.write_text(config_content, encoding="utf-8")
+
+    # Load config and verify values are correctly parsed (comments stripped)
+    config = config_manager.load_global_config()
+
+    assert config["max_concurrent_downloads"] == 10
+    assert config["max_backup"] == 3
+    assert config["batch_mode"] is False
+    assert config["network"]["retry_attempts"] == 5
+    assert config["network"]["timeout_seconds"] == 30
+    assert str(config["directory"]["download"]) == "/tmp/downloads"
+
+
+def _parse_ini_file_lines(content: str) -> tuple[list, list, list]:
+    """Parse INI file content and categorize config lines."""
+    lines = content.split("\n")
+
+    # Find all key=value lines (configuration lines)
+    config_lines = []
+    for line_num, line in enumerate(lines, 1):
+        if "=" in line and not line.strip().startswith("#"):
+            config_lines.append((line_num, line))
+
+    # Categorize lines: with comments vs without comments
+    lines_with_comments = []
+    lines_without_comments = []
+
+    for line_num, line in config_lines:
+        if "  #" in line:  # Has inline comment (double space before #)
+            lines_with_comments.append((line_num, line))
+        else:
+            lines_without_comments.append((line_num, line))
+
+    return config_lines, lines_with_comments, lines_without_comments
+
+
+def _verify_comment_lines(lines_with_comments: list) -> None:
+    """Verify lines with comments have proper formatting."""
+    MIN_COMMENT_LINES = 1
+
+    for line_num, line in lines_with_comments:
+        # Should have exactly one comment (config_version)
+        assert "config_version" in line, (
+            f"Only config_version should have inline comment, found: {line}"
+        )
+        assert line.count("  #") == MIN_COMMENT_LINES, (
+            f"Line {line_num} should have exactly one comment marker: {line!r}"
+        )
+        assert "DO NOT MODIFY" in line, (
+            f"Line {line_num} should have the protection comment: {line!r}"
+        )
+
+        # Verify format: should end with comment, not extra spaces
+        assert line.endswith("# DO NOT MODIFY - Config format version"), (
+            f"Line {line_num} should end with comment, not spaces: {line!r}"
+        )
+
+
+def _verify_clean_lines(lines_without_comments: list) -> None:
+    """Verify lines without comments have no trailing spaces."""
+    EXPECTED_KEY_VALUE_PARTS = 2
+
+    for line_num, line in lines_without_comments:
+        # Should not end with any spaces
+        assert not line.endswith(" "), (
+            f"Line {line_num} should not have trailing spaces: {line!r}"
+        )
+        assert not line.endswith("  "), (
+            f"Line {line_num} should not have trailing double spaces: {line!r}"
+        )
+
+        # Should have proper format: "key = value" (no trailing whitespace)
+        parts = line.split(" = ")
+        assert len(parts) == EXPECTED_KEY_VALUE_PARTS, (
+            f"Line {line_num} should have 'key = value' format: {line!r}"
+        )
+        _, value = parts  # Only use value, ignore key
+        assert not value.endswith(" "), (
+            f"Value in line {line_num} should not end with space: {value!r}"
+        )
+
+
+def test_ini_file_inline_spacing_format(config_dir, tmp_path):
+    """Test INI files have proper spacing without trailing spaces.
+
+    This prevents regression of the trailing whitespace issue where all lines
+    had unnecessary trailing spaces even when they had no inline comments.
+    """
+    MIN_COMMENT_LINES = 1
+    MIN_CLEAN_LINES = 5
+
+    catalog_dir = tmp_path / "catalog"
+    catalog_dir.mkdir(exist_ok=True)
+    config_manager = ConfigManager(config_dir, catalog_dir)
+
+    # Load and save config to create file with proper formatting
+    config = config_manager.load_global_config()
+    config_manager.save_global_config(config)
+
+    # Read and parse the raw file content
+    settings_file = config_manager.settings_file
+    content = settings_file.read_text(encoding="utf-8")
+    _, lines_with_comments, lines_without_comments = _parse_ini_file_lines(
+        content
+    )
+
+    # Verify we have the expected structure
+    assert len(lines_with_comments) >= MIN_COMMENT_LINES, (
+        "Should have at least config_version with comment"
+    )
+    assert len(lines_without_comments) >= MIN_CLEAN_LINES, (
+        "Should have multiple lines without comments"
+    )
+
+    # Test comment lines and clean lines
+    _verify_comment_lines(lines_with_comments)
+    _verify_clean_lines(lines_without_comments)
+
+    # Verify the file can be read back correctly
+    reloaded_config = config_manager.load_global_config()
+    assert reloaded_config == config, (
+        "Config should reload identically despite formatting changes"
+    )
