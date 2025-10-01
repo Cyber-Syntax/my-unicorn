@@ -14,28 +14,18 @@ from pathlib import Path
 from typing import Any
 
 from my_unicorn.config import config_manager
-
-# Logging configuration constants
-MAX_FILE_SIZE_BYTES = 1024 * 1024  # 1 MB prevents excessive disk usage
-BACKUP_COUNT = 3
-
-# Format strings
-CONSOLE_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-CONSOLE_DATE_FORMAT = "%H:%M:%S"
-FILE_FORMAT = (
-    "%(asctime)s - %(name)s - %(levelname)s - "
-    "%(funcName)s:%(lineno)d - %(message)s"
+from my_unicorn.constants import (
+    DEFAULT_LOG_LEVEL,
+    LOG_BACKUP_COUNT,
+    LOG_COLORS,
+    LOG_CONSOLE_DATE_FORMAT,
+    LOG_CONSOLE_FORMAT,
+    LOG_FILE_DATE_FORMAT,
+    LOG_FILE_FORMAT,
+    LOG_MAX_FILE_SIZE_BYTES,
 )
-FILE_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-COLORS = {
-    "DEBUG": "\033[36m",  # Cyan
-    "INFO": "\033[32m",  # Green
-    "WARNING": "\033[33m",  # Yellow
-    "ERROR": "\033[31m",  # Red
-    "CRITICAL": "\033[35m",  # Magenta
-    "RESET": "\033[0m",
-}
+# Using centralized logging constants from my_unicorn.constants
 
 # Global registry to prevent duplicate loggers across the application
 _logger_instances: dict[str, "MyUnicornLogger"] = {}
@@ -52,7 +42,7 @@ def _load_log_settings() -> tuple[str, str, Path]:
 
     """
     default_console_level = "WARNING"
-    default_file_level = "INFO"
+    default_file_level = DEFAULT_LOG_LEVEL
     default_path = (
         Path.home() / ".config" / "my-unicorn" / "logs" / "my-unicorn.log"
     )
@@ -99,9 +89,9 @@ class ColoredFormatter(logging.Formatter):
             Formatted log message with color codes
 
         """
-        if record.levelname in COLORS:
-            color = COLORS[record.levelname]
-            reset = COLORS["RESET"]
+        if record.levelname in LOG_COLORS:
+            color = LOG_COLORS[record.levelname]
+            reset = LOG_COLORS["RESET"]
             colored_level = f"{color}{record.levelname}{reset}"
 
             original_levelname = record.levelname
@@ -144,8 +134,8 @@ class MyUnicornLogger:
         """Set up console handler with colors."""
         self._console_handler = logging.StreamHandler(sys.stdout)
         console_formatter = ColoredFormatter(
-            CONSOLE_FORMAT,
-            datefmt=CONSOLE_DATE_FORMAT,
+            LOG_CONSOLE_FORMAT,
+            datefmt=LOG_CONSOLE_DATE_FORMAT,
         )
         self._console_handler.setFormatter(console_formatter)
         self._console_handler.setLevel(logging.WARNING)
@@ -174,13 +164,13 @@ class MyUnicornLogger:
                 # Create file handler directly
                 self._file_handler = logging.handlers.RotatingFileHandler(
                     log_file,
-                    maxBytes=MAX_FILE_SIZE_BYTES,
-                    backupCount=BACKUP_COUNT,
+                    maxBytes=LOG_MAX_FILE_SIZE_BYTES,
+                    backupCount=LOG_BACKUP_COUNT,
                     encoding="utf-8",
                     delay=False,
                 )
                 formatter = logging.Formatter(
-                    FILE_FORMAT, datefmt=FILE_DATE_FORMAT
+                    LOG_FILE_FORMAT, datefmt=LOG_FILE_DATE_FORMAT
                 )
                 self._file_handler.setFormatter(formatter)
 

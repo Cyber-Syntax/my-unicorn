@@ -19,7 +19,31 @@ from typing import TypedDict, cast
 
 import orjson
 
-from my_unicorn.constants import CONFIG_VERSION
+from my_unicorn.constants import (
+    CONFIG_DIR_NAME,
+    CONFIG_FILE_NAME,
+    CONFIG_VERSION,
+    DEFAULT_APPS_DIR_NAME,
+    DEFAULT_BATCH_MODE,
+    DEFAULT_CONFIG_SUBDIR,
+    DEFAULT_CONSOLE_LOG_LEVEL,
+    DEFAULT_LOCALE,
+    DEFAULT_LOG_LEVEL,
+    DEFAULT_MAX_BACKUP,
+    DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+    DIRECTORY_KEYS,
+    ISO_DATETIME_FORMAT,
+    KEY_BATCH_MODE,
+    KEY_CONFIG_VERSION,
+    KEY_CONSOLE_LOG_LEVEL,
+    KEY_LOCALE,
+    KEY_LOG_LEVEL,
+    KEY_MAX_BACKUP,
+    KEY_MAX_CONCURRENT_DOWNLOADS,
+    SECTION_DEFAULT,
+    SECTION_DIRECTORY,
+    SECTION_NETWORK,
+)
 
 
 class CommentAwareConfigParser(configparser.ConfigParser):
@@ -45,7 +69,7 @@ class ConfigCommentManager:
             Header comment string for the configuration file
 
         """
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now().strftime(ISO_DATETIME_FORMAT)
         return f"""# My-Unicorn AppImage Installer Configuration
 # This file contains settings for the my-unicorn AppImage installer.
 # You can modify these values to customize the behavior of the application.
@@ -64,7 +88,7 @@ class ConfigCommentManager:
 
         """
         return {
-            "DEFAULT": """# ========================================
+            SECTION_DEFAULT: """# ========================================
 # MAIN CONFIGURATION
 # ========================================
 # These settings control the overall behavior of my-unicorn.
@@ -78,7 +102,7 @@ class ConfigCommentManager:
 # console_log_level: Console output detail level (DEBUG, INFO, etc.)
 
 """,
-            "network": """
+            SECTION_NETWORK: """
 # ========================================
 # NETWORK CONFIGURATION
 # ========================================
@@ -88,7 +112,7 @@ class ConfigCommentManager:
 # timeout_seconds: Seconds to wait before timing out requests (5-60)
 
 """,
-            "directory": """
+            SECTION_DIRECTORY: """
 # ========================================
 # DIRECTORY PATHS
 # ========================================
@@ -118,11 +142,11 @@ class ConfigCommentManager:
 
         """
         return {
-            "DEFAULT": {
-                "config_version": "# DO NOT MODIFY - Config format version",
+            SECTION_DEFAULT: {
+                KEY_CONFIG_VERSION: "# DO NOT MODIFY - Config format version",
             },
-            "network": {},
-            "directory": {},
+            SECTION_NETWORK: {},
+            SECTION_DIRECTORY: {},
         }
 
 
@@ -237,15 +261,17 @@ class DirectoryManager:
         """Initialize directory manager.
 
         Args:
-            config_dir: Optional custom config directory. Defaults to ~/.config/my-unicorn/
-            catalog_dir: Optional custom catalog directory. Defaults to bundled catalog.
+            config_dir: Optional custom config directory. Defaults to
+                ~/.config/my-unicorn/
+            catalog_dir: Optional custom catalog directory. Defaults to
+                bundled catalog.
 
         """
         self._config_dir: Path = (
-            config_dir or Path.home() / ".config" / "my-unicorn"
+            config_dir or Path.home() / CONFIG_DIR_NAME / DEFAULT_CONFIG_SUBDIR
         )
-        self._settings_file: Path = self._config_dir / "settings.conf"
-        self._apps_dir: Path = self._config_dir / "apps"
+        self._settings_file: Path = self._config_dir / CONFIG_FILE_NAME
+        self._apps_dir: Path = self._config_dir / DEFAULT_APPS_DIR_NAME
         # Use provided catalog directory or bundled catalog directory
         self._catalog_dir: Path = (
             catalog_dir or Path(__file__).parent / "catalog"
@@ -353,15 +379,17 @@ class GlobalConfigManager:
         """
         home = Path.home()
         return {
-            "config_version": CONFIG_VERSION,
-            "max_concurrent_downloads": "5",
-            "max_backup": "1",
-            "batch_mode": "true",
-            "locale": "en_US",
-            "log_level": "INFO",
-            "console_log_level": "WARNING",
-            "network": {"retry_attempts": "3", "timeout_seconds": "10"},
-            "directory": {
+            KEY_CONFIG_VERSION: CONFIG_VERSION,
+            KEY_MAX_CONCURRENT_DOWNLOADS: str(
+                DEFAULT_MAX_CONCURRENT_DOWNLOADS
+            ),
+            KEY_MAX_BACKUP: str(DEFAULT_MAX_BACKUP),
+            KEY_BATCH_MODE: str(DEFAULT_BATCH_MODE).lower(),
+            KEY_LOCALE: DEFAULT_LOCALE,
+            KEY_LOG_LEVEL: DEFAULT_LOG_LEVEL,
+            KEY_CONSOLE_LOG_LEVEL: DEFAULT_CONSOLE_LOG_LEVEL,
+            SECTION_NETWORK: {"retry_attempts": "3", "timeout_seconds": "10"},
+            SECTION_DIRECTORY: {
                 "repo": str(home / ".local" / "share" / "my-unicorn-repo"),
                 "package": str(home / ".local" / "share" / "my-unicorn"),
                 "download": str(home / "Downloads"),
@@ -393,7 +421,9 @@ class GlobalConfigManager:
             # Perform migration if needed (no circular import)
             if not self.migration.migrate_if_needed(user_config, defaults):
                 # Migration failed, fall back to defaults
-                print("Configuration migration failed, using default settings.")
+                print(
+                    "Configuration migration failed, using default settings."
+                )
                 self.save_global_config(
                     self._convert_to_global_config(defaults)
                 )
@@ -411,7 +441,7 @@ class GlobalConfigManager:
                     # Skip nested dicts for configparser defaults
                     continue
                 flat_defaults[key] = str(value)
-            config.read_dict({"DEFAULT": flat_defaults})
+            config.read_dict({SECTION_DEFAULT: flat_defaults})
 
             # Add sections for nested configs
             for key, value in defaults.items():
@@ -434,7 +464,7 @@ class GlobalConfigManager:
                     # Skip nested dicts for configparser defaults
                     continue
                 flat_defaults[key] = str(value)
-            config.read_dict({"DEFAULT": flat_defaults})
+            config.read_dict({SECTION_DEFAULT: flat_defaults})
 
             # Add sections for nested configs
             for key, value in defaults.items():
@@ -469,8 +499,8 @@ class GlobalConfigManager:
             key_comments = comment_manager.get_key_comments()
 
             # Write DEFAULT section
-            f.write(section_comments["DEFAULT"])
-            f.write("[DEFAULT]\n")
+            f.write(section_comments[SECTION_DEFAULT])
+            f.write(f"[{SECTION_DEFAULT}]\n")
             default_data = {
                 "config_version": config["config_version"],
                 "max_concurrent_downloads": str(
@@ -484,36 +514,41 @@ class GlobalConfigManager:
             }
 
             for key, value in default_data.items():
-                inline_comment = key_comments["DEFAULT"].get(key, "")
+                inline_comment = key_comments[SECTION_DEFAULT].get(key, "")
                 if inline_comment:
                     f.write(f"{key} = {value}  {inline_comment}\n")
                 else:
                     f.write(f"{key} = {value}\n")
 
             # Write network section
-            f.write(section_comments["network"])
-            f.write("[network]\n")
-            network_data = {
-                "retry_attempts": str(config["network"]["retry_attempts"]),
-                "timeout_seconds": str(config["network"]["timeout_seconds"]),
+            f.write(section_comments[SECTION_NETWORK])
+            f.write(f"[{SECTION_NETWORK}]\n")
+            # Cast the top-level config to a plain dict before indexing with
+            # SECTION_* constants. Type checkers require string literals when
+            # interacting with TypedDicts directly.
+            network_section = cast(dict, config)[SECTION_NETWORK]
+            network_data: dict[str, str] = {
+                "retry_attempts": str(network_section["retry_attempts"]),
+                "timeout_seconds": str(network_section["timeout_seconds"]),
             }
 
             for key, value in network_data.items():
-                inline_comment = key_comments["network"].get(key, "")
+                inline_comment = key_comments[SECTION_NETWORK].get(key, "")
                 if inline_comment:
                     f.write(f"{key} = {value}  {inline_comment}\n")
                 else:
                     f.write(f"{key} = {value}\n")
 
             # Write directory section
-            f.write(section_comments["directory"])
-            f.write("[directory]\n")
-            directory_data = {
-                key: str(path) for key, path in config["directory"].items()
+            f.write(section_comments[SECTION_DIRECTORY])
+            f.write(f"[{SECTION_DIRECTORY}]\n")
+            directory_data: dict[str, str] = {
+                key: str(path)
+                for key, path in cast(dict, config)[SECTION_DIRECTORY].items()
             }
 
             for key, value in directory_data.items():
-                inline_comment = key_comments["directory"].get(key, "")
+                inline_comment = key_comments[SECTION_DIRECTORY].get(key, "")
                 if inline_comment:
                     f.write(f"{key} = {value}  {inline_comment}\n")
                 else:
@@ -539,10 +574,11 @@ class GlobalConfigManager:
             for section_name in config.sections():
                 section_dict = {}
                 for key in config.options(section_name):
-                    # Only get keys that are explicitly in this section, not from DEFAULT
+                    # Only get keys that are explicitly in this section,
+                    # not from DEFAULT
                     if config.has_option(
                         section_name, key
-                    ) and not config.has_option("DEFAULT", key):
+                    ) and not config.has_option(SECTION_DEFAULT, key):
                         section_dict[key] = config.get(section_name, key)
                 config_dict[section_name] = section_dict
 
@@ -577,21 +613,10 @@ class GlobalConfigManager:
 
         # Convert directory paths (only from explicit directory section)
         directory_config: dict[str, Path] = {}
-        directory_dict = config_dict.get("directory", {})
+        directory_dict = config_dict.get(SECTION_DIRECTORY, {})
         if isinstance(directory_dict, dict):
             # Only process known directory keys to avoid config values
-            known_dir_keys = {
-                "repo",
-                "package",
-                "download",
-                "storage",
-                "backup",
-                "icon",
-                "settings",
-                "logs",
-                "cache",
-                "tmp",
-            }
+            known_dir_keys = set(DIRECTORY_KEYS)
             for key, value in directory_dict.items():
                 if isinstance(value, str) and key in known_dir_keys:
                     cleaned_path = strip_comments(value)
@@ -600,7 +625,7 @@ class GlobalConfigManager:
                     )
 
         # Get network config
-        network_dict = config_dict.get("network", {})
+        network_dict = config_dict.get(SECTION_NETWORK, {})
 
         network_config = NetworkConfig(
             retry_attempts=int(
@@ -843,10 +868,6 @@ class CatalogManager:
 
 class ConfigManager:
     """Facade that coordinates all configuration managers."""
-
-    DEFAULT_CONFIG_VERSION: str = (
-        CONFIG_VERSION  # Maintain backward compatibility
-    )
 
     def __init__(
         self, config_dir: Path | None = None, catalog_dir: Path | None = None

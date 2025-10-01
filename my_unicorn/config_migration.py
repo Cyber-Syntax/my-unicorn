@@ -20,7 +20,23 @@ if TYPE_CHECKING:
     from my_unicorn.config import DirectoryManager
 
 # Import from centralized constants module
-from my_unicorn.constants import CONFIG_VERSION
+from my_unicorn.constants import (
+    CONFIG_BACKUP_EXTENSION,
+    CONFIG_BACKUP_SUFFIX_TEMPLATE,
+    CONFIG_BACKUP_TIMESTAMP_FORMAT,
+    CONFIG_FALLBACK_OLD_VERSION,
+    CONFIG_FALLBACK_PREVIOUS_VERSION,
+    CONFIG_MIGRATION_PRINT_PREFIX,
+    CONFIG_VERSION,
+    KEY_CONFIG_VERSION,
+    KEY_REPO,
+    KEY_RETRY_ATTEMPTS,
+    KEY_STORAGE,
+    KEY_TIMEOUT_SECONDS,
+    SECTION_DEFAULT,
+    SECTION_DIRECTORY,
+    SECTION_NETWORK,
+)
 
 
 class ConfigMigration:
@@ -51,7 +67,7 @@ class ConfigMigration:
         # Print critical errors to console as fallback
         if level in ("ERROR", "CRITICAL"):
             formatted_msg = message % args if args else message
-            print(f"Config Migration {level}: {formatted_msg}")
+            print(f"{CONFIG_MIGRATION_PRINT_PREFIX} {level}: {formatted_msg}")
 
     def migrate_if_needed(
         self,
@@ -69,7 +85,9 @@ class ConfigMigration:
 
         """
         current_version = user_config.get(
-            "DEFAULT", "config_version", fallback="0.0.0"
+            SECTION_DEFAULT,
+            KEY_CONFIG_VERSION,
+            fallback=CONFIG_FALLBACK_OLD_VERSION,
         )
 
         if not self._needs_migration(current_version):
@@ -145,7 +163,9 @@ class ConfigMigration:
             # Check if any fields actually need to be added/changed
             fields_added = self._merge_missing_fields(user_config, defaults)
             current_version = user_config.get(
-                "DEFAULT", "config_version", fallback="1.0.0"
+                SECTION_DEFAULT,
+                KEY_CONFIG_VERSION,
+                fallback=CONFIG_FALLBACK_PREVIOUS_VERSION,
             )
             version_needs_update = current_version != CONFIG_VERSION
 
@@ -212,9 +232,10 @@ class ConfigMigration:
             # No config to backup
             return self.directory_manager.settings_file
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = self.directory_manager.settings_file.with_suffix(
-            f".{timestamp}.backup"
+        # Prepare backup filename with timestamp
+        timestamp = datetime.now().strftime(CONFIG_BACKUP_TIMESTAMP_FORMAT)
+        backup_path: Path = self.directory_manager.settings_file.with_suffix(
+            CONFIG_BACKUP_SUFFIX_TEMPLATE.format(timestamp=timestamp)
         )
 
         try:
@@ -232,7 +253,8 @@ class ConfigMigration:
             # Find most recent backup
             backup_files = list(
                 self.directory_manager.settings_file.parent.glob(
-                    f"{self.directory_manager.settings_file.name}.*.backup"
+                    f"{self.directory_manager.settings_file.name}.*"
+                    f"{CONFIG_BACKUP_EXTENSION}"
                 )
             )
             if backup_files:
@@ -321,13 +343,13 @@ class ConfigMigration:
         try:
             # Basic validation - check required fields exist
             required_fields = [
-                ("DEFAULT", "config_version"),
-                ("DEFAULT", "log_level"),
-                ("DEFAULT", "console_log_level"),
-                ("network", "retry_attempts"),
-                ("network", "timeout_seconds"),
-                ("directory", "repo"),
-                ("directory", "storage"),
+                (SECTION_DEFAULT, KEY_CONFIG_VERSION),
+                (SECTION_DEFAULT, "log_level"),
+                (SECTION_DEFAULT, "console_log_level"),
+                (SECTION_NETWORK, KEY_RETRY_ATTEMPTS),
+                (SECTION_NETWORK, KEY_TIMEOUT_SECONDS),
+                (SECTION_DIRECTORY, KEY_REPO),
+                (SECTION_DIRECTORY, KEY_STORAGE),
             ]
 
             for section, key in required_fields:
