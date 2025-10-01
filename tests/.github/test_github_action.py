@@ -14,7 +14,6 @@ Environment Variables:
 """
 
 # Standard library imports
-import logging
 import os
 import re
 import subprocess
@@ -36,12 +35,6 @@ DEFAULT_NOTES: str = "Initial release"
 DEFAULT_REPO: str = "test/repo"
 FILE_ENCODING: str = "utf-8"
 MAX_SEARCH_ITEMS: int = 1
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
 
 
 class GitHubActionTester:
@@ -78,10 +71,8 @@ class GitHubActionTester:
             match = re.search(r"github\.com[:/](.+?)(?:\.git)?$", url)
             if match:
                 return match.group(1)
-            logger.warning("Could not parse GitHub URL: %s", url)
             return DEFAULT_REPO
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-            logger.warning("Could not get repository name from git remote: %s", e)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             return DEFAULT_REPO
 
     def _read_changelog(self) -> str:
@@ -94,10 +85,8 @@ class GitHubActionTester:
         try:
             return self.changelog_path.read_text(encoding=FILE_ENCODING)
         except FileNotFoundError:
-            logger.warning("Changelog file not found: %s", self.changelog_path)
             return ""
-        except OSError as e:
-            logger.error("Error reading changelog: %s", e)
+        except OSError:
             return ""
 
     def _extract_version_from_changelog(self) -> str:
@@ -109,17 +98,16 @@ class GitHubActionTester:
         """
         content = self._read_changelog()
         if not content:
-            logger.warning("Using default version due to missing changelog")
             return DEFAULT_VERSION
 
         # Find first version header
-        match = re.search(r"^## (v[0-9.]*[0-9](?:-[a-zA-Z0-9]*)*)", content, re.MULTILINE)
+        match = re.search(
+            r"^## (v[0-9.]*[0-9](?:-[a-zA-Z0-9]*)*)", content, re.MULTILINE
+        )
         if match:
             version = match.group(1)
-            logger.info("Found version in changelog: %s", version)
             return version
 
-        logger.warning("No version found in changelog, using fallback")
         return DEFAULT_FALLBACK_VERSION
 
     def _extract_notes_from_changelog(self, version: str) -> str:
@@ -134,7 +122,6 @@ class GitHubActionTester:
         """
         content = self._read_changelog()
         if not content:
-            logger.warning("Using default notes due to missing changelog")
             return DEFAULT_NOTES
 
         lines = content.splitlines()
@@ -169,10 +156,8 @@ class GitHubActionTester:
                 timeout=API_TIMEOUT,
             )
             tag = result.stdout.strip()
-            logger.info("Found previous tag: %s", tag)
             return tag
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-            logger.info("No previous git tag found")
             return ""
 
     def _extract_username_from_noreply_email(self, email: str) -> str | None:
@@ -185,7 +170,9 @@ class GitHubActionTester:
             Username if pattern matches, None otherwise.
 
         """
-        noreply_match = re.match(r"(?:[0-9]+\+)?([^@]+)@users\.noreply\.github\.com", email)
+        noreply_match = re.match(
+            r"(?:[0-9]+\+)?([^@]+)@users\.noreply\.github\.com", email
+        )
         return noreply_match.group(1) if noreply_match else None
 
     def _get_user_from_commit_api(self, commit_hash: str) -> str | None:
@@ -211,8 +198,8 @@ class GitHubActionTester:
                 author = data.get("author")
                 if author and author.get("login"):
                     return author["login"]
-        except requests.RequestException as e:
-            logger.warning("Commit API request failed: %s", e)
+        except requests.RequestException:
+            pass
 
         return None
 
@@ -239,8 +226,8 @@ class GitHubActionTester:
                 items = data.get("items", [])
                 if items and len(items) >= MAX_SEARCH_ITEMS:
                     return items[0]["login"]
-        except requests.RequestException as e:
-            logger.warning("User search API request failed: %s", e)
+        except requests.RequestException:
+            pass
 
         return None
 
@@ -275,7 +262,9 @@ class GitHubActionTester:
         # Fallback: use part before @
         return email.split("@")[0]
 
-    def _get_commits_with_usernames(self, previous_tag: str) -> tuple[str, list[str]]:
+    def _get_commits_with_usernames(
+        self, previous_tag: str
+    ) -> dict[str, list[str]]:
         """Get commits with GitHub usernames, categorized by type.
 
         Args:
@@ -295,11 +284,14 @@ class GitHubActionTester:
 
         try:
             result = subprocess.run(
-                cmd, capture_output=True, text=True, check=True, timeout=API_TIMEOUT
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=API_TIMEOUT,
             )
             commit_lines = result.stdout.strip().split("\n")
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-            logger.error("Failed to get git commit data: %s", e)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             return {"features": [], "bugfixes": [], "other": []}
 
         # Initialize categorized lists
@@ -341,7 +333,10 @@ class GitHubActionTester:
                     pr_match = re.search(r"#(\d+)", full_message)
                     pr_num = f" (#{pr_match.group(1)})" if pr_match else ""
 
-                except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                except (
+                    subprocess.CalledProcessError,
+                    subprocess.TimeoutExpired,
+                ):
                     pr_num = ""
 
                 formatted_commit = f"  - {subject}{pr_num} (@{username})"
@@ -354,16 +349,11 @@ class GitHubActionTester:
                 else:
                     other_commits.append(formatted_commit)
 
-        total_commits = len(features) + len(bugfixes) + len(other_commits)
-        logger.info(
-            "Found %d conventional commits (Features: %d, Bug Fixes: %d, Other: %d)",
-            total_commits,
-            len(features),
-            len(bugfixes),
-            len(other_commits),
-        )
-
-        return {"features": features, "bugfixes": bugfixes, "other": other_commits}
+        return {
+            "features": features,
+            "bugfixes": bugfixes,
+            "other": other_commits,
+        }
 
     def _create_release_notes(self) -> tuple[str, str]:
         """Create full release notes combining CHANGELOG and commits.
@@ -380,11 +370,23 @@ class GitHubActionTester:
         # Build categorized commits section
         commits_section = ""
         if commits_dict["features"]:
-            commits_section += "#### 🚀 Features\n" + "\n".join(commits_dict["features"]) + "\n\n"
+            commits_section += (
+                "#### 🚀 Features\n"
+                + "\n".join(commits_dict["features"])
+                + "\n\n"
+            )
         if commits_dict["bugfixes"]:
-            commits_section += "#### 🐛 Bug Fixes\n" + "\n".join(commits_dict["bugfixes"]) + "\n\n"
+            commits_section += (
+                "#### 🐛 Bug Fixes\n"
+                + "\n".join(commits_dict["bugfixes"])
+                + "\n\n"
+            )
         if commits_dict["other"]:
-            commits_section += "#### 📝 Other Commits\n" + "\n".join(commits_dict["other"]) + "\n\n"
+            commits_section += (
+                "#### 📝 Other Commits\n"
+                + "\n".join(commits_dict["other"])
+                + "\n\n"
+            )
 
         # Combine notes
         full_notes = changelog_notes
@@ -393,36 +395,24 @@ class GitHubActionTester:
 
         return version, full_notes
 
-    def test_workflow(self) -> tuple[str, Any]:
+    def test_workflow(self) -> dict[str, Any]:
         """Test the complete workflow logic.
 
         Returns:
             Dictionary containing test results.
 
         """
-        logger.info("Testing GitHub Actions workflow logic...")
-        logger.info("Repository: %s", self.repo)
-
         # Test version extraction
         version = self._extract_version_from_changelog()
-        logger.info("Extracted version: %s", version)
 
         # Test changelog notes extraction
         changelog_notes = self._extract_notes_from_changelog(version)
-        logger.info("Changelog notes length: %d characters", len(changelog_notes))
 
         # Test previous tag
         previous_tag = self._get_previous_tag()
-        logger.info("Previous tag: %s", previous_tag or "None")
 
         # Test commit extraction
         commits_dict = self._get_commits_with_usernames(previous_tag)
-        total_commits = (
-            len(commits_dict["features"])
-            + len(commits_dict["bugfixes"])
-            + len(commits_dict["other"])
-        )
-        logger.info("Found %d conventional commits", total_commits)
 
         # Test full release notes
         version, full_notes = self._create_release_notes()
@@ -436,7 +426,9 @@ class GitHubActionTester:
         }
 
 
-def _write_test_results_to_file(results: tuple[str, Any], output_path: Path) -> None:
+def _write_test_results_to_file(
+    results: dict[str, Any], output_path: Path
+) -> None:
     """Write test results to markdown file.
 
     Args:
@@ -448,48 +440,50 @@ def _write_test_results_to_file(results: tuple[str, Any], output_path: Path) -> 
         with output_path.open("w", encoding=FILE_ENCODING) as f:
             f.write("# Release Test Output\n\n")
             f.write(f"**Version:** {results['version']}\n\n")
-            f.write(f"**Previous Tag:** {results['previous_tag'] or 'None'}\n\n")
+            previous_tag = results["previous_tag"] or "None"
+            f.write(f"**Previous Tag:** {previous_tag}\n\n")
             f.write("## Release Notes\n\n")
             f.write(f"{results['full_notes']}\n")
-
-        logger.info("Results written to: %s", output_path)
-    except OSError as e:
-        logger.error("Failed to write results file: %s", e)
+    except OSError:
+        pass
 
 
-def _display_results_summary(results: tuple[str, Any]) -> None:
+def _display_results_summary(results: dict[str, Any]) -> None:
     """Display a summary of test results.
 
     Args:
         results: Test results dictionary.
 
     """
-    logger.info("Test completed successfully!")
-    logger.info("Version: %s", results["version"])
+    print("Test completed successfully!")
+    print(f"Version: {results['version']}")
 
     commits = results["commits"]
-    total_commits = len(commits["features"]) + len(commits["bugfixes"]) + len(commits["other"])
-    logger.info(
-        "Commits found: %d (Features: %d, Bug Fixes: %d, Other: %d)",
-        total_commits,
-        len(commits["features"]),
-        len(commits["bugfixes"]),
-        len(commits["other"]),
+    total_commits = (
+        len(commits["features"])
+        + len(commits["bugfixes"])
+        + len(commits["other"])
+    )
+    print(
+        f"Commits found: {total_commits} "
+        f"(Features: {len(commits['features'])}, "
+        f"Bug Fixes: {len(commits['bugfixes'])}, "
+        f"Other: {len(commits['other'])})"
     )
 
     # Show preview
-    logger.info("Release Notes Preview:")
-    logger.info("-" * 30)
+    print("Release Notes Preview:")
+    print("-" * 30)
     preview = results["full_notes"][:PREVIEW_LENGTH]
     if len(results["full_notes"]) > PREVIEW_LENGTH:
         preview += "..."
-    logger.info(preview)
+    print(preview)
 
 
 def main() -> None:
     """Run the GitHub Actions workflow test."""
-    logger.info("🚀 GitHub Actions Release Workflow Tester")
-    logger.info("=" * 50)
+    print("🚀 GitHub Actions Release Workflow Tester")
+    print("=" * 50)
 
     # Initialize tester
     tester = GitHubActionTester()
@@ -506,7 +500,7 @@ def main() -> None:
         _display_results_summary(results)
 
     except Exception as e:
-        logger.error("Test failed: %s", e)
+        print(f"Test failed: {e}")
         raise
 
 

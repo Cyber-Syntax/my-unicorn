@@ -6,7 +6,6 @@ levels and output formatting for the application.
 
 import logging
 import logging.handlers
-import shutil
 import sys
 import threading
 from collections import deque
@@ -46,6 +45,39 @@ _logger_instances: dict[str, "MyUnicornLogger"] = {}
 # Lock for thread-safe logger setup - prevents race conditions during init
 _setup_lock = threading.Lock()
 
+# Global shared handler registry
+_shared_file_handlers: dict[Path, logging.handlers.RotatingFileHandler] = {}
+_handler_lock = threading.Lock()
+
+
+def _get_shared_file_handler(
+    log_file: Path, level: str
+) -> logging.handlers.RotatingFileHandler:
+    """Get or create a shared file handler for the given log file."""
+    with _handler_lock:
+        if log_file not in _shared_file_handlers:
+            # Ensure log directory exists before creating handler
+            log_file.parent.mkdir(parents=True, exist_ok=True)
+
+            # Create the handler only once
+            handler = logging.handlers.RotatingFileHandler(
+                log_file,
+                maxBytes=MAX_FILE_SIZE_BYTES,
+                backupCount=BACKUP_COUNT,
+                encoding="utf-8",
+                delay=False,
+            )
+            formatter = logging.Formatter(
+                FILE_FORMAT, datefmt=FILE_DATE_FORMAT
+            )
+            handler.setFormatter(formatter)
+            _shared_file_handlers[log_file] = handler
+
+        # Update level if needed
+        numeric_level = getattr(logging, level.upper(), logging.INFO)
+        _shared_file_handlers[log_file].setLevel(numeric_level)
+        return _shared_file_handlers[log_file]
+
 
 def _load_log_settings() -> tuple[str, str, Path]:
     """Load console level, file level, and file path from configuration.
@@ -56,7 +88,9 @@ def _load_log_settings() -> tuple[str, str, Path]:
     """
     default_console_level = "WARNING"
     default_file_level = "INFO"
-    default_path = Path.home() / ".my-unicorn" / "logs" / "my-unicorn.log"
+    default_path = (
+        Path.home() / ".config" / "my-unicorn" / "logs" / "my-unicorn.log"
+    )
 
     try:
         global_config = config_manager.load_global_config()
@@ -188,151 +222,6 @@ class ProgressManager:
         return messages
 
 
-class CustomRotatingFileHandler(logging.handlers.BaseRotatingHandler):
-    """Custom rotating file handler with naming convention.
-
-    Uses naming convention my-unicorn.log.1, my-unicorn.log.2, etc.
-    """
-
-    def __init__(
-        self,
-        filename: str | Path,
-        max_bytes: int = 0,
-        backup_count: int = 0,
-        encoding: str | None = None,
-        delay: bool = False,
-    ) -> None:
-        """Initialize the handler.
-
-        Args:
-            filename: Path to the log file
-            max_bytes: Maximum size in bytes before rotation
-            backup_count: Number of backup files to keep
-            encoding: File encoding
-            delay: Whether to delay file opening
-
-        """
-        self.max_bytes = max_bytes
-        self.backup_count = backup_count
-        self.log_dir = Path(filename).parent
-        self.base_name = Path(filename).stem
-
-        super().__init__(str(filename), "a", encoding=encoding, delay=delay)
-
-    def shouldRollover(self, record: logging.LogRecord) -> bool:
-        """Check if rollover should occur.
-
-        Args:
-            record: Log record to check
-
-        Returns:
-            True if rollover should occur
-
-        """
-        if self.stream is None:
-            self.stream = self._open()
-
-        if self.max_bytes > 0:
-            try:
-                current_size = self.stream.tell()
-                record_size = len(self.format(record))
-                return current_size + record_size >= self.max_bytes
-            except (OSError, AttributeError):
-                # If we can't get file size, don't rotate
-                return False
-        return False
-
-    def doRollover(self) -> None:
-        """Perform the actual rollover."""
-        try:
-            self._close_current_stream()
-            self._ensure_log_directory()
-
-            main_log = Path(self.baseFilename)
-            if not self._should_rotate_file(main_log):
-                self._reopen_stream()
-                return
-
-            self._rotate_backup_files()
-            self._move_current_to_backup(main_log)
-            self._create_new_main_file(main_log)
-
-        except OSError as e:
-            self._handle_rotation_error(e)
-        finally:
-            self._reopen_stream()
-
-    def _close_current_stream(self) -> None:
-        """Close the current log stream."""
-        if self.stream:
-            self.stream.flush()  # Ensure data is written before closing
-            self.stream.close()
-            self.stream = None  # type: ignore[assignment]
-
-    def _ensure_log_directory(self) -> None:
-        """Ensure the log directory exists."""
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-
-    def _should_rotate_file(self, main_log: Path) -> bool:
-        """Check if the main log file should be rotated.
-
-        Args:
-            main_log: Path to the main log file
-
-        Returns:
-            True if the file should be rotated
-
-        """
-        return main_log.exists() and main_log.stat().st_size > 0
-
-    def _rotate_backup_files(self) -> None:
-        """Rotate existing backup files (log.2 -> log.3, log.1 -> log.2)."""
-        base_filename = Path(self.baseFilename).name
-        for i in range(self.backup_count - 1, 0, -1):
-            old_log = self.log_dir / f"{base_filename}.{i}"
-            new_log = self.log_dir / f"{base_filename}.{i + 1}"
-
-            if old_log.exists():
-                if new_log.exists():
-                    new_log.unlink()
-                shutil.move(str(old_log), str(new_log))
-
-    def _move_current_to_backup(self, main_log: Path) -> None:
-        """Move current log to backup location.
-
-        Args:
-            main_log: Path to the main log file
-
-        """
-        base_filename = Path(self.baseFilename).name
-        backup_log = self.log_dir / f"{base_filename}.1"
-        if backup_log.exists():
-            backup_log.unlink()
-        shutil.move(str(main_log), str(backup_log))
-
-    def _create_new_main_file(self, main_log: Path) -> None:
-        """Create a new main log file.
-
-        Args:
-            main_log: Path to the main log file
-
-        """
-        main_log.touch()
-
-    def _handle_rotation_error(self, error: OSError) -> None:
-        """Handle rotation errors with appropriate recovery.
-
-        Args:
-            error: The OSError that occurred
-
-        """
-        print(f"Warning: Log rotation failed: {error}", file=sys.stderr)
-
-    def _reopen_stream(self) -> None:
-        """Reopen the stream for the new file."""
-        self.stream = self._open()
-
-
 class ColoredFormatter(logging.Formatter):
     """Custom formatter with color support for console output."""
 
@@ -399,7 +288,7 @@ class MyUnicornLogger:
         self._file_logging_setup = False
         self._console_handler: logging.StreamHandler | None = None
         self._previous_console_level: int | None = None
-        self._file_handler: CustomRotatingFileHandler | None = None
+        self._file_handler: logging.handlers.RotatingFileHandler | None = None
         self._progress_manager = progress_manager or ProgressManager()
 
         # Prevent duplicate handlers
@@ -434,7 +323,12 @@ class MyUnicornLogger:
 
             try:
                 self._remove_existing_file_handlers()
-                self._create_file_handler(log_file, level)
+                # Get shared handler and ensure log directory exists
+                log_file.parent.mkdir(parents=True, exist_ok=True)
+                self._file_handler = _get_shared_file_handler(log_file, level)
+
+                # Critical: Add the handler to this logger instance
+                self.logger.addHandler(self._file_handler)
                 self._file_logging_setup = True
             except OSError as e:
                 raise ConfigurationError(
@@ -446,45 +340,12 @@ class MyUnicornLogger:
         handlers_to_remove = [
             handler
             for handler in self.logger.handlers
-            if isinstance(
-                handler,
-                (
-                    logging.handlers.RotatingFileHandler,
-                    CustomRotatingFileHandler,
-                ),
-            )
+            if isinstance(handler, logging.handlers.RotatingFileHandler)
         ]
 
         for handler in handlers_to_remove:
             self.logger.removeHandler(handler)
-            handler.close()
-
-    def _create_file_handler(self, log_file: Path, level: str) -> None:
-        """Create and configure file handler.
-
-        Args:
-            log_file: Path to log file
-            level: Logging level
-
-        """
-        log_file.parent.mkdir(parents=True, exist_ok=True)
-
-        # Create custom rotating file handler
-        self._file_handler = CustomRotatingFileHandler(
-            log_file,
-            max_bytes=MAX_FILE_SIZE_BYTES,
-            backup_count=BACKUP_COUNT,
-            encoding="utf-8",
-        )
-
-        file_formatter = logging.Formatter(
-            FILE_FORMAT,
-            datefmt=FILE_DATE_FORMAT,
-        )
-        self._file_handler.setFormatter(file_formatter)
-        numeric_level = getattr(logging, level.upper(), logging.INFO)
-        self._file_handler.setLevel(numeric_level)
-        self.logger.addHandler(self._file_handler)
+            # Don't close shared handlers - other loggers may be using them
 
     def set_level(self, level: str) -> None:
         """Set logging level for file handler while keeping console at WARNING.
