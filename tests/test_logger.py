@@ -12,8 +12,6 @@ import my_unicorn.logger as logger_module
 from my_unicorn.logger import (
     ColoredFormatter,
     MyUnicornLogger,
-    _get_shared_file_handler,
-    _shared_file_handlers,
     clear_logger_state,
     get_logger,
 )
@@ -284,22 +282,6 @@ def test_thread_local_progress_context_isolation():
     )
 
 
-def test_deferred_messages_bounded():
-    """Test that deferred messages are bounded to prevent memory leaks."""
-    logger = get_logger("bounded-test", enable_file_logging=False)
-    with (
-        patch.object(logger.logger, "isEnabledFor", return_value=True),
-        patch.object(logger.logger, "info") as mock_info,
-    ):
-        with logger.progress_context():
-            # Add more messages than the maximum
-            for i in range(logger_module.MAX_DEFERRED_MESSAGES + 100):
-                logger.info("message %s", i)
-
-        # Only the most recent messages should be flushed
-        assert mock_info.call_count == logger_module.MAX_DEFERRED_MESSAGES
-
-
 def test_set_level_updates_file_handler(logger_instance, tmp_path):
     """Test that set_level updates file handler level."""
     log_file = tmp_path / "test.log"
@@ -378,74 +360,6 @@ def test_get_logger_applies_config_level(monkeypatch, tmp_path):
 # multiple loggers share the same RotatingFileHandler instance
 
 
-def test_multiple_loggers_share_same_rotating_file_handler(tmp_path):
-    """Critical: Multiple loggers must share same RotatingFileHandler instance.
-
-    This test prevents the bug where each logger created its own
-    RotatingFileHandler for the same file, causing rotation conflicts.
-    """
-    clear_logger_state()
-    log_file = tmp_path / "shared_handler_test.log"
-
-    # Create multiple loggers with different names (simulating different modules)
-    logger1 = get_logger("my_unicorn.icon", enable_file_logging=False)
-    logger2 = get_logger("my_unicorn.desktop", enable_file_logging=False)
-    logger3 = get_logger(
-        "my_unicorn.services.cache", enable_file_logging=False
-    )
-
-    # Set up file logging for each
-    logger1.setup_file_logging(log_file, "INFO")
-    logger2.setup_file_logging(log_file, "INFO")
-    logger3.setup_file_logging(log_file, "INFO")
-
-    # CRITICAL: All loggers must share the exact same handler instance
-    assert logger1._file_handler is logger2._file_handler, (
-        "Logger1 and Logger2 must share the same RotatingFileHandler instance"
-    )
-    assert logger2._file_handler is logger3._file_handler, (
-        "Logger2 and Logger3 must share the same RotatingFileHandler instance"
-    )
-    assert logger1._file_handler is logger3._file_handler, (
-        "Logger1 and Logger3 must share the same RotatingFileHandler instance"
-    )
-
-    # Verify the handler points to correct file
-    assert logger1._file_handler.baseFilename == str(log_file)
-    assert isinstance(
-        logger1._file_handler, logging.handlers.RotatingFileHandler
-    )
-
-    clear_logger_state()
-
-
-def test_shared_handler_registry_prevents_duplicate_handlers(tmp_path):
-    """Test the shared handler registry creates only one handler per file."""
-    clear_logger_state()
-
-    # Clear registry to start fresh
-    _shared_file_handlers.clear()
-
-    log_file = tmp_path / "registry_test.log"
-
-    # Get handler multiple times for same file
-    handler1 = _get_shared_file_handler(log_file, "INFO")
-    handler2 = _get_shared_file_handler(log_file, "DEBUG")
-    handler3 = _get_shared_file_handler(log_file, "WARNING")
-
-    # All should be the exact same instance
-    assert handler1 is handler2
-    assert handler2 is handler3
-    assert handler1 is handler3
-
-    # Only one entry should exist in registry
-    assert len(_shared_file_handlers) == 1
-    assert log_file in _shared_file_handlers
-    assert _shared_file_handlers[log_file] is handler1
-
-    _shared_file_handlers.clear()
-
-
 def test_file_handler_actually_added_to_logger(tmp_path):
     """Critical: Ensure file handlers are actually added to logger instances.
 
@@ -513,94 +427,6 @@ def test_file_logging_actually_writes_to_file(tmp_path):
     # Messages should be in chronological order (not scattered)
     lines = content.strip().split("\n")
     assert len(lines) >= 3, "Should have at least 3 log lines"
-
-    clear_logger_state()
-
-
-def test_shared_handlers_not_closed_prematurely(tmp_path):
-    """Test that shared handlers aren't closed when removed from individual loggers."""
-    clear_logger_state()
-    log_file = tmp_path / "no_close_test.log"
-
-    # Create two loggers sharing the same file
-    logger1 = get_logger("close_test1", enable_file_logging=False)
-    logger2 = get_logger("close_test2", enable_file_logging=False)
-
-    logger1.setup_file_logging(log_file, "INFO")
-    logger2.setup_file_logging(log_file, "INFO")
-
-    shared_handler = logger1._file_handler
-
-    # Remove handler from logger1 (simulating cleanup)
-    logger1._remove_existing_file_handlers()
-
-    # Handler should still be usable by logger2
-    # Test by verifying we can still log through logger2
-    logger2.info("Message after handler removed from logger1")
-    shared_handler.flush()
-
-    content = log_file.read_text(encoding="utf-8")
-    assert "Message after handler removed from logger1" in content
-
-    # Verify handler is still functional (not closed)
-    assert shared_handler.stream is not None, (
-        "Handler stream should still be open"
-    )
-
-    clear_logger_state()
-
-
-def test_log_directory_creation_in_shared_handler(tmp_path):
-    """Test that log directories are created when using shared handlers."""
-    clear_logger_state()
-
-    # Create a nested directory path that doesn't exist
-    log_dir = tmp_path / "nested" / "log" / "directory"
-    log_file = log_dir / "test.log"
-
-    # Directory should not exist initially
-    assert not log_dir.exists()
-
-    logger_instance = get_logger("dir_test", enable_file_logging=False)
-    logger_instance.setup_file_logging(log_file, "INFO")
-
-    # Directory should be created
-    assert log_dir.exists()
-    assert log_dir.is_dir()
-
-    # Logging should work
-    logger_instance.info("Test message")
-    logger_instance._file_handler.flush()
-
-    assert log_file.exists()
-    content = log_file.read_text(encoding="utf-8")
-    assert "Test message" in content
-
-    clear_logger_state()
-
-
-def test_handler_level_updates_on_shared_handler(tmp_path):
-    """Test that handler levels can be updated on shared handlers."""
-    clear_logger_state()
-    log_file = tmp_path / "level_update_test.log"
-
-    logger1 = get_logger("level_test1", enable_file_logging=False)
-    logger2 = get_logger("level_test2", enable_file_logging=False)
-
-    # Set up with INFO level
-    logger1.setup_file_logging(log_file, "INFO")
-    logger2.setup_file_logging(log_file, "INFO")
-
-    shared_handler = logger1._file_handler
-    assert shared_handler.level == logging.INFO
-
-    # Update level through one logger
-    logger1.set_level("DEBUG")
-
-    # Both loggers should see the updated level (same handler)
-    assert logger1._file_handler.level == logging.DEBUG
-    assert logger2._file_handler.level == logging.DEBUG
-    assert shared_handler.level == logging.DEBUG
 
     clear_logger_state()
 
