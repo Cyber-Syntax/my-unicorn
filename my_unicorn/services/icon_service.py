@@ -5,8 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Final
+from typing import Any
 
+from my_unicorn.constants import (
+    DEFAULT_ICON_EXTENSION,
+    ICON_SOURCE_EXTRACTION,
+    ICON_SOURCE_GITHUB,
+    ICON_SOURCE_NONE,
+    SUPPORTED_EXTENSIONS,
+)
 from my_unicorn.download import DownloadService, IconAsset
 from my_unicorn.icon import IconManager
 from my_unicorn.logger import get_logger
@@ -14,12 +21,7 @@ from my_unicorn.services.progress import ProgressService
 
 logger = get_logger(__name__)
 
-# Constants for performance
-DEFAULT_ICON_EXTENSION: Final[str] = "png"
-SUPPORTED_EXTENSIONS: Final[frozenset[str]] = frozenset([".svg", ".png", ".ico"])
-ICON_SOURCE_EXTRACTION: Final[str] = "extraction"
-ICON_SOURCE_GITHUB: Final[str] = "github"
-ICON_SOURCE_NONE: Final[str] = "none"
+# Constants are imported from my_unicorn.constants
 
 
 @dataclass(slots=True, frozen=True)
@@ -111,7 +113,7 @@ class IconService:
         # Check current app config first
         extraction = current_config.get("extraction")
         if extraction is not None:
-            return extraction
+            return bool(extraction)
 
         # Check catalog config if available
         if catalog_entry:
@@ -123,7 +125,9 @@ class IconService:
         # Default to enabled
         return True
 
-    def _generate_icon_filename(self, app_name: str, icon_url: str | None = None) -> str:
+    def _generate_icon_filename(
+        self, app_name: str, icon_url: str | None = None
+    ) -> str:
         """Generate icon filename based on app name and URL.
 
         Args:
@@ -159,7 +163,9 @@ class IconService:
 
         """
         try:
-            logger.info("🔍 Attempting icon extraction from AppImage: %s", app_name)
+            logger.info(
+                "🔍 Attempting icon extraction from AppImage: %s", app_name
+            )
             extracted_icon = await self._get_icon_manager().extract_icon_only(
                 appimage_path=appimage_path,
                 dest_path=dest_path,
@@ -169,9 +175,13 @@ class IconService:
                 logger.info("✅ Icon extracted from AppImage for %s", app_name)
                 return extracted_icon
         except (OSError, PermissionError) as e:
-            logger.info("⚠️  AppImage extraction failed for %s: %s", app_name, e)
+            logger.info(
+                "⚠️  AppImage extraction failed for %s: %s", app_name, e
+            )
         except Exception as e:
-            logger.warning("⚠️  Unexpected error during extraction for %s: %s", app_name, e)
+            logger.warning(
+                "⚠️  Unexpected error during extraction for %s: %s", app_name, e
+            )
 
         return None
 
@@ -194,15 +204,21 @@ class IconService:
         """
         try:
             logger.info("📥 Downloading icon from GitHub: %s", app_name)
-            downloaded_icon = await self.download_service.download_icon(icon_asset, dest_path)
+            downloaded_icon = await self.download_service.download_icon(
+                icon_asset, dest_path
+            )
             if downloaded_icon:
                 logger.info("✅ Icon downloaded from GitHub for %s", app_name)
                 return downloaded_icon
         except (OSError, ConnectionError, TimeoutError) as e:
-            logger.warning("⚠️  GitHub icon download failed for %s: %s", app_name, e)
+            logger.warning(
+                "⚠️  GitHub icon download failed for %s: %s", app_name, e
+            )
         except Exception as e:
             logger.warning(
-                "⚠️  Unexpected error during GitHub download for %s: %s", app_name, e
+                "⚠️  Unexpected error during GitHub download for %s: %s",
+                app_name,
+                e,
             )
 
         return None
@@ -248,7 +264,9 @@ class IconService:
         # Set extraction and URL based on source
         if icon_source == ICON_SOURCE_EXTRACTION:
             updated_config["extraction"] = True
-            updated_config["url"] = icon_url if preserve_url_on_extraction else ""
+            updated_config["url"] = (
+                icon_url if preserve_url_on_extraction else ""
+            )
         elif icon_source == ICON_SOURCE_GITHUB:
             updated_config["extraction"] = False
             updated_config["url"] = icon_url or ""
@@ -294,8 +312,10 @@ class IconService:
             and progress_task_id is None
             and self.progress_service.is_active()
         ):
-            progress_task_id = await self.progress_service.create_icon_extraction_task(
-                app_name
+            progress_task_id = (
+                await self.progress_service.create_icon_extraction_task(
+                    app_name
+                )
             )
             create_own_task = True
 
@@ -314,7 +334,11 @@ class IconService:
                 current_config, catalog_entry
             )
 
-        logger.debug("🎨 Icon extraction for %s: enabled=%s", app_name, extraction_enabled)
+        logger.debug(
+            "🎨 Icon extraction for %s: enabled=%s",
+            app_name,
+            extraction_enabled,
+        )
 
         dest_path = icon_dir / icon_config.icon_filename
         icon_source = ICON_SOURCE_NONE

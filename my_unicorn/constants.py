@@ -8,7 +8,7 @@ Usage:
     from my_unicorn.constants import CONFIG_VERSION
 """
 
-from typing import Final
+from typing import Final, Literal
 
 # =============================================================================
 # Configuration Constants
@@ -210,6 +210,23 @@ DESKTOP_ICON_EXTENSIONS: Final[tuple[str, ...]] = (
 )
 
 # =============================================================================
+# Icon acquisition related constants
+# =============================================================================
+
+# Default icon extension used when none can be inferred from a URL
+DEFAULT_ICON_EXTENSION: Final[str] = "png"
+
+# Supported icon file extensions (used when extracting/extensions detection)
+SUPPORTED_EXTENSIONS: Final[frozenset[str]] = frozenset(
+    {".svg", ".png", ".ico"}
+)
+
+# Icon source identifiers used by the icon acquisition service
+ICON_SOURCE_EXTRACTION: Final[str] = "extraction"
+ICON_SOURCE_GITHUB: Final[str] = "github"
+ICON_SOURCE_NONE: Final[str] = "none"
+
+# =============================================================================
 # Backup service constants
 # =============================================================================
 
@@ -234,3 +251,32 @@ OLD_FLAT_BACKUP_GLOB: Final[str] = "*.backup.AppImage"
 
 # New AppImage filename suffix used when migrating (case sensitive)
 APPIMAGE_SUFFIX: Final[str] = ".AppImage"
+
+# =============================================================================
+# Hashing / verification constants
+# =============================================================================
+
+# Supported hash algorithms across verification code
+SUPPORTED_HASH_ALGORITHMS: Final[tuple[str, ...]] = (
+    "sha1",
+    "sha256",
+    "sha512",
+    "md5",
+)
+
+# Default hash algorithm when none is specified/detected
+DEFAULT_HASH_TYPE: Final[str] = "sha256"
+
+# Default hash to prefer for YAML checksum files
+YAML_DEFAULT_HASH: Final[str] = "sha512"
+
+# Preferred order when checking multiple hash types
+HASH_PREFERENCE_ORDER: Final[tuple[str, ...]] = (
+    "sha512",
+    "sha256",
+    "sha1",
+    "md5",
+)
+
+# Type alias for supported hash types used across verification modules
+HashType = Literal["sha1", "sha256", "sha512", "md5"]
