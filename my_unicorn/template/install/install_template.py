@@ -59,25 +59,35 @@ class InstallTemplate(ABC):
             raise InstallationError("No installation targets provided")
 
     @asynccontextmanager
-    async def _setup_progress_session(self, **kwargs: Any) -> AsyncIterator[dict[str, Any]]:
+    async def _setup_progress_session(
+        self, **kwargs: Any
+    ) -> AsyncIterator[dict[str, Any]]:
         """Set up progress session for the installation operation."""
         show_progress = kwargs.get("show_progress", True)
+        # Prefer reusing an existing progress service instance when available.
+        progress_service = getattr(
+            self.download_service, "progress_service", None
+        )
 
-        if (
-            show_progress
-            and hasattr(self.download_service, "progress_service")
-            and self.download_service.progress_service
-            and self.download_service.progress_service.is_active()
-        ):
+        if show_progress and progress_service:
             # Calculate total operations (each app: download, verify, icon, config)
             targets_count = kwargs.get("targets_count", 0)
             total_operations = targets_count * 4
-            async with self.download_service.progress_service.session(total_operations):
-                yield {"session_active": True}
+
+            # Only start a new session if the service is NOT already active.
+            if not progress_service.is_active():
+                async with progress_service.session(total_operations):
+                    yield {"session_active": True}
+            else:
+                # Service already has an active session; reuse it and don't start a nested session.
+                # Provide a small hint to callers that the session was reused.
+                yield {"session_active": True, "reused": True}
         else:
             yield {"session_active": False}
 
-    async def install(self, targets: list[str], **kwargs: Any) -> list[dict[str, Any]]:
+    async def install(
+        self, targets: list[str], **kwargs: Any
+    ) -> list[dict[str, Any]]:
         """Execute the main template method defining the installation algorithm.
 
         Args:
@@ -95,7 +105,9 @@ class InstallTemplate(ABC):
 
         async with self._setup_progress_session(**kwargs):
             # Template method pattern - define the algorithm skeleton
-            contexts = await self._prepare_installation_contexts(targets, **kwargs)
+            contexts = await self._prepare_installation_contexts(
+                targets, **kwargs
+            )
             results = await self._process_installations(contexts, **kwargs)
             return await self._finalize_results(results, **kwargs)
 
@@ -106,10 +118,16 @@ class InstallTemplate(ABC):
         concurrent_limit = kwargs.get(
             "concurrent", self.global_config["max_concurrent_downloads"]
         )
-        logger.info("📦 Install template using %d concurrent installations", concurrent_limit)
+        logger.info(
+            "📦 Install template using %d concurrent installations",
+            concurrent_limit,
+        )
 
         semaphore = asyncio.Semaphore(concurrent_limit)
-        tasks = [self._install_single_app(semaphore, ctx, **kwargs) for ctx in contexts]
+        tasks = [
+            self._install_single_app(semaphore, ctx, **kwargs)
+            for ctx in contexts
+        ]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -119,7 +137,9 @@ class InstallTemplate(ABC):
             if isinstance(result, Exception):
                 processed_results.append(
                     {
-                        "target": getattr(contexts[i], "target", f"target_{i}"),
+                        "target": getattr(
+                            contexts[i], "target", f"target_{i}"
+                        ),
                         "success": False,
                         "error": str(result),
                         "path": None,
@@ -137,13 +157,17 @@ class InstallTemplate(ABC):
         async with semaphore:
             try:
                 # Common installation workflow steps
-                downloaded_path = await self._download_appimage(context, **kwargs)
+                downloaded_path = await self._download_appimage(
+                    context, **kwargs
+                )
                 verified_result = await self._verify_appimage(
                     downloaded_path, context, **kwargs
                 )
 
                 # Check if verification failed and abort installation
-                if verified_result is None or not verified_result.get("passed", True):
+                if verified_result is None or not verified_result.get(
+                    "passed", True
+                ):
                     error_msg = (
                         verified_result.get("error", "Verification failed")
                         if verified_result
@@ -156,7 +180,9 @@ class InstallTemplate(ABC):
                 final_path = await self._move_to_install_directory(
                     downloaded_path, context, **kwargs
                 )
-                icon_result = await self._extract_icon(final_path, context, **kwargs)
+                icon_result = await self._extract_icon(
+                    final_path, context, **kwargs
+                )
                 config_result = await self._create_app_configuration(
                     final_path,
                     context,
@@ -203,7 +229,11 @@ class InstallTemplate(ABC):
 
     @abstractmethod
     async def _create_app_configuration(
-        self, app_path: Path, context: Any, icon_result: dict[str, Any], **kwargs: Any
+        self,
+        app_path: Path,
+        context: Any,
+        icon_result: dict[str, Any],
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Create app configuration (strategy-specific).
 
@@ -243,14 +273,22 @@ class InstallTemplate(ABC):
         # Get verification service from context or create it
         verification_service = getattr(self, "_verification_service", None)
         if not verification_service:
-            from ...verification.verification_service import VerificationService
+            from ...verification.verification_service import (
+                VerificationService,
+            )
 
-            progress_service = getattr(self.download_service, "progress_service", None)
-            verification_service = VerificationService(self.download_service, progress_service)
+            progress_service = getattr(
+                self.download_service, "progress_service", None
+            )
+            verification_service = VerificationService(
+                self.download_service, progress_service
+            )
             self._verification_service = verification_service
 
         # Update progress
-        post_processing_task_id = getattr(context, "post_processing_task_id", None)
+        post_processing_task_id = getattr(
+            context, "post_processing_task_id", None
+        )
         await self.progress_tracker.update_progress(
             post_processing_task_id,
             20.0,
@@ -267,15 +305,21 @@ class InstallTemplate(ABC):
             # URL context
             owner = context.owner
             repo = context.repo_name
-            tag_name = getattr(context, "release_data", {}).get("original_tag_name", "unknown")
+            tag_name = getattr(context, "release_data", {}).get(
+                "original_tag_name", "unknown"
+            )
         elif hasattr(context, "app_config"):
             # Catalog context
             owner = context.app_config.get("owner", "unknown")
             repo = context.app_config.get("repo", "unknown")
-            tag_name = getattr(context, "release_data", {}).get("original_tag_name", "unknown")
+            tag_name = getattr(context, "release_data", {}).get(
+                "original_tag_name", "unknown"
+            )
         else:
             # Fallback - skip verification if we don't have enough info
-            logger.warning("Skipping verification for %s: insufficient context", app_name)
+            logger.warning(
+                "Skipping verification for %s: insufficient context", app_name
+            )
             return None
 
         try:
@@ -309,7 +353,9 @@ class InstallTemplate(ABC):
         except Exception as error:
             logger.error("Verification failed for %s: %s", app_name, error)
             await self.progress_tracker.update_progress(
-                post_processing_task_id, 40.0, "⚠️ Verification skipped due to error"
+                post_processing_task_id,
+                40.0,
+                "⚠️ Verification skipped due to error",
             )
             return {
                 "passed": False,
@@ -318,7 +364,9 @@ class InstallTemplate(ABC):
                 "updated_config": {},
             }
 
-    def _handle_appimage_renaming(self, appimage_path: Path, context: Any) -> Path:
+    def _handle_appimage_renaming(
+        self, appimage_path: Path, context: Any
+    ) -> Path:
         """Handle AppImage renaming based on configuration (similar to update command).
 
         Args:
@@ -345,8 +393,12 @@ class InstallTemplate(ABC):
                 rename_to = app_config["appimage"].get("rename", app_name)
 
         if rename_to:
-            clean_name = self.storage_service.get_clean_appimage_name(rename_to)
-            appimage_path = self.storage_service.rename_appimage(appimage_path, clean_name)
+            clean_name = self.storage_service.get_clean_appimage_name(
+                rename_to
+            )
+            appimage_path = self.storage_service.rename_appimage(
+                appimage_path, clean_name
+            )
 
         return appimage_path
 
@@ -357,9 +409,13 @@ class InstallTemplate(ABC):
         app_name = getattr(context, "app_name", app_path.stem)
 
         # Update progress
-        post_processing_task_id = getattr(context, "post_processing_task_id", None)
+        post_processing_task_id = getattr(
+            context, "post_processing_task_id", None
+        )
         await self.progress_tracker.update_progress(
-            post_processing_task_id, 50.0, f"📁 Moving {app_name} to install directory..."
+            post_processing_task_id,
+            50.0,
+            f"📁 Moving {app_name} to install directory...",
         )
 
         # First move to install directory with original name
@@ -381,9 +437,13 @@ class InstallTemplate(ABC):
         app_name = getattr(context, "app_name", app_path.stem)
 
         # Update progress
-        post_processing_task_id = getattr(context, "post_processing_task_id", None)
+        post_processing_task_id = getattr(
+            context, "post_processing_task_id", None
+        )
         await self.progress_tracker.update_progress(
-            post_processing_task_id, 70.0, f"🎨 Extracting icon for {app_name}..."
+            post_processing_task_id,
+            70.0,
+            f"🎨 Extracting icon for {app_name}...",
         )
 
         # Get icon service
@@ -391,7 +451,9 @@ class InstallTemplate(ABC):
         if not icon_service:
             from ...services.icon_service import IconService
 
-            progress_service = getattr(self.download_service, "progress_service", None)
+            progress_service = getattr(
+                self.download_service, "progress_service", None
+            )
             icon_service = IconService(self.download_service, progress_service)
             self._icon_service = icon_service
 
@@ -410,7 +472,9 @@ class InstallTemplate(ABC):
 
         # Get icon directory (where to save icons)
         icon_dir = getattr(
-            self.storage_service, "icon_dir", Path.home() / ".local/share/icons"
+            self.storage_service,
+            "icon_dir",
+            Path.home() / ".local/share/icons",
         )
 
         # Get catalog entry if available
@@ -432,21 +496,31 @@ class InstallTemplate(ABC):
 
         # Convert IconResult to dict for consistency
         return {
-            "icon_path": str(icon_result.icon_path) if icon_result.icon_path else None,
+            "icon_path": str(icon_result.icon_path)
+            if icon_result.icon_path
+            else None,
             "source": icon_result.source,
             "config": icon_result.config,
         }
 
     async def _create_desktop_entry(
-        self, app_path: Path, context: Any, config_result: dict[str, Any], **kwargs: Any
+        self,
+        app_path: Path,
+        context: Any,
+        config_result: dict[str, Any],
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Create desktop entry (common implementation)."""
         app_name = getattr(context, "app_name", app_path.stem)
 
         # Update progress
-        post_processing_task_id = getattr(context, "post_processing_task_id", None)
+        post_processing_task_id = getattr(
+            context, "post_processing_task_id", None
+        )
         await self.progress_tracker.update_progress(
-            post_processing_task_id, 90.0, f"🖥️ Creating desktop entry for {app_name}..."
+            post_processing_task_id,
+            90.0,
+            f"🖥️ Creating desktop entry for {app_name}...",
         )
 
         # Create desktop entry using desktop module function
@@ -472,7 +546,9 @@ class InstallTemplate(ABC):
             )
             result = {"success": True, "desktop_path": str(desktop_path)}
         except Exception as error:
-            logger.warning("Failed to create desktop entry for %s: %s", app_name, error)
+            logger.warning(
+                "Failed to create desktop entry for %s: %s", app_name, error
+            )
             result = {"success": False, "error": str(error)}
 
         await self.progress_tracker.update_progress(
@@ -496,9 +572,13 @@ class InstallTemplate(ABC):
         target = getattr(context, "target", app_name)
 
         # Finish progress
-        post_processing_task_id = getattr(context, "post_processing_task_id", None)
+        post_processing_task_id = getattr(
+            context, "post_processing_task_id", None
+        )
         await self.progress_tracker.update_progress(
-            post_processing_task_id, 100.0, f"✅ {app_name} installation complete"
+            post_processing_task_id,
+            100.0,
+            f"✅ {app_name} installation complete",
         )
 
         return {
@@ -520,11 +600,17 @@ class InstallTemplate(ABC):
         app_name = getattr(context, "app_name", target)
 
         # Finish progress with error
-        post_processing_task_id = getattr(context, "post_processing_task_id", None)
-        if post_processing_task_id and hasattr(self.download_service, "progress_service"):
+        post_processing_task_id = getattr(
+            context, "post_processing_task_id", None
+        )
+        if post_processing_task_id and hasattr(
+            self.download_service, "progress_service"
+        ):
             progress_service = self.download_service.progress_service
             if progress_service and progress_service.is_active():
-                await progress_service.finish_task(post_processing_task_id, success=False)
+                await progress_service.finish_task(
+                    post_processing_task_id, success=False
+                )
 
         return {
             "target": target,
@@ -541,6 +627,8 @@ class InstallTemplate(ABC):
         # Log summary
         successful = sum(1 for r in results if r.get("success", False))
         total = len(results)
-        logger.info("📊 Installation complete: %d/%d successful", successful, total)
+        logger.info(
+            "📊 Installation complete: %d/%d successful", successful, total
+        )
 
         return results
