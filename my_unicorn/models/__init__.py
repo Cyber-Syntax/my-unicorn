@@ -3,13 +3,12 @@
 from .display import UpdateResultDisplay
 from .errors import InstallationError, ValidationError
 from .progress import ProgressTracker
-from .update import UpdateContext, UpdateResult
+from .update import UpdateResult
 
 __all__ = [
     "InstallationError",
-    "ValidationError", 
+    "ValidationError",
     "ProgressTracker",
-    "UpdateContext",
     "UpdateResult",
     "UpdateResultDisplay",
 ]

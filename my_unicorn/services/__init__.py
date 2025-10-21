@@ -19,6 +19,10 @@ def __getattr__(name):
         from .icon_service import IconService
 
         return IconService
+    elif name == "InstallService":
+        from .install_service import InstallService
+
+        return InstallService
     elif name == "VerificationConfig":
         from ..verification.verification_service import VerificationConfig
 
@@ -39,6 +43,7 @@ __all__ = [
     "IconConfig",
     "IconResult",
     "IconService",
+    "InstallService",
     "VerificationConfig",
     "VerificationResult",
     "VerificationService",

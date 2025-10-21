@@ -4,32 +4,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..config import ConfigManager
-    from ..update import UpdateInfo, UpdateManager
-
-
-@dataclass
-class UpdateContext:
-    """Context object containing all data needed for update operations.
-
-    This object is passed to strategies and contains all the dependencies
-    and configuration needed to perform update operations.
-    """
-
-    app_names: list[str] | None
-    check_only: bool
-    refresh_cache: bool
-    config_manager: "ConfigManager"
-    update_manager: "UpdateManager"
+    from ..update import UpdateInfo
 
 
 @dataclass
 class UpdateResult:
-    """Result object containing update operation outcomes.
-
-    This standardized result format is returned by all update strategies
-    to provide consistent information about what happened during the operation.
-    """
+    """Result object containing update operation outcomes."""
 
     success: bool
     updated_apps: list[str]
