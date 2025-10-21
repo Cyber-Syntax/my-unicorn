@@ -214,6 +214,7 @@ class SelfUpdater:
         try:
             logger.info("Fetching latest release from GitHub...")
             # TODO: Change to prefer_prerelease=False when we have stable releases
+            # would be better to have variable in settings.conf for user choice
             release_data = (
                 await self.github_fetcher.fetch_latest_release_or_prerelease(
                     prefer_prerelease=True, ignore_cache=refresh_cache
@@ -239,7 +240,8 @@ class SelfUpdater:
                 print(
                     "".join(
                         [
-                            "GitHub Rate limit exceeded. Please try again later ",
+                            "GitHub Rate limit exceeded. Please try "
+                            "again later ",
                             "within 1 hour or use different network/VPN.",
                         ]
                     )
@@ -336,13 +338,11 @@ class SelfUpdater:
         """
         repo_dir = self.global_config["directory"]["repo"]
         package_dir = self.global_config["directory"]["package"]
-        source_dir = repo_dir / "source"
         installer = package_dir / "setup.sh"
 
         logger.debug("Starting upgrade to my-unicorn...")
         logger.debug("Repository directory: %s", repo_dir)
         logger.debug("Package directory: %s", package_dir)
-        logger.debug("Source directory: %s", source_dir)
         logger.debug("Installer script: %s", installer)
 
         # Track progress with simple indicators
@@ -352,41 +352,38 @@ class SelfUpdater:
         cleanup_task_id = None
 
         try:
-            # Ensure repo directory exists
-            repo_dir.mkdir(parents=True, exist_ok=True)
-
-            # 1) Prepare fresh source tree
-            if source_dir.exists():
-                logger.info("Removing old source at %s", source_dir)
+            # 1) Prepare fresh repo directory
+            if repo_dir.exists():
+                logger.info("Removing old repo at %s", repo_dir)
                 logger.debug(
-                    "Old source directory size: %s",
-                    source_dir.stat().st_size
-                    if source_dir.is_file()
+                    "Old repo directory size: %s",
+                    repo_dir.stat().st_size
+                    if repo_dir.is_file()
                     else "directory",
                 )
-                shutil.rmtree(source_dir)
-                logger.debug("Old source directory removed successfully")
-            source_dir.mkdir(parents=True)
-            logger.debug("Created fresh source directory: %s", source_dir)
+                shutil.rmtree(repo_dir)
+                logger.debug("Old repo directory removed successfully")
+            repo_dir.mkdir(parents=True)
+            logger.debug("Created fresh repo directory: %s", repo_dir)
 
-            # 2) Clone into source_dir with simple progress tracking
+            # 2) Clone into repo_dir with simple progress tracking
             if self.progress:
                 download_task_id = self.progress.start_task(
                     "repo_clone", "Cloning repository from GitHub..."
                 )
 
-            logger.info("Cloning repository to %s", source_dir)
+            logger.info("Cloning repository to %s", repo_dir)
             logger.debug(
                 "Git clone command: git clone %s %s",
                 f"{GITHUB_URL}.git",
-                str(source_dir),
+                str(repo_dir),
             )
 
             clone_process = await asyncio.create_subprocess_exec(
                 "git",
                 "clone",
                 f"{GITHUB_URL}.git",
-                str(source_dir),
+                str(repo_dir),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -406,23 +403,21 @@ class SelfUpdater:
                 clone_process.returncode,
             )
             if clone_process.returncode == 0:
-                logger.debug(
-                    "Repository cloned successfully to %s", source_dir
-                )
-                # Check if source directory has expected content
+                logger.debug("Repository cloned successfully to %s", repo_dir)
+                # Check if repo directory has expected content
                 try:
-                    source_contents = list(source_dir.iterdir())
+                    repo_contents = list(repo_dir.iterdir())
                     logger.debug(
                         "Cloned repository contains %d items",
-                        len(source_contents),
+                        len(repo_contents),
                     )
                     logger.debug(
                         "Repository structure: %s",
-                        [item.name for item in source_contents],
+                        [item.name for item in repo_contents],
                     )
                 except Exception as e:
                     logger.debug(
-                        "Could not list source directory contents: %s", e
+                        "Could not list repo directory contents: %s", e
                     )
             else:
                 logger.debug("Git clone failed, will handle error")
@@ -463,7 +458,7 @@ class SelfUpdater:
                 "setup.sh",
             )
             for name in files_to_copy:
-                src = source_dir / name
+                src = repo_dir / name
                 dst = package_dir / name
 
                 logger.debug("Processing file/directory: %s", name)
@@ -481,7 +476,8 @@ class SelfUpdater:
                         description=f"Copying {name}...",
                     )
 
-                # Remove the old directory/file (but preserve venv and other dirs)
+                # Remove the old directory/file
+                # (but preserve venv and other dirs)
                 if dst.exists():
                     logger.debug("Destination exists, removing old: %s", dst)
                     if dst.is_dir():
@@ -555,7 +551,8 @@ class SelfUpdater:
                     # Debug log all installer output for troubleshooting
                     logger.debug("Installer output: %s", line_str)
 
-                    # Detailed logging for specific venv and installation operations
+                    # Detailed logging for specific venv and
+                    # installation operations
                     if "virtual environment" in line_str.lower():
                         logger.debug("VENV OPERATION: %s", line_str)
                     elif "pip install" in line_str.lower():
@@ -612,35 +609,36 @@ class SelfUpdater:
 
             if install_process.returncode != 0:
                 print(
-                    f"❌ Installer exited with code {install_process.returncode}"
+                    f"❌ Installer exited with code "
+                    f"{install_process.returncode}"
                 )
                 return False
 
-            # 5) Clean up source_dir with simple progress tracking
+            # 5) Clean up repo_dir with simple progress tracking
             if self.progress:
                 cleanup_task_id = self.progress.start_task(
                     "cleanup", "Cleaning up temporary files..."
                 )
 
-            if source_dir.exists():
-                logger.info("Cleaning up source directory")
-                logger.debug("Removing source directory: %s", source_dir)
+            if repo_dir.exists():
+                logger.info("Cleaning up repo directory")
+                logger.debug("Removing repo directory: %s", repo_dir)
                 try:
                     dir_size = sum(
                         f.stat().st_size
-                        for f in source_dir.rglob("*")
+                        for f in repo_dir.rglob("*")
                         if f.is_file()
                     )
                     logger.debug(
-                        "Source directory size before cleanup: %d bytes",
+                        "Repo directory size before cleanup: %d bytes",
                         dir_size,
                     )
                 except Exception as e:
                     logger.debug(
-                        "Could not calculate source directory size: %s", e
+                        "Could not calculate repo directory size: %s", e
                     )
-                shutil.rmtree(source_dir)
-                logger.debug("Source directory cleanup completed")
+                shutil.rmtree(repo_dir)
+                logger.debug("Repo directory cleanup completed")
 
             if self.progress and cleanup_task_id:
                 self.progress.finish_task(
@@ -651,7 +649,8 @@ class SelfUpdater:
 
             logger.debug("Self-update completed successfully")
             logger.debug(
-                "All operations completed: clone, file copy, installation, cleanup"
+                "All operations completed: clone, file copy, "
+                "installation, cleanup"
             )
             return True
 
@@ -678,7 +677,8 @@ async def get_self_updater(
     """Get a SelfUpdater instance with proper session management.
 
     Args:
-        config_manager: Optional config manager, will create one if not provided
+        config_manager: Optional config manager, will create one if not
+            provided
         simple_progress: Whether to use simple progress indicators
 
     Returns:
