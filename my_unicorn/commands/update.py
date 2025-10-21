@@ -70,9 +70,12 @@ class UpdateHandler(BaseCommandHandler):
         if not target_apps:
             return self._create_empty_result("No apps to check")
 
-        # Check for updates (no progress UI for check-only)
-        print(f"🔄 Checking {len(target_apps)} app(s) for updates...")
-        update_infos = await self.update_manager.check_all_updates(target_apps)
+        # Check for updates with progress message
+        update_infos = await self.update_manager.check_updates(
+            app_names=target_apps,
+            show_progress=True,
+            refresh_cache=refresh_cache,
+        )
 
         if not update_infos:
             return self._create_empty_result("Failed to check for updates")
@@ -121,11 +124,11 @@ class UpdateHandler(BaseCommandHandler):
             self.update_manager._shared_api_task_id = api_task_id
 
             try:
-                # Check for updates
-                update_infos = (
-                    await self.update_manager.check_all_updates_with_progress(
-                        target_apps, refresh_cache=refresh_cache
-                    )
+                # Check for updates with progress
+                update_infos = await self.update_manager.check_updates(
+                    app_names=target_apps,
+                    show_progress=True,
+                    refresh_cache=refresh_cache,
                 )
 
                 if not update_infos:

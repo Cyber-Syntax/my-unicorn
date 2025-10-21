@@ -380,13 +380,20 @@ class UpdateManager:
             logger.set_console_level_temporarily("WARNING")
             return None
 
-    async def check_all_updates(
-        self, app_names: list[str] | None = None
+    async def check_updates(
+        self,
+        app_names: list[str] | None = None,
+        show_progress: bool = False,
+        refresh_cache: bool = False,
     ) -> list[UpdateInfo]:
         """Check for updates for all or specified apps.
 
         Args:
-            app_names: List of app names to check, or None for all installed apps
+            app_names: List of app names to check, or None for all installed
+                apps
+            show_progress: If True, display progress message
+            refresh_cache: If True, bypass cache and fetch fresh data from
+                API
 
         Returns:
             List of UpdateInfo objects
@@ -398,6 +405,10 @@ class UpdateManager:
         if not app_names:
             logger.info("No installed apps found")
             return []
+
+        # Show progress message if requested
+        if show_progress:
+            print(f"🔄 Checking {len(app_names)} app(s) for updates...")
 
         semaphore = asyncio.Semaphore(
             self.global_config["max_concurrent_downloads"]
@@ -407,127 +418,17 @@ class UpdateManager:
 
             async def check_with_semaphore(app_name: str) -> UpdateInfo | None:
                 async with semaphore:
-                    return await self.check_single_update(app_name, session)
-
-            tasks = [check_with_semaphore(app) for app in app_names]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Filter out None results and exceptions
-        update_infos = []
-        for result in results:
-            if isinstance(result, UpdateInfo):
-                update_infos.append(result)
-            elif isinstance(result, Exception):
-                logger.error("Update check failed: %s", result)
-
-        return update_infos
-
-    async def check_all_updates_with_spinner(
-        self, app_names: list[str] | None = None
-    ) -> list[UpdateInfo]:
-        """Check for updates for all or specified apps with simple text message.
-
-        Uses a simple text message to avoid Rich rendering conflicts with
-        the main progress session during updates.
-
-        Args:
-            app_names: List of app names to check, or None for all installed apps
-
-        Returns:
-            List of UpdateInfo objects
-
-        """
-        if app_names is None:
-            app_names = self.config_manager.list_installed_apps()
-
-        if not app_names:
-            logger.info("No installed apps found")
-            return []
-
-        # Simple text message to avoid Rich conflicts
-        print(f"🔄 Checking {len(app_names)} app(s) for updates...")
-        return await self._check_apps_without_spinner(app_names)
-
-    async def _check_apps_without_spinner(
-        self, app_names: list[str]
-    ) -> list[UpdateInfo]:
-        """Internal method to check apps without any display wrapper."""
-        semaphore = asyncio.Semaphore(
-            self.global_config["max_concurrent_downloads"]
-        )
-        update_infos = []
-
-        async def check_with_semaphore(app_name: str) -> UpdateInfo | None:
-            async with semaphore:
-                try:
-                    async with aiohttp.ClientSession() as session:
-                        result = await self.check_single_update(
-                            app_name, session
-                        )
-                    return result
-                except Exception as e:
-                    logger.error("Update check failed for %s: %s", app_name, e)
-                    return None
-
-        # Check all apps concurrently
-        tasks = [check_with_semaphore(app) for app in app_names]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Process results
-        for result in results:
-            if isinstance(result, UpdateInfo):
-                update_infos.append(result)
-            elif isinstance(result, Exception):
-                logger.error("Update check failed: %s", result)
-
-        return update_infos
-
-    async def check_all_updates_with_progress(
-        self, app_names: list[str] | None = None, refresh_cache: bool = False
-    ) -> list[UpdateInfo]:
-        """Check for updates for all or specified apps with progress tracking.
-
-        This method creates progress tasks for each app being checked and updates them
-        as the checks complete. Should be called within an active progress session.
-
-        Args:
-            app_names: List of app names to check, or None for all installed apps
-            refresh_cache: If True, bypass cache and fetch fresh data from API
-
-        Returns:
-            List of UpdateInfo objects
-
-        """
-        if app_names is None:
-            app_names = self.config_manager.list_installed_apps()
-
-        if not app_names:
-            logger.info("No installed apps found")
-            return []
-
-        # Check updates without creating progress tasks (checking is quick preparation work)
-
-        semaphore = asyncio.Semaphore(
-            self.global_config["max_concurrent_downloads"]
-        )
-
-        async with aiohttp.ClientSession() as session:
-
-            async def check_with_semaphore_and_progress(
-                app_name: str,
-            ) -> UpdateInfo | None:
-                async with semaphore:
                     try:
-                        result = await self.check_single_update(
+                        return await self.check_single_update(
                             app_name, session, refresh_cache=refresh_cache
                         )
-                        return result
                     except Exception as e:
-                        raise e
+                        logger.error(
+                            "Update check failed for %s: %s", app_name, e
+                        )
+                        return None
 
-            tasks = [
-                check_with_semaphore_and_progress(app) for app in app_names
-            ]
+            tasks = [check_with_semaphore(app) for app in app_names]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Filter out None results and exceptions
