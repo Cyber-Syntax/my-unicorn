@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.9.1-alpha
+
+### Fixed
+
+Fixed wrong source directory path in the upgrade command which caused upgrade to fail.
+
+### Migration guide
+
+Please manually update with setup.sh script. Run the following commands in your terminal:
+
+```bash
+git clone https://github.com/Cyber-Syntax/my-unicorn.git
+cd my-unicorn
+./setup.sh install
+```
+
 ## v1.9.0-alpha
 
 ### Changed
