@@ -160,10 +160,11 @@ class UpdateHandler(BaseCommandHandler):
                 # Display update plan
                 self._display_update_plan(update_infos)
 
-                # Perform updates
+                # Perform updates - pass update_infos to eliminate redundant
+                # cache lookups (optimization: reuses in-memory release data)
                 update_results = (
                     await self.update_manager.update_multiple_apps(
-                        apps_to_update
+                        apps_to_update, update_infos=update_infos
                     )
                 )
 

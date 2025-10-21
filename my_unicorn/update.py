@@ -68,7 +68,11 @@ class PathContext:
 
 
 class UpdateInfo:
-    """Information about an available update."""
+    """Information about an available update.
+
+    This class now includes in-memory caching of release data to eliminate
+    redundant cache file reads during a single update operation.
+    """
 
     def __init__(
         self,
@@ -79,6 +83,7 @@ class UpdateInfo:
         release_url: str = "",
         prerelease: bool = False,
         original_tag_name: str = "",
+        release_data: dict[str, Any] | None = None,
     ):
         """Initialize update information.
 
@@ -90,6 +95,7 @@ class UpdateInfo:
             release_url: URL to the release
             prerelease: Whether the latest version is a prerelease
             original_tag_name: Original tag name from GitHub (preserves 'v' prefix)
+            release_data: Full release data from GitHub API (in-memory cache)
 
         """
         self.app_name = app_name
@@ -99,6 +105,9 @@ class UpdateInfo:
         self.release_url = release_url
         self.prerelease = prerelease
         self.original_tag_name = original_tag_name or f"v{latest_version}"
+        self.release_data = (
+            release_data  # In-memory cache for single operation
+        )
 
     def __repr__(self) -> str:
         """String representation of update info."""
@@ -109,7 +118,11 @@ class UpdateInfo:
 class UpdateManager:
     """Manages updates for installed AppImages."""
 
-    def __init__(self, config_manager: ConfigManager | None = None, progress_service=None):
+    def __init__(
+        self,
+        config_manager: ConfigManager | None = None,
+        progress_service=None,
+    ):
         """Initialize update manager.
 
         Args:
@@ -126,7 +139,9 @@ class UpdateManager:
         self.storage_service = StorageService(storage_dir)
 
         # Initialize backup service
-        self.backup_service = BackupService(self.config_manager, self.global_config)
+        self.backup_service = BackupService(
+            self.config_manager, self.global_config
+        )
 
         # Store progress service parameter but don't cache global service
         self._progress_service_param = progress_service
@@ -149,7 +164,9 @@ class UpdateManager:
         # Get progress service from download service if available
         progress_service = getattr(download_service, "progress_service", None)
         self.icon_service = IconService(download_service, progress_service)
-        self.verification_service = VerificationService(download_service, progress_service)
+        self.verification_service = VerificationService(
+            download_service, progress_service
+        )
 
     def _compare_versions(self, current: str, latest: str) -> bool:
         """Compare version strings to determine if update is available.
@@ -195,7 +212,10 @@ class UpdateManager:
             return latest_clean > current_clean
 
     async def check_single_update(
-        self, app_name: str, session: aiohttp.ClientSession, refresh_cache: bool = False
+        self,
+        app_name: str,
+        session: aiohttp.ClientSession,
+        refresh_cache: bool = False,
     ) -> UpdateInfo | None:
         """Check for updates for a single app.
 
@@ -219,20 +239,26 @@ class UpdateManager:
             logger.debug(
                 f"🔍 DEBUG: Source immediately after loading config from disk: {original_source}"
             )
-            logger.debug(f"🔍 DEBUG: Full app_config keys: {list(app_config.keys())}")
+            logger.debug(
+                f"🔍 DEBUG: Full app_config keys: {list(app_config.keys())}"
+            )
 
             current_version = app_config["appimage"]["version"]
             owner = app_config["owner"]
             repo = app_config["repo"]
 
-            logger.debug("Checking updates for %s (%s/%s)", app_name, owner, repo)
+            logger.debug(
+                "Checking updates for %s (%s/%s)", app_name, owner, repo
+            )
 
             # Check if app is configured to use GitHub API
             should_use_github = True
             should_use_prerelease = False
 
             # Check catalog first (preferred)
-            catalog_entry = self.config_manager.load_catalog_entry(app_config["repo"].lower())
+            catalog_entry = self.config_manager.load_catalog_entry(
+                app_config["repo"].lower()
+            )
             if catalog_entry:
                 github_config = catalog_entry.get("github", {})
                 should_use_github = github_config.get("repo", True)
@@ -242,25 +268,37 @@ class UpdateManager:
             if should_use_github and not should_use_prerelease:
                 # Check new github section first
                 app_github_config = app_config.get("github", {})
-                should_use_github = app_github_config.get("repo", should_use_github)
-                should_use_prerelease = app_github_config.get("prerelease", False)
+                should_use_github = app_github_config.get(
+                    "repo", should_use_github
+                )
+                should_use_prerelease = app_github_config.get(
+                    "prerelease", False
+                )
 
                 # Fallback to old verification section for backward compatibility
                 if not should_use_prerelease:
                     verification_config = app_config.get("verification", {})
-                    should_use_prerelease = verification_config.get("prerelease", False)
+                    should_use_prerelease = verification_config.get(
+                        "prerelease", False
+                    )
 
             if not should_use_github:
-                logger.error("GitHub API disabled for %s (github.repo: false)", app_name)
+                logger.error(
+                    "GitHub API disabled for %s (github.repo: false)", app_name
+                )
                 return None
 
             # TODO: This is making a duplicate API call!
             # The same release data will be fetched again in update_single_app()
             # This causes 2 API calls per app instead of 1
             # Fetch latest release
-            fetcher = GitHubReleaseFetcher(owner, repo, session, self._shared_api_task_id)
+            fetcher = GitHubReleaseFetcher(
+                owner, repo, session, self._shared_api_task_id
+            )
             if should_use_prerelease:
-                logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
+                logger.debug(
+                    "Fetching latest prerelease for %s/%s", owner, repo
+                )
                 try:
                     release_data = await fetcher.fetch_latest_prerelease(
                         ignore_cache=refresh_cache
@@ -273,20 +311,29 @@ class UpdateManager:
                             repo,
                         )
                         # Use fallback logic to handle repositories with only prereleases
-                        release_data = await fetcher.fetch_latest_release_or_prerelease(
-                            prefer_prerelease=False, ignore_cache=refresh_cache
+                        release_data = (
+                            await fetcher.fetch_latest_release_or_prerelease(
+                                prefer_prerelease=False,
+                                ignore_cache=refresh_cache,
+                            )
                         )
                     else:
                         raise
             else:
                 # Use fallback logic to handle repositories with only prereleases
-                release_data = await fetcher.fetch_latest_release_or_prerelease(
-                    prefer_prerelease=False, ignore_cache=refresh_cache
+                release_data = (
+                    await fetcher.fetch_latest_release_or_prerelease(
+                        prefer_prerelease=False, ignore_cache=refresh_cache
+                    )
                 )
 
             latest_version = release_data["version"]
-            has_update = self._compare_versions(current_version, latest_version)
+            has_update = self._compare_versions(
+                current_version, latest_version
+            )
 
+            # Cache release data in UpdateInfo for in-memory reuse within single operation
+            # This eliminates redundant cache file reads in subsequent update phases
             return UpdateInfo(
                 app_name=app_name,
                 current_version=current_version,
@@ -294,7 +341,10 @@ class UpdateManager:
                 has_update=has_update,
                 release_url=f"https://github.com/{owner}/{repo}/releases/tag/{latest_version}",
                 prerelease=release_data.get("prerelease", False),
-                original_tag_name=release_data.get("original_tag_name", f"v{latest_version}"),
+                original_tag_name=release_data.get(
+                    "original_tag_name", f"v{latest_version}"
+                ),
+                release_data=release_data,  # Store for in-memory reuse
             )
 
         except Exception as e:
@@ -314,7 +364,10 @@ class UpdateManager:
                 import traceback
 
                 logger.set_console_level_temporarily("CRITICAL")
-                logger.error("Traceback for Unauthorized (401):\n%s", traceback.format_exc())
+                logger.error(
+                    "Traceback for Unauthorized (401):\n%s",
+                    traceback.format_exc(),
+                )
                 logger.set_console_level_temporarily("WARNING")
                 return None
             # Other errors: user-facing message
@@ -327,7 +380,9 @@ class UpdateManager:
             logger.set_console_level_temporarily("WARNING")
             return None
 
-    async def check_all_updates(self, app_names: list[str] | None = None) -> list[UpdateInfo]:
+    async def check_all_updates(
+        self, app_names: list[str] | None = None
+    ) -> list[UpdateInfo]:
         """Check for updates for all or specified apps.
 
         Args:
@@ -344,7 +399,9 @@ class UpdateManager:
             logger.info("No installed apps found")
             return []
 
-        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
+        semaphore = asyncio.Semaphore(
+            self.global_config["max_concurrent_downloads"]
+        )
 
         async with aiohttp.ClientSession() as session:
 
@@ -391,16 +448,22 @@ class UpdateManager:
         print(f"🔄 Checking {len(app_names)} app(s) for updates...")
         return await self._check_apps_without_spinner(app_names)
 
-    async def _check_apps_without_spinner(self, app_names: list[str]) -> list[UpdateInfo]:
+    async def _check_apps_without_spinner(
+        self, app_names: list[str]
+    ) -> list[UpdateInfo]:
         """Internal method to check apps without any display wrapper."""
-        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
+        semaphore = asyncio.Semaphore(
+            self.global_config["max_concurrent_downloads"]
+        )
         update_infos = []
 
         async def check_with_semaphore(app_name: str) -> UpdateInfo | None:
             async with semaphore:
                 try:
                     async with aiohttp.ClientSession() as session:
-                        result = await self.check_single_update(app_name, session)
+                        result = await self.check_single_update(
+                            app_name, session
+                        )
                     return result
                 except Exception as e:
                     logger.error("Update check failed for %s: %s", app_name, e)
@@ -444,11 +507,15 @@ class UpdateManager:
 
         # Check updates without creating progress tasks (checking is quick preparation work)
 
-        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
+        semaphore = asyncio.Semaphore(
+            self.global_config["max_concurrent_downloads"]
+        )
 
         async with aiohttp.ClientSession() as session:
 
-            async def check_with_semaphore_and_progress(app_name: str) -> UpdateInfo | None:
+            async def check_with_semaphore_and_progress(
+                app_name: str,
+            ) -> UpdateInfo | None:
                 async with semaphore:
                     try:
                         result = await self.check_single_update(
@@ -458,7 +525,9 @@ class UpdateManager:
                     except Exception as e:
                         raise e
 
-            tasks = [check_with_semaphore_and_progress(app) for app in app_names]
+            tasks = [
+                check_with_semaphore_and_progress(app) for app in app_names
+            ]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Filter out None results and exceptions
@@ -472,7 +541,11 @@ class UpdateManager:
         return update_infos
 
     async def update_single_app(
-        self, app_name: str, session: aiohttp.ClientSession, force: bool = False
+        self,
+        app_name: str,
+        session: aiohttp.ClientSession,
+        force: bool = False,
+        update_info: UpdateInfo | None = None,
     ) -> bool:
         """Update a single app.
 
@@ -480,6 +553,7 @@ class UpdateManager:
             app_name: Name of the app to update
             session: aiohttp session
             force: Force update even if no new version available
+            update_info: Optional pre-fetched update info with cached release data
 
         Returns:
             True if update was successful
@@ -488,11 +562,15 @@ class UpdateManager:
         # Get current progress service (not cached instance) for individual tasks
         from my_unicorn.services.progress import get_progress_service
 
-        progress_service = self._progress_service_param or get_progress_service()
+        progress_service = (
+            self._progress_service_param or get_progress_service()
+        )
 
         try:
-            # Phase 1: Prepare update context
-            update_context = await self._prepare_update_context(app_name, session, force)
+            # Phase 1: Prepare update context (reuse update_info if provided)
+            update_context = await self._prepare_update_context(
+                app_name, session, force, update_info
+            )
             if not update_context:
                 return False
             if update_context == "NO_UPDATE_NEEDED":
@@ -533,7 +611,11 @@ class UpdateManager:
             return False
 
     async def _prepare_update_context(
-        self, app_name: str, session: aiohttp.ClientSession, force: bool = False
+        self,
+        app_name: str,
+        session: aiohttp.ClientSession,
+        force: bool = False,
+        cached_update_info: UpdateInfo | None = None,
     ) -> UpdateContext | None:
         """Prepare the update context with configuration and update info.
 
@@ -541,6 +623,7 @@ class UpdateManager:
             app_name: Name of the app to update
             session: aiohttp session
             force: Force update even if no new version available
+            cached_update_info: Optional pre-fetched UpdateInfo with release data
 
         Returns:
             UpdateContext object or None if preparation failed
@@ -554,14 +637,26 @@ class UpdateManager:
 
         # DEBUG: Log source immediately after loading for update context
         loaded_source = app_config.get("source", "NOT_SET")
-        logger.debug(f"🔍 DEBUG: Source loaded for UpdateContext creation: {loaded_source}")
-        logger.debug(f"🔍 DEBUG: App config has url_metadata: {'url_metadata' in app_config}")
+        logger.debug(
+            f"🔍 DEBUG: Source loaded for UpdateContext creation: {loaded_source}"
+        )
+        logger.debug(
+            f"🔍 DEBUG: App config has url_metadata: {'url_metadata' in app_config}"
+        )
 
-        # Check for updates first
-        update_info = await self.check_single_update(app_name, session)
-        if not update_info:
-            logger.error("Failed to check updates for %s", app_name)
-            return None
+        # Use cached update info if provided (eliminates redundant cache lookup)
+        if cached_update_info:
+            update_info = cached_update_info
+            logger.debug(
+                "Using cached update info for %s (eliminates cache re-read)",
+                app_name,
+            )
+        else:
+            # Check for updates (first lookup in this operation)
+            update_info = await self.check_single_update(app_name, session)
+            if not update_info:
+                logger.error("Failed to check updates for %s", app_name)
+                return None
 
         if not force and not update_info.has_update:
             logger.debug("%s is already up to date", app_name)
@@ -581,7 +676,9 @@ class UpdateManager:
         should_use_prerelease = False
 
         # Check catalog first (preferred)
-        catalog_entry = self.config_manager.load_catalog_entry(app_config["repo"].lower())
+        catalog_entry = self.config_manager.load_catalog_entry(
+            app_config["repo"].lower()
+        )
         if catalog_entry:
             github_config = catalog_entry.get("github", {})
             if isinstance(github_config, dict):
@@ -592,17 +689,23 @@ class UpdateManager:
         if should_use_github and not should_use_prerelease:
             # Check new github section first
             app_github_config = app_config.get("github", {})
-            should_use_github = app_github_config.get("repo", should_use_github)
+            should_use_github = app_github_config.get(
+                "repo", should_use_github
+            )
             should_use_prerelease = app_github_config.get("prerelease", False)
 
             # Fallback to old verification section for backward compatibility
             if not should_use_prerelease:
                 verification_config = app_config.get("verification", {})
                 if isinstance(verification_config, dict):
-                    should_use_prerelease = verification_config.get("prerelease", False)
+                    should_use_prerelease = verification_config.get(
+                        "prerelease", False
+                    )
 
         if not should_use_github:
-            logger.error("GitHub API disabled for %s (github.repo: false)", app_name)
+            logger.error(
+                "GitHub API disabled for %s (github.repo: false)", app_name
+            )
             return None
 
         # DEBUG: Log original source at UpdateContext creation
@@ -621,7 +724,9 @@ class UpdateManager:
             session=session,
         )
 
-    async def _prepare_assets(self, update_context: UpdateContext) -> AssetContext:
+    async def _prepare_assets(
+        self, update_context: UpdateContext
+    ) -> AssetContext:
         """Prepare assets for the update (AppImage and icon).
 
         Args:
@@ -631,28 +736,40 @@ class UpdateManager:
             AssetContext with prepared assets
 
         """
-        # Fetch latest release data
-        # TODO: DUPLICATE API CALL! This fetches the same release data already fetched in check_single_update()
-        # This is why we see 2-3 API calls per app instead of 1
-        # Should pass release_data from check phase instead of re-fetching
-        fetcher = GitHubReleaseFetcher(
-            update_context.owner,
-            update_context.repo,
-            update_context.session,
-            self._shared_api_task_id,
-        )
+        # Use cached release data from UpdateInfo (eliminates 2nd cache lookup)
+        release_data = update_context.update_info.release_data
 
-        if update_context.should_use_prerelease:
-            logger.debug(
-                "Fetching latest prerelease for %s/%s",
+        if not release_data:
+            # Fallback: fetch if somehow not cached (shouldn't happen)
+            logger.warning(
+                "No cached release data for %s, fetching (unexpected)",
+                update_context.app_name,
+            )
+            fetcher = GitHubReleaseFetcher(
                 update_context.owner,
                 update_context.repo,
+                update_context.session,
+                self._shared_api_task_id,
             )
-            release_data = await fetcher.fetch_latest_prerelease()
+            if update_context.should_use_prerelease:
+                release_data = await fetcher.fetch_latest_prerelease()
+            else:
+                release_data = (
+                    await fetcher.fetch_latest_release_or_prerelease(
+                        prefer_prerelease=False
+                    )
+                )
         else:
-            # Use fallback logic to handle repositories with only prereleases
-            release_data = await fetcher.fetch_latest_release_or_prerelease(
-                prefer_prerelease=False
+            logger.debug(
+                "Using cached release data for %s (eliminated cache re-read)",
+                update_context.app_name,
+            )
+            # Create fetcher only for asset selection methods
+            fetcher = GitHubReleaseFetcher(
+                update_context.owner,
+                update_context.repo,
+                update_context.session,
+                self._shared_api_task_id,
             )
 
         # Find AppImage asset using source-aware selection
@@ -664,7 +781,9 @@ class UpdateManager:
                 "characteristic_suffix", []
             )
             appimage_asset = fetcher.select_best_appimage(
-                release_data, characteristic_suffix, installation_source="catalog"
+                release_data,
+                characteristic_suffix,
+                installation_source="catalog",
             )
         else:
             # Fallback: URL-based selection
@@ -726,7 +845,9 @@ class UpdateManager:
                     # Could be optimized or eliminated if icons are extracted from AppImage
                     default_branch = await fetcher.get_default_branch()
                     icon_url = fetcher.build_icon_url(icon_url, default_branch)
-                    logger.debug(f"🎨 Built icon URL from template during update: {icon_url}")
+                    logger.debug(
+                        f"🎨 Built icon URL from template during update: {icon_url}"
+                    )
                 except Exception as e:
                     logger.warning(
                         f"⚠️  Failed to build icon URL from template during update: {e}"
@@ -740,12 +861,16 @@ class UpdateManager:
                     icon_filename=icon_filename,
                     icon_url=icon_url,
                 )
-                logger.debug("🎨 Created icon asset for update: %s", icon_filename)
+                logger.debug(
+                    "🎨 Created icon asset for update: %s", icon_filename
+                )
                 return icon_asset
 
         # If we still don't have an icon asset but the app should have an icon,
         # create one with a default filename for AppImage extraction to work
-        should_extract_icon = update_context.app_config.get("icon", {}).get("installed") or (
+        should_extract_icon = update_context.app_config.get("icon", {}).get(
+            "installed"
+        ) or (
             update_context.catalog_entry
             and update_context.catalog_entry.get("icon", {}).get("extraction")
         )
@@ -753,10 +878,15 @@ class UpdateManager:
         if not icon_asset and should_extract_icon:
             if not icon_filename:
                 # Try to get filename from catalog first
-                if update_context.catalog_entry and update_context.catalog_entry.get(
-                    "icon", {}
-                ).get("name"):
-                    icon_filename = update_context.catalog_entry["icon"]["name"]
+                if (
+                    update_context.catalog_entry
+                    and update_context.catalog_entry.get("icon", {}).get(
+                        "name"
+                    )
+                ):
+                    icon_filename = update_context.catalog_entry["icon"][
+                        "name"
+                    ]
                 else:
                     # Generate default icon filename
                     icon_filename = f"{update_context.app_name}.png"
@@ -766,7 +896,10 @@ class UpdateManager:
                 icon_filename=icon_filename,
                 icon_url="",  # Empty URL means AppImage extraction only
             )
-            logger.debug("🎨 Created icon asset for AppImage extraction: %s", icon_filename)
+            logger.debug(
+                "🎨 Created icon asset for AppImage extraction: %s",
+                icon_filename,
+            )
             return icon_asset
 
         return None
@@ -823,7 +956,8 @@ class UpdateManager:
         """
         # Create backup of current version
         current_appimage_path = (
-            path_context.storage_dir / update_context.app_config["appimage"]["name"]
+            path_context.storage_dir
+            / update_context.app_config["appimage"]["name"]
         )
         if current_appimage_path.exists():
             backup_path = self.backup_service.create_backup(
@@ -840,7 +974,9 @@ class UpdateManager:
 
         # Download AppImage
         appimage_path = await download_service.download_appimage(
-            asset_context.appimage_asset, path_context.download_path, show_progress=True
+            asset_context.appimage_asset,
+            path_context.download_path,
+            show_progress=True,
         )
 
         return appimage_path
@@ -866,15 +1002,19 @@ class UpdateManager:
         """
         from my_unicorn.services.progress import get_progress_service
 
-        progress_service = self._progress_service_param or get_progress_service()
+        progress_service = (
+            self._progress_service_param or get_progress_service()
+        )
         progress_enabled = progress_service.is_active()
 
         try:
             # Create combined post-processing task if progress is enabled
             post_processing_task_id = None
             if progress_enabled:
-                post_processing_task_id = await progress_service.create_post_processing_task(
-                    update_context.app_name
+                post_processing_task_id = (
+                    await progress_service.create_post_processing_task(
+                        update_context.app_name
+                    )
                 )
 
             # Verify download if requested (20% of post-processing)
@@ -898,10 +1038,14 @@ class UpdateManager:
                 )
 
             self.storage_service.make_executable(downloaded_path)
-            appimage_path = self.storage_service.move_to_install_dir(downloaded_path)
+            appimage_path = self.storage_service.move_to_install_dir(
+                downloaded_path
+            )
 
             # Finally rename to clean name using catalog configuration
-            appimage_path = self._handle_renaming(update_context, appimage_path)
+            appimage_path = self._handle_renaming(
+                update_context, appimage_path
+            )
 
             # Handle icon setup (30% of post-processing)
             icon_path, updated_icon_config = await self._handle_icon_setup(
@@ -978,15 +1122,21 @@ class UpdateManager:
         """
         # Load verification config from catalog if available, otherwise from app config
         verification_config: dict[str, Any] = {}
-        if update_context.catalog_entry and update_context.catalog_entry.get("verification"):
-            verification_config = dict(update_context.catalog_entry["verification"])
+        if update_context.catalog_entry and update_context.catalog_entry.get(
+            "verification"
+        ):
+            verification_config = dict(
+                update_context.catalog_entry["verification"]
+            )
             logger.debug(
                 "📋 Using catalog verification config for %s: %s",
                 update_context.app_name,
                 verification_config,
             )
         else:
-            verification_config = update_context.app_config.get("verification", {})
+            verification_config = update_context.app_config.get(
+                "verification", {}
+            )
             logger.debug(
                 "📋 Using app config verification config for %s: %s",
                 update_context.app_name,
@@ -1015,7 +1165,9 @@ class UpdateManager:
                 update_context.repo,
                 update_context.update_info.original_tag_name,
                 update_context.app_name,
-                release_data=dict(asset_context.release_data),  # Convert to dict
+                release_data=dict(
+                    asset_context.release_data
+                ),  # Convert to dict
                 progress_task_id=post_processing_task_id,
             )
 
@@ -1027,14 +1179,18 @@ class UpdateManager:
                 )
 
         except Exception as e:
-            logger.error("Verification failed for %s: %s", update_context.app_name, e)
+            logger.error(
+                "Verification failed for %s: %s", update_context.app_name, e
+            )
             # Continue with update even if verification fails
             verification_results = {}
             updated_verification_config = {}
 
         return verification_results, updated_verification_config
 
-    def _handle_renaming(self, update_context: UpdateContext, appimage_path: Path) -> Path:
+    def _handle_renaming(
+        self, update_context: UpdateContext, appimage_path: Path
+    ) -> Path:
         """Handle AppImage renaming based on configuration.
 
         Returns:
@@ -1054,8 +1210,12 @@ class UpdateManager:
             )
 
         if rename_to:
-            clean_name = self.storage_service.get_clean_appimage_name(rename_to)
-            appimage_path = self.storage_service.rename_appimage(appimage_path, clean_name)
+            clean_name = self.storage_service.get_clean_appimage_name(
+                rename_to
+            )
+            appimage_path = self.storage_service.rename_appimage(
+                appimage_path, clean_name
+            )
 
         return appimage_path
 
@@ -1080,7 +1240,9 @@ class UpdateManager:
             or update_context.app_config.get("icon", {}).get("installed")
             or (
                 update_context.catalog_entry
-                and update_context.catalog_entry.get("icon", {}).get("extraction")
+                and update_context.catalog_entry.get("icon", {}).get(
+                    "extraction"
+                )
             )
         )
 
@@ -1101,7 +1263,10 @@ class UpdateManager:
             icon_filename = None
             icon_url = ""
 
-            if update_context.catalog_entry and update_context.catalog_entry.get("icon"):
+            if (
+                update_context.catalog_entry
+                and update_context.catalog_entry.get("icon")
+            ):
                 catalog_icon = update_context.catalog_entry.get("icon", {})
                 if isinstance(catalog_icon, dict):
                     icon_filename = catalog_icon.get("name")
@@ -1114,7 +1279,9 @@ class UpdateManager:
                 icon_filename=icon_filename,
                 icon_url=icon_url,
             )
-            logger.debug(f"🎨 Created icon asset from catalog/defaults: {icon_filename}")
+            logger.debug(
+                f"🎨 Created icon asset from catalog/defaults: {icon_filename}"
+            )
 
         icon_path, updated_icon_config = await self._setup_update_icon(
             app_config=update_context.app_config,
@@ -1156,7 +1323,9 @@ class UpdateManager:
             )
 
         # Store the computed hash from verification or GitHub digest
-        stored_hash = self._get_stored_hash(verification_results, asset_context.appimage_asset)
+        stored_hash = self._get_stored_hash(
+            verification_results, asset_context.appimage_asset
+        )
 
         # DEBUG: Track source field throughout update process
         logger.debug(
@@ -1170,7 +1339,10 @@ class UpdateManager:
         )
 
         # CRITICAL DEBUG: Check if updated_verification_config contains a source field
-        if updated_verification_config and "source" in updated_verification_config:
+        if (
+            updated_verification_config
+            and "source" in updated_verification_config
+        ):
             logger.error(
                 f"🚨 BUG FOUND: updated_verification_config contains source field: {updated_verification_config['source']}"
             )
@@ -1188,7 +1360,15 @@ class UpdateManager:
             filtered_verification_config = {
                 k: v
                 for k, v in updated_verification_config.items()
-                if k not in ["source", "owner", "repo", "appimage", "icon", "github"]
+                if k
+                not in [
+                    "source",
+                    "owner",
+                    "repo",
+                    "appimage",
+                    "icon",
+                    "github",
+                ]
             }
 
             if filtered_verification_config != updated_verification_config:
@@ -1197,7 +1377,9 @@ class UpdateManager:
                     f"Original: {updated_verification_config}, Filtered: {filtered_verification_config}"
                 )
 
-            update_context.app_config["verification"].update(filtered_verification_config)
+            update_context.app_config["verification"].update(
+                filtered_verification_config
+            )
             logger.debug(
                 f"🔧 Updated verification config for {update_context.app_name} "
                 f"after successful verification"
@@ -1213,7 +1395,9 @@ class UpdateManager:
             update_context.update_info.latest_version
         )
         update_context.app_config["appimage"]["name"] = appimage_path.name
-        update_context.app_config["appimage"]["installed_date"] = datetime.now().isoformat()
+        update_context.app_config["appimage"]["installed_date"] = (
+            datetime.now().isoformat()
+        )
         update_context.app_config["appimage"]["digest"] = stored_hash
 
         # DEBUG: Track source field after appimage updates
@@ -1223,10 +1407,12 @@ class UpdateManager:
 
         # Update icon configuration with extraction settings and source tracking
         if updated_icon_config:
-            logger.debug(f"🔍 DEBUG: updated_icon_config contents: {updated_icon_config}")
-            previous_icon_status = update_context.app_config.get("icon", {}).get(
-                "installed", False
+            logger.debug(
+                f"🔍 DEBUG: updated_icon_config contents: {updated_icon_config}"
             )
+            previous_icon_status = update_context.app_config.get(
+                "icon", {}
+            ).get("installed", False)
             if "icon" not in update_context.app_config:
                 update_context.app_config["icon"] = {}
 
@@ -1246,14 +1432,18 @@ class UpdateManager:
             f"🔍 DEBUG: Final source before save: {update_context.app_config.get('source', 'NOT_SET')}"
         )
 
-        self.config_manager.save_app_config(update_context.app_name, update_context.app_config)
+        self.config_manager.save_app_config(
+            update_context.app_name, update_context.app_config
+        )
 
         # Clean up old backups after successful update
         try:
             self.backup_service.cleanup_old_backups(update_context.app_name)
         except Exception as e:
             logger.warning(
-                "⚠️  Failed to cleanup old backups for %s: %s", update_context.app_name, e
+                "⚠️  Failed to cleanup old backups for %s: %s",
+                update_context.app_name,
+                e,
             )
 
     async def _handle_desktop_entry(
@@ -1330,7 +1520,9 @@ class UpdateManager:
 
         icon_config = IconConfig(
             extraction_enabled=True,  # Will be determined by service
-            icon_url=icon_asset["icon_url"] if icon_asset["icon_url"] else None,
+            icon_url=icon_asset["icon_url"]
+            if icon_asset["icon_url"]
+            else None,
             icon_filename=icon_asset["icon_filename"],
             preserve_url_on_extraction=True,  # Preserve URL for future updates
         )
@@ -1416,9 +1608,13 @@ class UpdateManager:
                 progress_task_id=progress_task_id,
             )
 
-            logger.debug("✅ VerificationService.verify_file() completed successfully")
+            logger.debug(
+                "✅ VerificationService.verify_file() completed successfully"
+            )
             logger.debug("   - result.passed: %s", result.passed)
-            logger.debug("   - result.methods: %s", list(result.methods.keys()))
+            logger.debug(
+                "   - result.methods: %s", list(result.methods.keys())
+            )
 
             return result.methods, result.updated_config
 
@@ -1431,26 +1627,46 @@ class UpdateManager:
             raise
 
     async def update_multiple_apps(
-        self, app_names: list[str], force: bool = False
+        self,
+        app_names: list[str],
+        force: bool = False,
+        update_infos: list[UpdateInfo] | None = None,
     ) -> dict[str, bool]:
         """Update multiple apps.
 
         Args:
             app_names: List of app names to update
             force: Force update even if no new version available
+            update_infos: Optional pre-fetched update info objects with cached
+                release data
 
         Returns:
             Dictionary mapping app names to success status
 
         """
-        semaphore = asyncio.Semaphore(self.global_config["max_concurrent_downloads"])
+        semaphore = asyncio.Semaphore(
+            self.global_config["max_concurrent_downloads"]
+        )
         results = {}
+
+        # Create lookup map for update infos
+        update_info_map = {}
+        if update_infos:
+            update_info_map = {info.app_name: info for info in update_infos}
+            logger.debug(
+                "Using cached update info for %d apps (eliminates cache re-reads)",
+                len(update_info_map),
+            )
 
         async with aiohttp.ClientSession() as session:
 
             async def update_with_semaphore(app_name: str) -> tuple[str, bool]:
                 async with semaphore:
-                    success = await self.update_single_app(app_name, session, force)
+                    # Use cached update info if available
+                    cached_info = update_info_map.get(app_name)
+                    success = await self.update_single_app(
+                        app_name, session, force, cached_info
+                    )
                     return app_name, success
 
             tasks = [update_with_semaphore(app) for app in app_names]
