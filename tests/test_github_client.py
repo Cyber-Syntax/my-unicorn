@@ -455,21 +455,6 @@ async def test_fetch_latest_release_malformed_response(mock_session):
         pass
 
 
-def test_parse_repo_url_valid():
-    """Test parse_repo_url parses valid GitHub repo URLs."""
-    url = "https://github.com/Cyber-Syntax/my-unicorn"
-    owner, repo = GitHubReleaseFetcher.parse_repo_url(url)
-    assert owner == "Cyber-Syntax"
-    assert repo == "my-unicorn"
-
-
-def test_parse_repo_url_invalid():
-    """Test parse_repo_url raises on invalid URL."""
-    url = "https://gitlab.com/foo/bar"
-    with pytest.raises(ValueError):
-        GitHubReleaseFetcher.parse_repo_url(url)
-
-
 def test_build_icon_url_and_extract_icon_filename():
     """Test build_icon_url and extract_icon_filename produce correct results."""
     fetcher = GitHubReleaseFetcher(
@@ -481,84 +466,6 @@ def test_build_icon_url_and_extract_icon_filename():
     )
     filename = fetcher.extract_icon_filename(icon_url, "my-unicorn")
     assert filename == "my-unicorn.png"
-
-
-@pytest.mark.asyncio
-async def test_check_rate_limit(mock_session):
-    """Test check_rate_limit returns rate limit info."""
-    fetcher = GitHubReleaseFetcher(
-        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session
-    )
-    mock_response = AsyncMock()
-    mock_response.__aenter__.return_value = mock_response
-    mock_response.status = 200
-    # Make raise_for_status a regular Mock, not async
-    mock_response.raise_for_status = MagicMock()
-    mock_response.json = AsyncMock(
-        return_value={
-            "resources": {"core": {"limit": 5000, "remaining": 4999, "reset": 1234567890}}
-        }
-    )
-    mock_session.get.return_value = mock_response
-
-    info = await fetcher.check_rate_limit()
-    assert "core" in info["resources"]
-    assert info["resources"]["core"]["limit"] == 5000
-
-
-@pytest.mark.asyncio
-async def test_check_rate_limit_network_error(mock_session):
-    """Test check_rate_limit handles network error."""
-    fetcher = GitHubReleaseFetcher(
-        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session
-    )
-    import aiohttp
-
-    mock_session.get.side_effect = aiohttp.ClientError("Network unreachable")
-    with pytest.raises(aiohttp.ClientError):
-        await fetcher.check_rate_limit()
-
-
-@pytest.mark.asyncio
-async def test_check_rate_limit_timeout(mock_session):
-    """Test check_rate_limit handles timeout error."""
-    fetcher = GitHubReleaseFetcher(
-        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session
-    )
-    import asyncio
-
-    mock_session.get.side_effect = asyncio.TimeoutError
-    with pytest.raises(asyncio.TimeoutError):
-        await fetcher.check_rate_limit()
-
-
-@pytest.mark.asyncio
-async def test_check_rate_limit_malformed_response(mock_session):
-    """Test check_rate_limit handles malformed API response."""
-    fetcher = GitHubReleaseFetcher(
-        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session
-    )
-    mock_response = AsyncMock()
-    mock_response.__aenter__.return_value = mock_response
-    mock_response.status = 200
-    # Make raise_for_status a regular Mock, not async
-    mock_response.raise_for_status = MagicMock()
-    # Simulate malformed response: None
-    mock_response.json = AsyncMock(return_value=None)
-    mock_session.get.return_value = mock_response
-    # Should raise AttributeError if data is not a dict
-    try:
-        await fetcher.check_rate_limit()
-    except AttributeError:
-        pass
-
-    # Simulate malformed response: unexpected type
-    mock_response.json = AsyncMock(return_value="not-a-dict")
-    mock_session.get.return_value = mock_response
-    try:
-        await fetcher.check_rate_limit()
-    except AttributeError:
-        pass
 
 
 @pytest.mark.asyncio

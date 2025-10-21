@@ -6,7 +6,6 @@ information, extract AppImage assets, and manage GitHub-specific operations.
 
 from dataclasses import dataclass
 from typing import Any, TypedDict, cast
-from urllib.parse import urlparse
 
 import aiohttp
 
@@ -78,15 +77,6 @@ class GitHubReleaseFetcher:
         self.shared_api_task_id = shared_api_task_id
         self.use_cache = use_cache
         self.cache_manager = get_cache_manager() if use_cache else None
-
-    def set_shared_api_task(self, task_id: str | None) -> None:
-        """Set the shared API progress task ID.
-
-        Args:
-            task_id: Shared API progress task ID or None to disable
-
-        """
-        self.shared_api_task_id = task_id
 
     async def _update_shared_progress(self, description: str) -> None:
         """Update shared API progress task with ultra-simple approach.
@@ -793,54 +783,6 @@ class GitHubReleaseFetcher:
 
         # Fallback: return first candidate
         return candidates[0]
-
-    # FIXME: unused, move the auth or make this to check the available rate status
-    # and use in the github api requests to prevent limit errors
-    async def check_rate_limit(self) -> dict[str, Any]:
-        """Check current rate limit status.
-
-        Returns:
-            Rate limit information from GitHub API
-
-        """
-        url = "https://api.github.com/rate_limit"
-        headers = GitHubAuthManager.apply_auth({})
-
-        async with self.session.get(url=url, headers=headers) as response:
-            response.raise_for_status()
-            data = await response.json()
-            return data
-
-    # FIXME: unused? checkout parser.py or url install template method
-    @staticmethod
-    def parse_repo_url(repo_url: str) -> tuple[str, str]:
-        """Parse GitHub repository URL to extract owner and repo.
-
-        Args:
-            repo_url: GitHub repository URL or owner/repo format
-
-        Returns:
-            Tuple of (owner, repo)
-
-        Raises:
-            ValueError: If URL format is invalid
-
-        """
-        # Handle owner/repo format
-        if "/" in repo_url and not repo_url.startswith("http"):
-            parts = repo_url.split("/")
-            if len(parts) == 2:
-                return parts[0], parts[1]
-
-        # Handle full GitHub URLs
-        if repo_url.startswith("http"):
-            parsed = urlparse(repo_url)
-            if parsed.hostname == "github.com":
-                path_parts = parsed.path.strip("/").split("/")
-                if len(path_parts) >= 2:
-                    return path_parts[0], path_parts[1]
-
-        raise ValueError(f"Invalid GitHub repository format: {repo_url}")
 
     async def get_default_branch(self) -> str:
         """Get the default branch name for the repository.
