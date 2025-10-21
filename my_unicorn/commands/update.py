@@ -113,7 +113,34 @@ class UpdateHandler(BaseCommandHandler):
         if not target_apps:
             return self._create_empty_result("No apps to update")
 
-        # Use progress session for updates
+        # Check for updates first (without progress bar)
+        update_infos = await self.update_manager.check_updates(
+            app_names=target_apps,
+            show_progress=True,
+            refresh_cache=refresh_cache,
+        )
+
+        if not update_infos:
+            return self._create_empty_result("Failed to check for updates")
+
+        # Filter to apps needing updates
+        apps_to_update = [
+            info.app_name for info in update_infos if info.has_update
+        ]
+
+        # If no updates needed, return early without progress bar
+        if not apps_to_update:
+            up_to_date = [info.app_name for info in update_infos]
+            return UpdateResult(
+                success=True,
+                updated_apps=[],
+                failed_apps=[],
+                up_to_date_apps=up_to_date,
+                update_infos=update_infos,
+                message=f"All {len(update_infos)} app(s) are up to date",
+            )
+
+        # Only start progress session if there are apps to update
         async with progress_session():
             progress_service = get_progress_service()
 
@@ -124,42 +151,6 @@ class UpdateHandler(BaseCommandHandler):
             self.update_manager._shared_api_task_id = api_task_id
 
             try:
-                # Check for updates with progress
-                update_infos = await self.update_manager.check_updates(
-                    app_names=target_apps,
-                    show_progress=True,
-                    refresh_cache=refresh_cache,
-                )
-
-                if not update_infos:
-                    await progress_service.finish_task(
-                        api_task_id, success=False
-                    )
-                    return self._create_empty_result(
-                        "Failed to check for updates"
-                    )
-
-                # Filter to apps needing updates
-                apps_to_update = [
-                    info.app_name for info in update_infos if info.has_update
-                ]
-
-                if not apps_to_update:
-                    await progress_service.finish_task(
-                        api_task_id, success=True
-                    )
-                    up_to_date = [info.app_name for info in update_infos]
-                    return UpdateResult(
-                        success=True,
-                        updated_apps=[],
-                        failed_apps=[],
-                        up_to_date_apps=up_to_date,
-                        update_infos=update_infos,
-                        message=(
-                            f"All {len(update_infos)} app(s) are up to date"
-                        ),
-                    )
-
                 # Display update plan
                 self._display_update_plan(update_infos)
 
