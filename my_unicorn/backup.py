@@ -18,6 +18,16 @@ from typing import Any
 
 from packaging.version import InvalidVersion, Version
 
+from .constants import (
+    APPIMAGE_SUFFIX,
+    BACKUP_METADATA_CORRUPTED_SUFFIX,
+    BACKUP_METADATA_FILENAME,
+    BACKUP_METADATA_TMP_PREFIX,
+    BACKUP_METADATA_TMP_SUFFIX,
+    BACKUP_TEMP_SUFFIX,
+    CONFIG_BACKUP_EXTENSION,
+    OLD_FLAT_BACKUP_GLOB,
+)
 from .logger import get_logger
 
 logger = get_logger(__name__)
@@ -34,7 +44,7 @@ class BackupMetadata:
 
         """
         self.backup_dir = backup_dir
-        self.metadata_file = backup_dir / "metadata.json"
+        self.metadata_file = backup_dir / BACKUP_METADATA_FILENAME
 
     def load(self) -> dict[str, Any]:
         """Load metadata from file.
@@ -50,12 +60,18 @@ class BackupMetadata:
             with open(self.metadata_file, encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError) as e:
-            logger.warning("Corrupted metadata file %s: %s", self.metadata_file, e)
+            logger.warning(
+                "Corrupted metadata file %s: %s", self.metadata_file, e
+            )
             # Create backup of corrupted file
-            corrupted_backup = self.metadata_file.with_suffix(".json.corrupted")
+            corrupted_backup = self.metadata_file.with_suffix(
+                BACKUP_METADATA_CORRUPTED_SUFFIX
+            )
             if self.metadata_file.exists():
                 shutil.copy2(self.metadata_file, corrupted_backup)
-                logger.info("Backed up corrupted metadata to %s", corrupted_backup)
+                logger.info(
+                    "Backed up corrupted metadata to %s", corrupted_backup
+                )
             return {"versions": {}}
 
     def save(self, metadata: dict[str, Any]) -> None:
@@ -72,8 +88,8 @@ class BackupMetadata:
         with tempfile.NamedTemporaryFile(
             mode="w",
             dir=self.backup_dir,
-            prefix=".metadata_",
-            suffix=".json.tmp",
+            prefix=BACKUP_METADATA_TMP_PREFIX,
+            suffix=BACKUP_METADATA_TMP_SUFFIX,
             delete=False,
             encoding="utf-8",
         ) as tmp_file:
@@ -85,7 +101,9 @@ class BackupMetadata:
         temp_path.replace(self.metadata_file)
         logger.debug("Saved metadata to %s", self.metadata_file)
 
-    def add_version(self, version: str, filename: str, file_path: Path) -> None:
+    def add_version(
+        self, version: str, filename: str, file_path: Path
+    ) -> None:
         """Add a version entry to metadata with checksum.
 
         Args:
@@ -125,11 +143,15 @@ class BackupMetadata:
 
         # Sort versions using packaging.version for proper semantic versioning
         try:
-            sorted_versions = sorted(versions, key=lambda x: Version(x), reverse=True)
+            sorted_versions = sorted(
+                versions, key=lambda x: Version(x), reverse=True
+            )
             return sorted_versions[0]
         except InvalidVersion:
             # Fallback to lexicographic sorting if version parsing fails
-            logger.warning("Invalid version format detected, using lexicographic sorting")
+            logger.warning(
+                "Invalid version format detected, using lexicographic sorting"
+            )
             return max(versions)
 
     def get_version_info(self, version: str) -> dict[str, Any] | None:
@@ -161,7 +183,9 @@ class BackupMetadata:
         try:
             return sorted(versions, key=lambda x: Version(x), reverse=True)
         except InvalidVersion:
-            logger.warning("Invalid version format detected, using lexicographic sorting")
+            logger.warning(
+                "Invalid version format detected, using lexicographic sorting"
+            )
             return sorted(versions, reverse=True)
 
     def remove_version(self, version: str) -> bool:
@@ -291,7 +315,10 @@ class BackupService:
 
         # Copy file to backup location atomically
         with tempfile.NamedTemporaryFile(
-            dir=app_backup_dir, prefix=f".{backup_filename}_", suffix=".tmp", delete=False
+            dir=app_backup_dir,
+            prefix=f".{backup_filename}_",
+            suffix=BACKUP_TEMP_SUFFIX,
+            delete=False,
         ) as tmp_file:
             temp_path = Path(tmp_file.name)
 
@@ -317,7 +344,9 @@ class BackupService:
             logger.error("Failed to create backup for %s: %s", app_name, e)
             raise
 
-    def restore_latest_backup(self, app_name: str, destination_dir: Path) -> Path | None:
+    def restore_latest_backup(
+        self, app_name: str, destination_dir: Path
+    ) -> Path | None:
         """Restore the latest backup version for an app.
 
         This method performs the following operations:
@@ -352,7 +381,9 @@ class BackupService:
             logger.warning("No backup versions found for %s", app_name)
             return None
 
-        return self._restore_specific_version(app_name, latest_version, destination_dir)
+        return self._restore_specific_version(
+            app_name, latest_version, destination_dir
+        )
 
     def restore_specific_version(
         self, app_name: str, version: str, destination_dir: Path
@@ -371,7 +402,9 @@ class BackupService:
             Path to restored file or None if backup doesn't exist
 
         """
-        return self._restore_specific_version(app_name, version, destination_dir)
+        return self._restore_specific_version(
+            app_name, version, destination_dir
+        )
 
     def _restore_specific_version(
         self, app_name: str, version: str, destination_dir: Path
@@ -411,7 +444,9 @@ class BackupService:
 
         # Verify backup integrity
         if not metadata.verify_backup_integrity(version, backup_path):
-            logger.error("Backup integrity check failed for %s v%s", app_name, version)
+            logger.error(
+                "Backup integrity check failed for %s v%s", app_name, version
+            )
             return None
 
         # Get app config to determine proper filename and current version
@@ -423,7 +458,8 @@ class BackupService:
         # Validate app config structure
         if "appimage" not in app_config:
             logger.error(
-                "Invalid app configuration for %s: missing 'appimage' section", app_name
+                "Invalid app configuration for %s: missing 'appimage' section",
+                app_name,
             )
             return None
 
@@ -440,25 +476,34 @@ class BackupService:
         # If current AppImage exists, backup it first with its current version
         current_version = appimage_config.get("version", "unknown")
         if destination_path.exists() and current_version != version:
-            logger.info("Backing up current version %s before restore...", current_version)
+            logger.info(
+                "Backing up current version %s before restore...",
+                current_version,
+            )
             try:
                 current_backup_path = self.create_backup(
                     destination_path, app_name, current_version
                 )
                 if current_backup_path:
-                    logger.info("Current version backed up to: %s", current_backup_path)
+                    logger.info(
+                        "Current version backed up to: %s", current_backup_path
+                    )
                 else:
                     logger.warning(
                         "Failed to backup current version, continuing with restore..."
                     )
             except Exception as e:
                 logger.warning(
-                    "Failed to backup current version: %s, continuing with restore...", e
+                    "Failed to backup current version: %s, continuing with restore...",
+                    e,
                 )
 
         # Restore file atomically
         with tempfile.NamedTemporaryFile(
-            dir=destination_dir, prefix=f".{appimage_name}_", suffix=".tmp", delete=False
+            dir=destination_dir,
+            prefix=f".{appimage_name}_",
+            suffix=BACKUP_TEMP_SUFFIX,
+            delete=False,
         ) as tmp_file:
             temp_path = Path(tmp_file.name)
 
@@ -471,11 +516,15 @@ class BackupService:
 
             # Update app config with restored version
             app_config["appimage"]["version"] = version
-            app_config["appimage"]["installed_date"] = datetime.now().isoformat()
+            app_config["appimage"]["installed_date"] = (
+                datetime.now().isoformat()
+            )
 
             # Update digest if we have it from the backup metadata
             if version_info.get("sha256"):
-                app_config["appimage"]["digest"] = f"sha256:{version_info['sha256']}"
+                app_config["appimage"]["digest"] = (
+                    f"sha256:{version_info['sha256']}"
+                )
 
             # Ensure required fields exist in app config
             if "name" not in app_config["appimage"]:
@@ -484,12 +533,20 @@ class BackupService:
             # Save updated config
             try:
                 self.config_manager.save_app_config(app_name, app_config)
-                logger.debug("Updated app config for %s with version %s", app_name, version)
+                logger.debug(
+                    "Updated app config for %s with version %s",
+                    app_name,
+                    version,
+                )
             except Exception as e:
-                logger.error("Failed to update app config for %s: %s", app_name, e)
+                logger.error(
+                    "Failed to update app config for %s: %s", app_name, e
+                )
                 # Continue anyway, as the file restore was successful
 
-            logger.info("🔄 Restored %s v%s to %s", app_name, version, destination_path)
+            logger.info(
+                "🔄 Restored %s v%s to %s", app_name, version, destination_path
+            )
             logger.info("📝 Updated app configuration with restored version")
             return destination_path
 
@@ -533,7 +590,9 @@ class BackupService:
                         "path": backup_path,
                         "filename": version_info["filename"],
                         "size": version_info.get("size", 0),
-                        "created": datetime.fromisoformat(version_info["created"])
+                        "created": datetime.fromisoformat(
+                            version_info["created"]
+                        )
                         if version_info.get("created")
                         else None,
                         "sha256": version_info.get("sha256"),
@@ -569,7 +628,9 @@ class BackupService:
                 if app_dir.is_dir():
                     self._cleanup_old_backups_for_app(app_dir.name, app_dir)
 
-    def _cleanup_old_backups_for_app(self, app_name: str, app_backup_dir: Path) -> None:
+    def _cleanup_old_backups_for_app(
+        self, app_name: str, app_backup_dir: Path
+    ) -> None:
         """Clean up old backups for a specific app.
 
         Args:
@@ -613,9 +674,15 @@ class BackupService:
                     try:
                         backup_path.unlink()
                         metadata.remove_version(version)
-                        logger.info("Removed old backup: %s (v%s)", backup_path, version)
+                        logger.info(
+                            "Removed old backup: %s (v%s)",
+                            backup_path,
+                            version,
+                        )
                     except Exception as e:
-                        logger.error("Failed to remove backup %s: %s", backup_path, e)
+                        logger.error(
+                            "Failed to remove backup %s: %s", backup_path, e
+                        )
 
     def migrate_old_backups(self) -> int:
         """Migrate old flat backup structure to new folder-based structure.
@@ -630,13 +697,15 @@ class BackupService:
             return 0
 
         # Find old backup files (*.backup.AppImage)
-        old_backups = list(backup_dir.glob("*.backup.AppImage"))
+        old_backups = list(backup_dir.glob(OLD_FLAT_BACKUP_GLOB))
 
         if not old_backups:
             logger.debug("No old backups found to migrate")
             return 0
 
-        logger.info("🔄 Migrating %d old backups to new format...", len(old_backups))
+        logger.info(
+            "🔄 Migrating %d old backups to new format...", len(old_backups)
+        )
 
         migrated_count = 0
 
@@ -645,8 +714,9 @@ class BackupService:
                 # Parse filename to extract app name and version
                 # Format: appname-version.backup.AppImage
                 filename = old_backup.stem  # Remove .AppImage
-                if filename.endswith(".backup"):
-                    filename = filename[:-7]  # Remove .backup
+                if filename.endswith(CONFIG_BACKUP_EXTENSION):
+                    filename = filename[: -len(CONFIG_BACKUP_EXTENSION)]
+                    # Remove backup extension (e.g. '.backup')
 
                 # Try to parse app name and version
                 # Strategy: Look for installed apps first, then fallback to parsing
@@ -687,7 +757,7 @@ class BackupService:
                 app_backup_dir.mkdir(exist_ok=True)
 
                 # New filename format: appname-version.AppImage
-                new_filename = f"{app_name}-{version}.AppImage"
+                new_filename = f"{app_name}-{version}{APPIMAGE_SUFFIX}"
                 new_path = app_backup_dir / new_filename
 
                 # Move file to new location
@@ -703,13 +773,18 @@ class BackupService:
                 else:
                     # File already exists, remove old backup
                     old_backup.unlink()
-                    logger.debug("Removed duplicate old backup: %s", old_backup)
+                    logger.debug(
+                        "Removed duplicate old backup: %s", old_backup
+                    )
 
             except Exception as e:
                 logger.error("Failed to migrate %s: %s", old_backup, e)
 
         if migrated_count > 0:
-            logger.info("✅ Successfully migrated %d backups to new format", migrated_count)
+            logger.info(
+                "✅ Successfully migrated %d backups to new format",
+                migrated_count,
+            )
 
         return migrated_count
 

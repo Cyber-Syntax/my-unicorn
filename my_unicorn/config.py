@@ -13,13 +13,141 @@ Requirements:
 """
 
 import configparser
+from datetime import datetime
 from pathlib import Path
 from typing import TypedDict, cast
 
 import orjson
 
-# Module-level constants
-DEFAULT_CONFIG_VERSION: str = "1.0.0"
+from my_unicorn.constants import (
+    CONFIG_DIR_NAME,
+    CONFIG_FILE_NAME,
+    CONFIG_VERSION,
+    DEFAULT_APPS_DIR_NAME,
+    DEFAULT_BATCH_MODE,
+    DEFAULT_CONFIG_SUBDIR,
+    DEFAULT_CONSOLE_LOG_LEVEL,
+    DEFAULT_LOCALE,
+    DEFAULT_LOG_LEVEL,
+    DEFAULT_MAX_BACKUP,
+    DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+    DIRECTORY_KEYS,
+    ISO_DATETIME_FORMAT,
+    KEY_BATCH_MODE,
+    KEY_CONFIG_VERSION,
+    KEY_CONSOLE_LOG_LEVEL,
+    KEY_LOCALE,
+    KEY_LOG_LEVEL,
+    KEY_MAX_BACKUP,
+    KEY_MAX_CONCURRENT_DOWNLOADS,
+    SECTION_DEFAULT,
+    SECTION_DIRECTORY,
+    SECTION_NETWORK,
+)
+
+
+class CommentAwareConfigParser(configparser.ConfigParser):
+    """ConfigParser that strips inline comments when reading values."""
+
+    def get(self, section, option, **kwargs):
+        """Get a configuration value with inline comments stripped."""
+        value = super().get(section, option, **kwargs)
+        # Strip inline comments (anything after '  #')
+        if isinstance(value, str) and "  #" in value:
+            value = value.split("  #")[0].strip()
+        return value
+
+
+class ConfigCommentManager:
+    """Manages configuration file comments for user-friendly documentation."""
+
+    @staticmethod
+    def get_file_header() -> str:
+        """Generate file header comment with description and timestamp.
+
+        Returns:
+            Header comment string for the configuration file
+
+        """
+        timestamp = datetime.now().strftime(ISO_DATETIME_FORMAT)
+        return f"""# My-Unicorn AppImage Installer Configuration
+# This file contains settings for the my-unicorn AppImage installer.
+# You can modify these values to customize the behavior of the application.
+#
+# Last updated: {timestamp}
+# Configuration version: {CONFIG_VERSION}
+
+"""
+
+    @staticmethod
+    def get_section_comments() -> dict[str, str]:
+        """Get comments for each configuration section.
+
+        Returns:
+            Dictionary mapping section names to their comment strings
+
+        """
+        return {
+            SECTION_DEFAULT: """# ========================================
+# MAIN CONFIGURATION
+# ========================================
+# These settings control the overall behavior of my-unicorn.
+#
+# config_version: Version of configuration format (DO NOT EDIT)
+# max_concurrent_downloads: Max simultaneous downloads (1-10)
+# max_backup: Number of backup copies to keep when updating apps (0-5)
+# batch_mode: Enable non-interactive mode (true/false)
+# locale: Language setting (en_US, es_ES, fr_FR, etc.)
+# log_level: Detail level for log files (DEBUG, INFO, WARNING, ERROR)
+# console_log_level: Console output detail level (DEBUG, INFO, etc.)
+
+""",
+            SECTION_NETWORK: """
+# ========================================
+# NETWORK CONFIGURATION
+# ========================================
+# Settings for downloading AppImages and accessing repositories.
+#
+# retry_attempts: Number of times to retry failed downloads (1-10)
+# timeout_seconds: Seconds to wait before timing out requests (5-60)
+
+""",
+            SECTION_DIRECTORY: """
+# ========================================
+# DIRECTORY PATHS
+# ========================================
+# Customize where my-unicorn stores files and directories.
+# Use absolute paths or paths starting with ~ for home directory.
+#
+# repo: Source code repository for my-unicorn cli (e.g git cloned repo)
+# package: Installation directory for my-unicorn itself (only necessary code files)
+# download: Temporary download location for AppImages
+# storage: Where installed AppImages are stored
+# backup: Backup location for old AppImage versions
+# icon: Directory for application icons
+# settings: Configuration and settings directory
+# logs: Log files location
+# cache: Temporary cache directory
+# tmp: Temporary files directory
+
+""",
+        }
+
+    @staticmethod
+    def get_key_comments() -> dict[str, dict[str, str]]:
+        """Get inline comments for specific configuration keys.
+
+        Returns:
+            Nested dictionary mapping section -> key -> comment
+
+        """
+        return {
+            SECTION_DEFAULT: {
+                KEY_CONFIG_VERSION: "# DO NOT MODIFY - Config format version",
+            },
+            SECTION_NETWORK: {},
+            SECTION_DIRECTORY: {},
+        }
 
 
 class NetworkConfig(TypedDict):
@@ -53,6 +181,7 @@ class GlobalConfig(TypedDict):
     batch_mode: bool
     locale: str
     log_level: str
+    console_log_level: str
     network: NetworkConfig
     directory: DirectoryConfig
 
@@ -132,15 +261,21 @@ class DirectoryManager:
         """Initialize directory manager.
 
         Args:
-            config_dir: Optional custom config directory. Defaults to ~/.config/my-unicorn/
-            catalog_dir: Optional custom catalog directory. Defaults to bundled catalog.
+            config_dir: Optional custom config directory. Defaults to
+                ~/.config/my-unicorn/
+            catalog_dir: Optional custom catalog directory. Defaults to
+                bundled catalog.
 
         """
-        self._config_dir: Path = config_dir or Path.home() / ".config" / "my-unicorn"
-        self._settings_file: Path = self._config_dir / "settings.conf"
-        self._apps_dir: Path = self._config_dir / "apps"
+        self._config_dir: Path = (
+            config_dir or Path.home() / CONFIG_DIR_NAME / DEFAULT_CONFIG_SUBDIR
+        )
+        self._settings_file: Path = self._config_dir / CONFIG_FILE_NAME
+        self._apps_dir: Path = self._config_dir / DEFAULT_APPS_DIR_NAME
         # Use provided catalog directory or bundled catalog directory
-        self._catalog_dir: Path = catalog_dir or Path(__file__).parent / "catalog"
+        self._catalog_dir: Path = (
+            catalog_dir or Path(__file__).parent / "catalog"
+        )
 
     @property
     def config_dir(self) -> Path:
@@ -195,7 +330,9 @@ class DirectoryManager:
             )
 
         if not self._catalog_dir.is_dir():
-            raise NotADirectoryError(f"Catalog path is not a directory: {self._catalog_dir}")
+            raise NotADirectoryError(
+                f"Catalog path is not a directory: {self._catalog_dir}"
+            )
 
         # Check if catalog has any JSON files
         catalog_files = list(self._catalog_dir.glob("*.json"))
@@ -228,6 +365,10 @@ class GlobalConfigManager:
 
         """
         self.directory_manager = directory_manager
+        # Import migration module here to avoid circular imports
+        from my_unicorn.config_migration import ConfigMigration
+
+        self.migration = ConfigMigration(directory_manager)
 
     def get_default_global_config(self) -> dict[str, str | dict[str, str]]:
         """Get default global configuration values.
@@ -238,14 +379,17 @@ class GlobalConfigManager:
         """
         home = Path.home()
         return {
-            "config_version": DEFAULT_CONFIG_VERSION,
-            "max_concurrent_downloads": "5",
-            "max_backup": "1",
-            "batch_mode": "true",
-            "locale": "en_US",
-            "log_level": "INFO",
-            "network": {"retry_attempts": "3", "timeout_seconds": "10"},
-            "directory": {
+            KEY_CONFIG_VERSION: CONFIG_VERSION,
+            KEY_MAX_CONCURRENT_DOWNLOADS: str(
+                DEFAULT_MAX_CONCURRENT_DOWNLOADS
+            ),
+            KEY_MAX_BACKUP: str(DEFAULT_MAX_BACKUP),
+            KEY_BATCH_MODE: str(DEFAULT_BATCH_MODE).lower(),
+            KEY_LOCALE: DEFAULT_LOCALE,
+            KEY_LOG_LEVEL: DEFAULT_LOG_LEVEL,
+            KEY_CONSOLE_LOG_LEVEL: DEFAULT_CONSOLE_LOG_LEVEL,
+            SECTION_NETWORK: {"retry_attempts": "3", "timeout_seconds": "10"},
+            SECTION_DIRECTORY: {
                 "repo": str(home / ".local" / "share" / "my-unicorn-repo"),
                 "package": str(home / ".local" / "share" / "my-unicorn"),
                 "download": str(home / "Downloads"),
@@ -266,68 +410,153 @@ class GlobalConfigManager:
             Loaded global configuration
 
         """
-        config = configparser.ConfigParser()
-
-        # Set defaults
         defaults = self.get_default_global_config()
-        # Convert nested dicts to flat structure for configparser
-        flat_defaults = {}
-        for key, value in defaults.items():
-            if isinstance(value, dict):
-                # Skip nested dicts for configparser defaults
-                continue
-            flat_defaults[key] = str(value)
-        config.read_dict({"DEFAULT": flat_defaults})
-
-        # Add sections for nested configs
-        for key, value in defaults.items():
-            if isinstance(value, dict):
-                config.add_section(key)
-                for subkey, subvalue in value.items():
-                    config.set(key, subkey, str(subvalue))
 
         # Read user config if it exists
         if self.directory_manager.settings_file.exists():
+            # Create a config parser with only user settings first
+            user_config = CommentAwareConfigParser()
+            user_config.read(self.directory_manager.settings_file)
+
+            # Perform migration if needed (no circular import)
+            if not self.migration.migrate_if_needed(user_config, defaults):
+                # Migration failed, fall back to defaults
+                print(
+                    "Configuration migration failed, using default settings."
+                )
+                self.save_global_config(
+                    self._convert_to_global_config(defaults)
+                )
+                # Re-read after saving defaults
+                user_config.clear()
+                user_config.read(self.directory_manager.settings_file)
+
+            # Now set up config with defaults and user values
+            config = CommentAwareConfigParser()
+
+            # Set defaults
+            flat_defaults = {}
+            for key, value in defaults.items():
+                if isinstance(value, dict):
+                    # Skip nested dicts for configparser defaults
+                    continue
+                flat_defaults[key] = str(value)
+            config.read_dict({SECTION_DEFAULT: flat_defaults})
+
+            # Add sections for nested configs
+            for key, value in defaults.items():
+                if isinstance(value, dict):
+                    config.add_section(key)
+                    for subkey, subvalue in value.items():
+                        config.set(key, subkey, str(subvalue))
+
+            # Override with user settings
             config.read(self.directory_manager.settings_file)
         else:
-            # Create default config file
+            # Create default config file and set up config
             self.save_global_config(self._convert_to_global_config(defaults))
+
+            config = CommentAwareConfigParser()
+            # Convert nested dicts to flat structure for configparser
+            flat_defaults = {}
+            for key, value in defaults.items():
+                if isinstance(value, dict):
+                    # Skip nested dicts for configparser defaults
+                    continue
+                flat_defaults[key] = str(value)
+            config.read_dict({SECTION_DEFAULT: flat_defaults})
+
+            # Add sections for nested configs
+            for key, value in defaults.items():
+                if isinstance(value, dict):
+                    config.add_section(key)
+                    for subkey, subvalue in value.items():
+                        config.set(key, subkey, str(subvalue))
+
+        # After config loading, replay migration messages to logger
+        self.migration.replay_messages_to_logger()
 
         return self._convert_to_global_config(config)
 
     def save_global_config(self, config: GlobalConfig) -> None:
-        """Save global configuration to INI file.
+        """Save global configuration to INI file with user-friendly comments.
 
         Args:
             config: Global configuration to save
 
         """
-        parser = configparser.ConfigParser()
+        comment_manager = ConfigCommentManager()
 
-        # Main section
-        parser["DEFAULT"] = {
-            "config_version": config["config_version"],
-            "max_concurrent_downloads": str(config["max_concurrent_downloads"]),
-            "max_backup": str(config["max_backup"]),
-            "batch_mode": str(config["batch_mode"]).lower(),
-            "locale": config["locale"],
-            "log_level": config["log_level"],
-        }
+        # Build configuration content with comments
+        with open(
+            self.directory_manager.settings_file, "w", encoding="utf-8"
+        ) as f:
+            # Write file header
+            f.write(comment_manager.get_file_header())
 
-        # Network section
-        parser["network"] = {
-            "retry_attempts": str(config["network"]["retry_attempts"]),
-            "timeout_seconds": str(config["network"]["timeout_seconds"]),
-        }
+            # Get section comments and key comments
+            section_comments = comment_manager.get_section_comments()
+            key_comments = comment_manager.get_key_comments()
 
-        # Directory section
-        parser["directory"] = {key: str(path) for key, path in config["directory"].items()}
+            # Write DEFAULT section
+            f.write(section_comments[SECTION_DEFAULT])
+            f.write(f"[{SECTION_DEFAULT}]\n")
+            default_data = {
+                "config_version": config["config_version"],
+                "max_concurrent_downloads": str(
+                    config["max_concurrent_downloads"]
+                ),
+                "max_backup": str(config["max_backup"]),
+                "batch_mode": str(config["batch_mode"]).lower(),
+                "locale": config["locale"],
+                "log_level": config["log_level"],
+                "console_log_level": config["console_log_level"],
+            }
 
-        with open(self.directory_manager.settings_file, "w", encoding="utf-8") as f:
-            parser.write(f)
+            for key, value in default_data.items():
+                inline_comment = key_comments[SECTION_DEFAULT].get(key, "")
+                if inline_comment:
+                    f.write(f"{key} = {value}  {inline_comment}\n")
+                else:
+                    f.write(f"{key} = {value}\n")
+
+            # Write network section
+            f.write(section_comments[SECTION_NETWORK])
+            f.write(f"[{SECTION_NETWORK}]\n")
+            # Cast the top-level config to a plain dict before indexing with
+            # SECTION_* constants. Type checkers require string literals when
+            # interacting with TypedDicts directly.
+            network_section = cast(dict, config)[SECTION_NETWORK]
+            network_data: dict[str, str] = {
+                "retry_attempts": str(network_section["retry_attempts"]),
+                "timeout_seconds": str(network_section["timeout_seconds"]),
+            }
+
+            for key, value in network_data.items():
+                inline_comment = key_comments[SECTION_NETWORK].get(key, "")
+                if inline_comment:
+                    f.write(f"{key} = {value}  {inline_comment}\n")
+                else:
+                    f.write(f"{key} = {value}\n")
+
+            # Write directory section
+            f.write(section_comments[SECTION_DIRECTORY])
+            f.write(f"[{SECTION_DIRECTORY}]\n")
+            directory_data: dict[str, str] = {
+                key: str(path)
+                for key, path in cast(dict, config)[SECTION_DIRECTORY].items()
+            }
+
+            for key, value in directory_data.items():
+                inline_comment = key_comments[SECTION_DIRECTORY].get(key, "")
+                if inline_comment:
+                    f.write(f"{key} = {value}  {inline_comment}\n")
+                else:
+                    f.write(f"{key} = {value}\n")
 
     def _convert_to_global_config(
-        self, config: configparser.ConfigParser | dict[str, str | dict[str, str]]
+        self,
+        config: configparser.ConfigParser | dict[str, str | dict[str, str]],
     ) -> GlobalConfig:
         """Convert configparser or dict to typed GlobalConfig.
 
@@ -345,56 +574,68 @@ class GlobalConfigManager:
             for section_name in config.sections():
                 section_dict = {}
                 for key in config.options(section_name):
-                    # Only get keys that are explicitly in this section, not from DEFAULT
-                    if config.has_option(section_name, key) and not config.has_option(
-                        "DEFAULT", key
-                    ):
+                    # Only get keys that are explicitly in this section,
+                    # not from DEFAULT
+                    if config.has_option(
+                        section_name, key
+                    ) and not config.has_option(SECTION_DEFAULT, key):
                         section_dict[key] = config.get(section_name, key)
                 config_dict[section_name] = section_dict
 
             # Add DEFAULT section items separately
-            for key, value in config.defaults().items():
-                config_dict[key] = value
+            for key, raw_value in config.defaults().items():
+                # Strip inline comments from default values too
+                if isinstance(raw_value, str) and "  #" in raw_value:
+                    cleaned_value = raw_value.split("  #")[0].strip()
+                else:
+                    cleaned_value = raw_value
+                config_dict[key] = cleaned_value
         else:
             config_dict = config
+
+        # Helper to strip comments from config values
+        def strip_comments(value):
+            """Strip inline comments from config values."""
+            if isinstance(value, str) and "  #" in value:
+                return value.split("  #")[0].strip()
+            return value
 
         # Helper function to safely get scalar config values
         def get_scalar_config(key: str, default: str | int) -> str | int:
             """Get a scalar config value, ensuring it's not a dict."""
             value = config_dict.get(key, default)
             if isinstance(value, dict):
-                # This shouldn't happen for scalar values, but use default if it does
+                # This shouldn't happen for scalar values, use default
                 return default
-            return value
+            # Strip comments from the value
+            cleaned_value = strip_comments(value)
+            return cleaned_value if cleaned_value is not None else default
 
         # Convert directory paths (only from explicit directory section)
         directory_config: dict[str, Path] = {}
-        directory_dict = config_dict.get("directory", {})
+        directory_dict = config_dict.get(SECTION_DIRECTORY, {})
         if isinstance(directory_dict, dict):
             # Only process known directory keys to avoid config values
-            known_dir_keys = {
-                "repo",
-                "package",
-                "download",
-                "storage",
-                "backup",
-                "icon",
-                "settings",
-                "logs",
-                "cache",
-                "tmp",
-            }
+            known_dir_keys = set(DIRECTORY_KEYS)
             for key, value in directory_dict.items():
                 if isinstance(value, str) and key in known_dir_keys:
-                    directory_config[key] = self.directory_manager.expand_path(value)
+                    cleaned_path = strip_comments(value)
+                    directory_config[key] = self.directory_manager.expand_path(
+                        cleaned_path
+                    )
 
         # Get network config
-        network_dict = config_dict.get("network", {})
+        network_dict = config_dict.get(SECTION_NETWORK, {})
+
         network_config = NetworkConfig(
-            retry_attempts=int(network_dict.get("retry_attempts", 3))
+            retry_attempts=int(
+                strip_comments(network_dict.get("retry_attempts", 3))
+            )
             if isinstance(network_dict, dict)
             else 3,
-            timeout_seconds=int(network_dict.get("timeout_seconds", 10))
+            timeout_seconds=int(
+                strip_comments(network_dict.get("timeout_seconds", 10))
+            )
             if isinstance(network_dict, dict)
             else 10,
         )
@@ -402,36 +643,58 @@ class GlobalConfigManager:
         # Get batch mode value
         batch_mode_str = get_scalar_config("batch_mode", "true")
         batch_mode = (
-            batch_mode_str.lower() == "true" if isinstance(batch_mode_str, str) else True
+            batch_mode_str.lower() == "true"
+            if isinstance(batch_mode_str, str)
+            else True
         )
 
         return GlobalConfig(
-            config_version=str(get_scalar_config("config_version", DEFAULT_CONFIG_VERSION)),
-            max_concurrent_downloads=int(get_scalar_config("max_concurrent_downloads", 5)),
+            config_version=str(
+                get_scalar_config("config_version", CONFIG_VERSION)
+            ),
+            max_concurrent_downloads=int(
+                get_scalar_config("max_concurrent_downloads", 5)
+            ),
             max_backup=int(get_scalar_config("max_backup", 1)),
             batch_mode=batch_mode,
             locale=str(get_scalar_config("locale", "en_US")),
             log_level=str(get_scalar_config("log_level", "INFO")),
+            console_log_level=str(
+                get_scalar_config("console_log_level", "WARNING")
+            ),
             network=network_config,
             directory=DirectoryConfig(
                 repo=directory_config.get(
-                    "repo", Path.home() / ".local" / "share" / "my-unicorn-repo"
+                    "repo",
+                    Path.home() / ".local" / "share" / "my-unicorn-repo",
                 ),
                 package=directory_config.get(
                     "package", Path.home() / ".local" / "share" / "my-unicorn"
                 ),
-                download=directory_config.get("download", Path.home() / "Downloads"),
-                storage=directory_config.get("storage", Path.home() / "Applications"),
+                download=directory_config.get(
+                    "download", Path.home() / "Downloads"
+                ),
+                storage=directory_config.get(
+                    "storage", Path.home() / "Applications"
+                ),
                 backup=directory_config.get(
                     "backup", Path.home() / "Applications" / "backups"
                 ),
-                icon=directory_config.get("icon", Path.home() / "Applications" / "icons"),
-                settings=directory_config.get("settings", self.directory_manager.config_dir),
-                logs=directory_config.get("logs", self.directory_manager.config_dir / "logs"),
+                icon=directory_config.get(
+                    "icon", Path.home() / "Applications" / "icons"
+                ),
+                settings=directory_config.get(
+                    "settings", self.directory_manager.config_dir
+                ),
+                logs=directory_config.get(
+                    "logs", self.directory_manager.config_dir / "logs"
+                ),
                 cache=directory_config.get(
                     "cache", self.directory_manager.config_dir / "cache"
                 ),
-                tmp=directory_config.get("tmp", self.directory_manager.config_dir / "tmp"),
+                tmp=directory_config.get(
+                    "tmp", self.directory_manager.config_dir / "tmp"
+                ),
             ),
         )
 
@@ -473,7 +736,9 @@ class AppConfigManager:
             config_data = self._migrate_app_config(config_data)
             return cast(AppConfig, config_data)
         except (Exception, OSError) as e:
-            raise ValueError(f"Failed to load app config for {app_name}: {e}") from e
+            raise ValueError(
+                f"Failed to load app config for {app_name}: {e}"
+            ) from e
 
     def save_app_config(self, app_name: str, config: AppConfig) -> None:
         """Save app-specific configuration.
@@ -492,7 +757,9 @@ class AppConfigManager:
             with open(app_file, "wb") as f:
                 f.write(orjson.dumps(config, option=orjson.OPT_INDENT_2))
         except OSError as e:
-            raise ValueError(f"Failed to save app config for {app_name}: {e}") from e
+            raise ValueError(
+                f"Failed to save app config for {app_name}: {e}"
+            ) from e
 
     def list_installed_apps(self) -> list[str]:
         """Get list of installed apps.
@@ -504,7 +771,11 @@ class AppConfigManager:
         if not self.directory_manager.apps_dir.exists():
             return []
 
-        return [f.stem for f in self.directory_manager.apps_dir.glob("*.json") if f.is_file()]
+        return [
+            f.stem
+            for f in self.directory_manager.apps_dir.glob("*.json")
+            if f.is_file()
+        ]
 
     def remove_app_config(self, app_name: str) -> bool:
         """Remove app configuration file.
@@ -573,7 +844,9 @@ class CatalogManager:
             with open(catalog_file, "rb") as f:
                 return cast(CatalogEntry, orjson.loads(f.read()))
         except (Exception, OSError) as e:
-            raise ValueError(f"Failed to load catalog entry for {app_name}: {e}") from e
+            raise ValueError(
+                f"Failed to load catalog entry for {app_name}: {e}"
+            ) from e
 
     def list_catalog_apps(self) -> list[str]:
         """Get list of available apps in bundled catalog.
@@ -587,14 +860,14 @@ class CatalogManager:
             return []
 
         return [
-            f.stem for f in self.directory_manager.catalog_dir.glob("*.json") if f.is_file()
+            f.stem
+            for f in self.directory_manager.catalog_dir.glob("*.json")
+            if f.is_file()
         ]
 
 
 class ConfigManager:
     """Facade that coordinates all configuration managers."""
-
-    DEFAULT_CONFIG_VERSION: str = DEFAULT_CONFIG_VERSION  # Maintain backward compatibility
 
     def __init__(
         self, config_dir: Path | None = None, catalog_dir: Path | None = None
@@ -607,7 +880,9 @@ class ConfigManager:
 
         """
         self.directory_manager = DirectoryManager(config_dir, catalog_dir)
-        self.global_config_manager = GlobalConfigManager(self.directory_manager)
+        self.global_config_manager = GlobalConfigManager(
+            self.directory_manager
+        )
         self.app_config_manager = AppConfigManager(self.directory_manager)
         self.catalog_manager = CatalogManager(self.directory_manager)
 

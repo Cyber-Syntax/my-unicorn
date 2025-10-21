@@ -17,6 +17,20 @@ from pathlib import Path
 from typing import Any
 
 from .config import ConfigManager
+from .constants import (
+    DESKTOP_BROWSER_CATEGORIES,
+    DESKTOP_BROWSER_EXEC_PARAM,
+    DESKTOP_BROWSER_KEYWORDS,
+    DESKTOP_BROWSER_MIME_TYPES,
+    DESKTOP_BROWSER_NAMES,
+    DESKTOP_DEFAULT_CATEGORIES,
+    DESKTOP_FILE_TYPE,
+    DESKTOP_FILE_VERSION,
+    DESKTOP_ICON_EXTENSIONS,
+    DESKTOP_SECTION_HEADER,
+    DESKTOP_SYSTEM_APPLICATION_DIRS,
+    DESKTOP_USER_APPLICATIONS_SUBPATH,
+)
 from .logger import get_logger
 from .utils import create_desktop_entry_name, sanitize_filename
 
@@ -59,16 +73,12 @@ class DesktopEntry:
         dirs = []
 
         # User-specific directory (highest priority)
-        user_dir = Path.home() / ".local" / "share" / "applications"
+        user_dir = Path.home().joinpath(*DESKTOP_USER_APPLICATIONS_SUBPATH)
         dirs.append(user_dir)
 
         # System directories (lower priority)
-        system_dirs = [
-            Path("/usr/local/share/applications"),
-            Path("/usr/share/applications"),
-        ]
-
-        for dir_path in system_dirs:
+        for dirpath in DESKTOP_SYSTEM_APPLICATION_DIRS:
+            dir_path = Path(dirpath)
             if dir_path.exists():
                 dirs.append(dir_path)
 
@@ -117,13 +127,17 @@ class DesktopEntry:
         is_browser = self._is_browser_app()
 
         if categories is None:
-            categories = ["Network", "WebBrowser"] if is_browser else ["Utility"]
+            categories = (
+                list(DESKTOP_BROWSER_CATEGORIES)
+                if is_browser
+                else list(DESKTOP_DEFAULT_CATEGORIES)
+            )
 
         if mime_types is None:
-            mime_types = self._get_browser_mime_types() if is_browser else []
+            mime_types = list(DESKTOP_BROWSER_MIME_TYPES) if is_browser else []
 
         if keywords is None:
-            keywords = ["web", "browser", "internet"] if is_browser else []
+            keywords = list(DESKTOP_BROWSER_KEYWORDS) if is_browser else []
 
         # Sanitize values and use proper paths
         # For browsers, keep the original name format; for others, format as title
@@ -131,7 +145,10 @@ class DesktopEntry:
             display_name = self.app_name
         else:
             display_name = (
-                sanitize_filename(self.app_name).replace("-", " ").replace("_", " ").title()
+                sanitize_filename(self.app_name)
+                .replace("-", " ")
+                .replace("_", " ")
+                .title()
             )
         comment = comment or f"{display_name} AppImage Application"
 
@@ -139,7 +156,7 @@ class DesktopEntry:
         # Add %u parameter for browsers to handle URLs
         exec_path = str(self.appimage_path.resolve())
         if is_browser:
-            exec_path += " %u"
+            exec_path += f" {DESKTOP_BROWSER_EXEC_PARAM}"
 
         # Determine icon path - prefer provided icon_path, fallback to configured icon directory
         if self.icon_path and self.icon_path.exists():
@@ -147,7 +164,7 @@ class DesktopEntry:
         else:
             # Try to find icon in configured icon directory
             icon_dir = self.global_config["directory"]["icon"]
-            potential_icon_extensions = [".png", ".svg", ".ico", ".xpm"]
+            potential_icon_extensions = list(DESKTOP_ICON_EXTENSIONS)
             icon_value = display_name.lower()  # fallback to name
 
             for ext in potential_icon_extensions:
@@ -158,13 +175,13 @@ class DesktopEntry:
 
         # Build desktop file content
         content_lines = [
-            "[Desktop Entry]",
-            "Version=1.0",
+            DESKTOP_SECTION_HEADER,
+            f"Version={DESKTOP_FILE_VERSION}",
             f"Name={display_name}",
             f"Comment={comment}",
             f"Exec={exec_path}",
             f"Icon={icon_value}",
-            "Type=Application",
+            f"Type={DESKTOP_FILE_TYPE}",
             f"Categories={';'.join(categories)};",
         ]
 
@@ -243,14 +260,19 @@ class DesktopEntry:
                     existing_content = f.read()
 
                 # Compare key fields that matter for functionality
-                needs_update = self._should_update_desktop_file(existing_content, new_content)
+                needs_update = self._should_update_desktop_file(
+                    existing_content, new_content
+                )
 
                 if needs_update:
                     logger.debug(
                         f"Desktop file content changed, updating: {desktop_file_path}"
                     )
                 else:
-                    logger.debug("Desktop file unchanged, skipping: %s", desktop_file_path)
+                    logger.debug(
+                        "Desktop file unchanged, skipping: %s",
+                        desktop_file_path,
+                    )
                     return desktop_file_path
             except OSError:
                 # If we can't read the existing file, create a new one
@@ -266,14 +288,19 @@ class DesktopEntry:
                 os.chmod(desktop_file_path, 0o755)
 
                 if desktop_file_path.exists():
-                    logger.info("🖥️  Updated desktop entry: %s", desktop_file_path.name)
+                    logger.info(
+                        "🖥️  Updated desktop entry: %s", desktop_file_path.name
+                    )
                 else:
-                    logger.info("🖥️  Created desktop entry: %s", desktop_file_path.name)
+                    logger.info(
+                        "🖥️  Created desktop entry: %s", desktop_file_path.name
+                    )
                 return desktop_file_path
 
             except OSError as e:
                 logger.error(
-                    f"Failed to write desktop file {desktop_file_path}: {e}", exc_info=True
+                    f"Failed to write desktop file {desktop_file_path}: {e}",
+                    exc_info=True,
                 )
                 raise
         else:
@@ -303,7 +330,9 @@ class DesktopEntry:
         """
         existing_file = self.find_existing_desktop_file()
         if not existing_file:
-            logger.warning("No existing desktop file found for %s", self.app_name)
+            logger.warning(
+                "No existing desktop file found for %s", self.app_name
+            )
             return None
 
         # Update by recreating the file
@@ -324,7 +353,10 @@ class DesktopEntry:
 
         except OSError as e:
             logger.error(
-                "Failed to update desktop file %s: %s", existing_file, e, exc_info=True
+                "Failed to update desktop file %s: %s",
+                existing_file,
+                e,
+                exc_info=True,
             )
             return None
 
@@ -346,7 +378,10 @@ class DesktopEntry:
             return True
         except OSError as e:
             logger.error(
-                "Failed to remove desktop file %s: %s", existing_file, e, exc_info=True
+                "Failed to remove desktop file %s: %s",
+                existing_file,
+                e,
+                exc_info=True,
             )
             return False
 
@@ -357,23 +392,10 @@ class DesktopEntry:
             True if the app is detected as a browser
 
         """
-        browser_names = [
-            "zen-browser",
-            "firefox",
-            "chrome",
-            "chromium",
-            "brave",
-            "vivaldi",
-            "opera",
-            "edge",
-            "safari",
-            "tor-browser",
-            "librewolf",
-            "waterfox",
-        ]
-
         app_name_lower = self.app_name.lower()
-        return any(browser in app_name_lower for browser in browser_names)
+        return any(
+            browser in app_name_lower for browser in DESKTOP_BROWSER_NAMES
+        )
 
     def _get_browser_mime_types(self) -> list[str]:
         """Get standard browser MIME types for web browsers.
@@ -400,7 +422,9 @@ class DesktopEntry:
             "application/x-xpinstall",
         ]
 
-    def _should_update_desktop_file(self, existing_content: str, new_content: str) -> bool:
+    def _should_update_desktop_file(
+        self, existing_content: str, new_content: str
+    ) -> bool:
         """Check if desktop file should be updated by comparing key fields.
 
         Args:
@@ -497,7 +521,9 @@ class DesktopEntry:
                 if line.startswith("Exec="):
                     exec_path = line.split("=", 1)[1].strip()
                     if not Path(exec_path).exists():
-                        errors.append(f"AppImage file does not exist: {exec_path}")
+                        errors.append(
+                            f"AppImage file does not exist: {exec_path}"
+                        )
 
         except OSError as e:
             errors.append(f"Failed to read desktop file: {e}")
@@ -559,8 +585,12 @@ def create_desktop_entry_for_app(
         Path to desktop file (existing, newly created, or updated)
 
     """
-    desktop_entry = DesktopEntry(app_name, appimage_path, icon_path, config_manager)
-    return desktop_entry.create_desktop_file(comment=comment, categories=categories, **kwargs)
+    desktop_entry = DesktopEntry(
+        app_name, appimage_path, icon_path, config_manager
+    )
+    return desktop_entry.create_desktop_file(
+        comment=comment, categories=categories, **kwargs
+    )
 
 
 def remove_desktop_entry_for_app(
@@ -578,5 +608,7 @@ def remove_desktop_entry_for_app(
     """
     # Create a dummy DesktopEntry to use the removal logic
     dummy_path = Path("/dev/null")
-    desktop_entry = DesktopEntry(app_name, dummy_path, config_manager=config_manager)
+    desktop_entry = DesktopEntry(
+        app_name, dummy_path, config_manager=config_manager
+    )
     return desktop_entry.remove_desktop_file()

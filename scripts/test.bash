@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Comprehensive Manual Testing Script for my-unicorn
+# Manual test script for my-unicorn
+# REQUIRES: jq, python3
+# USAGE: ./scripts/test.bash [--quick|--comprehensive|--help]
 #
 # This script provides a comprehensive CLI testing framework for my-unicorn,
 # combining URL installs, catalog installs, updates, and all core functionality.
@@ -20,6 +22,14 @@ readonly LOG_FILE="$HOME/.config/my-unicorn/logs/comprehensive_test.log"
 
 # Test configuration
 readonly TEST_VERSION="0.1.0"
+
+# ======== Dependency Check ========
+
+check_deps() {
+    command -v jq >/dev/null || { echo "ERROR: jq not found. Install: sudo apt install jq"; exit 1; }
+    command -v python3 >/dev/null || { echo "ERROR: python3 not found"; exit 1; }
+}
+check_deps
 
 # ======== Utility Functions ========
 
@@ -55,7 +65,7 @@ error() {
 confirm() {
     local prompt="$1"
     local answer
-    read -p "$prompt [Y/n]: " answer
+    read -r -p "$prompt [Y/n]: " answer
     answer="${answer:-y}"
     [[ "${answer:0:1}" =~ [yY] ]]
 }
@@ -82,12 +92,25 @@ cleanup_test_environment() {
     fi
 }
 
+# ======== Version Manipulation ========
+
+set_version() {
+    local app="$1" version="$2"
+    local config_file="$CONFIG_DIR/${app}.json"
+    
+    [[ -f "$config_file" ]] || { error "Config not found: $config_file"; return 1; }
+    
+    info "Setting $app version to $version (for update test)"
+    jq --arg v "$version" '.appimage.version = $v' "$config_file" > "$config_file.tmp" \
+        && mv "$config_file.tmp" "$config_file"
+}
+
 # ======== Backup and Restore Functions ========
 
 backup_app_configs() {
     info "Backing up existing app configurations"
 
-    local apps=("keepassxc" "legcord""zettlr")
+    local apps=("keepassxc" "legcord" "zettlr")
 
     for app in "${apps[@]}"; do
         if [[ -f "$CONFIG_DIR/$app.json" ]]; then
@@ -110,585 +133,88 @@ restore_app_configs() {
     done
 }
 
-# ======== App Configuration Setup Functions ========
-
-# Use Checksum_file + Digest 
-setup_tagspaces_config() {
-    local version="${1:-$TEST_VERSION}"
-    info "Setting up tagspaces test config with version $version"
-
-    cat >"$CONFIG_DIR/tagspaces.json" <<EOF
-{
-  "config_version": "1.0.0",
-  "source": "catalog",
-  "owner": "tagspaces",
-  "repo": "tagspaces",
-  "appimage": {
-    "rename": "tagspaces",
-    "name_template": "{repo}-{latest_version}-{characteristic_suffix}.AppImage",
-    "characteristic_suffix": [
-      "linux-x86_64",
-      "x86_64",
-      "amd64"
-    ],
-    "version": "$version",
-    "name": "tagspaces.AppImage",
-    "installed_date": "$(date --iso-8601=seconds)",
-    "digest": ""
-  },
-  "github": {
-    "repo": true,
-    "prerelease": false
-  },
-  "verification": {
-    "digest": false,
-    "skip": false,
-    "checksum_file": "SHA256SUMS.txt",
-    "checksum_hash_type": "sha256"
-  },
-  "icon": {
-    "extraction": true,
-    "url": null,
-    "name": "tagspaces.png",
-    "source": "extraction",
-    "installed": true,
-    "path": "/home/developer/Applications/icons/tagspaces.png"
-  }
-}
-EOF
-}
-
-# Digest test
-setup_qownnotes_config() {
-    local version="${1:-$TEST_VERSION}"
-    info "Setting up qownnotes test config with version $version"
-
-    cat >"$CONFIG_DIR/qownnotes.json" <<EOF
-{
-    "config_version": "1.0.0",
-    "source": "catalog",
-    "owner": "pbek",
-    "repo": "QOwnNotes",
-    "appimage": {
-        "rename": "qownnotes",
-        "name_template": "{repo}-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": [
-            "x86_64.AppImage",
-            "x86_64-Qt6.AppImage"
-        ],
-        "version": "$version",
-        "name": "qownnotes.AppImage",
-        "installed_date": "$(date --iso-8601=seconds)",
-        "digest": ""
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "https://raw.githubusercontent.com/pbek/QOwnNotes/develop/icons/icon.png",
-        "name": "qownnotes.png",
-        "source": "extraction",
-        "installed": true,
-        "path": "/home/developer/Applications/icons/qownnotes.png"
-    }
-}
-EOF
-}
-
-# URL test + digest
-setup_nuclear_config() {
-    local version="${1:-$TEST_VERSION}"
-    info "Setting up nuclear test config with version $version"
-
-    cat >"$CONFIG_DIR/nuclear.json" <<EOF
-{
-    "config_version": "1.0.0",
-    "source": "url",
-    "owner": "nukeop",
-    "repo": "nuclear",
-    "appimage": {
-        "rename": "nuclear",
-        "name_template": "",
-        "characteristic_suffix": [],
-        "version": "$version",
-        "name": "nuclear.AppImage",
-        "installed_date": "$(date --iso-8601=seconds)",
-        "digest": ""
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": null,
-        "name": "nuclear.png",
-        "source": "extraction",
-        "installed": true,
-        "path": "/home/developer/Applications/icons/nuclear.png"
-    },
-    "url_metadata": {
-        "target_url": "https://github.com/nukeop/nuclear"
-    }
-}
-EOF
-}
-
-# URL test + checksum_file test via x.AppImage.DIGEST file
-setup_keepassxc_config() {
-    local version="${1:-$TEST_VERSION}"
-    info "Setting up keepassxc test config with version $version"
-
-    cat >"$CONFIG_DIR/keepassxc.json" <<EOF
-{
-    "config_version": "1.0.0",
-    "source": "url",
-    "owner": "keepassxreboot",
-    "repo": "keepassxc",
-    "appimage": {
-        "rename": "keepassxc",
-        "name_template": "",
-        "characteristic_suffix": [],
-        "version": "$version",
-        "name": "keepassxc.AppImage",
-        "installed_date": "$(date --iso-8601=seconds)",
-        "digest": ""
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": null,
-        "name": "keepassxc.png",
-        "source": "extraction",
-        "installed": true,
-        "path": "/home/developer/Applications/icons/keepassxc.png"
-    },
-    "url_metadata": {
-        "target_url": "https://github.com/keepassxreboot/keepassxc"
-    }
-}
-EOF
-}
-
-# Catalog + Digest
-setup_appflowy_config() {
-    local version="${1:-$TEST_VERSION}"
-    info "Setting up appflowy test config with version $version"
-
-    cat >"$CONFIG_DIR/appflowy.json" <<EOF
-{
-    "config_version": "1.0.0",
-    "source": "catalog",
-    "owner": "appflowy-io",
-    "repo": "appflowy",
-    "appimage": {
-        "rename": "appflowy",
-        "name_template": "{repo}-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": [
-            "linux-x86_64.AppImage"
-        ],
-        "version": "$version",
-        "name": "appflowy.AppImage",
-        "installed_date": "$(date --iso-8601=seconds)",
-        "digest": ""
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": null,
-        "name": "appflowy.png",
-        "source": "extraction",
-        "installed": true,
-        "path": "/home/developer/Applications/icons/appflowy.png"
-    }
-}
-EOF
-}
-
-# Checksumfile
-setup_legcord_config() {
-    local version="${1:-$TEST_VERSION}"
-    info "Setting up legcord test config with version $version"
-
-    cat >"$CONFIG_DIR/legcord.json" <<EOF
-{
-    "config_version": "1.0.0",
-    "source": "catalog",
-    "owner": "legcord",
-    "repo": "legcord",
-    "appimage": {
-        "rename": "legcord",
-        "name_template": "{repo}-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": [
-            ".AppImage"
-        ],
-        "version": "$version",
-        "name": "legcord.AppImage",
-        "installed_date": "$(date --iso-8601=seconds)",
-        "digest": ""
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": false,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": null,
-        "name": "legcord.png",
-        "source": "extraction",
-        "installed": true,
-        "path": "/home/developer/Applications/icons/legcord.png"
-    }
-}
-EOF
-}
-
-# Digest + Checksum_file
-setup_joplin_config() {
-    local version="${1:-$TEST_VERSION}"
-    info "Setting up joplin test config with version $version"
-
-    cat >"$CONFIG_DIR/joplin.json" <<EOF
-{
-    "config_version": "1.0.0",
-    "source": "catalog",
-    "owner": "laurent22",
-    "repo": "joplin",
-    "appimage": {
-        "rename": "joplin",
-        "name_template": "{repo}-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": [
-            ".AppImage"
-        ],
-        "version": "$version",
-        "name": "joplin.AppImage",
-        "installed_date": "$(date --iso-8601=seconds)",
-        "digest": ""
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "latest-linux.yml",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": null,
-        "name": "joplin.png",
-        "source": "extraction",
-        "installed": true,
-        "path": "/home/developer/Applications/icons/joplin.png"
-    }
-}
-EOF
-}
-
-# ======== Version Manipulation Functions ========
-
-set_app_version() {
-    local app_name="$1"
-    local version="$2"
-
-    if [[ ! -f "$CONFIG_DIR/$app_name.json" ]]; then
-        error "Configuration file for $app_name does not exist"
-        return 1
-    fi
-
-    # Use python to update JSON (more reliable than sed for JSON)
-    python3 -c "
-import json
-import sys
-
-try:
-    with open('$CONFIG_DIR/$app_name.json', 'r') as f:
-        config = json.load(f)
-    
-    config['appimage']['version'] = '$version'
-    
-    with open('$CONFIG_DIR/$app_name.json', 'w') as f:
-        json.dump(config, f, indent=4)
-    
-    print('Successfully updated $app_name version to $version')
-except Exception as e:
-    print(f'Error updating $app_name version: {e}', file=sys.stderr)
-    sys.exit(1)
-"
-}
-
-set_multiple_app_versions() {
-    local version="$1"
-    shift
-    local apps=("$@")
-
-    info "Setting version $version for apps: ${apps[*]}"
-
-    for app in "${apps[@]}"; do
-        set_app_version "$app" "$version"
-    done
-}
-
 # ======== qownnotes Specific Tests ========
 
 test_qownnotes_install_url() {
-    info "=== Testing qownnotes URL Install ==="
-
-    # Remove existing config to ensure clean installation
-    cd "$APP_ROOT"
-    if python3 run.py remove qownnotes; then
-        info "Cleanup (qownnotes): SUCCESS"
-    else
-        warn "Cleanup (qownnotes): FAILED or app not installed"
-    fi
-
-    rm -f "$CONFIG_DIR/qownnotes.json"
-    cd "$APP_ROOT"
-
-    if python3 run.py install https://github.com/pbek/QOwnNotes; then
-        info "qownnotes URL install: SUCCESS"
-    else
-        error "qownnotes URL install: FAILED"
-    fi
+    info "Testing qownnotes URL install"
+    python3 run.py remove qownnotes 2>/dev/null || true
+    python3 run.py install https://github.com/pbek/QOwnNotes
 }
 
 test_qownnotes_install_catalog() {
-    info "=== Testing qownnotes Catalog Install ==="
-
-    # Remove existing config to ensure clean installation
-    cd "$APP_ROOT"
-    if python3 run.py remove qownnotes; then
-        info "Cleanup (qownnotes): SUCCESS"
-    else
-        warn "Cleanup (qownnotes): FAILED or app not installed"
-    fi
-
-    rm -f "$CONFIG_DIR/qownnotes.json"
-    cd "$APP_ROOT"
-
-    if python3 run.py install qownnotes; then
-        info "qownnotes catalog install: SUCCESS"
-    else
-        error "qownnotes catalog install: FAILED"
-    fi
+    info "Testing qownnotes catalog install"
+    python3 run.py remove qownnotes 2>/dev/null || true
+    python3 run.py install qownnotes
 }
 
 test_qownnotes_update() {
-    info "=== Testing qownnotes Update ==="
-    setup_qownnotes_config "$TEST_VERSION"
+    info "Testing qownnotes update"
+    set_version "qownnotes" "$TEST_VERSION"
     cd "$APP_ROOT"
-
-    if python3 run.py update qownnotes; then
-        info "qownnotes update: SUCCESS"
-    else
-        error "qownnotes update: FAILED"
-    fi
+    python3 run.py update qownnotes
 }
 
 test_qownnotes_list() {
-    info "=== Testing qownnotes List ==="
+    info "Testing qownnotes list"
     cd "$APP_ROOT"
-
-    if python3 run.py list; then
-        info "qownnotes list: SUCCESS"
-    else
-        error "qownnotes list: FAILED"
-    fi
-}
-
-test_qownnotes_remove() {
-    info "=== Testing qownnotes Remove ==="
-    cd "$APP_ROOT"
-
-    if python3 run.py remove qownnotes; then
-        info "qownnotes remove: SUCCESS"
-    else
-        error "qownnotes remove: FAILED"
-    fi
+    python3 run.py list
 }
 
 test_qownnotes_backup() {
-    info "=== Testing qownnotes Backup ==="
-    setup_qownnotes_config "1.0.0"
+    info "Testing qownnotes backup"
+    set_version "qownnotes" "1.0.0"
     cd "$APP_ROOT"
-
-    if python3 run.py backup qownnotes; then
-        info "qownnotes backup: SUCCESS"
-    else
-        error "qownnotes backup: FAILED"
-    fi
+    python3 run.py backup qownnotes
 }
 
 # ======== URL Tests ========
 
 test_nuclear_url() {
-    info "=== Testing nuclear URL Install ==="
-
-    # Step 1: Remove existing app to ensure clean installation
-    cd "$APP_ROOT"
-    if python3 run.py remove nuclear; then
-        info "Cleanup (nuclear): SUCCESS"
-    else
-        warn "Cleanup (nuclear): FAILED or app not installed"
-    fi
-
-    # Also clean config file manually to be sure
-    rm -f "$CONFIG_DIR/nuclear.json"
-
-    # Step 2: Test URL installation
-    cd "$APP_ROOT"
-    if python3 run.py install https://github.com/nukeop/nuclear; then
-        info "nuclear URL install: SUCCESS"
-    else
-        error "nuclear URL install: FAILED"
-    fi
+    info "Testing nuclear URL install"
+    python3 run.py remove nuclear 2>/dev/null || true
+    python3 run.py install https://github.com/nukeop/nuclear
 }
 
 test_keepassxc_url() {
-    info "=== Testing keepassxc URL Install ==="
-
-    # Step 1: Remove existing app to ensure clean installation
-    cd "$APP_ROOT"
-    if python3 run.py remove keepassxc; then
-        info "Cleanup (keepassxc): SUCCESS"
-    else
-        warn "Cleanup (keepassxc): FAILED or app not installed"
-    fi
-
-    # Also clean config file manually to be sure
-    rm -f "$CONFIG_DIR/keepassxc.json"
-
-    # Step 2: Test URL installation
-    cd "$APP_ROOT"
-    if python3 run.py install https://github.com/keepassxreboot/keepassxc; then
-        info "keepassxc URL install: SUCCESS"
-    else
-        error "keepassxc URL install: FAILED"
-    fi
+    info "Testing keepassxc URL install"
+    python3 run.py remove keepassxc 2>/dev/null || true
+    python3 run.py install https://github.com/keepassxreboot/keepassxc
 }
 
 test_all_urls() {
-    info "=== Testing All URL Installs (Concurrent) ==="
-
-    # Step 1: Remove any existing configs to ensure clean installation
+    info "Testing all URL installs (concurrent)"
     info "Step 1/2: Removing existing configs for clean URL install test"
-    cd "$APP_ROOT"
-    if python3 run.py remove nuclear keepassxc; then
-        info "Cleanup (nuclear + keepassxc): SUCCESS"
-    else
-        warn "Cleanup (nuclear + keepassxc): FAILED or apps not installed"
-    fi
+    python3 run.py remove nuclear keepassxc 2>/dev/null || true
 
-    # Also clean config files manually to be sure
-    rm -f "$CONFIG_DIR/nuclear.json"
-    rm -f "$CONFIG_DIR/keepassxc.json"
-
-    # Step 2: Install both URLs concurrently using Python script's built-in concurrency
     info "Step 2/2: Testing concurrent URL installs (nuclear + keepassxc)"
-    cd "$APP_ROOT"
-    if python3 run.py install https://github.com/nukeop/nuclear https://github.com/keepassxreboot/keepassxc; then
-        info "Concurrent URL installs (nuclear + keepassxc): SUCCESS"
-    else
-        error "Concurrent URL installs (nuclear + keepassxc): FAILED"
-    fi
+    python3 run.py install https://github.com/nukeop/nuclear https://github.com/keepassxreboot/keepassxc
 }
 
 # ======== Catalog Tests ========
 
 test_single_catalog_install() {
-    info "=== Testing Single Catalog Install ==="
-
-    # Step 1: Remove existing app to ensure clean installation
+    info "Testing single catalog install"
     info "Step 1/2: Removing existing appflowy for clean install test"
-    cd "$APP_ROOT"
-    if python3 run.py remove appflowy; then
-        info "Cleanup (appflowy): SUCCESS"
-    else
-        warn "Cleanup (appflowy): FAILED or app not installed"
-    fi
+    python3 run.py remove appflowy 2>/dev/null || true
 
-    # Also clean config file manually to be sure
-    rm -f "$CONFIG_DIR/appflowy.json"
-
-    # Step 2: Test single catalog installation
     info "Step 2/2: Testing single catalog install (appflowy)"
-    cd "$APP_ROOT"
-    if python3 run.py install appflowy; then
-        info "Single catalog install: SUCCESS"
-    else
-        error "Single catalog install: FAILED"
-    fi
+    python3 run.py install appflowy
 }
 
 test_multiple_catalog_install() {
-    info "=== Testing Multiple Catalog Install ==="
+    info "Testing multiple catalog install"
     local apps=("appflowy" "legcord" "joplin")
 
-    # Step 1: Remove existing apps and configs to ensure clean installation
     info "Step 1/2: Removing existing apps for clean catalog install test"
-    cd "$APP_ROOT"
-    if python3 run.py remove "${apps[@]}"; then
-        info "Cleanup (${apps[*]}): SUCCESS"
-    else
-        warn "Cleanup (${apps[*]}): FAILED or apps not installed"
-    fi
+    python3 run.py remove "${apps[@]}" 2>/dev/null || true
 
-    # Also clean config files manually to be sure
-    for app in "${apps[@]}"; do
-        rm -f "$CONFIG_DIR/$app.json"
-    done
-
-    # Step 2: Install multiple apps from catalog
     info "Step 2/2: Testing multiple catalog install (${apps[*]})"
     cd "$APP_ROOT"
-    if python3 run.py install "${apps[@]}"; then
-        info "Multiple catalog install: SUCCESS"
-    else
-        error "Multiple catalog install: FAILED"
-    fi
+    python3 run.py install "${apps[@]}"
 }
 
-#Testing Updates
+# ======== Update Tests ========
+# Update specific apps to test update functionality
 # appflowy: Catalog + digest
 # legcord: Catalog + checksum_file via latest-linux.yml
 # keepassxc: URL + checksum_file via x.AppImage.DIGEST
@@ -700,24 +226,15 @@ test_updates() {
     # Step 1: Set up configs with old versions and test updates
     info "Step 1/3: Setting up old versions and testing updates"
     for app in "${apps[@]}"; do
-        case "$app" in
-            "tagspaces") setup_tagspaces_config "$TEST_VERSION" ;;
-            "appflowy") setup_appflowy_config "$TEST_VERSION" ;;
-            "legcord") setup_legcord_config "$TEST_VERSION" ;;
-            "keepassxc") setup_keepassxc_config "$TEST_VERSION" ;;
-        esac
+        set_version "$app" "$TEST_VERSION"
     done
 
     cd "$APP_ROOT"
-    if python3 run.py update "${apps[@]}"; then
-        info "updates: SUCCESS"
-    else
-        error "updates: FAILED"
-        return 1
-    fi
+    python3 run.py update "${apps[@]}"
 
 }
 
+# `update` command is different than above because it updates all apps instead of specific ones
 test_updates_all() {
     info "=== Testing Updates All ==="
     local apps=("appflowy" "legcord" "tagspaces")
@@ -725,21 +242,11 @@ test_updates_all() {
     # Step 1: Set up configs with old versions and test updates all
     info "Step 1/3: Setting up old versions and testing updates all"
     for app in "${apps[@]}"; do
-        case "$app" in
-            "tagspaces") setup_tagspaces_config "$TEST_VERSION" ;;
-            "appflowy") setup_appflowy_config "$TEST_VERSION" ;;
-            "legcord") setup_legcord_config "$TEST_VERSION" ;;
-                # "joplin") setup_joplin_config "$TEST_VERSION" ;;
-        esac
+        set_version "$app" "$TEST_VERSION"
     done
 
     cd "$APP_ROOT"
-    if python3 run.py update; then
-        info "updates_all: SUCCESS"
-    else
-        error "updates_all: FAILED"
-        return 1
-    fi
+    python3 run.py update
 
 }
 
@@ -749,32 +256,24 @@ test_all_qownnotes() {
     info "=== Running All qownnotes Tests ==="
 
     # Step 1: Test update functionality (requires existing installation)
-    info "Step 1/7: Setting up and testing qownnotes update"
-    setup_qownnotes_config "$TEST_VERSION"
+    info "Step 1/5: Setting up and testing qownnotes update"
+    set_version "qownnotes" "$TEST_VERSION"
     test_qownnotes_update
 
-    # Step 2: Test remove functionality (cleans everything for fresh install test)
-    info "Step 2/7: Testing qownnotes removal (cleanup for fresh install test)"
-    test_qownnotes_remove
-
     # Step 3: Test catalog installation (fresh install with full config/icon/desktop creation)
-    info "Step 3/7: Testing qownnotes catalog installation (fresh install)"
+    info "Step 2/5: Testing qownnotes catalog installation (fresh install)"
     test_qownnotes_install_catalog
 
     # Step 4: Test list functionality (verify installation)
-    info "Step 4/7: Testing qownnotes list"
+    info "Step 3/5: Testing qownnotes list"
     test_qownnotes_list
 
     # Step 5: Test backup functionality
-    info "Step 5/7: Testing qownnotes backup"
+    info "Step 4/5: Testing qownnotes backup"
     test_qownnotes_backup
 
-    # Step 6: Remove again to prepare for URL install test
-    info "Step 6/7: Removing qownnotes for URL install test"
-    test_qownnotes_remove
-
     # Step 7: Test URL installation (fresh install via URL)
-    info "Step 7/7: Testing qownnotes URL installation"
+    info "Step 5/5: Testing qownnotes URL installation"
     test_qownnotes_install_url
 }
 
@@ -783,41 +282,24 @@ test_quick() {
 
     # Step 1: Update qownnotes + appflowy (set old versions first)
     info "Step 3/3: Testing update for qownnotes + appflowy"
-    set_app_version "qownnotes" "$TEST_VERSION"
-    set_app_version "appflowy" "$TEST_VERSION"
+    set_version "qownnotes" "$TEST_VERSION"
+    set_version "appflowy" "$TEST_VERSION"
     cd "$APP_ROOT"
-    if python3 run.py update qownnotes appflowy; then
-        info "Update (qownnotes + appflowy): SUCCESS"
-    else
-        error "Update (qownnotes + appflowy): FAILED"
-    fi
+    python3 run.py update qownnotes appflowy
 
     # Step 2: remove the apps and their config, icons etc.
     info "Removing qownnotes + appflowy before re-install"
-    if python3 run.py remove qownnotes appflowy keepassxc; then
-        info "Remove (qownnotes + appflowy + keepassxc): SUCCESS"
-    else
-        warn "Remove (qownnotes + appflowy + keepassxc): FAILED or apps not installed"
-    fi
+    python3 run.py remove qownnotes appflowy keepassxc 2>/dev/null || true
 
     # Step 3: Install qownnotes + appflowy from catalog
     info "Step 2/3: Installing qownnotes + appflowy from catalog"
     cd "$APP_ROOT"
-    if python3 run.py install qownnotes appflowy; then
-        info "Catalog install (qownnotes + appflowy): SUCCESS"
-    else
-        error "Catalog install (qownnotes + appflowy): FAILED"
-    fi
+    python3 run.py install qownnotes appflowy
 
     # Step 4: Install keepassxc via URL
     info "Step 1/3: Installing keepassxc via URL"
-    rm -f "$CONFIG_DIR/keepassxc.json"
-    cd "$APP_ROOT"
-    if python3 run.py install https://github.com/keepassxreboot/keepassxc; then
-        info "keepassxc URL install: SUCCESS"
-    else
-        error "keepassxc URL install: FAILED"
-    fi
+    python3 run.py remove keepassxc 2>/dev/null || true
+    python3 run.py install https://github.com/keepassxreboot/keepassxc
 
     info "Quick comprehensive tests completed successfully!"
 }
@@ -918,9 +400,6 @@ parse_arguments() {
         --qown-list)
             test_qownnotes_list
             ;;
-        --qown-remove)
-            test_qownnotes_remove
-            ;;
         --qown-backup)
             test_qownnotes_backup
             ;;
@@ -952,6 +431,10 @@ parse_arguments() {
             test_quick
             ;;
         --comprehensive | --all)
+            # Run updates first so install tests can use the global removal helper safely
+            if ! test_updates; then
+                warn "test_updates failed; continuing with comprehensive tests"
+            fi
             test_comprehensive
             ;;
         --cleanup)

@@ -6,149 +6,94 @@ levels and output formatting for the application.
 
 import logging
 import logging.handlers
-import shutil
 import sys
 import threading
-from collections import deque
 from collections.abc import Generator
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-# Module-level imports for better performance
-if TYPE_CHECKING:
-    from .config import ConfigManager
-else:
-    ConfigManager = None
-    with suppress(ImportError):
-        from .config import ConfigManager
-    if ConfigManager is None:
-        with suppress(ImportError):
-            from my_unicorn.config import ConfigManager
+from my_unicorn.config import config_manager
+from my_unicorn.constants import (
+    DEFAULT_LOG_LEVEL,
+    LOG_BACKUP_COUNT,
+    LOG_COLORS,
+    LOG_CONSOLE_DATE_FORMAT,
+    LOG_CONSOLE_FORMAT,
+    LOG_FILE_DATE_FORMAT,
+    LOG_FILE_FORMAT,
+    LOG_MAX_FILE_SIZE_BYTES,
+)
 
-# Global registry to prevent duplicate loggers
+# Using centralized logging constants from my_unicorn.constants
+
+# Global registry to prevent duplicate loggers across the application
 _logger_instances: dict[str, "MyUnicornLogger"] = {}
 
-# Thread-local storage for progress context
-_thread_local = threading.local()
-
-# Maximum number of deferred messages to prevent memory leaks
-MAX_DEFERRED_MESSAGES = 1000
-
-# Lock for thread-safe logger setup
-_setup_lock = threading.Lock()
-
-# Constants for deferred message format
-DEFERRED_MESSAGE_MIN_PARTS = 3
-DEFERRED_MESSAGE_WITH_KWARGS = 4
+# Lock for thread-safe logger operations
+_logger_lock = threading.Lock()
 
 
-class CustomRotatingFileHandler(logging.handlers.BaseRotatingHandler):
-    """Custom rotating file handler that uses the naming convention my-unicorn.log.1, my-unicorn.log.2, my-unicorn.log.3."""
+def _load_log_settings() -> tuple[str, str, Path]:
+    """Load console level, file level, and file path from configuration.
 
-    def __init__(self, filename, maxBytes=0, backupCount=0, encoding=None, delay=False):
-        """Initialize the handler.
+    Returns:
+        Tuple of (console log level name, file log level name, log file path).
 
-        Args:
-            filename: Path to the log file
-            maxBytes: Maximum size in bytes before rotation
-            backupCount: Number of backup files to keep
-            encoding: File encoding
-            delay: Whether to delay file opening
+    """
+    default_console_level = "WARNING"
+    default_file_level = DEFAULT_LOG_LEVEL
+    default_path = (
+        Path.home() / ".config" / "my-unicorn" / "logs" / "my-unicorn.log"
+    )
 
-        """
-        self.maxBytes = maxBytes
-        self.backupCount = backupCount
-        self.log_dir = Path(filename).parent
-        self.base_name = Path(filename).stem  # e.g., "my-unicorn" from "my-unicorn.log"
+    try:
+        global_config = config_manager.load_global_config()
+    except (OSError, KeyError, ValueError):
+        return default_console_level, default_file_level, default_path
 
-        super().__init__(filename, "a", encoding=encoding, delay=delay)
+    console_level = str(
+        global_config.get("console_log_level", default_console_level)
+    ).upper()
+    file_level = str(
+        global_config.get("log_level", default_file_level)
+    ).upper()
 
-    def shouldRollover(self, record):
-        """Check if rollover should occur."""
-        if self.stream is None:
-            self.stream = self._open()
-        if self.maxBytes > 0:
-            # Get current file size
-            try:
-                return self.stream.tell() + len(self.format(record)) >= self.maxBytes
-            except (OSError, AttributeError):
-                # If we can't get file size, don't rotate
-                return False
-        return False
+    try:
+        logs_dir = global_config["directory"]["logs"]
+        log_file = Path(logs_dir) / "my-unicorn.log"
+    except (KeyError, TypeError):
+        log_file = default_path
 
-    def doRollover(self):
-        """Perform the actual rollover."""
-        if self.stream:
-            self.stream.close()
-            # Note: We need to handle the type issue here
-            self.stream = None  # type: ignore[assignment]
-
-        # Ensure directory exists
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-
-        main_log = Path(self.baseFilename)
-
-        # Only rotate if the main log file exists and has content
-        if not main_log.exists() or main_log.stat().st_size == 0:
-            self.stream = self._open()
-            return
-
-        try:
-            # Rotate existing backup files: log.2 -> log.3, log.1 -> log.2
-            for i in range(self.backupCount - 1, 0, -1):
-                old_log = self.log_dir / f"my-unicorn.log.{i}"
-                new_log = self.log_dir / f"my-unicorn.log.{i + 1}"
-
-                if old_log.exists():
-                    if new_log.exists():
-                        new_log.unlink()
-                    shutil.move(str(old_log), str(new_log))
-
-            # Move current my-unicorn.log to my-unicorn.log.1
-            backup_log = self.log_dir / "my-unicorn.log.1"
-            if backup_log.exists():
-                backup_log.unlink()
-            shutil.move(str(main_log), str(backup_log))
-
-            # Create new main log file
-            main_log.touch()
-
-        except OSError as e:
-            # If rotation fails, try to continue with the original file
-            print(f"Warning: Log rotation failed: {e}", file=sys.stderr)
-
-        # Reopen the stream for the new file
-        self.stream = self._open()
+    return console_level, file_level, log_file
 
 
-DEFERRED_MESSAGE_WITH_KWARGS = 4
+class LoggingError(Exception):
+    """Base exception for logging errors."""
+
+
+class ConfigurationError(LoggingError):
+    """Error in logging configuration."""
 
 
 class ColoredFormatter(logging.Formatter):
     """Custom formatter with color support for console output."""
 
-    __slots__ = ("_colored_levels", "_reset")
-
-    def __init__(self, *args, **kwargs):
-        """Initialize formatter with cached color codes."""
-        super().__init__(*args, **kwargs)
-        colors = {
-            "DEBUG": "\033[36m",  # Cyan
-            "INFO": "\033[32m",  # Green
-            "WARNING": "\033[33m",  # Yellow
-            "ERROR": "\033[31m",  # Red
-            "CRITICAL": "\033[35m",  # Magenta
-        }
-        self._reset = "\033[0m"
-        self._colored_levels = {
-            level: f"{color}{level}{self._reset}" for level, color in colors.items()
-        }
-
     def format(self, record: logging.LogRecord) -> str:
-        """Format log record with colors."""
-        colored_level = self._colored_levels.get(record.levelname)
-        if colored_level:
+        """Format log record with colors.
+
+        Args:
+            record: The log record to format
+
+        Returns:
+            Formatted log message with color codes
+
+        """
+        if record.levelname in LOG_COLORS:
+            color = LOG_COLORS[record.levelname]
+            reset = LOG_COLORS["RESET"]
+            colored_level = f"{color}{record.levelname}{reset}"
+
             original_levelname = record.levelname
             record.levelname = colored_level
             try:
@@ -159,26 +104,10 @@ class ColoredFormatter(logging.Formatter):
         return super().format(record)
 
 
-def _get_progress_state():
-    """Get thread-local progress state."""
-    if not hasattr(_thread_local, "progress_active"):
-        _thread_local.progress_active = False
-        _thread_local.deferred_messages = deque(maxlen=MAX_DEFERRED_MESSAGES)
-    return _thread_local.progress_active, _thread_local.deferred_messages
-
-
-def _set_progress_state(active: bool):
-    """Set thread-local progress state."""
-    if not hasattr(_thread_local, "progress_active"):
-        _thread_local.progress_active = False
-        _thread_local.deferred_messages = deque(maxlen=MAX_DEFERRED_MESSAGES)
-    _thread_local.progress_active = active
-
-
 class MyUnicornLogger:
     """Logger manager for my-unicorn application."""
 
-    def __init__(self, name: str = "my-unicorn"):
+    def __init__(self, name: str = "my-unicorn") -> None:
         """Initialize logger with given name.
 
         Args:
@@ -190,22 +119,26 @@ class MyUnicornLogger:
         self.logger.setLevel(logging.DEBUG)
         self._file_logging_setup = False
         self._console_handler: logging.StreamHandler | None = None
-        self._file_handler: CustomRotatingFileHandler | None = None
+        self._previous_console_level: int | None = None
+        self._file_handler: logging.handlers.RotatingFileHandler | None = None
+        self._progress_active = False
+        self._deferred_messages: list[
+            tuple[str, str, tuple[Any, ...], dict[str, Any]]
+        ] = []
 
         # Prevent duplicate handlers
         if not self.logger.handlers:
-            self._setup_handlers()
+            self._setup_console_handler()
 
-    def _setup_handlers(self) -> None:
-        """Set up console and file handlers."""
-        # Console handler with colors
+    def _setup_console_handler(self) -> None:
+        """Set up console handler with colors."""
         self._console_handler = logging.StreamHandler(sys.stdout)
         console_formatter = ColoredFormatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%H:%M:%S"
+            LOG_CONSOLE_FORMAT,
+            datefmt=LOG_CONSOLE_DATE_FORMAT,
         )
         self._console_handler.setFormatter(console_formatter)
         self._console_handler.setLevel(logging.WARNING)
-
         self.logger.addHandler(self._console_handler)
 
     def setup_file_logging(self, log_file: Path, level: str = "DEBUG") -> None:
@@ -215,51 +148,55 @@ class MyUnicornLogger:
             log_file: Path to log file
             level: Logging level for file output
 
+        Raises:
+            ConfigurationError: If file logging setup fails
+
         """
-        # Thread-safe setup with simplified logic
-        with _setup_lock:
-            # Check if file logging is already set up for this logger instance
+        with _logger_lock:
             if self._file_logging_setup and self._file_handler:
                 return
 
-            # Remove any existing file handlers to avoid duplicates
-            handlers_to_remove = []
-            for handler in self.logger.handlers:
-                if isinstance(
-                    handler, logging.handlers.RotatingFileHandler | CustomRotatingFileHandler
-                ):
-                    handlers_to_remove.append(handler)
+            try:
+                self._remove_existing_file_handlers()
+                # Ensure log directory exists
+                log_file.parent.mkdir(parents=True, exist_ok=True)
 
-            for handler in handlers_to_remove:
-                self.logger.removeHandler(handler)
-                handler.close()
+                # Create file handler directly
+                self._file_handler = logging.handlers.RotatingFileHandler(
+                    log_file,
+                    maxBytes=LOG_MAX_FILE_SIZE_BYTES,
+                    backupCount=LOG_BACKUP_COUNT,
+                    encoding="utf-8",
+                    delay=False,
+                )
+                formatter = logging.Formatter(
+                    LOG_FILE_FORMAT, datefmt=LOG_FILE_DATE_FORMAT
+                )
+                self._file_handler.setFormatter(formatter)
 
-            # Ensure log directory exists
-            log_file.parent.mkdir(parents=True, exist_ok=True)
+                # Set level
+                numeric_level = getattr(logging, level.upper(), logging.INFO)
+                self._file_handler.setLevel(numeric_level)
 
-            # Use our custom rotating file handler with desired naming convention
-            # Files will be named: my-unicorn.log, my-unicorn.log.1, my-unicorn.log.2, my-unicorn.log.3
-            self._file_handler = CustomRotatingFileHandler(
-                log_file,
-                maxBytes=1024 * 1024,  # 1MB
-                backupCount=3,
-                encoding="utf-8",
-            )
+                # Add the handler to this logger instance
+                self.logger.addHandler(self._file_handler)
+                self._file_logging_setup = True
+            except OSError as e:
+                raise ConfigurationError(
+                    f"Failed to setup file logging: {e}"
+                ) from e
 
-            # File formatter without colors
-            format_str = (
-                "%(asctime)s - %(name)s - %(levelname)s - "
-                "%(funcName)s:%(lineno)d - %(message)s"
-            )
-            file_formatter = logging.Formatter(
-                format_str,
-                datefmt="%Y-%m-%d %H:%M:%S",
-            )
-            self._file_handler.setFormatter(file_formatter)
-            self._file_handler.setLevel(getattr(logging, level.upper()))
+    def _remove_existing_file_handlers(self) -> None:
+        """Remove any existing file handlers to avoid duplicates."""
+        handlers_to_remove = [
+            handler
+            for handler in self.logger.handlers
+            if isinstance(handler, logging.handlers.RotatingFileHandler)
+        ]
 
-            self.logger.addHandler(self._file_handler)
-            self._file_logging_setup = True
+        for handler in handlers_to_remove:
+            self.logger.removeHandler(handler)
+            # Don't close shared handlers - other loggers may be using them
 
     def set_level(self, level: str) -> None:
         """Set logging level for file handler while keeping console at WARNING.
@@ -269,119 +206,180 @@ class MyUnicornLogger:
 
         """
         numeric_level = getattr(logging, level.upper(), logging.INFO)
-
         if self._file_handler:
             self._file_handler.setLevel(numeric_level)
 
     def debug(self, message: str, *args: Any, **kwargs: Any) -> None:
-        """Log debug message."""
+        """Log debug message.
+
+        Args:
+            message: Log message
+            *args: Message arguments
+            **kwargs: Message keyword arguments
+
+        """
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(message, *args, **kwargs)
 
     def info(self, message: str, *args: Any, **kwargs: Any) -> None:
-        """Log info message."""
+        """Log info message.
+
+        Args:
+            message: Log message
+            *args: Message arguments
+            **kwargs: Message keyword arguments
+
+        """
         if not self.logger.isEnabledFor(logging.INFO):
             return
 
-        progress_active, deferred_messages = _get_progress_state()
-        if progress_active:
-            deferred_messages.append(("INFO", message, args, kwargs))
+        if self._progress_active:
+            self._deferred_messages.append(("INFO", message, args, kwargs))
         else:
             self.logger.info(message, *args, **kwargs)
 
     def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
-        """Log warning message."""
+        """Log warning message.
+
+        Args:
+            message: Log message
+            *args: Message arguments
+            **kwargs: Message keyword arguments
+
+        """
         if not self.logger.isEnabledFor(logging.WARNING):
             return
 
-        progress_active, deferred_messages = _get_progress_state()
-        if progress_active:
-            deferred_messages.append(("WARNING", message, args, kwargs))
+        if self._progress_active:
+            self._deferred_messages.append(("WARNING", message, args, kwargs))
         else:
             self.logger.warning(message, *args, **kwargs)
 
-    def error(self, message: str, *args: Any, exc_info: bool = False, **kwargs: Any) -> None:
-        """Log error message."""
+    def error(
+        self, message: str, *args: Any, exc_info: bool = False, **kwargs: Any
+    ) -> None:
+        """Log error message.
+
+        Args:
+            message: Log message
+            *args: Message arguments
+            exc_info: Include exception info
+            **kwargs: Message keyword arguments
+
+        """
         if self.logger.isEnabledFor(logging.ERROR):
             self.logger.error(message, *args, exc_info=exc_info, **kwargs)
 
     def critical(self, message: str, *args: Any, **kwargs: Any) -> None:
-        """Log critical message."""
+        """Log critical message.
+
+        Args:
+            message: Log message
+            *args: Message arguments
+            **kwargs: Message keyword arguments
+
+        """
         if self.logger.isEnabledFor(logging.CRITICAL):
             self.logger.critical(message, *args, **kwargs)
 
     def exception(self, message: str, *args: Any, **kwargs: Any) -> None:
-        """Log exception with traceback."""
+        """Log exception with traceback.
+
+        Args:
+            message: Log message
+            *args: Message arguments
+            **kwargs: Message keyword arguments
+
+        """
         if self.logger.isEnabledFor(logging.ERROR):
             self.logger.exception(message, *args, **kwargs)
 
     @contextmanager
     def progress_context(self) -> Generator[None, None, None]:
-        """Context manager to defer logging during progress operations."""
-        progress_active, deferred_messages = _get_progress_state()
-        old_state = progress_active
-        _set_progress_state(True)
+        """Context manager to defer logging during progress operations.
 
-        # Get fresh state after setting
-        _, deferred_messages = _get_progress_state()
-        deferred_messages.clear()
+        Yields:
+            None
+
+        """
+        old_state = self._progress_active
+        self._progress_active = True
+        self._deferred_messages.clear()
 
         try:
             yield
         finally:
-            _set_progress_state(old_state)
+            self._progress_active = old_state
+            # Process deferred messages
+            for level, message, args, kwargs in self._deferred_messages:
+                if level == "INFO":
+                    self.logger.info(message, *args, **kwargs)
+                elif level == "WARNING":
+                    self.logger.warning(message, *args, **kwargs)
+            self._deferred_messages.clear()
 
-            # Flush deferred messages
-            if deferred_messages:
-                for item in deferred_messages:
-                    if len(item) >= DEFERRED_MESSAGE_MIN_PARTS:  # New format with args
-                        level, message, args = item[0], item[1], item[2]
-                        kwargs = (
-                            item[DEFERRED_MESSAGE_WITH_KWARGS - 1]
-                            if len(item) > DEFERRED_MESSAGE_MIN_PARTS
-                            else {}
-                        )
-                        if level == "INFO":
-                            self.logger.info(message, *args, **kwargs)
-                        elif level == "WARNING":
-                            self.logger.warning(message, *args, **kwargs)
-                    else:  # Backward compatibility with old format
-                        level, formatted_message = item
-                        if level == "INFO":
-                            self.logger.info(formatted_message)
-                        elif level == "WARNING":
-                            self.logger.warning(formatted_message)
-                deferred_messages.clear()
+    def set_console_level(self, level: str) -> None:
+        """Set console logging level.
 
-    def set_console_level_temporarily(self, level: str) -> None:
-        """Temporarily set console logging level."""
+        Args:
+            level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+        """
         if self._console_handler:
             numeric_level = getattr(logging, level.upper(), logging.WARNING)
             self._console_handler.setLevel(numeric_level)
 
+    def set_console_level_temporarily(self, level: str) -> None:
+        """Temporarily adjust console logging level.
+
+        Stores the current console level so it can be restored later.
+
+        Args:
+            level: Temporary logging level name.
+
+        """
+        if not self._console_handler:
+            return
+
+        if self._previous_console_level is None:
+            self._previous_console_level = self._console_handler.level
+
+        self.set_console_level(level)
+
     def restore_console_level(self) -> None:
-        """Restore console logging level to WARNING."""
-        if self._console_handler:
-            self._console_handler.setLevel(logging.WARNING)
+        """Restore the console logging level after a temporary change."""
+        if not self._console_handler:
+            return
+
+        if self._previous_console_level is not None:
+            self._console_handler.setLevel(self._previous_console_level)
+
+        self._previous_console_level = None
 
 
-# HACK: This is a temporary workaround for testing for now.
 def clear_logger_state() -> None:
-    """Clear global logger state for testing purposes."""
-    with _setup_lock:
+    """Clear global logger state for testing purposes.
+
+    Note:
+        This is a temporary workaround for testing.
+
+    """
+    with _logger_lock:
         _logger_instances.clear()
-        # Also clear any existing loggers to ensure fresh state
+        # Clear existing loggers to ensure fresh state
         for logger_name in list(logging.Logger.manager.loggerDict.keys()):
             if logger_name.startswith("test-") or logger_name == "my-unicorn":
                 log_instance = logging.getLogger(logger_name)
                 for handler in log_instance.handlers[:]:
                     log_instance.removeHandler(handler)
-                # Remove from manager to ensure fresh creation
+                # Remove from manager to ensure fresh logger creation
                 if logger_name in logging.Logger.manager.loggerDict:
                     del logging.Logger.manager.loggerDict[logger_name]
 
 
-def get_logger(name: str = "my-unicorn", enable_file_logging: bool = True) -> MyUnicornLogger:
+def get_logger(
+    name: str = "my-unicorn", enable_file_logging: bool = True
+) -> MyUnicornLogger:
     """Get logger instance with singleton pattern.
 
     Args:
@@ -392,28 +390,27 @@ def get_logger(name: str = "my-unicorn", enable_file_logging: bool = True) -> My
         Logger instance
 
     """
-    # Use singleton pattern to prevent duplicates
+    # Use singleton pattern to prevent duplicate logger instances
     if name in _logger_instances:
         return _logger_instances[name]
 
+    # Create logger instance
     logger_instance = MyUnicornLogger(name)
 
-    # Setup file logging if enabled and config is available
-    if enable_file_logging and ConfigManager is not None:
-        try:
-            config_manager = ConfigManager()
-            global_config = config_manager.load_global_config()
-            log_file = global_config["directory"]["logs"] / "my-unicorn.log"
-            log_level = global_config.get("log_level", "INFO")
-            logger_instance.setup_file_logging(log_file, log_level)
-        except (ImportError, AttributeError, OSError) as e:
-            # If config loading fails, continue without file logging
-            logger.debug("Failed to set up file logging: %s", e)
+    # Apply configuration-derived logging levels
+    console_level, file_level, log_file = _load_log_settings()
+    logger_instance.set_console_level(console_level)
 
-    # Store in registry
+    if enable_file_logging:
+        logger_instance.setup_file_logging(log_file, file_level)
+    else:
+        # Ensure file handler adopts level if enabled later
+        logger_instance.set_level(file_level)
+
+    # Store in registry for singleton pattern
     _logger_instances[name] = logger_instance
     return logger_instance
 
 
-# Global logger instance
-logger = get_logger(enable_file_logging=False)  # Will be enabled when config is available
+# Global logger instance - file logging enabled later when config is available
+logger = get_logger(enable_file_logging=False)

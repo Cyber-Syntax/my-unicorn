@@ -17,7 +17,9 @@ class TestInstallTemplate:
         """Test that InstallTemplate cannot be instantiated directly."""
         mock_services = self.create_mock_services()
 
-        with pytest.raises(TypeError, match="Can't instantiate abstract class"):
+        with pytest.raises(
+            TypeError, match="Can't instantiate abstract class"
+        ):
             InstallTemplate(**mock_services)
 
     def create_mock_services(self):
@@ -43,9 +45,17 @@ class TestInstallTemplate:
                 return contexts
 
             async def _create_app_configuration(
-                self, final_path, context, icon_result, verification_result=None, **kwargs
+                self,
+                final_path,
+                context,
+                icon_result,
+                verification_result=None,
+                **kwargs,
             ):
-                return {"config": "created", "verification_result": verification_result}
+                return {
+                    "config": "created",
+                    "verification_result": verification_result,
+                }
 
         mock_services = self.create_mock_services()
         # Mock progress service
@@ -67,7 +77,9 @@ class TestInstallTemplate:
         """Test input validation with empty targets."""
         template = self.create_concrete_template()
 
-        with pytest.raises(InstallationError, match="No installation targets provided"):
+        with pytest.raises(
+            InstallationError, match="No installation targets provided"
+        ):
             template.validate_inputs([])
 
     def test_validate_inputs_valid_targets(self):
@@ -82,7 +94,9 @@ class TestInstallTemplate:
         """Test progress session setup without progress service."""
         template = self.create_concrete_template()
 
-        async with template._setup_progress_session(show_progress=False) as session:
+        async with template._setup_progress_session(
+            show_progress=False
+        ) as session:
             assert session["session_active"] is False
 
     @pytest.mark.asyncio
@@ -110,10 +124,14 @@ class TestInstallTemplate:
         async with template._setup_progress_session(
             show_progress=True, targets_count=2
         ) as session:
+            # Since the mocked progress service reports active, the template should reuse
+            # the existing session and NOT call progress_service.session() to start a new one.
             assert session["session_active"] is True
+            # Reused flag indicates the session was not created by this template but reused.
+            assert session.get("reused") is True
 
-        # Verify progress service was called with correct total operations (2 * 4 = 8)
-        mock_progress_service.session.assert_called_once_with(8)
+        # Verify progress service.session was not called because the service was already active
+        mock_progress_service.session.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_install_method_basic_flow(self):
@@ -121,27 +139,31 @@ class TestInstallTemplate:
         template = self.create_concrete_template()
 
         # Mock the template methods
-        with patch.object(
-            template, "_process_installations", new_callable=AsyncMock
-        ) as mock_process:
-            with patch.object(
+        with (
+            patch.object(
+                template, "_process_installations", new_callable=AsyncMock
+            ) as mock_process,
+            patch.object(
                 template, "_finalize_results", new_callable=AsyncMock
-            ) as mock_finalize:
-                mock_process.return_value = [{"target": "app1", "success": True}]
-                mock_finalize.return_value = [{"target": "app1", "success": True}]
+            ) as mock_finalize,
+        ):
+            mock_process.return_value = [{"target": "app1", "success": True}]
+            mock_finalize.return_value = [{"target": "app1", "success": True}]
 
-                results = await template.install(["app1"])
+            results = await template.install(["app1"])
 
-                assert len(results) == 1
-                assert results[0]["target"] == "app1"
-                assert results[0]["success"] is True
+            assert len(results) == 1
+            assert results[0]["target"] == "app1"
+            assert results[0]["success"] is True
 
     @pytest.mark.asyncio
     async def test_install_method_validation_failure(self):
         """Test install method with validation failure."""
         template = self.create_concrete_template()
 
-        with pytest.raises(InstallationError, match="No installation targets provided"):
+        with pytest.raises(
+            InstallationError, match="No installation targets provided"
+        ):
             await template.install([])
 
     @pytest.mark.asyncio
@@ -207,7 +229,9 @@ class TestInstallTemplate:
                 template, "_verify_appimage", new_callable=AsyncMock
             ) as mock_verify:
                 with patch.object(
-                    template, "_move_to_install_directory", new_callable=AsyncMock
+                    template,
+                    "_move_to_install_directory",
+                    new_callable=AsyncMock,
                 ) as mock_move:
                     with patch.object(
                         template, "_extract_icon", new_callable=AsyncMock
@@ -217,7 +241,9 @@ class TestInstallTemplate:
                         mock_move.return_value = "/apps/test_app.appimage"
                         mock_icon.return_value = {"icon": "extracted"}
 
-                        result = await template._install_single_app(semaphore, mock_context)
+                        result = await template._install_single_app(
+                            semaphore, mock_context
+                        )
 
                         # Verify all steps were called
                         mock_download.assert_called_once()
@@ -227,7 +253,9 @@ class TestInstallTemplate:
 
                         # Verify result structure
                         assert "success" in result
-                        assert "error" in result  # Should be present when success is False
+                        assert (
+                            "error" in result
+                        )  # Should be present when success is False
 
     @pytest.mark.asyncio
     async def test_install_single_app_failure_handling(self):
@@ -247,7 +275,9 @@ class TestInstallTemplate:
         ) as mock_download:
             mock_download.side_effect = InstallationError("Download failed")
 
-            result = await template._install_single_app(semaphore, mock_context)
+            result = await template._install_single_app(
+                semaphore, mock_context
+            )
 
             assert result["success"] is False
             assert "Download failed" in result["error"]
@@ -277,7 +307,9 @@ class TestInstallTemplate:
                 return {"target": context.target, "success": True}
 
         with patch.object(
-            template, "_install_single_app", side_effect=track_concurrent_install
+            template,
+            "_install_single_app",
+            side_effect=track_concurrent_install,
         ):
             await template._process_installations(contexts, concurrent=2)
 
@@ -309,19 +341,30 @@ class TestInstallTemplate:
         semaphore = asyncio.Semaphore(1)
 
         # Mock workflow steps with verification result
-        verification_result = {"checksum_file": "test.sha256", "verified": True}
+        verification_result = {
+            "checksum_file": "test.sha256",
+            "verified": True,
+        }
 
-        with patch.object(template, "_download_appimage", new_callable=AsyncMock):
+        with patch.object(
+            template, "_download_appimage", new_callable=AsyncMock
+        ):
             with patch.object(
                 template, "_verify_appimage", new_callable=AsyncMock
             ) as mock_verify:
                 with patch.object(
-                    template, "_move_to_install_directory", new_callable=AsyncMock
+                    template,
+                    "_move_to_install_directory",
+                    new_callable=AsyncMock,
                 ):
-                    with patch.object(template, "_extract_icon", new_callable=AsyncMock):
+                    with patch.object(
+                        template, "_extract_icon", new_callable=AsyncMock
+                    ):
                         mock_verify.return_value = verification_result
 
-                        result = await template._install_single_app(semaphore, mock_context)
+                        result = await template._install_single_app(
+                            semaphore, mock_context
+                        )
 
                         # Verify verification result was passed to config creation
                         # Note: verification is handled at config creation level, not in result structure
@@ -354,9 +397,17 @@ class TestInstallTemplateRenaming:
                 return contexts
 
             async def _create_app_configuration(
-                self, final_path, context, icon_result, verification_result=None, **kwargs
+                self,
+                final_path,
+                context,
+                icon_result,
+                verification_result=None,
+                **kwargs,
             ):
-                return {"config": "created", "verification_result": verification_result}
+                return {
+                    "config": "created",
+                    "verification_result": verification_result,
+                }
 
         mock_services = self.create_mock_services()
         # Mock progress service
@@ -369,8 +420,12 @@ class TestInstallTemplateRenaming:
         template = self.create_concrete_template()
 
         # Mock storage service methods
-        template.storage_service.get_clean_appimage_name.return_value = "joplin"
-        template.storage_service.rename_appimage.return_value = Path("/apps/joplin.AppImage")
+        template.storage_service.get_clean_appimage_name.return_value = (
+            "joplin"
+        )
+        template.storage_service.rename_appimage.return_value = Path(
+            "/apps/joplin.AppImage"
+        )
 
         # Create mock context with catalog entry
         context = Mock()
@@ -383,7 +438,9 @@ class TestInstallTemplateRenaming:
         )
 
         # Verify storage service methods were called correctly
-        template.storage_service.get_clean_appimage_name.assert_called_once_with("joplin")
+        template.storage_service.get_clean_appimage_name.assert_called_once_with(
+            "joplin"
+        )
         template.storage_service.rename_appimage.assert_called_once_with(
             Path("/tmp/joplin-1.2.3.AppImage"), "joplin"
         )
@@ -396,8 +453,12 @@ class TestInstallTemplateRenaming:
         template = self.create_concrete_template()
 
         # Mock storage service methods
-        template.storage_service.get_clean_appimage_name.return_value = "obsidian"
-        template.storage_service.rename_appimage.return_value = Path("/apps/obsidian.AppImage")
+        template.storage_service.get_clean_appimage_name.return_value = (
+            "obsidian"
+        )
+        template.storage_service.rename_appimage.return_value = Path(
+            "/apps/obsidian.AppImage"
+        )
 
         # Create mock context with app_config but no catalog entry
         context = Mock()
@@ -411,7 +472,9 @@ class TestInstallTemplateRenaming:
         )
 
         # Verify storage service methods were called correctly
-        template.storage_service.get_clean_appimage_name.assert_called_once_with("obsidian")
+        template.storage_service.get_clean_appimage_name.assert_called_once_with(
+            "obsidian"
+        )
         template.storage_service.rename_appimage.assert_called_once_with(
             Path("/tmp/obsidian-1.9.10.AppImage"), "obsidian"
         )
@@ -424,8 +487,12 @@ class TestInstallTemplateRenaming:
         template = self.create_concrete_template()
 
         # Mock storage service methods
-        template.storage_service.get_clean_appimage_name.return_value = "nuclear"
-        template.storage_service.rename_appimage.return_value = Path("/apps/nuclear.AppImage")
+        template.storage_service.get_clean_appimage_name.return_value = (
+            "nuclear"
+        )
+        template.storage_service.rename_appimage.return_value = Path(
+            "/apps/nuclear.AppImage"
+        )
 
         # Create mock context with no catalog entry or app_config
         context = Mock()
@@ -439,7 +506,9 @@ class TestInstallTemplateRenaming:
         )
 
         # Verify storage service methods were called correctly
-        template.storage_service.get_clean_appimage_name.assert_called_once_with("nuclear")
+        template.storage_service.get_clean_appimage_name.assert_called_once_with(
+            "nuclear"
+        )
         template.storage_service.rename_appimage.assert_called_once_with(
             Path("/tmp/nuclear-0.6.48.AppImage"), "nuclear"
         )
@@ -452,8 +521,12 @@ class TestInstallTemplateRenaming:
         template = self.create_concrete_template()
 
         # Mock storage service methods
-        template.storage_service.get_clean_appimage_name.return_value = "test-app"
-        template.storage_service.rename_appimage.return_value = Path("/apps/test-app.AppImage")
+        template.storage_service.get_clean_appimage_name.return_value = (
+            "test-app"
+        )
+        template.storage_service.rename_appimage.return_value = Path(
+            "/apps/test-app.AppImage"
+        )
 
         # Create mock context with empty rename (should fall back to app_name)
         context = Mock()
@@ -467,10 +540,14 @@ class TestInstallTemplateRenaming:
 
         # Test the renaming function with empty rename (should fall back to app_name)
         original_path = Path("/tmp/test-app-1.0.0.AppImage")
-        result_path = template._handle_appimage_renaming(original_path, context)
+        result_path = template._handle_appimage_renaming(
+            original_path, context
+        )
 
         # Verify storage service methods were called with app_name fallback
-        template.storage_service.get_clean_appimage_name.assert_called_once_with("test-app")
+        template.storage_service.get_clean_appimage_name.assert_called_once_with(
+            "test-app"
+        )
         template.storage_service.rename_appimage.assert_called_once_with(
             Path("/tmp/test-app-1.0.0.AppImage"), "test-app"
         )
@@ -483,8 +560,12 @@ class TestInstallTemplateRenaming:
         template = self.create_concrete_template()
 
         # Mock storage service methods
-        template.storage_service.get_clean_appimage_name.return_value = "test-app"
-        template.storage_service.rename_appimage.return_value = Path("/apps/test-app.AppImage")
+        template.storage_service.get_clean_appimage_name.return_value = (
+            "test-app"
+        )
+        template.storage_service.rename_appimage.return_value = Path(
+            "/apps/test-app.AppImage"
+        )
 
         # Create mock context with catalog entry but no appimage config
         context = Mock()
@@ -498,7 +579,9 @@ class TestInstallTemplateRenaming:
         )
 
         # Verify storage service methods were called with app_name fallback
-        template.storage_service.get_clean_appimage_name.assert_called_once_with("test-app")
+        template.storage_service.get_clean_appimage_name.assert_called_once_with(
+            "test-app"
+        )
         template.storage_service.rename_appimage.assert_called_once_with(
             Path("/tmp/test-app.AppImage"), "test-app"
         )
@@ -515,8 +598,12 @@ class TestInstallTemplateRenaming:
         template.storage_service.move_to_install_dir.return_value = Path(
             "/apps/joplin-1.2.3.AppImage"
         )
-        template.storage_service.get_clean_appimage_name.return_value = "joplin"
-        template.storage_service.rename_appimage.return_value = Path("/apps/joplin.AppImage")
+        template.storage_service.get_clean_appimage_name.return_value = (
+            "joplin"
+        )
+        template.storage_service.rename_appimage.return_value = Path(
+            "/apps/joplin.AppImage"
+        )
 
         # Mock progress tracker
         template.progress_tracker = Mock()
@@ -530,11 +617,17 @@ class TestInstallTemplateRenaming:
 
         # Test the move_to_install_directory method
         original_path = Path("/tmp/joplin-1.2.3.AppImage")
-        result_path = await template._move_to_install_directory(original_path, context)
+        result_path = await template._move_to_install_directory(
+            original_path, context
+        )
 
         # Verify the workflow
-        template.storage_service.move_to_install_dir.assert_called_once_with(original_path)
-        template.storage_service.get_clean_appimage_name.assert_called_once_with("joplin")
+        template.storage_service.move_to_install_dir.assert_called_once_with(
+            original_path
+        )
+        template.storage_service.get_clean_appimage_name.assert_called_once_with(
+            "joplin"
+        )
         template.storage_service.rename_appimage.assert_called_once_with(
             Path("/apps/joplin-1.2.3.AppImage"), "joplin"
         )

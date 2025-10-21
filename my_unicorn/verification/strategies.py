@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Literal
+from typing import Any
 
+from my_unicorn.constants import (
+    DEFAULT_HASH_TYPE,
+    SUPPORTED_HASH_ALGORITHMS,
+    YAML_DEFAULT_HASH,
+    HashType,
+)
 from my_unicorn.download import DownloadService
 from my_unicorn.github_client import ChecksumFileInfo
 from my_unicorn.logger import get_logger
 from my_unicorn.verification.verify import Verifier
 
 logger = get_logger(__name__, enable_file_logging=True)
-
-# Type alias for hash types
-HashType = Literal["sha1", "sha256", "sha512", "md5"]
 
 
 class VerificationStrategy(ABC):
@@ -39,7 +42,9 @@ class VerificationStrategy(ABC):
         """
 
     @abstractmethod
-    def can_verify(self, verification_data: Any, context: dict[str, Any]) -> bool:
+    def can_verify(
+        self, verification_data: Any, context: dict[str, Any]
+    ) -> bool:
         """Check if this strategy can perform verification with given data.
 
         Args:
@@ -83,7 +88,9 @@ class DigestVerificationStrategy(VerificationStrategy):
                 logger.debug("   Note: Using digest despite skip=true setting")
 
             # Get actual file hash to compare
-            actual_digest = verifier.compute_hash("sha256")  # Digest is usually SHA-256
+            actual_digest = verifier.compute_hash(
+                "sha256"
+            )  # Digest is usually SHA-256
             logger.debug("   🧮 Computed digest: %s", actual_digest)
 
             verifier.verify_digest(digest)
@@ -105,7 +112,9 @@ class DigestVerificationStrategy(VerificationStrategy):
                 "details": str(e),
             }
 
-    def can_verify(self, verification_data: str, context: dict[str, Any]) -> bool:
+    def can_verify(
+        self, verification_data: str, context: dict[str, Any]
+    ) -> bool:
         """Check if digest verification is possible.
 
         Args:
@@ -149,7 +158,9 @@ class ChecksumFileVerificationStrategy(VerificationStrategy):
 
         """
         checksum_file = verification_data
-        target_filename = context.get("target_filename", verifier.file_path.name)
+        target_filename = context.get(
+            "target_filename", verifier.file_path.name
+        )
 
         try:
             logger.debug(
@@ -159,23 +170,35 @@ class ChecksumFileVerificationStrategy(VerificationStrategy):
             )
 
             # Download checksum file content using existing download service method
-            content = await self.download_service.download_checksum_file(checksum_file.url)
+            content = await self.download_service.download_checksum_file(
+                checksum_file.url
+            )
 
             # Use Verifier's parse_checksum_file method which handles both formats
             if checksum_file.format_type == "yaml":
-                # For YAML files, use sha512 as default hash type (common for Electron apps)
-                hash_type: HashType = "sha512"
+                # For YAML files, use YAML_DEFAULT_HASH as default hash type
+                hash_type: HashType = YAML_DEFAULT_HASH
             else:
                 # For traditional files, detect hash type from filename
-                detected_hash = verifier.detect_hash_type_from_filename(checksum_file.filename)
+                detected_hash = verifier.detect_hash_type_from_filename(
+                    checksum_file.filename
+                )
                 # Ensure we get a valid hash type
-                valid_hashes = ["sha1", "sha256", "sha512", "md5"]
-                hash_type = detected_hash if detected_hash in valid_hashes else "sha256"
+                valid_hashes = list(SUPPORTED_HASH_ALGORITHMS)
+                hash_type = (
+                    detected_hash
+                    if detected_hash in valid_hashes
+                    else DEFAULT_HASH_TYPE
+                )
 
             # Parse using the public method that handles both YAML and traditional formats
-            expected_hash = verifier.parse_checksum_file(content, target_filename, hash_type)
+            expected_hash = verifier.parse_checksum_file(
+                content, target_filename, hash_type
+            )
             if not expected_hash:
-                logger.error("❌ Checksum file verification FAILED - hash not found!")
+                logger.error(
+                    "❌ Checksum file verification FAILED - hash not found!"
+                )
                 logger.error(
                     "   📄 Checksum file: %s (%s format)",
                     checksum_file.filename,
@@ -188,18 +211,28 @@ class ChecksumFileVerificationStrategy(VerificationStrategy):
                     "details": f"Hash not found for {target_filename} in checksum file",
                 }
 
-            logger.debug("🔍 Starting hash comparison for checksum file verification")
+            logger.debug(
+                "🔍 Starting hash comparison for checksum file verification"
+            )
             logger.debug(
                 "   📄 Checksum file: %s (%s format)",
                 checksum_file.filename,
                 checksum_file.format_type,
             )
             logger.debug("   🔍 Target file: %s", target_filename)
-            logger.debug("   📋 Expected hash (%s): %s", hash_type.upper(), expected_hash)
+            logger.debug(
+                "   📋 Expected hash (%s): %s",
+                hash_type.upper(),
+                expected_hash,
+            )
 
             # Compute actual hash and compare
             computed_hash = verifier.compute_hash(hash_type)
-            logger.debug("   🧮 Computied hash (%s): %s", hash_type.upper(), computed_hash)
+            logger.debug(
+                "   🧮 Computied hash (%s): %s",
+                hash_type.upper(),
+                computed_hash,
+            )
 
             # Perform comparison
             hashes_match = computed_hash.lower() == expected_hash.lower()
@@ -211,7 +244,10 @@ class ChecksumFileVerificationStrategy(VerificationStrategy):
             )
 
             if hashes_match:
-                logger.debug("✅ Checksum file verification PASSED! (%s)", hash_type.upper())
+                logger.debug(
+                    "✅ Checksum file verification PASSED! (%s)",
+                    hash_type.upper(),
+                )
                 logger.debug(
                     "   📄 Checksum file: %s (%s format)",
                     checksum_file.filename,
@@ -249,7 +285,9 @@ class ChecksumFileVerificationStrategy(VerificationStrategy):
                 "details": str(e),
             }
 
-    def can_verify(self, verification_data: ChecksumFileInfo, context: dict[str, Any]) -> bool:
+    def can_verify(
+        self, verification_data: ChecksumFileInfo, context: dict[str, Any]
+    ) -> bool:
         """Check if checksum file verification is possible.
 
         Args:

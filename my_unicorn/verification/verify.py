@@ -7,8 +7,15 @@ checksum file parsing, and hash computation for downloaded AppImages.
 import base64
 import hashlib
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
+from ..constants import (
+    DEFAULT_HASH_TYPE,
+    HASH_PREFERENCE_ORDER,
+    SUPPORTED_HASH_ALGORITHMS,
+    YAML_DEFAULT_HASH,
+    HashType,
+)
 from ..logger import get_logger
 from ..utils import format_bytes
 
@@ -26,11 +33,9 @@ except ImportError:
     _YAML_AVAILABLE = False
 
 
-HashType = Literal["sha1", "sha256", "sha512", "md5"]
 logger = get_logger(__name__)
 
 
-#TODO: move the functions to their corresponding classes
 class Verifier:
     """Handles verification of downloaded AppImage files."""
 
@@ -50,7 +55,11 @@ class Verifier:
             file_size = self.file_path.stat().st_size
             logger.debug("📁 File info: %s", self.file_path.name)
             logger.debug("   Path: %s", self.file_path)
-            logger.debug("   Size: %s (%s bytes)", format_bytes(file_size), f"{file_size:,}")
+            logger.debug(
+                "   Size: %s (%s bytes)",
+                format_bytes(file_size),
+                f"{file_size:,}",
+            )
         else:
             logger.warning("⚠️  File does not exist: %s", self.file_path)
 
@@ -64,7 +73,9 @@ class Verifier:
             ValueError: If digest format is invalid or verification fails
 
         """
-        logger.debug("🔍 Starting digest verification for %s", self.file_path.name)
+        logger.debug(
+            "🔍 Starting digest verification for %s", self.file_path.name
+        )
         logger.debug("   Expected digest: %s", expected_digest)
 
         if not expected_digest:
@@ -76,7 +87,7 @@ class Verifier:
             logger.error("❌ Invalid digest format: %s", expected_digest)
             raise ValueError(f"Invalid digest format: {expected_digest}")
 
-        if algo not in ["sha1", "sha256", "sha512", "md5"]:
+        if algo not in SUPPORTED_HASH_ALGORITHMS:
             logger.error("❌ Unsupported digest algorithm: %s", algo)
             raise ValueError(f"Unsupported digest algorithm: {algo}")
 
@@ -166,7 +177,11 @@ class Verifier:
             logger.error("❌ Unsupported hash type: %s", hash_type)
             raise ValueError(f"Unsupported hash type: {hash_type}")
 
-        logger.debug("🧮 Computing %s hash for %s", hash_type.upper(), self.file_path.name)
+        logger.debug(
+            "🧮 Computing %s hash for %s",
+            hash_type.upper(),
+            self.file_path.name,
+        )
 
         hasher = hash_algorithms[hash_type]()
         bytes_processed = 0
@@ -209,24 +224,35 @@ class Verifier:
         """
         target_filename = filename or self.file_path.name
 
-        logger.debug("🔍 Starting checksum file verification for %s", self.file_path.name)
+        logger.debug(
+            "🔍 Starting checksum file verification for %s",
+            self.file_path.name,
+        )
         logger.debug("   Checksum URL: %s", checksum_url)
         logger.debug("   Target filename: %s", target_filename)
         logger.debug("   Hash type: %s", hash_type.upper())
 
         # Download checksum file
         logger.debug("📥 Downloading checksum file...")
-        checksum_content = await download_service.download_checksum_file(checksum_url)
+        checksum_content = await download_service.download_checksum_file(
+            checksum_url
+        )
         logger.debug("   Downloaded %d characters", len(checksum_content))
 
         # Parse checksum file to find our file's hash
         logger.debug("🔍 Parsing checksum file for %s...", target_filename)
-        expected_hash = self._parse_checksum_file(checksum_content, target_filename, hash_type)
+        expected_hash = self._parse_checksum_file(
+            checksum_content, target_filename, hash_type
+        )
 
         if not expected_hash:
-            logger.error("❌ Hash for %s not found in checksum file", target_filename)
+            logger.error(
+                "❌ Hash for %s not found in checksum file", target_filename
+            )
             logger.debug("   Checksum file content:\n%s", checksum_content)
-            raise ValueError(f"Hash for {target_filename} not found in checksum file")
+            raise ValueError(
+                f"Hash for {target_filename} not found in checksum file"
+            )
 
         logger.debug("✅ Found expected hash in checksum file")
         logger.debug("   Expected hash: %s", expected_hash)
@@ -271,7 +297,9 @@ class Verifier:
             return self._parse_yaml_checksum_file(content, filename)
 
         # Otherwise, parse as traditional checksum file
-        return self._parse_traditional_checksum_file(content, filename, hash_type)
+        return self._parse_traditional_checksum_file(
+            content, filename, hash_type
+        )
 
     def _is_yaml_content(self, content: str) -> bool:
         """Check if content appears to be YAML format.
@@ -311,7 +339,12 @@ class Verifier:
 
             # Check for traditional hash format patterns (hash followed by filename)
             parts = line.split()
-            if len(parts) == 2 and len(parts[0]) in [32, 40, 64, 128]:  # Common hash lengths
+            if len(parts) == 2 and len(parts[0]) in [
+                32,
+                40,
+                64,
+                128,
+            ]:  # Common hash lengths
                 # First part looks like a hex hash, second part like a filename
                 try:
                     int(parts[0], 16)  # Valid hex string
@@ -322,11 +355,17 @@ class Verifier:
 
             # Look for YAML-specific structures
             # YAML key-value pairs at root level
-            if ":" in line and not line.startswith("-") and " " not in line.split(":")[0]:
+            if (
+                ":" in line
+                and not line.startswith("-")
+                and " " not in line.split(":")[0]
+            ):
                 yaml_indicators += 1
 
             # YAML list items with structured content
-            if line.startswith("- ") and (":" in line or len(line.split()) > 2):
+            if line.startswith("- ") and (
+                ":" in line or len(line.split()) > 2
+            ):
                 yaml_indicators += 1
 
             # Indented key-value pairs (YAML structure)
@@ -344,7 +383,9 @@ class Verifier:
         # Strong YAML indicators required
         return yaml_indicators >= 2
 
-    def _parse_yaml_checksum_file(self, content: str, target_filename: str) -> str | None:
+    def _parse_yaml_checksum_file(
+        self, content: str, target_filename: str
+    ) -> str | None:
         """Parse YAML format checksum file (like latest-linux.yml).
 
         Args:
@@ -356,7 +397,9 @@ class Verifier:
 
         """
         if not _YAML_AVAILABLE or yaml is None:
-            logger.warning("PyYAML not available - cannot parse YAML checksum files")
+            logger.warning(
+                "PyYAML not available - cannot parse YAML checksum files"
+            )
             return None
 
         try:
@@ -365,9 +408,15 @@ class Verifier:
             # Handle Electron auto-updater format
             if isinstance(data, dict):
                 # Check if it's the main file referenced at root level
-                if data.get("path") == target_filename and "sha512" in data:
-                    logger.debug("✅ Found hash for %s in YAML root level", target_filename)
-                    base64_hash = data["sha512"]
+                if (
+                    data.get("path") == target_filename
+                    and YAML_DEFAULT_HASH in data
+                ):
+                    logger.debug(
+                        "✅ Found hash for %s in YAML root level",
+                        target_filename,
+                    )
+                    base64_hash = data[YAML_DEFAULT_HASH]
                     return self._convert_base64_to_hex(base64_hash)
 
                 # Check in files array
@@ -379,7 +428,7 @@ class Verifier:
                             and file_info.get("url") == target_filename
                         ):
                             # Look for any hash type
-                            for hash_type in ["sha512", "sha256", "sha1", "md5"]:
+                            for hash_type in HASH_PREFERENCE_ORDER:
                                 if hash_type in file_info:
                                     logger.debug(
                                         "✅ Found %s hash for %s in YAML files array",
@@ -387,9 +436,14 @@ class Verifier:
                                         target_filename,
                                     )
                                     base64_hash = file_info[hash_type]
-                                    return self._convert_base64_to_hex(base64_hash)
+                                    return self._convert_base64_to_hex(
+                                        base64_hash
+                                    )
 
-            logger.info("Could not find hash for %s in YAML checksum file", target_filename)
+            logger.info(
+                "Could not find hash for %s in YAML checksum file",
+                target_filename,
+            )
             return None
 
         except Exception as e:
@@ -411,14 +465,18 @@ class Verifier:
 
         """
         lines = content.strip().split("\n")
-        logger.debug("🔍 Parsing %d lines in traditional checksum file", len(lines))
+        logger.debug(
+            "🔍 Parsing %d lines in traditional checksum file", len(lines)
+        )
 
         found_entries = []
 
         for line_num, line in enumerate(lines, 1):
             line = line.strip()
             if not line or line.startswith("#"):
-                logger.debug("   Line %d: Skipping (empty or comment)", line_num)
+                logger.debug(
+                    "   Line %d: Skipping (empty or comment)", line_num
+                )
                 continue
 
             logger.debug("   Line %d: %s", line_num, line)
@@ -446,7 +504,9 @@ class Verifier:
             if hash_value and file_name:
                 logger.debug("      Parsed hash: %s", hash_value)
                 logger.debug("      Parsed filename: %s", file_name)
-                found_entries.append((hash_value, file_name, Path(file_name).name))
+                found_entries.append(
+                    (hash_value, file_name, Path(file_name).name)
+                )
 
             # Remove path separators and compare just the filename
             if file_name and Path(file_name).name == filename:
@@ -455,10 +515,18 @@ class Verifier:
                 logger.debug("   Full filename in checksum: %s", file_name)
                 return hash_value
 
-        logger.info("⚠️  Target file %s not found in traditional checksum file", filename)
+        logger.info(
+            "⚠️  Target file %s not found in traditional checksum file",
+            filename,
+        )
         logger.debug("   Found %d entries:", len(found_entries))
         for hash_val, full_name, base_name in found_entries:
-            logger.debug("      • %s (full: %s) -> %s...", base_name, full_name, hash_val[:16])
+            logger.debug(
+                "      • %s (full: %s) -> %s...",
+                base_name,
+                full_name,
+                hash_val[:16],
+            )
 
         return None
 
@@ -472,7 +540,7 @@ class Verifier:
         parts = line.split(None, 1)
         return parts[0], parts[1].strip("*")
 
-    #TODO: is that necessary to make global func for private func?
+    # TODO: is that necessary to make global func for private func?
     def detect_hash_type_from_filename(self, filename: str) -> HashType:
         """Detect hash type from checksum filename.
 
@@ -508,9 +576,9 @@ class Verifier:
         elif "md5" in filename_lower:
             return "md5"
         elif filename_lower.endswith(".digest"):
-            return "sha256"  # .DIGEST files typically use sha256
+            return DEFAULT_HASH_TYPE  # .DIGEST files typically use default
         else:
-            return "sha256"  # Default fallback
+            return DEFAULT_HASH_TYPE  # Default fallback
 
     def _convert_base64_to_hex(self, base64_hash: str) -> str:
         """Convert Base64 encoded hash to hexadecimal format.
