@@ -153,7 +153,12 @@ class InstallService:
                     "characteristic_suffix": [],
                 },
                 "github": {},
-                "verification": {},
+                "verification": {
+                    "digest": True,
+                    "skip": False,
+                    "checksum_file": "",
+                    "checksum_hash_type": "sha256",
+                },
                 "icon": {"extraction": True, "url": None},
             }
 
@@ -291,8 +296,9 @@ class InstallService:
                     task_id,
                 )
                 if not verify_result["passed"]:
+                    error_msg = verify_result.get("error", "Unknown error")
                     raise InstallationError(
-                        f"Verification failed: {verify_result.get('error', 'Unknown error')}"
+                        f"Verification failed: {error_msg}"
                     )
 
             # 3. Move to install directory
@@ -646,14 +652,24 @@ class InstallService:
             Config creation result
 
         """
-        # Extract digest from verification
+        # Extract digest hash string from verification result
         digest = None
         if verify_result and verify_result.get("passed"):
             methods = verify_result.get("methods", {})
             if "digest" in methods:
-                digest = methods["digest"]
+                # Extract just the hash string from digest verification result
+                digest_result = methods["digest"]
+                if isinstance(digest_result, dict):
+                    digest = digest_result.get("hash")
+                else:
+                    digest = digest_result
             elif "sha256" in methods:
                 digest = f"sha256:{methods['sha256']}"
+
+        # Get updated verification config from verification result
+        updated_verification_config = app_config.get("verification", {})
+        if verify_result and "updated_config" in verify_result:
+            updated_verification_config.update(verify_result["updated_config"])
 
         # Get owner/repo
         owner = app_config.get("owner", "unknown")
@@ -667,6 +683,8 @@ class InstallService:
             "repo": repo,
             "installed_path": str(app_path),
             "appimage": {
+                "version": release_data.get("tag_name", "unknown"),
+                "name": app_path.name,
                 "rename": app_config.get("appimage", {}).get(
                     "rename", app_name
                 ),
@@ -676,13 +694,11 @@ class InstallService:
                 "characteristic_suffix": app_config.get("appimage", {}).get(
                     "characteristic_suffix", []
                 ),
-                "version": release_data.get("version", "unknown"),
-                "name": app_path.name,
                 "installed_date": datetime.now().isoformat(),
                 "digest": digest,
             },
             "github": app_config.get("github", {}),
-            "verification": app_config.get("verification", {}),
+            "verification": updated_verification_config,
             "icon": {
                 "extraction": app_config.get("icon", {}).get(
                     "extraction", True
