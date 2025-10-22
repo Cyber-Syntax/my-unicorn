@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.commands.install import InstallCommand, InstallHandler
-from my_unicorn.models import ValidationError
+from my_unicorn.exceptions import ValidationError
 
 
 @pytest.fixture
@@ -58,8 +58,12 @@ async def test_execute_with_valid_targets(install_command, mock_dependencies):
     install_command._initialize_services_with_progress(show_progress=False)
 
     # Mock the template method execution
-    with patch.object(install_command, '_execute_catalog_install', new_callable=AsyncMock) as mock_catalog:
-        with patch.object(install_command, '_execute_url_install', new_callable=AsyncMock) as mock_url:
+    with patch.object(
+        install_command, "_execute_catalog_install", new_callable=AsyncMock
+    ) as mock_catalog:
+        with patch.object(
+            install_command, "_execute_url_install", new_callable=AsyncMock
+        ) as mock_url:
             mock_catalog.return_value = [{"success": True}]
             mock_url.return_value = [{"success": True}]
 

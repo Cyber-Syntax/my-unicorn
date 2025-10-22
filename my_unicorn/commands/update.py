@@ -1,13 +1,13 @@
 """Update command handler for my-unicorn CLI.
 
-Simplified to directly use UpdateManager without template overhead.
+Simplified to use direct display functions instead of UpdateResult objects.
 """
 
 from argparse import Namespace
 
 from ..logger import get_logger
-from ..models import UpdateResult, UpdateResultDisplay
 from ..services.progress import get_progress_service, progress_session
+from ..utils import display_update_error, display_update_summary
 from .base import BaseCommandHandler
 
 logger = get_logger(__name__)
@@ -26,7 +26,7 @@ class UpdateHandler(BaseCommandHandler):
         """Execute the update command.
 
         Args:
-            args: Parsed command-line arguments containing update parameters
+            args: Parsed command-line arguments containing update parameters.
 
         """
         try:
@@ -37,38 +37,29 @@ class UpdateHandler(BaseCommandHandler):
 
             # Execute based on mode
             if check_only:
-                result = await self._check_for_updates(
-                    app_names, refresh_cache
-                )
+                await self._check_for_updates(app_names, refresh_cache)
             else:
-                result = await self._perform_updates(app_names, refresh_cache)
-
-            # Display results
-            UpdateResultDisplay.display_summary(result)
-
-            logger.debug("Update operation completed: %s", result.message)
+                await self._perform_updates(app_names, refresh_cache)
 
         except Exception as e:
             logger.error("Update command failed: %s", e)
-            UpdateResultDisplay.display_error(f"Update operation failed: {e}")
+            display_update_error(f"Update operation failed: {e}")
 
     async def _check_for_updates(
         self, app_names: list[str] | None, refresh_cache: bool
-    ) -> UpdateResult:
+    ) -> None:
         """Check for updates without installing them.
 
         Args:
-            app_names: Specific apps to check, or None for all
-            refresh_cache: Whether to bypass cache
-
-        Returns:
-            UpdateResult with check results
+            app_names: Specific apps to check, or None for all.
+            refresh_cache: Whether to bypass cache.
 
         """
         # Get target apps
         target_apps = self._get_target_apps(app_names)
         if not target_apps:
-            return self._create_empty_result("No apps to check")
+            print("No apps to check.")
+            return
 
         # Check for updates with progress message
         update_infos = await self.update_manager.check_updates(
@@ -78,40 +69,31 @@ class UpdateHandler(BaseCommandHandler):
         )
 
         if not update_infos:
-            return self._create_empty_result("Failed to check for updates")
+            print("Failed to check for updates.")
+            return
 
         # Display check results
         self._display_check_results(update_infos)
 
-        # Create result
-        return UpdateResult(
-            success=True,
-            updated_apps=[],
-            failed_apps=[],
-            up_to_date_apps=[
-                info.app_name for info in update_infos if not info.has_update
-            ],
-            update_infos=update_infos,
-            message=f"Checked {len(update_infos)} app(s)",
+        logger.debug(
+            "Check operation completed for %s app(s)", len(update_infos)
         )
 
     async def _perform_updates(
         self, app_names: list[str] | None, refresh_cache: bool
-    ) -> UpdateResult:
+    ) -> None:
         """Perform actual updates on apps.
 
         Args:
-            app_names: Specific apps to update, or None for all
-            refresh_cache: Whether to bypass cache
-
-        Returns:
-            UpdateResult with update results
+            app_names: Specific apps to update, or None for all.
+            refresh_cache: Whether to bypass cache.
 
         """
         # Get target apps
         target_apps = self._get_target_apps(app_names)
         if not target_apps:
-            return self._create_empty_result("No apps to update")
+            print("No apps to update.")
+            return
 
         # Check for updates first (without progress bar)
         update_infos = await self.update_manager.check_updates(
@@ -121,7 +103,8 @@ class UpdateHandler(BaseCommandHandler):
         )
 
         if not update_infos:
-            return self._create_empty_result("Failed to check for updates")
+            print("Failed to check for updates.")
+            return
 
         # Filter to apps needing updates
         apps_to_update = [
@@ -131,14 +114,9 @@ class UpdateHandler(BaseCommandHandler):
         # If no updates needed, return early without progress bar
         if not apps_to_update:
             up_to_date = [info.app_name for info in update_infos]
-            return UpdateResult(
-                success=True,
-                updated_apps=[],
-                failed_apps=[],
-                up_to_date_apps=up_to_date,
-                update_infos=update_infos,
-                message=f"All {len(update_infos)} app(s) are up to date",
-            )
+            print(f"\n✅ All {len(update_infos)} app(s) are up to date")
+            logger.debug("No updates needed for %s app(s)", len(update_infos))
+            return
 
         # Only start progress session if there are apps to update
         async with progress_session():
@@ -164,8 +142,42 @@ class UpdateHandler(BaseCommandHandler):
 
                 await progress_service.finish_task(api_task_id, success=True)
 
-                # Create final result
-                return self._create_update_result(update_results, update_infos)
+                # Display results using new display functions
+                updated_apps = [
+                    app for app, success in update_results.items() if success
+                ]
+                failed_apps = [
+                    app
+                    for app, success in update_results.items()
+                    if not success
+                ]
+                up_to_date_apps = [
+                    info.app_name
+                    for info in update_infos
+                    if not info.has_update
+                ]
+
+                display_update_summary(
+                    updated_apps=updated_apps,
+                    failed_apps=failed_apps,
+                    up_to_date_apps=up_to_date_apps,
+                    update_infos=update_infos,
+                    check_only=False,
+                )
+
+                # Log final status
+                updated_count = len(updated_apps)
+                failed_count = len(failed_apps)
+                if updated_count > 0 and failed_count == 0:
+                    message = f"Successfully updated {updated_count}/{len(update_infos)} app(s)"
+                elif updated_count > 0 and failed_count > 0:
+                    message = f"Updated {updated_count} app(s), {failed_count} failed"
+                elif failed_count > 0:
+                    message = f"Failed to update {failed_count}/{len(update_infos)} app(s)"
+                else:
+                    message = f"All {len(update_infos)} app(s) processed"
+
+                logger.debug("Update operation completed: %s", message)
 
             except Exception:
                 await progress_service.finish_task(api_task_id, success=False)
@@ -177,10 +189,10 @@ class UpdateHandler(BaseCommandHandler):
         """Get target apps with validation.
 
         Args:
-            app_names: Specific apps or None for all
+            app_names: Specific apps or None for all.
 
         Returns:
-            List of valid installed app names
+            List of valid installed app names.
 
         """
         installed_apps = self.config_manager.list_installed_apps()
@@ -217,7 +229,7 @@ class UpdateHandler(BaseCommandHandler):
         """Display check results in formatted table.
 
         Args:
-            update_infos: List of UpdateInfo objects
+            update_infos: List of UpdateInfo objects.
 
         """
         has_updates = False
@@ -250,7 +262,7 @@ class UpdateHandler(BaseCommandHandler):
         """Display which apps will be updated.
 
         Args:
-            update_infos: List of UpdateInfo objects
+            update_infos: List of UpdateInfo objects.
 
         """
         apps_with_updates = [info for info in update_infos if info.has_update]
@@ -259,86 +271,18 @@ class UpdateHandler(BaseCommandHandler):
             print(f"📦 Updating {len(apps_with_updates)} app(s):")
             for info in apps_with_updates:
                 print(
-                    f"   • {info.app_name}: "
-                    f"{info.current_version} → {info.latest_version}"
+                    f"   • {info.app_name}: {info.current_version} → {info.latest_version}"
                 )
             print()  # Empty line
-
-    def _create_update_result(
-        self, update_results: dict[str, bool], update_infos: list
-    ) -> UpdateResult:
-        """Create UpdateResult from update operation results.
-
-        Args:
-            update_results: Dict mapping app names to success status
-            update_infos: List of UpdateInfo objects
-
-        Returns:
-            UpdateResult object
-
-        """
-        updated_apps = [
-            app for app, success in update_results.items() if success
-        ]
-        failed_apps = [
-            app for app, success in update_results.items() if not success
-        ]
-        up_to_date_apps = [
-            info.app_name for info in update_infos if not info.has_update
-        ]
-
-        # Generate message
-        updated_count = len(updated_apps)
-        failed_count = len(failed_apps)
-        total_checked = len(update_infos)
-
-        if updated_count > 0 and failed_count == 0:
-            message = (
-                f"Successfully updated {updated_count}/{total_checked} app(s)"
-            )
-        elif updated_count > 0 and failed_count > 0:
-            message = f"Updated {updated_count} app(s), {failed_count} failed"
-        elif failed_count > 0:
-            message = f"Failed to update {failed_count}/{total_checked} app(s)"
-        else:
-            message = f"All {total_checked} app(s) processed"
-
-        return UpdateResult(
-            success=len(failed_apps) == 0,
-            updated_apps=updated_apps,
-            failed_apps=failed_apps,
-            up_to_date_apps=up_to_date_apps,
-            update_infos=update_infos,
-            message=message,
-        )
-
-    def _create_empty_result(self, message: str) -> UpdateResult:
-        """Create empty result for edge cases.
-
-        Args:
-            message: Descriptive message
-
-        Returns:
-            Empty UpdateResult
-
-        """
-        return UpdateResult(
-            success=True,
-            updated_apps=[],
-            failed_apps=[],
-            up_to_date_apps=[],
-            update_infos=[],
-            message=message,
-        )
 
     def _parse_app_names(self, args: Namespace) -> list[str]:
         """Parse app names from command arguments.
 
         Args:
-            args: Command arguments
+            args: Command arguments.
 
         Returns:
-            List of app names
+            List of app names.
 
         """
         if not args.apps:

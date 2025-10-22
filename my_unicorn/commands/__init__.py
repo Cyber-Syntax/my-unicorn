@@ -14,8 +14,8 @@ from .update import UpdateHandler
 from .upgrade import UpgradeHandler
 
 __all__ = [
-    "BaseCommandHandler",
     "AuthHandler",
+    "BaseCommandHandler",
     "ConfigHandler",
     "InstallHandler",
     "ListHandler",

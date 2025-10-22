@@ -48,8 +48,8 @@ def test_format_bytes_with_floats():
     assert utils.format_bytes(1610612736.0) == "1.5 GB"
     assert utils.format_bytes(1127428915.2) == "1.1 GB"
     assert utils.format_bytes(1509949439.0) == "1.4 GB"
-    assert utils.format_bytes(1.5 * 1024 ** 4) == "1.5 TB"
-    assert utils.format_bytes(1.5 * 1024 ** 5) == "1.5 PB"
+    assert utils.format_bytes(1.5 * 1024**4) == "1.5 TB"
+    assert utils.format_bytes(1.5 * 1024**5) == "1.5 PB"
 
 
 def test_validate_version_string_semver():
@@ -67,6 +67,12 @@ def test_create_desktop_entry_name_normalizes():
     assert utils.create_desktop_entry_name("QOwnNotes") == "qownnotes.desktop"
     assert utils.create_desktop_entry_name("Siyuan!") == "siyuan.desktop"
     assert utils.create_desktop_entry_name("") == "appimage.desktop"
-    assert utils.create_desktop_entry_name("Standard Notes") == "standardnotes.desktop"
-    assert utils.create_desktop_entry_name("Standard-Notes") == "standard-notes.desktop"
+    assert (
+        utils.create_desktop_entry_name("Standard Notes")
+        == "standardnotes.desktop"
+    )
+    assert (
+        utils.create_desktop_entry_name("Standard-Notes")
+        == "standard-notes.desktop"
+    )
     assert utils.create_desktop_entry_name("FreeTube") == "freetube.desktop"

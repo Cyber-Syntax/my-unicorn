@@ -28,9 +28,7 @@ def update_handler(mock_config_manager, mock_update_manager):
     )
 
 
-@pytest.mark.skip(
-    reason="Update command uses template pattern now, not strategy pattern"
-)
+@pytest.mark.skip(reason="Update command uses template pattern now, not strategy pattern")
 @pytest.mark.asyncio
 async def test_update_handler_executes_strategy_success(update_handler):
     """Test UpdateHandler executes strategy and displays summary on success."""
@@ -65,17 +63,11 @@ async def test_update_handler_executes_strategy_success(update_handler):
         mock_strategy.validate_inputs.assert_called_once_with(mock_context)
         mock_strategy.execute.assert_awaited_once_with(mock_context)
         mock_display_summary.assert_called_once_with(mock_result)
-        mock_logger.debug.assert_any_call(
-            "Selected strategy: %s", "MockStrategy"
-        )
-        mock_logger.debug.assert_any_call(
-            "Update operation completed: %s", "Update completed"
-        )
+        mock_logger.debug.assert_any_call("Selected strategy: %s", "MockStrategy")
+        mock_logger.debug.assert_any_call("Update operation completed: %s", "Update completed")
 
 
-@pytest.mark.skip(
-    reason="Update command uses template pattern now, not strategy pattern"
-)
+@pytest.mark.skip(reason="Update command uses template pattern now, not strategy pattern")
 @pytest.mark.asyncio
 async def test_update_handler_invalid_inputs(update_handler):
     """Test UpdateHandler does not execute strategy if inputs are invalid."""
@@ -112,9 +104,7 @@ async def test_update_handler_exception_handling(update_handler):
             "my_unicorn.commands.update.UpdateHandler._get_target_apps",
             side_effect=Exception("Boom"),
         ),
-        patch(
-            "my_unicorn.commands.update.UpdateResultDisplay.display_error"
-        ) as mock_display_error,
+        patch("my_unicorn.commands.update.display_update_error") as mock_display_error,
         patch("my_unicorn.commands.update.logger") as mock_logger,
     ):
         args = Namespace(apps=["app1"], check_only=False, refresh_cache=False)
@@ -122,10 +112,7 @@ async def test_update_handler_exception_handling(update_handler):
 
         mock_display_error.assert_called_once()
         mock_logger.error.assert_called_once()
-        assert (
-            "Update operation failed: Boom"
-            in mock_display_error.call_args[0][0]
-        )
+        assert "Update operation failed: Boom" in mock_display_error.call_args[0][0]
 
 
 def test_parse_app_names_handles_comma_separated(update_handler):
@@ -135,9 +122,7 @@ def test_parse_app_names_handles_comma_separated(update_handler):
     assert expanded == ["foo", "bar", "baz"]
 
 
-def test_get_target_apps_validates_installed(
-    update_handler, mock_config_manager
-):
+def test_get_target_apps_validates_installed(update_handler, mock_config_manager):
     """Test _get_target_apps validates apps are installed."""
     mock_config_manager.list_installed_apps.return_value = ["app1", "app2"]
 

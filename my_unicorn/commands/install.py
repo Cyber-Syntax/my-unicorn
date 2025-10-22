@@ -14,9 +14,9 @@ from my_unicorn.download import DownloadService
 from my_unicorn.services.install_service import InstallService
 from my_unicorn.storage import StorageService
 
+from ..exceptions import ValidationError
 from ..github_client import GitHubClient
 from ..logger import get_logger
-from ..models import ValidationError
 from .base import BaseCommandHandler
 
 logger = get_logger(__name__)

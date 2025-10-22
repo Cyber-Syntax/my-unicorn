@@ -11,9 +11,9 @@ from typing import Any
 
 from my_unicorn.desktop import DesktopEntry
 from my_unicorn.download import DownloadService
+from my_unicorn.exceptions import InstallationError
 from my_unicorn.github_client import GitHubAsset, GitHubClient
 from my_unicorn.logger import get_logger
-from my_unicorn.models import InstallationError
 from my_unicorn.services.icon_service import IconService
 from my_unicorn.storage import StorageService
 from my_unicorn.verification import VerificationService
