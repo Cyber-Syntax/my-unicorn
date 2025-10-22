@@ -3,8 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.verification.verification_service import VerificationConfig
-from my_unicorn.verification.verify import Verifier
+from my_unicorn.verification import VerificationConfig, Verifier
 
 # Test data constants
 LEGCORD_YAML_CONTENT = """version: 1.1.5
@@ -37,15 +36,13 @@ d9ad0f257893f6f2d25b948422257a938b03e6362ab638ad1a74e9bab1c0e755 siyuan-3.2.1.ap
 
 # Expected hex hash for Legcord AppImage (converted from Base64)
 LEGCORD_EXPECTED_HEX = "24d9980531bd96a5edfd55e67acdf6a6eddb9f3fd868a3337e31552fed09f92f0c49697b9cb987a2599434b140b9ba72d4959353011d94f5bc52144dc4d890bb"
-LEGCORD_BASE64_HASH = (
-    "JNmYBTG9lqXt/VXmes32pu3bnz/YaKMzfjFVL+0J+S8MSWl7nLmHolmUNLFAubpy1JWTUwEdlPW8UhRNxNiQuw=="
-)
+LEGCORD_BASE64_HASH = "JNmYBTG9lqXt/VXmes32pu3bnz/YaKMzfjFVL+0J+S8MSWl7nLmHolmUNLFAubpy1JWTUwEdlPW8UhRNxNiQuw=="
 
 
 @pytest.fixture
 def patch_logger():
     """Patch get_logger to avoid real logging output."""
-    with patch("my_unicorn.verification.verify.get_logger") as mock_logger:
+    with patch("my_unicorn.verification.verifier.get_logger") as mock_logger:
         yield mock_logger
 
 
@@ -103,7 +100,7 @@ def test_convert_base64_to_hex_invalid(tmp_path: Path, patch_logger):
     file.write_bytes(b"test")
     verifier = Verifier(file)
 
-    with pytest.raises(ValueError, match="Invalid Base64 hash"):
+    with pytest.raises(ValueError, match="Invalid base64 hash"):
         verifier._convert_base64_to_hex("not_valid_base64!")
 
 
@@ -214,7 +211,9 @@ def test_parse_yaml_checksum_file_invalid_yaml(tmp_path: Path, patch_logger):
 
     invalid_yaml = "{ invalid: yaml: content: ["
 
-    hash_value = verifier._parse_yaml_checksum_file(invalid_yaml, "test.AppImage")
+    hash_value = verifier._parse_yaml_checksum_file(
+        invalid_yaml, "test.AppImage"
+    )
 
     assert hash_value is None
 
@@ -229,10 +228,15 @@ def test_parse_traditional_checksum_file(tmp_path: Path, patch_logger):
         SIYUAN_SHA256SUMS_CONTENT, "siyuan-3.2.1-linux.AppImage", "sha256"
     )
 
-    assert hash_value == "3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef"
+    assert (
+        hash_value
+        == "3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef"
+    )
 
 
-def test_parse_traditional_checksum_file_with_asterisk(tmp_path: Path, patch_logger):
+def test_parse_traditional_checksum_file_with_asterisk(
+    tmp_path: Path, patch_logger
+):
     """Test parsing traditional checksum file with asterisk prefix."""
     file = tmp_path / "file.bin"
     file.write_bytes(b"test")
@@ -247,7 +251,9 @@ def test_parse_traditional_checksum_file_with_asterisk(tmp_path: Path, patch_log
     assert hash_value == "abc123def456"
 
 
-def test_parse_traditional_checksum_file_not_found(tmp_path: Path, patch_logger):
+def test_parse_traditional_checksum_file_not_found(
+    tmp_path: Path, patch_logger
+):
     """Test parsing traditional checksum file when target not found."""
     file = tmp_path / "file.bin"
     file.write_bytes(b"test")
@@ -260,7 +266,9 @@ def test_parse_traditional_checksum_file_not_found(tmp_path: Path, patch_logger)
     assert hash_value is None
 
 
-def test_parse_traditional_checksum_file_with_comments(tmp_path: Path, patch_logger):
+def test_parse_traditional_checksum_file_with_comments(
+    tmp_path: Path, patch_logger
+):
     """Test parsing traditional checksum file with comments and empty lines."""
     file = tmp_path / "file.bin"
     file.write_bytes(b"test")
@@ -288,10 +296,15 @@ def test_detect_hash_type_from_filename(tmp_path: Path, patch_logger):
     verifier = Verifier(file)
 
     assert verifier._detect_hash_type_from_filename("SHA512SUMS") == "sha512"
-    assert verifier._detect_hash_type_from_filename("SHA256SUMS.txt") == "sha256"
+    assert (
+        verifier._detect_hash_type_from_filename("SHA256SUMS.txt") == "sha256"
+    )
     assert verifier._detect_hash_type_from_filename("checksums.sha1") == "sha1"
     assert verifier._detect_hash_type_from_filename("hashes.md5") == "md5"
-    assert verifier._detect_hash_type_from_filename("latest-linux.yml") == "sha256"  # Default
+    assert (
+        verifier._detect_hash_type_from_filename("latest-linux.yml")
+        == "sha256"
+    )  # Default
 
 
 def test_parse_checksum_file_auto_detect_yaml(tmp_path: Path, patch_logger):
@@ -307,7 +320,9 @@ def test_parse_checksum_file_auto_detect_yaml(tmp_path: Path, patch_logger):
     assert hash_value == LEGCORD_EXPECTED_HEX
 
 
-def test_parse_checksum_file_auto_detect_traditional(tmp_path: Path, patch_logger):
+def test_parse_checksum_file_auto_detect_traditional(
+    tmp_path: Path, patch_logger
+):
     """Test automatic detection and parsing of traditional checksum files."""
     file = tmp_path / "file.bin"
     file.write_bytes(b"test")
@@ -317,7 +332,10 @@ def test_parse_checksum_file_auto_detect_traditional(tmp_path: Path, patch_logge
         SIYUAN_SHA256SUMS_CONTENT, "siyuan-3.2.1-linux.AppImage", "sha256"
     )
 
-    assert hash_value == "3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef"
+    assert (
+        hash_value
+        == "3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef"
+    )
     file = tmp_path / "file.bin"
     file.write_bytes(b"abc")
     verifier = Verifier(file)
@@ -387,7 +405,9 @@ async def test_verify_from_checksum_file_success(tmp_path: Path, patch_logger):
     verifier = Verifier(file)
     checksum_content = f"{verifier.compute_hash('sha256')} {file.name}\n"
     mock_download_service = MagicMock()
-    mock_download_service.download_checksum_file = AsyncMock(return_value=checksum_content)
+    mock_download_service.download_checksum_file = AsyncMock(
+        return_value=checksum_content
+    )
     await verifier.verify_from_checksum_file(
         checksum_url="http://example.com/checksum.txt",
         hash_type="sha256",
@@ -397,14 +417,18 @@ async def test_verify_from_checksum_file_success(tmp_path: Path, patch_logger):
 
 
 @pytest.mark.asyncio
-async def test_verify_from_checksum_file_not_found(tmp_path: Path, patch_logger):
+async def test_verify_from_checksum_file_not_found(
+    tmp_path: Path, patch_logger
+):
     """Test Verifier.verify_from_checksum_file raises if hash not found."""
     file = tmp_path / "file.bin"
     file.write_bytes(b"abc")
     verifier = Verifier(file)
     checksum_content = "deadbeef otherfile.bin\n"
     mock_download_service = MagicMock()
-    mock_download_service.download_checksum_file = AsyncMock(return_value=checksum_content)
+    mock_download_service.download_checksum_file = AsyncMock(
+        return_value=checksum_content
+    )
     with pytest.raises(ValueError):
         await verifier.verify_from_checksum_file(
             checksum_url="http://example.com/checksum.txt",

@@ -34,7 +34,9 @@ class TestInstallService:
         github_client = Mock()
         github_client.get_latest_release = AsyncMock(
             return_value={
-                "version": "1.0.0",
+                "tag_name": "1.0.0",
+                "original_tag_name": "v1.0.0",
+                "prerelease": False,
                 "assets": [
                     {
                         "name": "test.appimage",
@@ -42,6 +44,7 @@ class TestInstallService:
                         "size": 1024,
                     }
                 ],
+                "html_url": "https://github.com/test-owner/test-repo/releases/tag/v1.0.0",
             }
         )
 

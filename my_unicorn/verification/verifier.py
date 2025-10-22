@@ -1,7 +1,7 @@
-"""Verification utilities for AppImage integrity checking.
+"""Verifier class for AppImage integrity checking.
 
-This module provides various verification methods including digest verification,
-checksum file parsing, and hash computation for downloaded AppImages.
+This module provides the core Verifier class that handles hash computation,
+digest verification, and checksum file parsing for downloaded AppImages.
 """
 
 import base64
@@ -29,7 +29,7 @@ try:
 
     _YAML_AVAILABLE = True
 except ImportError:
-    yaml = None  # type: ignore
+    yaml = None  # type: ignore[assignment]
     _YAML_AVAILABLE = False
 
 
@@ -105,7 +105,8 @@ class Verifier:
             logger.error("   Algorithm: %s", algo.upper())
             logger.error("   File: %s", self.file_path)
             raise ValueError(
-                f"Digest mismatch!\nExpected: {hash_value}\nActual:   {actual_hash}"
+                f"Digest mismatch!\nExpected: {hash_value}\n"
+                f"Actual:   {actual_hash}"
             )
 
         logger.debug("✅ Digest verification PASSED!")
@@ -215,8 +216,8 @@ class Verifier:
         Args:
             checksum_url: URL to the checksum file
             hash_type: Type of hash used in checksum file
-            download_service: DownloadService instance for downloading checksum file
-            filename: Specific filename to look for (defaults to file_path.name)
+            download_service: DownloadService for downloading file
+            filename: Specific filename to look for (default: file_path.name)
 
         Raises:
             ValueError: If verification fails or checksum not found
@@ -302,306 +303,340 @@ class Verifier:
         )
 
     def _is_yaml_content(self, content: str) -> bool:
-        """Check if content appears to be YAML format.
+        """Detect if content is YAML format.
 
         Args:
             content: File content to check
 
         Returns:
-            True if content appears to be YAML
+            True if content appears to be YAML, False otherwise
 
         """
-        if not _YAML_AVAILABLE or yaml is None:
+        if not _YAML_AVAILABLE:
             return False
 
-        # Try to parse as YAML first - most reliable method
-        try:
-            data = yaml.safe_load(content)
-            # Valid YAML but check if it's structured data (not just plain text)
-            if isinstance(data, (dict, list)):
-                return True
-            # If it's just a string, it might be traditional checksum content
-            return False
-        except yaml.YAMLError:
-            # Fall back to heuristic detection
-            pass
+        # Quick heuristic checks before attempting YAML parsing
+        content_stripped = content.strip()
 
-        # Basic YAML detection heuristics - be more strict
-        lines = content.strip().split("\n")
-        yaml_indicators = 0
-        traditional_hash_indicators = 0
-
-        for line in lines:
-            original_line = line
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-
-            # Check for traditional hash format patterns (hash followed by filename)
-            parts = line.split()
-            if len(parts) == 2 and len(parts[0]) in [
-                32,
-                40,
-                64,
-                128,
-            ]:  # Common hash lengths
-                # First part looks like a hex hash, second part like a filename
-                try:
-                    int(parts[0], 16)  # Valid hex string
-                    traditional_hash_indicators += 1
-                    continue
-                except ValueError:
-                    pass
-
-            # Look for YAML-specific structures
-            # YAML key-value pairs at root level
-            if (
-                ":" in line
-                and not line.startswith("-")
-                and " " not in line.split(":")[0]
-            ):
-                yaml_indicators += 1
-
-            # YAML list items with structured content
-            if line.startswith("- ") and (
-                ":" in line or len(line.split()) > 2
-            ):
-                yaml_indicators += 1
-
-            # Indented key-value pairs (YAML structure)
-            if (
-                original_line.startswith(("  ", "\t"))
-                and ":" in line
-                and not line.startswith("-")
-            ):
-                yaml_indicators += 1
-
-        # Prioritize traditional format detection
-        if traditional_hash_indicators > 0 and yaml_indicators == 0:
+        # Empty content is not YAML
+        if not content_stripped:
             return False
 
-        # Strong YAML indicators required
-        return yaml_indicators >= 2
+        # Check for YAML indicators
+        yaml_indicators = [
+            "version:",  # Common YAML key
+            "files:",  # Common YAML key for checksum files
+            "\n  ",  # Indentation is common in YAML
+        ]
+
+        has_yaml_indicator = any(
+            indicator in content_stripped for indicator in yaml_indicators
+        )
+
+        # Check for traditional checksum format indicators
+        lines = content_stripped.split("\n")
+        if lines:
+            first_line = lines[0].strip()
+            # Traditional format: "hash filename" or "hash *filename"
+            # Hash is typically 32 (MD5), 40 (SHA1), 64 (SHA256),
+            # or 128 (SHA512) hex chars
+            min_parts = 2
+            parts = first_line.split()
+            if len(parts) >= min_parts:
+                potential_hash = parts[0]
+                # Check if first part looks like a hash
+                # (hex string of expected length)
+                if len(potential_hash) in {32, 40, 64, 128} and all(
+                    c in "0123456789abcdefABCDEF" for c in potential_hash
+                ):
+                    # This looks like a traditional checksum file
+                    return False
+
+        # If we found YAML indicators and no strong traditional indicators,
+        # try parsing as YAML
+        if has_yaml_indicator:
+            try:
+                data = yaml.safe_load(content_stripped)
+                # Valid YAML that's also a dict with expected structure
+                if isinstance(data, dict) and (
+                    "files" in data or "version" in data
+                ):
+                    logger.debug("   Detected YAML format checksum file")
+                    return True
+            except yaml.YAMLError:
+                # Not valid YAML
+                return False
+
+        return False
 
     def _parse_yaml_checksum_file(
-        self, content: str, target_filename: str
+        self, content: str, filename: str
     ) -> str | None:
-        """Parse YAML format checksum file (like latest-linux.yml).
+        """Parse YAML format checksum file.
 
         Args:
-            content: YAML file content
-            target_filename: Name of file to find hash for
+            content: YAML content
+            filename: Target filename to find
 
         Returns:
-            Hash value for the file or None if not found (converted from Base64 to hex)
+            Hash value or None if not found
 
         """
-        if not _YAML_AVAILABLE or yaml is None:
-            logger.warning(
-                "PyYAML not available - cannot parse YAML checksum files"
-            )
+        if not _YAML_AVAILABLE:
+            logger.warning("⚠️  YAML parsing not available")
             return None
 
         try:
             data = yaml.safe_load(content)
+            logger.debug("   Parsed YAML checksum file")
+            logger.debug("   Structure keys: %s", list(data.keys()))
 
-            # Handle Electron auto-updater format
-            if isinstance(data, dict):
-                # Check if it's the main file referenced at root level
-                if (
-                    data.get("path") == target_filename
-                    and YAML_DEFAULT_HASH in data
-                ):
-                    logger.debug(
-                        "✅ Found hash for %s in YAML root level",
-                        target_filename,
-                    )
-                    base64_hash = data[YAML_DEFAULT_HASH]
-                    return self._convert_base64_to_hex(base64_hash)
+            # Look for files section
+            if "files" not in data:
+                logger.debug("   No 'files' section in YAML")
+                return None
 
-                # Check in files array
-                files = data.get("files", [])
-                if isinstance(files, list):
-                    for file_info in files:
-                        if (
-                            isinstance(file_info, dict)
-                            and file_info.get("url") == target_filename
-                        ):
-                            # Look for any hash type
-                            for hash_type in HASH_PREFERENCE_ORDER:
-                                if hash_type in file_info:
-                                    logger.debug(
-                                        "✅ Found %s hash for %s in YAML files array",
-                                        hash_type,
-                                        target_filename,
-                                    )
-                                    base64_hash = file_info[hash_type]
+            files = data["files"]
+            logger.debug("   Files section type: %s", type(files))
+            logger.debug("   Looking for: %s", filename)
+
+            # Handle different YAML structures
+            if isinstance(files, dict):
+                # Structure: files: {filename: hash, ...}
+                hash_value = files.get(filename)
+                if hash_value:
+                    logger.debug("   Found hash in dict structure")
+                    # Handle potential format like "sha256:hash" or just "hash"
+                    if isinstance(hash_value, str):
+                        # Remove algorithm prefix if present
+                        if ":" in hash_value:
+                            _, _, hash_value = hash_value.partition(":")
+                        # Convert base64 to hex if needed
+                        try:
+                            return self._convert_base64_to_hex(hash_value)
+                        except ValueError:
+                            # If conversion fails, assume it's already hex
+                            return hash_value
+                    elif isinstance(hash_value, dict):
+                        # Handle structure like {sha256: hash}
+                        # Try hash from default or first available algorithm
+                        for algo in HASH_PREFERENCE_ORDER:
+                            if algo in hash_value:
+                                hash_val = hash_value[algo]
+                                # Convert base64 to hex if needed
+                                try:
                                     return self._convert_base64_to_hex(
-                                        base64_hash
+                                        hash_val
                                     )
+                                except ValueError:
+                                    # If conversion fails, assume hex
+                                    return hash_val
+                        # Return first available hash
+                        first_hash = next(iter(hash_value.values()))
+                        try:
+                            return self._convert_base64_to_hex(first_hash)
+                        except ValueError:
+                            # If conversion fails, assume it's already hex
+                            return first_hash
+            elif isinstance(files, list):
+                # Structure: files: [{name: filename, hash: value}, ...]
+                # or files: [{url: filename, sha512: value}, ...]
+                for file_entry in files:
+                    if not isinstance(file_entry, dict):
+                        continue
 
-            logger.info(
-                "Could not find hash for %s in YAML checksum file",
-                target_filename,
-            )
+                    # Check both 'name' and 'url' fields for filename match
+                    file_name = file_entry.get("name") or file_entry.get("url")
+                    if file_name == filename:
+                        logger.debug("   Found hash in list structure")
+                        # Try to get hash from various possible keys
+                        hash_value = (
+                            file_entry.get("hash")
+                            or file_entry.get(YAML_DEFAULT_HASH)
+                            or file_entry.get("sha256")
+                        )
+                        if hash_value:
+                            # Remove algorithm prefix if present
+                            if (
+                                isinstance(hash_value, str)
+                                and ":" in hash_value
+                            ):
+                                _, _, hash_value = hash_value.partition(":")
+                            # Convert base64 to hex if needed
+                            try:
+                                return self._convert_base64_to_hex(hash_value)
+                            except ValueError:
+                                # If conversion fails, assume it's already hex
+                                return hash_value
+
+            logger.debug("   Hash not found for %s in YAML", filename)
             return None
 
-        except Exception as e:
-            logger.error("Error parsing YAML checksum file: %s", e)
+        except yaml.YAMLError as e:
+            logger.error("❌ Failed to parse YAML checksum file: %s", e)
             return None
 
     def _parse_traditional_checksum_file(
         self, content: str, filename: str, hash_type: HashType
     ) -> str | None:
-        """Parse traditional format checksum file.
+        """Parse traditional checksum file format.
+
+        Supports multiple formats:
+        - Standard: "hash  filename" or "hash *filename"
+        - SHA256SUMS: "hash filename"
+        - With paths: "hash  ./path/to/filename"
 
         Args:
             content: Checksum file content
-            filename: Target filename to find hash for
+            filename: Target filename to find
             hash_type: Type of hash being used
 
         Returns:
-            Hash value for the file or None if not found
+            Hash value or None if not found
 
         """
+        logger.debug("   Parsing as traditional checksum file format")
+        logger.debug("   Looking for: %s", filename)
+        logger.debug("   Hash type: %s", hash_type)
+
         lines = content.strip().split("\n")
-        logger.debug(
-            "🔍 Parsing %d lines in traditional checksum file", len(lines)
-        )
+        logger.debug("   Total lines: %d", len(lines))
 
-        found_entries = []
-
-        for line_num, line in enumerate(lines, 1):
-            line = line.strip()
+        for line_num, raw_line in enumerate(lines, 1):
+            line = raw_line.strip()
             if not line or line.startswith("#"):
-                logger.debug(
-                    "   Line %d: Skipping (empty or comment)", line_num
-                )
                 continue
 
-            logger.debug("   Line %d: %s", line_num, line)
+            # Try to parse the line
+            parsed = self._parse_sha256sums_line(line)
+            if not parsed:
+                continue
 
-            # Handle different checksum file formats
-            hash_value = None
-            file_name = None
+            hash_value, file_in_checksum = parsed
 
-            if self._is_sha256sums_format(line):
-                hash_value, file_name = self._parse_sha256sums_line(line)
-                logger.debug("      Format: SHA256SUMS")
-            else:
-                # Try generic "hash filename" format
-                parts = line.split()
-                if len(parts) >= 2:
-                    hash_value, file_name = (
-                        parts[0],
-                        parts[1].lstrip("*"),
-                    )  # Remove optional * prefix
-                    logger.debug("      Format: Generic")
-                else:
-                    logger.debug("      Format: Unknown/Invalid")
-                    continue
-
-            if hash_value and file_name:
-                logger.debug("      Parsed hash: %s", hash_value)
-                logger.debug("      Parsed filename: %s", file_name)
-                found_entries.append(
-                    (hash_value, file_name, Path(file_name).name)
-                )
-
-            # Remove path separators and compare just the filename
-            if file_name and Path(file_name).name == filename:
-                logger.debug("✅ Found matching entry for %s", filename)
-                logger.debug("   Hash: %s", hash_value)
-                logger.debug("   Full filename in checksum: %s", file_name)
-                return hash_value
-
-        logger.info(
-            "⚠️  Target file %s not found in traditional checksum file",
-            filename,
-        )
-        logger.debug("   Found %d entries:", len(found_entries))
-        for hash_val, full_name, base_name in found_entries:
             logger.debug(
-                "      • %s (full: %s) -> %s...",
-                base_name,
-                full_name,
-                hash_val[:16],
+                "   Line %d: hash=%s... file=%s",
+                line_num,
+                hash_value[:16],
+                file_in_checksum,
             )
 
+            # Check if this is our file (match exact or basename)
+            if file_in_checksum == filename or file_in_checksum.endswith(
+                f"/{filename}"
+            ):
+                logger.debug("   ✅ Match found on line %d", line_num)
+                logger.debug("   Hash: %s", hash_value)
+                return hash_value
+
+        logger.debug("   No match found for %s", filename)
         return None
 
     def _is_sha256sums_format(self, line: str) -> bool:
-        """Check if line is in SHA256SUMS format."""
-        parts = line.split()
-        return len(parts) >= 2 and len(parts[0]) == 64
+        """Check if line is in SHA256SUMS format.
 
-    def _parse_sha256sums_line(self, line: str) -> tuple[str, str]:
-        """Parse SHA256SUMS format line."""
+        Args:
+            line: Line to check
+
+        Returns:
+            True if line appears to be SHA256SUMS format
+
+        """
+        return " " in line and not line.startswith(" ")
+
+    def _parse_sha256sums_line(self, line: str) -> tuple[str, str] | None:
+        """Parse a single line from checksum file.
+
+        Args:
+            line: Line to parse
+
+        Returns:
+            Tuple of (hash, filename) or None if parsing fails
+
+        """
+        # Split on whitespace, expecting "hash filename" or "hash *filename"
+        expected_parts = 2
         parts = line.split(None, 1)
-        return parts[0], parts[1].strip("*")
+        if len(parts) != expected_parts:
+            return None
 
-    # TODO: is that necessary to make global func for private func?
+        hash_value = parts[0]
+        filename_part = parts[1]
+
+        # Remove binary mode indicator if present
+        if filename_part.startswith("*"):
+            filename_part = filename_part[1:]
+
+        # Remove leading ./ if present
+        if filename_part.startswith("./"):
+            filename_part = filename_part[2:]
+
+        return hash_value, filename_part
+
     def detect_hash_type_from_filename(self, filename: str) -> HashType:
         """Detect hash type from checksum filename.
 
-        This is a public method that can be used by external services.
-
         Args:
-            filename: Checksum file name
+            filename: Checksum filename
 
         Returns:
-            Detected hash type (defaults to sha256)
+            Detected hash type or default
 
         """
-        return self._detect_hash_type_from_filename(filename)
+        detected = self._detect_hash_type_from_filename(filename)
+        return detected if detected else DEFAULT_HASH_TYPE
 
-    def _detect_hash_type_from_filename(self, filename: str) -> HashType:
+    def _detect_hash_type_from_filename(
+        self, filename: str
+    ) -> HashType | None:
         """Detect hash type from checksum filename.
 
         Args:
-            filename: Checksum file name
+            filename: Checksum filename
 
         Returns:
-            Detected hash type (defaults to sha256)
+            Detected hash type or None
 
         """
         filename_lower = filename.lower()
 
-        if "sha512" in filename_lower or "512" in filename_lower:
-            return "sha512"
-        elif "sha256" in filename_lower or "256" in filename_lower:
-            return "sha256"
-        elif "sha1" in filename_lower:
-            return "sha1"
-        elif "md5" in filename_lower:
-            return "md5"
-        elif filename_lower.endswith(".digest"):
-            return DEFAULT_HASH_TYPE  # .DIGEST files typically use default
-        else:
-            return DEFAULT_HASH_TYPE  # Default fallback
+        # Check for explicit hash type in filename
+        hash_patterns = {
+            "sha512": ["sha512", "sha-512"],
+            "sha256": ["sha256", "sha-256"],
+            "sha1": ["sha1", "sha-1"],
+            "md5": ["md5"],
+        }
+
+        for hash_type, patterns in hash_patterns.items():
+            if any(pattern in filename_lower for pattern in patterns):
+                logger.debug(
+                    "   Detected %s hash type from filename", hash_type
+                )
+                return hash_type  # type: ignore[return-value]
+
+        return None
 
     def _convert_base64_to_hex(self, base64_hash: str) -> str:
-        """Convert Base64 encoded hash to hexadecimal format.
+        """Convert base64 encoded hash to hexadecimal.
 
         Args:
-            base64_hash: Base64 encoded hash string
+            base64_hash: Base64 encoded hash
 
         Returns:
             Hexadecimal hash string
 
         Raises:
-            ValueError: If Base64 decoding fails
+            ValueError: If base64 decoding fails
 
         """
         try:
-            # Decode Base64 to bytes
+            # Decode base64
             hash_bytes = base64.b64decode(base64_hash)
-            # Convert bytes to hexadecimal string
+            # Convert to hex
             hex_hash = hash_bytes.hex()
-            logger.debug("🔄 Converted Base64 hash to hex:")
-            logger.debug("   Base64: %s", base64_hash)
-            logger.debug("   Hex:    %s", hex_hash)
+            logger.debug("   Converted base64 to hex: %s", hex_hash)
             return hex_hash
         except Exception as e:
-            logger.error("❌ Failed to convert Base64 hash to hex: %s", e)
-            raise ValueError(f"Invalid Base64 hash: {base64_hash}") from e
+            logger.error("❌ Failed to convert base64 to hex: %s", e)
+            raise ValueError(f"Invalid base64 hash: {base64_hash}") from e

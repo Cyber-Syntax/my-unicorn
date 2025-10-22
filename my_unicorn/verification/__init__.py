@@ -1,37 +1,19 @@
-"""Verification strategies and services."""
+"""Simplified verification module for AppImage integrity checking.
 
-from my_unicorn.verification.detection import (
-    ChecksumFilePrioritizationService,
-    VerificationDetectionService,
-)
-from my_unicorn.verification.factory import (
-    VerificationServiceFacade,
-    VerificationStrategyFactory,
-)
-from my_unicorn.verification.strategies import (
-    ChecksumFileVerificationStrategy,
-    DigestVerificationStrategy,
-    VerificationStrategy,
-)
-from my_unicorn.verification.verification_service import (
-    VerificationService,
-    VerificationResult,
+This module provides a streamlined API for verifying downloaded AppImages
+using digest verification and checksum file verification methods.
+"""
+
+from my_unicorn.verification.service import (
     VerificationConfig,
-    VerificationServiceFacade,
+    VerificationResult,
+    VerificationService,
 )
-from my_unicorn.verification.verify import Verifier
+from my_unicorn.verification.verifier import Verifier
 
 __all__ = [
-    "VerificationStrategy",
-    "DigestVerificationStrategy", 
-    "ChecksumFileVerificationStrategy",
-    "VerificationDetectionService",
-    "ChecksumFilePrioritizationService",
-    "VerificationStrategyFactory",
-    "VerificationServiceFacade",
+    "Verifier",
     "VerificationService",
     "VerificationResult",
     "VerificationConfig",
-    "VerificationServiceFacade",
-    "Verifier",
 ]

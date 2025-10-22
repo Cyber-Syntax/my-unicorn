@@ -6,7 +6,7 @@ import pytest
 
 from my_unicorn.download import DownloadService, IconAsset
 from my_unicorn.services.icon_service import IconConfig, IconService
-from my_unicorn.verification.verification_service import VerificationService
+from my_unicorn.verification.service import VerificationService
 
 
 @pytest.fixture

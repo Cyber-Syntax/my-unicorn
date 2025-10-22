@@ -19,7 +19,7 @@ except ImportError:
 
 
 from my_unicorn.services.icon_service import IconService
-from my_unicorn.verification.verification_service import VerificationService
+from my_unicorn.verification import VerificationService
 
 from .auth import GitHubAuthManager
 from .backup import BackupService
