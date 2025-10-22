@@ -7,6 +7,7 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import aiohttp
 import pytest
 
+from my_unicorn.github_client import Release
 from my_unicorn.update import UpdateInfo, UpdateManager
 
 # Test constants
@@ -208,9 +209,7 @@ class TestUpdateManager:
             }
             mock_config.load_catalog_entry.return_value = None
 
-            with patch(
-                "my_unicorn.update.GitHubReleaseFetcher"
-            ) as mock_fetcher_cls:
+            with patch("my_unicorn.update.ReleaseFetcher") as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
                 mock_fetcher.fetch_latest_release.return_value = {
@@ -245,11 +244,14 @@ class TestUpdateManager:
             "github": {"use_github_api": True, "use_prerelease": False}
         }
 
-        mock_release_data = {
-            "version": "1.2.0",
-            "prerelease": False,
-            "original_tag_name": "v1.2.0",
-        }
+        mock_release_data = Release(
+            owner="test-owner",
+            repo="test-repo",
+            version="1.2.0",
+            prerelease=False,
+            assets=[],
+            original_tag_name="v1.2.0",
+        )
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
@@ -258,9 +260,7 @@ class TestUpdateManager:
         ):
             update_manager = UpdateManager(mock_config_manager)
 
-            with patch(
-                "my_unicorn.update.GitHubReleaseFetcher"
-            ) as mock_fetcher_cls:
+            with patch("my_unicorn.update.ReleaseFetcher") as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
                 # Mock both possible method calls
@@ -322,9 +322,7 @@ class TestUpdateManager:
         ):
             update_manager = UpdateManager(mock_config_manager)
 
-            with patch(
-                "my_unicorn.update.GitHubReleaseFetcher"
-            ) as mock_fetcher_cls:
+            with patch("my_unicorn.update.ReleaseFetcher") as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
                 # Create proper mock request info and history
@@ -366,9 +364,7 @@ class TestUpdateManager:
         ):
             update_manager = UpdateManager(mock_config_manager)
 
-            with patch(
-                "my_unicorn.update.GitHubReleaseFetcher"
-            ) as mock_fetcher_cls:
+            with patch("my_unicorn.update.ReleaseFetcher") as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
                 mock_fetcher.fetch_latest_release.side_effect = error

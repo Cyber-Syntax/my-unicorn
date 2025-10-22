@@ -3,7 +3,13 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import pytest_asyncio
 
-from my_unicorn.github_client import ChecksumFileInfo, GitHubClient, GitHubReleaseFetcher
+from my_unicorn.github_client import (
+    Asset,
+    AssetSelector,
+    ChecksumFileInfo,
+    GitHubClient,
+    ReleaseFetcher,
+)
 
 
 @pytest_asyncio.fixture
@@ -14,9 +20,12 @@ def mock_session():
 
 @pytest.mark.asyncio
 async def test_fetch_latest_release_success(mock_session):
-    """Test GitHubReleaseFetcher.fetch_latest_release returns release data."""
-    fetcher = GitHubReleaseFetcher(
-        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session
+    """Test ReleaseFetcher.fetch_latest_release returns release data."""
+    fetcher = ReleaseFetcher(
+        owner="Cyber-Syntax",
+        repo="my-unicorn",
+        session=mock_session,
+        use_cache=False,
     )
     # Prepare mock response
     mock_response = AsyncMock()
@@ -29,7 +38,10 @@ async def test_fetch_latest_release_success(mock_session):
             "prerelease": False,
             "assets": [
                 {
-                    "browser_download_url": "https://github.com/Cyber-Syntax/my-unicorn/releases/download/v1.2.3/app.AppImage"
+                    "name": "app.AppImage",
+                    "size": 12345,
+                    "digest": "",
+                    "browser_download_url": "https://github.com/Cyber-Syntax/my-unicorn/releases/download/v1.2.3/app.AppImage",
                 }
             ],
         }
@@ -37,13 +49,10 @@ async def test_fetch_latest_release_success(mock_session):
     mock_session.get.return_value = mock_response
 
     result = await fetcher.fetch_latest_release()
-    assert result["version"] == "1.2.3"
-    assert result["prerelease"] is False
-    # The result may have assets or browser_download_url at top level
-    if result.get("assets"):
-        assert result["assets"][0]["browser_download_url"].endswith(".AppImage")
-    elif "browser_download_url" in result:
-        assert result["browser_download_url"].endswith(".AppImage")
+    assert result.version == "1.2.3"
+    assert result.prerelease is False
+    assert len(result.assets) > 0
+    assert result.assets[0].browser_download_url.endswith(".AppImage")
 
 
 def test_detect_checksum_files_yaml_priority():
@@ -69,7 +78,15 @@ def test_detect_checksum_files_yaml_priority():
         },
     ]
 
-    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v1.0.0")
+    # Convert to Asset objects
+    asset_objects = [
+        Asset.from_api_response(a)
+        for a in assets
+        if Asset.from_api_response(a)
+    ]
+    checksum_files = AssetSelector.detect_checksum_files(
+        asset_objects, "v1.0.0"
+    )
 
     assert len(checksum_files) == 2
     # YAML should be first (prioritized)
@@ -136,7 +153,15 @@ def test_detect_checksum_files_multiple_patterns():
         },
     ]
 
-    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v1.0.0")
+    # Convert to Asset objects
+    asset_objects = [
+        Asset.from_api_response(a)
+        for a in assets
+        if Asset.from_api_response(a)
+    ]
+    checksum_files = AssetSelector.detect_checksum_files(
+        asset_objects, "v1.0.0"
+    )
 
     detected_names = [cf.filename for cf in checksum_files]
 
@@ -187,7 +212,15 @@ def test_detect_checksum_files_format_detection():
         },
     ]
 
-    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v1.0.0")
+    # Convert to Asset objects
+    asset_objects = [
+        Asset.from_api_response(a)
+        for a in assets
+        if Asset.from_api_response(a)
+    ]
+    checksum_files = AssetSelector.detect_checksum_files(
+        asset_objects, "v1.0.0"
+    )
 
     # Check format types
     format_map = {cf.filename: cf.format_type for cf in checksum_files}
@@ -221,7 +254,15 @@ def test_detect_checksum_files_case_insensitive():
         },
     ]
 
-    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v1.0.0")
+    # Convert to Asset objects
+    asset_objects = [
+        Asset.from_api_response(a)
+        for a in assets
+        if Asset.from_api_response(a)
+    ]
+    checksum_files = AssetSelector.detect_checksum_files(
+        asset_objects, "v1.0.0"
+    )
 
     assert len(checksum_files) == 3
     detected_names = [cf.filename for cf in checksum_files]
@@ -232,7 +273,7 @@ def test_detect_checksum_files_case_insensitive():
 
 def test_detect_checksum_files_empty_assets():
     """Test checksum file detection with empty assets list."""
-    checksum_files = GitHubReleaseFetcher.detect_checksum_files([], "v1.0.0")
+    checksum_files = AssetSelector.detect_checksum_files([], "v1.0.0")
     assert len(checksum_files) == 0
 
 
@@ -259,7 +300,15 @@ def test_detect_checksum_files_no_checksum_files():
         },
     ]
 
-    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v1.0.0")
+    # Convert to Asset objects
+    asset_objects = [
+        Asset.from_api_response(a)
+        for a in assets
+        if Asset.from_api_response(a)
+    ]
+    checksum_files = AssetSelector.detect_checksum_files(
+        asset_objects, "v1.0.0"
+    )
     assert len(checksum_files) == 0
 
 
@@ -286,7 +335,15 @@ def test_detect_checksum_files_legcord_example():
         },
     ]
 
-    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v1.1.5")
+    # Convert to Asset objects
+    asset_objects = [
+        Asset.from_api_response(a)
+        for a in assets
+        if Asset.from_api_response(a)
+    ]
+    checksum_files = AssetSelector.detect_checksum_files(
+        asset_objects, "v1.1.5"
+    )
 
     assert len(checksum_files) == 1
     assert checksum_files[0].filename == "latest-linux.yml"
@@ -317,7 +374,15 @@ def test_detect_checksum_files_siyuan_example():
         },
     ]
 
-    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v3.2.1")
+    # Convert to Asset objects
+    asset_objects = [
+        Asset.from_api_response(a)
+        for a in assets
+        if Asset.from_api_response(a)
+    ]
+    checksum_files = AssetSelector.detect_checksum_files(
+        asset_objects, "v3.2.1"
+    )
 
     assert len(checksum_files) == 1
     assert checksum_files[0].filename == "SHA256SUMS.txt"
@@ -354,7 +419,15 @@ def test_detect_checksum_files_appimage_patterns():
         },
     ]
 
-    checksum_files = GitHubReleaseFetcher.detect_checksum_files(assets, "v2.0.0")
+    # Convert to Asset objects
+    asset_objects = [
+        Asset.from_api_response(a)
+        for a in assets
+        if Asset.from_api_response(a)
+    ]
+    checksum_files = AssetSelector.detect_checksum_files(
+        asset_objects, "v2.0.0"
+    )
 
     assert len(checksum_files) == 3
     detected_names = [cf.filename for cf in checksum_files]
@@ -371,7 +444,9 @@ def test_detect_checksum_files_appimage_patterns():
 def test_checksum_file_info_dataclass():
     """Test ChecksumFileInfo dataclass creation and immutability."""
     info = ChecksumFileInfo(
-        filename="test.yml", url="https://example.com/test.yml", format_type="yaml"
+        filename="test.yml",
+        url="https://example.com/test.yml",
+        format_type="yaml",
     )
 
     assert info.filename == "test.yml"
@@ -386,14 +461,19 @@ def test_checksum_file_info_dataclass():
 @pytest.mark.asyncio
 async def test_fetch_latest_release_api_error(mock_session):
     """Test fetch_latest_release raises on API error."""
-    fetcher = GitHubReleaseFetcher(
-        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session, use_cache=False
+    fetcher = ReleaseFetcher(
+        owner="Cyber-Syntax",
+        repo="my-unicorn",
+        session=mock_session,
+        use_cache=False,
     )
     mock_response = AsyncMock()
     mock_response.__aenter__.return_value = mock_response
     mock_response.status = 404
     # Make raise_for_status a regular Mock, not async
-    mock_response.raise_for_status = MagicMock(side_effect=Exception("Not Found"))
+    mock_response.raise_for_status = MagicMock(
+        side_effect=Exception("Not Found")
+    )
     mock_session.get.return_value = mock_response
 
     with pytest.raises(Exception):
@@ -403,8 +483,11 @@ async def test_fetch_latest_release_api_error(mock_session):
 @pytest.mark.asyncio
 async def test_fetch_latest_release_network_error(mock_session):
     """Test fetch_latest_release handles network error (e.g., connection lost)."""
-    fetcher = GitHubReleaseFetcher(
-        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session, use_cache=False
+    fetcher = ReleaseFetcher(
+        owner="Cyber-Syntax",
+        repo="my-unicorn",
+        session=mock_session,
+        use_cache=False,
     )
     # Simulate aiohttp.ClientError (network error)
     import aiohttp
@@ -417,8 +500,11 @@ async def test_fetch_latest_release_network_error(mock_session):
 @pytest.mark.asyncio
 async def test_fetch_latest_release_timeout(mock_session):
     """Test fetch_latest_release handles timeout error."""
-    fetcher = GitHubReleaseFetcher(
-        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session, use_cache=False
+    fetcher = ReleaseFetcher(
+        owner="Cyber-Syntax",
+        repo="my-unicorn",
+        session=mock_session,
+        use_cache=False,
     )
     import asyncio
 
@@ -430,7 +516,7 @@ async def test_fetch_latest_release_timeout(mock_session):
 @pytest.mark.asyncio
 async def test_fetch_latest_release_malformed_response(mock_session):
     """Test fetch_latest_release handles malformed API response."""
-    fetcher = GitHubReleaseFetcher(
+    fetcher = ReleaseFetcher(
         owner="Cyber-Syntax", repo="my-unicorn", session=mock_session
     )
     mock_response = AsyncMock()
@@ -457,14 +543,14 @@ async def test_fetch_latest_release_malformed_response(mock_session):
 
 def test_build_icon_url_and_extract_icon_filename():
     """Test build_icon_url and extract_icon_filename produce correct results."""
-    fetcher = GitHubReleaseFetcher(
-        owner="Cyber-Syntax", repo="my-unicorn", session=MagicMock()
+    icon_url = ReleaseFetcher.build_icon_url(
+        "Cyber-Syntax", "my-unicorn", "icon.png"
     )
-    icon_url = fetcher.build_icon_url("icon.png")
     assert (
-        icon_url == "https://raw.githubusercontent.com/Cyber-Syntax/my-unicorn/main/icon.png"
+        icon_url
+        == "https://raw.githubusercontent.com/Cyber-Syntax/my-unicorn/main/icon.png"
     )
-    filename = fetcher.extract_icon_filename(icon_url, "my-unicorn")
+    filename = ReleaseFetcher.extract_icon_filename(icon_url, "my-unicorn")
     assert filename == "my-unicorn.png"
 
 

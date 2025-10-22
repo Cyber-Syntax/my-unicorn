@@ -12,7 +12,12 @@ from typing import Any
 from my_unicorn.desktop import DesktopEntry
 from my_unicorn.download import DownloadService
 from my_unicorn.exceptions import InstallationError
-from my_unicorn.github_client import GitHubAsset, GitHubClient
+from my_unicorn.github_client import (
+    Asset,
+    AssetSelector,
+    GitHubClient,
+    Release,
+)
 from my_unicorn.logger import get_logger
 from my_unicorn.services.icon_service import IconService
 from my_unicorn.storage import StorageService
@@ -240,7 +245,7 @@ class InstallService:
     async def _install_workflow(
         self,
         app_name: str,
-        asset: GitHubAsset,
+        asset: Asset,
         release_data: dict[str, Any],
         app_config: dict[str, Any],
         source: str,
@@ -277,7 +282,7 @@ class InstallService:
 
         try:
             # 1. Download
-            download_path = download_dir / asset["name"]
+            download_path = download_dir / asset.name
             logger.info("📥 Downloading %s", app_name)
             downloaded_path = await self.download_service.download_appimage(
                 asset, download_path, show_progress=show_progress
@@ -404,7 +409,7 @@ class InstallService:
         owner: str,
         repo: str,
         installation_source: str = "catalog",
-    ) -> GitHubAsset:
+    ) -> Asset:
         """Select best AppImage asset from release.
 
         Args:
@@ -415,27 +420,33 @@ class InstallService:
             installation_source: Installation source ("catalog" or "url")
 
         Returns:
-            Selected GitHubAsset
+            Selected Asset
 
         """
-        from my_unicorn.github_client import GitHubReleaseFetcher
-
         assets = release_data.get("assets", [])
         if not assets:
             raise InstallationError("No assets found in release")
 
-        # Get shared API task if available
-        shared_api_task_id = getattr(
-            self.github_client, "shared_api_task_id", None
+        # Convert dict assets to Asset objects
+        asset_objects = []
+        for asset_dict in assets:
+            asset = Asset.from_api_response(asset_dict)
+            if asset:
+                asset_objects.append(asset)
+
+        # Create minimal Release object for selection
+        release = Release(
+            owner=owner,
+            repo=repo,
+            version=release_data.get("tag_name", ""),
+            prerelease=release_data.get("prerelease", False),
+            assets=asset_objects,
+            original_tag_name=release_data.get("original_tag_name", ""),
         )
 
-        # Create fetcher and select asset
-        fetcher = GitHubReleaseFetcher(
-            owner, repo, self.github_client.session, shared_api_task_id
-        )
-
-        asset = fetcher.select_best_appimage(
-            release_data,
+        # Use AssetSelector to find best AppImage
+        asset = AssetSelector.select_appimage_for_platform(
+            release,
             preferred_suffixes=characteristic_suffix,
             installation_source=installation_source,
         )
@@ -451,7 +462,7 @@ class InstallService:
     async def _verify_appimage(
         self,
         file_path: Path,
-        asset: GitHubAsset,
+        asset: Asset,
         app_config: dict[str, Any],
         release_data: dict[str, Any],
         app_name: str,

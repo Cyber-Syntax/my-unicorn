@@ -25,7 +25,7 @@ from .auth import GitHubAuthManager
 from .backup import BackupService
 from .config import ConfigManager
 from .download import DownloadService, IconAsset
-from .github_client import GitHubAsset, GitHubReleaseFetcher
+from .github_client import Asset, AssetSelector, Release, ReleaseFetcher
 from .logger import get_logger
 from .storage import StorageService
 
@@ -48,7 +48,7 @@ class UpdateInfo:
         release_url: str = "",
         prerelease: bool = False,
         original_tag_name: str = "",
-        release_data: dict[str, Any] | None = None,
+        release_data: Release | None = None,
     ):
         """Initialize update information.
 
@@ -257,7 +257,7 @@ class UpdateManager:
             # The same release data will be fetched again in update_single_app()
             # This causes 2 API calls per app instead of 1
             # Fetch latest release
-            fetcher = GitHubReleaseFetcher(
+            fetcher = ReleaseFetcher(
                 owner, repo, session, self._shared_api_task_id
             )
             if should_use_prerelease:
@@ -292,7 +292,7 @@ class UpdateManager:
                     )
                 )
 
-            latest_version = release_data["version"]
+            latest_version = release_data.version
             has_update = self._compare_versions(
                 current_version, latest_version
             )
@@ -305,10 +305,9 @@ class UpdateManager:
                 latest_version=latest_version,
                 has_update=has_update,
                 release_url=f"https://github.com/{owner}/{repo}/releases/tag/{latest_version}",
-                prerelease=release_data.get("prerelease", False),
-                original_tag_name=release_data.get(
-                    "original_tag_name", f"v{latest_version}"
-                ),
+                prerelease=release_data.prerelease,
+                original_tag_name=release_data.original_tag_name
+                or f"v{latest_version}",
                 release_data=release_data,  # Store for in-memory reuse
             )
 
@@ -470,7 +469,7 @@ class UpdateManager:
 
             download_service_temp = DownloadService(None)  # type: ignore[arg-type]
             filename = download_service_temp.get_filename_from_url(
-                appimage_asset["browser_download_url"]
+                appimage_asset.browser_download_url
             )
             download_path = download_dir / filename
 
@@ -567,23 +566,23 @@ class UpdateManager:
 
     def _find_appimage_asset(
         self,
-        release_data: dict[str, Any],
+        release_data: Release,
         catalog_entry: dict[str, Any] | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> Asset | None:
         """Find best AppImage asset from release data using selection logic.
 
         For updates, we always prefer stable versions over experimental/beta
         builds to ensure consistency with initial catalog installations.
 
         Args:
-            release_data: Release data from GitHub API
+            release_data: Release object from GitHub API
             catalog_entry: Optional catalog entry for preferred suffixes
 
         Returns:
-            Best AppImage asset dict or None if not found
+            Best AppImage Asset object or None if not found
 
         """
-        if not release_data or "assets" not in release_data:
+        if not release_data or not release_data.assets:
             return None
 
         # Get preferred suffixes from catalog if available
@@ -593,26 +592,15 @@ class UpdateManager:
             if isinstance(appimage_config, dict):
                 preferred_suffixes = appimage_config.get("preferred_suffixes")
 
-        # Use GitHubReleaseFetcher's select_best_appimage logic
-        # Note: This method expects GitHubReleaseDetails but works with dict
-        from my_unicorn.github_client import GitHubReleaseFetcher
-
-        # Create temporary fetcher instance for selection logic
-        # Session not needed for selection logic, only for API calls
-        fetcher = GitHubReleaseFetcher("", "", None, None)  # type: ignore[arg-type]
-
         # Use "url" installation source to filter out experimental versions
         # This ensures we get stable builds during updates, even for catalog apps
-        best_asset = fetcher.select_best_appimage(
-            release_data=release_data,  # type: ignore[arg-type]
+        best_asset = AssetSelector.select_appimage_for_platform(
+            release_data,
             preferred_suffixes=preferred_suffixes,
             installation_source="url",  # Filter experimental versions
         )
 
-        # Convert GitHubAsset back to dict for compatibility
-        if best_asset:
-            return dict(best_asset)
-        return None
+        return best_asset
 
     async def _process_post_download(
         self,
@@ -622,8 +610,8 @@ class UpdateManager:
         owner: str,
         repo: str,
         catalog_entry: dict[str, Any] | None,
-        appimage_asset: dict[str, Any],
-        release_data: dict[str, Any],
+        appimage_asset: Asset,
+        release_data: Release,
         icon_dir: Path,
         storage_dir: Path,
         downloaded_path: Path,
@@ -637,7 +625,7 @@ class UpdateManager:
             owner: GitHub owner
             repo: GitHub repository
             catalog_entry: Catalog entry or None
-            appimage_asset: AppImage asset
+            appimage_asset: AppImage Asset object
             release_data: Release data
             icon_dir: Icon directory path
             storage_dir: Storage directory path
@@ -772,8 +760,8 @@ class UpdateManager:
         owner: str,
         repo: str,
         update_info: UpdateInfo,
-        appimage_asset: dict[str, Any],
-        release_data: dict[str, Any],
+        appimage_asset: Asset,
+        release_data: Release,
         downloaded_path: Path,
         progress_service: Any,
         post_processing_task_id: str | None,
@@ -787,7 +775,7 @@ class UpdateManager:
             owner: GitHub owner
             repo: GitHub repository
             update_info: Update information
-            appimage_asset: AppImage asset
+            appimage_asset: AppImage Asset object
             release_data: Release data
             downloaded_path: Path to downloaded file
             progress_service: Progress service
@@ -836,7 +824,7 @@ class UpdateManager:
                 repo,
                 update_info.original_tag_name,
                 app_name,
-                release_data=dict(release_data),
+                release_data=release_data,
                 progress_task_id=post_processing_task_id,
             )
 
@@ -897,8 +885,8 @@ class UpdateManager:
         app_name: str,
         app_config: dict[str, Any],
         catalog_entry: dict[str, Any] | None,
-        appimage_asset: dict[str, Any],
-        release_data: dict[str, Any],
+        appimage_asset: Asset,
+        release_data: Release,
         icon_dir: Path,
         appimage_path: Path,
         progress_service: Any,
@@ -910,7 +898,7 @@ class UpdateManager:
             app_name: Name of the app
             app_config: App configuration
             catalog_entry: Catalog entry or None
-            appimage_asset: AppImage asset
+            appimage_asset: AppImage Asset object
             release_data: Release data
             icon_dir: Icon directory path
             appimage_path: Path to AppImage
@@ -1128,15 +1116,17 @@ class UpdateManager:
             logger.warning("⚠️  Failed to update desktop entry: %s", e)
 
     def _get_stored_hash(
-        self, verification_results: dict[str, Any], appimage_asset: GitHubAsset
+        self,
+        verification_results: dict[str, Any],
+        appimage_asset: Asset,
     ) -> str:
         """Get the hash to store from verification results or asset digest."""
         if verification_results.get("digest", {}).get("passed"):
             return verification_results["digest"]["hash"]
         elif verification_results.get("checksum_file", {}).get("passed"):
             return verification_results["checksum_file"]["hash"]
-        elif appimage_asset.get("digest"):
-            return appimage_asset["digest"]
+        elif appimage_asset.digest:
+            return appimage_asset.digest
         return ""
 
     async def _setup_update_icon(
@@ -1195,13 +1185,13 @@ class UpdateManager:
     async def _perform_update_verification(
         self,
         path: Path,
-        asset: GitHubAsset,
+        asset: dict[str, Any],
         verification_config: dict[str, Any],
         owner: str,
         repo: str,
         tag_name: str,
         app_name: str,
-        release_data: dict[str, Any] | None = None,
+        release_data: Release | None = None,
         progress_task_id: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Perform update verification using priority-based approach.
@@ -1222,33 +1212,37 @@ class UpdateManager:
         """
         logger.debug("🔍 _perform_update_verification called for %s", app_name)
         logger.debug("   📋 Verification config: %s", verification_config)
-        logger.debug("   📦 Asset digest: %s", asset.get("digest", "None"))
+        logger.debug("   📦 Asset digest: %s", asset.digest or "None")
 
         if self.verification_service is None:
             raise RuntimeError("Verification service not initialized")
 
         logger.debug("🔄 About to call VerificationService.verify_file()")
 
-        # Convert GitHubAsset to dict for service compatibility
-        asset_dict = {
-            "digest": asset.get("digest", ""),
-            "size": asset.get("size", 0),
-        }
-
         # Extract assets list from release_data if available
+        # Convert Release assets to dict format for compatibility with verification
         assets_list = []
-        if release_data and "assets" in release_data:
-            assets_list = release_data["assets"]
+        if release_data and release_data.assets:
+            # Convert Asset objects to dicts for verification service
+            for asset_obj in release_data.assets:
+                assets_list.append(
+                    {
+                        "name": asset_obj.name,
+                        "size": asset_obj.size,
+                        "browser_download_url": asset_obj.browser_download_url,
+                        "digest": asset_obj.digest or "",
+                    }
+                )
 
         try:
             logger.debug("🔍 Calling VerificationService.verify_file() with:")
-            logger.debug("   - asset_dict: %s", asset_dict)
+            logger.debug("   - asset: %s", asset)
             logger.debug("   - config: %s", verification_config)
             logger.debug("   - assets_list: %d items", len(assets_list))
 
             result = await self.verification_service.verify_file(
                 file_path=path,
-                asset=asset_dict,
+                asset=asset,
                 config=verification_config,
                 owner=owner,
                 repo=repo,

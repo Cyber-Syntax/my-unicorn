@@ -4,9 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.github_client import ChecksumFileInfo
-from my_unicorn.verification import (
-    VerificationConfig,
+from my_unicorn.github_client import Asset
+from my_unicorn.verification.service import (
     VerificationResult,
     VerificationService,
 )
@@ -167,7 +166,12 @@ class TestVerificationService:
         self, verification_service, sample_assets
     ):
         """Test detection with assets containing YAML checksum file."""
-        asset = {"digest": "", "size": 124457255}
+        asset = Asset(
+            name="Legcord-1.1.5-linux-x86_64.AppImage",
+            size=124457255,
+            browser_download_url="https://github.com/Legcord/Legcord/releases/download/v1.1.5/Legcord-1.1.5-linux-x86_64.AppImage",
+            digest=None,
+        )
         config = {"checksum_file": ""}
 
         has_digest, checksum_files = (
@@ -186,7 +190,12 @@ class TestVerificationService:
         self, verification_service, sample_assets_with_both
     ):
         """Test detection with both digest and checksum files available."""
-        asset = {"digest": "sha256:abc123", "size": 12345}
+        asset = Asset(
+            name="app.AppImage",
+            size=12345,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/app.AppImage",
+            digest="sha256:abc123",
+        )
         config = {"checksum_file": ""}
 
         has_digest, checksum_files = (
@@ -207,7 +216,12 @@ class TestVerificationService:
         self, verification_service
     ):
         """Test detection with manually configured checksum file."""
-        asset = {"digest": "", "size": 124457255}
+        asset = Asset(
+            name="test.AppImage",
+            size=124457255,
+            browser_download_url="https://github.com/owner/repo/releases/download/v1.0.0/test.AppImage",
+            digest=None,
+        )
         config = {"checksum_file": "manual-checksums.txt"}
 
         has_digest, checksum_files = (
@@ -225,7 +239,12 @@ class TestVerificationService:
         self, verification_service
     ):
         """Test backward compatibility when assets parameter is not provided."""
-        asset = {"digest": "sha256:abc123", "size": 124457255}
+        asset = Asset(
+            name="test.AppImage",
+            size=124457255,
+            browser_download_url="https://github.com/owner/repo/releases/download/v1.0.0/test.AppImage",
+            digest="sha256:abc123",
+        )
         config = {"checksum_file": "checksums.txt"}
 
         # Without assets parameter (old behavior)
@@ -454,10 +473,12 @@ class TestVerificationService:
         self, verification_service, test_file_path, sample_assets
     ):
         """Test that digest verification is prioritized over checksum files."""
-        asset = {
-            "digest": "sha256:6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72",
-            "size": 12,
-        }
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/repo/releases/download/v1.0.0/test.AppImage",
+            digest="sha256:6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72",
+        )
         config = {"skip": False}
 
         result = await verification_service.verify_file(
@@ -481,7 +502,12 @@ class TestVerificationService:
         self, verification_service, test_file_path, sample_assets
     ):
         """Test fallback to checksum file when digest is not available."""
-        asset = {"digest": "", "size": 12}  # No digest
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/Legcord/Legcord/releases/download/v1.1.5/test.AppImage",
+            digest=None,
+        )
         config = {"skip": False}
 
         verification_service.download_service.download_checksum_file = (
@@ -508,7 +534,12 @@ class TestVerificationService:
         self, verification_service, test_file_path, sample_assets_with_both
     ):
         """Test that multiple checksum files are tried and YAML is prioritized."""
-        asset = {"digest": "", "size": 12}
+        asset = Asset(
+            name="app.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/app.AppImage",
+            digest=None,
+        )
         config = {"skip": False}
 
         # Mock first checksum file (YAML) to fail
@@ -561,8 +592,13 @@ class TestVerificationService:
     async def test_verify_file_skip_verification(
         self, verification_service, test_file_path
     ):
-        """Test skipping verification when configured and no strong methods available."""
-        asset = {"digest": "", "size": 12}
+        """Test verification is skipped when configured."""
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/repo/releases/download/v1.0.0/test.AppImage",
+            digest=None,
+        )
         config = {"skip": True}
 
         result = await verification_service.verify_file(
@@ -583,7 +619,12 @@ class TestVerificationService:
         self, verification_service, test_file_path, sample_assets_with_both
     ):
         """Test when all available verification methods fail."""
-        asset = {"digest": "sha256:wrong_hash", "size": 12}
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/test.AppImage",
+            digest="sha256:wrong_hash",
+        )
         config = {"skip": False}
 
         # Use YAML content that doesn't have test.AppImage entry to force checksum failure
@@ -620,10 +661,12 @@ releaseDate: '2025-05-26T17:26:48.710Z'"""
         self, verification_service, test_file_path
     ):
         """Test backward compatibility without assets parameter."""
-        asset = {
-            "digest": "sha256:6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72",
-            "size": 12,
-        }
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/repo/releases/download/v1.0.0/test.AppImage",
+            digest="sha256:6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72",
+        )
         config = {"skip": False, "checksum_file": "manual.txt"}
 
         # Mock the download service to return proper checksum content
@@ -650,7 +693,12 @@ releaseDate: '2025-05-26T17:26:48.710Z'"""
         self, verification_service, test_file_path
     ):
         """Test with empty assets list - should fail without verification methods."""
-        asset = {"digest": "", "size": 12}
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/repo/releases/download/v1.0.0/test.AppImage",
+            digest=None,
+        )
         config = {"skip": False}
         empty_assets = []
 
@@ -680,7 +728,12 @@ releaseDate: '2025-05-26T17:26:48.710Z'"""
         self, verification_service, test_file_path, sample_assets_with_both
     ):
         """Test that configuration is properly updated based on verification results."""
-        asset = {"digest": "", "size": 12}
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/repo/releases/download/v1.0.0/test.AppImage",
+            digest=None,
+        )
         config = {"skip": True, "checksum_file": ""}  # Skip initially true
 
         verification_service.download_service.download_checksum_file = (

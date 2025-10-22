@@ -18,9 +18,9 @@ from my_unicorn.constants import (
 )
 from my_unicorn.download import DownloadService
 from my_unicorn.github_client import (
+    Asset,
+    AssetSelector,
     ChecksumFileInfo,
-    GitHubAsset,
-    GitHubReleaseFetcher,
 )
 from my_unicorn.logger import get_logger
 from my_unicorn.services.progress import ProgressService
@@ -69,7 +69,7 @@ class VerificationService:
     async def verify_file(
         self,
         file_path: Path,
-        asset: dict[str, Any],
+        asset: Asset,
         config: dict[str, Any],
         owner: str,
         repo: str,
@@ -106,7 +106,7 @@ class VerificationService:
             config.get("checksum_file", ""),
             config.get("digest", False),
         )
-        logger.debug("   📦 Asset digest: %s", asset.get("digest", "None"))
+        logger.debug("   📦 Asset digest: %s", asset.digest or "None")
         logger.debug(
             "   📂 Assets provided: %s (%d items)",
             bool(assets),
@@ -186,7 +186,7 @@ class VerificationService:
                 )
 
             digest_result = await self._verify_digest(
-                verifier, asset["digest"], app_name, skip_configured
+                verifier, asset.digest, app_name, skip_configured
             )
             if digest_result:
                 verification_methods["digest"] = digest_result
@@ -220,7 +220,7 @@ class VerificationService:
                 )
 
             # Use original asset name for checksum lookups
-            original_asset_name = asset.get("name", file_path.name)
+            original_asset_name = asset.name if asset.name else file_path.name
             logger.debug(
                 "🔍 Using original asset name for checksum verification: %s",
                 original_asset_name,
@@ -331,7 +331,7 @@ class VerificationService:
 
     def _detect_available_methods(
         self,
-        asset: dict[str, Any],
+        asset: Asset,
         config: dict[str, Any],
         assets: list[dict[str, Any]] | None = None,
         owner: str | None = None,
@@ -352,7 +352,7 @@ class VerificationService:
             Tuple of (has_digest, checksum_files_list)
 
         """
-        digest_value = asset.get("digest", "")
+        digest_value = asset.digest or ""
         has_digest = bool(digest_value and digest_value.strip())
         digest_requested = config.get("digest", False)
 
@@ -406,23 +406,16 @@ class VerificationService:
                 "(digest not explicitly enabled)"
             )
             try:
-                # Convert assets to the format expected by GitHubReleaseFetcher
-                github_assets: list[GitHubAsset] = []
+                # Convert assets to Asset objects
+                asset_objects: list[Asset] = []
                 for asset_data in assets:
-                    github_assets.append(
-                        GitHubAsset(
-                            name=asset_data.get("name", ""),
-                            browser_download_url=asset_data.get(
-                                "browser_download_url", ""
-                            ),
-                            size=asset_data.get("size", 0),
-                            digest=asset_data.get("digest", ""),
-                        )
-                    )
+                    asset_obj = Asset.from_api_response(asset_data)
+                    if asset_obj:
+                        asset_objects.append(asset_obj)
 
-                # Use GitHubReleaseFetcher to detect checksum files
-                checksum_files = GitHubReleaseFetcher.detect_checksum_files(
-                    github_assets, tag_name
+                # Use AssetSelector to detect checksum files
+                checksum_files = AssetSelector.detect_checksum_files(
+                    asset_objects, tag_name
                 )
                 logger.debug(
                     "🔍 Auto-detected %d checksum files from assets",

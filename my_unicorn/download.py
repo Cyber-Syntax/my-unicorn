@@ -12,9 +12,13 @@ from urllib.parse import urlparse
 import aiohttp
 
 from my_unicorn.auth import GitHubAuthManager
-from my_unicorn.github_client import GitHubAsset
+from my_unicorn.github_client import Asset
 from my_unicorn.logger import get_logger
-from my_unicorn.services.progress import ProgressService, ProgressType, get_progress_service
+from my_unicorn.services.progress import (
+    ProgressService,
+    ProgressType,
+    get_progress_service,
+)
 
 logger = get_logger(__name__)
 
@@ -69,7 +73,9 @@ class DownloadService:
         timeout = aiohttp.ClientTimeout(total=600, sock_read=30)
 
         try:
-            async with self.session.get(url, headers=headers, timeout=timeout) as response:
+            async with self.session.get(
+                url, headers=headers, timeout=timeout
+            ) as response:
                 response.raise_for_status()
                 total = int(response.headers.get("Content-Length", 0))
 
@@ -82,7 +88,11 @@ class DownloadService:
                     f"{total:,}" if total > 0 else "",
                 )
 
-                if show_progress and total > 0 and self.progress_service.is_active():
+                if (
+                    show_progress
+                    and total > 0
+                    and self.progress_service.is_active()
+                ):
                     await self._download_with_progress(
                         response,
                         dest,
@@ -167,7 +177,9 @@ class DownloadService:
             logger.error("❌ Download timed out: %s", dest.name)
             raise Exception(f"Download timed out: {dest.name}")
         except aiohttp.ClientError as e:
-            logger.error("❌ Network error during download: %s - %s", dest.name, e)
+            logger.error(
+                "❌ Network error during download: %s - %s", dest.name, e
+            )
             raise Exception(f"Network error: {e}")
         except Exception as e:
             logger.error("❌ Download failed during progress tracking: %s", e)
@@ -184,7 +196,7 @@ class DownloadService:
             await asyncio.sleep(0.2)
 
     async def download_appimage(
-        self, asset: GitHubAsset, dest: Path, show_progress: bool = True
+        self, asset: Asset, dest: Path, show_progress: bool = True
     ) -> Path:
         """Download an AppImage file.
 
@@ -201,7 +213,7 @@ class DownloadService:
 
         """
         await self.download_file(
-            asset["browser_download_url"],
+            asset.browser_download_url,
             dest,
             show_progress=show_progress,
             progress_type=ProgressType.DOWNLOAD,
@@ -243,12 +255,14 @@ class DownloadService:
             if file_size == 0:
                 raise Exception(f"Downloaded file is empty: {dest}")
 
-            logger.info("✅ Icon downloaded: %s (%s bytes)", dest, f"{file_size:,}")
+            logger.info(
+                "✅ Icon downloaded: %s (%s bytes)", dest, f"{file_size:,}"
+            )
             return dest
         except Exception as e:
             logger.error("❌ Failed to download icon: %s", e)
             raise
-   
+
     def get_filename_from_url(self, url: str) -> str:
         """Extract filename from URL.
 
@@ -277,7 +291,9 @@ class DownloadService:
         headers = GitHubAuthManager.apply_auth({})
 
         try:
-            async with self.session.get(checksum_url, headers=headers) as response:
+            async with self.session.get(
+                checksum_url, headers=headers
+            ) as response:
                 response.raise_for_status()
                 content = await response.text()
 

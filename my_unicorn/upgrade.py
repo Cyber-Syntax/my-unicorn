@@ -19,7 +19,7 @@ import aiohttp
 from packaging import version
 
 from .config import ConfigManager, GlobalConfig
-from .github_client import GitHubReleaseFetcher
+from .github_client import ReleaseFetcher
 from .logger import get_logger
 
 
@@ -150,7 +150,7 @@ class SelfUpdater:
         self.global_config: GlobalConfig = config_manager.load_global_config()
         self.session: aiohttp.ClientSession = session
         self.progress = SimpleProgress() if simple_progress else None
-        self.github_fetcher: GitHubReleaseFetcher = GitHubReleaseFetcher(
+        self.github_fetcher: ReleaseFetcher = ReleaseFetcher(
             owner=GITHUB_OWNER,
             repo=GITHUB_REPO,
             session=session,
@@ -223,15 +223,23 @@ class SelfUpdater:
 
             logger.info(
                 "Found latest release: %s",
-                release_data.get("version", "unknown"),
+                release_data.version,
             )
 
             # Convert to format compatible with old code
             return {
-                "tag_name": f"v{release_data['version']}",
-                "version": release_data["version"],
-                "prerelease": release_data.get("prerelease", False),
-                "assets": release_data.get("assets", []),
+                "tag_name": f"v{release_data.version}",
+                "version": release_data.version,
+                "prerelease": release_data.prerelease,
+                "assets": [
+                    {
+                        "name": asset.name,
+                        "size": asset.size,
+                        "browser_download_url": asset.browser_download_url,
+                        "digest": asset.digest or "",
+                    }
+                    for asset in release_data.assets
+                ],
             }
 
         except aiohttp.ClientResponseError as e:
