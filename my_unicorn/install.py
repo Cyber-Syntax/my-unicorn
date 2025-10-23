@@ -9,18 +9,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from my_unicorn.desktop import DesktopEntry
+from my_unicorn.desktop_entry import DesktopEntry
 from my_unicorn.download import DownloadService
 from my_unicorn.exceptions import InstallationError
+from my_unicorn.file_ops import FileOperations
 from my_unicorn.github_client import (
     Asset,
     AssetSelector,
     GitHubClient,
     Release,
 )
+from my_unicorn.icon import IconHandler
 from my_unicorn.logger import get_logger
-from my_unicorn.services.icon_service import IconHandler
-from my_unicorn.storage import FileOperations
 from my_unicorn.verification import VerificationService
 
 logger = get_logger(__name__)
@@ -578,7 +578,7 @@ class InstallHandler:
 
         """
         try:
-            from my_unicorn.services.icon_service import IconConfig
+            from my_unicorn.icon import IconConfig
 
             icon_cfg = app_config.get("icon", {})
             extraction_enabled = icon_cfg.get("extraction", True)

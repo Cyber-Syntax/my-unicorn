@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from my_unicorn.storage import FileOperations
+from my_unicorn.file_ops import FileOperations
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ def install_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def patch_logger():
     """Patch get_logger to avoid real logging output."""
-    with patch("my_unicorn.storage.get_logger") as mock_logger:
+    with patch("my_unicorn.file_ops.get_logger") as mock_logger:
         yield mock_logger
 
 

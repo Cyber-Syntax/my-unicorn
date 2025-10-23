@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from my_unicorn.services.install_service import InstallHandler
+from my_unicorn.install import InstallHandler
 
 
 class TestInstallHandler:
@@ -93,7 +93,7 @@ class TestInstallHandler:
     ):
         """Test successful installation from catalog."""
         with patch(
-            "my_unicorn.services.install_service.VerificationService"
+            "my_unicorn.install.VerificationService"
         ) as mock_verification:
             from dataclasses import dataclass
 
@@ -111,9 +111,7 @@ class TestInstallHandler:
                 )
             )
 
-            with patch(
-                "my_unicorn.services.install_service.DesktopEntry"
-            ) as mock_desktop:
+            with patch("my_unicorn.install.DesktopEntry") as mock_desktop:
                 mock_desktop.return_value.create = Mock(
                     return_value=Path("/desktop/test.desktop")
                 )
@@ -143,7 +141,7 @@ class TestInstallHandler:
     ):
         """Test installing multiple apps concurrently."""
         with patch(
-            "my_unicorn.services.install_service.VerificationService"
+            "my_unicorn.install.VerificationService"
         ) as mock_verification:
             from dataclasses import dataclass
 
@@ -161,9 +159,7 @@ class TestInstallHandler:
                 )
             )
 
-            with patch(
-                "my_unicorn.services.install_service.DesktopEntry"
-            ) as mock_desktop:
+            with patch("my_unicorn.install.DesktopEntry") as mock_desktop:
                 mock_desktop.return_value.create_desktop_file = Mock(
                     return_value=Path("/desktop/test.desktop")
                 )
@@ -183,7 +179,7 @@ class TestInstallHandler:
     ):
         """Test successful installation from URL."""
         with patch(
-            "my_unicorn.services.install_service.VerificationService"
+            "my_unicorn.install.VerificationService"
         ) as mock_verification:
             from dataclasses import dataclass
 
@@ -201,9 +197,7 @@ class TestInstallHandler:
                 )
             )
 
-            with patch(
-                "my_unicorn.services.install_service.DesktopEntry"
-            ) as mock_desktop:
+            with patch("my_unicorn.install.DesktopEntry") as mock_desktop:
                 mock_desktop.return_value.create_desktop_file = Mock(
                     return_value=Path("/desktop/test.desktop")
                 )

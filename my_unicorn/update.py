@@ -18,16 +18,16 @@ except ImportError:
     InvalidVersion = None  # type: ignore
 
 
-from my_unicorn.services.icon_service import IconHandler
+from my_unicorn.icon import IconHandler
 from my_unicorn.verification import VerificationService
 
 from .auth import GitHubAuthManager
 from .backup import BackupService
 from .config import ConfigManager
 from .download import DownloadService, IconAsset
+from .file_ops import FileOperations
 from .github_client import Asset, AssetSelector, Release, ReleaseFetcher
 from .logger import get_logger
-from .storage import FileOperations
 
 logger = get_logger(__name__)
 
@@ -635,7 +635,7 @@ class UpdateManager:
             True if processing was successful
 
         """
-        from my_unicorn.services.progress import get_progress_service
+        from my_unicorn.progress import get_progress_service
 
         progress_service = (
             self._progress_service_param or get_progress_service()
@@ -1102,7 +1102,7 @@ class UpdateManager:
             )
 
         try:
-            from .desktop import create_desktop_entry_for_app
+            from .desktop_entry import create_desktop_entry_for_app
 
             create_desktop_entry_for_app(
                 app_name=app_name,
@@ -1154,7 +1154,7 @@ class UpdateManager:
             Tuple of (Path to acquired icon or None, updated icon config)
 
         """
-        from .services import IconConfig
+        from .icon import IconConfig
 
         current_icon_config = app_config.get("icon", {}) if app_config else {}
 

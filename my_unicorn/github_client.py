@@ -13,9 +13,9 @@ from typing import Any
 import aiohttp
 
 from .auth import GitHubAuthManager, auth_manager
+from .cache import get_cache_manager
 from .logger import get_logger
-from .services.cache import get_cache_manager
-from .services.progress import get_progress_service
+from .progress import get_progress_service
 from .utils import (
     extract_and_validate_version,
     get_checksum_file_format_type,

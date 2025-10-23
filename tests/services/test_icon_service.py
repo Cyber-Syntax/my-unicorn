@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.download import DownloadService, IconAsset
-from my_unicorn.services.icon_service import (
+from my_unicorn.icon import (
     IconConfig,
     IconHandler,
     IconResult,
@@ -227,9 +227,7 @@ class TestIconHandler:
         """Test successful icon extraction."""
         mock_icon_path = mock_paths["dest_path"]
 
-        with patch(
-            "my_unicorn.services.icon_service.IconManager"
-        ) as mock_icon_manager_class:
+        with patch("my_unicorn.icon.IconManager") as mock_icon_manager_class:
             mock_icon_manager = AsyncMock()
             mock_icon_manager_class.return_value = mock_icon_manager
             mock_icon_manager.extract_icon_only.return_value = mock_icon_path
@@ -253,9 +251,7 @@ class TestIconHandler:
     @pytest.mark.asyncio
     async def test_attempt_extraction_failure(self, icon_service, mock_paths):
         """Test failed icon extraction."""
-        with patch(
-            "my_unicorn.services.icon_service.IconManager"
-        ) as mock_icon_manager_class:
+        with patch("my_unicorn.icon.IconManager") as mock_icon_manager_class:
             mock_icon_manager = AsyncMock()
             mock_icon_manager_class.return_value = mock_icon_manager
             mock_icon_manager.extract_icon_only.side_effect = Exception(
@@ -275,9 +271,7 @@ class TestIconHandler:
         self, icon_service, mock_paths
     ):
         """Test extraction when no icon is found."""
-        with patch(
-            "my_unicorn.services.icon_service.IconManager"
-        ) as mock_icon_manager_class:
+        with patch("my_unicorn.icon.IconManager") as mock_icon_manager_class:
             mock_icon_manager = AsyncMock()
             mock_icon_manager_class.return_value = mock_icon_manager
             mock_icon_manager.extract_icon_only.return_value = None
@@ -689,7 +683,7 @@ class TestIconHandler:
 
         with (
             patch.object(icon_service, "_attempt_extraction") as mock_extract,
-            patch("my_unicorn.services.icon_service.logger") as mock_logger,
+            patch("my_unicorn.icon.logger") as mock_logger,
         ):
             mock_extract.return_value = mock_icon_path
 

@@ -11,7 +11,7 @@ from typing import Any
 import aiohttp
 
 from my_unicorn.download import DownloadService
-from my_unicorn.storage import FileOperations
+from my_unicorn.file_ops import FileOperations
 
 from ..exceptions import ValidationError
 from ..github_client import GitHubClient
@@ -69,7 +69,7 @@ class InstallCommand:
         if self.download_service is None:
             # Use global progress service if progress is enabled
             if show_progress:
-                from ..services.progress import get_progress_service
+                from ..progress import get_progress_service
 
                 self.progress_service = get_progress_service()
                 self.download_service = DownloadService(
@@ -305,8 +305,8 @@ class InstallCommand:
         """
         # Create install service if not already created
         if self.install_service is None:
-            from my_unicorn.services.icon_service import IconHandler
-            from my_unicorn.services.install_service import InstallHandler
+            from my_unicorn.icon import IconHandler
+            from my_unicorn.install import InstallHandler
 
             self.install_service = InstallHandler(
                 download_service=self.download_service,

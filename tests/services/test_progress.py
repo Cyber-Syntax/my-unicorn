@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.live import Live
 from rich.progress import Progress, TaskID
 
-from my_unicorn.services.progress import (
+from my_unicorn.progress import (
     ProgressConfig,
     ProgressDisplay,
     ProgressType,
@@ -157,7 +157,7 @@ def mock_live() -> Mock:
 @pytest.fixture
 def progress_service(mock_console: Mock) -> ProgressDisplay:
     """Fixture providing a ProgressDisplay instance."""
-    with patch("my_unicorn.services.progress.Progress"):
+    with patch("my_unicorn.progress.Progress"):
         service = ProgressDisplay(console=mock_console)
         # Don't set _active=True here as some tests need to test inactive state
         return service
@@ -169,8 +169,8 @@ class TestProgressDisplay:
     def test_init_with_defaults(self) -> None:
         """Test ProgressDisplay initialization with default values."""
         with (
-            patch("my_unicorn.services.progress.Progress"),
-            patch("my_unicorn.services.progress.Console") as mock_console_cls,
+            patch("my_unicorn.progress.Progress"),
+            patch("my_unicorn.progress.Console") as mock_console_cls,
         ):
             service = ProgressDisplay()
 
@@ -185,7 +185,7 @@ class TestProgressDisplay:
         """Test ProgressDisplay initialization with custom values."""
         config = ProgressConfig(refresh_per_second=8)
 
-        with patch("my_unicorn.services.progress.Progress"):
+        with patch("my_unicorn.progress.Progress"):
             service = ProgressDisplay(console=mock_console, config=config)
 
             assert service.console == mock_console
@@ -227,7 +227,7 @@ class TestProgressDisplay:
         self, progress_service: ProgressDisplay
     ) -> None:
         """Test starting a progress session."""
-        with patch("my_unicorn.services.progress.Live") as mock_live_cls:
+        with patch("my_unicorn.progress.Live") as mock_live_cls:
             mock_live = Mock()
             mock_live_cls.return_value = mock_live
 
@@ -794,7 +794,7 @@ class TestErrorScenarios:
     ) -> None:
         """Test starting multiple sessions doesn't break anything."""
         progress_service._active = False  # Start inactive for this test
-        with patch("my_unicorn.services.progress.Live") as mock_live_cls:
+        with patch("my_unicorn.progress.Live") as mock_live_cls:
             mock_live = Mock()
             mock_live_cls.return_value = mock_live
 

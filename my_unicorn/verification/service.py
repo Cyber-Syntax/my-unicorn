@@ -23,7 +23,7 @@ from my_unicorn.github_client import (
     ChecksumFileInfo,
 )
 from my_unicorn.logger import get_logger
-from my_unicorn.services.progress import ProgressDisplay
+from my_unicorn.progress import ProgressDisplay
 from my_unicorn.verification.verifier import Verifier
 
 logger = get_logger(__name__, enable_file_logging=True)

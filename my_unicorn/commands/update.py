@@ -6,7 +6,7 @@ Simplified to use direct display functions instead of UpdateResult objects.
 from argparse import Namespace
 
 from ..logger import get_logger
-from ..services.progress import get_progress_service, progress_session
+from ..progress import get_progress_service, progress_session
 from ..utils import display_update_error, display_update_summary
 from .base import BaseCommandHandler
 

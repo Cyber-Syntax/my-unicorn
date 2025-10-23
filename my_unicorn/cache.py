@@ -41,7 +41,9 @@ class ReleaseCacheManager:
     - Uses atomic writes to prevent file corruption
     """
 
-    def __init__(self, config_manager: ConfigManager | None = None, ttl_hours: int = 24):
+    def __init__(
+        self, config_manager: ConfigManager | None = None, ttl_hours: int = 24
+    ):
         """Initialize the release cache manager.
 
         Args:
@@ -91,7 +93,9 @@ class ReleaseCacheManager:
         """
         return is_appimage_file(filename)
 
-    def _filter_relevant_assets(self, assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _filter_relevant_assets(
+        self, assets: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Filter assets to keep only AppImages and related checksum files.
 
         This reduces cache file size by removing irrelevant assets like:
@@ -131,7 +135,9 @@ class ReleaseCacheManager:
 
         # Count AppImages vs checksums for better logging
         appimage_count = sum(
-            1 for asset in relevant_assets if self._is_appimage_file(asset.get("name", ""))
+            1
+            for asset in relevant_assets
+            if self._is_appimage_file(asset.get("name", ""))
         )
         checksum_count = len(relevant_assets) - appimage_count
 
@@ -145,7 +151,9 @@ class ReleaseCacheManager:
 
         return relevant_assets
 
-    def _get_cache_file_path(self, owner: str, repo: str, cache_type: str = "stable") -> Path:
+    def _get_cache_file_path(
+        self, owner: str, repo: str, cache_type: str = "stable"
+    ) -> Path:
         """Get cache file path for a specific repository.
 
         Args:
@@ -183,7 +191,11 @@ class ReleaseCacheManager:
             return False
 
     async def get_cached_release(
-        self, owner: str, repo: str, ignore_ttl: bool = False, cache_type: str = "stable"
+        self,
+        owner: str,
+        repo: str,
+        ignore_ttl: bool = False,
+        cache_type: str = "stable",
     ) -> dict[str, Any] | None:
         """Get cached release data if available and fresh.
 
@@ -218,17 +230,25 @@ class ReleaseCacheManager:
 
         except (ValueError, KeyError, TypeError) as e:
             # orjson raises ValueError for JSON errors
-            logger.warning("Cache file corrupted for %s/%s: %s", owner, repo, e)
+            logger.warning(
+                "Cache file corrupted for %s/%s: %s", owner, repo, e
+            )
             # Remove corrupted cache file
             with contextlib.suppress(OSError):
                 cache_file.unlink()
             return None
         except Exception as e:
-            logger.error("Unexpected error reading cache for %s/%s: %s", owner, repo, e)
+            logger.error(
+                "Unexpected error reading cache for %s/%s: %s", owner, repo, e
+            )
             return None
 
     async def save_release_data(
-        self, owner: str, repo: str, release_data: dict[str, Any], cache_type: str = "stable"
+        self,
+        owner: str,
+        repo: str,
+        release_data: dict[str, Any],
+        cache_type: str = "stable",
     ) -> None:
         """Save release data to cache with current timestamp.
 
@@ -288,7 +308,9 @@ class ReleaseCacheManager:
             with contextlib.suppress(OSError, UnboundLocalError):
                 temp_file.unlink()
 
-    async def clear_cache(self, owner: str | None = None, repo: str | None = None) -> None:
+    async def clear_cache(
+        self, owner: str | None = None, repo: str | None = None
+    ) -> None:
         """Clear cache entries.
 
         Args:

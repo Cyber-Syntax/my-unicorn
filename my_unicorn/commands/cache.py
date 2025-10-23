@@ -7,8 +7,8 @@ and displaying cache statistics.
 import sys
 from argparse import Namespace
 
+from ..cache import get_cache_manager
 from ..logger import get_logger
-from ..services.cache import get_cache_manager
 from .base import BaseCommandHandler
 
 logger = get_logger(__name__)

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from my_unicorn.download import DownloadService, IconAsset
-from my_unicorn.services.icon_service import IconConfig, IconHandler
+from my_unicorn.icon import IconConfig, IconHandler
 from my_unicorn.verification.service import VerificationService
 
 
@@ -127,7 +127,7 @@ def mock_logger():
     from unittest.mock import patch
 
     with (
-        patch("my_unicorn.services.icon_service.logger"),
+        patch("my_unicorn.icon.logger"),
         patch("my_unicorn.verification_service.logger"),
     ):
         yield

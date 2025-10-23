@@ -14,7 +14,7 @@ import aiohttp
 from my_unicorn.auth import GitHubAuthManager
 from my_unicorn.github_client import Asset
 from my_unicorn.logger import get_logger
-from my_unicorn.services.progress import (
+from my_unicorn.progress import (
     ProgressDisplay,
     ProgressType,
     get_progress_service,

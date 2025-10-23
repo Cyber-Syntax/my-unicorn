@@ -11,8 +11,8 @@ from unittest.mock import MagicMock, patch
 import orjson
 import pytest
 
+from my_unicorn.cache import CacheEntry, ReleaseCacheManager, get_cache_manager
 from my_unicorn.config import ConfigManager
-from my_unicorn.services.cache import CacheEntry, ReleaseCacheManager, get_cache_manager
 
 
 class TestReleaseCacheManager:
@@ -73,7 +73,7 @@ class TestReleaseCacheManager:
 
     def test_init_without_config_manager(self):
         """Test initialization without explicit config manager."""
-        with patch("my_unicorn.services.cache.ConfigManager") as mock_config_class:
+        with patch("my_unicorn.cache.ConfigManager") as mock_config_class:
             mock_config = MagicMock()
             mock_config.load_global_config.return_value = {
                 "directory": {"cache": Path("/tmp")}
@@ -99,7 +99,7 @@ class TestReleaseCacheManager:
 
     def test_is_checksum_file(self, cache_manager):
         """Test checksum file detection."""
-        with patch("my_unicorn.services.cache.is_checksum_file") as mock_is_checksum:
+        with patch("my_unicorn.cache.is_checksum_file") as mock_is_checksum:
             # Test that it calls the utility function with correct parameters
             mock_is_checksum.return_value = True
 
@@ -115,8 +115,12 @@ class TestReleaseCacheManager:
         assets = sample_release_data["assets"]
 
         with (
-            patch.object(cache_manager, "_is_appimage_file") as mock_is_appimage,
-            patch.object(cache_manager, "_is_checksum_file") as mock_is_checksum,
+            patch.object(
+                cache_manager, "_is_appimage_file"
+            ) as mock_is_appimage,
+            patch.object(
+                cache_manager, "_is_checksum_file"
+            ) as mock_is_checksum,
         ):
             # Mock the detection methods
             def mock_appimage_check(filename):
@@ -143,7 +147,9 @@ class TestReleaseCacheManager:
         assert path.parent.name == "releases"
 
         # Test prerelease cache
-        path = cache_manager._get_cache_file_path("owner", "repo", "prerelease")
+        path = cache_manager._get_cache_file_path(
+            "owner", "repo", "prerelease"
+        )
         assert path.name == "owner_repo_prerelease.json"
 
         # Test latest cache
@@ -155,7 +161,11 @@ class TestReleaseCacheManager:
         # Create cache entry that's 1 hour old (should be fresh for 24h TTL)
         cached_at = datetime.now(UTC) - timedelta(hours=1)
         cache_entry = CacheEntry(
-            {"cached_at": cached_at.isoformat(), "ttl_hours": 24, "release_data": {}}
+            {
+                "cached_at": cached_at.isoformat(),
+                "ttl_hours": 24,
+                "release_data": {},
+            }
         )
 
         assert cache_manager._is_cache_fresh(cache_entry) is True
@@ -165,7 +175,11 @@ class TestReleaseCacheManager:
         # Create cache entry that's 25 hours old (expired for 24h TTL)
         cached_at = datetime.now(UTC) - timedelta(hours=25)
         cache_entry = CacheEntry(
-            {"cached_at": cached_at.isoformat(), "ttl_hours": 24, "release_data": {}}
+            {
+                "cached_at": cached_at.isoformat(),
+                "ttl_hours": 24,
+                "release_data": {},
+            }
         )
 
         assert cache_manager._is_cache_fresh(cache_entry) is False
@@ -187,7 +201,11 @@ class TestReleaseCacheManager:
     def test_is_cache_fresh_invalid_timestamp(self, cache_manager):
         """Test cache freshness with invalid timestamp."""
         cache_entry = CacheEntry(
-            {"cached_at": "invalid-timestamp", "ttl_hours": 24, "release_data": {}}
+            {
+                "cached_at": "invalid-timestamp",
+                "ttl_hours": 24,
+                "release_data": {},
+            }
         )
 
         assert cache_manager._is_cache_fresh(cache_entry) is False
@@ -219,11 +237,15 @@ class TestReleaseCacheManager:
         assert result == sample_release_data
 
     @pytest.mark.asyncio
-    async def test_get_cached_release_expired_cache(self, cache_manager, sample_release_data):
+    async def test_get_cached_release_expired_cache(
+        self, cache_manager, sample_release_data
+    ):
         """Test getting cached release with expired cache."""
         # Create an expired cache file
         cache_file = cache_manager._get_cache_file_path("owner", "repo")
-        cached_at = datetime.now(UTC) - timedelta(hours=25)  # 25h old, expires after 24h
+        cached_at = datetime.now(UTC) - timedelta(
+            hours=25
+        )  # 25h old, expires after 24h
         cache_entry = CacheEntry(
             {
                 "cached_at": cached_at.isoformat(),
@@ -238,7 +260,9 @@ class TestReleaseCacheManager:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_cached_release_ignore_ttl(self, cache_manager, sample_release_data):
+    async def test_get_cached_release_ignore_ttl(
+        self, cache_manager, sample_release_data
+    ):
         """Test getting cached release while ignoring TTL."""
         # Create an expired cache file
         cache_file = cache_manager._get_cache_file_path("owner", "repo")
@@ -254,7 +278,9 @@ class TestReleaseCacheManager:
         cache_file.write_bytes(orjson.dumps(cache_entry))  # pylint: disable=no-member
 
         # Should return data even if expired when ignore_ttl=True
-        result = await cache_manager.get_cached_release("owner", "repo", ignore_ttl=True)
+        result = await cache_manager.get_cached_release(
+            "owner", "repo", ignore_ttl=True
+        )
         assert result == sample_release_data
 
     @pytest.mark.asyncio
@@ -274,7 +300,9 @@ class TestReleaseCacheManager:
     @pytest.mark.asyncio
     async def test_save_release_data(self, cache_manager, sample_release_data):
         """Test saving release data to cache."""
-        await cache_manager.save_release_data("owner", "repo", sample_release_data)
+        await cache_manager.save_release_data(
+            "owner", "repo", sample_release_data
+        )
 
         cache_file = cache_manager._get_cache_file_path("owner", "repo")
         assert cache_file.exists()
@@ -296,23 +324,35 @@ class TestReleaseCacheManager:
     ):
         """Test saving release data for different cache types."""
         # Save to different cache types
-        await cache_manager.save_release_data("owner", "repo", sample_release_data, "stable")
+        await cache_manager.save_release_data(
+            "owner", "repo", sample_release_data, "stable"
+        )
         await cache_manager.save_release_data(
             "owner", "repo", sample_release_data, "prerelease"
         )
-        await cache_manager.save_release_data("owner", "repo", sample_release_data, "latest")
+        await cache_manager.save_release_data(
+            "owner", "repo", sample_release_data, "latest"
+        )
 
         # Check that separate files were created
-        stable_file = cache_manager._get_cache_file_path("owner", "repo", "stable")
-        prerelease_file = cache_manager._get_cache_file_path("owner", "repo", "prerelease")
-        latest_file = cache_manager._get_cache_file_path("owner", "repo", "latest")
+        stable_file = cache_manager._get_cache_file_path(
+            "owner", "repo", "stable"
+        )
+        prerelease_file = cache_manager._get_cache_file_path(
+            "owner", "repo", "prerelease"
+        )
+        latest_file = cache_manager._get_cache_file_path(
+            "owner", "repo", "latest"
+        )
 
         assert stable_file.exists()
         assert prerelease_file.exists()
         assert latest_file.exists()
 
     @pytest.mark.asyncio
-    async def test_save_release_data_atomic_write(self, cache_manager, sample_release_data):
+    async def test_save_release_data_atomic_write(
+        self, cache_manager, sample_release_data
+    ):
         """Test that save_release_data uses atomic writes."""
         # Mock a write failure during the rename step
         original_replace = Path.replace
@@ -324,17 +364,23 @@ class TestReleaseCacheManager:
 
         with patch.object(Path, "replace", mock_replace):
             # This should handle the error gracefully
-            await cache_manager.save_release_data("owner", "repo", sample_release_data)
+            await cache_manager.save_release_data(
+                "owner", "repo", sample_release_data
+            )
 
             # Cache file should not exist due to failed write
             cache_file = cache_manager._get_cache_file_path("owner", "repo")
             assert not cache_file.exists()
 
     @pytest.mark.asyncio
-    async def test_clear_cache_specific_app(self, cache_manager, sample_release_data):
+    async def test_clear_cache_specific_app(
+        self, cache_manager, sample_release_data
+    ):
         """Test clearing cache for a specific app."""
         # Create cache file
-        await cache_manager.save_release_data("owner", "repo", sample_release_data)
+        await cache_manager.save_release_data(
+            "owner", "repo", sample_release_data
+        )
         cache_file = cache_manager._get_cache_file_path("owner", "repo")
         assert cache_file.exists()
 
@@ -346,8 +392,12 @@ class TestReleaseCacheManager:
     async def test_clear_cache_all(self, cache_manager, sample_release_data):
         """Test clearing all cache entries."""
         # Create multiple cache files
-        await cache_manager.save_release_data("owner1", "repo1", sample_release_data)
-        await cache_manager.save_release_data("owner2", "repo2", sample_release_data)
+        await cache_manager.save_release_data(
+            "owner1", "repo1", sample_release_data
+        )
+        await cache_manager.save_release_data(
+            "owner2", "repo2", sample_release_data
+        )
 
         cache_file1 = cache_manager._get_cache_file_path("owner1", "repo1")
         cache_file2 = cache_manager._get_cache_file_path("owner2", "repo2")
@@ -365,15 +415,21 @@ class TestReleaseCacheManager:
     async def test_clear_cache_error_handling(self, cache_manager):
         """Test error handling in cache clearing."""
         # Mock an error during file deletion
-        with patch("pathlib.Path.unlink", side_effect=OSError("Permission denied")):
+        with patch(
+            "pathlib.Path.unlink", side_effect=OSError("Permission denied")
+        ):
             # Should not raise exception
             await cache_manager.clear_cache("owner", "repo")
 
     @pytest.mark.asyncio
-    async def test_cleanup_expired_cache(self, cache_manager, sample_release_data):
+    async def test_cleanup_expired_cache(
+        self, cache_manager, sample_release_data
+    ):
         """Test cleanup of expired cache entries."""
         # Create fresh cache
-        await cache_manager.save_release_data("owner1", "repo1", sample_release_data)
+        await cache_manager.save_release_data(
+            "owner1", "repo1", sample_release_data
+        )
 
         # Create old cache by manually setting timestamp
         old_cache_file = cache_manager._get_cache_file_path("owner2", "repo2")
@@ -387,7 +443,9 @@ class TestReleaseCacheManager:
         )
         old_cache_file.write_bytes(orjson.dumps(old_cache_entry))  # pylint: disable=no-member
 
-        fresh_cache_file = cache_manager._get_cache_file_path("owner1", "repo1")
+        fresh_cache_file = cache_manager._get_cache_file_path(
+            "owner1", "repo1"
+        )
 
         # Both files should exist initially
         assert fresh_cache_file.exists()
@@ -418,7 +476,9 @@ class TestReleaseCacheManager:
     async def test_get_cache_stats(self, cache_manager, sample_release_data):
         """Test getting cache statistics."""
         # Create fresh cache
-        await cache_manager.save_release_data("owner1", "repo1", sample_release_data)
+        await cache_manager.save_release_data(
+            "owner1", "repo1", sample_release_data
+        )
 
         # Create expired cache
         expired_file = cache_manager._get_cache_file_path("owner2", "repo2")
@@ -459,7 +519,9 @@ class TestReleaseCacheManager:
             assert "error" in stats
 
     @pytest.mark.asyncio
-    async def test_cache_with_different_cache_types(self, cache_manager, sample_release_data):
+    async def test_cache_with_different_cache_types(
+        self, cache_manager, sample_release_data
+    ):
         """Test caching and retrieval with different cache types."""
         # Test all cache types
         cache_types = ["stable", "prerelease", "latest"]
@@ -487,13 +549,13 @@ class TestReleaseCacheManager:
     def test_get_cache_manager_singleton(self):
         """Test the module-level cache manager getter."""
         # Test that it creates a new instance when none exists
-        with patch("my_unicorn.services.cache._cache_manager", None):
+        with patch("my_unicorn.cache._cache_manager", None):
             manager = get_cache_manager(ttl_hours=48)
             assert isinstance(manager, ReleaseCacheManager)
             assert manager.ttl_hours == 48
 
     def test_get_cache_manager_existing_instance(self):
         """Test that get_cache_manager returns existing instance when available."""
-        with patch("my_unicorn.services.cache._cache_manager") as mock_manager:
+        with patch("my_unicorn.cache._cache_manager") as mock_manager:
             result = get_cache_manager()
             assert result == mock_manager
