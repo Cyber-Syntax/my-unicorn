@@ -1,4 +1,4 @@
-"""Comprehensive tests for IconService with high coverage and edge cases."""
+"""Comprehensive tests for IconHandler with high coverage and edge cases."""
 
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -6,7 +6,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.download import DownloadService, IconAsset
-from my_unicorn.services.icon_service import IconConfig, IconResult, IconService
+from my_unicorn.services.icon_service import (
+    IconConfig,
+    IconHandler,
+    IconResult,
+)
 
 
 class TestIconConfig:
@@ -96,8 +100,8 @@ class TestIconResult:
             result.source = "github"
 
 
-class TestIconService:
-    """Test cases for IconService."""
+class TestIconHandler:
+    """Test cases for IconHandler."""
 
     @pytest.fixture
     def mock_download_service(self):
@@ -106,8 +110,8 @@ class TestIconService:
 
     @pytest.fixture
     def icon_service(self, mock_download_service):
-        """Create an IconService instance with mock dependencies."""
-        return IconService(mock_download_service)
+        """Create an IconHandler instance with mock dependencies."""
+        return IconHandler(mock_download_service)
 
     @pytest.fixture
     def sample_icon_config(self):
@@ -132,12 +136,16 @@ class TestIconService:
             "dest_path": icon_dir / "testapp.png",
         }
 
-    def test_determine_extraction_preference_from_current_config(self, icon_service):
+    def test_determine_extraction_preference_from_current_config(
+        self, icon_service
+    ):
         """Test extraction preference detection from current config."""
         current_config = {"extraction": False}
         catalog_entry = {"icon": {"extraction": True}}
 
-        result = icon_service._determine_extraction_preference(current_config, catalog_entry)
+        result = icon_service._determine_extraction_preference(
+            current_config, catalog_entry
+        )
 
         assert result is False  # Current config takes priority
 
@@ -146,7 +154,9 @@ class TestIconService:
         current_config = {}
         catalog_entry = {"icon": {"extraction": False}}
 
-        result = icon_service._determine_extraction_preference(current_config, catalog_entry)
+        result = icon_service._determine_extraction_preference(
+            current_config, catalog_entry
+        )
 
         assert result is False
 
@@ -155,16 +165,22 @@ class TestIconService:
         current_config = {}
         catalog_entry = None
 
-        result = icon_service._determine_extraction_preference(current_config, catalog_entry)
+        result = icon_service._determine_extraction_preference(
+            current_config, catalog_entry
+        )
 
         assert result is True
 
-    def test_determine_extraction_preference_catalog_none_extraction(self, icon_service):
+    def test_determine_extraction_preference_catalog_none_extraction(
+        self, icon_service
+    ):
         """Test extraction preference when catalog has None extraction value."""
         current_config = {}
         catalog_entry = {"icon": {"extraction": None}}
 
-        result = icon_service._determine_extraction_preference(current_config, catalog_entry)
+        result = icon_service._determine_extraction_preference(
+            current_config, catalog_entry
+        )
 
         assert result is True  # Should use default
 
@@ -200,7 +216,9 @@ class TestIconService:
 
     def test_generate_icon_filename_no_extension(self, icon_service):
         """Test icon filename generation with URL without extension."""
-        filename = icon_service._generate_icon_filename("testapp", "https://example.com/icon")
+        filename = icon_service._generate_icon_filename(
+            "testapp", "https://example.com/icon"
+        )
 
         assert filename == "testapp.png"
 
@@ -209,7 +227,9 @@ class TestIconService:
         """Test successful icon extraction."""
         mock_icon_path = mock_paths["dest_path"]
 
-        with patch("my_unicorn.services.icon_service.IconManager") as mock_icon_manager_class:
+        with patch(
+            "my_unicorn.services.icon_service.IconManager"
+        ) as mock_icon_manager_class:
             mock_icon_manager = AsyncMock()
             mock_icon_manager_class.return_value = mock_icon_manager
             mock_icon_manager.extract_icon_only.return_value = mock_icon_path
@@ -221,7 +241,9 @@ class TestIconService:
             )
 
             assert result == mock_icon_path
-            mock_icon_manager_class.assert_called_once_with(enable_extraction=True)
+            mock_icon_manager_class.assert_called_once_with(
+                enable_extraction=True
+            )
             mock_icon_manager.extract_icon_only.assert_called_once_with(
                 appimage_path=mock_paths["appimage_path"],
                 dest_path=mock_paths["dest_path"],
@@ -231,10 +253,14 @@ class TestIconService:
     @pytest.mark.asyncio
     async def test_attempt_extraction_failure(self, icon_service, mock_paths):
         """Test failed icon extraction."""
-        with patch("my_unicorn.services.icon_service.IconManager") as mock_icon_manager_class:
+        with patch(
+            "my_unicorn.services.icon_service.IconManager"
+        ) as mock_icon_manager_class:
             mock_icon_manager = AsyncMock()
             mock_icon_manager_class.return_value = mock_icon_manager
-            mock_icon_manager.extract_icon_only.side_effect = Exception("Extraction failed")
+            mock_icon_manager.extract_icon_only.side_effect = Exception(
+                "Extraction failed"
+            )
 
             result = await icon_service._attempt_extraction(
                 mock_paths["appimage_path"],
@@ -245,9 +271,13 @@ class TestIconService:
             assert result is None
 
     @pytest.mark.asyncio
-    async def test_attempt_extraction_no_icon_found(self, icon_service, mock_paths):
+    async def test_attempt_extraction_no_icon_found(
+        self, icon_service, mock_paths
+    ):
         """Test extraction when no icon is found."""
-        with patch("my_unicorn.services.icon_service.IconManager") as mock_icon_manager_class:
+        with patch(
+            "my_unicorn.services.icon_service.IconManager"
+        ) as mock_icon_manager_class:
             mock_icon_manager = AsyncMock()
             mock_icon_manager_class.return_value = mock_icon_manager
             mock_icon_manager.extract_icon_only.return_value = None
@@ -261,7 +291,9 @@ class TestIconService:
             assert result is None
 
     @pytest.mark.asyncio
-    async def test_attempt_github_download_success(self, icon_service, mock_paths):
+    async def test_attempt_github_download_success(
+        self, icon_service, mock_paths
+    ):
         """Test successful GitHub icon download."""
         icon_asset = IconAsset(
             icon_filename="testapp.png",
@@ -269,7 +301,9 @@ class TestIconService:
         )
         mock_icon_path = mock_paths["dest_path"]
 
-        icon_service.download_service.download_icon.return_value = mock_icon_path
+        icon_service.download_service.download_icon.return_value = (
+            mock_icon_path
+        )
 
         result = await icon_service._attempt_github_download(
             icon_asset,
@@ -283,14 +317,18 @@ class TestIconService:
         )
 
     @pytest.mark.asyncio
-    async def test_attempt_github_download_failure(self, icon_service, mock_paths):
+    async def test_attempt_github_download_failure(
+        self, icon_service, mock_paths
+    ):
         """Test failed GitHub icon download."""
         icon_asset = IconAsset(
             icon_filename="testapp.png",
             icon_url="https://github.com/test/repo/raw/main/icon.png",
         )
 
-        icon_service.download_service.download_icon.side_effect = Exception("Download failed")
+        icon_service.download_service.download_icon.side_effect = Exception(
+            "Download failed"
+        )
 
         result = await icon_service._attempt_github_download(
             icon_asset,
@@ -301,7 +339,9 @@ class TestIconService:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_attempt_github_download_no_icon_returned(self, icon_service, mock_paths):
+    async def test_attempt_github_download_no_icon_returned(
+        self, icon_service, mock_paths
+    ):
         """Test GitHub download when no icon is returned."""
         icon_asset = IconAsset(
             icon_filename="testapp.png",
@@ -318,7 +358,9 @@ class TestIconService:
 
         assert result is None
 
-    def test_build_updated_config_extraction_success(self, icon_service, mock_paths):
+    def test_build_updated_config_extraction_success(
+        self, icon_service, mock_paths
+    ):
         """Test config building for successful extraction."""
         base_config = {"old_key": "old_value"}
 
@@ -344,7 +386,9 @@ class TestIconService:
 
         assert result == expected
 
-    def test_build_updated_config_github_success(self, icon_service, mock_paths):
+    def test_build_updated_config_github_success(
+        self, icon_service, mock_paths
+    ):
         """Test config building for successful GitHub download."""
         base_config = {}
 
@@ -395,7 +439,9 @@ class TestIconService:
 
         assert result == expected
 
-    def test_build_updated_config_extraction_clear_url(self, icon_service, mock_paths):
+    def test_build_updated_config_extraction_clear_url(
+        self, icon_service, mock_paths
+    ):
         """Test config building for extraction without preserving URL."""
         result = icon_service._build_updated_config(
             base_config={},
@@ -461,7 +507,9 @@ class TestIconService:
 
         with (
             patch.object(icon_service, "_attempt_extraction") as mock_extract,
-            patch.object(icon_service, "_attempt_github_download") as mock_github,
+            patch.object(
+                icon_service, "_attempt_github_download"
+            ) as mock_github,
         ):
             mock_extract.return_value = None  # Extraction fails
             mock_github.return_value = mock_icon_path
@@ -482,7 +530,9 @@ class TestIconService:
             mock_github.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_acquire_icon_extraction_disabled(self, icon_service, mock_paths):
+    async def test_acquire_icon_extraction_disabled(
+        self, icon_service, mock_paths
+    ):
         """Test icon acquisition with extraction disabled."""
         config = IconConfig(
             extraction_enabled=False,
@@ -493,7 +543,9 @@ class TestIconService:
 
         with (
             patch.object(icon_service, "_attempt_extraction") as mock_extract,
-            patch.object(icon_service, "_attempt_github_download") as mock_github,
+            patch.object(
+                icon_service, "_attempt_github_download"
+            ) as mock_github,
         ):
             mock_github.return_value = mock_icon_path
 
@@ -519,7 +571,9 @@ class TestIconService:
 
         with (
             patch.object(icon_service, "_attempt_extraction") as mock_extract,
-            patch.object(icon_service, "_attempt_github_download") as mock_github,
+            patch.object(
+                icon_service, "_attempt_github_download"
+            ) as mock_github,
         ):
             mock_extract.return_value = None  # Extraction fails
 
@@ -544,7 +598,9 @@ class TestIconService:
         """Test icon acquisition when both extraction and GitHub download fail."""
         with (
             patch.object(icon_service, "_attempt_extraction") as mock_extract,
-            patch.object(icon_service, "_attempt_github_download") as mock_github,
+            patch.object(
+                icon_service, "_attempt_github_download"
+            ) as mock_github,
         ):
             mock_extract.return_value = None
             mock_github.return_value = None
@@ -561,7 +617,9 @@ class TestIconService:
             assert result.config["installed"] is False
 
     @pytest.mark.asyncio
-    async def test_acquire_icon_with_catalog_entry(self, icon_service, mock_paths):
+    async def test_acquire_icon_with_catalog_entry(
+        self, icon_service, mock_paths
+    ):
         """Test icon acquisition with catalog entry for preference detection."""
         config = IconConfig(
             extraction_enabled=True,  # Will be overridden
@@ -576,7 +634,9 @@ class TestIconService:
 
         with (
             patch.object(icon_service, "_attempt_extraction") as mock_extract,
-            patch.object(icon_service, "_attempt_github_download") as mock_github,
+            patch.object(
+                icon_service, "_attempt_github_download"
+            ) as mock_github,
         ):
             mock_github.return_value = mock_icon_path
 
@@ -595,7 +655,9 @@ class TestIconService:
             mock_github.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_acquire_icon_preserve_url_on_extraction(self, icon_service, mock_paths):
+    async def test_acquire_icon_preserve_url_on_extraction(
+        self, icon_service, mock_paths
+    ):
         """Test icon acquisition preserving URL on extraction."""
         config = IconConfig(
             extraction_enabled=True,
@@ -642,7 +704,9 @@ class TestIconService:
             mock_logger.debug.assert_called()
 
     @pytest.mark.asyncio
-    async def test_acquire_icon_edge_case_empty_filename(self, icon_service, mock_paths):
+    async def test_acquire_icon_edge_case_empty_filename(
+        self, icon_service, mock_paths
+    ):
         """Test icon acquisition with empty filename."""
         config = IconConfig(
             extraction_enabled=True,
@@ -691,13 +755,15 @@ class TestIconService:
             )
 
     def test_icon_service_initialization(self, mock_download_service):
-        """Test that IconService initializes correctly."""
-        service = IconService(mock_download_service)
+        """Test that IconHandler initializes correctly."""
+        service = IconHandler(mock_download_service)
 
         assert service.download_service is mock_download_service
 
     @pytest.mark.asyncio
-    async def test_acquire_icon_complex_workflow(self, icon_service, mock_paths):
+    async def test_acquire_icon_complex_workflow(
+        self, icon_service, mock_paths
+    ):
         """Test complex workflow with multiple configurations and scenarios."""
         # Test scenario: catalog prefers extraction, but extraction fails,
         # then GitHub succeeds, and config should reflect the actual outcome
@@ -709,13 +775,17 @@ class TestIconService:
             preserve_url_on_extraction=True,
         )
 
-        catalog_entry = {"icon": {"extraction": True}}  # Catalog wants extraction
+        catalog_entry = {
+            "icon": {"extraction": True}
+        }  # Catalog wants extraction
         current_config = {"old_setting": "value"}
         mock_icon_path = mock_paths["dest_path"]
 
         with (
             patch.object(icon_service, "_attempt_extraction") as mock_extract,
-            patch.object(icon_service, "_attempt_github_download") as mock_github,
+            patch.object(
+                icon_service, "_attempt_github_download"
+            ) as mock_github,
         ):
             mock_extract.return_value = None  # Extraction fails
             mock_github.return_value = mock_icon_path  # GitHub succeeds
@@ -736,6 +806,8 @@ class TestIconService:
             # Result should reflect actual outcome
             assert result.source == "github"
             assert result.config["extraction"] is False
-            assert result.config["old_setting"] == "value"  # Preserves existing config
+            assert (
+                result.config["old_setting"] == "value"
+            )  # Preserves existing config
             assert result.config["installed"] is True
             assert result.config["url"] == "https://example.com/icon.png"

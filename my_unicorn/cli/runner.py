@@ -13,7 +13,7 @@ from ..commands.auth import AuthHandler
 from ..commands.backup import BackupHandler
 from ..commands.cache import CacheHandler
 from ..commands.config import ConfigHandler
-from ..commands.install import InstallHandler
+from ..commands.install import InstallCommandHandler
 from ..commands.list import ListHandler
 from ..commands.remove import RemoveHandler
 from ..commands.update import UpdateHandler
@@ -53,7 +53,7 @@ class CLIRunner:
     def _init_command_handlers(self) -> None:
         """Initialize all command handlers with shared dependencies."""
         self.command_handlers = {
-            "install": InstallHandler(
+            "install": InstallCommandHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
             "update": UpdateHandler(

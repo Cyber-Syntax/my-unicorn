@@ -1,6 +1,6 @@
-"""Storage service for handling file system operations.
+"""File operations for handling file system tasks.
 
-This module provides a service for file operations such as making files executable,
+This module provides utilities for file operations such as making files executable,
 renaming, moving, creating backups, and other storage-related tasks.
 """
 
@@ -12,12 +12,11 @@ from my_unicorn.logger import get_logger
 logger = get_logger(__name__)
 
 
-# TODO: Rename the class as FileOps or AppimageFileOps to represent much meaningful for python.
-class StorageService:
-    """Service for handling file system operations."""
+class FileOperations:
+    """File system operations utility."""
 
     def __init__(self, install_dir: Path) -> None:
-        """Initialize storage service with install directory.
+        """Initialize file operations with install directory.
 
         Args:
             install_dir: Directory for installations
@@ -63,7 +62,9 @@ class StorageService:
         source.rename(destination)
         return destination
 
-    def move_to_install_dir(self, source: Path, filename: str | None = None) -> Path:
+    def move_to_install_dir(
+        self, source: Path, filename: str | None = None
+    ) -> Path:
         """Move file from source to install directory.
 
         Args:

@@ -1,6 +1,6 @@
-"""Install service for AppImage installations.
+"""Install handler for AppImage installations.
 
-This service consolidates all installation logic, replacing the complex
+This handler consolidates all installation logic, replacing the complex
 template method pattern with a simpler, more maintainable approach.
 """
 
@@ -19,26 +19,26 @@ from my_unicorn.github_client import (
     Release,
 )
 from my_unicorn.logger import get_logger
-from my_unicorn.services.icon_service import IconService
-from my_unicorn.storage import StorageService
+from my_unicorn.services.icon_service import IconHandler
+from my_unicorn.storage import FileOperations
 from my_unicorn.verification import VerificationService
 
 logger = get_logger(__name__)
 
 
-class InstallService:
-    """Simple service for installing AppImages."""
+class InstallHandler:
+    """Handles installation orchestration."""
 
     def __init__(
         self,
         download_service: DownloadService,
-        storage_service: StorageService,
+        storage_service: FileOperations,
         config_manager: Any,
         github_client: GitHubClient,
         catalog_manager: Any,
-        icon_service: IconService | None = None,
+        icon_service: IconHandler | None = None,
     ) -> None:
-        """Initialize install service.
+        """Initialize install handler.
 
         Args:
             download_service: Service for downloading files
@@ -54,8 +54,8 @@ class InstallService:
         self.config_manager = config_manager
         self.github_client = github_client
         self.catalog_manager = catalog_manager
-        self.icon_service = icon_service or IconService(
-            config_manager=config_manager,
+        self.icon_service = icon_service or IconHandler(
+            download_service=download_service,
         )
 
     async def install_from_catalog(
@@ -149,6 +149,8 @@ class InstallService:
             )
 
             # Create minimal app config for URL installs
+            # Note: digest=False enables auto-detection of checksum files
+            # Verification service will use digest if available from API
             app_config = {
                 "owner": owner,
                 "repo": repo,
@@ -159,7 +161,7 @@ class InstallService:
                 },
                 "github": {},
                 "verification": {
-                    "digest": True,
+                    "digest": False,
                     "skip": False,
                     "checksum_file": "",
                     "checksum_hash_type": "sha256",

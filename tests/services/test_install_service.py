@@ -1,15 +1,15 @@
-"""Tests for InstallService."""
+"""Tests for InstallHandler."""
 
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from my_unicorn.services.install_service import InstallService
+from my_unicorn.services.install_service import InstallHandler
 
 
-class TestInstallService:
-    """Test cases for InstallService."""
+class TestInstallHandler:
+    """Test cases for InstallHandler."""
 
     @pytest.fixture
     def mock_services(self):
@@ -84,8 +84,8 @@ class TestInstallService:
 
     @pytest.fixture
     def install_service(self, mock_services):
-        """Create InstallService instance with mocked dependencies."""
-        return InstallService(**mock_services)
+        """Create InstallHandler instance with mocked dependencies."""
+        return InstallHandler(**mock_services)
 
     @pytest.mark.asyncio
     async def test_install_from_catalog_success(

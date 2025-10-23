@@ -1,4 +1,4 @@
-"""Shared icon acquisition service to eliminate code duplication."""
+"""Shared icon acquisition handler to eliminate code duplication."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from my_unicorn.constants import (
 from my_unicorn.download import DownloadService, IconAsset
 from my_unicorn.icon import IconManager
 from my_unicorn.logger import get_logger
-from my_unicorn.services.progress import ProgressService
+from my_unicorn.services.progress import ProgressDisplay
 
 logger = get_logger(__name__)
 
@@ -43,15 +43,15 @@ class IconResult:
     config: dict[str, Any]
 
 
-class IconService:
-    """Shared service for icon acquisition with extraction and GitHub fallback."""
+class IconHandler:
+    """Handles icon acquisition orchestration."""
 
     def __init__(
         self,
         download_service: DownloadService,
-        progress_service: ProgressService | None = None,
+        progress_service: ProgressDisplay | None = None,
     ) -> None:
-        """Initialize icon service.
+        """Initialize icon handler.
 
         Args:
             download_service: Service for downloading icons from GitHub

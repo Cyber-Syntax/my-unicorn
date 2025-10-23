@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from my_unicorn.download import DownloadService, IconAsset
-from my_unicorn.services.icon_service import IconConfig, IconService
+from my_unicorn.services.icon_service import IconConfig, IconHandler
 from my_unicorn.verification.service import VerificationService
 
 
@@ -20,8 +20,8 @@ def mock_download_service():
 
 @pytest.fixture
 def icon_service(mock_download_service):
-    """Create an IconService instance with mock dependencies."""
-    return IconService(mock_download_service)
+    """Create an IconHandler instance with mock dependencies."""
+    return IconHandler(mock_download_service)
 
 
 @pytest.fixture

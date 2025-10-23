@@ -11,8 +11,7 @@ from typing import Any
 import aiohttp
 
 from my_unicorn.download import DownloadService
-from my_unicorn.services.install_service import InstallService
-from my_unicorn.storage import StorageService
+from my_unicorn.storage import FileOperations
 
 from ..exceptions import ValidationError
 from ..github_client import GitHubClient
@@ -55,8 +54,10 @@ class InstallCommand:
         # Progress and download services will be created when needed
         self.progress_service: Any = None
         self.download_service: Any = None
-        self.storage_service = StorageService(install_dir)
-        self.install_service: InstallService | None = None
+        self.storage_service = FileOperations(install_dir)
+        self.install_service: Any = (
+            None  # Will be InstallHandler from services
+        )
 
     def _initialize_services_with_progress(self, show_progress: bool) -> None:
         """Initialize services with progress service if needed.
@@ -304,15 +305,16 @@ class InstallCommand:
         """
         # Create install service if not already created
         if self.install_service is None:
-            from my_unicorn.services.icon_service import IconService
+            from my_unicorn.services.icon_service import IconHandler
+            from my_unicorn.services.install_service import InstallHandler
 
-            self.install_service = InstallService(
+            self.install_service = InstallHandler(
                 download_service=self.download_service,
                 storage_service=self.storage_service,
                 config_manager=self.config_manager,
                 github_client=self.github_client,
                 catalog_manager=self.catalog_manager,
-                icon_service=IconService(
+                icon_service=IconHandler(
                     download_service=self.download_service,
                     progress_service=self.progress_service,
                 ),
@@ -423,7 +425,7 @@ class InstallCommand:
                 logger.error("   ❌ %s: %s", app_name, error)
 
 
-class InstallHandler(BaseCommandHandler):
+class InstallCommandHandler(BaseCommandHandler):
     """Handler for install command CLI interface."""
 
     async def execute(self, args: Namespace) -> None:

@@ -18,7 +18,7 @@ except ImportError:
     InvalidVersion = None  # type: ignore
 
 
-from my_unicorn.services.icon_service import IconService
+from my_unicorn.services.icon_service import IconHandler
 from my_unicorn.verification import VerificationService
 
 from .auth import GitHubAuthManager
@@ -27,7 +27,7 @@ from .config import ConfigManager
 from .download import DownloadService, IconAsset
 from .github_client import Asset, AssetSelector, Release, ReleaseFetcher
 from .logger import get_logger
-from .storage import StorageService
+from .storage import FileOperations
 
 logger = get_logger(__name__)
 
@@ -101,7 +101,7 @@ class UpdateManager:
 
         # Initialize storage service with install directory
         storage_dir = self.global_config["directory"]["storage"]
-        self.storage_service = StorageService(storage_dir)
+        self.storage_service = FileOperations(storage_dir)
 
         # Initialize backup service
         self.backup_service = BackupService(
@@ -128,7 +128,7 @@ class UpdateManager:
         download_service = DownloadService(session)
         # Get progress service from download service if available
         progress_service = getattr(download_service, "progress_service", None)
-        self.icon_service = IconService(download_service, progress_service)
+        self.icon_service = IconHandler(download_service, progress_service)
         self.verification_service = VerificationService(
             download_service, progress_service
         )

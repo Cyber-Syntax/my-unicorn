@@ -23,7 +23,7 @@ from my_unicorn.github_client import (
     ChecksumFileInfo,
 )
 from my_unicorn.logger import get_logger
-from my_unicorn.services.progress import ProgressService
+from my_unicorn.services.progress import ProgressDisplay
 from my_unicorn.verification.verifier import Verifier
 
 logger = get_logger(__name__, enable_file_logging=True)
@@ -54,7 +54,7 @@ class VerificationService:
     def __init__(
         self,
         download_service: DownloadService,
-        progress_service: ProgressService | None = None,
+        progress_service: ProgressDisplay | None = None,
     ) -> None:
         """Initialize verification service.
 

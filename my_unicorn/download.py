@@ -15,7 +15,7 @@ from my_unicorn.auth import GitHubAuthManager
 from my_unicorn.github_client import Asset
 from my_unicorn.logger import get_logger
 from my_unicorn.services.progress import (
-    ProgressService,
+    ProgressDisplay,
     ProgressType,
     get_progress_service,
 )
@@ -36,7 +36,7 @@ class DownloadService:
     def __init__(
         self,
         session: aiohttp.ClientSession,
-        progress_service: ProgressService | None = None,
+        progress_service: ProgressDisplay | None = None,
     ) -> None:
         """Initialize download service with HTTP session.
 

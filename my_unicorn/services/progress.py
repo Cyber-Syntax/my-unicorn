@@ -1,6 +1,6 @@
-"""Progress service using Rich library for unified progress display.
+"""Progress display using Rich library for unified progress display.
 
-This module provides a centralized progress management service that handles
+This module provides a centralized progress display UI component that handles
 different types of operations with rich visual feedback using the Rich library.
 """
 
@@ -91,7 +91,9 @@ class ProgressConfig:
     show_post_processing: bool = True
     batch_ui_updates: bool = True
     ui_update_interval: float = 0.25  # Seconds between batched UI updates
-    speed_calculation_interval: float = 0.5  # Minimum interval for speed recalculation
+    speed_calculation_interval: float = (
+        0.5  # Minimum interval for speed recalculation
+    )
     max_speed_history: int = 10  # Number of speed measurements to retain
 
 
@@ -117,7 +119,9 @@ class TaskInfo:
 
     # Speed tracking for downloads
     current_speed_mbps: float = 0.0
-    speed_history: deque[tuple[float, float]] | None = None  # (timestamp, speed) pairs
+    speed_history: deque[tuple[float, float]] | None = (
+        None  # (timestamp, speed) pairs
+    )
 
     def __post_init__(self) -> None:
         """Initialize speed history deque."""
@@ -125,15 +129,15 @@ class TaskInfo:
             self.speed_history = deque(maxlen=10)
 
 
-class ProgressService:
-    """Centralized progress management service with proper task isolation."""
+class ProgressDisplay:
+    """Progress display UI component."""
 
     def __init__(
         self,
         console: Console | None = None,
         config: ProgressConfig | None = None,
     ) -> None:
-        """Initialize progress service."""
+        """Initialize progress display."""
         self.console = console or Console()
         self.config = config or ProgressConfig()
 
@@ -201,14 +205,18 @@ class ProgressService:
         # Legacy attributes for backward compatibility
         self._api_task_ids = self._task_sets[ProgressType.API_FETCHING]
         self._download_task_ids = self._task_sets[ProgressType.DOWNLOAD]
-        self._post_processing_task_ids = set()  # Combined for all post-processing types
+        self._post_processing_task_ids = (
+            set()
+        )  # Combined for all post-processing types
 
         # UI state management
         self._layout_cache: Table | None = None
         self._pending_ui_updates: bool = False
         self._ui_update_task: asyncio.Task | None = None
 
-    def _generate_namespaced_id(self, progress_type: ProgressType, name: str) -> str:
+    def _generate_namespaced_id(
+        self, progress_type: ProgressType, name: str
+    ) -> str:
         """Generate a unique namespaced ID for a task with optimized caching."""
         # Check cache first
         cache_key = (progress_type, name)
@@ -264,16 +272,23 @@ class ProgressService:
         # Group tasks by app and count apps that have active tasks
         app_has_active_task = set()
         for task in self._tasks.values():
-            if task.progress_type in post_processing_types and not task.is_finished:
+            if (
+                task.progress_type in post_processing_types
+                and not task.is_finished
+            ):
                 app_name = self._extract_app_name_from_task(task)
                 app_has_active_task.add(app_name)
         return len(app_has_active_task)
 
-    def _create_filtered_post_processing_display(self, max_visible_tasks: int = 3) -> Progress:
+    def _create_filtered_post_processing_display(
+        self, max_visible_tasks: int = 3
+    ) -> Progress:
         """Create a Progress display showing one line per app (most recent task per app)."""
         # Create a new Progress instance for filtered display
         # Handle case where console might be None or mocked during testing
-        console_arg = self.console if hasattr(self.console, "get_time") else None
+        console_arg = (
+            self.console if hasattr(self.console, "get_time") else None
+        )
         filtered_progress = Progress(
             TextColumn("{task.description}"),
             SpinnerColumn(),
@@ -309,13 +324,19 @@ class ProgressService:
             # Sort by last_update descending to get most recent first
             tasks.sort(key=lambda x: x[1].last_update, reverse=True)
             most_recent_task = tasks[0]  # Most recent task for this app
-            app_current_tasks.append((app_name, most_recent_task[0], most_recent_task[1]))
+            app_current_tasks.append(
+                (app_name, most_recent_task[0], most_recent_task[1])
+            )
 
         # Sort apps by priority: active tasks first, then by last update descending
-        app_current_tasks.sort(key=lambda x: (x[2].is_finished, -x[2].last_update))
+        app_current_tasks.sort(
+            key=lambda x: (x[2].is_finished, -x[2].last_update)
+        )
 
         # Add the most relevant app tasks to the filtered display (limit by max_visible_tasks)
-        for app_name, _namespaced_id, task in app_current_tasks[:max_visible_tasks]:
+        for app_name, _namespaced_id, task in app_current_tasks[
+            :max_visible_tasks
+        ]:
             # Create appropriate description with status indicator
             if task.is_finished:
                 status_icon = "✅" if task.success else "❌"
@@ -356,7 +377,14 @@ class ProgressService:
             # Extract filename without extension
             filename = task.name.replace("Verifying ", "")
             # Remove common extensions
-            for ext in [".AppImage", ".tar.gz", ".tar.xz", ".zip", ".deb", ".rpm"]:
+            for ext in [
+                ".AppImage",
+                ".tar.gz",
+                ".tar.xz",
+                ".zip",
+                ".deb",
+                ".rpm",
+            ]:
                 if filename.endswith(ext):
                     filename = filename[: -len(ext)]
             return filename
@@ -404,11 +432,17 @@ class ProgressService:
         # Create post-processing panel dynamically with filtered task display
         if self.config.show_post_processing:
             # Calculate how many tasks can fit in the panel height
-            panel_height = max(5, self._count_active_post_processing_tasks() + 3)
-            max_visible_tasks = max(1, panel_height - 2)  # Account for top and bottom borders
+            panel_height = max(
+                5, self._count_active_post_processing_tasks() + 3
+            )
+            max_visible_tasks = max(
+                1, panel_height - 2
+            )  # Account for top and bottom borders
 
             # Create filtered progress display showing most recent tasks
-            filtered_display = self._create_filtered_post_processing_display(max_visible_tasks)
+            filtered_display = self._create_filtered_post_processing_display(
+                max_visible_tasks
+            )
 
             processing_panel = Panel(
                 filtered_display,
@@ -456,7 +490,11 @@ class ProgressService:
         """Background task to batch UI updates for better performance."""
         while self._active:
             await asyncio.sleep(self.config.ui_update_interval)
-            if self._pending_ui_updates and self._live and self._live.is_started:
+            if (
+                self._pending_ui_updates
+                and self._live
+                and self._live.is_started
+            ):
                 try:
                     updated_layout = self._create_layout()
                     self._live.update(updated_layout)
@@ -469,7 +507,9 @@ class ProgressService:
         if self.config.batch_ui_updates:
             # For now, use standard asyncio.create_task for better compatibility
             # TaskGroup requires more complex context management that can cause issues
-            self._ui_update_task = asyncio.create_task(self._batched_ui_update_loop())
+            self._ui_update_task = asyncio.create_task(
+                self._batched_ui_update_loop()
+            )
 
     async def _stop_background_tasks(self) -> None:
         """Stop background tasks with optimized cleanup."""
@@ -532,7 +572,10 @@ class ProgressService:
             # Start background tasks using optimized method
             await self._start_background_tasks()
 
-            logger.debug("Progress session started with %d total operations", total_operations)
+            logger.debug(
+                "Progress session started with %d total operations",
+                total_operations,
+            )
 
     async def stop_session(self) -> None:
         """Stop the progress display session with optimized cleanup."""
@@ -549,7 +592,9 @@ class ProgressService:
             if self._live and self._pending_ui_updates:
                 try:
                     self._refresh_live_display()
-                    await asyncio.sleep(0.05)  # Brief pause to ensure rendering
+                    await asyncio.sleep(
+                        0.05
+                    )  # Brief pause to ensure rendering
                 except Exception as e:
                     logger.debug("Error in final UI update: %s", e)
 
@@ -583,7 +628,9 @@ class ProgressService:
         # Generate description if not provided
         if description is None:
             description = (
-                f"📦 {name}" if progress_type == ProgressType.DOWNLOAD else f"⚙️ {name}"
+                f"📦 {name}"
+                if progress_type == ProgressType.DOWNLOAD
+                else f"⚙️ {name}"
             )
 
         # Generate unique namespaced ID
@@ -650,10 +697,15 @@ class ProgressService:
 
         return namespaced_id
 
-    def _calculate_speed_optimized(self, task: TaskInfo, current_time: float) -> None:
+    def _calculate_speed_optimized(
+        self, task: TaskInfo, current_time: float
+    ) -> None:
         """Calculate current download speed using lock-free optimized algorithm."""
         # Skip if insufficient time has passed (reduces frequent calculations)
-        if current_time - task.last_speed_update < self.config.speed_calculation_interval:
+        if (
+            current_time - task.last_speed_update
+            < self.config.speed_calculation_interval
+        ):
             return
 
         # Ensure speed_history is initialized
@@ -680,7 +732,8 @@ class ProgressService:
                     # Smooth the speed with EMA (alpha = 0.3 for responsiveness)
                     alpha = 0.3
                     task.current_speed_mbps = (
-                        alpha * new_speed + (1 - alpha) * task.current_speed_mbps
+                        alpha * new_speed
+                        + (1 - alpha) * task.current_speed_mbps
                     )
                 else:
                     task.current_speed_mbps = new_speed
@@ -696,7 +749,10 @@ class ProgressService:
     ) -> None:
         """Update a progress task with optimized lock-reduced implementation."""
         if not self._active:
-            logger.warning("Cannot update task %s: Progress session not active", namespaced_id)
+            logger.warning(
+                "Cannot update task %s: Progress session not active",
+                namespaced_id,
+            )
             return
 
         # Pre-calculate values outside the lock to minimize lock time
@@ -732,7 +788,10 @@ class ProgressService:
             task.last_update = current_time
 
         # Mark for speed calculation if this is a download task with progress change
-        if task.progress_type == ProgressType.DOWNLOAD and new_completed != old_completed:
+        if (
+            task.progress_type == ProgressType.DOWNLOAD
+            and new_completed != old_completed
+        ):
             needs_speed_calc = True
 
         # Perform expensive operations outside the lock
@@ -758,7 +817,9 @@ class ProgressService:
                 progress_instance.update(task.task_id, **update_kwargs)
                 self._schedule_ui_update()
             except Exception as e:
-                logger.error("Error updating progress for task %s: %s", task.name, e)
+                logger.error(
+                    "Error updating progress for task %s: %s", task.name, e
+                )
 
     async def update_task_total(
         self,
@@ -785,7 +846,9 @@ class ProgressService:
         try:
             progress_instance.update(task.task_id, total=task.total)
             if completed is not None:
-                progress_instance.update(task.task_id, completed=task.completed)
+                progress_instance.update(
+                    task.task_id, completed=task.completed
+                )
             self._schedule_ui_update()
         except Exception as e:
             logger.error("Error updating task total for %s: %s", task.name, e)
@@ -843,7 +906,9 @@ class ProgressService:
             await asyncio.sleep(0.15)
 
         except Exception as e:
-            logger.error("Error updating progress for task %s: %s", task.name, e)
+            logger.error(
+                "Error updating progress for task %s: %s", task.name, e
+            )
 
         # Advance overall progress
         if should_advance_overall:
@@ -865,7 +930,9 @@ class ProgressService:
                 logger.debug("Error advancing overall progress: %s", e)
 
     @asynccontextmanager
-    async def session(self, total_operations: int = 0) -> AsyncGenerator[None, None]:
+    async def session(
+        self, total_operations: int = 0
+    ) -> AsyncGenerator[None, None]:
         """Context manager for progress session."""
         try:
             await self.start_session(total_operations)
@@ -881,10 +948,16 @@ class ProgressService:
         """Check if progress session is active."""
         return self._active
 
-    async def create_api_fetching_task(self, endpoint: str, total_requests: int = 100) -> str:
+    async def create_api_fetching_task(
+        self, endpoint: str, total_requests: int = 100
+    ) -> str:
         """Create an API fetching task."""
         # Simplify endpoint display - extract meaningful part
-        display_name = endpoint.split("/")[-1].split("?")[0] if "/" in endpoint else endpoint
+        display_name = (
+            endpoint.split("/")[-1].split("?")[0]
+            if "/" in endpoint
+            else endpoint
+        )
 
         return await self.add_task(
             name=f"Fetching {display_name}",
@@ -934,18 +1007,18 @@ class ProgressService:
 
 
 # Global progress service instance
-_global_progress_service: ProgressService | None = None
+_global_progress_service: ProgressDisplay | None = None
 
 
-def get_progress_service() -> ProgressService:
+def get_progress_service() -> ProgressDisplay:
     """Get or create the global progress service instance."""
     global _global_progress_service
     if _global_progress_service is None:
-        _global_progress_service = ProgressService()
+        _global_progress_service = ProgressDisplay()
     return _global_progress_service
 
 
-def set_progress_service(service: ProgressService) -> None:
+def set_progress_service(service: ProgressDisplay) -> None:
     """Set the global progress service instance."""
     global _global_progress_service
     _global_progress_service = service
@@ -956,10 +1029,10 @@ async def progress_session(
     total_operations: int = 0,
     console: Console | None = None,
     config: ProgressConfig | None = None,
-) -> AsyncGenerator[ProgressService, None]:
+) -> AsyncGenerator[ProgressDisplay, None]:
     """Context manager for isolated progress session."""
     global _global_progress_service
-    service = ProgressService(console=console, config=config)
+    service = ProgressDisplay(console=console, config=config)
     old_service = _global_progress_service
     _global_progress_service = service
 
