@@ -120,7 +120,7 @@ def test_is_yaml_content(tmp_path: Path, patch_logger):
     assert verifier._is_yaml_content("just some random text") is False
 
 
-@patch("my_unicorn.verification.verify._YAML_AVAILABLE", False)
+@patch("my_unicorn.verification.verifier._YAML_AVAILABLE", False)
 def test_is_yaml_content_no_yaml_available(tmp_path: Path, patch_logger):
     """Test YAML detection when PyYAML is not available."""
     file = tmp_path / "file.bin"
@@ -189,7 +189,7 @@ def test_parse_yaml_checksum_file_not_found(tmp_path: Path, patch_logger):
     assert hash_value is None
 
 
-@patch("my_unicorn.verification.verify._YAML_AVAILABLE", False)
+@patch("my_unicorn.verification.verifier._YAML_AVAILABLE", False)
 def test_parse_yaml_checksum_file_no_yaml(tmp_path: Path, patch_logger):
     """Test YAML parsing when PyYAML is not available."""
     file = tmp_path / "file.bin"
@@ -295,15 +295,14 @@ def test_detect_hash_type_from_filename(tmp_path: Path, patch_logger):
     file.write_bytes(b"test")
     verifier = Verifier(file)
 
-    assert verifier._detect_hash_type_from_filename("SHA512SUMS") == "sha512"
+    assert verifier.detect_hash_type_from_filename("SHA512SUMS") == "sha512"
     assert (
-        verifier._detect_hash_type_from_filename("SHA256SUMS.txt") == "sha256"
+        verifier.detect_hash_type_from_filename("SHA256SUMS.txt") == "sha256"
     )
-    assert verifier._detect_hash_type_from_filename("checksums.sha1") == "sha1"
-    assert verifier._detect_hash_type_from_filename("hashes.md5") == "md5"
+    assert verifier.detect_hash_type_from_filename("checksums.sha1") == "sha1"
+    assert verifier.detect_hash_type_from_filename("hashes.md5") == "md5"
     assert (
-        verifier._detect_hash_type_from_filename("latest-linux.yml")
-        == "sha256"
+        verifier.detect_hash_type_from_filename("latest-linux.yml") == "sha256"
     )  # Default
 
 

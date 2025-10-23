@@ -526,19 +526,16 @@ async def test_fetch_latest_release_malformed_response(mock_session):
     # Simulate malformed response: None
     mock_response.json = AsyncMock(return_value=None)
     mock_session.get.return_value = mock_response
-    # Should raise AttributeError if data is not a dict
-    try:
+    # Should raise ValueError when no release found (malformed response)
+    with pytest.raises(ValueError, match="No stable release found"):
         await fetcher.fetch_latest_release()
-    except AttributeError:
-        pass
 
     # Simulate malformed response: unexpected type
     mock_response.json = AsyncMock(return_value="not-a-dict")
     mock_session.get.return_value = mock_response
-    try:
+    # Should raise AttributeError when trying to call .get() on non-dict
+    with pytest.raises(AttributeError):
         await fetcher.fetch_latest_release()
-    except AttributeError:
-        pass
 
 
 def test_build_icon_url_and_extract_icon_filename():

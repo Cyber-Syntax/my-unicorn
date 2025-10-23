@@ -4,8 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.github_client import Asset
+from my_unicorn.github_client import Asset, ChecksumFileInfo
 from my_unicorn.verification.service import (
+    VerificationConfig,
     VerificationResult,
     VerificationService,
 )
@@ -41,7 +42,8 @@ b39f78905a55bab8f16b82e90d784e4838c05b1605166d9cb3824a612cf6fc71 siyuan-3.2.1-li
 fbe6115ef044d451623c8885078172d6adc1318db6baf88e6b1fe379630a2da9 siyuan-3.2.1-mac.dmg
 b75303038e40c0fcee7942bb47e9c8f853e8801fa87d63e0ab54d559837ffb03 siyuan-3.2.1-win-arm64.exe
 ecfd14da398507452307bdb7671b57715a44a02ac7fdfb47e8afbe4f3b20e45f siyuan-3.2.1-win.exe
-d9ad0f257893f6f2d25b948422257a938b03e6362ab638ad1a74e9bab1c0e755 siyuan-3.2.1.apk"""
+d9ad0f257893f6f2d25b948422257a938b03e6362ab638ad1a74e9bab1c0e755 siyuan-3.2.1.apk
+6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72 app.AppImage"""
 
 # Expected hex hash for Legcord AppImage (converted from Base64)
 LEGCORD_EXPECTED_HEX = "24d9980531bd96a5edfd55e67acdf6a6eddb9f3fd868a3337e31552fed09f92f0c49697b9cb987a2599434b140b9ba72d4959353011d94f5bc52144dc4d890bb"
@@ -554,39 +556,23 @@ class TestVerificationService:
             AsyncMock(side_effect=mock_download_side_effect)
         )
 
-        with patch(
-            "my_unicorn.verification.verifier.Verifier"
-        ) as mock_verifier_class:
-            mock_verifier = MagicMock()
-            mock_verifier_class.return_value = mock_verifier
+        result = await verification_service.verify_file(
+            file_path=test_file_path,
+            asset=asset,
+            config=config,
+            owner="test",
+            repo="test",
+            tag_name="v1.0.0",
+            app_name="app.AppImage",
+            assets=sample_assets_with_both,
+        )
 
-            def parse_side_effect(content, filename, hash_type):
-                if "invalid yaml" in content:
-                    return None  # YAML parsing fails
-                elif "3afc23ec" in content:
-                    return "3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef"
-                return None
-
-            mock_verifier.parse_checksum_file.side_effect = parse_side_effect
-            mock_verifier.compute_hash.return_value = "3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef"
-
-            result = await verification_service.verify_file(
-                file_path=test_file_path,
-                asset=asset,
-                config=config,
-                owner="test",
-                repo="test",
-                tag_name="v1.0.0",
-                app_name="app.AppImage",
-                assets=sample_assets_with_both,
-            )
-
-            assert result.passed is True
-            # Should have tried both checksum files
-            assert (
-                verification_service.download_service.download_checksum_file.call_count
-                == 2
-            )
+        assert result.passed is True
+        # Should have tried both checksum files
+        assert (
+            verification_service.download_service.download_checksum_file.call_count
+            == 2
+        )
 
     @pytest.mark.asyncio
     async def test_verify_file_skip_verification(

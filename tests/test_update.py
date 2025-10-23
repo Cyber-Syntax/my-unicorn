@@ -130,7 +130,7 @@ class TestUpdateManager:
         """Create UpdateManager instance with mocked dependencies."""
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
         ):
             manager = UpdateManager(mock_config_manager)
@@ -142,7 +142,7 @@ class TestUpdateManager:
         """Test UpdateManager initialization with provided config manager."""
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
         ):
             manager = UpdateManager(mock_config_manager)
@@ -155,7 +155,7 @@ class TestUpdateManager:
         with (
             patch("my_unicorn.update.ConfigManager") as mock_config_cls,
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
         ):
             mock_config_instance = MagicMock()
@@ -255,7 +255,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -293,7 +293,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
             patch("my_unicorn.update.logger"),
         ):
@@ -317,7 +317,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -359,7 +359,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -391,7 +391,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -423,7 +423,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -449,7 +449,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
             patch("my_unicorn.update.logger"),
         ):
@@ -472,7 +472,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -504,7 +504,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -536,7 +536,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
             patch("my_unicorn.update.logger"),
             patch("builtins.print"),
@@ -557,7 +557,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -590,7 +590,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
             patch("my_unicorn.update.logger"),
         ):
@@ -616,7 +616,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -644,7 +644,7 @@ class TestUpdateManager:
 
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -668,10 +668,10 @@ class TestUpdateManager:
         """Test services initialization with HTTP session."""
         with (
             patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.StorageService"),
+            patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
             patch("my_unicorn.update.DownloadService") as mock_download_cls,
-            patch("my_unicorn.update.IconService") as mock_icon_cls,
+            patch("my_unicorn.update.IconHandler") as mock_icon_cls,
             patch("my_unicorn.update.VerificationService") as mock_verify_cls,
         ):
             update_manager = UpdateManager(mock_config_manager)

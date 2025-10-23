@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from my_unicorn.github_client import Release
 from my_unicorn.upgrade import PackageNotFoundError, SelfUpdater
 
 
@@ -79,11 +80,14 @@ def test_display_version_info_prints_version(
 async def test_get_latest_release_success(mock_config_manager, mock_session):
     """Test get_latest_release returns release dict."""
     updater = SelfUpdater(mock_config_manager, mock_session)
-    release_data = {
-        "version": "2.0.0",
-        "prerelease": False,
-        "assets": [],
-    }
+    release_data = Release(
+        owner="test",
+        repo="repo",
+        version="2.0.0",
+        prerelease=False,
+        assets=[],
+        original_tag_name="v2.0.0",
+    )
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -274,11 +278,14 @@ async def test_check_for_update_newer_version(
 ):
     """Test check_for_update returns True for newer version."""
     updater = SelfUpdater(mock_config_manager, mock_session)
-    release_data = {
-        "version": "2.0.0",
-        "prerelease": False,
-        "assets": [],
-    }
+    release_data = Release(
+        owner="test",
+        repo="repo",
+        version="2.0.0",
+        prerelease=False,
+        assets=[],
+        original_tag_name="v2.0.0",
+    )
     with (
         patch.object(
             updater.github_fetcher,
