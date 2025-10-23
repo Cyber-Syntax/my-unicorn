@@ -333,12 +333,12 @@ USAGE:
 
 COMMANDS:
     qownnotes Tests:
-        --qown-install-url      Install qownnotes via URL
-        --qown-install-catalog  Install qownnotes from catalog
-        --qown-update          Update qownnotes (sets up old version first)
-        --qown-list            List installed apps (after installing qownnotes)
+        --url-qown      Install qownnotes via URL
+        --catalog-qown  Install qownnotes from catalog
+        --update-qown          Update qownnotes (sets up old version first)
+        --list-qown            List installed apps (after installing qownnotes)
         --qown-remove          Remove qownnotes
-        --qown-backup          Test backup functionality with qownnotes
+        --backup-qown          Test backup functionality with qownnotes
         --qown-all             Run all qownnotes tests
 
     URL Tests:
@@ -388,19 +388,19 @@ parse_arguments() {
     fi
 
     case "$1" in
-        --qown-install-url)
+        --url-qown)
             test_qownnotes_install_url
             ;;
-        --qown-install-catalog)
+        --catalog-qown)
             test_qownnotes_install_catalog
             ;;
-        --qown-update)
+        --update-qown)
             test_qownnotes_update
             ;;
-        --qown-list)
+        --list-qown)
             test_qownnotes_list
             ;;
-        --qown-backup)
+        --backup-qown)
             test_qownnotes_backup
             ;;
         --qown-all)
