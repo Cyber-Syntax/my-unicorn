@@ -391,9 +391,27 @@ class Verifier:
             logger.debug("   Parsed YAML checksum file")
             logger.debug("   Structure keys: %s", list(data.keys()))
 
-            # Look for files section
+            # Check for root-level hash first (e.g., path: file, sha512: hash)
             if "files" not in data:
                 logger.debug("   No 'files' section in YAML")
+                # Check if this is a root-level hash structure
+                # e.g., path: filename, sha512: hash
+                if "path" in data and data["path"] == filename:
+                    logger.debug("   Found root-level hash structure")
+                    # Try to find hash in preferred order
+                    for algo in HASH_PREFERENCE_ORDER:
+                        if algo in data:
+                            hash_value = data[algo]
+                            logger.debug(
+                                "   Found %s hash at root level", algo
+                            )
+                            # Convert base64 to hex if needed
+                            try:
+                                return self._convert_base64_to_hex(hash_value)
+                            except ValueError:
+                                # If conversion fails, assume it's already hex
+                                return hash_value
+                logger.debug("   No matching hash found at root level")
                 return None
 
             files = data["files"]
