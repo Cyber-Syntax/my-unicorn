@@ -595,11 +595,12 @@ class TestUpdateManager:
             patch("my_unicorn.update.logger"),
         ):
             update_manager = UpdateManager(mock_config_manager)
-            result = await update_manager.update_single_app(
+            success, error_reason = await update_manager.update_single_app(
                 "nonexistent-app", mock_session
             )
 
-            assert result is False
+            assert success is False
+            assert error_reason == "Configuration not found"
 
     @pytest.mark.asyncio
     async def test_update_single_app_no_update_needed(
@@ -627,12 +628,16 @@ class TestUpdateManager:
                 mock_check.return_value = update_info
 
                 with patch("my_unicorn.update.logger"):
-                    result = await update_manager.update_single_app(
+                    (
+                        success,
+                        error_reason,
+                    ) = await update_manager.update_single_app(
                         "test-app", mock_session
                     )
 
                     # Method returns True when no update is needed (successful check)
-                    assert result is True
+                    assert success is True
+                    assert error_reason is None
 
     @pytest.mark.asyncio
     async def test_update_multiple_apps(
@@ -653,11 +658,19 @@ class TestUpdateManager:
                 update_manager, "update_single_app", new=AsyncMock()
             ) as mock_update_single:
                 # app1 succeeds, app2 fails, app3 succeeds
-                mock_update_single.side_effect = [True, False, True]
+                mock_update_single.side_effect = [
+                    (True, None),
+                    (False, "Some error"),
+                    (True, None),
+                ]
 
-                result = await update_manager.update_multiple_apps(app_names)
+                (
+                    result,
+                    error_reasons,
+                ) = await update_manager.update_multiple_apps(app_names)
 
                 assert result == {"app1": True, "app2": False, "app3": True}
+                assert error_reasons == {"app2": "Some error"}
                 assert mock_update_single.call_count == EXPECTED_CALL_COUNT
 
     def test_initialize_services(

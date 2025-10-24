@@ -77,9 +77,7 @@ class InstallHandler:
             # Get app configuration
             app_config = self.catalog_manager.get_app_config(app_name)
             if not app_config:
-                raise InstallationError(
-                    f"App '{app_name}' not found in catalog"
-                )
+                raise InstallationError("App not found in catalog")
 
             # Fetch latest release
             owner = app_config["owner"]
@@ -108,13 +106,34 @@ class InstallHandler:
                 **options,
             )
 
+        except InstallationError as error:
+            logger.error("Failed to install %s: %s", app_name, error)
+            # Context-aware error message
+            error_msg = str(error)
+            if "not found in catalog" in error_msg.lower():
+                error_msg = "App not found in catalog"
+            elif "no assets found" in error_msg.lower():
+                error_msg = (
+                    "No assets found in release - may still be building"
+                )
+            elif "no suitable appimage" in error_msg.lower():
+                error_msg = (
+                    "AppImage not found in release - may still be building"
+                )
+            return {
+                "success": False,
+                "target": app_name,
+                "name": app_name,
+                "error": error_msg,
+                "source": "catalog",
+            }
         except Exception as error:
             logger.error("Failed to install %s: %s", app_name, error)
             return {
                 "success": False,
                 "target": app_name,
                 "name": app_name,
-                "error": str(error),
+                "error": f"Installation failed: {error}",
                 "source": "catalog",
             }
 
@@ -223,6 +242,27 @@ class InstallHandler:
                         return await self.install_from_catalog(
                             app_or_url, **options
                         )
+                except InstallationError as error:
+                    logger.error(
+                        "Installation error for %s: %s", app_or_url, error
+                    )
+                    # Context-aware error message
+                    error_msg = str(error)
+                    if "not found in catalog" in error_msg.lower():
+                        error_msg = "App not found in catalog"
+                    elif "no assets found" in error_msg.lower():
+                        error_msg = "No assets found in release - may still be building"
+                    elif "no suitable appimage" in error_msg.lower():
+                        error_msg = "AppImage not found in release - may still be building"
+                    elif "already installed" in error_msg.lower():
+                        error_msg = "Already installed"
+                    return {
+                        "success": False,
+                        "target": app_or_url,
+                        "name": app_or_url,
+                        "error": error_msg,
+                        "source": "url" if is_url else "catalog",
+                    }
                 except Exception as error:
                     logger.error(
                         "Unexpected error installing %s: %s", app_or_url, error
@@ -231,7 +271,7 @@ class InstallHandler:
                         "success": False,
                         "target": app_or_url,
                         "name": app_or_url,
-                        "error": str(error),
+                        "error": f"Installation failed: {error}",
                         "source": "url" if is_url else "catalog",
                     }
 
@@ -347,6 +387,7 @@ class InstallHandler:
                 "name": app_name,
                 "path": str(install_path),
                 "source": source,
+                "version": release_data.get("tag_name", "unknown"),
                 "verification": verify_result,
                 "icon": icon_result,
                 "config": config_result,
@@ -447,6 +488,7 @@ class InstallHandler:
         )
 
         # Use AssetSelector to find best AppImage
+        #TODO: appimage_asset naming would be better
         asset = AssetSelector.select_appimage_for_platform(
             release,
             preferred_suffixes=characteristic_suffix,
@@ -454,9 +496,7 @@ class InstallHandler:
         )
         if not asset:
             raise InstallationError(
-                f"No suitable AppImage found in release for {owner}/{repo} "
-                f"(source: {installation_source}, "
-                f"suffixes: {characteristic_suffix})"
+                "AppImage not found in release - may still be building"
             )
 
         return asset

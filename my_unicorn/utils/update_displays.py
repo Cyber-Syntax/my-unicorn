@@ -39,7 +39,9 @@ def display_update_summary(
     if check_only:
         _display_check_only_summary(update_infos)
     else:
-        _display_update_operation_summary(updated_apps, failed_apps, update_infos)
+        _display_update_operation_summary(
+            updated_apps, failed_apps, update_infos
+        )
 
 
 def _display_update_operation_summary(
@@ -65,13 +67,19 @@ def _display_update_operation_summary(
     for app_name in updated_apps:
         app_info = _find_update_info(app_name, update_infos)
         if app_info:
-            version_info = f"{app_info.current_version} → {app_info.latest_version}"
+            version_info = (
+                f"{app_info.current_version} → {app_info.latest_version}"
+            )
             print(f"{app_name:<25} ✅ {version_info}")
         else:
             print(f"{app_name:<25} ✅ Updated")
 
     for app_name in failed_apps:
+        app_info = _find_update_info(app_name, update_infos)
         print(f"{app_name:<25} ❌ Update failed")
+        # Display error reason if available
+        if app_info and app_info.error_reason:
+            print(f"{'':>25}    → {app_info.error_reason}")
 
     # Show summary stats
     print()
@@ -105,7 +113,9 @@ def _display_check_only_summary(update_infos: list["UpdateInfo"]) -> None:
         print("\nApps with updates available:")
         for info in update_infos:
             if info.has_update:
-                version_info = f"{info.current_version} → {info.latest_version}"
+                version_info = (
+                    f"{info.current_version} → {info.latest_version}"
+                )
                 print(f"  • {info.app_name}: {version_info}")
 
 

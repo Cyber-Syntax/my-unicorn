@@ -219,9 +219,6 @@ class InstallCommand:
         ]
         results.extend(already_installed_results)
 
-        # Print installation summary
-        self._print_installation_summary(results)
-
         return results
 
     async def _check_apps_needing_work(
@@ -370,14 +367,14 @@ class InstallCommand:
     def _print_installation_summary(
         self, results: list[dict[str, Any]]
     ) -> None:
-        """Print installation summary.
+        """Print installation summary with detailed error reasons.
 
         Args:
             results: List of installation results
 
         """
         if not results:
-            logger.info("No installations completed")
+            print("No installations completed")
             return
 
         # Categorize results
@@ -396,33 +393,41 @@ class InstallCommand:
 
         # Handle the case where all apps are already installed
         if len(already_installed) == total:
-            logger.info(
-                "✅ All %d specified app(s) are already installed:", total
-            )
+            print(f"✅ All {total} specified app(s) are already installed:")
             for result in already_installed:
-                logger.info("   • %s", result.get("name", "Unknown"))
+                print(f"   • {result.get('name', 'Unknown')}")
             return
 
-        # Print summary for mixed results
-        logger.info("📊 Installation Summary:")
-        if newly_installed:
-            logger.info("   Newly installed: %d", len(newly_installed))
-        if already_installed:
-            logger.info("   Already installed: %d", len(already_installed))
-        if failed:
-            logger.info("   Failed: %d", len(failed))
+        # Print summary header
+        print("\n📦 Installation Summary:")
+        print("-" * 50)
 
-        # Print detailed results
+        # Print detailed results with context-aware error messages
         for result in results:
             app_name = result.get("name", "Unknown")
             if result.get("success", False):
                 if result.get("status") == "already_installed":
-                    logger.info("   ℹ️  %s: Already installed", app_name)
+                    print(f"{app_name:<25} ℹ️  Already installed")
                 else:
-                    logger.info("   ✅ %s: Installation successful", app_name)
+                    version = result.get("version", "")
+                    if version:
+                        print(f"{app_name:<25} ✅ {version}")
+                    else:
+                        print(f"{app_name:<25} ✅ Installed")
             else:
+                print(f"{app_name:<25} ❌ Installation failed")
+                # Display error reason if available
                 error = result.get("error", "Unknown error")
-                logger.error("   ❌ %s: %s", app_name, error)
+                print(f"{'':>25}    → {error}")
+
+        # Print summary stats
+        print()
+        if newly_installed:
+            print(f"🎉 Successfully installed {len(newly_installed)} app(s)")
+        if already_installed:
+            print(f"ℹ️  {len(already_installed)} app(s) already installed")
+        if failed:
+            print(f"❌ {len(failed)} app(s) failed to install")
 
 
 class InstallCommandHandler(BaseCommandHandler):
@@ -504,6 +509,9 @@ class InstallCommandHandler(BaseCommandHandler):
                 logger.info("   Show progress: %s", options["show_progress"])
 
                 results = await install_command.execute(targets, **options)
+
+                # Print installation summary AFTER progress completes
+                install_command._print_installation_summary(results)
 
                 # Check results and log appropriate messages
                 if not results:

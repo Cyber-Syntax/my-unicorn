@@ -49,6 +49,7 @@ class UpdateInfo:
         prerelease: bool = False,
         original_tag_name: str = "",
         release_data: Release | None = None,
+        error_reason: str | None = None,
     ):
         """Initialize update information.
 
@@ -61,6 +62,7 @@ class UpdateInfo:
             prerelease: Whether the latest version is a prerelease
             original_tag_name: Original tag name from GitHub (preserves 'v' prefix)
             release_data: Full release data from GitHub API (in-memory cache)
+            error_reason: Optional error message if update failed
 
         """
         self.app_name = app_name
@@ -73,6 +75,7 @@ class UpdateInfo:
         self.release_data = (
             release_data  # In-memory cache for single operation
         )
+        self.error_reason = error_reason
 
     def __repr__(self) -> str:
         """String representation of update info."""
@@ -411,7 +414,7 @@ class UpdateManager:
         session: aiohttp.ClientSession,
         force: bool = False,
         update_info: UpdateInfo | None = None,
-    ) -> bool:
+    ) -> tuple[bool, str | None]:
         """Update a single app using direct parameter passing.
 
         Args:
@@ -421,7 +424,7 @@ class UpdateManager:
             update_info: Optional pre-fetched update info with cached release data
 
         Returns:
-            True if update was successful
+            Tuple of (success status, error reason or None)
 
         """
         try:
@@ -429,18 +432,18 @@ class UpdateManager:
             app_config = self.config_manager.load_app_config(app_name)
             if not app_config:
                 logger.error("No config found for app: %s", app_name)
-                return False
+                return False, "Configuration not found"
 
             # Use cached update info if provided, otherwise check for updates
             if not update_info:
                 update_info = await self.check_single_update(app_name, session)
                 if not update_info:
-                    return False
+                    return False, "Failed to check for updates"
 
             # Check if update is needed
             if not update_info.has_update and not force:
                 logger.info("%s is already up to date", app_name)
-                return True
+                return True, None
 
             # Get GitHub configuration
             (
@@ -456,7 +459,11 @@ class UpdateManager:
             )
             if not appimage_asset:
                 logger.error("No AppImage found for %s", app_name)
-                return False
+                # Context-aware error message for missing AppImage
+                error_msg = (
+                    "AppImage not found in release - may still be building"
+                )
+                return False, error_msg
 
             # Setup paths
             storage_dir = Path(self.global_config["directory"]["storage"])
@@ -493,7 +500,7 @@ class UpdateManager:
                 appimage_asset, download_path, show_progress=True
             )
             if not downloaded_path:
-                return False
+                return False, "Download failed"
 
             # Verify, install, and configure
             success = await self._process_post_download(
@@ -516,12 +523,13 @@ class UpdateManager:
                     app_name,
                     update_info.latest_version,
                 )
-
-            return success
+                return True, None
+            else:
+                return False, "Post-download processing failed"
 
         except Exception as e:
             logger.error("Failed to update %s: %s", app_name, e)
-            return False
+            return False, f"Update failed: {e}"
 
     async def _get_github_info(
         self, app_name: str, app_config: dict[str, Any]
@@ -1275,7 +1283,7 @@ class UpdateManager:
         app_names: list[str],
         force: bool = False,
         update_infos: list[UpdateInfo] | None = None,
-    ) -> dict[str, bool]:
+    ) -> tuple[dict[str, bool], dict[str, str]]:
         """Update multiple apps.
 
         Args:
@@ -1285,13 +1293,16 @@ class UpdateManager:
                 release data
 
         Returns:
-            Dictionary mapping app names to success status
+            Tuple of (success status dict, error reasons dict)
+            - success status dict: maps app names to True/False
+            - error reasons dict: maps failed app names to error messages
 
         """
         semaphore = asyncio.Semaphore(
             self.global_config["max_concurrent_downloads"]
         )
         results = {}
+        error_reasons = {}
 
         # Create lookup map for update infos
         update_info_map = {}
@@ -1304,23 +1315,30 @@ class UpdateManager:
 
         async with aiohttp.ClientSession() as session:
 
-            async def update_with_semaphore(app_name: str) -> tuple[str, bool]:
+            async def update_with_semaphore(
+                app_name: str,
+            ) -> tuple[str, bool, str | None]:
                 async with semaphore:
                     # Use cached update info if available
                     cached_info = update_info_map.get(app_name)
-                    success = await self.update_single_app(
+                    success, error_reason = await self.update_single_app(
                         app_name, session, force, cached_info
                     )
-                    return app_name, success
+                    return app_name, success, error_reason
 
             tasks = [update_with_semaphore(app) for app in app_names]
             task_results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for result in task_results:
                 if isinstance(result, tuple):
-                    app_name, success = result
+                    app_name, success, error_reason = result
                     results[app_name] = success
+                    if not success and error_reason:
+                        error_reasons[app_name] = error_reason
                 elif isinstance(result, Exception):
                     logger.error("Update task failed: %s", result)
+                    # Extract app name from exception if possible
+                    error_msg = f"Task failed: {result}"
+                    error_reasons["unknown"] = error_msg
 
-        return results
+        return results, error_reasons

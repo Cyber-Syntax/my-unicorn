@@ -113,7 +113,6 @@ class UpdateHandler(BaseCommandHandler):
 
         # If no updates needed, return early without progress bar
         if not apps_to_update:
-            up_to_date = [info.app_name for info in update_infos]
             print(f"\n✅ All {len(update_infos)} app(s) are up to date")
             logger.debug("No updates needed for %s app(s)", len(update_infos))
             return
@@ -134,56 +133,60 @@ class UpdateHandler(BaseCommandHandler):
 
                 # Perform updates - pass update_infos to eliminate redundant
                 # cache lookups (optimization: reuses in-memory release data)
-                update_results = (
-                    await self.update_manager.update_multiple_apps(
-                        apps_to_update, update_infos=update_infos
-                    )
+                (
+                    update_results,
+                    error_reasons,
+                ) = await self.update_manager.update_multiple_apps(
+                    apps_to_update, update_infos=update_infos
                 )
 
                 await progress_service.finish_task(api_task_id, success=True)
-
-                # Display results using new display functions
-                updated_apps = [
-                    app for app, success in update_results.items() if success
-                ]
-                failed_apps = [
-                    app
-                    for app, success in update_results.items()
-                    if not success
-                ]
-                up_to_date_apps = [
-                    info.app_name
-                    for info in update_infos
-                    if not info.has_update
-                ]
-
-                display_update_summary(
-                    updated_apps=updated_apps,
-                    failed_apps=failed_apps,
-                    up_to_date_apps=up_to_date_apps,
-                    update_infos=update_infos,
-                    check_only=False,
-                )
-
-                # Log final status
-                updated_count = len(updated_apps)
-                failed_count = len(failed_apps)
-                if updated_count > 0 and failed_count == 0:
-                    message = f"Successfully updated {updated_count}/{len(update_infos)} app(s)"
-                elif updated_count > 0 and failed_count > 0:
-                    message = f"Updated {updated_count} app(s), {failed_count} failed"
-                elif failed_count > 0:
-                    message = f"Failed to update {failed_count}/{len(update_infos)} app(s)"
-                else:
-                    message = f"All {len(update_infos)} app(s) processed"
-
-                logger.debug("Update operation completed: %s", message)
 
             except Exception:
                 await progress_service.finish_task(api_task_id, success=False)
                 raise
             finally:
                 self.update_manager._shared_api_task_id = None
+
+        # Display results AFTER progress session ends to avoid visual conflicts
+        updated_apps = [
+            app for app, success in update_results.items() if success
+        ]
+        failed_apps = [
+            app for app, success in update_results.items() if not success
+        ]
+        up_to_date_apps = [
+            info.app_name for info in update_infos if not info.has_update
+        ]
+
+        # Store error reasons in UpdateInfo objects
+        for info in update_infos:
+            if info.app_name in error_reasons:
+                info.error_reason = error_reasons[info.app_name]
+
+        display_update_summary(
+            updated_apps=updated_apps,
+            failed_apps=failed_apps,
+            up_to_date_apps=up_to_date_apps,
+            update_infos=update_infos,
+            check_only=False,
+        )
+
+        # Log final status
+        updated_count = len(updated_apps)
+        failed_count = len(failed_apps)
+        if updated_count > 0 and failed_count == 0:
+            total = len(update_infos)
+            message = f"Successfully updated {updated_count}/{total} app(s)"
+        elif updated_count > 0 and failed_count > 0:
+            message = f"Updated {updated_count} app(s), {failed_count} failed"
+        elif failed_count > 0:
+            total = len(update_infos)
+            message = f"Failed to update {failed_count}/{total} app(s)"
+        else:
+            message = f"All {len(update_infos)} app(s) processed"
+
+        logger.debug("Update operation completed: %s", message)
 
     def _get_target_apps(self, app_names: list[str] | None) -> list[str]:
         """Get target apps with validation.
@@ -270,9 +273,8 @@ class UpdateHandler(BaseCommandHandler):
         if apps_with_updates:
             print(f"📦 Updating {len(apps_with_updates)} app(s):")
             for info in apps_with_updates:
-                print(
-                    f"   • {info.app_name}: {info.current_version} → {info.latest_version}"
-                )
+                version_str = f"{info.current_version} → {info.latest_version}"
+                print(f"   • {info.app_name}: {version_str}")
             print()  # Empty line
 
     def _parse_app_names(self, args: Namespace) -> list[str]:
