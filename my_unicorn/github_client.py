@@ -7,7 +7,8 @@ Refactored to use dataclasses and improved separation of concerns.
 """
 
 import os
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, replace
 from typing import Any
 
 import aiohttp
@@ -17,8 +18,10 @@ from .cache import get_cache_manager
 from .logger import get_logger
 from .progress import get_progress_service
 from .utils import (
+    SPECIFIC_CHECKSUM_EXTENSIONS,
     extract_and_validate_version,
     get_checksum_file_format_type,
+    is_appimage_file,
     is_checksum_file,
 )
 
@@ -233,6 +236,23 @@ class Release:
         """
         return [asset for asset in self.assets if asset.is_appimage()]
 
+    def filter_for_platform(self) -> "Release":
+        """Return new Release with only platform-relevant assets.
+
+        Filters assets to include only:
+        - Linux x86_64 AppImages (excludes Windows, macOS, ARM)
+        - Checksum files for compatible AppImages
+
+        This method uses AssetSelector.filter_for_cache() for consistent
+        filtering across the application.
+
+        Returns:
+            New Release instance with filtered assets
+
+        """
+        filtered_assets = AssetSelector.filter_for_cache(self.assets)
+        return replace(self, assets=filtered_assets)
+
 
 class AssetSelector:
     """Handles selection logic for choosing the best asset from a release."""
@@ -272,22 +292,23 @@ class AssetSelector:
     ) -> Asset | None:
         """Select the best AppImage based on architecture and preferences.
 
-        This method prioritizes amd64/x86_64 architecture.
-        It automatically filters out ARM architectures.
+        Note: This method assumes the release has already been filtered
+        by filter_for_platform() which removes ARM/Windows/macOS assets.
+        Additional filtering here focuses on selecting the best variant
+        when multiple compatible AppImages exist.
 
         Selection strategy for catalog installs:
         1. Filter by preferred_suffixes if provided
-        2. Filter out ARM architectures
-        3. Prefer explicit x86_64/amd64 markers
-        4. Fall back to first remaining candidate
+        2. Prefer explicit x86_64/amd64 markers
+        3. Fall back to first remaining candidate
 
         Selection strategy for URL installs:
-        1. Filter out unstable versions
-        2. Filter out ARM architectures
+        1. Filter out unstable versions (beta, alpha, etc.)
+        2. Prefer explicit x86_64/amd64 markers
         3. Return first remaining stable candidate
 
         Args:
-            release: Release to select from
+            release: Release to select from (should be pre-filtered)
             preferred_suffixes: List of preferred filename suffixes
             installation_source: Installation source ("catalog" or "url")
 
@@ -304,34 +325,24 @@ class AssetSelector:
             return appimages[0]
 
         # Apply different strategies based on installation source
-        candidates = AssetSelector._filter_by_source(
-            appimages, installation_source, preferred_suffixes
-        )
+        if installation_source == "url":
+            # For URL installs, filter out unstable versions
+            candidates = AssetSelector._filter_unstable_versions(appimages)
+        elif preferred_suffixes:
+            # For catalog installs with suffixes, filter by them
+            candidates = AssetSelector._filter_by_preferred_suffixes(
+                appimages, preferred_suffixes
+            )
+        else:
+            candidates = appimages
 
-        # Filter out ARM architectures to prefer amd64
-        candidates = AssetSelector._filter_arm_architectures(candidates)
-
-        # For catalog installs, prefer explicit x86_64/amd64 markers
-        if installation_source == "catalog":
-            explicit_match = AssetSelector._find_explicit_amd64(candidates)
-            if explicit_match:
-                return explicit_match
+        # Prefer explicit x86_64/amd64 markers when available
+        explicit_match = AssetSelector._find_explicit_amd64(candidates)
+        if explicit_match:
+            return explicit_match
 
         # Fallback: return first candidate
-        return candidates[0]
-
-    @staticmethod
-    def _filter_by_source(
-        appimages: list[Asset],
-        installation_source: str,
-        preferred_suffixes: list[str] | None,
-    ) -> list[Asset]:
-        """Filter assets based on installation source."""
-        if installation_source == "url":
-            return AssetSelector._filter_unstable_versions(appimages)
-        return AssetSelector._filter_by_preferred_suffixes(
-            appimages, preferred_suffixes
-        )
+        return candidates[0] if candidates else appimages[0]
 
     @staticmethod
     def _filter_unstable_versions(appimages: list[Asset]) -> list[Asset]:
@@ -368,17 +379,6 @@ class AssetSelector:
             if suffix.lower() in app.name.lower()
         ]
         return matched if matched else appimages
-
-    @staticmethod
-    def _filter_arm_architectures(appimages: list[Asset]) -> list[Asset]:
-        """Filter out ARM architecture assets."""
-        arm_keywords = ["arm64", "aarch64", "armhf", "armv7", "armv6"]
-        amd64 = [
-            app
-            for app in appimages
-            if not any(kw in app.name.lower() for kw in arm_keywords)
-        ]
-        return amd64 if amd64 else appimages
 
     @staticmethod
     def _find_explicit_amd64(appimages: list[Asset]) -> Asset | None:
@@ -422,6 +422,168 @@ class AssetSelector:
         )
 
         return checksum_files
+
+    @staticmethod
+    def is_platform_compatible(filename: str) -> bool:
+        """Check if file is compatible with Linux x86_64 platform.
+
+        Excludes:
+        - Windows files (.msi, .exe, Win64, Windows patterns)
+        - macOS files (.dmg, .pkg, mac/darwin patterns)
+        - ARM architectures (arm64, aarch64, armv7l, armhf, armv6)
+        - Source archives (tar.gz, tar.xz with -src- pattern)
+        - Experimental builds
+
+        Args:
+            filename: Filename to check
+
+        Returns:
+            True if file is compatible with Linux x86_64, False otherwise
+
+        """
+        if not filename:
+            return False
+
+        filename_lower = filename.lower()
+
+        # Check all incompatible patterns
+        incompatible_patterns = [
+            # Windows patterns
+            r"(?i)win(32|64)",
+            r"(?i)windows",
+            r"(?i)legacy.*win",
+            r"(?i)portable.*win",
+            # macOS patterns (but not "macro")
+            r"(?i)mac(?!ro)",
+            r"(?i)darwin",
+            r"(?i)osx",
+            r"(?i)apple",
+            # macOS-specific YAML files
+            r"(?i)latest.*mac.*\.ya?ml$",
+            r"(?i)mac.*latest.*\.ya?ml$",
+            # ARM architecture patterns
+            r"(?i)arm64",
+            r"(?i)aarch64",
+            r"(?i)armv7l?",
+            r"(?i)armhf",
+            r"(?i)armv6",
+            # Source archive patterns
+            r"(?i)[-_.]src[-_.]",
+            r"(?i)[-_.]source[-_.]",
+            # Experimental/unstable patterns
+            r"(?i)experimental",
+            r"(?i)qt6.*experimental",
+        ]
+
+        # Check if any pattern matches
+        for pattern in incompatible_patterns:
+            if re.search(pattern, filename):
+                return False
+
+        # Check incompatible extensions
+        incompatible_exts = (".msi", ".exe", ".dmg", ".pkg")
+        return not filename_lower.endswith(incompatible_exts)
+
+    @staticmethod
+    def is_relevant_checksum(filename: str) -> bool:
+        """Check if checksum file is for a platform-compatible AppImage.
+
+        Examples:
+            ✅ "QOwnNotes-x86_64.AppImage.sha256sum"
+            ✅ "KeePassXC-2.7.10-x86_64.AppImage.DIGEST"
+            ✅ "Joplin-3.4.12.AppImage.sha512"
+            ❌ "KeePassXC-2.7.10-Win64.msi.DIGEST" (Windows)
+            ❌ "Obsidian-1.9.14-arm64.AppImage.sha256" (ARM)
+            ❌ "latest-mac-arm64.yml" (macOS)
+
+        Args:
+            filename: Checksum filename to check
+
+        Returns:
+            True if checksum is for a compatible AppImage, False otherwise
+
+        """
+        if not filename:
+            return False
+
+        # Must be a checksum file
+        if not is_checksum_file(filename):
+            return False
+
+        filename_lower = filename.lower()
+
+        # Extract base filename (remove checksum extension)
+        base_name = filename
+        for ext in SPECIFIC_CHECKSUM_EXTENSIONS:
+            if filename_lower.endswith(ext):
+                base_name = filename[: -len(ext)]
+                break
+
+        # Also handle pattern-based checksums (e.g., .sha256, .sha512)
+        if base_name == filename:
+            # Try removing common checksum suffixes
+            checksum_suffixes = [
+                ".sha256",
+                ".sha512",
+                ".sha1",
+                ".md5",
+            ]
+            for suffix in checksum_suffixes:
+                if filename_lower.endswith(suffix):
+                    base_name = filename[: -len(suffix)]
+                    break
+
+        # Base must be an AppImage
+        if not is_appimage_file(base_name):
+            return False
+
+        # Base must be platform-compatible (not Windows, macOS, ARM)
+        return AssetSelector.is_platform_compatible(base_name)
+
+    @staticmethod
+    def filter_for_cache(assets: list[Asset]) -> list[Asset]:
+        """Filter assets to cache-worthy subset (x86_64 AppImages + checksums).
+
+        This is the main entry point for cache filtering. It keeps only:
+        - Linux x86_64 AppImages (excludes Windows, macOS, ARM builds)
+        - Checksum files for compatible AppImages
+
+        This method should be called before caching release data to avoid
+        storing irrelevant assets.
+
+        Args:
+            assets: List of all release assets
+
+        Returns:
+            Filtered list of platform-compatible assets
+
+        """
+        filtered = []
+
+        for asset in assets:
+            filename = asset.name
+
+            # Keep platform-compatible AppImages
+            if is_appimage_file(filename):
+                if AssetSelector.is_platform_compatible(filename):
+                    filtered.append(asset)
+                    logger.debug(
+                        "Including platform-compatible AppImage: %s", filename
+                    )
+                else:
+                    logger.debug(
+                        "Filtering out non-compatible AppImage: %s", filename
+                    )
+                continue
+
+            # Keep relevant checksum files
+            if AssetSelector.is_relevant_checksum(filename):
+                filtered.append(asset)
+                logger.debug("Including relevant checksum file: %s", filename)
+            else:
+                logger.debug("Filtering out asset: %s", filename)
+
+        return filtered
 
 
 class ReleaseAPIClient:
@@ -703,6 +865,8 @@ class ReleaseFetcher:
                 f"No stable release found for {self.owner}/{self.repo}"
             )
 
+        # Filter for platform compatibility before caching
+        release = release.filter_for_platform()
         await self._save_to_cache(release, cache_type="stable")
         return release
 
@@ -732,6 +896,8 @@ class ReleaseFetcher:
                 f"No prerelease found for {self.owner}/{self.repo}"
             )
 
+        # Filter for platform compatibility before caching
+        release = release.filter_for_platform()
         await self._save_to_cache(release, cache_type="prerelease")
         return release
 
@@ -778,6 +944,8 @@ class ReleaseFetcher:
 
         release = await self.api_client.fetch_prerelease()
         if release:
+            # Filter for platform compatibility before caching
+            release = release.filter_for_platform()
             await self._save_to_cache(release, cache_type="prerelease")
             return release
 
@@ -801,6 +969,8 @@ class ReleaseFetcher:
 
         release = await self.api_client.fetch_prerelease()
         if release:
+            # Filter for platform compatibility before caching
+            release = release.filter_for_platform()
             await self._save_to_cache(release, cache_type="prerelease")
             return release
 
@@ -817,6 +987,8 @@ class ReleaseFetcher:
 
         release = await self.api_client.fetch_stable_release()
         if release:
+            # Filter for platform compatibility before caching
+            release = release.filter_for_platform()
             await self._save_to_cache(release, cache_type="stable")
         return release
 

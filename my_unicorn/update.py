@@ -600,8 +600,9 @@ class UpdateManager:
             if isinstance(appimage_config, dict):
                 preferred_suffixes = appimage_config.get("preferred_suffixes")
 
-        # Use "url" installation source to filter out experimental versions
-        # This ensures we get stable builds during updates, even for catalog apps
+        # Select best AppImage from compatible options
+        # (already filtered for x86_64 Linux by cache layer)
+        # Use "url" source to filter unstable versions during updates
         best_asset = AssetSelector.select_appimage_for_platform(
             release_data,
             preferred_suffixes=preferred_suffixes,

@@ -1,11 +1,11 @@
 """Persistent cache service for GitHub release data.
 
-This module provides a simple, efficient caching system for GitHub API responses
-to eliminate duplicate API requests and improve performance for frequent operations
-like update checks and widget scripts.
+This module provides a simple, efficient caching system for GitHub API
+responses to eliminate duplicate API requests and improve performance for
+frequent operations like update checks and widget scripts.
 
-The cache stores complete GitHubReleaseDetails objects with TTL (Time To Live)
-validation to ensure data freshness while minimizing API calls.
+The cache stores complete GitHubReleaseDetails objects with TTL (Time To
+Live) validation to ensure data freshness while minimizing API calls.
 """
 
 import contextlib
@@ -17,7 +17,6 @@ import orjson
 
 from my_unicorn.config import ConfigManager
 from my_unicorn.logger import get_logger
-from my_unicorn.utils import is_appimage_file, is_checksum_file
 
 logger = get_logger(__name__)
 
@@ -60,96 +59,6 @@ class ReleaseCacheManager:
 
         # Ensure cache directory exists
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-    def _is_checksum_file(self, filename: str) -> bool:
-        """Check if filename is a checksum file for an AppImage.
-
-        This method checks if the file is a checksum file AND if it's specifically
-        a checksum for an AppImage file. This prevents keeping checksums for
-        irrelevant files like tar.xz, zip, dmg, etc.
-
-        Use the consolidated checksum file detection from utils.
-
-        Args:
-            filename: Name of the file to check
-
-        Returns:
-            True if the file is a checksum for an AppImage, False otherwise
-
-        """
-        return is_checksum_file(filename, require_appimage_base=True)
-
-    def _is_appimage_file(self, filename: str) -> bool:
-        """Check if filename is an AppImage file.
-
-        Use the consolidated AppImage file detection from utils.
-
-        Args:
-            filename: Name of the file to check
-
-        Returns:
-            True if the file is an AppImage, False otherwise
-
-        """
-        return is_appimage_file(filename)
-
-    def _filter_relevant_assets(
-        self, assets: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        """Filter assets to keep only AppImages and related checksum files.
-
-        This reduces cache file size by removing irrelevant assets like:
-        - Source code archives (.zip, .tar.gz)
-        - Documentation files
-        - Binary packages for other platforms
-        - Other non-AppImage executables
-
-        Args:
-            assets: List of asset dictionaries from GitHub release
-
-        Returns:
-            Filtered list containing only AppImages and checksum files
-
-        """
-        relevant_assets = []
-
-        for asset in assets:
-            filename = asset.get("name", "")
-            if not filename:
-                continue
-
-            # Keep AppImages
-            if self._is_appimage_file(filename):
-                relevant_assets.append(asset)
-                logger.debug("Including AppImage: %s", filename)
-                continue
-
-            # Keep checksum files (only for AppImages)
-            if self._is_checksum_file(filename):
-                relevant_assets.append(asset)
-                logger.debug("Including AppImage checksum file: %s", filename)
-                continue
-
-            # Log what we're filtering out for debugging
-            logger.debug("Filtering out non-AppImage asset: %s", filename)
-
-        # Count AppImages vs checksums for better logging
-        appimage_count = sum(
-            1
-            for asset in relevant_assets
-            if self._is_appimage_file(asset.get("name", ""))
-        )
-        checksum_count = len(relevant_assets) - appimage_count
-
-        logger.debug(
-            "Asset filtering: %d -> %d assets (%d AppImages + %d AppImage checksums)",
-            len(assets),
-            len(relevant_assets),
-            appimage_count,
-            checksum_count,
-        )
-
-        return relevant_assets
 
     def _get_cache_file_path(
         self, owner: str, repo: str, cache_type: str = "stable"
@@ -202,7 +111,8 @@ class ReleaseCacheManager:
         Args:
             owner: Repository owner
             repo: Repository name
-            ignore_ttl: If True, return cached data regardless of TTL (for --refresh logic)
+            ignore_ttl: If True, return cached data regardless of TTL
+                       (for --refresh logic)
             cache_type: Type of cache ("stable", "prerelease", "latest")
 
         Returns:
@@ -252,39 +162,30 @@ class ReleaseCacheManager:
     ) -> None:
         """Save release data to cache with current timestamp.
 
+        Note: Expects release_data to already be filtered by ReleaseFetcher.
+        This method no longer performs filtering to follow DRY principle.
+        Filtering happens in github_client.py via Release.filter_for_platform()
+        before the data is passed to this method.
+
         Uses atomic write operation to prevent file corruption.
 
         Args:
             owner: Repository owner
             repo: Repository name
-            release_data: Release data to cache
+            release_data: Pre-filtered release data to cache
             cache_type: Type of cache ("stable", "prerelease", "latest")
 
         """
         cache_file = self._get_cache_file_path(owner, repo, cache_type)
 
         try:
-            # Filter release data to keep only relevant assets (AppImages + checksums)
-            filtered_release_data = release_data.copy()
-            if "assets" in filtered_release_data:
-                original_count = len(filtered_release_data["assets"])
-                filtered_release_data["assets"] = self._filter_relevant_assets(
-                    filtered_release_data["assets"]
-                )
-                logger.debug(
-                    "Cache storage optimization: filtered assets from %d to %d for %s/%s",
-                    original_count,
-                    len(filtered_release_data["assets"]),
-                    owner,
-                    repo,
-                )
-
             # Create cache entry with current timestamp
+            # Note: No filtering here - data is pre-filtered by ReleaseFetcher
             cache_entry = CacheEntry(
                 {
                     "cached_at": datetime.now(UTC).isoformat(),
                     "ttl_hours": self.ttl_hours,
-                    "release_data": filtered_release_data,
+                    "release_data": release_data,
                 }
             )
 

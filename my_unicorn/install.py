@@ -7,6 +7,7 @@ template method pattern with a simpler, more maintainable approach.
 import asyncio
 from datetime import datetime
 from pathlib import Path
+from sys import prefix
 from typing import Any
 
 from my_unicorn.desktop_entry import DesktopEntry
@@ -79,12 +80,12 @@ class InstallHandler:
             if not app_config:
                 raise InstallationError("App not found in catalog")
 
-            # Fetch latest release
+            # Fetch latest release (already filtered for x86_64 Linux)
             owner = app_config["owner"]
             repo = app_config["repo"]
             release_data = await self._fetch_release_for_catalog(owner, repo)
 
-            # Select best AppImage asset
+            # Select best AppImage asset from compatible options
             characteristic_suffix = app_config.get("appimage", {}).get(
                 "characteristic_suffix", []
             )
@@ -158,11 +159,12 @@ class InstallHandler:
             owner = url_info["owner"]
             repo = url_info["repo"]
             app_name = url_info.get("app_name") or repo
+            prerelease = url_info.get("prerelease", False)
 
-            # Fetch latest release
+            # Fetch latest release (already filtered for x86_64 Linux)
             release_data = await self._fetch_release_for_url(owner, repo)
 
-            # Select best AppImage asset (URL: filters unstable versions)
+            # Select best AppImage (filters unstable versions for URLs)
             asset = self._select_best_asset(
                 release_data, [], owner, repo, installation_source="url"
             )
@@ -178,7 +180,9 @@ class InstallHandler:
                     "name_template": "",
                     "characteristic_suffix": [],
                 },
-                "github": {},
+                "github": {
+                    "prerelease": prerelease,
+                },
                 "verification": {
                     "digest": False,
                     "skip": False,
@@ -488,7 +492,7 @@ class InstallHandler:
         )
 
         # Use AssetSelector to find best AppImage
-        #TODO: appimage_asset naming would be better
+        # TODO: appimage_asset naming would be better
         asset = AssetSelector.select_appimage_for_platform(
             release,
             preferred_suffixes=characteristic_suffix,

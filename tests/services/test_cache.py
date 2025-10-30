@@ -22,7 +22,7 @@ class TestReleaseCacheManager:
     def mock_config_manager(self, tmp_path):
         """Create a mock config manager with a temporary cache directory."""
         config_manager = MagicMock(spec=ConfigManager)
-        cache_dir = tmp_path / "cache" / "releases"
+        tmp_path / "cache" / "releases"
         global_config = {"directory": {"cache": tmp_path / "cache"}}
         config_manager.load_global_config.return_value = global_config
         return config_manager
@@ -59,8 +59,8 @@ class TestReleaseCacheManager:
         }
 
     def test_init_creates_cache_directory(self, mock_config_manager, tmp_path):
-        """Test that cache manager creates cache directory on initialization."""
-        cache_manager = ReleaseCacheManager(mock_config_manager)
+        """Test cache manager creates cache directory on initialization."""
+        ReleaseCacheManager(mock_config_manager)
 
         cache_dir = tmp_path / "cache" / "releases"
         assert cache_dir.exists()
@@ -84,60 +84,11 @@ class TestReleaseCacheManager:
             assert cache_manager.config_manager == mock_config
             assert cache_manager.ttl_hours == 24
 
-    def test_is_appimage_file(self, cache_manager):
-        """Test AppImage file detection."""
-        # Positive cases
-        assert cache_manager._is_appimage_file("test.AppImage")
-        assert cache_manager._is_appimage_file("test.appimage")
-        assert cache_manager._is_appimage_file("my-app.AppImage")
-
-        # Negative cases
-        assert not cache_manager._is_appimage_file("test.deb")
-        assert not cache_manager._is_appimage_file("test.tar.gz")
-        assert not cache_manager._is_appimage_file("test.zip")
-        assert not cache_manager._is_appimage_file("README.md")
-
-    def test_is_checksum_file(self, cache_manager):
-        """Test checksum file detection."""
-        with patch("my_unicorn.cache.is_checksum_file") as mock_is_checksum:
-            # Test that it calls the utility function with correct parameters
-            mock_is_checksum.return_value = True
-
-            result = cache_manager._is_checksum_file("test.AppImage.sha256")
-
-            mock_is_checksum.assert_called_once_with(
-                "test.AppImage.sha256", require_appimage_base=True
-            )
-            assert result is True
-
-    def test_filter_relevant_assets(self, cache_manager, sample_release_data):
-        """Test asset filtering functionality."""
-        assets = sample_release_data["assets"]
-
-        with (
-            patch.object(
-                cache_manager, "_is_appimage_file"
-            ) as mock_is_appimage,
-            patch.object(
-                cache_manager, "_is_checksum_file"
-            ) as mock_is_checksum,
-        ):
-            # Mock the detection methods
-            def mock_appimage_check(filename):
-                return filename.endswith(".AppImage")
-
-            def mock_checksum_check(filename):
-                return filename.endswith(".sha256")
-
-            mock_is_appimage.side_effect = mock_appimage_check
-            mock_is_checksum.side_effect = mock_checksum_check
-
-            filtered = cache_manager._filter_relevant_assets(assets)
-
-            # Should keep AppImage and checksum files, filter out source archives
-            assert len(filtered) == 2
-            assert filtered[0]["name"] == "test.AppImage"
-            assert filtered[1]["name"] == "test.AppImage.sha256"
+    # NOTE: _is_appimage_file, _is_checksum_file, and _filter_relevant_assets
+    # have been removed from ReleaseCacheManager as filtering now happens
+    # in github_client.py via Release.filter_for_platform() before caching.
+    # These tests are no longer needed as the cache manager no longer
+    # performs filtering (DRY principle).
 
     def test_get_cache_file_path(self, cache_manager):
         """Test cache file path generation."""
@@ -314,9 +265,10 @@ class TestReleaseCacheManager:
         assert "release_data" in cache_data
         assert cache_data["ttl_hours"] == 24
 
-        # Check that assets were filtered (should only have AppImage-related assets)
+        # Note: Filtering now happens in github_client.py before caching,
+        # so we just verify the data is stored as-is
         saved_assets = cache_data["release_data"]["assets"]
-        assert len(saved_assets) < len(sample_release_data["assets"])
+        assert saved_assets == sample_release_data["assets"]
 
     @pytest.mark.asyncio
     async def test_save_release_data_different_cache_types(
@@ -526,25 +478,19 @@ class TestReleaseCacheManager:
         # Test all cache types
         cache_types = ["stable", "prerelease", "latest"]
 
-        # Create expected filtered data (only AppImage and checksum files)
-        expected_filtered_data = sample_release_data.copy()
-        expected_filtered_data["assets"] = [
-            asset
-            for asset in sample_release_data["assets"]
-            if asset["name"].endswith((".AppImage", ".appimage", ".sha256"))
-        ]
-
+        # Note: Filtering now happens in github_client.py before caching,
+        # so we just verify the data is stored and retrieved as-is
         for cache_type in cache_types:
             # Save data for each cache type
             await cache_manager.save_release_data(
                 "owner", "repo", sample_release_data, cache_type
             )
 
-            # Retrieve data for each cache type - should match filtered data
+            # Retrieve data for each cache type - should match original data
             result = await cache_manager.get_cached_release(
                 "owner", "repo", cache_type=cache_type
             )
-            assert result == expected_filtered_data
+            assert result == sample_release_data
 
     def test_get_cache_manager_singleton(self):
         """Test the module-level cache manager getter."""
@@ -555,7 +501,7 @@ class TestReleaseCacheManager:
             assert manager.ttl_hours == 48
 
     def test_get_cache_manager_existing_instance(self):
-        """Test that get_cache_manager returns existing instance when available."""
+        """Test get_cache_manager returns existing instance when available."""
         with patch("my_unicorn.cache._cache_manager") as mock_manager:
             result = get_cache_manager()
             assert result == mock_manager
