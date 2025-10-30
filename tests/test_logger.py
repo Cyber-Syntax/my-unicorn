@@ -131,11 +131,11 @@ def test_setup_file_logging_creates_file_handler(tmp_path, logger_name):
     log_file = tmp_path / "my-unicorn.log"
     logger_instance = MyUnicornLogger(logger_name)
     logger_instance.setup_file_logging(log_file, level="DEBUG")
-    # Should have a file handler with correct level (using RotatingFileHandler)
+    # Should have a file handler with correct level (using FileHandler)
     file_handlers = [
         h
         for h in logger_instance.logger.handlers
-        if isinstance(h, logging.handlers.RotatingFileHandler)
+        if isinstance(h, logging.FileHandler)
     ]
     assert file_handlers
     assert file_handlers[0].level == logging.DEBUG
@@ -375,7 +375,7 @@ def test_file_handler_actually_added_to_logger(tmp_path):
     file_handlers_before = [
         h
         for h in logger_instance.logger.handlers
-        if isinstance(h, logging.handlers.RotatingFileHandler)
+        if isinstance(h, logging.FileHandler)
     ]
     assert len(file_handlers_before) == 0
 
@@ -386,7 +386,7 @@ def test_file_handler_actually_added_to_logger(tmp_path):
     file_handlers_after = [
         h
         for h in logger_instance.logger.handlers
-        if isinstance(h, logging.handlers.RotatingFileHandler)
+        if isinstance(h, logging.FileHandler)
     ]
     assert len(file_handlers_after) == 1
     assert file_handlers_after[0] is logger_instance._file_handler
@@ -443,14 +443,12 @@ def test_no_duplicate_handlers_on_multiple_setup_calls(tmp_path):
     logger_instance.setup_file_logging(log_file, "DEBUG")
     logger_instance.setup_file_logging(log_file, "WARNING")
 
-    # Should have exactly one RotatingFileHandler
+    # Should have exactly one FileHandler
     file_handlers = [
         h
         for h in logger_instance.logger.handlers
-        if isinstance(h, logging.handlers.RotatingFileHandler)
+        if isinstance(h, logging.FileHandler)
     ]
-    assert len(file_handlers) == 1, (
-        "Should have exactly one RotatingFileHandler"
-    )
+    assert len(file_handlers) == 1, "Should have exactly one FileHandler"
 
     clear_logger_state()

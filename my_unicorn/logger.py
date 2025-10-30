@@ -5,11 +5,11 @@ levels and output formatting for the application.
 """
 
 import logging
-import logging.handlers
 import sys
 import threading
 from collections.abc import Generator
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +22,8 @@ from my_unicorn.constants import (
     LOG_CONSOLE_FORMAT,
     LOG_FILE_DATE_FORMAT,
     LOG_FILE_FORMAT,
-    LOG_MAX_FILE_SIZE_BYTES,
+    LOG_ROTATION_THRESHOLD_BYTES,
+    LOG_ROTATION_TIMESTAMP_FORMAT,
 )
 
 # Using centralized logging constants from my_unicorn.constants
@@ -120,7 +121,7 @@ class MyUnicornLogger:
         self._file_logging_setup = False
         self._console_handler: logging.StreamHandler | None = None
         self._previous_console_level: int | None = None
-        self._file_handler: logging.handlers.RotatingFileHandler | None = None
+        self._file_handler: logging.FileHandler | None = None
         self._progress_active = False
         self._deferred_messages: list[
             tuple[str, str, tuple[Any, ...], dict[str, Any]]
@@ -141,8 +142,55 @@ class MyUnicornLogger:
         self._console_handler.setLevel(logging.WARNING)
         self.logger.addHandler(self._console_handler)
 
+    def _rotate_log_file(self, log_file: Path) -> None:
+        """Rotate log file if it exceeds threshold.
+
+        Creates timestamped backup and enforces backup count limit.
+
+        Args:
+            log_file: Path to the log file to check and rotate
+
+        """
+        try:
+            if not log_file.exists():
+                return
+
+            file_size = log_file.stat().st_size
+            if file_size < LOG_ROTATION_THRESHOLD_BYTES:
+                return
+
+            # Generate timestamped backup filename
+            timestamp = datetime.now().strftime(LOG_ROTATION_TIMESTAMP_FORMAT)
+            counter = 1
+            backup_name = f"{log_file.stem}.{timestamp}.{counter}.log"
+            backup_path = log_file.parent / backup_name
+
+            # Handle timestamp collisions
+            while backup_path.exists():
+                counter += 1
+                backup_name = f"{log_file.stem}.{timestamp}.{counter}.log"
+                backup_path = log_file.parent / backup_name
+
+            # Rotate: rename current log to backup
+            log_file.rename(backup_path)
+
+            # Enforce backup count limit
+            pattern = f"{log_file.stem}.*.*.log"
+            backups = sorted(
+                log_file.parent.glob(pattern),
+                key=lambda p: p.stat().st_mtime,
+            )
+
+            while len(backups) > LOG_BACKUP_COUNT:
+                oldest = backups.pop(0)
+                oldest.unlink(missing_ok=True)
+
+        except (OSError, ValueError):
+            # Rotation failed - continue with existing log
+            pass
+
     def setup_file_logging(self, log_file: Path, level: str = "DEBUG") -> None:
-        """Set up file logging with rotation.
+        """Set up file logging with manual rotation at startup.
 
         Args:
             log_file: Path to log file
@@ -161,11 +209,13 @@ class MyUnicornLogger:
                 # Ensure log directory exists
                 log_file.parent.mkdir(parents=True, exist_ok=True)
 
-                # Create file handler directly
-                self._file_handler = logging.handlers.RotatingFileHandler(
+                # Rotate log file if needed before creating handler
+                self._rotate_log_file(log_file)
+
+                # Create simple FileHandler (not RotatingFileHandler)
+                self._file_handler = logging.FileHandler(
                     log_file,
-                    maxBytes=LOG_MAX_FILE_SIZE_BYTES,
-                    backupCount=LOG_BACKUP_COUNT,
+                    mode="a",
                     encoding="utf-8",
                     delay=False,
                 )
@@ -191,7 +241,7 @@ class MyUnicornLogger:
         handlers_to_remove = [
             handler
             for handler in self.logger.handlers
-            if isinstance(handler, logging.handlers.RotatingFileHandler)
+            if isinstance(handler, logging.FileHandler)
         ]
 
         for handler in handlers_to_remove:
