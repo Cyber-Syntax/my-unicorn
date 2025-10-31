@@ -6,8 +6,8 @@ parsed arguments to the appropriate command handlers.
 
 import sys
 from argparse import Namespace
-from importlib.metadata import PackageNotFoundError, metadata
 
+from .. import __version__
 from ..auth import auth_manager
 from ..commands.auth import AuthHandler
 from ..commands.backup import BackupHandler
@@ -91,20 +91,8 @@ class CLIRunner:
 
             # Global: --version should print package version and exit early.
             if getattr(args, "version", False):
-                try:
-                    # Use the same metadata approach as upgrade module
-                    package_metadata = metadata("my-unicorn")
-                    version_str = package_metadata["Version"]
-                    # Handle version with git info for better readability
-                    if "+" in version_str:
-                        numbered_version, git_version = version_str.split(
-                            "+", 1
-                        )
-                        print(f"{numbered_version} (git: {git_version})")
-                    else:
-                        print(version_str)
-                except PackageNotFoundError:
-                    print("Version information not available")
+                # Use __version__ from package which has proper fallback logic
+                print(__version__)
                 return
 
             # Validate command

@@ -169,11 +169,11 @@ async def test_upgrade_version_progression(
         patch(
             "asyncio.create_subprocess_exec", side_effect=mock_git_subprocess
         ),
-        patch("my_unicorn.upgrade.metadata") as mock_metadata,
+        patch("my_unicorn.upgrade.get_version") as mock_get_version,
         patch.object(SelfUpdater, "get_latest_release") as mock_get_release,
     ):
         # Mock current installed version
-        mock_metadata.return_value = {"Version": current_version}
+        mock_get_version.return_value = current_version
 
         # Mock latest release version
         mock_get_release.return_value = {
@@ -241,11 +241,11 @@ async def test_upgrade_clones_to_correct_directory(
         patch(
             "asyncio.create_subprocess_exec", side_effect=mock_git_subprocess
         ),
-        patch("my_unicorn.upgrade.metadata") as mock_metadata,
+        patch("my_unicorn.upgrade.get_version") as mock_get_version,
         patch.object(SelfUpdater, "get_latest_release") as mock_get_release,
     ):
         # Mock current version
-        mock_metadata.return_value = {"Version": "1.9.1"}
+        mock_get_version.return_value = "1.9.1"
 
         # Mock latest release
         mock_get_release.return_value = {
@@ -312,10 +312,10 @@ async def test_upgrade_copies_files_correctly(
         patch(
             "asyncio.create_subprocess_exec", side_effect=mock_git_subprocess
         ),
-        patch("my_unicorn.upgrade.metadata") as mock_metadata,
+        patch("my_unicorn.upgrade.get_version") as mock_get_version,
         patch.object(SelfUpdater, "get_latest_release") as mock_get_release,
     ):
-        mock_metadata.return_value = {"Version": "1.9.1"}
+        mock_get_version.return_value = "1.9.1"
         mock_get_release.return_value = {
             "tag_name": "v1.9.2",
             "version": "1.9.2",
@@ -368,10 +368,10 @@ async def test_installer_finds_required_files(
         patch(
             "asyncio.create_subprocess_exec", side_effect=mock_git_subprocess
         ),
-        patch("my_unicorn.upgrade.metadata") as mock_metadata,
+        patch("my_unicorn.upgrade.get_version") as mock_get_version,
         patch.object(SelfUpdater, "get_latest_release") as mock_get_release,
     ):
-        mock_metadata.return_value = {"Version": "1.9.1"}
+        mock_get_version.return_value = "1.9.1"
         mock_get_release.return_value = {
             "tag_name": "v1.9.2",
             "version": "1.9.2",

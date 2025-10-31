@@ -29,12 +29,12 @@ def mock_session():
 def test_get_current_version_success(mock_config_manager, mock_session):
     """Test SelfUpdater.get_current_version returns version string."""
     with (
-        patch("my_unicorn.upgrade.metadata") as mock_metadata,
+        patch("my_unicorn.upgrade.get_version") as mock_get_version,
         patch("my_unicorn.github_client.auth_manager") as mock_auth_manager,
     ):
         # Ensure auth_manager is properly mocked as a regular Mock, not AsyncMock
         mock_auth_manager.update_rate_limit_info = MagicMock()
-        mock_metadata.return_value = {"Version": "1.2.3"}
+        mock_get_version.return_value = "1.2.3"
         updater = SelfUpdater(mock_config_manager, mock_session)
         version = updater.get_current_version()
         assert version == "1.2.3"
@@ -45,7 +45,9 @@ def test_get_current_version_package_not_found(
 ):
     """Test SelfUpdater.get_current_version raises PackageNotFoundError."""
     with (
-        patch("my_unicorn.upgrade.metadata", side_effect=PackageNotFoundError),
+        patch(
+            "my_unicorn.upgrade.get_version", side_effect=PackageNotFoundError
+        ),
         patch("my_unicorn.github_client.auth_manager") as mock_auth_manager,
     ):
         # Ensure auth_manager is properly mocked as a regular Mock, not AsyncMock
@@ -57,8 +59,8 @@ def test_get_current_version_package_not_found(
 
 def test_get_formatted_version_git_info(mock_config_manager, mock_session):
     """Test get_formatted_version returns formatted version with git info."""
-    with patch("my_unicorn.upgrade.metadata") as mock_metadata:
-        mock_metadata.return_value = {"Version": "1.2.3+abcdef"}
+    with patch("my_unicorn.upgrade.get_version") as mock_get_version:
+        mock_get_version.return_value = "1.2.3+abcdef"
         updater = SelfUpdater(mock_config_manager, mock_session)
         formatted = updater.get_formatted_version()
         assert formatted == "1.2.3 (git: abcdef)"
@@ -68,8 +70,8 @@ def test_display_version_info_prints_version(
     mock_config_manager, mock_session, capsys
 ):
     """Test display_version_info prints formatted version."""
-    with patch("my_unicorn.upgrade.metadata") as mock_metadata:
-        mock_metadata.return_value = {"Version": "1.2.3"}
+    with patch("my_unicorn.upgrade.get_version") as mock_get_version:
+        mock_get_version.return_value = "1.2.3"
         updater = SelfUpdater(mock_config_manager, mock_session)
         updater.display_version_info()
         out = capsys.readouterr().out
@@ -292,9 +294,9 @@ async def test_check_for_update_newer_version(
             "fetch_latest_release_or_prerelease",
             new=AsyncMock(return_value=release_data),
         ),
-        patch("my_unicorn.upgrade.metadata") as mock_metadata,
+        patch("my_unicorn.upgrade.get_version") as mock_get_version,
     ):
-        mock_metadata.return_value = {"Version": "1.0.0"}
+        mock_get_version.return_value = "1.0.0"
         result = await updater.check_for_update()
         assert result is True
 
@@ -316,9 +318,9 @@ async def test_check_for_update_up_to_date(
             "fetch_latest_release_or_prerelease",
             new=AsyncMock(return_value=release_data),
         ),
-        patch("my_unicorn.upgrade.metadata") as mock_metadata,
+        patch("my_unicorn.upgrade.get_version") as mock_get_version,
     ):
-        mock_metadata.return_value = {"Version": "1.0.0"}
+        mock_get_version.return_value = "1.0.0"
         result = await updater.check_for_update()
         assert result is False
 
@@ -397,7 +399,7 @@ async def test_perform_self_update_runs_update(mock_config_manager):
 def test_display_current_version_prints(monkeypatch, capsys):
     """Test display_current_version prints version."""
     monkeypatch.setattr(
-        "my_unicorn.upgrade.metadata", lambda pkg: {"Version": "1.2.3+abcdef"}
+        "my_unicorn.upgrade.get_version", lambda pkg: "1.2.3+abcdef"
     )
     from my_unicorn.upgrade import display_current_version
 
