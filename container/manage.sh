@@ -154,15 +154,18 @@ cmd_clean() {
 
   echo -e "${BLUE}Cleaning container(s): $distro${NC}"
 
+  #WARN: down is not enough to remove volumes
+  #TODO: lets a better way to remove those?
+  #NOTE: We probably better to make 2 command, one remove all, one down only
   if [[ "$distro" == "all" ]]; then
     podman-compose down -v
     echo -e "${GREEN}✓ All containers and volumes removed${NC}"
   else
     podman-compose stop "$distro"
-    podman-compose rm -f "$distro"
+    podman rm -f "$distro"
     # Volume names are created/managed by the compose file and use the
     # my-unicorn-<distro>-config naming defined in the compose.
-    podman volume rm "my-unicorn-${distro}-config" 2>/dev/null || true
+    podman volume rm "container_my-unicorn-${distro}-config" 2>/dev/null || true
     echo -e "${GREEN}✓ ${distro} container and volume removed${NC}"
   fi
 }

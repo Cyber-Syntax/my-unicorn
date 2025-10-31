@@ -26,7 +26,6 @@ RUN groupadd -g ${USER_GID} devuser && \
     echo "devuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/devuser && \
     chmod 0440 /etc/sudoers.d/devuser
 
-# AUR helper installation omitted — not required for my-unicorn testing
 # Keep non-root user and temporary working dir for any user-level steps
 USER devuser
 WORKDIR /tmp
@@ -34,9 +33,13 @@ WORKDIR /tmp
 # Create .config directory with proper permissions
 RUN mkdir -p /home/devuser/.config
 
-# Copy source code to home directory (owned by devuser)
-# This solves permission issues and makes relative paths work
-COPY --chown=devuser:devuser . /home/devuser/my-unicorn/
+#TESTING: source code volume mount
+# Creating directory for source code volume mount
+RUN mkdir -p /home/devuser/my-unicorn
+# Make the directory writable by the user
+RUN chmod -R 755 /home/devuser/my-unicorn
+# run on the host (adjust path & uid/gid if different)
+RUN chown -R 1000:1000 /home/devuser/my-unicorn
 
 # Set working directory to the project
 WORKDIR /home/devuser/my-unicorn
