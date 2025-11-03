@@ -4,8 +4,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from my_unicorn import auth as auth_module
 from my_unicorn.auth import (
     GitHubAuthManager,
+    KeyringAccessError,
+    KeyringUnavailableError,
     setup_keyring,
     validate_github_token,
 )
@@ -78,7 +81,7 @@ def test_get_token_none(monkeypatch, auth_manager):
     assert auth_manager.get_token() is None
 
 
-def test_apply_auth_with_token(monkeypatch, auth_manager):
+def test_apply_auth_adds_auth_header(monkeypatch, auth_manager):
     """Test apply_auth adds Authorization header if token exists."""
     monkeypatch.setattr("keyring.get_password", lambda k, u: "abc123")
     headers = {}
@@ -103,8 +106,8 @@ def test_update_rate_limit_info_valid(auth_manager):
     with patch("time.time", return_value=1234560000):
         auth_manager.update_rate_limit_info(headers)
         status = auth_manager.get_rate_limit_status()
-    assert status["remaining"] == 42
-    assert status["reset_time"] == 1234567890
+    assert status["remaining"] == 42  # noqa: PLR2004
+    assert status["reset_time"] == 1234567890  # noqa: PLR2004
 
 
 def test_update_rate_limit_info_invalid(auth_manager):
@@ -140,14 +143,14 @@ def test_get_wait_time_with_reset(auth_manager):
     auth_manager._remaining_requests = 0
     with patch("time.time", return_value=now):
         wait = auth_manager.get_wait_time()
-    assert wait == 60  # 50 + 10 = 60
+    assert wait == 60  # noqa: PLR2004 - 50 + 10 = 60
 
 
 def test_get_wait_time_default(auth_manager):
     """Test get_wait_time returns default if no reset time."""
     auth_manager._rate_limit_reset = None
     wait = auth_manager.get_wait_time()
-    assert wait == 60
+    assert wait == 60  # noqa: PLR2004
 
 
 def test_is_authenticated_true(monkeypatch, auth_manager):
@@ -270,11 +273,12 @@ def test_is_token_valid_method(monkeypatch, auth_manager):
     assert auth_manager.is_token_valid() is False
 
 
-def test_setup_keyring_dbus_unavailable(monkeypatch):
-    """Test setup_keyring handles DBUS unavailable gracefully."""
-    # Import at module level (moved for linter compliance)
-    from my_unicorn import auth as auth_module
+def test_setup_keyring_unavailable_dbus(monkeypatch):
+    """Test setup_keyring raises KeyringUnavailableError for DBUS issues.
 
+    When DBUS is unavailable (headless environment), setup_keyring should
+    raise KeyringUnavailableError and log at DEBUG level.
+    """
     # Reset the global state
     auth_module._keyring_initialized = False
 
@@ -283,38 +287,44 @@ def test_setup_keyring_dbus_unavailable(monkeypatch):
 
     monkeypatch.setattr("keyring.set_keyring", mock_set_keyring)
 
-    # Should not raise, should log at DEBUG
+    # Should raise KeyringUnavailableError and log at DEBUG
     with patch("my_unicorn.auth.logger") as mock_logger:
-        setup_keyring()
+        with pytest.raises(KeyringUnavailableError):
+            setup_keyring()
         # Verify DEBUG log, not ERROR or WARNING for DBUS errors
         debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
         assert any("headless" in call for call in debug_calls)
         assert mock_logger.error.call_count == 0
 
 
-def test_setup_keyring_import_error(monkeypatch):
-    """Test setup_keyring handles ImportError gracefully."""
-    # Import at module level (moved for linter compliance)
-    from my_unicorn import auth as auth_module
+def test_setup_keyring_access_error(monkeypatch):
+    """Test setup_keyring raises KeyringAccessError for other failures.
 
+    When keyring setup fails for reasons other than unavailability
+    (e.g., permission issues), should raise KeyringAccessError.
+    """
     # Reset the global state
     auth_module._keyring_initialized = False
 
     def mock_set_keyring(backend):
-        raise ImportError("SecretService not available")
+        raise Exception("Permission denied accessing keyring")
 
     monkeypatch.setattr("keyring.set_keyring", mock_set_keyring)
 
-    # Should not raise, should log at DEBUG
+    # Should raise KeyringAccessError and log at WARNING
     with patch("my_unicorn.auth.logger") as mock_logger:
-        setup_keyring()
-        # Verify DEBUG log for ImportError
-        assert mock_logger.debug.call_count > 0
-        assert mock_logger.error.call_count == 0
+        with pytest.raises(KeyringAccessError):
+            setup_keyring()
+        # Verify WARNING log for non-DBUS errors
+        assert mock_logger.warning.call_count > 0
 
 
-def test_get_token_dbus_unavailable(monkeypatch, auth_manager):
-    """Test get_token handles DBUS unavailable gracefully."""
+def test_get_token_keyring_unavailable(monkeypatch, auth_manager):
+    """Test get_token returns None when keyring unavailable.
+
+    When keyring is unavailable (DBUS error), get_token should return None
+    and log at DEBUG level without raising an exception.
+    """
 
     def mock_get_password(key, username):
         raise Exception("DBUS_SESSION_BUS_ADDRESS is unset")
@@ -326,12 +336,35 @@ def test_get_token_dbus_unavailable(monkeypatch, auth_manager):
         token = auth_manager.get_token()
         assert token is None
         # Verify DEBUG log, not ERROR
-        assert mock_logger.debug.call_count > 0
+        debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
+        assert any("headless" in call for call in debug_calls)
+        assert mock_logger.error.call_count == 0
+
+
+def test_get_token_no_token_stored(monkeypatch, auth_manager):
+    """Test get_token returns None when no token stored.
+
+    When keyring returns None (no token stored), get_token should return
+    None and log at DEBUG level.
+    """
+    monkeypatch.setattr("keyring.get_password", lambda k, u: None)
+
+    # Should return None and log DEBUG
+    with patch("my_unicorn.auth.logger") as mock_logger:
+        token = auth_manager.get_token()
+        assert token is None
+        # Verify DEBUG log about no token stored
+        debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
+        assert any("No token stored" in call for call in debug_calls)
         assert mock_logger.error.call_count == 0
 
 
 def test_get_token_other_exception(monkeypatch, auth_manager):
-    """Test get_token handles non-DBUS exceptions gracefully."""
+    """Test get_token handles non-DBUS exceptions gracefully.
+
+    When keyring access fails for other reasons, get_token should return
+    None and log at DEBUG level.
+    """
 
     def mock_get_password(key, username):
         raise Exception("Some other error")
@@ -342,13 +375,64 @@ def test_get_token_other_exception(monkeypatch, auth_manager):
     with patch("my_unicorn.auth.logger") as mock_logger:
         token = auth_manager.get_token()
         assert token is None
-        # Verify DEBUG log (not ERROR)
-        assert mock_logger.debug.call_count > 0
+        # Verify DEBUG log about keyring access failure
+        debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
+        assert any("Keyring access failed" in call for call in debug_calls)
         assert mock_logger.error.call_count == 0
 
 
+def test_apply_auth_no_token(monkeypatch, auth_manager):
+    """Test apply_auth works without token.
+
+    When no token is available, apply_auth should return headers unchanged
+    (no Authorization header added) and notify user once.
+    """
+    monkeypatch.setattr("keyring.get_password", lambda k, u: None)
+
+    # Reset the notification flag
+    GitHubAuthManager._user_notified = False
+
+    headers = {"User-Agent": "test"}
+    result = auth_manager.apply_auth(headers)
+
+    # Should not add Authorization header
+    assert "Authorization" not in result
+    # Should keep existing headers
+    assert result["User-Agent"] == "test"
+    # Notification flag should be set
+    assert GitHubAuthManager._user_notified is True
+
+
+def test_apply_auth_with_token(monkeypatch, auth_manager):
+    """Test apply_auth adds Authorization header when token present.
+
+    When a token is available, apply_auth should add the Authorization
+    header with Bearer token and not notify user.
+    """
+    monkeypatch.setattr("keyring.get_password", lambda k, u: "ghp_test123")
+
+    # Reset the notification flag
+    GitHubAuthManager._user_notified = False
+
+    headers = {"User-Agent": "test"}
+
+    with patch("my_unicorn.auth.logger") as mock_logger:
+        result = auth_manager.apply_auth(headers)
+
+        # Should add Authorization header
+        assert result["Authorization"] == "Bearer ghp_test123"
+        # Should not notify user
+        assert mock_logger.info.call_count == 0
+        # Notification flag should remain False
+        assert GitHubAuthManager._user_notified is False
+
+
 def test_apply_auth_notifies_once(monkeypatch):
-    """Test user notification appears only once."""
+    """Test user notification appears only once per session.
+
+    When no token is available, apply_auth should notify the user about
+    rate limits only once, not on subsequent calls.
+    """
     monkeypatch.setattr("keyring.get_password", lambda k, u: None)
 
     # Reset the notification flag
@@ -367,22 +451,6 @@ def test_apply_auth_notifies_once(monkeypatch):
 
         assert info_calls_first == 1
         assert info_calls_second == 1  # Same count (no new notification)
-
-
-def test_apply_auth_with_token_no_notification(monkeypatch, auth_manager):
-    """Test no notification when token present."""
-    monkeypatch.setattr("keyring.get_password", lambda k, u: "ghp_test123")
-
-    # Reset the notification flag
-    GitHubAuthManager._user_notified = False
-
-    with patch("my_unicorn.auth.logger") as mock_logger:
-        headers = auth_manager.apply_auth({})
-        assert "Authorization" in headers
-        # Should not log INFO about rate limits
-        assert mock_logger.info.call_count == 0
-        # Should log DEBUG about token being present
-        assert mock_logger.debug.call_count > 0
 
 
 def test_save_token_dbus_unavailable(monkeypatch, auth_manager, capsys):
@@ -404,4 +472,27 @@ def test_save_token_dbus_unavailable(monkeypatch, auth_manager, capsys):
     # Check that helpful message was printed
     captured = capsys.readouterr()
     assert "Keyring not available in headless environment" in captured.out
-    assert "MY_UNICORN_GITHUB_TOKEN" in captured.out
+    assert "Future: Environment variable support coming soon" in captured.out
+
+
+def test_setup_keyring_import_error(monkeypatch):
+    """Test setup_keyring raises KeyringUnavailableError for ImportError.
+
+    When SecretService is not available (ImportError), setup_keyring should
+    raise KeyringUnavailableError and log at DEBUG level.
+    """
+    # Reset the global state
+    auth_module._keyring_initialized = False
+
+    def mock_set_keyring(backend):
+        raise ImportError("SecretService not available")
+
+    monkeypatch.setattr("keyring.set_keyring", mock_set_keyring)
+
+    # Should raise KeyringUnavailableError and log at DEBUG
+    with patch("my_unicorn.auth.logger") as mock_logger:
+        with pytest.raises(KeyringUnavailableError):
+            setup_keyring()
+        # Verify DEBUG log for ImportError
+        assert mock_logger.debug.call_count > 0
+        assert mock_logger.error.call_count == 0

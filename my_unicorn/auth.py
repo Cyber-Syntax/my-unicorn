@@ -4,6 +4,7 @@ This module handles GitHub token storage, retrieval, and rate limiting
 to ensure API requests are properly authenticated and don't exceed limits.
 """
 
+import contextlib
 import getpass
 import re
 import time
@@ -19,9 +20,30 @@ logger = get_logger(__name__)
 _keyring_initialized: bool = False
 
 
+class KeyringError(Exception):
+    """Base exception for keyring-related errors."""
+
+
+class KeyringUnavailableError(KeyringError):
+    """Raised when keyring is unavailable (e.g., headless environment)."""
+
+
+class KeyringAccessError(KeyringError):
+    """Raised when keyring access fails (e.g., permission denied)."""
+
+
 def setup_keyring() -> None:
-    """Set SecretService as the preferred keyring backend if available."""
-    global _keyring_initialized
+    """Set SecretService as the preferred keyring backend if available.
+
+    Raises
+    ------
+    KeyringUnavailableError
+        If keyring is unavailable (e.g., headless environment, no DBUS).
+    KeyringAccessError
+        If keyring setup fails for other reasons.
+
+    """
+    global _keyring_initialized  # noqa: PLW0603
 
     if _keyring_initialized:
         return
@@ -32,17 +54,27 @@ def setup_keyring() -> None:
         keyring.set_keyring(SecretService.Keyring())
         logger.debug("SecretService backend set successfully")
     except ImportError:
+        # SecretService not available - expected in some environments
         logger.debug("SecretService backend not available (import failed)")
+        raise KeyringUnavailableError(
+            "SecretService backend not available"
+        ) from None
     except Exception as e:
         # Expected in headless environments (DBUS unavailable)
         if "DBUS" in str(e) or "DBus" in str(e):
             logger.debug("Keyring unavailable in headless environment: %s", e)
+            raise KeyringUnavailableError(
+                "Keyring unavailable in headless environment"
+            ) from e
         else:
             logger.warning("Keyring setup failed: %s", e)
+            raise KeyringAccessError("Keyring setup failed") from e
 
 
-# Initialize the keyring backend
-setup_keyring()
+# Initialize the keyring backend (suppress exceptions at module load)
+# Expected in some environments - authentication will fall back
+with contextlib.suppress(KeyringError):
+    setup_keyring()
 
 
 def validate_github_token(token) -> bool:
@@ -160,18 +192,18 @@ class GitHubAuthManager:
             logger.error("GitHub token input aborted: %s", e)
             raise ValueError("Token input aborted by user") from e
         except Exception as e:
-            # Provide helpful message for common issues
+            # Provide helpful message for keyring errors
             error_msg = str(e)
             if "DBUS" in error_msg or "DBus" in error_msg:
                 logger.error(
                     "Keyring unavailable (headless environment): %s", e
                 )
                 print("\n❌ Keyring not available in headless environment")
+                print("💡 Future: Environment variable support coming soon")
                 print(
-                    "💡 Tip: Set MY_UNICORN_GITHUB_TOKEN environment "
-                    + "variable instead:"
+                    "   (MY_UNICORN_GITHUB_TOKEN will be supported in a "
+                    "future release)"
                 )
-                print("   export MY_UNICORN_GITHUB_TOKEN='your_token_here'")
             else:
                 logger.error("Failed to save GitHub token to keyring: %s", e)
             raise
@@ -192,7 +224,8 @@ class GitHubAuthManager:
         Returns
         -------
         str | None
-            Token if available, None otherwise (not an error).
+            Token if available, None if no token stored or keyring
+            unavailable.
 
         """
         try:
@@ -203,7 +236,10 @@ class GitHubAuthManager:
                 logger.debug(
                     "GitHub token retrieved from keyring (value hidden)"
                 )
-            return token
+                return token
+            else:
+                logger.debug("No token stored in keyring")
+                return None
         except Exception as e:
             # Keyring unavailable is expected in headless environments
             if "DBUS" in str(e) or "DBus" in str(e):
@@ -211,7 +247,7 @@ class GitHubAuthManager:
                     "Keyring unavailable (headless environment): %s", e
                 )
             else:
-                logger.debug("Failed to retrieve token from keyring: %s", e)
+                logger.debug("Keyring access failed: %s", e)
             return None
 
     @staticmethod
@@ -219,7 +255,7 @@ class GitHubAuthManager:
         """Apply GitHub authentication to request headers.
 
         If no token available, continues unauthenticated and notifies user
-        once.
+        once per session about rate limits.
 
         Parameters
         ----------
@@ -229,35 +265,33 @@ class GitHubAuthManager:
         Returns
         -------
         dict[str, str]
-            Headers with authentication applied if token available.
+            Headers with authentication applied if token available,
+            otherwise unmodified headers.
 
         """
-        try:
-            token: str | None = GitHubAuthManager.get_token()
-            if token:
-                headers["Authorization"] = f"Bearer {token}"
-                logger.debug("Applied GitHub authentication (token present)")
-            # Notify user once per session about rate limits
-            elif not GitHubAuthManager._user_notified:
-                GitHubAuthManager._user_notified = True
-                logger.info(
-                    "No GitHub token configured. API rate limits apply "
-                    + "(60 requests/hour). Use 'my-unicorn auth --save-token' "
-                    + "to increase limit to 5000 requests/hour."
-                )
-                print(
-                    "No GitHub token configured. API rate limits apply "
-                    + "(60 requests/hour). Use 'my-unicorn auth --save-token' "
-                    + "to increase limit to 5000 requests/hour."
-                )
-            return headers
-        except Exception as e:
-            logger.debug(
-                "Failed to apply authentication: %s; continuing "
-                + "unauthenticated",
-                e,
+        token: str | None = GitHubAuthManager.get_token()
+
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+            logger.debug("Applied GitHub authentication (token present)")
+        # Notify user once per session about rate limits when no token
+        elif not GitHubAuthManager._user_notified:
+            GitHubAuthManager._user_notified = True
+            logger.info(
+                "No GitHub token configured. API rate limits apply "
+                "(60 requests/hour). Use 'my-unicorn auth --save-token' "
+                "to increase limit to 5000 requests/hour."
             )
-            return headers
+            print(
+                "INFO: No GitHub token configured. API rate limits "
+                "apply (60 requests/hour)."
+            )
+            print(
+                "💡 Use 'my-unicorn auth --save-token' to increase "
+                "limit to 5000 requests/hour."
+            )
+
+        return headers
 
     def update_rate_limit_info(self, headers: dict[str, str]) -> None:
         """Update rate limit information from response headers."""
@@ -313,12 +347,27 @@ class GitHubAuthManager:
         return 60  # Default 1 minute wait
 
     def is_authenticated(self) -> bool:
-        """Check if we have a valid token stored."""
+        """Check if we have a valid token stored.
+
+        Returns
+        -------
+        bool
+            True if a token is available (regardless of validity),
+            False otherwise.
+
+        """
         token = self.get_token()
         return token is not None and len(token.strip()) > 0
 
     def is_token_valid(self) -> bool:
-        """Check if the stored token has a valid format."""
+        """Check if the stored token has a valid format.
+
+        Returns
+        -------
+        bool
+            True if token exists and has valid format, False otherwise.
+
+        """
         token = self.get_token()
         if token is None:
             return False

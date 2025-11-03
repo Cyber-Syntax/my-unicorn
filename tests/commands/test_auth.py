@@ -1,3 +1,5 @@
+"""Tests for AuthHandler command."""
+
 from argparse import Namespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -9,9 +11,11 @@ from my_unicorn.commands.auth import AuthHandler
 
 @pytest.mark.asyncio
 class TestAuthHandler:
+    """Test cases for AuthHandler command."""
+
     @pytest.fixture
     def auth_handler(self):
-        """Fixture to create an instance of AuthHandler with mocked dependencies."""
+        """Fixture for AuthHandler with mocked dependencies."""
         config_manager = MagicMock()
         auth_manager = MagicMock(is_authenticated=MagicMock(return_value=True))
         update_manager = MagicMock()
@@ -44,7 +48,8 @@ class TestAuthHandler:
         mock_remove_token.assert_called_once()
 
     @patch(
-        "my_unicorn.commands.auth.AuthHandler._fetch_fresh_rate_limit", new_callable=AsyncMock
+        "my_unicorn.commands.auth.AuthHandler._fetch_fresh_rate_limit",
+        new_callable=AsyncMock,
     )
     @patch("my_unicorn.commands.auth.GitHubAuthManager.is_authenticated")
     async def test_show_status_authenticated(
@@ -76,10 +81,22 @@ class TestAuthHandler:
         mock_print.assert_any_call("✅ GitHub token is configured")
         mock_print.assert_any_call("\n📊 GitHub API Rate Limit Status:")
 
-    async def test_show_status_not_authenticated(self, auth_handler):
+    @patch(
+        "my_unicorn.commands.auth.AuthHandler._fetch_fresh_rate_limit",
+        new_callable=AsyncMock,
+    )
+    async def test_show_status_not_authenticated(
+        self, mock_fetch_fresh_rate_limit, auth_handler
+    ):
         """Test showing status when not authenticated."""
         # Mock the auth_manager instance method, not the static method
         auth_handler.auth_manager.is_authenticated.return_value = False
+        auth_handler.auth_manager.get_rate_limit_status.return_value = {
+            "remaining": 60,
+            "reset_time": 1700000000,
+            "reset_in_seconds": 3600,
+        }
+        mock_fetch_fresh_rate_limit.return_value = {"rate": {"limit": 60}}
 
         args = Namespace(save_token=False, remove_token=False, status=True)
 
@@ -89,7 +106,7 @@ class TestAuthHandler:
         auth_handler.auth_manager.is_authenticated.assert_called_once()
         mock_print.assert_any_call("❌ No GitHub token configured")
         mock_print.assert_any_call(
-            "Use 'my-unicorn auth --save-token' to configure authentication"
+            "Use 'my-unicorn auth --save-token' to set a token"
         )
 
     @patch("my_unicorn.commands.auth.GitHubAuthManager.apply_auth")
@@ -97,7 +114,9 @@ class TestAuthHandler:
         """Test fetching fresh rate limit information."""
         # Set up safe mock headers
         test_token = "test_token_safe_123"
-        mock_apply_auth.return_value = {"Authorization": f"Bearer {test_token}"}
+        mock_apply_auth.return_value = {
+            "Authorization": f"Bearer {test_token}"
+        }
 
         # Mock the API response
         expected_response = {"rate_limit": "mock_data"}
