@@ -20,18 +20,25 @@ _keyring_initialized: bool = False
 
 
 def setup_keyring() -> None:
-    """Set SecretService as the preferred keyring backend and log the result."""
+    """Set SecretService as the preferred keyring backend if available."""
     global _keyring_initialized
 
     if _keyring_initialized:
         return
 
+    _keyring_initialized = True  # Mark as attempted (prevent retries)
+
     try:
         keyring.set_keyring(SecretService.Keyring())
-        logger.debug("SecretService backend set as the preferred keyring backend")
-        _keyring_initialized = True
+        logger.debug("SecretService backend set successfully")
+    except ImportError:
+        logger.debug("SecretService backend not available (import failed)")
     except Exception as e:
-        logger.warning("Failed to set SecretService as the preferred keyring backend: %s", e)
+        # Expected in headless environments (DBUS unavailable)
+        if "DBUS" in str(e) or "DBus" in str(e):
+            logger.debug("Keyring unavailable in headless environment: %s", e)
+        else:
+            logger.warning("Keyring setup failed: %s", e)
 
 
 # Initialize the keyring backend
@@ -95,6 +102,7 @@ class GitHubAuthManager:
 
     GITHUB_KEY_NAME: str = "my-unicorn-github-token"
     RATE_LIMIT_THRESHOLD: int = 10  # Minimum remaining requests before waiting
+    _user_notified: bool = False  # Track if user notified about rate limits
 
     def __init__(self):
         """Initialize the auth manager with rate limit tracking."""
@@ -106,7 +114,9 @@ class GitHubAuthManager:
     def save_token() -> None:
         """Prompt user for GitHub token and save it securely."""
         try:
-            token: str = getpass.getpass(prompt="Enter your GitHub token (input hidden): ")
+            token: str = getpass.getpass(
+                prompt="Enter your GitHub token (input hidden): "
+            )
             if token is None:
                 logger.error("No input received for GitHub token.")
                 raise ValueError("Token cannot be empty")
@@ -120,9 +130,13 @@ class GitHubAuthManager:
                 raise ValueError("Token cannot be empty")
 
             # Confirm token input
-            confirm_token: str = getpass.getpass(prompt="Confirm your GitHub token: ")
+            confirm_token: str = getpass.getpass(
+                prompt="Confirm your GitHub token: "
+            )
             if confirm_token is None:
-                logger.error("No input received for GitHub token confirmation.")
+                logger.error(
+                    "No input received for GitHub token confirmation."
+                )
                 raise ValueError("Token confirmation does not match")
 
             confirm_token = confirm_token.strip()
@@ -133,15 +147,33 @@ class GitHubAuthManager:
             # Validate token format before saving
             if not validate_github_token(token):
                 logger.error("Invalid GitHub token format provided.")
-                raise ValueError("Invalid GitHub token format. Must be a valid GitHub token.")
+                raise ValueError(
+                    "Invalid GitHub token format. "
+                    + "Must be a valid GitHub token."
+                )
 
-            keyring.set_password(GitHubAuthManager.GITHUB_KEY_NAME, "token", token)
+            keyring.set_password(
+                GitHubAuthManager.GITHUB_KEY_NAME, "token", token
+            )
             logger.info("GitHub token saved successfully.")
         except (EOFError, KeyboardInterrupt) as e:
             logger.error("GitHub token input aborted: %s", e)
             raise ValueError("Token input aborted by user") from e
         except Exception as e:
-            logger.error("Failed to save GitHub token to keyring: %s", e)
+            # Provide helpful message for common issues
+            error_msg = str(e)
+            if "DBUS" in error_msg or "DBus" in error_msg:
+                logger.error(
+                    "Keyring unavailable (headless environment): %s", e
+                )
+                print("\n❌ Keyring not available in headless environment")
+                print(
+                    "💡 Tip: Set MY_UNICORN_GITHUB_TOKEN environment "
+                    + "variable instead:"
+                )
+                print("   export MY_UNICORN_GITHUB_TOKEN='your_token_here'")
+            else:
+                logger.error("Failed to save GitHub token to keyring: %s", e)
             raise
 
     @staticmethod
@@ -155,30 +187,85 @@ class GitHubAuthManager:
 
     @staticmethod
     def get_token() -> str | None:
-        """Retrieve GitHub token from keyring."""
+        """Retrieve GitHub token from keyring.
+
+        Returns
+        -------
+        str | None
+            Token if available, None otherwise (not an error).
+
+        """
         try:
-            return keyring.get_password(GitHubAuthManager.GITHUB_KEY_NAME, "token")
+            token = keyring.get_password(
+                GitHubAuthManager.GITHUB_KEY_NAME, "token"
+            )
+            if token:
+                logger.debug(
+                    "GitHub token retrieved from keyring (value hidden)"
+                )
+            return token
         except Exception as e:
-            logger.error(f"Failed to retrieve GitHub token from keyring: {e}")
+            # Keyring unavailable is expected in headless environments
+            if "DBUS" in str(e) or "DBus" in str(e):
+                logger.debug(
+                    "Keyring unavailable (headless environment): %s", e
+                )
+            else:
+                logger.debug("Failed to retrieve token from keyring: %s", e)
             return None
 
     @staticmethod
     def apply_auth(headers: dict[str, str]) -> dict[str, str]:
-        """Apply GitHub authentication to request headers."""
+        """Apply GitHub authentication to request headers.
+
+        If no token available, continues unauthenticated and notifies user
+        once.
+
+        Parameters
+        ----------
+        headers : dict[str, str]
+            HTTP headers to apply authentication to.
+
+        Returns
+        -------
+        dict[str, str]
+            Headers with authentication applied if token available.
+
+        """
         try:
             token: str | None = GitHubAuthManager.get_token()
             if token:
                 headers["Authorization"] = f"Bearer {token}"
+                logger.debug("Applied GitHub authentication (token present)")
+            # Notify user once per session about rate limits
+            elif not GitHubAuthManager._user_notified:
+                GitHubAuthManager._user_notified = True
+                logger.info(
+                    "No GitHub token configured. API rate limits apply "
+                    + "(60 requests/hour). Use 'my-unicorn auth --save-token' "
+                    + "to increase limit to 5000 requests/hour."
+                )
+                print(
+                    "No GitHub token configured. API rate limits apply "
+                    + "(60 requests/hour). Use 'my-unicorn auth --save-token' "
+                    + "to increase limit to 5000 requests/hour."
+                )
             return headers
         except Exception as e:
-            logger.error(f"Failed to apply GitHub authentication to headers: {e}")
+            logger.debug(
+                "Failed to apply authentication: %s; continuing "
+                + "unauthenticated",
+                e,
+            )
             return headers
 
     def update_rate_limit_info(self, headers: dict[str, str]) -> None:
         """Update rate limit information from response headers."""
         try:
             # GitHub API uses capitalized header names
-            self._remaining_requests = int(headers.get("X-RateLimit-Remaining", 0))
+            self._remaining_requests = int(
+                headers.get("X-RateLimit-Remaining", 0)
+            )
             self._rate_limit_reset = int(headers.get("X-RateLimit-Reset", 0))
             self._last_check_time = time.time()
         except (ValueError, TypeError) as e:
@@ -199,7 +286,9 @@ class GitHubAuthManager:
             "remaining": self._remaining_requests,
             "reset_time": self._rate_limit_reset,
             "reset_in_seconds": (
-                self._rate_limit_reset - current_time if self._rate_limit_reset else None
+                self._rate_limit_reset - current_time
+                if self._rate_limit_reset
+                else None
             ),
         }
 
