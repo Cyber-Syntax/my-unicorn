@@ -2,9 +2,11 @@
 
 ## testing
 
+- [>] #TEST: version command logic is deprecated, so testing to use **version** library
 - [~] #BUG: Rotation error on logs...
-    - not keep the old ones in .1, .2, .3, instead it is also clear those too.
-    - This happened when I try to update with the update.bash and cancelled the update.
+    - Currently, implemented to custom rotation logic more simple and efficient
+      and also increased 1MB log to 10MB to increase the log size. Manual and pytest
+      succesfully passed.
 - [~] appimage build take times
     - [x] install/update show installation error reasons(show appimage build takes times)
     - [ ] take care the edge cases, maybe app not have appimage at all?
@@ -20,10 +22,43 @@
 
 ## in-progress
 
-- [ ] update.bash check network connection
-- [ ] png need priority one because kde not show .svg on its bar when pinned
-- [ ] update docs with mermaid, use copilot to create them it seems copilot handles mermaid pretty well
-- [ ] #BUG: is backup folder not created after new feature? test qownnotes when there is update available
+- [ ] test.bash -> update test not available because we remove before catalog install or url install
+      so we need a better logic to handle this case
+- [ ] TEST: Never use the real user config logs, app location on pytest unittests which current is use them!
+- [ ] container need to be copy the source code on start arch or shell arch?
+- [ ] #BUG: Token need to be optional (container error, it might be related to dbus issue which container based not use secretservice dbus?)
+
+    ```
+    2025-10-31 12:04:00 - my_unicorn.backup - WARNING - warning:306 - Invalid version format detected, using lexicographic sorting
+    2025-10-31 12:04:00 - my_unicorn.auth - ERROR - error:321 - Failed to retrieve GitHub token from keyring: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
+    ```
+
+    ```bash
+    # try to test it in container, and I confirm it is dbus issue
+    github_pat_aXCvasdfbcasdfXZCXVA^Cdg1231asdfascvasd123 # example github pat, not real
+    [devuser@arch-dev my-unicorn]$ my-unicorn auth --save-token
+    Enter your GitHub token (input hidden):
+    Confirm your GitHub token:
+    15:37:15 - my_unicorn.auth - ERROR - Failed to save GitHub token to keyring: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
+    15:37:15 - my_unicorn.cli.runner - ERROR - Unexpected error: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
+    ❌ Unexpected error: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
+    ```
+
+- BUG: two time installed print on new version
+
+    ```bash
+    ✅ All 2 specified app(s) are already installed:
+    • qownnotes
+    • legcord
+    ✅ All 2 specified app(s) are already installed:
+    • qownnotes
+    • legcord
+    ```
+
+- [ ] INFO need to give good information about verification status, current approach
+      give errors but not give anything about success in INFO level, all of them in DEBUG level
+- [ ] #BUG: Cycle detected in import chain for cache.py
+- [ ] API rate limiting
 - [~] refactor
   <https://refactoring.guru/refactoring/smells>
     - [x] general
@@ -32,18 +67,26 @@
     - [ ] config
     - [ ] handle FIXME, TODO for duplicate functions
     - [x] service.progress already active
-    - [ ] services
-    - [ ] utils.py seperated folders
+    - [x] services
+    - [x] utils.py seperated folders
     - [ ] strategies
-    - [ ] reading code from top to bottom
-    - [ ] functions instead of comments
+    - [x] reading code from top to bottom
+    - [x] functions instead of comments
     - [ ] contexts
     - [ ] remove license, contribution from readme.md because there is already markdown files for them
 
 ## todo
 
-- [ ] API rate limiting
-- [ ] #BUG: Cycle detected in import chain for cache.py
+- [ ] png need priority one because kde not show .svg on its bar when pinned
+- [ ] add autocompletion for the catalog apps
+- [ ] #BUG: post-processing spinner not turn correctly,
+      it is start and stop, start and stop, it is like in a for loop or
+      something like that, maybe it is happening because of the way we are handling the spinner.
+      We update the post-processing and same time download section etc.
+      probably something is wrong in the implementation of the spinner.
+- [ ] update.bash check network connection
+- [ ] update docs with mermaid, use copilot to create them it seems copilot handles mermaid pretty well
+- [ ] #BUG: is backup folder not created after new feature? test qownnotes when there is update available
 - [ ] dev(improve): rename list.py to catalog.py and all it's commands list to catalog
 - [ ] TEST: test probably use AppImageKit, better to make sure it is only used for though.
 - [ ] #TEST: test.bash need another command --use-cache, --no-cache which remove and not remove
@@ -71,7 +114,6 @@
     - [ ] add my unicorn export path to fish shells
     - [ ] kde wallet support via dbus-python, test in the shared folder 3. kdewallet isn't show any token saved which seems like we don't support ito. written script to keyring-my-unicorn folder, check that out.
           dbus-python used on kdewallet saves, so we can add that to auth later as a support.
-
 - [ ] #BUG: digest not became true on catalog installs if its use checksum_file with digest verify both
 - [ ] add verification passed or not to verification section on app-specific config
 - [ ] #BUG: upgrade command get stable cache 1.2.3 version for my-unicorn repo
