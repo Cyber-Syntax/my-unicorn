@@ -134,12 +134,6 @@ class InstallCommand:
             and not urls_needing_work
             and not catalog_needing_work
         ):
-            print(
-                f"✅ All {len(already_installed)} specified app(s) are already installed:"
-            )
-            for app_name in already_installed:
-                print(f"   • {app_name}")
-
             # Return success results for already installed apps
             return [
                 {
