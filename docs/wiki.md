@@ -218,13 +218,6 @@ max_concurrent_downloads = 5
 # Maximum number of backups to keep for each AppImage.
 max_backup = 1
 
-# Enables batch mode for downloading AppImages without user interaction.
-batch_mode = true
-
-# Locale for the user interface and messages.
-# Supported languages: English (en_US)
-locale = "en_US"
-
 # Logging level for the application.
 # Supported levels: DEBUG, INFO, WARNING, ERROR
 log_level = "INFO"

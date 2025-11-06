@@ -26,8 +26,9 @@ class ConfigHandler(BaseCommandHandler):
         """Display current configuration."""
         print("📋 Current Configuration:")
         print(f"  Config Version: {self.global_config['config_version']}")
-        print(f"  Max Downloads: {self.global_config['max_concurrent_downloads']}")
-        print(f"  Batch Mode: {self.global_config['batch_mode']}")
+        print(
+            f"  Max Downloads: {self.global_config['max_concurrent_downloads']}"
+        )
         print(f"  Log Level: {self.global_config['log_level']}")
         print(f"  Storage Dir: {self.global_config['directory']['storage']}")
         print(f"  Download Dir: {self.global_config['directory']['download']}")

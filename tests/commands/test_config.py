@@ -40,7 +40,6 @@ def mock_config_manager():
             return {
                 "config_version": "1.0",
                 "max_concurrent_downloads": 5,
-                "batch_mode": True,
                 "log_level": "INFO",
                 "directory": {
                     "storage": "/tmp/storage",
@@ -77,7 +76,7 @@ async def test_execute_show(monkeypatch, handler, capsys):
     assert "📋 Current Configuration:" in captured.out
     assert "Config Version: 1.0" in captured.out
     assert "Max Downloads: 5" in captured.out
-    assert "Batch Mode: True" in captured.out
+
     assert "Log Level: INFO" in captured.out
     assert "/tmp/storage" in captured.out
     assert "/tmp/download" in captured.out

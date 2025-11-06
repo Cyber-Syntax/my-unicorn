@@ -4,13 +4,6 @@
 # in the ~/.config/my-unicorn/apps directory.
 # You need to install the apps first to use this script.
 #
-# Make sure you enabled batch mode if you want to run this
-# script in an automated fashion (e.g. via cron or a window
-# manager autostart). Batch mode already defaults to true
-# in the ~/.config/my-unicorn/settings.conf file.
-#
-#   "batch_mode": true,
-#
 # Author: Cyber-Syntax
 # License: same as my-unicorn project
 
