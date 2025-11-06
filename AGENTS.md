@@ -9,7 +9,6 @@ This file provides guidance to agents when working with code in this repository.
 3. DRY (Don't Repeat Yourself): Reuse code appropriately but avoid over-engineering. Each command handler has single responsibility.
 4. YAGNI (You Aren't Gonna Need It): Always implement things when you actually need them, never when you just foresee that you need them.
 5. **ALWAYS** use `ruff check <filepath>` on each file you modify to ensure proper formatting and linting.
-    - Use `ruff lint <filepath>` on each file you modify to ensure proper linting.
     - Use `ruff format <filepath>` on each file you modify to ensure proper formatting.
     - Use `ruff check --fix <filepath>` on each file you modify to fix any fixable errors.
 6. Confirm understanding before making changes: If you're unsure about the purpose of a piece of code, ask for clarification rather than making assumptions.

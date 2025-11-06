@@ -7,7 +7,7 @@
 # Make sure you enabled batch mode if you want to run this
 # script in an automated fashion (e.g. via cron or a window
 # manager autostart). Batch mode already defaults to true
-# in the ~/.config/my-unicorn/settings.conf file. 
+# in the ~/.config/my-unicorn/settings.conf file.
 #
 #   "batch_mode": true,
 #
@@ -63,7 +63,7 @@ show_cli_upgrade() {
   # Detect common 'no update' responses (allow spaces or hyphens):
   # examples: "no new version", "up to date", "up-to-date", "already at version"
   if echo "$output" | grep -qiE 'no (new|updates?|upgrade)|up[ -]?to[ -]?date|already( at| )?version|nothing to (do|update)|no updates found|no update available'; then
-    echo "✅ CLI up-to-date"
+    echo "CLI up-to-date"
     return 0
   fi
 
@@ -93,7 +93,7 @@ upgrade_cli() {
     return 1
   fi
 
-  echo "✅ CLI upgraded successfully"
+  echo "✓ CLI upgraded successfully"
   notify_cli_upgrade "my-unicorn CLI upgraded" "Upgrade completed"
 }
 
@@ -132,7 +132,7 @@ show_updates() {
   count=$(echo "$output" | grep -c '📦 Update available' || true)
 
   if [ "$count" -eq 0 ]; then
-    echo "✅ Up-to-date"
+    echo "Up-to-date"
   else
     echo "AppImage Updates: $count"
   fi
@@ -144,7 +144,7 @@ determine_outdated_apps() {
     echo "Error: Failed to check updates"
     return 1
   fi
-  
+
   local outdated_apps=()
   while IFS= read -r line; do
     if [[ $line == *"📦 Update available"* ]]; then
@@ -153,8 +153,8 @@ determine_outdated_apps() {
       app_name=$(echo "$line" | awk '{print $1}')
       outdated_apps+=("$app_name")
     fi
-  done <<< "$output"
-  
+  done <<<"$output"
+
   # Return the array of outdated apps
   printf '%s\n' "${outdated_apps[@]}"
 }
@@ -163,15 +163,15 @@ determine_outdated_apps() {
 update_outdated() {
   local outdated_apps=()
   local outdated_output
-  
+
   if ! outdated_output=$(determine_outdated_apps); then
     echo "Error: Failed to determine outdated apps"
     return 1
   fi
-  
+
   # Use readarray to populate the array safely
-  readarray -t outdated_apps <<< "$outdated_output"
-  
+  readarray -t outdated_apps <<<"$outdated_output"
+
   # Remove empty elements
   local filtered_apps=()
   for app in "${outdated_apps[@]}"; do
@@ -180,14 +180,14 @@ update_outdated() {
     fi
   done
   outdated_apps=("${filtered_apps[@]}")
-  
+
   if [ ${#outdated_apps[@]} -eq 0 ]; then
-    echo "✅ All apps are up-to-date"
+    echo "✓ All apps are up-to-date"
     return 0
   fi
-  
+
   echo "Updating ${#outdated_apps[@]} outdated app(s): ${outdated_apps[*]}"
-  
+
   # Update all outdated apps concurrently in a single command
   if ! "$UNICORN" update "${outdated_apps[@]}"; then
     echo "Error: Update failed for some apps. Check your network connection or logs."
@@ -199,8 +199,8 @@ update_outdated() {
       echo "Warning: Qtile widget update failed"
     fi
   fi
-  
-  echo "✅ All outdated apps updated successfully"
+
+  echo "✓ All outdated apps updated successfully"
 }
 
 # help for CLI
@@ -223,30 +223,30 @@ help() {
 
 # Parse command line options
 case "${1:-}" in
-  --check | "")
-    show_updates
-    ;;
-  --check-cli)
-    show_cli_upgrade
-    ;;
-  --update-all)
-    update_all
-    ;;
-  --update-outdated)
-    update_outdated
-    ;;
-  --upgrade-cli)
-    upgrade_cli
-    ;;
-  --help | -h)
-    help
-    ;;
-  *)
-    echo "Invalid option: $1"
-    echo ""
-    help
-    exit 1
-    ;;
+--check | "")
+  show_updates
+  ;;
+--check-cli)
+  show_cli_upgrade
+  ;;
+--update-all)
+  update_all
+  ;;
+--update-outdated)
+  update_outdated
+  ;;
+--upgrade-cli)
+  upgrade_cli
+  ;;
+--help | -h)
+  help
+  ;;
+*)
+  echo "Invalid option: $1"
+  echo ""
+  help
+  exit 1
+  ;;
 esac
 
 exit 0

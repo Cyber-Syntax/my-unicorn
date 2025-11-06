@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.10.0-alpha
+
+### Changed
+
+- Large refactor and reorganization across core modules to simplify command flows and reduce template overhead.
+  Services were consolidated and many modules were moved or renamed for clarity (install/update flows, icon handling, file operations, and verification service).
+- GitHub client rewritten using dataclasses and clearer API abstractions to improve maintainability and testability.
+- Improved caching and asset selection/filtering logic to reduce redundant API calls and improve release data handling.
+- Logging improvements: added manual log rotation, centralized constants, and safer handling of rotating log handlers.
+- Update/install UX: update process optimized and summaries improved to show detailed error reasons in install/update summaries.
+- Tests: expanded and adapted test coverage to match refactors and new APIs.
+
+### Fixed
+
+- Support for root-level hash in checksum YAML parsing.
+- Various bug fixes surfaced during refactors (see commit history for details).
+
+### Migration guide
+
+No manual migration steps are required for most users. If you have a custom setup that relies on deprecated module paths or templates,
+review your configuration and follow the repository README for update instructions.
+
 ## v1.9.1-alpha
 
 ### Fixed
@@ -125,7 +147,7 @@ Please read [wiki.md](docs/wiki.md) for more information how to use the new feat
 - Keep in mind that the migration process is irreversible and will cause data loss.
 - Run `backup app_name --migrate` to migrate old backups to new format.
 - If something goes wrong, migrate manually by moving the `~/Applications/backups` directory to `~/Applications/backups.old`
-than make sure to run migrate command again to migrate the new backups to the new format.
+  than make sure to run migrate command again to migrate the new backups to the new format.
 
 ## v1.0.1-alpha
 
@@ -147,7 +169,7 @@ Please read the [wiki.md](docs/wiki.md) for more information.
     - tqdm.asyncio instead of manual progress bar
 4. Authentication is simplified for better security and performance
 5. Locale support, migration and other similar features removed for the simplicity of the code
-but they might be implemented in the future.
+   but they might be implemented in the future.
 
 #### Migration guide
 
