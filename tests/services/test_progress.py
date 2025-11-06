@@ -12,9 +12,9 @@ from rich.console import Console
 from rich.live import Live
 from rich.progress import Progress, TaskID
 
-from my_unicorn.services.progress import (
+from my_unicorn.progress import (
     ProgressConfig,
-    ProgressService,
+    ProgressDisplay,
     ProgressType,
     SpeedColumn,
     TaskInfo,
@@ -155,24 +155,24 @@ def mock_live() -> Mock:
 
 
 @pytest.fixture
-def progress_service(mock_console: Mock) -> ProgressService:
-    """Fixture providing a ProgressService instance."""
-    with patch("my_unicorn.services.progress.Progress"):
-        service = ProgressService(console=mock_console)
+def progress_service(mock_console: Mock) -> ProgressDisplay:
+    """Fixture providing a ProgressDisplay instance."""
+    with patch("my_unicorn.progress.Progress"):
+        service = ProgressDisplay(console=mock_console)
         # Don't set _active=True here as some tests need to test inactive state
         return service
 
 
-class TestProgressService:
-    """Comprehensive test cases for ProgressService."""
+class TestProgressDisplay:
+    """Comprehensive test cases for ProgressDisplay."""
 
     def test_init_with_defaults(self) -> None:
-        """Test ProgressService initialization with default values."""
+        """Test ProgressDisplay initialization with default values."""
         with (
-            patch("my_unicorn.services.progress.Progress"),
-            patch("my_unicorn.services.progress.Console") as mock_console_cls,
+            patch("my_unicorn.progress.Progress"),
+            patch("my_unicorn.progress.Console") as mock_console_cls,
         ):
-            service = ProgressService()
+            service = ProgressDisplay()
 
             assert service.console is not None
             assert service.config is not None
@@ -182,20 +182,28 @@ class TestProgressService:
             assert service._live is None
 
     def test_init_with_custom_values(self, mock_console: Mock) -> None:
-        """Test ProgressService initialization with custom values."""
+        """Test ProgressDisplay initialization with custom values."""
         config = ProgressConfig(refresh_per_second=8)
 
-        with patch("my_unicorn.services.progress.Progress"):
-            service = ProgressService(console=mock_console, config=config)
+        with patch("my_unicorn.progress.Progress"):
+            service = ProgressDisplay(console=mock_console, config=config)
 
             assert service.console == mock_console
             assert service.config == config
 
-    def test_generate_namespaced_id(self, progress_service: ProgressService) -> None:
+    def test_generate_namespaced_id(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test namespaced ID generation."""
-        id1 = progress_service._generate_namespaced_id(ProgressType.DOWNLOAD, "test_file")
-        id2 = progress_service._generate_namespaced_id(ProgressType.DOWNLOAD, "another_file")
-        id3 = progress_service._generate_namespaced_id(ProgressType.API_FETCHING, "api_call")
+        id1 = progress_service._generate_namespaced_id(
+            ProgressType.DOWNLOAD, "test_file"
+        )
+        id2 = progress_service._generate_namespaced_id(
+            ProgressType.DOWNLOAD, "another_file"
+        )
+        id3 = progress_service._generate_namespaced_id(
+            ProgressType.API_FETCHING, "api_call"
+        )
 
         assert id1.startswith("dl_1_")
         assert id2.startswith("dl_2_")
@@ -204,18 +212,22 @@ class TestProgressService:
         assert id1 != id3
 
     def test_generate_namespaced_id_sanitization(
-        self, progress_service: ProgressService
+        self, progress_service: ProgressDisplay
     ) -> None:
         """Test that namespaced ID sanitizes special characters."""
         dirty_name = "file with spaces & symbols!"
-        clean_id = progress_service._generate_namespaced_id(ProgressType.DOWNLOAD, dirty_name)
+        clean_id = progress_service._generate_namespaced_id(
+            ProgressType.DOWNLOAD, dirty_name
+        )
 
         assert "dl_1_filewithspaces" in clean_id
 
     @pytest.mark.asyncio
-    async def test_start_session(self, progress_service: ProgressService) -> None:
+    async def test_start_session(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test starting a progress session."""
-        with patch("my_unicorn.services.progress.Live") as mock_live_cls:
+        with patch("my_unicorn.progress.Live") as mock_live_cls:
             mock_live = Mock()
             mock_live_cls.return_value = mock_live
 
@@ -227,7 +239,7 @@ class TestProgressService:
 
     @pytest.mark.asyncio
     async def test_start_session_already_active(
-        self, progress_service: ProgressService
+        self, progress_service: ProgressDisplay
     ) -> None:
         """Test starting session when already active does nothing."""
         progress_service._active = True
@@ -238,7 +250,9 @@ class TestProgressService:
         assert progress_service._live == original_live
 
     @pytest.mark.asyncio
-    async def test_stop_session(self, progress_service: ProgressService) -> None:
+    async def test_stop_session(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test stopping a progress session."""
         mock_live = Mock()
         progress_service._live = mock_live
@@ -251,7 +265,9 @@ class TestProgressService:
         mock_live.stop.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_stop_session_not_active(self, progress_service: ProgressService) -> None:
+    async def test_stop_session_not_active(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test stopping session when not active does nothing."""
         await progress_service.stop_session()
 
@@ -259,10 +275,14 @@ class TestProgressService:
         assert progress_service._live is None
 
     @pytest.mark.asyncio
-    async def test_add_download_task(self, progress_service: ProgressService) -> None:
+    async def test_add_download_task(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test adding a download task."""
         progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._download_progress, "add_task") as mock_add:
+        with patch.object(
+            progress_service._download_progress, "add_task"
+        ) as mock_add:
             mock_add.return_value = TaskID(1)
 
             task_id = await progress_service.add_task(
@@ -281,30 +301,44 @@ class TestProgressService:
             assert task.description == "Downloading test file"
 
     @pytest.mark.asyncio
-    async def test_add_task_with_exception(self, progress_service: ProgressService) -> None:
+    async def test_add_task_with_exception(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test adding task that raises exception."""
         progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._download_progress, "add_task") as mock_add:
+        with patch.object(
+            progress_service._download_progress, "add_task"
+        ) as mock_add:
             mock_add.side_effect = Exception("Rich error")
 
             with pytest.raises(Exception, match="Rich error"):
                 await progress_service.add_task(
-                    name="test_file", progress_type=ProgressType.DOWNLOAD, total=100.0
+                    name="test_file",
+                    progress_type=ProgressType.DOWNLOAD,
+                    total=100.0,
                 )
 
     @pytest.mark.asyncio
-    async def test_update_task_progress(self, progress_service: ProgressService) -> None:
+    async def test_update_task_progress(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test updating task progress."""
         progress_service._active = True  # Make active for this test
         # First add a task
         with (
-            patch.object(progress_service._download_progress, "add_task") as mock_add,
-            patch.object(progress_service._download_progress, "update") as mock_update,
+            patch.object(
+                progress_service._download_progress, "add_task"
+            ) as mock_add,
+            patch.object(
+                progress_service._download_progress, "update"
+            ) as mock_update,
         ):
             mock_add.return_value = TaskID(1)
 
             task_id = await progress_service.add_task(
-                name="test_file", progress_type=ProgressType.DOWNLOAD, total=100.0
+                name="test_file",
+                progress_type=ProgressType.DOWNLOAD,
+                total=100.0,
             )
 
             # Then update it
@@ -316,7 +350,9 @@ class TestProgressService:
             mock_update.assert_called()
 
     @pytest.mark.asyncio
-    async def test_update_nonexistent_task(self, progress_service: ProgressService) -> None:
+    async def test_update_nonexistent_task(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test updating a task that doesn't exist."""
         progress_service._active = True  # Make active for this test
         # Task update should just log warning, not raise exception for nonexistent tasks
@@ -324,17 +360,25 @@ class TestProgressService:
         # No exception should be raised
 
     @pytest.mark.asyncio
-    async def test_finish_task_success(self, progress_service: ProgressService) -> None:
+    async def test_finish_task_success(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test finishing a task successfully."""
         progress_service._active = True  # Make active for this test
         with (
-            patch.object(progress_service._download_progress, "add_task") as mock_add,
-            patch.object(progress_service._download_progress, "update") as mock_update,
+            patch.object(
+                progress_service._download_progress, "add_task"
+            ) as mock_add,
+            patch.object(
+                progress_service._download_progress, "update"
+            ) as mock_update,
         ):
             mock_add.return_value = TaskID(1)
 
             task_id = await progress_service.add_task(
-                name="test_file", progress_type=ProgressType.DOWNLOAD, total=100.0
+                name="test_file",
+                progress_type=ProgressType.DOWNLOAD,
+                total=100.0,
             )
 
             await progress_service.finish_task(task_id, success=True)
@@ -344,14 +388,20 @@ class TestProgressService:
             assert task.is_finished
 
     @pytest.mark.asyncio
-    async def test_finish_task_failure(self, progress_service: ProgressService) -> None:
+    async def test_finish_task_failure(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test finishing a task with failure."""
         progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._download_progress, "add_task") as mock_add:
+        with patch.object(
+            progress_service._download_progress, "add_task"
+        ) as mock_add:
             mock_add.return_value = TaskID(1)
 
             task_id = await progress_service.add_task(
-                name="test_file", progress_type=ProgressType.DOWNLOAD, total=100.0
+                name="test_file",
+                progress_type=ProgressType.DOWNLOAD,
+                total=100.0,
             )
 
             await progress_service.finish_task(
@@ -363,17 +413,25 @@ class TestProgressService:
             assert task.description == "Download failed"
 
     @pytest.mark.asyncio
-    async def test_calculate_speed(self, progress_service: ProgressService) -> None:
+    async def test_calculate_speed(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test speed calculation for download tasks."""
         progress_service._active = True  # Make active for this test
         with (
-            patch.object(progress_service._download_progress, "add_task") as mock_add,
-            patch.object(progress_service._download_progress, "update") as mock_update,
+            patch.object(
+                progress_service._download_progress, "add_task"
+            ) as mock_add,
+            patch.object(
+                progress_service._download_progress, "update"
+            ) as mock_update,
         ):
             mock_add.return_value = TaskID(1)
 
             task_id = await progress_service.add_task(
-                name="test_file", progress_type=ProgressType.DOWNLOAD, total=100.0
+                name="test_file",
+                progress_type=ProgressType.DOWNLOAD,
+                total=100.0,
             )
 
             # Simulate progress over time
@@ -388,13 +446,19 @@ class TestProgressService:
             assert task.current_speed_mbps > 0
 
     @pytest.mark.asyncio
-    async def test_create_api_fetching_task(self, progress_service: ProgressService) -> None:
+    async def test_create_api_fetching_task(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test creating an API fetching task."""
         progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._api_progress, "add_task") as mock_add:
+        with patch.object(
+            progress_service._api_progress, "add_task"
+        ) as mock_add:
             mock_add.return_value = TaskID(1)
 
-            task_id = await progress_service.create_api_fetching_task("API Request", 10)
+            task_id = await progress_service.create_api_fetching_task(
+                "API Request", 10
+            )
 
             assert task_id is not None
             task = progress_service._tasks[task_id]
@@ -403,13 +467,19 @@ class TestProgressService:
 
     @pytest.mark.asyncio
     @pytest.mark.asyncio
-    async def test_create_verification_task(self, progress_service: ProgressService) -> None:
+    async def test_create_verification_task(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test creating a verification task."""
         progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._post_processing_progress, "add_task") as mock_add:
+        with patch.object(
+            progress_service._post_processing_progress, "add_task"
+        ) as mock_add:
             mock_add.return_value = TaskID(1)
 
-            task_id = await progress_service.create_verification_task("file.zip")
+            task_id = await progress_service.create_verification_task(
+                "file.zip"
+            )
 
             assert task_id is not None
             task = progress_service._tasks[task_id]
@@ -417,20 +487,26 @@ class TestProgressService:
 
     @pytest.mark.asyncio
     async def test_create_icon_extraction_task(
-        self, progress_service: ProgressService
+        self, progress_service: ProgressDisplay
     ) -> None:
         """Test creating an icon extraction task."""
         progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._post_processing_progress, "add_task") as mock_add:
+        with patch.object(
+            progress_service._post_processing_progress, "add_task"
+        ) as mock_add:
             mock_add.return_value = TaskID(1)
 
-            task_id = await progress_service.create_icon_extraction_task("app.exe")
+            task_id = await progress_service.create_icon_extraction_task(
+                "app.exe"
+            )
 
             assert task_id is not None
             task = progress_service._tasks[task_id]
             assert task.progress_type == ProgressType.ICON_EXTRACTION
 
-    def test_get_task_info_existing(self, progress_service: ProgressService) -> None:
+    def test_get_task_info_existing(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test getting info for existing task."""
         task = TaskInfo(
             task_id=TaskID(1),
@@ -444,13 +520,15 @@ class TestProgressService:
 
         assert info == task
 
-    def test_get_task_info_nonexistent(self, progress_service: ProgressService) -> None:
+    def test_get_task_info_nonexistent(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test getting info for nonexistent task returns None."""
         info = progress_service.get_task_info("nonexistent_task")
 
         assert info is None
 
-    def test_is_active(self, progress_service: ProgressService) -> None:
+    def test_is_active(self, progress_service: ProgressDisplay) -> None:
         """Test checking if service is active."""
         # Start with inactive service
         progress_service._active = False
@@ -460,7 +538,9 @@ class TestProgressService:
         assert progress_service.is_active()
 
     @pytest.mark.asyncio
-    async def test_session_context_manager(self, progress_service: ProgressService) -> None:
+    async def test_session_context_manager(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test using progress service as async context manager."""
         with (
             patch.object(progress_service, "start_session") as mock_start,
@@ -474,7 +554,7 @@ class TestProgressService:
 
     @pytest.mark.asyncio
     async def test_session_context_manager_with_exception(
-        self, progress_service: ProgressService
+        self, progress_service: ProgressDisplay
     ) -> None:
         """Test context manager properly cleans up on exception."""
         with (
@@ -490,19 +570,25 @@ class TestProgressService:
 
     @pytest.mark.asyncio
     async def test_network_error_during_download(
-        self, progress_service: ProgressService
+        self, progress_service: ProgressDisplay
     ) -> None:
         """Test handling network errors during download tasks."""
         progress_service._active = True  # Make active for this test
         with (
-            patch.object(progress_service._download_progress, "add_task") as mock_add,
-            patch.object(progress_service._download_progress, "update") as mock_update,
+            patch.object(
+                progress_service._download_progress, "add_task"
+            ) as mock_add,
+            patch.object(
+                progress_service._download_progress, "update"
+            ) as mock_update,
         ):
             mock_add.return_value = TaskID(1)
             mock_update.side_effect = ConnectionError("Network error")
 
             task_id = await progress_service.add_task(
-                name="network_file", progress_type=ProgressType.DOWNLOAD, total=100.0
+                name="network_file",
+                progress_type=ProgressType.DOWNLOAD,
+                total=100.0,
             )
 
             # Should log error but not raise (based on the captured logs)
@@ -510,17 +596,25 @@ class TestProgressService:
             # The error is caught and logged, not re-raised
 
     @pytest.mark.asyncio
-    async def test_verification_error(self, progress_service: ProgressService) -> None:
+    async def test_verification_error(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test handling verification errors."""
         progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._post_processing_progress, "add_task") as mock_add:
+        with patch.object(
+            progress_service._post_processing_progress, "add_task"
+        ) as mock_add:
             mock_add.return_value = TaskID(1)
 
-            task_id = await progress_service.create_verification_task("corrupt_file.zip")
+            task_id = await progress_service.create_verification_task(
+                "corrupt_file.zip"
+            )
 
             # Simulate verification failure
             await progress_service.finish_task(
-                task_id, success=False, final_description="Checksum verification failed"
+                task_id,
+                success=False,
+                final_description="Checksum verification failed",
             )
 
             task = progress_service._tasks[task_id]
@@ -528,13 +622,19 @@ class TestProgressService:
             assert "verification failed" in task.description.lower()
 
     @pytest.mark.asyncio
-    async def test_icon_extraction_error(self, progress_service: ProgressService) -> None:
+    async def test_icon_extraction_error(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test handling icon extraction errors."""
         progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._post_processing_progress, "add_task") as mock_add:
+        with patch.object(
+            progress_service._post_processing_progress, "add_task"
+        ) as mock_add:
             mock_add.return_value = TaskID(1)
 
-            task_id = await progress_service.create_icon_extraction_task("invalid_exe.exe")
+            task_id = await progress_service.create_icon_extraction_task(
+                "invalid_exe.exe"
+            )
 
             # Simulate extraction failure
             await progress_service.finish_task(
@@ -548,14 +648,20 @@ class TestProgressService:
             assert "extraction failed" in task.description.lower()
 
     @pytest.mark.asyncio
-    async def test_concurrent_task_updates(self, progress_service: ProgressService) -> None:
+    async def test_concurrent_task_updates(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test concurrent task updates don't cause race conditions."""
         progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._download_progress, "add_task") as mock_add:
+        with patch.object(
+            progress_service._download_progress, "add_task"
+        ) as mock_add:
             mock_add.return_value = TaskID(1)
 
             task_id = await progress_service.add_task(
-                name="concurrent_file", progress_type=ProgressType.DOWNLOAD, total=100.0
+                name="concurrent_file",
+                progress_type=ProgressType.DOWNLOAD,
+                total=100.0,
             )
 
             # Simulate concurrent updates
@@ -571,17 +677,25 @@ class TestProgressService:
             assert task_id in progress_service._tasks
 
     @pytest.mark.asyncio
-    async def test_task_update_total_change(self, progress_service: ProgressService) -> None:
+    async def test_task_update_total_change(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test updating task total during progress."""
         progress_service._active = True  # Make active for this test
         with (
-            patch.object(progress_service._download_progress, "add_task") as mock_add,
-            patch.object(progress_service._download_progress, "update") as mock_update,
+            patch.object(
+                progress_service._download_progress, "add_task"
+            ) as mock_add,
+            patch.object(
+                progress_service._download_progress, "update"
+            ) as mock_update,
         ):
             mock_add.return_value = TaskID(1)
 
             task_id = await progress_service.add_task(
-                name="variable_size_file", progress_type=ProgressType.DOWNLOAD, total=100.0
+                name="variable_size_file",
+                progress_type=ProgressType.DOWNLOAD,
+                total=100.0,
             )
 
             # Update total size mid-download
@@ -590,7 +704,9 @@ class TestProgressService:
             task = progress_service._tasks[task_id]
             assert task.total == 200.0
 
-    def test_speed_calculation_edge_cases(self, progress_service: ProgressService) -> None:
+    def test_speed_calculation_edge_cases(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test speed calculation with edge cases."""
         # Test zero time difference
         task = TaskInfo(
@@ -673,10 +789,12 @@ class TestErrorScenarios:
     """Test various error scenarios and edge cases."""
 
     @pytest.mark.asyncio
-    async def test_multiple_session_starts(self, progress_service: ProgressService) -> None:
+    async def test_multiple_session_starts(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test starting multiple sessions doesn't break anything."""
         progress_service._active = False  # Start inactive for this test
-        with patch("my_unicorn.services.progress.Live") as mock_live_cls:
+        with patch("my_unicorn.progress.Live") as mock_live_cls:
             mock_live = Mock()
             mock_live_cls.return_value = mock_live
 
@@ -690,7 +808,7 @@ class TestErrorScenarios:
 
     @pytest.mark.asyncio
     async def test_stop_session_multiple_times(
-        self, progress_service: ProgressService
+        self, progress_service: ProgressDisplay
     ) -> None:
         """Test stopping session multiple times doesn't break anything."""
         mock_live = Mock()
@@ -705,7 +823,7 @@ class TestErrorScenarios:
 
     @pytest.mark.asyncio
     async def test_task_operations_when_not_active(
-        self, progress_service: ProgressService
+        self, progress_service: ProgressDisplay
     ) -> None:
         """Test task operations when service is not active."""
         # Set service as inactive
@@ -714,20 +832,26 @@ class TestErrorScenarios:
         # Should raise RuntimeError when trying to add task while inactive
         with pytest.raises(RuntimeError, match="Progress session not active"):
             await progress_service.add_task(
-                name="test_file", progress_type=ProgressType.DOWNLOAD, total=100.0
+                name="test_file",
+                progress_type=ProgressType.DOWNLOAD,
+                total=100.0,
             )
 
     @pytest.mark.asyncio
     async def test_finish_already_finished_task(
-        self, progress_service: ProgressService
+        self, progress_service: ProgressDisplay
     ) -> None:
         """Test finishing a task that's already finished."""
         progress_service._active = True  # Make active for this test
-        with patch.object(progress_service._download_progress, "add_task") as mock_add:
+        with patch.object(
+            progress_service._download_progress, "add_task"
+        ) as mock_add:
             mock_add.return_value = TaskID(1)
 
             task_id = await progress_service.add_task(
-                name="test_file", progress_type=ProgressType.DOWNLOAD, total=100.0
+                name="test_file",
+                progress_type=ProgressType.DOWNLOAD,
+                total=100.0,
             )
 
             # Finish it once
@@ -741,17 +865,25 @@ class TestErrorScenarios:
             assert task.success is True  # First finish call wins
 
     @pytest.mark.asyncio
-    async def test_update_task_beyond_total(self, progress_service: ProgressService) -> None:
+    async def test_update_task_beyond_total(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test updating task progress beyond total."""
         progress_service._active = True  # Make active for this test
         with (
-            patch.object(progress_service._download_progress, "add_task") as mock_add,
-            patch.object(progress_service._download_progress, "update") as mock_update,
+            patch.object(
+                progress_service._download_progress, "add_task"
+            ) as mock_add,
+            patch.object(
+                progress_service._download_progress, "update"
+            ) as mock_update,
         ):
             mock_add.return_value = TaskID(1)
 
             task_id = await progress_service.add_task(
-                name="test_file", progress_type=ProgressType.DOWNLOAD, total=100.0
+                name="test_file",
+                progress_type=ProgressType.DOWNLOAD,
+                total=100.0,
             )
 
             # Update beyond total - should be clamped to total based on implementation
@@ -760,12 +892,20 @@ class TestErrorScenarios:
             task = progress_service._tasks[task_id]
             assert task.completed == 100.0  # Should be clamped to total
 
-    def test_task_counter_isolation(self, progress_service: ProgressService) -> None:
+    def test_task_counter_isolation(
+        self, progress_service: ProgressDisplay
+    ) -> None:
         """Test that task counters are isolated per progress type."""
         # Generate IDs for different types
-        download_id1 = progress_service._generate_namespaced_id(ProgressType.DOWNLOAD, "file1")
-        download_id2 = progress_service._generate_namespaced_id(ProgressType.DOWNLOAD, "file2")
-        api_id1 = progress_service._generate_namespaced_id(ProgressType.API_FETCHING, "api1")
+        download_id1 = progress_service._generate_namespaced_id(
+            ProgressType.DOWNLOAD, "file1"
+        )
+        download_id2 = progress_service._generate_namespaced_id(
+            ProgressType.DOWNLOAD, "file2"
+        )
+        api_id1 = progress_service._generate_namespaced_id(
+            ProgressType.API_FETCHING, "api1"
+        )
 
         # Each type should have its own counter
         assert download_id1.startswith("dl_1_")
@@ -774,17 +914,23 @@ class TestErrorScenarios:
 
     @pytest.mark.asyncio
     async def test_progress_update_methods_comprehensive(
-        self, progress_service: ProgressService
+        self, progress_service: ProgressDisplay
     ) -> None:
         """Test different progress update methods including advance and description."""
         progress_service._active = True
         with (
-            patch.object(progress_service._post_processing_progress, "add_task") as mock_add,
-            patch.object(progress_service._post_processing_progress, "update") as mock_update,
+            patch.object(
+                progress_service._post_processing_progress, "add_task"
+            ) as mock_add,
+            patch.object(
+                progress_service._post_processing_progress, "update"
+            ) as mock_update,
         ):
             mock_add.return_value = TaskID(1)
 
-            task_id = await progress_service.create_verification_task("test.AppImage")
+            task_id = await progress_service.create_verification_task(
+                "test.AppImage"
+            )
 
             # Test absolute completion update
             await progress_service.update_task(task_id, completed=25.0)
@@ -806,7 +952,7 @@ class TestErrorScenarios:
     @pytest.mark.asyncio
     async def test_basic_progress_operations_with_session(self) -> None:
         """Test basic progress operations with proper session management."""
-        service = ProgressService()
+        service = ProgressDisplay()
 
         # Test session management
         await service.start_session(total_operations=1)

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from my_unicorn.desktop import (
+from my_unicorn.desktop_entry import (
     DesktopEntry,
     create_desktop_entry_for_app,
     remove_desktop_entry_for_app,
@@ -35,7 +35,9 @@ def test_create_and_remove_desktop_file(desktop_entry, tmp_path):
     desktop_dir = tmp_path / "applications"
     desktop_dir.mkdir()
     desktop_entry.get_desktop_dirs = lambda: [desktop_dir]
-    file_path = desktop_entry.create_desktop_file(target_dir=desktop_dir, comment="Test app")
+    file_path = desktop_entry.create_desktop_file(
+        target_dir=desktop_dir, comment="Test app"
+    )
     assert file_path.exists()
     assert desktop_entry.is_installed()
     assert "Test app" in file_path.read_text()
@@ -49,7 +51,9 @@ def test_update_desktop_file(desktop_entry, tmp_path):
     desktop_dir = tmp_path / "applications"
     desktop_dir.mkdir()
     desktop_entry.get_desktop_dirs = lambda: [desktop_dir]
-    file_path = desktop_entry.create_desktop_file(target_dir=desktop_dir, comment="Test app")
+    file_path = desktop_entry.create_desktop_file(
+        target_dir=desktop_dir, comment="Test app"
+    )
     # Update with new comment
     updated = desktop_entry.update_desktop_file(comment="Updated app")
     assert updated.exists()
@@ -59,7 +63,9 @@ def test_update_desktop_file(desktop_entry, tmp_path):
 def test_validate_desktop_file(desktop_entry, tmp_path):
     desktop_dir = tmp_path / "applications"
     desktop_dir.mkdir()
-    file_path = desktop_entry.create_desktop_file(target_dir=desktop_dir, comment="Test app")
+    file_path = desktop_entry.create_desktop_file(
+        target_dir=desktop_dir, comment="Test app"
+    )
     errors = desktop_entry.validate_desktop_file(file_path)
     assert errors == []
     # Remove AppImage file to trigger error
@@ -78,11 +84,16 @@ def test_browser_detection_and_mime_types(tmp_path):
 def test_should_update_desktop_file_logic(desktop_entry):
     old_content = desktop_entry.generate_desktop_content(comment="Old")
     new_content = desktop_entry.generate_desktop_content(comment="New")
-    assert desktop_entry._should_update_desktop_file(old_content, new_content) is True
+    assert (
+        desktop_entry._should_update_desktop_file(old_content, new_content)
+        is True
+    )
 
 
 def test_refresh_desktop_database(monkeypatch, desktop_entry):
-    monkeypatch.setattr("shutil.which", lambda cmd: "/usr/bin/update-desktop-database")
+    monkeypatch.setattr(
+        "shutil.which", lambda cmd: "/usr/bin/update-desktop-database"
+    )
     monkeypatch.setattr("subprocess.run", MagicMock(return_value=None))
     assert desktop_entry.refresh_desktop_database() is True
 
@@ -103,7 +114,12 @@ def test_remove_desktop_entry_for_app(tmp_path):
     appimage_path = tmp_path / "testapp.AppImage"
     appimage_path.write_text("run")
     entry = DesktopEntry("testapp", appimage_path)
-    file_path = entry.create_desktop_file(target_dir=tmp_path, comment="Test app")
+    file_path = entry.create_desktop_file(
+        target_dir=tmp_path, comment="Test app"
+    )
     assert file_path.exists()
     # Remove using helper
-    assert remove_desktop_entry_for_app("testapp", config_manager=None) in [True, False]
+    assert remove_desktop_entry_for_app("testapp", config_manager=None) in [
+        True,
+        False,
+    ]

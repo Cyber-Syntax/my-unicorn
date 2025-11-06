@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+    arch:
+        build:
+            context: ..
+            dockerfile: container/Dockerfile
+            args:
+                USER_UID: ${USER_UID:-1000}
+                USER_GID: ${USER_GID:-1000}
+        container_name: my-unicorn-arch
+        hostname: arch-dev
+        restart: unless-stopped
+        volumes:
+            # Persistent .config directory (isolated from host)
+            # - my-unicorn-arch-config:/home/devuser/.config
+            # Source volume for the project directory, Z for SELinux
+            - ..:/home/devuser/my-unicorn:Z
+        working_dir: /home/devuser/my-unicorn
+        environment:
+            - DISTRO=arch
+            - XDG_CONFIG_HOME=/home/devuser/.config
+        tty: true
+        stdin_open: true

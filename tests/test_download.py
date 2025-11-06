@@ -5,6 +5,7 @@ import pytest
 import pytest_asyncio
 
 from my_unicorn.download import DownloadService
+from my_unicorn.github_client import Asset
 
 
 @pytest_asyncio.fixture
@@ -29,7 +30,9 @@ def patch_logger():
 @pytest_asyncio.fixture
 def patch_progress_service():
     """Patch progress service to avoid real progress bars."""
-    with patch("my_unicorn.download.get_progress_service") as mock_progress_service:
+    with patch(
+        "my_unicorn.download.get_progress_service"
+    ) as mock_progress_service:
         mock_service = MagicMock()
         mock_service.add_task = AsyncMock(return_value="task-id")
         mock_service.update_task = AsyncMock()
@@ -53,11 +56,16 @@ async def test_download_file_success(
     mock_response = AsyncMock()
     mock_response.__aenter__.return_value = mock_response
     mock_response.headers = {"Content-Length": str(len(content))}
-    mock_response.content.iter_chunked = lambda size: async_chunk_gen([content])
+    mock_response.content.iter_chunked = lambda size: async_chunk_gen(
+        [content]
+    )
     mock_response.raise_for_status = MagicMock()
     mock_session.get.return_value = mock_response
 
-    with patch("my_unicorn.download.logger.progress_context", return_value=patch_logger):
+    with patch(
+        "my_unicorn.download.logger.progress_context",
+        return_value=patch_logger,
+    ):
         service = DownloadService(mock_session)
         await service.download_file(
             url="http://example.com/file.bin",
@@ -78,11 +86,18 @@ async def test_download_file_error(
     mock_response = AsyncMock()
     mock_response.__aenter__.return_value = mock_response
     mock_response.headers = {"Content-Length": str(len(content))}
-    mock_response.content.iter_chunked = lambda size: async_chunk_gen([content])
-    mock_response.raise_for_status = MagicMock(side_effect=Exception("Network error"))
+    mock_response.content.iter_chunked = lambda size: async_chunk_gen(
+        [content]
+    )
+    mock_response.raise_for_status = MagicMock(
+        side_effect=Exception("Network error")
+    )
     mock_session.get.return_value = mock_response
 
-    with patch("my_unicorn.download.logger.progress_context", return_value=patch_logger):
+    with patch(
+        "my_unicorn.download.logger.progress_context",
+        return_value=patch_logger,
+    ):
         service = DownloadService(mock_session)
         with pytest.raises(Exception):
             await service.download_file(
@@ -97,16 +112,26 @@ async def test_download_appimage_success(
     tmp_file, mock_session, patch_logger, patch_progress_service
 ):
     """Test DownloadService.download_appimage downloads AppImage successfully."""
-    asset = {"browser_download_url": "http://example.com/appimage"}
+    asset = Asset(
+        name="test.AppImage",
+        size=100,
+        browser_download_url="http://example.com/appimage",
+        digest=None,
+    )
     content = b"appimage"
     mock_response = AsyncMock()
     mock_response.__aenter__.return_value = mock_response
     mock_response.headers = {"Content-Length": str(len(content))}
-    mock_response.content.iter_chunked = lambda size: async_chunk_gen([content])
+    mock_response.content.iter_chunked = lambda size: async_chunk_gen(
+        [content]
+    )
     mock_response.raise_for_status = MagicMock()
     mock_session.get.return_value = mock_response
 
-    with patch("my_unicorn.download.logger.progress_context", return_value=patch_logger):
+    with patch(
+        "my_unicorn.download.logger.progress_context",
+        return_value=patch_logger,
+    ):
         service = DownloadService(mock_session)
         result = await service.download_appimage(asset, tmp_file)
     assert result == tmp_file
@@ -117,7 +142,10 @@ async def test_download_appimage_success(
 async def test_download_icon_exists(tmp_file, mock_session, patch_logger):
     """Test DownloadService.download_icon returns early if icon exists."""
     tmp_file.write_bytes(b"icon")
-    icon = {"icon_url": "http://example.com/icon", "icon_filename": tmp_file.name}
+    icon = {
+        "icon_url": "http://example.com/icon",
+        "icon_filename": tmp_file.name,
+    }
     service = DownloadService(mock_session)
     with patch("my_unicorn.download.logger.info") as info_mock:
         result = await service.download_icon(icon, tmp_file)
@@ -130,13 +158,16 @@ async def test_download_icon_download(
     tmp_file, mock_session, patch_logger, patch_progress_service
 ):
     """Test DownloadService.download_icon downloads icon file."""
-    icon = {"icon_url": "http://example.com/icon", "icon_filename": tmp_file.name}
+    icon = {
+        "icon_url": "http://example.com/icon",
+        "icon_filename": tmp_file.name,
+    }
     # Patch download_file to simulate file writing
     with patch.object(
         DownloadService, "download_file", new_callable=AsyncMock
     ) as mock_download_file:
-        mock_download_file.side_effect = lambda url, dest, **kwargs: dest.write_bytes(
-            b"icondata"
+        mock_download_file.side_effect = (
+            lambda url, dest, **kwargs: dest.write_bytes(b"icondata")
         )
         service = DownloadService(mock_session)
         result = await service.download_icon(icon, tmp_file)
@@ -164,9 +195,14 @@ async def test_download_checksum_file_success(mock_session, patch_logger):
     mock_response.raise_for_status = MagicMock()
     mock_session.get.return_value = mock_response
 
-    with patch("my_unicorn.download.logger.progress_context", return_value=patch_logger):
+    with patch(
+        "my_unicorn.download.logger.progress_context",
+        return_value=patch_logger,
+    ):
         service = DownloadService(mock_session)
-        result = await service.download_checksum_file("http://example.com/checksum.txt")
+        result = await service.download_checksum_file(
+            "http://example.com/checksum.txt"
+        )
     assert result == content
 
 
@@ -175,13 +211,20 @@ async def test_download_checksum_file_error(mock_session, patch_logger):
     """Test download_checksum_file raises on error."""
     mock_response = AsyncMock()
     mock_response.__aenter__.return_value = mock_response
-    mock_response.raise_for_status = MagicMock(side_effect=Exception("Checksum error"))
+    mock_response.raise_for_status = MagicMock(
+        side_effect=Exception("Checksum error")
+    )
     mock_session.get.return_value = mock_response
 
-    with patch("my_unicorn.download.logger.progress_context", return_value=patch_logger):
+    with patch(
+        "my_unicorn.download.logger.progress_context",
+        return_value=patch_logger,
+    ):
         service = DownloadService(mock_session)
         with pytest.raises(Exception):
-            await service.download_checksum_file("http://example.com/checksum.txt")
+            await service.download_checksum_file(
+                "http://example.com/checksum.txt"
+            )
 
 
 def test_download_error_exception():

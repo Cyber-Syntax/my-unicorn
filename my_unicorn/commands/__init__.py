@@ -7,17 +7,17 @@ the core functionality for each CLI command.
 from .auth import AuthHandler
 from .base import BaseCommandHandler
 from .config import ConfigHandler
-from .install import InstallHandler
+from .install import InstallCommandHandler
 from .list import ListHandler
 from .remove import RemoveHandler
 from .update import UpdateHandler
 from .upgrade import UpgradeHandler
 
 __all__ = [
-    "BaseCommandHandler",
     "AuthHandler",
+    "BaseCommandHandler",
     "ConfigHandler",
-    "InstallHandler",
+    "InstallCommandHandler",
     "ListHandler",
     "RemoveHandler",
     "UpdateHandler",

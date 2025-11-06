@@ -2,41 +2,33 @@
 
 This module handles communication with the GitHub API to fetch release
 information, extract AppImage assets, and manage GitHub-specific operations.
+
+Refactored to use dataclasses and improved separation of concerns.
 """
 
-from dataclasses import dataclass
-from typing import Any, TypedDict, cast
-from urllib.parse import urlparse
+import os
+import re
+from dataclasses import dataclass, replace
+from typing import Any
 
 import aiohttp
 
 from .auth import GitHubAuthManager, auth_manager
+from .cache import get_cache_manager
 from .logger import get_logger
-from .services.cache import get_cache_manager
-from .services.progress import get_progress_service
+from .progress import get_progress_service
 from .utils import (
+    SPECIFIC_CHECKSUM_EXTENSIONS,
     extract_and_validate_version,
     get_checksum_file_format_type,
+    is_appimage_file,
     is_checksum_file,
 )
 
 logger = get_logger(__name__)
 
-
-class GitHubAsset(TypedDict):
-    name: str
-    size: int
-    digest: str
-    browser_download_url: str
-
-
-class GitHubReleaseDetails(TypedDict):
-    owner: str
-    repo: str
-    version: str
-    prerelease: bool
-    assets: list[GitHubAsset]
-    original_tag_name: str
+# Constants
+HTTP_NOT_FOUND = 404
 
 
 @dataclass(slots=True, frozen=True)
@@ -48,86 +40,122 @@ class ChecksumFileInfo:
     format_type: str  # 'yaml' or 'traditional'
 
 
-class GitHubReleaseFetcher:
-    """Fetches GitHub release information and extracts AppImage assets."""
+@dataclass(slots=True, frozen=True)
+class Asset:
+    """Represents a GitHub release asset.
 
-    def __init__(
-        self,
-        owner: str,
-        repo: str,
-        session: aiohttp.ClientSession,
-        shared_api_task_id: str | None = None,
-        use_cache: bool = True,
-    ) -> None:
-        """Initialize the GitHub release fetcher.
+    Attributes:
+        name: Asset filename
+        size: Asset size in bytes
+        digest: Asset digest/hash (may be empty)
+        browser_download_url: Direct download URL for the asset
 
-        Args:
-            owner: GitHub repository owner
-            repo: GitHub repository name
-            session: aiohttp session for making requests
-            shared_api_task_id: Optional shared API progress task ID for consolidated progress
-            use_cache: Whether to use persistent caching (default: True)
+    """
 
-        """
-        self.owner: str = owner
-        self.repo: str = repo
-        self.auth_manager: GitHubAuthManager = auth_manager
-        self.api_url: str = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
-        self.session = session
-        self.progress_service = get_progress_service()
-        self.shared_api_task_id = shared_api_task_id
-        self.use_cache = use_cache
-        self.cache_manager = get_cache_manager() if use_cache else None
+    name: str
+    size: int
+    digest: str
+    browser_download_url: str
 
-    def set_shared_api_task(self, task_id: str | None) -> None:
-        """Set the shared API progress task ID.
+    @classmethod
+    def from_api_response(cls, asset_data: dict[str, Any]) -> "Asset | None":
+        """Create Asset from GitHub API response data.
 
         Args:
-            task_id: Shared API progress task ID or None to disable
+            asset_data: Raw asset data from GitHub API
+
+        Returns:
+            Asset instance or None if required fields are missing
 
         """
-        self.shared_api_task_id = task_id
-
-    async def _update_shared_progress(self, description: str) -> None:
-        """Update shared API progress task with ultra-simple approach.
-
-        Shows current API request count as 100% (1/1, 2/2, 3/3, etc.)
-        No prediction, no complex estimation - just real-time request counting.
-
-        Args:
-            description: Description to show for the current API request
-
-        """
-        if not self.shared_api_task_id or not self.progress_service.is_active():
-            return
-
         try:
-            # Get current progress info
-            task_info = self.progress_service.get_task_info(self.shared_api_task_id)
-            if task_info:
-                new_completed = int(task_info.completed) + 1
+            name = asset_data.get("name", "")
+            size = asset_data.get("size", 0)
+            download_url = asset_data.get("browser_download_url", "")
+            digest = asset_data.get("digest", "")
 
-                # Ultra-simple: total always equals completed (always shows 100%)
-                await self.progress_service.update_task_total(
-                    self.shared_api_task_id, float(new_completed)
-                )
-                await self.progress_service.update_task(
-                    self.shared_api_task_id,
-                    completed=float(new_completed),
-                    description=f"🌐 {description} ({new_completed}/{new_completed})",
-                )
+            if not name or not download_url:
+                return None
 
-                # Force immediate display refresh
-                if hasattr(self.progress_service, "_refresh_live_display"):
-                    self.progress_service._refresh_live_display()
-        except Exception:
-            # Don't let progress updates crash the main operation
-            pass
+            return cls(
+                name=name,
+                size=int(size),
+                digest=digest,
+                browser_download_url=download_url,
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
 
-    def _normalize_version(self, tag_name: str) -> str:
+    def is_appimage(self) -> bool:
+        """Check if this asset is an AppImage file.
+
+        Returns:
+            True if asset is an AppImage, False otherwise
+
+        """
+        name_lower = self.name.lower()
+        return name_lower.endswith(".appimage")
+
+
+@dataclass(slots=True, frozen=True)
+class Release:
+    """Represents a GitHub release with its metadata and assets.
+
+    Attributes:
+        owner: Repository owner
+        repo: Repository name
+        version: Normalized version string
+        prerelease: Whether this is a prerelease
+        assets: List of release assets
+        original_tag_name: Original tag name from GitHub
+
+    """
+
+    owner: str
+    repo: str
+    version: str
+    prerelease: bool
+    assets: list[Asset]
+    original_tag_name: str
+
+    @classmethod
+    def from_api_response(
+        cls, owner: str, repo: str, api_data: dict[str, Any]
+    ) -> "Release":
+        """Create Release from GitHub API response data.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            api_data: Raw release data from GitHub API
+
+        Returns:
+            Release instance
+
+        """
+        tag_name = api_data.get("tag_name", "")
+        version = cls._normalize_version(tag_name)
+        prerelease = api_data.get("prerelease", False)
+
+        # Convert assets
+        assets = []
+        for asset_data in api_data.get("assets", []):
+            asset = Asset.from_api_response(asset_data)
+            if asset:
+                assets.append(asset)
+
+        return cls(
+            owner=owner,
+            repo=repo,
+            version=version,
+            prerelease=prerelease,
+            assets=assets,
+            original_tag_name=tag_name,
+        )
+
+    @staticmethod
+    def _normalize_version(tag_name: str) -> str:
         """Normalize version by extracting and sanitizing version string.
-
-        Handles various formats including package@version and v-prefixed versions.
 
         Args:
             tag_name: Version tag that may have 'v' prefix or package format
@@ -139,601 +167,156 @@ class GitHubReleaseFetcher:
         if not tag_name:
             return ""
 
-        # Use the comprehensive version extraction and validation
         normalized = extract_and_validate_version(tag_name)
-
-        # Fall back to original logic if extraction fails
         if normalized is None:
             return tag_name.lstrip("v")
 
         return normalized
 
-    @staticmethod
-    def detect_checksum_files(
-        assets: list[GitHubAsset],
-        tag_name: str,
-    ) -> list[ChecksumFileInfo]:
-        """Detect checksum files in GitHub release assets.
-
-        Args:
-            assets: List of GitHub release assets
-            tag_name: Release tag name
+    def to_dict(self) -> dict[str, Any]:
+        """Convert Release to dictionary for caching.
 
         Returns:
-            List of detected checksum files with their info
+            Dictionary representation suitable for JSON serialization
 
         """
-        checksum_files = []
+        return {
+            "owner": self.owner,
+            "repo": self.repo,
+            "version": self.version,
+            "prerelease": self.prerelease,
+            "assets": [
+                {
+                    "name": asset.name,
+                    "size": asset.size,
+                    "digest": asset.digest,
+                    "browser_download_url": asset.browser_download_url,
+                }
+                for asset in self.assets
+            ],
+            "original_tag_name": self.original_tag_name,
+        }
 
-        for asset in assets:
-            asset_name = asset["name"]
-
-            # Use the consolidated checksum file detection from utils
-            if is_checksum_file(asset_name):
-                url = asset["browser_download_url"]
-                format_type = get_checksum_file_format_type(asset_name)
-
-                checksum_files.append(
-                    ChecksumFileInfo(filename=asset_name, url=url, format_type=format_type)
-                )
-
-        # Prioritize YAML files (like latest-linux.yml) first as they're often more reliable
-        checksum_files.sort(key=lambda x: (x.format_type != "yaml", x.filename))
-
-        return checksum_files
-
-    async def _try_fetch_stable_release(
-        self, ignore_cache: bool = False
-    ) -> GitHubReleaseDetails | None:
-        """Try to fetch the latest stable release, returning None if not found.
-
-        This is a helper method that doesn't raise exceptions for expected "no releases" scenarios.
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Release":
+        """Create Release from dictionary (e.g., from cache).
 
         Args:
-            ignore_cache: If True, bypass cache and fetch fresh data from API
+            data: Dictionary representation of a release
 
         Returns:
-            Release details if found, None if no stable releases exist
-
-        Raises:
-            aiohttp.ClientError: If there are actual API/network errors
+            Release instance
 
         """
-        try:
-            # Check cache first (unless bypassed)
-            if self.cache_manager and not ignore_cache:
-                cached_data = await self.cache_manager.get_cached_release(
-                    self.owner, self.repo, cache_type="stable"
-                )
-                if cached_data:
-                    logger.debug(
-                        "Using cached stable release data for %s/%s", self.owner, self.repo
-                    )
-                    # Convert cached data back to GitHubReleaseDetails
-                    return GitHubReleaseDetails(
-                        owner=cached_data["owner"],
-                        repo=cached_data["repo"],
-                        version=cached_data["version"],
-                        prerelease=cached_data["prerelease"],
-                        assets=cached_data["assets"],
-                        original_tag_name=cached_data["original_tag_name"],
-                    )
-
-            # Fetch from API
-            headers = GitHubAuthManager.apply_auth({})
-
-            async with self.session.get(url=self.api_url, headers=headers) as response:
-                if response.status == 404:
-                    # Repository not found or no releases - this is expected for some apps
-                    return None
-
-                response.raise_for_status()
-
-                # Update rate limit information
-                self.auth_manager.update_rate_limit_info(dict(response.headers))
-
-                data = await response.json()
-
-                # Check if this is actually a prerelease (some repos only have prereleases)
-                if data.get("prerelease", False):
-                    return None
-
-                # Update shared progress if available
-                if self.shared_api_task_id and self.progress_service.is_active():
-                    await self._update_shared_progress("Fetched stable release")
-
-                release_details = GitHubReleaseDetails(
-                    owner=self.owner,
-                    repo=self.repo,
-                    version=self._normalize_version(data.get("tag_name", "")),
-                    prerelease=data.get("prerelease", False),
-                    assets=[
-                        asset_obj
-                        for asset in data.get("assets", [])
-                        if (asset_obj := self.to_github_asset(asset)) is not None
-                    ],
-                    original_tag_name=data.get("tag_name", ""),
-                )
-
-                # Save to cache for future use
-                if self.cache_manager:
-                    await self.cache_manager.save_release_data(
-                        self.owner, self.repo, dict(release_details), cache_type="stable"
-                    )
-                    logger.debug("Cached stable release data for %s/%s", self.owner, self.repo)
-
-                return release_details
-
-        except aiohttp.ClientResponseError as e:
-            if e.status == 404:
-                # Repository not found or no releases
-                return None
-            # Re-raise other HTTP errors
-            raise
-        except Exception:
-            # Re-raise actual errors (network issues, etc.)
-            raise
-
-    async def _try_fetch_prerelease(
-        self, ignore_cache: bool = False
-    ) -> GitHubReleaseDetails | None:
-        """Try to fetch the latest prerelease, returning None if not found.
-
-        This is a helper method that doesn't raise exceptions for expected "no releases" scenarios.
-
-        Args:
-            ignore_cache: If True, bypass cache and fetch fresh data from API
-
-        Returns:
-            Release details if found, None if no prereleases exist
-
-        Raises:
-            aiohttp.ClientError: If there are actual API/network errors
-
-        """
-        try:
-            # Check cache first (unless bypassed)
-            if self.cache_manager and not ignore_cache:
-                cached_data = await self.cache_manager.get_cached_release(
-                    self.owner, self.repo, cache_type="prerelease"
-                )
-                if cached_data:
-                    logger.debug(
-                        "Using cached prerelease data for %s/%s", self.owner, self.repo
-                    )
-                    # Convert cached data back to GitHubReleaseDetails
-                    return GitHubReleaseDetails(
-                        owner=cached_data["owner"],
-                        repo=cached_data["repo"],
-                        version=cached_data["version"],
-                        prerelease=cached_data["prerelease"],
-                        assets=cached_data["assets"],
-                        original_tag_name=cached_data["original_tag_name"],
-                    )
-
-            # Fetch from API
-            url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases"
-            headers = GitHubAuthManager.apply_auth({})
-
-            async with self.session.get(url=url, headers=headers) as response:
-                if response.status == 404:
-                    # Repository not found or no releases
-                    return None
-
-                response.raise_for_status()
-
-                # Update rate limit information
-                self.auth_manager.update_rate_limit_info(dict(response.headers))
-
-                data = await response.json()
-
-                # Find the latest prerelease
-                latest_prerelease = None
-                for release in data:
-                    if release.get("prerelease", False):
-                        latest_prerelease = release
-                        break
-
-                if not latest_prerelease:
-                    return None
-
-                # Update shared progress if available
-                if self.shared_api_task_id and self.progress_service.is_active():
-                    await self._update_shared_progress("Fetched prerelease")
-
-                release_details = GitHubReleaseDetails(
-                    owner=self.owner,
-                    repo=self.repo,
-                    version=self._normalize_version(latest_prerelease.get("tag_name", "")),
-                    prerelease=latest_prerelease.get("prerelease", False),
-                    assets=[
-                        asset_obj
-                        for asset in latest_prerelease.get("assets", [])
-                        if (asset_obj := self.to_github_asset(asset)) is not None
-                    ],
-                    original_tag_name=latest_prerelease.get("tag_name", ""),
-                )
-
-                # Cache the prerelease data
-                if self.cache_manager:
-                    await self.cache_manager.save_release_data(
-                        self.owner, self.repo, dict(release_details), cache_type="prerelease"
-                    )
-                    logger.debug("Cached prerelease data for %s/%s", self.owner, self.repo)
-
-                return release_details
-
-        except aiohttp.ClientResponseError as e:
-            if e.status == 404:
-                # Repository not found or no releases
-                return None
-            # Re-raise other HTTP errors
-            raise
-        except Exception:
-            # Re-raise actual errors (network issues, etc.)
-            raise
-
-    async def fetch_latest_release(self, ignore_cache: bool = False) -> GitHubReleaseDetails:
-        """Fetch the latest release information from GitHub API.
-
-        Args:
-            ignore_cache: If True, bypass cache and fetch fresh data from API
-
-        Returns:
-            Release details including assets
-
-        Raises:
-            aiohttp.ClientError: If the API request fails
-
-        """
-        # Check cache first (unless bypassed)
-        if self.use_cache and self.cache_manager and not ignore_cache:
-            cached_data = await self.cache_manager.get_cached_release(self.owner, self.repo)
-            if cached_data:
-                logger.debug("Using cached data for %s/%s", self.owner, self.repo)
-                # Convert cached data back to GitHubReleaseDetails
-                return GitHubReleaseDetails(
-                    owner=cached_data["owner"],
-                    repo=cached_data["repo"],
-                    version=cached_data["version"],
-                    prerelease=cached_data["prerelease"],
-                    assets=cached_data["assets"],
-                    original_tag_name=cached_data["original_tag_name"],
-                )
-
-        # Fetch from API
-        try:
-            headers = GitHubAuthManager.apply_auth({})
-
-            async with self.session.get(url=self.api_url, headers=headers) as response:
-                response.raise_for_status()
-
-                # Update rate limit information
-                self.auth_manager.update_rate_limit_info(dict(response.headers))
-
-                data = await response.json()
-
-                # Update shared progress if available
-                if self.shared_api_task_id and self.progress_service.is_active():
-                    await self._update_shared_progress("Fetched ")
-
-                release_details = GitHubReleaseDetails(
-                    owner=self.owner,
-                    repo=self.repo,
-                    version=self._normalize_version(data.get("tag_name", "")),
-                    prerelease=data.get("prerelease", False),
-                    assets=[
-                        asset_obj
-                        for asset in data.get("assets", [])
-                        if (asset_obj := self.to_github_asset(asset)) is not None
-                    ],
-                    original_tag_name=data.get("tag_name", ""),
-                )
-
-                # Save to cache for future use
-                if self.use_cache and self.cache_manager:
-                    await self.cache_manager.save_release_data(
-                        self.owner, self.repo, dict(release_details)
-                    )
-                    logger.debug("Cached release data for %s/%s", self.owner, self.repo)
-
-                return release_details
-
-        except Exception:
-            # Update shared progress with error if available
-            if self.shared_api_task_id and self.progress_service.is_active():
-                await self._update_shared_progress(
-                    f"Failed to fetch release for {self.owner}/{self.repo}"
-                )
-            raise
-
-    async def fetch_specific_release(self, tag: str) -> GitHubReleaseDetails:
-        """Fetch a specific release by tag.
-
-        Args:
-            tag: Release tag to fetch
-
-        Returns:
-            Release details for the specified tag
-
-        """
-        try:
-            url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/tags/{tag}"
-            headers = GitHubAuthManager.apply_auth({})
-
-            async with self.session.get(url=url, headers=headers) as response:
-                response.raise_for_status()
-
-                # Update rate limit information
-                self.auth_manager.update_rate_limit_info(dict(response.headers))
-
-                data = await response.json()
-
-                # Update shared progress if available
-                if self.shared_api_task_id and self.progress_service.is_active():
-                    await self._update_shared_progress(
-                        f"Fetched release {tag} for {self.owner}/{self.repo}"
-                    )
-
-                return GitHubReleaseDetails(
-                    owner=self.owner,
-                    repo=self.repo,
-                    version=self._normalize_version(data.get("tag_name", "")),
-                    prerelease=data.get("prerelease", False),
-                    assets=[
-                        asset_obj
-                        for asset in data.get("assets", [])
-                        if (asset_obj := self.to_github_asset(asset)) is not None
-                    ],
-                    original_tag_name=data.get("tag_name", ""),
-                )
-
-        except Exception:
-            # Update shared progress with error if available
-            if self.shared_api_task_id and self.progress_service.is_active():
-                await self._update_shared_progress(
-                    f"Failed to fetch release {tag} for {self.owner}/{self.repo}"
-                )
-            raise
-
-    async def fetch_latest_prerelease(
-        self, ignore_cache: bool = False
-    ) -> GitHubReleaseDetails:
-        """Fetch the latest prerelease from GitHub API.
-
-        This method is useful for apps like FreeTube that only provide prereleases.
-        It fetches all releases and returns the most recent prerelease.
-
-        Args:
-            ignore_cache: If True, bypass cache and fetch fresh data from API
-
-        Returns:
-            Release details for the latest prerelease
-
-        Raises:
-            aiohttp.ClientError: If the API request fails
-            ValueError: If no prerelease is found
-
-        """
-        # Check cache first (unless bypassed)
-        if self.cache_manager and not ignore_cache:
-            cached_data = await self.cache_manager.get_cached_release(
-                self.owner, self.repo, cache_type="prerelease"
+        assets = [
+            Asset(
+                name=a["name"],
+                size=a["size"],
+                digest=a.get("digest", ""),
+                browser_download_url=a["browser_download_url"],
             )
-            if cached_data:
-                logger.debug("Using cached prerelease data for %s/%s", self.owner, self.repo)
-                # Convert cached data back to GitHubReleaseDetails
-                return GitHubReleaseDetails(
-                    owner=cached_data["owner"],
-                    repo=cached_data["repo"],
-                    version=cached_data["version"],
-                    prerelease=cached_data["prerelease"],
-                    assets=cached_data["assets"],
-                    original_tag_name=cached_data["original_tag_name"],
-                )
-
-        try:
-            url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases"
-            headers = GitHubAuthManager.apply_auth({})
-
-            async with self.session.get(url=url, headers=headers) as response:
-                response.raise_for_status()
-
-                # Update rate limit information
-                self.auth_manager.update_rate_limit_info(dict(response.headers))
-
-                data = await response.json()
-
-                # Update shared progress if available
-                if self.shared_api_task_id and self.progress_service.is_active():
-                    await self._update_shared_progress(
-                        f"Fetched prereleases for {self.owner}/{self.repo}"
-                    )
-
-                # Filter for prereleases only
-                prereleases = [release for release in data if release.get("prerelease", False)]
-
-                if not prereleases:
-                    raise ValueError(f"No prereleases found for {self.owner}/{self.repo}")
-
-                # The releases are already sorted by published date (newest first)
-                latest_prerelease = prereleases[0]
-
-                release_details = GitHubReleaseDetails(
-                    owner=self.owner,
-                    repo=self.repo,
-                    version=self._normalize_version(latest_prerelease.get("tag_name", "")),
-                    prerelease=latest_prerelease.get("prerelease", False),
-                    assets=[
-                        asset_obj
-                        for asset in latest_prerelease.get("assets", [])
-                        if (asset_obj := self.to_github_asset(asset)) is not None
-                    ],
-                    original_tag_name=latest_prerelease.get("tag_name", ""),
-                )
-
-                # Cache the prerelease data
-                if self.cache_manager:
-                    await self.cache_manager.save_release_data(
-                        self.owner, self.repo, dict(release_details), cache_type="prerelease"
-                    )
-                    logger.debug("Cached prerelease data for %s/%s", self.owner, self.repo)
-
-                return release_details
-
-        except Exception:
-            # Update shared progress with error if available
-            if self.shared_api_task_id and self.progress_service.is_active():
-                await self._update_shared_progress(
-                    f"Failed to fetch prereleases for {self.owner}/{self.repo}"
-                )
-            raise
-
-    async def fetch_latest_release_or_prerelease(
-        self, prefer_prerelease: bool = False, ignore_cache: bool = False
-    ) -> GitHubReleaseDetails:
-        """Fetch the latest release or prerelease based on preference.
-
-        This method provides flexibility for apps that may have both stable releases
-        and prereleases, or apps that only provide one type.
-
-        Args:
-            prefer_prerelease: If True, prefer prereleases over stable releases.
-                              If False, prefer stable releases over prereleases.
-            ignore_cache: If True, bypass cache and fetch fresh data from API
-
-        Returns:
-            Release details for the best matching release
-
-        Raises:
-            aiohttp.ClientError: If the API request fails
-            ValueError: If no releases are found
-
-        """
-        # Use clean if/else logic instead of exception-driven control flow
-        if prefer_prerelease:
-            # First try prerelease, then stable as fallback
-            result = await self._try_fetch_prerelease(ignore_cache=ignore_cache)
-            if result is not None:
-                return result
-
-            # Fallback to stable release
-            result = await self._try_fetch_stable_release(ignore_cache=ignore_cache)
-            if result is not None:
-                return result
-        else:
-            # First try stable, then prerelease as fallback
-            result = await self._try_fetch_stable_release(ignore_cache=ignore_cache)
-            if result is not None:
-                return result
-
-            # Fallback to prerelease
-            result = await self._try_fetch_prerelease(ignore_cache=ignore_cache)
-            if result is not None:
-                return result
-
-        # If we get here, no releases were found at all
-        if self.shared_api_task_id and self.progress_service.is_active():
-            await self._update_shared_progress(
-                f"No releases found for {self.owner}/{self.repo}"
-            )
-        raise ValueError(f"No releases found for {self.owner}/{self.repo}")
-
-    def to_github_asset(self, asset: dict[str, Any]) -> GitHubAsset | None:
-        """Convert GitHub API asset response to typed GitHubAsset.
-
-        Args:
-            asset: Raw asset data from GitHub API
-
-        Returns:
-            Typed GitHubAsset or None if conversion fails
-
-        """
-        try:
-            name = asset.get("name", "")
-            size = asset.get("size", 0)
-            download_url = asset.get("browser_download_url", "")
-
-            # GitHub API doesn't always provide digest, use empty string as default
-            digest = asset.get("digest", "")
-
-            if not name or not download_url:
-                return None
-
-            return GitHubAsset(
-                name=cast(str, name),
-                digest=cast(str, digest),
-                size=cast(int, size),
-                browser_download_url=cast(str, download_url),
-            )
-        except (KeyError, TypeError, ValueError):
-            return None
-
-    def extract_appimage_asset(self, release_data: GitHubReleaseDetails) -> GitHubAsset | None:
-        """Extract the first AppImage asset from release data.
-
-        Args:
-            release_data: Release details containing assets
-
-        Returns:
-            First AppImage asset found or None
-
-        """
-        for asset in release_data["assets"]:
-            if asset["name"].endswith(".AppImage") or asset["name"].endswith(".appimage"):
-                return asset
-        return None
-
-    def extract_appimage_assets(self, release_data: GitHubReleaseDetails) -> list[GitHubAsset]:
-        """Extract all AppImage assets from release data.
-
-        Args:
-            release_data: Release details containing assets
-
-        Returns:
-            List of all AppImage assets found
-
-        """
-        return [
-            asset
-            for asset in release_data["assets"]
-            if asset["name"].endswith(".AppImage") or asset["name"].endswith(".appimage")
+            for a in data.get("assets", [])
         ]
 
-    # FIXME: too many branches
-    def select_best_appimage(
-        self,
-        release_data: GitHubReleaseDetails,
+        return cls(
+            owner=data["owner"],
+            repo=data["repo"],
+            version=data["version"],
+            prerelease=data["prerelease"],
+            assets=assets,
+            original_tag_name=data["original_tag_name"],
+        )
+
+    def get_appimages(self) -> list[Asset]:
+        """Get all AppImage assets from this release.
+
+        Returns:
+            List of AppImage assets
+
+        """
+        return [asset for asset in self.assets if asset.is_appimage()]
+
+    def filter_for_platform(self) -> "Release":
+        """Return new Release with only platform-relevant assets.
+
+        Filters assets to include only:
+        - Linux x86_64 AppImages (excludes Windows, macOS, ARM)
+        - Checksum files for compatible AppImages
+
+        This method uses AssetSelector.filter_for_cache() for consistent
+        filtering across the application.
+
+        Returns:
+            New Release instance with filtered assets
+
+        """
+        filtered_assets = AssetSelector.filter_for_cache(self.assets)
+        return replace(self, assets=filtered_assets)
+
+
+class AssetSelector:
+    """Handles selection logic for choosing the best asset from a release."""
+
+    @staticmethod
+    def find_all_appimages(release: Release) -> list[Asset]:
+        """Find all AppImage assets in a release.
+
+        Args:
+            release: Release to search
+
+        Returns:
+            List of all AppImage assets
+
+        """
+        return release.get_appimages()
+
+    @staticmethod
+    def find_first_appimage(release: Release) -> Asset | None:
+        """Find the first AppImage asset in a release.
+
+        Args:
+            release: Release to search
+
+        Returns:
+            First AppImage asset or None if no AppImages found
+
+        """
+        appimages = AssetSelector.find_all_appimages(release)
+        return appimages[0] if appimages else None
+
+    @staticmethod
+    def select_appimage_for_platform(
+        release: Release,
         preferred_suffixes: list[str] | None = None,
         installation_source: str = "catalog",
-    ) -> GitHubAsset | None:
-        """Select the best AppImage based on architecture, preferences, and installation source.
+    ) -> Asset | None:
+        """Select the best AppImage based on architecture and preferences.
 
-        This method prioritizes amd64/x86_64 architecture since that's what most users need.
-        It automatically filters out ARM architectures (arm64, aarch64, armhf, etc.) to
-        avoid complexity and focus on the most common use case.
+        Note: This method assumes the release has already been filtered
+        by filter_for_platform() which removes ARM/Windows/macOS assets.
+        Additional filtering here focuses on selecting the best variant
+        when multiple compatible AppImages exist.
 
         Selection strategy for catalog installs:
         1. Filter by preferred_suffixes if provided
-        2. Filter out ARM architectures (arm64, aarch64, armhf, armv7, armv6)
-        3. Among remaining candidates, prefer explicit x86_64/amd64 markers
-        4. Fall back to first remaining candidate
+        2. Prefer explicit x86_64/amd64 markers
+        3. Fall back to first remaining candidate
 
         Selection strategy for URL installs:
-        1. Filter out unstable versions (experimental, beta, alpha, etc.)
-        2. Filter out ARM architectures (arm64, aarch64, armhf, armv7, armv6)
+        1. Filter out unstable versions (beta, alpha, etc.)
+        2. Prefer explicit x86_64/amd64 markers
         3. Return first remaining stable candidate
 
         Args:
-            release_data: Release details containing assets
-            preferred_suffixes: List of preferred filename suffixes (e.g., ["x86_64", "linux"])
+            release: Release to select from (should be pre-filtered)
+            preferred_suffixes: List of preferred filename suffixes
             installation_source: Installation source ("catalog" or "url")
 
         Returns:
             Best matching AppImage asset or None
 
         """
-        appimages = self.extract_appimage_assets(release_data)
+        appimages = AssetSelector.find_all_appimages(release)
 
         if not appimages:
             return None
@@ -743,154 +326,724 @@ class GitHubReleaseFetcher:
 
         # Apply different strategies based on installation source
         if installation_source == "url":
-            # For URL installs: filter out unstable versions first
-            unstable_keywords = [
-                "experimental",
-                "beta",
-                "alpha",
-                "rc",
-                "pre",
-                "dev",
-                "test",
-                "nightly",
-            ]
-            stable_candidates = []
-            for appimage in appimages:
-                name_lower = appimage["name"].lower()
-                if not any(keyword in name_lower for keyword in unstable_keywords):
-                    stable_candidates.append(appimage)
-
-            candidates = stable_candidates if stable_candidates else appimages
+            # For URL installs, filter out unstable versions
+            candidates = AssetSelector._filter_unstable_versions(appimages)
+        elif preferred_suffixes:
+            # For catalog installs with suffixes, filter by them
+            candidates = AssetSelector._filter_by_preferred_suffixes(
+                appimages, preferred_suffixes
+            )
         else:
-            # For catalog installs: use preferred_suffixes matching
-            matched_appimages = []
-            if preferred_suffixes:
-                for suffix in preferred_suffixes:
-                    for appimage in appimages:
-                        if suffix.lower() in appimage["name"].lower():
-                            matched_appimages.append(appimage)
+            candidates = appimages
 
-            candidates = matched_appimages if matched_appimages else appimages
-
-        # Filter out ARM architectures to prefer amd64 (most common)
-        arm_keywords = ["arm64", "aarch64", "armhf", "armv7", "armv6"]
-        amd64_candidates = []
-        for appimage in candidates:
-            name_lower = appimage["name"].lower()
-            if not any(arm_keyword in name_lower for arm_keyword in arm_keywords):
-                amd64_candidates.append(appimage)
-
-        # If we have amd64 candidates, use those
-        if amd64_candidates:
-            candidates = amd64_candidates
-
-        # For catalog installs, prefer explicit x86_64/amd64 markers
-        if installation_source == "catalog":
-            for appimage in candidates:
-                name_lower = appimage["name"].lower()
-                if "x86_64" in name_lower or "amd64" in name_lower:
-                    return appimage
+        # Prefer explicit x86_64/amd64 markers when available
+        explicit_match = AssetSelector._find_explicit_amd64(candidates)
+        if explicit_match:
+            return explicit_match
 
         # Fallback: return first candidate
-        return candidates[0]
+        return candidates[0] if candidates else appimages[0]
 
-    # FIXME: unused, move the auth or make this to check the available rate status
-    # and use in the github api requests to prevent limit errors
-    async def check_rate_limit(self) -> dict[str, Any]:
-        """Check current rate limit status.
+    @staticmethod
+    def _filter_unstable_versions(appimages: list[Asset]) -> list[Asset]:
+        """Filter out unstable version keywords."""
+        unstable_keywords = [
+            "experimental",
+            "beta",
+            "alpha",
+            "rc",
+            "pre",
+            "dev",
+            "test",
+            "nightly",
+        ]
+        stable = [
+            app
+            for app in appimages
+            if not any(kw in app.name.lower() for kw in unstable_keywords)
+        ]
+        return stable if stable else appimages
+
+    @staticmethod
+    def _filter_by_preferred_suffixes(
+        appimages: list[Asset], preferred_suffixes: list[str] | None
+    ) -> list[Asset]:
+        """Filter assets by preferred suffixes."""
+        if not preferred_suffixes:
+            return appimages
+
+        matched = [
+            app
+            for suffix in preferred_suffixes
+            for app in appimages
+            if suffix.lower() in app.name.lower()
+        ]
+        return matched if matched else appimages
+
+    @staticmethod
+    def _find_explicit_amd64(appimages: list[Asset]) -> Asset | None:
+        """Find asset with explicit amd64/x86_64 marker."""
+        for app in appimages:
+            name_lower = app.name.lower()
+            if "x86_64" in name_lower or "amd64" in name_lower:
+                return app
+        return None
+
+    @staticmethod
+    def detect_checksum_files(
+        assets: list[Asset], tag_name: str
+    ) -> list[ChecksumFileInfo]:
+        """Detect checksum files in release assets.
+
+        Args:
+            assets: List of release assets
+            tag_name: Release tag name
 
         Returns:
-            Rate limit information from GitHub API
+            List of detected checksum files with their info
 
         """
-        url = "https://api.github.com/rate_limit"
+        checksum_files = []
+
+        for asset in assets:
+            if is_checksum_file(asset.name):
+                format_type = get_checksum_file_format_type(asset.name)
+                checksum_files.append(
+                    ChecksumFileInfo(
+                        filename=asset.name,
+                        url=asset.browser_download_url,
+                        format_type=format_type,
+                    )
+                )
+
+        # Prioritize YAML files first as they're often more reliable
+        checksum_files.sort(
+            key=lambda x: (x.format_type != "yaml", x.filename)
+        )
+
+        return checksum_files
+
+    @staticmethod
+    def is_platform_compatible(filename: str) -> bool:
+        """Check if file is compatible with Linux x86_64 platform.
+
+        Excludes:
+        - Windows files (.msi, .exe, Win64, Windows patterns)
+        - macOS files (.dmg, .pkg, mac/darwin patterns)
+        - ARM architectures (arm64, aarch64, armv7l, armhf, armv6)
+        - Source archives (tar.gz, tar.xz with -src- pattern)
+        - Experimental builds
+
+        Args:
+            filename: Filename to check
+
+        Returns:
+            True if file is compatible with Linux x86_64, False otherwise
+
+        """
+        if not filename:
+            return False
+
+        filename_lower = filename.lower()
+
+        # Check all incompatible patterns
+        incompatible_patterns = [
+            # Windows patterns
+            r"(?i)win(32|64)",
+            r"(?i)windows",
+            r"(?i)legacy.*win",
+            r"(?i)portable.*win",
+            # macOS patterns (but not "macro")
+            r"(?i)mac(?!ro)",
+            r"(?i)darwin",
+            r"(?i)osx",
+            r"(?i)apple",
+            # macOS-specific YAML files
+            r"(?i)latest.*mac.*\.ya?ml$",
+            r"(?i)mac.*latest.*\.ya?ml$",
+            # ARM architecture patterns
+            r"(?i)arm64",
+            r"(?i)aarch64",
+            r"(?i)armv7l?",
+            r"(?i)armhf",
+            r"(?i)armv6",
+            # Source archive patterns
+            r"(?i)[-_.]src[-_.]",
+            r"(?i)[-_.]source[-_.]",
+            # Experimental/unstable patterns
+            r"(?i)experimental",
+            r"(?i)qt6.*experimental",
+        ]
+
+        # Check if any pattern matches
+        for pattern in incompatible_patterns:
+            if re.search(pattern, filename):
+                return False
+
+        # Check incompatible extensions
+        incompatible_exts = (".msi", ".exe", ".dmg", ".pkg")
+        return not filename_lower.endswith(incompatible_exts)
+
+    @staticmethod
+    def is_relevant_checksum(filename: str) -> bool:
+        """Check if checksum file is for a platform-compatible AppImage.
+
+        Examples:
+            ✅ "QOwnNotes-x86_64.AppImage.sha256sum"
+            ✅ "KeePassXC-2.7.10-x86_64.AppImage.DIGEST"
+            ✅ "Joplin-3.4.12.AppImage.sha512"
+            ❌ "KeePassXC-2.7.10-Win64.msi.DIGEST" (Windows)
+            ❌ "Obsidian-1.9.14-arm64.AppImage.sha256" (ARM)
+            ❌ "latest-mac-arm64.yml" (macOS)
+
+        Args:
+            filename: Checksum filename to check
+
+        Returns:
+            True if checksum is for a compatible AppImage, False otherwise
+
+        """
+        if not filename:
+            return False
+
+        # Must be a checksum file
+        if not is_checksum_file(filename):
+            return False
+
+        filename_lower = filename.lower()
+
+        # Extract base filename (remove checksum extension)
+        base_name = filename
+        for ext in SPECIFIC_CHECKSUM_EXTENSIONS:
+            if filename_lower.endswith(ext):
+                base_name = filename[: -len(ext)]
+                break
+
+        # Also handle pattern-based checksums (e.g., .sha256, .sha512)
+        if base_name == filename:
+            # Try removing common checksum suffixes
+            checksum_suffixes = [
+                ".sha256",
+                ".sha512",
+                ".sha1",
+                ".md5",
+            ]
+            for suffix in checksum_suffixes:
+                if filename_lower.endswith(suffix):
+                    base_name = filename[: -len(suffix)]
+                    break
+
+        # Base must be an AppImage
+        if not is_appimage_file(base_name):
+            return False
+
+        # Base must be platform-compatible (not Windows, macOS, ARM)
+        return AssetSelector.is_platform_compatible(base_name)
+
+    @staticmethod
+    def filter_for_cache(assets: list[Asset]) -> list[Asset]:
+        """Filter assets to cache-worthy subset (x86_64 AppImages + checksums).
+
+        This is the main entry point for cache filtering. It keeps only:
+        - Linux x86_64 AppImages (excludes Windows, macOS, ARM builds)
+        - Checksum files for compatible AppImages
+
+        This method should be called before caching release data to avoid
+        storing irrelevant assets.
+
+        Args:
+            assets: List of all release assets
+
+        Returns:
+            Filtered list of platform-compatible assets
+
+        """
+        filtered = []
+
+        for asset in assets:
+            filename = asset.name
+
+            # Keep platform-compatible AppImages
+            if is_appimage_file(filename):
+                if AssetSelector.is_platform_compatible(filename):
+                    filtered.append(asset)
+                    logger.debug(
+                        "Including platform-compatible AppImage: %s", filename
+                    )
+                else:
+                    logger.debug(
+                        "Filtering out non-compatible AppImage: %s", filename
+                    )
+                continue
+
+            # Keep relevant checksum files
+            if AssetSelector.is_relevant_checksum(filename):
+                filtered.append(asset)
+                logger.debug("Including relevant checksum file: %s", filename)
+            else:
+                logger.debug("Filtering out asset: %s", filename)
+
+        return filtered
+
+
+class ReleaseAPIClient:
+    """Handles direct communication with GitHub API for release data."""
+
+    def __init__(
+        self,
+        owner: str,
+        repo: str,
+        session: aiohttp.ClientSession,
+        auth_manager: GitHubAuthManager,
+        shared_api_task_id: str | None = None,
+    ) -> None:
+        """Initialize the API client.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            session: aiohttp session for making requests
+            auth_manager: GitHub authentication manager
+            shared_api_task_id: Optional shared API progress task ID
+
+        """
+        self.owner = owner
+        self.repo = repo
+        self.session = session
+        self.auth_manager = auth_manager
+        self.shared_api_task_id = shared_api_task_id
+        self.progress_service = get_progress_service()
+
+    async def _update_shared_progress(self, description: str) -> None:
+        """Update shared API progress task.
+
+        Args:
+            description: Description to show for the current API request
+
+        """
+        if (
+            not self.shared_api_task_id
+            or not self.progress_service.is_active()
+        ):
+            return
+
+        try:
+            task_info = self.progress_service.get_task_info(
+                self.shared_api_task_id
+            )
+            if task_info:
+                new_completed = int(task_info.completed) + 1
+                await self.progress_service.update_task_total(
+                    self.shared_api_task_id, float(new_completed)
+                )
+                await self.progress_service.update_task(
+                    self.shared_api_task_id,
+                    completed=float(new_completed),
+                    description=(
+                        f"🌐 {description} ({new_completed}/{new_completed})"
+                    ),
+                )
+
+                if hasattr(self.progress_service, "_refresh_live_display"):
+                    self.progress_service._refresh_live_display()
+        except Exception:
+            pass
+
+    async def _fetch_from_api(
+        self, url: str, description: str
+    ) -> dict[str, Any] | None:
+        """Fetch data from GitHub API.
+
+        Args:
+            url: API URL to fetch
+            description: Description for progress tracking
+
+        Returns:
+            API response data or None if not found
+
+        """
         headers = GitHubAuthManager.apply_auth({})
 
         async with self.session.get(url=url, headers=headers) as response:
+            if response.status == HTTP_NOT_FOUND:
+                return None
+
             response.raise_for_status()
-            data = await response.json()
-            return data
+            self.auth_manager.update_rate_limit_info(dict(response.headers))
 
-    # FIXME: unused? checkout parser.py or url install template method
-    @staticmethod
-    def parse_repo_url(repo_url: str) -> tuple[str, str]:
-        """Parse GitHub repository URL to extract owner and repo.
+            if self.shared_api_task_id and self.progress_service.is_active():
+                await self._update_shared_progress(description)
 
-        Args:
-            repo_url: GitHub repository URL or owner/repo format
+            return await response.json()
+
+    async def fetch_stable_release(self) -> Release | None:
+        """Fetch the latest stable release.
 
         Returns:
-            Tuple of (owner, repo)
-
-        Raises:
-            ValueError: If URL format is invalid
+            Release instance or None if no stable release found
 
         """
-        # Handle owner/repo format
-        if "/" in repo_url and not repo_url.startswith("http"):
-            parts = repo_url.split("/")
-            if len(parts) == 2:
-                return parts[0], parts[1]
+        url = (
+            f"https://api.github.com/repos/{self.owner}/"
+            f"{self.repo}/releases/latest"
+        )
+        data = await self._fetch_from_api(url, "Fetched stable release")
 
-        # Handle full GitHub URLs
-        if repo_url.startswith("http"):
-            parsed = urlparse(repo_url)
-            if parsed.hostname == "github.com":
-                path_parts = parsed.path.strip("/").split("/")
-                if len(path_parts) >= 2:
-                    return path_parts[0], path_parts[1]
+        if data is None:
+            return None
 
-        raise ValueError(f"Invalid GitHub repository format: {repo_url}")
+        if data.get("prerelease", False):
+            return None
 
-    async def get_default_branch(self) -> str:
+        return Release.from_api_response(self.owner, self.repo, data)
+
+    async def fetch_prerelease(self) -> Release | None:
+        """Fetch the latest prerelease.
+
+        Returns:
+            Release instance or None if no prerelease found
+
+        """
+        url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases"
+        data = await self._fetch_from_api(url, "Fetched prerelease")
+
+        if data is None:
+            return None
+
+        for release in data:
+            if release.get("prerelease", False):
+                return Release.from_api_response(
+                    self.owner, self.repo, release
+                )
+
+        return None
+
+    async def fetch_release_by_tag(self, tag: str) -> Release | None:
+        """Fetch a specific release by tag.
+
+        Args:
+            tag: Release tag to fetch
+
+        Returns:
+            Release instance or None if not found
+
+        """
+        url = (
+            f"https://api.github.com/repos/{self.owner}/"
+            f"{self.repo}/releases/tags/{tag}"
+        )
+        data = await self._fetch_from_api(url, f"Fetched release {tag}")
+
+        if data is None:
+            return None
+
+        return Release.from_api_response(self.owner, self.repo, data)
+
+    async def fetch_default_branch(self) -> str:
         """Get the default branch name for the repository.
 
         Returns:
             Default branch name (e.g., 'main', 'master')
 
-        Raises:
-            aiohttp.ClientError: If the API request fails
-
         """
         url = f"https://api.github.com/repos/{self.owner}/{self.repo}"
-        headers = GitHubAuthManager.apply_auth({})
+        data = await self._fetch_from_api(url, "Fetched default branch")
 
-        async with self.session.get(url=url, headers=headers) as response:
-            response.raise_for_status()
+        if data is None:
+            return "main"
 
-            # Update rate limit information
-            self.auth_manager.update_rate_limit_info(dict(response.headers))
+        return data.get("default_branch", "main")
 
-            data = await response.json()
 
-            # Update shared progress if available
-            if self.shared_api_task_id and self.progress_service.is_active():
-                await self._update_shared_progress(
-                    f"Fetched default branch for {self.owner}/{self.repo}"
-                )
+class ReleaseFetcher:
+    """Orchestrates release fetching with caching support."""
 
-            # FIXME: return str not Any
-            return data.get("default_branch", "main")
+    def __init__(
+        self,
+        owner: str,
+        repo: str,
+        session: aiohttp.ClientSession,
+        shared_api_task_id: str | None = None,
+        use_cache: bool = True,
+    ) -> None:
+        """Initialize the release fetcher.
 
-    def build_icon_url(self, icon_path: str, branch: str | None = None) -> str:
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            session: aiohttp session for making requests
+            shared_api_task_id: Optional shared API progress task ID
+            use_cache: Whether to use persistent caching
+
+        """
+        self.owner = owner
+        self.repo = repo
+        self.use_cache = use_cache
+        self.cache_manager = get_cache_manager() if use_cache else None
+        self.api_client = ReleaseAPIClient(
+            owner, repo, session, auth_manager, shared_api_task_id
+        )
+        self.progress_service = get_progress_service()
+        self.shared_api_task_id = shared_api_task_id
+
+    async def _get_from_cache(
+        self, cache_type: str = "stable"
+    ) -> Release | None:
+        """Get release from cache.
+
+        Args:
+            cache_type: Cache type ('stable', 'prerelease', or default)
+
+        Returns:
+            Cached release or None
+
+        """
+        if not self.cache_manager:
+            return None
+
+        cached_data = await self.cache_manager.get_cached_release(
+            self.owner, self.repo, cache_type=cache_type
+        )
+
+        if cached_data:
+            logger.debug(
+                "Using cached %s release data for %s/%s",
+                cache_type,
+                self.owner,
+                self.repo,
+            )
+            return Release.from_dict(cached_data)
+
+        return None
+
+    async def _save_to_cache(
+        self, release: Release, cache_type: str = "stable"
+    ) -> None:
+        """Save release to cache.
+
+        Args:
+            release: Release to cache
+            cache_type: Cache type ('stable', 'prerelease', or default)
+
+        """
+        if not self.cache_manager:
+            return
+
+        await self.cache_manager.save_release_data(
+            self.owner, self.repo, release.to_dict(), cache_type=cache_type
+        )
+        logger.debug(
+            "Cached %s release data for %s/%s",
+            cache_type,
+            self.owner,
+            self.repo,
+        )
+
+    async def fetch_latest_release(
+        self, ignore_cache: bool = False
+    ) -> Release:
+        """Fetch the latest release (stable only).
+
+        Args:
+            ignore_cache: If True, bypass cache and fetch fresh data
+
+        Returns:
+            Latest release
+
+        Raises:
+            ValueError: If no release found
+
+        """
+        if not ignore_cache:
+            cached = await self._get_from_cache(cache_type="stable")
+            if cached:
+                return cached
+
+        release = await self.api_client.fetch_stable_release()
+        if release is None:
+            raise ValueError(
+                f"No stable release found for {self.owner}/{self.repo}"
+            )
+
+        # Filter for platform compatibility before caching
+        release = release.filter_for_platform()
+        await self._save_to_cache(release, cache_type="stable")
+        return release
+
+    async def fetch_latest_prerelease(
+        self, ignore_cache: bool = False
+    ) -> Release:
+        """Fetch the latest prerelease.
+
+        Args:
+            ignore_cache: If True, bypass cache and fetch fresh data
+
+        Returns:
+            Latest prerelease
+
+        Raises:
+            ValueError: If no prerelease found
+
+        """
+        if not ignore_cache:
+            cached = await self._get_from_cache(cache_type="prerelease")
+            if cached:
+                return cached
+
+        release = await self.api_client.fetch_prerelease()
+        if release is None:
+            raise ValueError(
+                f"No prerelease found for {self.owner}/{self.repo}"
+            )
+
+        # Filter for platform compatibility before caching
+        release = release.filter_for_platform()
+        await self._save_to_cache(release, cache_type="prerelease")
+        return release
+
+    async def fetch_latest_release_or_prerelease(
+        self, prefer_prerelease: bool = False, ignore_cache: bool = False
+    ) -> Release:
+        """Fetch the latest release or prerelease based on preference.
+
+        Args:
+            prefer_prerelease: If True, prefer prereleases over stable
+            ignore_cache: If True, bypass cache and fetch fresh data
+
+        Returns:
+            Latest release matching preference
+
+        Raises:
+            ValueError: If no releases found
+
+        """
+        if prefer_prerelease:
+            release = await self._try_prerelease_then_stable(ignore_cache)
+        else:
+            release = await self._try_stable_then_prerelease(ignore_cache)
+
+        if release:
+            return release
+
+        if self.shared_api_task_id and self.progress_service.is_active():
+            await self.api_client._update_shared_progress(
+                f"No releases found for {self.owner}/{self.repo}"
+            )
+
+        raise ValueError(f"No releases found for {self.owner}/{self.repo}")
+
+    async def _try_prerelease_then_stable(
+        self, ignore_cache: bool
+    ) -> Release | None:
+        """Try to fetch prerelease first, then stable as fallback."""
+        # Try prerelease
+        if not ignore_cache:
+            cached = await self._get_from_cache(cache_type="prerelease")
+            if cached:
+                return cached
+
+        release = await self.api_client.fetch_prerelease()
+        if release:
+            # Filter for platform compatibility before caching
+            release = release.filter_for_platform()
+            await self._save_to_cache(release, cache_type="prerelease")
+            return release
+
+        # Fallback to stable
+        return await self._fetch_stable_with_cache(ignore_cache)
+
+    async def _try_stable_then_prerelease(
+        self, ignore_cache: bool
+    ) -> Release | None:
+        """Try to fetch stable first, then prerelease as fallback."""
+        # Try stable
+        release = await self._fetch_stable_with_cache(ignore_cache)
+        if release:
+            return release
+
+        # Fallback to prerelease
+        if not ignore_cache:
+            cached = await self._get_from_cache(cache_type="prerelease")
+            if cached:
+                return cached
+
+        release = await self.api_client.fetch_prerelease()
+        if release:
+            # Filter for platform compatibility before caching
+            release = release.filter_for_platform()
+            await self._save_to_cache(release, cache_type="prerelease")
+            return release
+
+        return None
+
+    async def _fetch_stable_with_cache(
+        self, ignore_cache: bool
+    ) -> Release | None:
+        """Fetch stable release with cache support."""
+        if not ignore_cache:
+            cached = await self._get_from_cache(cache_type="stable")
+            if cached:
+                return cached
+
+        release = await self.api_client.fetch_stable_release()
+        if release:
+            # Filter for platform compatibility before caching
+            release = release.filter_for_platform()
+            await self._save_to_cache(release, cache_type="stable")
+        return release
+
+    async def fetch_specific_release(self, tag: str) -> Release:
+        """Fetch a specific release by tag.
+
+        Args:
+            tag: Release tag to fetch
+
+        Returns:
+            Release for the specified tag
+
+        Raises:
+            ValueError: If release not found
+
+        """
+        release = await self.api_client.fetch_release_by_tag(tag)
+        if release is None:
+            raise ValueError(
+                f"Release {tag} not found for {self.owner}/{self.repo}"
+            )
+        return release
+
+    async def get_default_branch(self) -> str:
+        """Get the default branch name for the repository.
+
+        Returns:
+            Default branch name
+
+        """
+        return await self.api_client.fetch_default_branch()
+
+    @staticmethod
+    def build_icon_url(
+        owner: str, repo: str, icon_path: str, branch: str | None = None
+    ) -> str:
         """Build GitHub raw URL for an icon file.
 
         Args:
+            owner: Repository owner
+            repo: Repository name
             icon_path: Path to the icon file within the repository
-            branch: Branch name (if None, will need to be fetched)
+            branch: Branch name (defaults to 'main')
 
         Returns:
             Full GitHub raw URL for the icon
 
         """
         if branch is None:
-            branch = "main"  # Default fallback
+            branch = "main"
 
-        # Clean the path - remove leading slash if present
         clean_path = icon_path.lstrip("/")
-
         return (
-            f"https://raw.githubusercontent.com/{self.owner}/{self.repo}/{branch}/{clean_path}"
+            f"https://raw.githubusercontent.com/{owner}/"
+            f"{repo}/{branch}/{clean_path}"
         )
 
     @staticmethod
@@ -905,16 +1058,11 @@ class GitHubReleaseFetcher:
             Appropriate filename for the icon
 
         """
-        # If path has a filename with extension, use it but rename to app_name
-        import os
-
         filename = os.path.basename(icon_path)
         if "." in filename:
             extension = os.path.splitext(filename)[1]
             return f"{app_name}{extension}"
-        else:
-            # Default to .png if no extension detected
-            return f"{app_name}.png"
+        return f"{app_name}.png"
 
 
 class GitHubClient:
@@ -940,7 +1088,9 @@ class GitHubClient:
         """
         self.shared_api_task_id = task_id
 
-    async def get_latest_release(self, owner: str, repo: str) -> dict[str, Any] | None:
+    async def get_latest_release(
+        self, owner: str, repo: str
+    ) -> dict[str, Any] | None:
         """Get the latest release for a repository.
 
         Args:
@@ -952,26 +1102,42 @@ class GitHubClient:
 
         """
         try:
-            fetcher = GitHubReleaseFetcher(owner, repo, self.session, self.shared_api_task_id)
-            release_details = await fetcher.fetch_latest_release_or_prerelease(
+            fetcher = ReleaseFetcher(
+                owner, repo, self.session, self.shared_api_task_id
+            )
+            release = await fetcher.fetch_latest_release_or_prerelease(
                 prefer_prerelease=False
             )
 
-            # Use original tag name from the release details, fallback to version-based tag
             original_tag_name = (
-                release_details.get("original_tag_name") or f"v{release_details['version']}"
+                release.original_tag_name or f"v{release.version}"
             )
 
             return {
-                "tag_name": release_details["version"],
+                "tag_name": release.version,
                 "original_tag_name": original_tag_name,
-                "prerelease": release_details["prerelease"],
-                "assets": release_details["assets"],
-                "html_url": f"https://github.com/{owner}/{repo}/releases/tag/{original_tag_name}",
+                "prerelease": release.prerelease,
+                "assets": [
+                    {
+                        "name": asset.name,
+                        "size": asset.size,
+                        "digest": asset.digest,
+                        "browser_download_url": asset.browser_download_url,
+                    }
+                    for asset in release.assets
+                ],
+                "html_url": (
+                    f"https://github.com/{owner}/{repo}/"
+                    f"releases/tag/{original_tag_name}"
+                ),
             }
-
         except Exception as e:
-            logger.error("Failed to fetch latest release for %s/%s: %s", owner, repo, e)
+            logger.error(
+                "Failed to fetch latest release for %s/%s: %s",
+                owner,
+                repo,
+                e,
+            )
             raise
 
     async def get_release_by_tag(
@@ -989,15 +1155,27 @@ class GitHubClient:
 
         """
         try:
-            fetcher = GitHubReleaseFetcher(owner, repo, self.session, self.shared_api_task_id)
-            release_details = await fetcher.fetch_specific_release(tag)
+            fetcher = ReleaseFetcher(
+                owner, repo, self.session, self.shared_api_task_id
+            )
+            release = await fetcher.fetch_specific_release(tag)
 
             return {
-                "tag_name": release_details["version"],
+                "tag_name": release.version,
                 "original_tag_name": tag,
-                "prerelease": release_details["prerelease"],
-                "assets": release_details["assets"],
-                "html_url": f"https://github.com/{owner}/{repo}/releases/tag/{tag}",
+                "prerelease": release.prerelease,
+                "assets": [
+                    {
+                        "name": asset.name,
+                        "size": asset.size,
+                        "digest": asset.digest,
+                        "browser_download_url": asset.browser_download_url,
+                    }
+                    for asset in release.assets
+                ],
+                "html_url": (
+                    f"https://github.com/{owner}/{repo}/releases/tag/{tag}"
+                ),
             }
         except Exception:
             return None

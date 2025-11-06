@@ -191,12 +191,6 @@ Example zen browser cache:
     "prerelease": false,
     "assets": [
       {
-        "name": "zen-aarch64.AppImage",
-        "digest": "sha256:d0417f900e1e3af6a13e201cab54e35c4f50200292fef2c613e867de33c0d326",
-        "size": 96831888,
-        "browser_download_url": "https://github.com/zen-browser/desktop/releases/download/1.15.2b/zen-aarch64.AppImage"
-      },
-      {
         "name": "zen-x86_64.AppImage",
         "digest": "sha256:9035c485921102f77fdfaa37536200fd7ce61ec9ae8f694c0f472911df182cbd",
         "size": 109846928,

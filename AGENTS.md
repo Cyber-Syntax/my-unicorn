@@ -8,7 +8,10 @@ This file provides guidance to agents when working with code in this repository.
 2. KISS (Keep It Simple, Stupid): Aim for simplicity and clarity. Avoid unnecessary abstractions or metaprogramming.
 3. DRY (Don't Repeat Yourself): Reuse code appropriately but avoid over-engineering. Each command handler has single responsibility.
 4. YAGNI (You Aren't Gonna Need It): Always implement things when you actually need them, never when you just foresee that you need them.
-5. Confirm understanding before making changes: If you're unsure about the purpose of a piece of code, ask for clarification rather than making assumptions.
+5. **ALWAYS** use `ruff check <filepath>` on each file you modify to ensure proper formatting and linting.
+    - Use `ruff format <filepath>` on each file you modify to ensure proper formatting.
+    - Use `ruff check --fix <filepath>` on each file you modify to fix any fixable errors.
+6. Confirm understanding before making changes: If you're unsure about the purpose of a piece of code, ask for clarification rather than making assumptions.
 
 ## Project Overview
 
@@ -24,6 +27,18 @@ This file provides guidance to agents when working with code in this repository.
 
 - Command pattern: Each CLI command has a dedicated handler in `my_unicorn/commands/`
 - Catalog system: App definitions in `my_unicorn/catalog/` as JSON files
+
+**Project Structure:**
+
+- `cli/` - CLI interface (parser, runner)
+- `commands/` - Command handlers (install, update, remove, etc.)
+- `handlers/` - Orchestrators for complex operations (planned)
+- `services/` - Business logic services (icon, install, cache)
+- `clients/` - External API clients (GitHub API, download operations)
+- `ui/` - UI components (progress display)
+- `utils/` - Shared utilities
+- `catalog/` - App catalog data (JSON files)
+- `verification/` - Checksum verification logic
 
 ## Development Workflow
 
@@ -73,65 +88,19 @@ pytest tests/test_config.py -v
 pytest tests/test_config.py::test_function_name -v
 ```
 
-**Test patterns:**
-
-- Test files: `tests/test_*.py`
-- Test functions: `def test_*()`
-- Async tests: Use `pytest-asyncio` with `@pytest.mark.asyncio`
-- Mock external calls: Use `pytest-mock` and `aioresponses`
-
 **Critical: Run tests after any change to ensure nothing breaks.**
 
 ## Code Style Guidelines
-
-**Language:** Python 3.12+
-
-**Code Formatting (Ruff):**
-
-```bash
-# Check formatting
-ruff check .
-
-# Auto-fix issues
-ruff check --fix .
-
-# Format code
-ruff format .
-```
 
 **Style Rules:**
 
 - Follow PEP 8 strictly
 - Max line length: 79 characters
-- Use double quotes for strings
-- Use spaces (not tabs) for indentation
-- Include type hints for all functions
-- Use Google-style docstrings
 
 **Type Annotations:**
 
 - Use built-in types: `list[str]`, `dict[str, int]` (not `List`, `Dict`)
 - Use `from typing import TYPE_CHECKING` for imports only used in type hints
-
-**Docstring Format (Google Style):**
-
-```python
-def function_name(param1: str, param2: int) -> bool:
-    """Brief description.
-
-    Longer description if needed.
-
-    Args:
-        param1: Description of param1.
-        param2: Description of param2.
-
-    Returns:
-        Description of return value.
-
-    Raises:
-        ValueError: When something goes wrong.
-    """
-```
 
 **Logging:**
 
@@ -140,8 +109,11 @@ def function_name(param1: str, param2: int) -> bool:
 
 **Project Conventions:**
 
-- Each command handler inherits from `BaseCommand`
+- Each command handler inherits from `BaseCommandHandler`
 - Services handle business logic, commands handle CLI interaction
+- Handlers orchestrate complex workflows using multiple services
+- Clients manage external API communication (GitHub, downloads)
+- UI components handle presentation (progress displays)
 - Use async/await for I/O operations (network, file system)
 - my-unicorn source code stored in `~/.local/share/my-unicorn/`
 - Configuration stored in `~/.config/my-unicorn/`
@@ -154,12 +126,10 @@ def function_name(param1: str, param2: int) -> bool:
 2. Inherit from `BaseCommand`
 3. Implement `execute()` method
 4. Register in CLI parser
-5. Add tests in `tests/commands/`
 
 **Debugging:**
 
 - Check logs in `~/.config/my-unicorn/logs/`
-- Use `--verbose` flag for detailed output
 
 ## Additional Notes
 

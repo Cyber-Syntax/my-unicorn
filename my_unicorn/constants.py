@@ -101,11 +101,14 @@ KEY_STORAGE: Final[str] = "storage"
 # Logging Constants
 # =============================================================================
 
-# Maximum size for rotated log files (bytes)
-LOG_MAX_FILE_SIZE_BYTES: Final[int] = 1024 * 1024  # 1 MB
+# Rotation threshold - rotate when log exceeds this size (bytes)
+LOG_ROTATION_THRESHOLD_BYTES: Final[int] = 10 * 1024 * 1024  # 10 MB
 
-# Number of backup files to keep for rotated logs (defaults to global backup)
-LOG_BACKUP_COUNT: Final[int] = DEFAULT_BACKUP_COUNT
+# Number of backup files to keep for rotated logs
+LOG_BACKUP_COUNT: Final[int] = 5
+
+# Timestamp format for rotated log filenames
+LOG_ROTATION_TIMESTAMP_FORMAT: Final[str] = "%Y%m%d_%H%M%S"
 
 # Console and file format strings used by the logger
 LOG_CONSOLE_FORMAT: Final[str] = (

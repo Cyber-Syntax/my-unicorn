@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.commands.install import InstallCommand, InstallHandler
-from my_unicorn.models import ValidationError
+from my_unicorn.commands.install import InstallCommand, InstallCommandHandler
+from my_unicorn.exceptions import ValidationError
 
 
 @pytest.fixture
@@ -42,36 +42,45 @@ def install_command(mock_dependencies):
     )
 
 
-@pytest.mark.skip(reason="Install command now uses template pattern, needs test rewrite")
 @pytest.mark.asyncio
 async def test_execute_with_valid_targets(install_command, mock_dependencies):
-    """Test InstallCommand.execute with valid targets."""
+    """Test InstallCommand.execute with valid catalog app."""
     mock_dependencies["catalog_manager"].get_available_apps.return_value = {
         "app1": {},
-        "app2": {},
     }
-    mock_dependencies["catalog_manager"].get_app_config.return_value = {"mock": "config"}
-    mock_dependencies["session"].get = AsyncMock(return_value=MagicMock(status=200))
-    mock_dependencies["github_client"].get_repo = AsyncMock(return_value={"mock": "repo"})
+    mock_dependencies["catalog_manager"].load_catalog_entry.return_value = {
+        "owner": "mock",
+        "repo": "app1",
+        "asset_patterns": ["*.AppImage"],
+    }
+    mock_dependencies["config_manager"].is_app_installed.return_value = False
 
-    # Initialize services with progress
-    install_command._initialize_services_with_progress(show_progress=False)
+    # Mock the internal execution method
+    with patch.object(
+        install_command, "_execute_installations", new_callable=AsyncMock
+    ) as mock_execute:
+        mock_execute.return_value = [
+            {
+                "success": True,
+                "name": "app1",
+                "version": "1.0.0",
+            }
+        ]
 
-    # Mock the template method execution
-    with patch.object(install_command, '_execute_catalog_install', new_callable=AsyncMock) as mock_catalog:
-        with patch.object(install_command, '_execute_url_install', new_callable=AsyncMock) as mock_url:
-            mock_catalog.return_value = [{"success": True}]
-            mock_url.return_value = [{"success": True}]
+        targets = ["app1"]
+        results = await install_command.execute(
+            targets, show_progress=False, verify_downloads=False
+        )
 
-            targets = ["app1", "https://github.com/mock/repo"]
-            results = await install_command.execute(targets)
-
-            assert len(results) == 2
-            assert all(result["success"] for result in results)
+        assert len(results) == 1
+        assert results[0]["success"] is True
+        assert results[0]["name"] == "app1"
 
 
 @pytest.mark.asyncio
-async def test_execute_with_invalid_targets(install_command, mock_dependencies):
+async def test_execute_with_invalid_targets(
+    install_command, mock_dependencies
+):
     """Test InstallCommand.execute with invalid targets."""
     mock_dependencies["catalog_manager"].get_available_apps.return_value = {
         "app1": {},
@@ -82,7 +91,9 @@ async def test_execute_with_invalid_targets(install_command, mock_dependencies):
     with pytest.raises(ValidationError) as excinfo:
         await install_command.execute(targets)
 
-    assert "Unknown applications or invalid URLs: invalid_app" in str(excinfo.value)
+    assert "Unknown applications or invalid URLs: invalid_app" in str(
+        excinfo.value
+    )
 
 
 @pytest.mark.asyncio
@@ -95,9 +106,11 @@ async def test_execute_no_targets(install_command):
 
 
 @pytest.mark.asyncio
-async def test_install_handler_execute_with_no_targets(monkeypatch, mock_dependencies):
-    """Test InstallHandler.execute with no targets."""
-    handler = InstallHandler(
+async def test_install_handler_execute_with_no_targets(
+    monkeypatch, mock_dependencies
+):
+    """Test InstallCommandHandler.execute with no targets."""
+    handler = InstallCommandHandler(
         config_manager=mock_dependencies["config_manager"],
         auth_manager=MagicMock(),
         update_manager=MagicMock(),
@@ -116,24 +129,34 @@ async def test_install_handler_execute_with_no_targets(monkeypatch, mock_depende
 
 
 @pytest.mark.asyncio
-async def test_install_handler_execute_with_valid_targets(monkeypatch, mock_dependencies):
-    """Test InstallHandler.execute with valid targets."""
-    handler = InstallHandler(
+async def test_install_handler_execute_with_valid_targets(
+    monkeypatch, mock_dependencies
+):
+    """Test InstallCommandHandler.execute with valid targets."""
+    handler = InstallCommandHandler(
         config_manager=mock_dependencies["config_manager"],
         auth_manager=MagicMock(),
         update_manager=MagicMock(),
     )
     args = Namespace(
-        targets=["app1", "https://github.com/mock/repo"], concurrency=3, no_verify=False
+        targets=["app1", "https://github.com/mock/repo"],
+        concurrency=3,
+        no_verify=False,
     )
 
     mock_dependencies["catalog_manager"].get_available_apps.return_value = {
         "app1": {},
         "app2": {},
     }
-    mock_dependencies["catalog_manager"].get_app_config.return_value = {"mock": "config"}
-    mock_dependencies["session"].get = AsyncMock(return_value=MagicMock(status=200))
-    mock_dependencies["github_client"].get_repo = AsyncMock(return_value={"mock": "repo"})
+    mock_dependencies["catalog_manager"].get_app_config.return_value = {
+        "mock": "config"
+    }
+    mock_dependencies["session"].get = AsyncMock(
+        return_value=MagicMock(status=200)
+    )
+    mock_dependencies["github_client"].get_repo = AsyncMock(
+        return_value={"mock": "repo"}
+    )
 
     install_command_mock = MagicMock()
     install_command_mock.execute = AsyncMock(return_value=[{"success": True}])
@@ -156,4 +179,6 @@ async def test_install_handler_execute_with_valid_targets(monkeypatch, mock_depe
         force=False,
         update=False,
     )
-    logger_mock.info.assert_called_with("All installations completed successfully")
+    logger_mock.info.assert_called_with(
+        "All installations completed successfully"
+    )

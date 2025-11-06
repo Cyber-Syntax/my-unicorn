@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from my_unicorn.commands.remove import RemoveHandler
-from my_unicorn.desktop import ConfigManager
+from my_unicorn.desktop_entry import ConfigManager
 
 
 @pytest.fixture
@@ -67,17 +67,22 @@ async def test_remove_single_app_success(
     icon_path = icon_dir / "test_app.png"
 
     with (
-        patch("pathlib.Path.exists", autospec=True, return_value=True) as mock_exists,
+        patch(
+            "pathlib.Path.exists", autospec=True, return_value=True
+        ) as mock_exists,
         patch("pathlib.Path.unlink", autospec=True) as mock_unlink,
         patch(
-            "my_unicorn.desktop.ConfigManager", return_value=ConfigManager()
+            "my_unicorn.desktop_entry.ConfigManager",
+            return_value=ConfigManager(),
         ) as MockConfigManager,
         patch("builtins.print") as mock_print,
     ):
         mock_appimage_unlink = mock_unlink
         mock_clean_appimage_unlink = mock_unlink
         mock_icon_unlink = mock_unlink
-        print(f"Debugging paths: {appimage_path}, {clean_appimage_path}, {icon_path}")
+        print(
+            f"Debugging paths: {appimage_path}, {clean_appimage_path}, {icon_path}"
+        )
         args = Namespace(apps=["test_app"], keep_config=False)
         await remove_handler.execute(args)
 
@@ -96,7 +101,9 @@ async def test_remove_single_app_success(
         assert mock_unlink.call_count == 4
 
         # Verify config removal
-        mock_config_manager.remove_app_config.assert_called_once_with("test_app")
+        mock_config_manager.remove_app_config.assert_called_once_with(
+            "test_app"
+        )
 
 
 @pytest.mark.asyncio
@@ -113,10 +120,13 @@ async def test_remove_single_app_keep_config(
     icon_path = icon_dir / "test_app.png"
 
     with (
-        patch("pathlib.Path.exists", autospec=True, return_value=True) as mock_exists,
+        patch(
+            "pathlib.Path.exists", autospec=True, return_value=True
+        ) as mock_exists,
         patch("pathlib.Path.unlink", autospec=True) as mock_unlink,
         patch(
-            "my_unicorn.desktop.ConfigManager", return_value=ConfigManager()
+            "my_unicorn.desktop_entry.ConfigManager",
+            return_value=ConfigManager(),
         ) as MockConfigManager,
         patch("builtins.print") as mock_print,
     ):
@@ -157,9 +167,14 @@ async def test_remove_icon_always_attempted(
     )
 
     with (
-        patch("pathlib.Path.exists", autospec=True, return_value=True) as mock_exists,
+        patch(
+            "pathlib.Path.exists", autospec=True, return_value=True
+        ) as mock_exists,
         patch("pathlib.Path.unlink", autospec=True) as mock_unlink,
-        patch("my_unicorn.desktop.ConfigManager", return_value=ConfigManager()),
+        patch(
+            "my_unicorn.desktop_entry.ConfigManager",
+            return_value=ConfigManager(),
+        ),
         patch("builtins.print") as mock_print,
     ):
         args = Namespace(apps=["test_app"], keep_config=False)
@@ -198,14 +213,17 @@ async def test_remove_app_with_desktop_entry_error(
     icon_path = icon_dir / "test_app.png"
 
     with (
-        patch("pathlib.Path.exists", autospec=True, return_value=True) as mock_exists,
+        patch(
+            "pathlib.Path.exists", autospec=True, return_value=True
+        ) as mock_exists,
         patch("pathlib.Path.unlink", autospec=True) as mock_unlink,
         patch(
-            "my_unicorn.desktop.remove_desktop_entry_for_app",
+            "my_unicorn.desktop_entry.remove_desktop_entry_for_app",
             side_effect=Exception("Desktop entry error"),
         ) as mock_remove_desktop_entry,
         patch(
-            "my_unicorn.desktop.ConfigManager", return_value=ConfigManager()
+            "my_unicorn.desktop_entry.ConfigManager",
+            return_value=ConfigManager(),
         ) as MockConfigManager,
         patch("builtins.print") as mock_print,
     ):
@@ -223,4 +241,6 @@ async def test_remove_app_with_desktop_entry_error(
         assert mock_unlink.call_count == 3
 
         # Verify desktop entry removal error is logged
-        mock_remove_desktop_entry.assert_called_once_with("test_app", mock_config_manager)
+        mock_remove_desktop_entry.assert_called_once_with(
+            "test_app", mock_config_manager
+        )

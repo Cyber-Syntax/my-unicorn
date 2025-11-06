@@ -1,6 +1,7 @@
 """Install command for AppImage installations.
 
-This module provides installation from both catalog apps and direct URLs using the Template Method pattern.
+This module provides installation from both catalog apps and direct URLs
+using a simplified service-based approach.
 """
 
 from argparse import Namespace
@@ -10,19 +11,18 @@ from typing import Any
 import aiohttp
 
 from my_unicorn.download import DownloadService
-from my_unicorn.storage import StorageService
+from my_unicorn.file_ops import FileOperations
 
+from ..exceptions import ValidationError
 from ..github_client import GitHubClient
 from ..logger import get_logger
-from ..models import ValidationError
-from ..template.install import InstallTemplateFactory
 from .base import BaseCommandHandler
 
 logger = get_logger(__name__)
 
 
 class InstallCommand:
-    """Command for installing AppImages from catalog or direct URLs using Template Method pattern."""
+    """Command for installing AppImages from catalog or direct URLs."""
 
     def __init__(
         self,
@@ -54,7 +54,10 @@ class InstallCommand:
         # Progress and download services will be created when needed
         self.progress_service: Any = None
         self.download_service: Any = None
-        self.storage_service = StorageService(install_dir)
+        self.storage_service = FileOperations(install_dir)
+        self.install_service: Any = (
+            None  # Will be InstallHandler from services
+        )
 
     def _initialize_services_with_progress(self, show_progress: bool) -> None:
         """Initialize services with progress service if needed.
@@ -66,14 +69,18 @@ class InstallCommand:
         if self.download_service is None:
             # Use global progress service if progress is enabled
             if show_progress:
-                from ..services.progress import get_progress_service
+                from ..progress import get_progress_service
 
                 self.progress_service = get_progress_service()
-                self.download_service = DownloadService(self.session, self.progress_service)
+                self.download_service = DownloadService(
+                    self.session, self.progress_service
+                )
             else:
                 self.download_service = DownloadService(self.session)
 
-    async def execute(self, targets: list[str], **options: Any) -> list[dict[str, Any]]:
+    async def execute(
+        self, targets: list[str], **options: Any
+    ) -> list[dict[str, Any]]:
         """Execute installation command.
 
         Args:
@@ -117,14 +124,16 @@ class InstallCommand:
             urls_needing_work,
             catalog_needing_work,
             already_installed,
-        ) = await self._check_apps_needing_work(url_targets, catalog_targets, install_options)
+        ) = await self._check_apps_needing_work(
+            url_targets, catalog_targets, install_options
+        )
 
         # Handle case where all apps are already installed
-        if already_installed and not urls_needing_work and not catalog_needing_work:
-            print(f"✅ All {len(already_installed)} specified app(s) are already installed:")
-            for app_name in already_installed:
-                print(f"   • {app_name}")
-
+        if (
+            already_installed
+            and not urls_needing_work
+            and not catalog_needing_work
+        ):
             # Return success results for already installed apps
             return [
                 {
@@ -140,7 +149,9 @@ class InstallCommand:
 
         # Print info about already installed apps if there are some
         if already_installed:
-            print(f"ℹ️  Skipping {len(already_installed)} already installed app(s):")
+            print(
+                f"ℹ️  Skipping {len(already_installed)} already installed app(s):"
+            )
             for app_name in already_installed:
                 print(f"   • {app_name}")
 
@@ -153,9 +164,11 @@ class InstallCommand:
             total_operations = apps_needing_work * 4
             async with self.progress_service.session(total_operations):
                 # Create minimal API progress task - let API calls drive the count
-                api_task_id = await self.progress_service.create_api_fetching_task(
-                    endpoint="API assets",
-                    total_requests=1,
+                api_task_id = (
+                    await self.progress_service.create_api_fetching_task(
+                        endpoint="API assets",
+                        total_requests=1,
+                    )
                 )
 
                 # Set shared API task for GitHub client
@@ -163,14 +176,20 @@ class InstallCommand:
 
                 try:
                     results = await self._execute_installations(
-                        urls_needing_work, catalog_needing_work, install_options
+                        urls_needing_work,
+                        catalog_needing_work,
+                        install_options,
                     )
 
                     # Finish API progress task
-                    await self.progress_service.finish_task(api_task_id, success=True)
+                    await self.progress_service.finish_task(
+                        api_task_id, success=True
+                    )
                 except Exception:
                     # Finish API progress task with error
-                    await self.progress_service.finish_task(api_task_id, success=False)
+                    await self.progress_service.finish_task(
+                        api_task_id, success=False
+                    )
                     raise
                 finally:
                     # Clean up shared task
@@ -193,9 +212,6 @@ class InstallCommand:
             for app_name in already_installed
         ]
         results.extend(already_installed_results)
-
-        # Print installation summary
-        self._print_installation_summary(results)
 
         return results
 
@@ -235,10 +251,14 @@ class InstallCommand:
 
                 # Check if app is already installed (unless force is specified)
                 if not install_options.get("force", False):
-                    installed_config = self.catalog_manager.get_installed_app_config(app_name)
+                    installed_config = (
+                        self.catalog_manager.get_installed_app_config(app_name)
+                    )
                     if installed_config:
                         # Check if the installed app file still exists
-                        installed_path = Path(installed_config.get("installed_path", ""))
+                        installed_path = Path(
+                            installed_config.get("installed_path", "")
+                        )
                         if installed_path.exists():
                             already_installed.append(app_name)
                             continue
@@ -247,7 +267,11 @@ class InstallCommand:
                 catalog_needing_work.append(app_name)
 
             except Exception as e:
-                logger.debug("Error checking installation status for %s: %s", app_name, e)
+                logger.debug(
+                    "Error checking installation status for %s: %s",
+                    app_name,
+                    e,
+                )
                 # On error, assume it needs installation
                 catalog_needing_work.append(app_name)
 
@@ -259,7 +283,7 @@ class InstallCommand:
         catalog_targets: list[str],
         install_options: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        """Execute the actual installations using template method pattern.
+        """Execute the actual installations using the install service.
 
         Args:
             url_targets: List of URL targets
@@ -270,39 +294,35 @@ class InstallCommand:
             List of installation results
 
         """
-        results: list[dict[str, Any]] = []
+        # Create install service if not already created
+        if self.install_service is None:
+            from my_unicorn.icon import IconHandler
+            from my_unicorn.install import InstallHandler
 
-        # Create shared dependencies for templates
-        dependencies = {
-            "download_service": self.download_service,
-            "storage_service": self.storage_service,
-            "session": self.session,
-            "config_manager": self.config_manager,
-            "github_client": self.github_client,
-            "catalog_manager": self.catalog_manager,
-        }
-
-        # Install URL targets if any
-        if url_targets:
-            logger.info("📡 Installing %d URL(s)", len(url_targets))
-            url_template = InstallTemplateFactory.create_template("url", **dependencies)
-            url_results = await url_template.install(url_targets, **install_options)
-            results.extend(url_results)
-
-        # Install catalog targets if any
-        if catalog_targets:
-            logger.info("📚 Installing %d catalog app(s)", len(catalog_targets))
-            catalog_template = InstallTemplateFactory.create_template(
-                "catalog", **dependencies
+            self.install_service = InstallHandler(
+                download_service=self.download_service,
+                storage_service=self.storage_service,
+                config_manager=self.config_manager,
+                github_client=self.github_client,
+                catalog_manager=self.catalog_manager,
+                icon_service=IconHandler(
+                    download_service=self.download_service,
+                    progress_service=self.progress_service,
+                ),
             )
-            catalog_results = await catalog_template.install(
-                catalog_targets, **install_options
-            )
-            results.extend(catalog_results)
+
+        # Install apps using the service
+        results = await self.install_service.install_multiple(
+            catalog_apps=catalog_targets,
+            url_apps=url_targets,
+            **install_options,
+        )
 
         return results
 
-    def _separate_targets(self, targets: list[str]) -> tuple[list[str], list[str]]:
+    def _separate_targets(
+        self, targets: list[str]
+    ) -> tuple[list[str], list[str]]:
         """Separate targets into URL and catalog targets.
 
         Args:
@@ -338,23 +358,28 @@ class InstallCommand:
 
         return url_targets, catalog_targets
 
-    def _print_installation_summary(self, results: list[dict[str, Any]]) -> None:
-        """Print installation summary.
+    def _print_installation_summary(
+        self, results: list[dict[str, Any]]
+    ) -> None:
+        """Print installation summary with detailed error reasons.
 
         Args:
             results: List of installation results
 
         """
         if not results:
-            logger.info("No installations completed")
+            print("No installations completed")
             return
 
         # Categorize results
-        already_installed = [r for r in results if r.get("status") == "already_installed"]
+        already_installed = [
+            r for r in results if r.get("status") == "already_installed"
+        ]
         newly_installed = [
             r
             for r in results
-            if r.get("success", False) and r.get("status") != "already_installed"
+            if r.get("success", False)
+            and r.get("status") != "already_installed"
         ]
         failed = [r for r in results if not r.get("success", False)]
 
@@ -362,34 +387,44 @@ class InstallCommand:
 
         # Handle the case where all apps are already installed
         if len(already_installed) == total:
-            logger.info("✅ All %d specified app(s) are already installed:", total)
+            print(f"✅ All {total} specified app(s) are already installed:")
             for result in already_installed:
-                logger.info("   • %s", result.get("name", "Unknown"))
+                print(f"   • {result.get('name', 'Unknown')}")
             return
 
-        # Print summary for mixed results
-        logger.info("📊 Installation Summary:")
-        if newly_installed:
-            logger.info("   Newly installed: %d", len(newly_installed))
-        if already_installed:
-            logger.info("   Already installed: %d", len(already_installed))
-        if failed:
-            logger.info("   Failed: %d", len(failed))
+        # Print summary header
+        print("\n📦 Installation Summary:")
+        print("-" * 50)
 
-        # Print detailed results
+        # Print detailed results with context-aware error messages
         for result in results:
             app_name = result.get("name", "Unknown")
             if result.get("success", False):
                 if result.get("status") == "already_installed":
-                    logger.info("   ℹ️  %s: Already installed", app_name)
+                    print(f"{app_name:<25} ℹ️  Already installed")
                 else:
-                    logger.info("   ✅ %s: Installation successful", app_name)
+                    version = result.get("version", "")
+                    if version:
+                        print(f"{app_name:<25} ✅ {version}")
+                    else:
+                        print(f"{app_name:<25} ✅ Installed")
             else:
+                print(f"{app_name:<25} ❌ Installation failed")
+                # Display error reason if available
                 error = result.get("error", "Unknown error")
-                logger.error("   ❌ %s: %s", app_name, error)
+                print(f"{'':>25}    → {error}")
+
+        # Print summary stats
+        print()
+        if newly_installed:
+            print(f"🎉 Successfully installed {len(newly_installed)} app(s)")
+        if already_installed:
+            print(f"ℹ️  {len(already_installed)} app(s) already installed")
+        if failed:
+            print(f"❌ {len(failed)} app(s) failed to install")
 
 
-class InstallHandler(BaseCommandHandler):
+class InstallCommandHandler(BaseCommandHandler):
     """Handler for install command CLI interface."""
 
     async def execute(self, args: Namespace) -> None:
@@ -401,11 +436,15 @@ class InstallHandler(BaseCommandHandler):
         """
         try:
             # Extract targets from args
-            targets = self._expand_comma_separated_targets(getattr(args, "targets", []))
+            targets = self._expand_comma_separated_targets(
+                getattr(args, "targets", [])
+            )
 
             if not targets:
                 logger.error("❌ No targets specified.")
-                logger.info("💡 Use 'my-unicorn list' to see available catalog apps.")
+                logger.info(
+                    "💡 Use 'my-unicorn list' to see available catalog apps."
+                )
                 return
 
             # Setup directories from config
@@ -414,11 +453,19 @@ class InstallHandler(BaseCommandHandler):
             download_dir = Path(self.global_config["directory"]["download"])
 
             # Create session with timeout configuration
-            timeout = aiohttp.ClientTimeout(total=1200, sock_read=60, sock_connect=30)
-            max_concurrent = self.global_config.get("max_concurrent_downloads", 3)
-            connector = aiohttp.TCPConnector(limit=10, limit_per_host=max_concurrent)
+            timeout = aiohttp.ClientTimeout(
+                total=1200, sock_read=60, sock_connect=30
+            )
+            max_concurrent = self.global_config.get(
+                "max_concurrent_downloads", 3
+            )
+            connector = aiohttp.TCPConnector(
+                limit=10, limit_per_host=max_concurrent
+            )
 
-            async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+            async with aiohttp.ClientSession(
+                timeout=timeout, connector=connector
+            ) as session:
                 from ..github_client import GitHubClient
 
                 github_client = GitHubClient(session)
@@ -449,18 +496,25 @@ class InstallHandler(BaseCommandHandler):
 
                 # Log the concurrent value being used for debugging
                 logger.info("🔧 Install configuration:")
-                logger.info("   Max concurrent installations: %d", concurrent_value)
+                logger.info(
+                    "   Max concurrent installations: %d", concurrent_value
+                )
                 logger.info("   Max connections per host: %d", max_concurrent)
                 logger.info("   Show progress: %s", options["show_progress"])
 
                 results = await install_command.execute(targets, **options)
+
+                # Print installation summary AFTER progress completes
+                install_command._print_installation_summary(results)
 
                 # Check results and log appropriate messages
                 if not results:
                     logger.error("No installations were attempted")
                     return
 
-                failed_count = sum(1 for result in results if not result.get("success", False))
+                failed_count = sum(
+                    1 for result in results if not result.get("success", False)
+                )
                 if failed_count > 0:
                     logger.error("%d installation(s) failed", failed_count)
                 else:

@@ -12,14 +12,15 @@ Currently using prereleases until stable releases are available.
 import asyncio
 import shutil
 import sys
-from importlib.metadata import PackageNotFoundError, metadata
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as get_version
 from typing import Any
 
 import aiohttp
 from packaging import version
 
 from .config import ConfigManager, GlobalConfig
-from .github_client import GitHubReleaseFetcher
+from .github_client import ReleaseFetcher
 from .logger import get_logger
 
 
@@ -150,7 +151,7 @@ class SelfUpdater:
         self.global_config: GlobalConfig = config_manager.load_global_config()
         self.session: aiohttp.ClientSession = session
         self.progress = SimpleProgress() if simple_progress else None
-        self.github_fetcher: GitHubReleaseFetcher = GitHubReleaseFetcher(
+        self.github_fetcher: ReleaseFetcher = ReleaseFetcher(
             owner=GITHUB_OWNER,
             repo=GITHUB_REPO,
             session=session,
@@ -167,8 +168,12 @@ class SelfUpdater:
 
         """
         try:
-            package_metadata = metadata("my-unicorn")
-            return package_metadata["Version"]
+            version_str = get_version("my-unicorn")
+            # Handle None return in Python 3.13+ for uninstalled packages
+            if version_str is None:
+                logger.error("Package 'my-unicorn' not found")
+                raise PackageNotFoundError("my-unicorn")
+            return version_str
         except PackageNotFoundError:
             logger.error("Package 'my-unicorn' not found")
             raise
@@ -223,15 +228,23 @@ class SelfUpdater:
 
             logger.info(
                 "Found latest release: %s",
-                release_data.get("version", "unknown"),
+                release_data.version,
             )
 
             # Convert to format compatible with old code
             return {
-                "tag_name": f"v{release_data['version']}",
-                "version": release_data["version"],
-                "prerelease": release_data.get("prerelease", False),
-                "assets": release_data.get("assets", []),
+                "tag_name": f"v{release_data.version}",
+                "version": release_data.version,
+                "prerelease": release_data.prerelease,
+                "assets": [
+                    {
+                        "name": asset.name,
+                        "size": asset.size,
+                        "browser_download_url": asset.browser_download_url,
+                        "digest": asset.digest or "",
+                    }
+                    for asset in release_data.assets
+                ],
             }
 
         except aiohttp.ClientResponseError as e:
@@ -738,8 +751,11 @@ async def perform_self_update(refresh_cache: bool = False) -> bool:
 def display_current_version() -> None:
     """Display the current version synchronously (for CLI compatibility)."""
     try:
-        package_metadata = metadata("my-unicorn")
-        version_str = package_metadata["Version"]
+        version_str = get_version("my-unicorn")
+        # Handle None return in Python 3.13+ for uninstalled packages
+        if version_str is None:
+            print("Version information not available")
+            return
         # Handle version with git info
         if "+" in version_str:
             numbered_version, git_version = version_str.split("+", 1)
