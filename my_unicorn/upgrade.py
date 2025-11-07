@@ -577,8 +577,21 @@ async def get_self_updater(
 
         config_manager = default_config_manager
 
-    # Use a timeout for GitHub API requests
-    timeout = aiohttp.ClientTimeout(total=30)
+    # Use a timeout for GitHub API requests driven by configuration
+    try:
+        global_conf = config_manager.load_global_config()
+        network_cfg = global_conf.get("network", {})
+        timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
+    except Exception:
+        # Fall back to a sensible default if config lookup fails
+        timeout_seconds = 10
+
+    # Map configured base seconds to aiohttp timeouts (keeps previous defaults)
+    timeout = aiohttp.ClientTimeout(
+        total=timeout_seconds * 3,
+        sock_read=timeout_seconds * 2,
+        sock_connect=timeout_seconds,
+    )
     session = aiohttp.ClientSession(timeout=timeout)
 
     return SelfUpdater(config_manager, session, simple_progress)

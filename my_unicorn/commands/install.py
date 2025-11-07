@@ -452,9 +452,13 @@ class InstallCommandHandler(BaseCommandHandler):
             install_dir = Path(self.global_config["directory"]["storage"])
             download_dir = Path(self.global_config["directory"]["download"])
 
-            # Create session with timeout configuration
+            # Create session with timeout configuration (driven by config)
+            network_cfg = self.global_config.get("network", {})
+            timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
             timeout = aiohttp.ClientTimeout(
-                total=1200, sock_read=60, sock_connect=30
+                total=timeout_seconds * 60,
+                sock_read=timeout_seconds * 3,
+                sock_connect=timeout_seconds,
             )
             max_concurrent = self.global_config.get(
                 "max_concurrent_downloads", 3

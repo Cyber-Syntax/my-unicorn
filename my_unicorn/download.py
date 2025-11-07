@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 import aiohttp
 
 from my_unicorn.auth import GitHubAuthManager
+from my_unicorn.config import config_manager
 from my_unicorn.github_client import Asset
 from my_unicorn.logger import get_logger
 from my_unicorn.progress import (
@@ -21,6 +22,11 @@ from my_unicorn.progress import (
 )
 
 logger = get_logger(__name__)
+
+# Download constants
+CHUNK_SIZE = 8192
+PROGRESS_MB_THRESHOLD = 0.5
+CONTENT_PREVIEW_MAX = 200
 
 
 class IconAsset(TypedDict):
@@ -69,48 +75,79 @@ class DownloadService:
         """
         headers: dict[str, str] = GitHubAuthManager.apply_auth({})
 
-        # Set timeout for downloads (30 seconds per chunk, 10 minutes total)
-        timeout = aiohttp.ClientTimeout(total=600, sock_read=30)
+        # Load network configuration
+        network_cfg = config_manager.load_global_config()["network"]
+        retry_attempts = int(network_cfg.get("retry_attempts", 3))
+        timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
 
-        try:
-            async with self.session.get(
-                url, headers=headers, timeout=timeout
-            ) as response:
-                response.raise_for_status()
-                total = int(response.headers.get("Content-Length", 0))
+        # Derive timeouts from configured base seconds.
+        # Keep previous defaults via multipliers.
+        timeout = aiohttp.ClientTimeout(
+            total=timeout_seconds * 60,
+            sock_read=timeout_seconds * 3,
+            sock_connect=timeout_seconds,
+        )
 
-                dest.parent.mkdir(parents=True, exist_ok=True)
+        for attempt in range(1, retry_attempts + 1):
+            try:
+                async with self.session.get(
+                    url, headers=headers, timeout=timeout
+                ) as response:
+                    _maybe = response.raise_for_status()
+                    if asyncio.iscoroutine(_maybe):
+                        await _maybe
+                    total = int(response.headers.get("Content-Length", 0))
 
-                logger.debug("📥 Downloading %s", dest.name)
-                logger.debug("   URL: %s", url)
-                logger.debug(
-                    "   Size: %s bytes" if total > 0 else "   Size: Unknown",
-                    f"{total:,}" if total > 0 else "",
-                )
+                    dest.parent.mkdir(parents=True, exist_ok=True)
 
-                if (
-                    show_progress
-                    and total > 0
-                    and self.progress_service.is_active()
-                ):
-                    await self._download_with_progress(
-                        response,
-                        dest,
-                        total,
-                        progress_type,
+                    logger.debug("📥 Downloading %s", dest.name)
+                    logger.debug("   URL: %s", url)
+                    logger.debug(
+                        "   Size: %s bytes"
+                        if total > 0
+                        else "   Size: Unknown",
+                        f"{total:,}" if total > 0 else "",
                     )
-                else:
-                    # Download without progress bar
-                    with open(dest, "wb") as f:
-                        async for chunk in response.content.iter_chunked(8192):
-                            if chunk:
-                                f.write(chunk)
 
-                logger.debug("✅ Download completed: %s", dest)
+                    if (
+                        show_progress
+                        and total > 0
+                        and self.progress_service.is_active()
+                    ):
+                        await self._download_with_progress(
+                            response,
+                            dest,
+                            total,
+                            progress_type,
+                        )
+                    else:
+                        # Download without progress bar
+                        with open(dest, "wb") as f:
+                            async for chunk in response.content.iter_chunked(
+                                8192
+                            ):
+                                if chunk:
+                                    f.write(chunk)
 
-        except Exception as e:
-            logger.error("❌ Download failed: %s - %s", dest.name, e)
-            raise
+                    logger.debug("✅ Download completed: %s", dest)
+                    break
+            except (aiohttp.ClientError, TimeoutError) as e:
+                logger.warning(
+                    "Attempt %s/%s failed for %s: %s",
+                    attempt,
+                    retry_attempts,
+                    dest.name,
+                    e,
+                )
+                if attempt == retry_attempts:
+                    logger.error("❌ Download failed: %s - %s", dest.name, e)
+                    raise
+                # Exponential backoff before retrying
+                backoff = 2**attempt
+                await asyncio.sleep(backoff)
+            except Exception as e:
+                logger.error("❌ Download failed: %s - %s", dest.name, e)
+                raise
 
     async def _download_with_progress(
         self,
@@ -152,11 +189,13 @@ class DownloadService:
                         downloaded_bytes += len(chunk)
                         chunk_count += 1
 
-                        # Update progress in MB (throttle updates to every 0.5 MB or every 100 chunks)
+                        # Update progress in MB (throttle updates to every
+                        # PROGRESS_MB_THRESHOLD MB or every 100 chunks)
                         downloaded_mb = downloaded_bytes / (1024 * 1024)
-                        if (downloaded_mb - last_progress_update >= 0.5) or (
-                            chunk_count % 100 == 0
-                        ):
+                        if (
+                            downloaded_mb - last_progress_update
+                            >= PROGRESS_MB_THRESHOLD
+                        ) or (chunk_count % 100 == 0):
                             await self.progress_service.update_task(
                                 task_id,
                                 completed=downloaded_mb,
@@ -166,33 +205,37 @@ class DownloadService:
             # Always ensure final progress update with actual downloaded size
             final_mb = downloaded_bytes / (1024 * 1024)
 
-            # Update the task total and completion to match actual download size
-            # This handles cases where Content-Length differs from actual size due to compression, etc.
+            # Update task total and completion to match
+            # actual download size
+            # This handles cases where Content-Length differs from actual size
+            # (e.g. due to compression)
             await self.progress_service.update_task_total(
                 task_id, new_total=final_mb, completed=final_mb
             )
             success = True
 
-        except TimeoutError:
+        except TimeoutError as e:
             logger.error("❌ Download timed out: %s", dest.name)
-            raise Exception(f"Download timed out: {dest.name}")
+            raise Exception(f"Download timed out: {dest.name}") from e
         except aiohttp.ClientError as e:
             logger.error(
                 "❌ Network error during download: %s - %s", dest.name, e
             )
-            raise Exception(f"Network error: {e}")
+            raise Exception(f"Network error: {e}") from e
         except Exception as e:
             logger.error("❌ Download failed during progress tracking: %s", e)
             raise
         finally:
-            # Mark task as finished with the actual final total for accurate percentage display
+            # Mark task as finished with the actual final total
+            # for accurate percentage display
             final_mb = downloaded_bytes / (1024 * 1024) if success else 0.0
             await self.progress_service.finish_task(
                 task_id,
                 success=success,
                 final_total=final_mb if success else None,
             )
-            # Give Rich time to properly update the display and prevent race conditions
+            # Give Rich time to update the display and prevent race
+            # conditions
             await asyncio.sleep(0.2)
 
     async def download_appimage(
@@ -290,28 +333,56 @@ class DownloadService:
         """
         headers = GitHubAuthManager.apply_auth({})
 
-        try:
-            async with self.session.get(
-                checksum_url, headers=headers
-            ) as response:
-                response.raise_for_status()
-                content = await response.text()
+        # Load network configuration
+        network_cfg = config_manager.load_global_config()["network"]
+        retry_attempts = int(network_cfg.get("retry_attempts", 3))
+        timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
 
-                logger.debug("📄 Checksum file downloaded successfully")
-                logger.debug("   Status: %s", response.status)
-                logger.debug("   Content length: %d characters", len(content))
-                logger.debug(
-                    "   Content preview: %s%s",
-                    content[:200],
-                    "..." if len(content) > 200 else "",
+        timeout = aiohttp.ClientTimeout(
+            total=timeout_seconds * 60,
+            sock_read=timeout_seconds * 3,
+            sock_connect=timeout_seconds,
+        )
+
+        for attempt in range(1, retry_attempts + 1):
+            try:
+                async with self.session.get(
+                    checksum_url, headers=headers, timeout=timeout
+                ) as response:
+                    _maybe = response.raise_for_status()
+                    if asyncio.iscoroutine(_maybe):
+                        await _maybe
+                    content = await response.text()
+
+                    logger.debug("📄 Checksum file downloaded successfully")
+                    logger.debug("   Status: %s", response.status)
+                    logger.debug(
+                        "   Content length: %d characters", len(content)
+                    )
+                    logger.debug(
+                        "   Content preview: %s%s",
+                        content[:CONTENT_PREVIEW_MAX],
+                        "..." if len(content) > CONTENT_PREVIEW_MAX else "",
+                    )
+
+                    return content
+            except (aiohttp.ClientError, TimeoutError) as e:
+                logger.warning(
+                    "Attempt %s/%s failed downloading checksum %s: %s",
+                    attempt,
+                    retry_attempts,
+                    checksum_url,
+                    e,
                 )
-
-                return content
-
-        except Exception as e:
-            logger.error("❌ Failed to download checksum file: %s", e)
-            logger.error("   URL: %s", checksum_url)
-            raise
+                if attempt == retry_attempts:
+                    logger.error("❌ Failed to download checksum file: %s", e)
+                    logger.error("   URL: %s", checksum_url)
+                    raise
+                await asyncio.sleep(2**attempt)
+            except Exception as e:
+                logger.error("❌ Failed to download checksum file: %s", e)
+                logger.error("   URL: %s", checksum_url)
+                raise
 
 
 class DownloadError(Exception):

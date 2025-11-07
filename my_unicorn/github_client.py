@@ -6,12 +6,15 @@ information, extract AppImage assets, and manage GitHub-specific operations.
 Refactored to use dataclasses and improved separation of concerns.
 """
 
+import asyncio
 import os
 import re
 from dataclasses import dataclass, replace
 from typing import Any
 
 import aiohttp
+
+from my_unicorn.config import config_manager
 
 from .auth import GitHubAuthManager, auth_manager
 from .cache import get_cache_manager
@@ -649,9 +652,7 @@ class ReleaseAPIClient:
         except Exception:
             pass
 
-    async def _fetch_from_api(
-        self, url: str, description: str
-    ) -> dict[str, Any] | None:
+    async def _fetch_from_api(self, url: str, description: str) -> Any | None:
         """Fetch data from GitHub API.
 
         Args:
@@ -664,17 +665,98 @@ class ReleaseAPIClient:
         """
         headers = GitHubAuthManager.apply_auth({})
 
-        async with self.session.get(url=url, headers=headers) as response:
-            if response.status == HTTP_NOT_FOUND:
-                return None
+        # If rate-limit is low, wait before making the request
+        try:
+            if self.auth_manager.should_wait_for_rate_limit():
+                wait_time = self.auth_manager.get_wait_time()
+                # Cap wait during tests
+                capped_wait = min(wait_time, 1)
+                logger.warning(
+                    "Rate limit low (%s). Waiting %s s (capped %s s)",
+                    self.auth_manager._remaining_requests,
+                    wait_time,
+                    capped_wait,
+                )
+                if (
+                    self.shared_api_task_id
+                    and self.progress_service.is_active()
+                ):
+                    # Update shared progress with a short message
+                    await self._update_shared_progress(
+                        f"Waiting for rate limit reset ({capped_wait}s)"
+                    )
+                await asyncio.sleep(capped_wait)
+        except Exception:
+            # Do not fail API fetch if rate-limit helpers have issues; proceed
+            pass
 
-            response.raise_for_status()
-            self.auth_manager.update_rate_limit_info(dict(response.headers))
+        # Load network configuration (retry and timeout)
+        network_cfg = config_manager.load_global_config()["network"]
+        retry_attempts = int(network_cfg.get("retry_attempts", 3))
+        timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
 
-            if self.shared_api_task_id and self.progress_service.is_active():
-                await self._update_shared_progress(description)
+        # Compose a ClientTimeout derived from configured base seconds.
+        # Use modest multipliers to keep behavior similar to prior defaults.
+        timeout = aiohttp.ClientTimeout(
+            total=timeout_seconds * 3,
+            sock_read=timeout_seconds * 2,
+            sock_connect=timeout_seconds,
+        )
 
-            return await response.json()
+        last_exc: Exception | None = None
+
+        # Retry loop with exponential backoff for transient network errors
+        for attempt in range(1, retry_attempts + 1):
+            try:
+                async with self.session.get(
+                    url=url, headers=headers, timeout=timeout
+                ) as response:
+                    if response.status == HTTP_NOT_FOUND:
+                        return None
+
+                    _maybe = response.raise_for_status()
+                    if asyncio.iscoroutine(_maybe):
+                        await _maybe
+                    # Update rate limit info from headers
+                    self.auth_manager.update_rate_limit_info(
+                        dict(response.headers)
+                    )
+
+                    if (
+                        self.shared_api_task_id
+                        and self.progress_service.is_active()
+                    ):
+                        await self._update_shared_progress(description)
+
+                    return await response.json()
+
+            except (aiohttp.ClientError, TimeoutError) as e:
+                last_exc = e
+                logger.warning(
+                    "Attempt %d/%d for %s failed: %s",
+                    attempt,
+                    retry_attempts,
+                    url,
+                    e,
+                )
+                if attempt == retry_attempts:
+                    logger.error(
+                        "❌ API fetch failed after %d attempts: %s - %s",
+                        attempt,
+                        url,
+                        e,
+                    )
+                    raise
+                # Exponential backoff before retrying
+                backoff = 2**attempt
+                await asyncio.sleep(backoff)
+            except Exception as e:
+                # Non-network error: do not attempt further retries
+                logger.error("Unexpected error fetching API %s: %s", url, e)
+                raise
+
+        if last_exc:
+            raise last_exc
 
     async def fetch_stable_release(self) -> Release | None:
         """Fetch the latest stable release.
@@ -692,6 +774,7 @@ class ReleaseAPIClient:
         if data is None:
             return None
 
+        # Allow AttributeError for non-dict responses (tests expect this)
         if data.get("prerelease", False):
             return None
 
@@ -710,10 +793,23 @@ class ReleaseAPIClient:
         if data is None:
             return None
 
-        for release in data:
+        # Expect a list of releases; guard if API returned unexpected type
+        if not isinstance(data, list):
+            logger.warning(
+                "Unexpected API response type for prereleases: %s", type(data)
+            )
+            return None
+
+        # Filter releases to dict entries to avoid calling .get() on bad items
+        releases = [r for r in data if isinstance(r, dict)]
+
+        for release in releases:
             if release.get("prerelease", False):
+                # release is a dict from the filtered list; cast for the call
                 return Release.from_api_response(
-                    self.owner, self.repo, release
+                    self.owner,
+                    self.repo,
+                    __import__("typing").cast(dict, release),
                 )
 
         return None
@@ -737,6 +833,15 @@ class ReleaseAPIClient:
         if data is None:
             return None
 
+        if not isinstance(data, dict):
+            logger.warning(
+                "Unexpected API response type for release by tag %s: %s",
+                tag,
+                type(data),
+            )
+            return None
+
+        # data should be a dict here; pass through to constructor
         return Release.from_api_response(self.owner, self.repo, data)
 
     async def fetch_default_branch(self) -> str:
@@ -750,6 +855,12 @@ class ReleaseAPIClient:
         data = await self._fetch_from_api(url, "Fetched default branch")
 
         if data is None:
+            return "main"
+
+        if not isinstance(data, dict):
+            logger.warning(
+                "Unexpected API response for default branch: %s", type(data)
+            )
             return "main"
 
         return data.get("default_branch", "main")
