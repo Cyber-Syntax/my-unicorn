@@ -99,7 +99,7 @@ def mock_git_subprocess():
     """
 
     async def _mock_subprocess(*args, **kwargs):
-        """Mock subprocess that simulates git clone.
+        """Mock subprocess that simulates git clone and setup.sh install.
 
         Args:
             *args: Command arguments
@@ -127,7 +127,46 @@ def mock_git_subprocess():
             mock_process.wait = AsyncMock(return_value=0)
             return mock_process
 
-        # For other subprocess calls (like setup.sh), return success
+        # For setup.sh install calls, simulate installation
+        if len(args) > 0 and args[0] == "bash" and "install" in args:
+            # Get the working directory (repo_dir)
+            repo_dir = kwargs.get("cwd")
+            if repo_dir:
+                repo_path = Path(repo_dir)
+                # Find package_dir from config (parent of repo_dir usually)
+                # For testing, we derive it from the fixture structure
+                package_dir = repo_path.parent / "my-unicorn"
+
+                # Simulate what setup.sh install does:
+                # copy files to package_dir
+                package_dir.mkdir(parents=True, exist_ok=True)
+
+                # Copy my_unicorn, scripts, setup.sh, pyproject.toml
+                for item in [
+                    "my_unicorn",
+                    "scripts",
+                    "setup.sh",
+                    "pyproject.toml",
+                ]:
+                    src = repo_path / item
+                    dst = package_dir / item
+                    if src.exists():
+                        if src.is_dir():
+                            if dst.exists():
+                                shutil.rmtree(dst)
+                            shutil.copytree(src, dst)
+                        else:
+                            shutil.copy2(src, dst)
+
+            mock_process = AsyncMock()
+            mock_process.returncode = 0
+            mock_process.stdout = AsyncMock()
+            mock_process.stdout.readline = AsyncMock(return_value=b"")
+            mock_process.wait = AsyncMock(return_value=0)
+            mock_process.pid = 12345
+            return mock_process
+
+        # For other subprocess calls, return success
         mock_process = AsyncMock()
         mock_process.returncode = 0
         mock_process.stdout = AsyncMock()
@@ -198,16 +237,15 @@ async def test_upgrade_version_progression(
         result = await updater.perform_update()
 
         # CRITICAL ASSERTIONS: Verify directory structure
-        repo_dir = temp_install_dirs["repo"]
         package_dir = temp_install_dirs["package"]
 
-        # 1. Verify NO source/ subdirectory exists (the bug we fixed)
-        assert not (repo_dir / "source").exists(), (
-            f"Bug regression: 'source/' subdirectory should not exist "
-            f"in {repo_dir}"
+        # 1. Verify upgrade succeeded
+        assert result is True, (
+            f"Upgrade from {current_version} to {new_version} should succeed"
         )
 
-        # 2. Verify files copied to correct location in package_dir
+        # 2. Verify files installed to correct location in package_dir
+        # (setup.sh install handles this now)
         assert (package_dir / "my_unicorn").exists(), (
             f"my_unicorn/ should exist in {package_dir}"
         )
@@ -218,19 +256,14 @@ async def test_upgrade_version_progression(
             f"scripts/ should exist in {package_dir}"
         )
 
-        # 3. Verify upgrade succeeded
-        assert result is True, (
-            f"Upgrade from {current_version} to {new_version} should succeed"
-        )
-
 
 @pytest.mark.asyncio
 async def test_upgrade_clones_to_correct_directory(
     temp_install_dirs, mock_git_subprocess
 ):
-    """Verify upgrade clones directly to repo_dir, not repo_dir/source/.
+    """Verify upgrade uses setup.sh install from cloned repo.
 
-    This is the core test for the directory structure bug fix.
+    This is the core test for Phase 1: delegating installation to setup.sh.
 
     Args:
         temp_install_dirs: Temporary directory fixture
@@ -272,36 +305,31 @@ async def test_upgrade_clones_to_correct_directory(
         assert result is True, "Upgrade should succeed"
 
         # After successful upgrade, repo_dir is cleaned up
-        # So we verify files were copied to package_dir correctly
+        # So we verify files were installed to package_dir correctly
         package_dir = temp_install_dirs["package"]
 
-        # CRITICAL: Verify files copied to package_dir
-        # This proves they were sourced from repo_dir/my_unicorn
-        # (NOT repo_dir/source/my_unicorn which would have failed)
+        # CRITICAL: Verify files installed by setup.sh to package_dir
+        # Phase 1 delegates all installation to setup.sh install
         assert (package_dir / "my_unicorn").exists(), (
-            "my_unicorn should be copied to package_dir"
+            "my_unicorn should be installed to package_dir"
         )
 
-        # Verify setup.sh was copied
+        # Verify setup.sh was installed
         assert (package_dir / "setup.sh").exists(), (
-            "setup.sh should be copied to package_dir"
+            "setup.sh should be installed to package_dir"
         )
 
-        # Verify scripts directory was copied
+        # Verify scripts directory was installed
         assert (package_dir / "scripts").exists(), (
-            "scripts should be copied to package_dir"
+            "scripts should be installed to package_dir"
         )
-
-        # CRITICAL: The fact that these files exist in package_dir proves
-        # they were successfully copied from repo_dir/my_unicorn
-        # If the bug existed (repo_dir/source/my_unicorn), the copy would fail
 
 
 @pytest.mark.asyncio
 async def test_upgrade_copies_files_correctly(
     temp_install_dirs, mock_git_subprocess
 ):
-    """Verify files are copied from repo_dir to package_dir.
+    """Verify files are installed by setup.sh to package_dir.
 
     Args:
         temp_install_dirs: Temporary directory fixture
@@ -339,17 +367,18 @@ async def test_upgrade_copies_files_correctly(
         package_dir = temp_install_dirs["package"]
 
         # Verify all required files exist in package_dir
+        # (installed by setup.sh install)
         assert (package_dir / "my_unicorn").is_dir(), (
-            "my_unicorn/ directory should exist"
+            "my_unicorn/ directory should be installed"
         )
         assert (package_dir / "setup.sh").is_file(), (
-            "setup.sh file should exist"
+            "setup.sh file should be installed"
         )
         assert (package_dir / "scripts").is_dir(), (
-            "scripts/ directory should exist"
+            "scripts/ directory should be installed"
         )
         assert (package_dir / "pyproject.toml").is_file(), (
-            "pyproject.toml file should exist"
+            "pyproject.toml file should be installed"
         )
 
 
@@ -357,7 +386,7 @@ async def test_upgrade_copies_files_correctly(
 async def test_installer_finds_required_files(
     temp_install_dirs, mock_git_subprocess
 ):
-    """Verify setup.sh can find all required files after upgrade.
+    """Verify setup.sh installs all required files during upgrade.
 
     Args:
         temp_install_dirs: Temporary directory fixture
@@ -394,8 +423,8 @@ async def test_installer_finds_required_files(
 
         package_dir = temp_install_dirs["package"]
 
-        # Verify setup.sh can find all files it needs
-        # (These are the files setup.sh looks for)
+        # Verify setup.sh installed all required files
+        # (These are the files setup.sh install should create)
         required_files = [
             "my_unicorn",  # Source code directory
             "scripts",  # Wrapper scripts
@@ -405,5 +434,5 @@ async def test_installer_finds_required_files(
         for file_name in required_files:
             file_path = package_dir / file_name
             assert file_path.exists(), (
-                f"setup.sh requires {file_name} but it's missing"
+                f"setup.sh should have installed {file_name}"
             )

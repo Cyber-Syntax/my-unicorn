@@ -24,19 +24,15 @@ from my_unicorn.constants import (
     CONFIG_FILE_NAME,
     CONFIG_VERSION,
     DEFAULT_APPS_DIR_NAME,
-    DEFAULT_BATCH_MODE,
     DEFAULT_CONFIG_SUBDIR,
     DEFAULT_CONSOLE_LOG_LEVEL,
-    DEFAULT_LOCALE,
     DEFAULT_LOG_LEVEL,
     DEFAULT_MAX_BACKUP,
     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
     DIRECTORY_KEYS,
     ISO_DATETIME_FORMAT,
-    KEY_BATCH_MODE,
     KEY_CONFIG_VERSION,
     KEY_CONSOLE_LOG_LEVEL,
-    KEY_LOCALE,
     KEY_LOG_LEVEL,
     KEY_MAX_BACKUP,
     KEY_MAX_CONCURRENT_DOWNLOADS,
@@ -96,8 +92,6 @@ class ConfigCommentManager:
 # config_version: Version of configuration format (DO NOT EDIT)
 # max_concurrent_downloads: Max simultaneous downloads (1-10)
 # max_backup: Number of backup copies to keep when updating apps (0-5)
-# batch_mode: Enable non-interactive mode (true/false)
-# locale: Language setting (en_US, es_ES, fr_FR, etc.)
 # log_level: Detail level for log files (DEBUG, INFO, WARNING, ERROR)
 # console_log_level: Console output detail level (DEBUG, INFO, etc.)
 
@@ -178,8 +172,6 @@ class GlobalConfig(TypedDict):
     config_version: str
     max_concurrent_downloads: int
     max_backup: int
-    batch_mode: bool
-    locale: str
     log_level: str
     console_log_level: str
     network: NetworkConfig
@@ -384,8 +376,6 @@ class GlobalConfigManager:
                 DEFAULT_MAX_CONCURRENT_DOWNLOADS
             ),
             KEY_MAX_BACKUP: str(DEFAULT_MAX_BACKUP),
-            KEY_BATCH_MODE: str(DEFAULT_BATCH_MODE).lower(),
-            KEY_LOCALE: DEFAULT_LOCALE,
             KEY_LOG_LEVEL: DEFAULT_LOG_LEVEL,
             KEY_CONSOLE_LOG_LEVEL: DEFAULT_CONSOLE_LOG_LEVEL,
             SECTION_NETWORK: {"retry_attempts": "3", "timeout_seconds": "10"},
@@ -507,8 +497,6 @@ class GlobalConfigManager:
                     config["max_concurrent_downloads"]
                 ),
                 "max_backup": str(config["max_backup"]),
-                "batch_mode": str(config["batch_mode"]).lower(),
-                "locale": config["locale"],
                 "log_level": config["log_level"],
                 "console_log_level": config["console_log_level"],
             }
@@ -640,14 +628,6 @@ class GlobalConfigManager:
             else 10,
         )
 
-        # Get batch mode value
-        batch_mode_str = get_scalar_config("batch_mode", "true")
-        batch_mode = (
-            batch_mode_str.lower() == "true"
-            if isinstance(batch_mode_str, str)
-            else True
-        )
-
         return GlobalConfig(
             config_version=str(
                 get_scalar_config("config_version", CONFIG_VERSION)
@@ -656,8 +636,6 @@ class GlobalConfigManager:
                 get_scalar_config("max_concurrent_downloads", 5)
             ),
             max_backup=int(get_scalar_config("max_backup", 1)),
-            batch_mode=batch_mode,
-            locale=str(get_scalar_config("locale", "en_US")),
             log_level=str(get_scalar_config("log_level", "INFO")),
             console_log_level=str(
                 get_scalar_config("console_log_level", "WARNING")

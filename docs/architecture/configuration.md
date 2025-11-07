@@ -41,8 +41,6 @@ Default values and where they are defined
 config_version = 1.0.0
 max_concurrent_downloads = 5
 max_backup = 1
-batch_mode = true
-locale = en_US
 log_level = INFO
 console_log_level = WARNING
 [network]

@@ -36,8 +36,6 @@ DEFAULT_BACKUP_COUNT: Final[int] = 3
 # Defaults used by the global config manager
 DEFAULT_MAX_CONCURRENT_DOWNLOADS: Final[int] = 5
 DEFAULT_MAX_BACKUP: Final[int] = 1
-DEFAULT_BATCH_MODE: Final[bool] = True
-DEFAULT_LOCALE: Final[str] = "en_US"
 DEFAULT_CONSOLE_LOG_LEVEL: Final[str] = "WARNING"
 
 # Date/time formats used in config headers and saved timestamps
@@ -51,8 +49,6 @@ SECTION_DIRECTORY: Final[str] = "directory"
 KEY_CONFIG_VERSION: Final[str] = "config_version"
 KEY_MAX_CONCURRENT_DOWNLOADS: Final[str] = "max_concurrent_downloads"
 KEY_MAX_BACKUP: Final[str] = "max_backup"
-KEY_BATCH_MODE: Final[str] = "batch_mode"
-KEY_LOCALE: Final[str] = "locale"
 KEY_LOG_LEVEL: Final[str] = "log_level"
 KEY_CONSOLE_LOG_LEVEL: Final[str] = "console_log_level"
 

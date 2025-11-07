@@ -206,8 +206,6 @@ def test_ensure_directories_from_config(config_manager, tmp_path):
         "config_version": "1.0.0",
         "max_concurrent_downloads": 5,
         "max_backup": 1,
-        "batch_mode": True,
-        "locale": "en_US",
         "log_level": "INFO",
         "network": {"retry_attempts": 3, "timeout_seconds": 10},
         "directory": dirs,
@@ -288,7 +286,6 @@ def test_comment_stripping_configparser(config_manager):
     """Test that CommentAwareConfigParser correctly strips inline comments."""
     # Create a config file with inline comments
     config_content = """[DEFAULT]
-batch_mode = true  # Non-interactive mode
 
 [directory]
 logs = /test/logs  # Log files directory
@@ -305,7 +302,6 @@ tmp = /test/tmp  # Temporary files directory
     parser.read(test_config_file)
 
     # Verify that comments are stripped from values
-    assert parser.get("DEFAULT", "batch_mode") == "true"
     assert parser.get("directory", "logs") == "/test/logs"
     assert parser.get("directory", "cache") == "/test/cache"
     assert parser.get("directory", "tmp") == "/test/tmp"
@@ -369,7 +365,6 @@ def test_global_config_manager(config_dir):
     raw_config = ConfigParser()
     raw_config.add_section("settings")
     raw_config.set("settings", "max_backup", "3")
-    raw_config.set("settings", "locale", "en_US")
     converted = global_manager._convert_to_global_config(raw_config)
     assert "directory" in converted
     assert "network" in converted
@@ -580,7 +575,7 @@ def test_config_manager_facade_integration(config_dir):
     assert isinstance(default_config, dict)
 
     # Test the global config manager conversion method by creating a proper config dict
-    test_config = {"max_backup": "2", "locale": "en_US", "directory": {}}
+    test_config = {"max_backup": "2", "directory": {}}
     converted_config = (
         config_manager.global_config_manager._convert_to_global_config(
             test_config
@@ -661,7 +656,6 @@ def test_merge_missing_fields(config_dir):
     # Start with minimal config using proper ConfigParser syntax
     user_config.read_string("""[DEFAULT]
 config_version = 1.0.0
-locale = en_US
 """)
 
     defaults = manager.get_default_global_config()
@@ -740,7 +734,6 @@ def test_configuration_migration_integration(config_dir):
     # Create old configuration file missing some fields
     old_config_content = """[DEFAULT]
 config_version = 1.0.0
-locale = fr_FR
 max_backup = 3
 
 [network]
@@ -756,7 +749,6 @@ storage = /custom/storage
 
     # Verify configuration was migrated
     assert config["config_version"] == "1.0.2"  # Should be updated
-    assert config["locale"] == "fr_FR"  # User value preserved
     assert config["max_backup"] == 3  # User value preserved
     assert config["network"]["retry_attempts"] == 5  # User value preserved
 
@@ -791,7 +783,6 @@ def test_migration_failure_rollback(config_dir):
 
     old_config_content = """[DEFAULT]
 config_version = 1.0.0
-locale = test_locale
 """
     manager.directory_manager.settings_file.write_text(old_config_content)
 
@@ -817,7 +808,6 @@ def test_migration_with_new_config_file(config_dir):
 
     # Should create default configuration
     assert config["config_version"] == "1.0.2"
-    assert config["locale"] == "en_US"
     assert manager.directory_manager.settings_file.exists()
 
 
@@ -827,30 +817,28 @@ def test_migration_no_changes_needed(config_dir):
 
     # Create current configuration file with all required fields
     complete_config_content = """[DEFAULT]
-config_version = 1.0.2
-max_concurrent_downloads = 5
-max_backup = 1
-batch_mode = true
-locale = en_US
-log_level = INFO
-console_log_level = WARNING
+    config_version = 1.0.2
+    max_concurrent_downloads = 5
+    max_backup = 1
+    log_level = INFO
+    console_log_level = WARNING
 
-[network]
-retry_attempts = 3
-timeout_seconds = 10
+    [network]
+    retry_attempts = 3
+    timeout_seconds = 10
 
-[directory]
-repo = /tmp/test-repo
-package = /tmp/test-package
-download = /tmp/downloads
-storage = /tmp/storage
-backup = /tmp/backup
-icon = /tmp/icons
-settings = /tmp/settings
-logs = /tmp/logs
-cache = /tmp/cache
-tmp = /tmp/tmp
-"""
+    [directory]
+    repo = /tmp/test-repo
+    package = /tmp/test-package
+    download = /tmp/downloads
+    storage = /tmp/storage
+    backup = /tmp/backup
+    icon = /tmp/icons
+    settings = /tmp/settings
+    logs = /tmp/logs
+    cache = /tmp/cache
+    tmp = /tmp/tmp
+    """
 
     manager.directory_manager.settings_file.write_text(complete_config_content)
 
@@ -915,7 +903,6 @@ def test_comment_stripping_functionality(config_dir, tmp_path):
     config_content = """[DEFAULT]
 max_concurrent_downloads = 10  # Max simultaneous downloads
 max_backup = 3  # Number of backup copies to keep
-batch_mode = false  # Non-interactive mode
 
 [network]
 retry_attempts = 5  # Download retry attempts
@@ -932,7 +919,6 @@ download = /tmp/downloads  # Temporary download location
 
     assert config["max_concurrent_downloads"] == 10
     assert config["max_backup"] == 3
-    assert config["batch_mode"] is False
     assert config["network"]["retry_attempts"] == 5
     assert config["network"]["timeout_seconds"] == 30
     assert str(config["directory"]["download"]) == "/tmp/downloads"

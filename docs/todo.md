@@ -2,80 +2,53 @@
 
 ## testing
 
-- [ ] #BUG: Token need to be optional (container error, it might be related to dbus issue which container based not use secretservice dbus?)
-  - [x] when there is correctly setup gnome-keyring, it works.
-
-    ```
-    2025-10-31 12:04:00 - my_unicorn.backup - WARNING - warning:306 - Invalid version format detected, using lexicographic sorting
-    2025-10-31 12:04:00 - my_unicorn.auth - ERROR - error:321 - Failed to retrieve GitHub token from keyring: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
-    ```
-
-    ```bash
-    # try to test it in container, and I confirm it is dbus issue
-    github_pat_aXCvasdfbcasdfXZCXVA^Cdg1231asdfascvasd123 # example github pat, not real
-    [devuser@arch-dev my-unicorn]$ my-unicorn auth --save-token
-    Enter your GitHub token (input hidden):
-    Confirm your GitHub token:
-    15:37:15 - my_unicorn.auth - ERROR - Failed to save GitHub token to keyring: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
-    15:37:15 - my_unicorn.cli.runner - ERROR - Unexpected error: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
-    ❌ Unexpected error: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
-    ```
-
-- [ ] Copy the source code on start arch or shell arch? Start readonly current repo?
+- [ ] clean unused code
+    - [x] locale, batch_mode on configs
+    - [ ] network retry etc.
+          this one is hard to implement, so I am thinking to remove it for now.
 - [ ] #TEST: version command logic is deprecated, so testing to use **version** library
 - [ ] #BUG: Rotation error on logs...
-  - Currently, implemented to custom rotation logic more simple and efficient
+    - Currently, implemented to custom rotation logic more simple and efficient
       and also increased 1MB log to 10MB to increase the log size. Manual and pytest
       succesfully passed.
 - [ ] appimage build take times
-  - [x] install/update show installation error reasons(show appimage build takes times)
-  - [ ] take care the edge cases, maybe app not have appimage at all?
+    - [x] install/update show installation error reasons(show appimage build takes times)
+    - [ ] take care the edge cases, maybe app not have appimage at all?
 - [ ] Remove overengineering
-  - [ ] dataclasses
-  - [ ] strategy
+    - [ ] dataclasses
+    - [ ] strategy
           " If you only have a couple of algorithms and they rarely change, there’s no real reason to overcomplicate the program with new classes and interfaces
           that come along with the pattern." by <https://refactoring.guru/design-patterns/strategy>
-  - [x] template
+    - [x] template
           "Template methods tend to be harder to maintain the more steps they have.
           You might violate the Liskov Substitution Principle by suppressing a default step implementation via a subclass.
           " by <https://refactoring.guru/design-patterns/template-method>
 
 ## in-progress
 
-- [ ] test.bash -> update test not available because we remove before catalog install or url install
-      so we need a better logic to handle this case
+- [ ] remove writing commits to release desc
+- [ ] better app.json config like owner, repo must be inside github dict
 - [ ] TEST: Never use the real user config logs, app location on pytest unittests which current is use them!
       it would be better to make the pytest logs like my-unicorn_pytest.log
-
-- [ ] BUG: two time installed print on new version
-
-    ```bash
-    ✅ All 2 specified app(s) are already installed:
-    • qownnotes
-    • legcord
-    ✅ All 2 specified app(s) are already installed:
-    • qownnotes
-    • legcord
-    ```
 
 - [ ] add INFO level logs for verification instead of DEBUG
 - [ ] #BUG: Cycle detected in import chain for cache.py
 - [ ] API rate limiting
 - [ ] refactor
-  <https://refactoring.guru/refactoring/smells>
-  - [x] general
-  - [x] logger
-  - [x] scripts
-  - [ ] config
-  - [ ] handle FIXME, TODO for duplicate functions
-  - [x] service.progress already active
-  - [x] services
-  - [x] utils.py seperated folders
-  - [ ] strategies
-  - [x] reading code from top to bottom
-  - [x] functions instead of comments
-  - [ ] contexts
-  - [ ] remove license, contribution from readme.md because there is already markdown files for them
+      <https://refactoring.guru/refactoring/smells>
+    - [x] general
+    - [x] logger
+    - [x] scripts
+    - [ ] config
+    - [ ] handle FIXME, TODO for duplicate functions
+    - [x] service.progress already active
+    - [x] services
+    - [x] utils.py seperated folders
+    - [ ] strategies
+    - [x] reading code from top to bottom
+    - [x] functions instead of comments
+    - [ ] contexts
+    - [ ] remove license, contribution from readme.md because there is already markdown files for them
 
 ## todo
 
@@ -103,18 +76,19 @@
 - [ ] might be better to use loguru
 - [ ] mv neovim to usr bin to use appimage neovim
       mv /tmp/nvim.appimage /usr/local/bin/nvim
-- [ ] make sure tha decrease files on template and move them to one file to read more easy and make it function base utilities for it
 - [ ] make sure skip not skip verification if there is verification option
-  - tested obsidian and it seems work but we need to make sure about it.
+    - [x] freetube test verify digest even it is skip: true on the catalog,
+          and I still keep it skip purposely
+    - [x] obsidian test
 - [ ] upgrade need auto easy update and notify like appimages
 - [ ] config structure refactor
 - [ ] log rotation fix
 - [ ] things tested and need updates
-  - [ ] general test
-  - [ ] fish terminal, kitty terminal not good with rich library but alacrity good(artifacts on bars)
-  - [x] auth log info, validation
-  - [ ] add my unicorn export path to fish shells
-  - [ ] kde wallet support via dbus-python, test in the shared folder 3. kdewallet isn't show any token saved which seems like we don't support ito. written script to keyring-my-unicorn folder, check that out.
+    - [ ] general test
+    - [ ] fish terminal, kitty terminal not good with rich library but alacrity good(artifacts on bars)
+    - [x] auth log info, validation
+    - [ ] add my unicorn export path to fish shells
+    - [ ] kde wallet support via dbus-python, test in the shared folder 3. kdewallet isn't show any token saved which seems like we don't support ito. written script to keyring-my-unicorn folder, check that out.
           dbus-python used on kdewallet saves, so we can add that to auth later as a support.
 - [ ] #BUG: digest not became true on catalog installs if its use checksum_file with digest verify both
 - [ ] add verification passed or not to verification section on app-specific config
@@ -126,24 +100,59 @@
 
 ## backlog
 
+- [ ] #BUG: Token need to be optional (container error, it might be related to dbus issue which container based not use secretservice dbus?)
+    - [x] when there is correctly setup gnome-keyring, it works.
+
+        ```
+        2025-10-31 12:04:00 - my_unicorn.backup - WARNING - warning:306 - Invalid version format detected, using lexicographic sorting
+        2025-10-31 12:04:00 - my_unicorn.auth - ERROR - error:321 - Failed to retrieve GitHub token from keyring: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
+        ```
+
+        ```bash
+        # try to test it in container, and I confirm it is dbus issue
+        github_pat_aXCvasdfbcasdfXZCXVA^Cdg1231asdfascvasd123 # example github pat, not real
+        [devuser@arch-dev my-unicorn]$ my-unicorn auth --save-token
+        Enter your GitHub token (input hidden):
+        Confirm your GitHub token:
+        15:37:15 - my_unicorn.auth - ERROR - Failed to save GitHub token to keyring: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
+        15:37:15 - my_unicorn.cli.runner - ERROR - Unexpected error: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
+        ❌ Unexpected error: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
+        ```
+
 - [ ] good cli design princibles
       <https://clig.dev/>
       <https://www.amazon.com/UNIX-Programming-Addison-Wesley-Professional-Computng/dp/0131429019>
 
     My advice as a user of CLI:
-  - no emojis please, ever
+    - no emojis please, ever
       Many people are more visually oriented, and are greatly aided by images and color.
       A standard `NO_EMOJIS` environment variable could perhaps be used to help both camps, just like `NO_COLOR` is available today.
-  - if you want to make it look nice, use ANSI escape codes for color rather than emojis.
+    - if you want to make it look nice, use ANSI escape codes for color rather than emojis.
       even then, don't use color alone to convey meaning because it will most likely get destroyed by whatever you're piping it to.
-  - No, please don't use escape codes in your output. Use the library that is designed for this purpose: terminfo.
-  - please take the time to write detailed man pages, not just a "--help" screen
-  - implement "did you mean?" for typos (git style) and potentially dangerous commands
-  - separate the interface into a tree of subcommands (Go/Docker/AWS style) rather than a flat assortment of flags
-  - if you are displaying tabular data, present an ncurses interface
-  - (extremely important) shell completion for bash and zsh
+    - No, please don't use escape codes in your output. Use the library that is designed for this purpose: terminfo.
+    - please take the time to write detailed man pages, not just a "--help" screen
+    - implement "did you mean?" for typos (git style) and potentially dangerous commands
+    - separate the interface into a tree of subcommands (Go/Docker/AWS style) rather than a flat assortment of flags
+    - if you are displaying tabular data, present an ncurses interface
+    - (extremely important) shell completion for bash and zsh
 
 - [ ] typer, click libraries
+
+## done
+
+- [x] Start source code readonly on container
+- [x] test.bash -> update test not available because we remove before catalog install or url install
+      so we need a better logic to handle this case
+- [x] BUG: two time installed print on new version
+
+    ```bash
+    ✅ All 2 specified app(s) are already installed:
+    • qownnotes
+    • legcord
+    ✅ All 2 specified app(s) are already installed:
+    • qownnotes
+    • legcord
+    ```
 
 ## Future Enhancements (Good-to-have)
 

@@ -11,6 +11,7 @@ Currently using prereleases until stable releases are available.
 
 import asyncio
 import shutil
+import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as get_version
@@ -156,6 +157,30 @@ class SelfUpdater:
             repo=GITHUB_REPO,
             session=session,
         )
+        self._uv_available: bool = self._check_uv_available()
+
+    def _check_uv_available(self) -> bool:
+        """Check if UV is available in the system.
+
+        Returns:
+            True if UV is installed and available, False otherwise
+
+        """
+        try:
+            result = subprocess.run(
+                ["uv", "--version"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            available = result.returncode == 0
+            if available:
+                logger.debug("UV is available: %s", result.stdout.strip())
+            return available
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            logger.debug("UV is not available in PATH")
+            return False
 
     def get_current_version(self) -> str:
         """Get the current installed version of my-unicorn.
@@ -343,24 +368,32 @@ class SelfUpdater:
             return False
 
     async def perform_update(self) -> bool:
-        """Update by doing a fresh git clone and running the installer.
+        """Update by cloning repo and running setup.sh install.
+
+        Simplified approach that delegates all
+        installation logic to setup.sh, eliminating code duplication.
 
         Returns:
             True if update was successful, False otherwise
 
         """
         repo_dir = self.global_config["directory"]["repo"]
-        package_dir = self.global_config["directory"]["package"]
-        installer = package_dir / "setup.sh"
+        installer_script = repo_dir / "setup.sh"
 
         logger.debug("Starting upgrade to my-unicorn...")
         logger.debug("Repository directory: %s", repo_dir)
-        logger.debug("Package directory: %s", package_dir)
-        logger.debug("Installer script: %s", installer)
+        logger.debug("UV available: %s", self._uv_available)
 
-        # Track progress with simple indicators
+        # Inform user about UV usage
+        if self._uv_available:
+            logger.info("UV detected - will use UV for faster installation")
+        else:
+            logger.info(
+                "Using pip for installation (install UV for faster updates)"
+            )
+
+        # Track progress
         download_task_id = None
-        file_task_id = None
         install_task_id = None
         cleanup_task_id = None
 
@@ -368,30 +401,19 @@ class SelfUpdater:
             # 1) Prepare fresh repo directory
             if repo_dir.exists():
                 logger.info("Removing old repo at %s", repo_dir)
-                logger.debug(
-                    "Old repo directory size: %s",
-                    repo_dir.stat().st_size
-                    if repo_dir.is_file()
-                    else "directory",
-                )
                 shutil.rmtree(repo_dir)
                 logger.debug("Old repo directory removed successfully")
+
             repo_dir.mkdir(parents=True)
             logger.debug("Created fresh repo directory: %s", repo_dir)
 
-            # 2) Clone into repo_dir with simple progress tracking
+            # 2) Clone repository
             if self.progress:
                 download_task_id = self.progress.start_task(
                     "repo_clone", "Cloning repository from GitHub..."
                 )
 
             logger.info("Cloning repository to %s", repo_dir)
-            logger.debug(
-                "Git clone command: git clone %s %s",
-                f"{GITHUB_URL}.git",
-                str(repo_dir),
-            )
-
             clone_process = await asyncio.create_subprocess_exec(
                 "git",
                 "clone",
@@ -401,39 +423,14 @@ class SelfUpdater:
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            # Simple progress updates during clone
+            # Progress updates during clone
             clone_task = asyncio.create_task(clone_process.wait())
             if self.progress and download_task_id:
-                # Show progress during clone
                 while not clone_task.done():
                     self.progress.update_task(download_task_id)
                     await asyncio.sleep(0.5)
 
             await clone_task
-
-            logger.debug(
-                "Git clone process completed with return code: %s",
-                clone_process.returncode,
-            )
-            if clone_process.returncode == 0:
-                logger.debug("Repository cloned successfully to %s", repo_dir)
-                # Check if repo directory has expected content
-                try:
-                    repo_contents = list(repo_dir.iterdir())
-                    logger.debug(
-                        "Cloned repository contains %d items",
-                        len(repo_contents),
-                    )
-                    logger.debug(
-                        "Repository structure: %s",
-                        [item.name for item in repo_contents],
-                    )
-                except Exception as e:
-                    logger.debug(
-                        "Could not list repo directory contents: %s", e
-                    )
-            else:
-                logger.debug("Git clone failed, will handle error")
 
             if self.progress and download_task_id:
                 self.progress.finish_task(
@@ -445,151 +442,57 @@ class SelfUpdater:
                 )
 
             if clone_process.returncode != 0:
-                logger.error(
-                    "Git clone failed with return code %s",
-                    clone_process.returncode,
-                )
+                logger.error("Git clone failed")
                 print("❌ Failed to download repository")
                 return False
 
-            # 3) Copy files with simple progress tracking
-            if self.progress:
-                file_task_id = self.progress.start_task(
-                    "file_operations", "Copying project files..."
+            # 3) Run setup.sh install from the cloned repo
+            if not installer_script.exists():
+                logger.error(
+                    "Installer script missing at %s", installer_script
                 )
-
-            logger.info("Copying code + scripts to %s", package_dir)
-            logger.debug("Ensuring package directory exists: %s", package_dir)
-            package_dir.mkdir(parents=True, exist_ok=True)
-            logger.debug("Package directory created/verified")
-
-            # Copy over the package code, scripts, and installation files
-            files_to_copy = (
-                "my_unicorn",
-                "scripts",
-                "pyproject.toml",
-                "setup.sh",
-            )
-            for name in files_to_copy:
-                src = repo_dir / name
-                dst = package_dir / name
-
-                logger.debug("Processing file/directory: %s", name)
-                logger.debug("Source: %s", src)
-                logger.debug("Destination: %s", dst)
-
-                if not src.exists():
-                    logger.warning("Source file/directory not found: %s", src)
-                    logger.debug("Skipping %s - source does not exist", name)
-                    continue
-
-                if self.progress and file_task_id:
-                    self.progress.update_task(
-                        file_task_id,
-                        description=f"Copying {name}...",
-                    )
-
-                # Remove the old directory/file
-                # (but preserve venv and other dirs)
-                if dst.exists():
-                    logger.debug("Destination exists, removing old: %s", dst)
-                    if dst.is_dir():
-                        logger.debug("Removing old directory: %s", dst)
-                        shutil.rmtree(dst)
-                    else:
-                        logger.debug("Removing old file: %s", dst)
-                        dst.unlink()
-
-                # Copy fresh
-                if src.is_dir():
-                    logger.debug(
-                        "Copying directory tree from %s to %s", src, dst
-                    )
-                    _ = shutil.copytree(src, dst)
-                    logger.debug("Directory copy completed for %s", name)
-                else:
-                    logger.debug("Copying file from %s to %s", src, dst)
-                    _ = shutil.copy2(src, dst)
-                    logger.debug("File copy completed for %s", name)
-
-            if self.progress and file_task_id:
-                self.progress.finish_task(
-                    file_task_id,
-                    success=True,
-                    final_description="Files copied successfully",
-                )
-
-            # 4) Run installer with simple progress tracking
-            if not installer.exists():
-                logger.error("Installer script missing at %s", installer)
                 print("❌ Installer script not found.")
                 return False
 
-            # Make installer executable
-            logger.debug("Setting installer script permissions: %s", installer)
-            installer.chmod(0o755)
-            logger.debug("Installer script is now executable")
+            logger.debug("Making installer executable: %s", installer_script)
+            installer_script.chmod(0o755)
 
             if self.progress:
+                install_msg = (
+                    "Running installation with UV..."
+                    if self._uv_available
+                    else "Running installation with pip..."
+                )
                 install_task_id = self.progress.start_task(
                     "upgrade_installation",
-                    "Running installer in UPDATE mode...",
+                    install_msg,
                 )
 
-            logger.debug("Starting installer subprocess")
-            logger.debug("Command: bash %s update", str(installer))
-            logger.debug("Working directory: %s", str(package_dir))
+            logger.info("Executing: bash %s install", installer_script)
             install_process = await asyncio.create_subprocess_exec(
                 "bash",
-                str(installer),
-                "update",
-                cwd=str(package_dir),
+                str(installer_script),
+                "install",
+                cwd=str(repo_dir),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
-            logger.debug(
-                "Installer subprocess started with PID: %s",
-                install_process.pid,
-            )
 
-            # Stream output and update progress
+            # Stream output with progress updates
             if install_process.stdout:
                 while True:
                     line = await install_process.stdout.readline()
                     if not line:
                         break
-
                     line_str = line.decode().strip()
-
-                    # Debug log all installer output for troubleshooting
                     logger.debug("Installer output: %s", line_str)
 
-                    # Detailed logging for specific venv and
-                    # installation operations
-                    if "virtual environment" in line_str.lower():
-                        logger.debug("VENV OPERATION: %s", line_str)
-                    elif "pip install" in line_str.lower():
-                        logger.debug("PIP INSTALL: %s", line_str)
-                    elif "installing" in line_str.lower():
-                        logger.debug("PACKAGE INSTALL: %s", line_str)
-                    elif "creating" in line_str.lower():
-                        logger.debug("CREATION STEP: %s", line_str)
-                    elif "updating" in line_str.lower():
-                        logger.debug("UPDATE STEP: %s", line_str)
-                    elif "complete" in line_str.lower():
-                        logger.debug("COMPLETION: %s", line_str)
-                    elif "error" in line_str.lower():
-                        logger.debug("ERROR OUTPUT: %s", line_str)
-                    elif "warning" in line_str.lower():
-                        logger.debug("WARNING OUTPUT: %s", line_str)
-
-                    # Update progress indicator on key installer stages
                     if (
                         self.progress
                         and install_task_id
                         and any(
-                            keyword in line_str.lower()
-                            for keyword in [
+                            kw in line_str.lower()
+                            for kw in [
                                 "creating",
                                 "installing",
                                 "updating",
@@ -599,17 +502,8 @@ class SelfUpdater:
                     ):
                         self.progress.update_task(install_task_id)
 
-            _ = await install_process.wait()
-
-            logger.debug("Installer process completed")
+            await install_process.wait()
             logger.debug("Installer exit code: %s", install_process.returncode)
-            if install_process.returncode == 0:
-                logger.debug("Installation successful")
-            else:
-                logger.debug(
-                    "Installation failed with code: %s",
-                    install_process.returncode,
-                )
 
             if self.progress and install_task_id:
                 self.progress.finish_task(
@@ -627,7 +521,7 @@ class SelfUpdater:
                 )
                 return False
 
-            # 5) Clean up repo_dir with simple progress tracking
+            # 4) Clean up cloned repository
             if self.progress:
                 cleanup_task_id = self.progress.start_task(
                     "cleanup", "Cleaning up temporary files..."
@@ -635,21 +529,6 @@ class SelfUpdater:
 
             if repo_dir.exists():
                 logger.info("Cleaning up repo directory")
-                logger.debug("Removing repo directory: %s", repo_dir)
-                try:
-                    dir_size = sum(
-                        f.stat().st_size
-                        for f in repo_dir.rglob("*")
-                        if f.is_file()
-                    )
-                    logger.debug(
-                        "Repo directory size before cleanup: %d bytes",
-                        dir_size,
-                    )
-                except Exception as e:
-                    logger.debug(
-                        "Could not calculate repo directory size: %s", e
-                    )
                 shutil.rmtree(repo_dir)
                 logger.debug("Repo directory cleanup completed")
 
@@ -660,18 +539,13 @@ class SelfUpdater:
                     final_description="Cleanup completed",
                 )
 
-            logger.debug("Self-update completed successfully")
-            logger.debug(
-                "All operations completed: clone, file copy, "
-                "installation, cleanup"
-            )
+            logger.info("Self-update completed successfully")
             return True
 
         except Exception as e:
-            # Finish any pending progress tasks with error
+            # Finish any pending progress tasks
             for task_id in [
                 download_task_id,
-                file_task_id,
                 install_task_id,
                 cleanup_task_id,
             ]:

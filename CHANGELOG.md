@@ -2,7 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
-This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.10.1-alpha]
+
+### Added
+
+- **UV Support**: Added support for UV (Astral's fast Python package manager) with automatic detection and seamless fallback to pip.
+  UV is used to install the venv, which is faster and more efficient than pip.
+
+### Changed
+
+- Enhanced setup.sh with UV detection and conditional usage
+- Improved upgrade logging to indicate whether UV or pip is being used
+
+### Fixed
+
+- Fixed a bug where the venv installation process could fail due to wrong directory usage on upgrade module.
+  Now, the package upgrade process is uses setup.sh instead of upgrade module for better simplified installation process.
+  
+### Removed
+
+- Locale and batch_mode on configuration which they was violate YAGNI. May be added back in the future if needed
+- Commit history writing to release notes
 
 ## v1.10.0-alpha
 

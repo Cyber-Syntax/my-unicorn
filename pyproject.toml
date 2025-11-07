@@ -1,20 +1,37 @@
 [project]
 name = 'my-unicorn'
-version = '1.10.0-alpha'
+version = '1.10.1-alpha'
 maintainers = [{ name = "Cyber-Syntax" }]
 license = { text = "GPL-3.0-or-later" }
 description = 'My Unicorn is a command-line tool to manage AppImages on Linux. It allows users to install, update, and manage AppImages from GitHub repositories easily. It is designed to simplify the process of handling AppImages, making it more convenient for users to keep their applications up-to-date.'
 keywords = ["appimage", "appimage-manager"]
 requires-python = ">= 3.12"
 dependencies = [
-  "aiohttp>=3.12.10, <4.0.0",
-  "rich>=14.1.0",
+  "aiohttp==3.12.15",
+  "rich==14.1.0",
   "asyncio>=3.12.1",
-  "orjson>=3.11.1",
-  "uvloop>=0.21.0",
-  "keyring>=25.6.0",
+  "orjson==3.11.1",
+  "uvloop==0.21.0",
+  "keyring==25.6.0",
   "packaging>=25.0",
-  "PyYAML>=6.0.2",
+  "pyyaml==6.0.2",
+  "aiohappyeyeballs==2.6.1",
+  "aiosignal==1.4.0",
+  "attrs==25.3.0",
+  "cffi==1.17.1",
+  "cryptography==45.0.6",
+  "frozenlist==1.7.0",
+  "idna==3.10",
+  "jaraco-classes==3.4.0",
+  "jaraco-context==6.0.1",
+  "jaraco-functools==4.2.1",
+  "jeepney==0.9.0",
+  "more-itertools==10.7.0",
+  "multidict==6.6.3",
+  "propcache==0.3.2",
+  "pycparser==2.22",
+  "secretstorage==3.3.3",
+  "yarl==1.20.1",
 ]
 
 readme = { file = "README.md", content-type = "text/markdown" }
@@ -75,6 +92,9 @@ python_functions = "test_*"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 pythonpath = [".", "my_unicorn"]
+markers = [
+  "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
 
 [tool.ruff]
 include = ["pyproject.toml"]
