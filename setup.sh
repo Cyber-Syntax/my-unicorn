@@ -4,7 +4,7 @@
 # ------------------------------------------------
 # User-level installer & updater for "my-unicorn"
 # - Copies project files into XDG user data directory
-# - Creates/updates Python virtual environment  
+# - Creates/updates Python virtual environment
 # - Installs wrapper script and ensures PATH configuration
 # - Sets up shell autocomplete (bash/zsh)
 #
@@ -62,16 +62,16 @@ detect_rc_file() {
   local rc user_shell
   user_shell="$(basename "${SHELL:-}")"
   case "$user_shell" in
-    zsh)
-      rc="$HOME/.zshrc"
-      [[ -f "$HOME/.config/zsh/.zshrc" ]] && rc="$HOME/.config/zsh/.zshrc"
-      ;;
-    bash)
-      rc="$HOME/.bashrc"
-      ;;
-    *)
-      rc="$HOME/.bashrc"
-      ;;
+  zsh)
+    rc="$HOME/.zshrc"
+    [[ -f "$HOME/.config/zsh/.zshrc" ]] && rc="$HOME/.config/zsh/.zshrc"
+    ;;
+  bash)
+    rc="$HOME/.bashrc"
+    ;;
+  *)
+    rc="$HOME/.bashrc"
+    ;;
   esac
   # Create the file if it doesn't exist
   [[ ! -f "$rc" ]] && touch "$rc"
@@ -84,9 +84,9 @@ detect_rc_file() {
 ensure_path_in_file() {
   local rc_file="$1"
   local position="${2:-append}"
-  
+
   [[ ! -f "$rc_file" ]] && touch "$rc_file"
-  
+
   if ! grep -Fxq "$EXPORT_LINE" "$rc_file"; then
     if [[ "$position" == "prepend" ]]; then
       # Put PATH export at the very top
@@ -95,16 +95,16 @@ ensure_path_in_file() {
         echo "$EXPORT_LINE"
         echo
         cat "$rc_file"
-      } > "$rc_file.tmp" && mv "$rc_file.tmp" "$rc_file"
+      } >"$rc_file.tmp" && mv "$rc_file.tmp" "$rc_file"
       echo "Added PATH to top of $rc_file"
     else
       # Add PATH export at the bottom
-      printf '\n# Added by my-unicorn installer\n%s\n' "$EXPORT_LINE" >> "$rc_file"
+      printf '\n# Added by my-unicorn installer\n%s\n' "$EXPORT_LINE" >>"$rc_file"
       echo "Added PATH to bottom of $rc_file"
     fi
   else
     echo "ℹ️ PATH already configured in $rc_file"
-  fi  
+  fi
 }
 
 # Ensure PATH is set for both bash and zsh shells
@@ -113,9 +113,9 @@ ensure_path_in_file() {
 ensure_path_for_shells() {
   local bashrc="$HOME/.bashrc"
   local zshrc="$HOME/.zshrc"
-  
+
   [[ -f "$HOME/.config/zsh/.zshrc" ]] && zshrc="$HOME/.config/zsh/.zshrc"
-  
+
   ensure_path_in_file "$bashrc" prepend
   ensure_path_in_file "$zshrc" append
 }
@@ -144,15 +144,31 @@ copy_source_to_install_dir() {
   done
 }
 
+# Check if UV is available
+has_uv() {
+  command -v uv >/dev/null 2>&1
+}
+
 # Create or update virtual environment and install package in editable mode
 setup_venv() {
-  echo "🐍 Creating/updating virtual environment in $VENV_DIR..."
-  python3 -m venv "$VENV_DIR"
-  # shellcheck source=/dev/null
-  source "$BIN_DIR/activate"
-  python3 -m pip install --upgrade pip wheel
-  echo "📦 Installing my-unicorn (editable) into venv..."
-  python3 -m pip install -e "$INSTALL_DIR"
+  if has_uv; then
+    echo "🐍 Creating/updating virtual environment with UV in $VENV_DIR..."
+    cd "$INSTALL_DIR"
+    uv venv "$VENV_DIR" --clear
+    # shellcheck source=/dev/null
+    source "$BIN_DIR/activate"
+    echo "📦 Installing my-unicorn with UV (editable mode)..."
+    uv pip install -e "$INSTALL_DIR"
+    cd - >/dev/null
+  else
+    echo "🐍 Creating/updating virtual environment with pip in $VENV_DIR..."
+    python3 -m venv "$VENV_DIR"
+    # shellcheck source=/dev/null
+    source "$BIN_DIR/activate"
+    python3 -m pip install --upgrade pip wheel
+    echo "📦 Installing my-unicorn (editable) into venv..."
+    python3 -m pip install -e "$INSTALL_DIR"
+  fi
 }
 
 # Install wrapper script into ~/.local/bin so `my-unicorn` works globally
@@ -166,14 +182,14 @@ install_wrapper() {
 # Set up shell autocomplete by delegating to autocomplete.bash
 setup_autocomplete() {
   local helper="$INSTALL_DIR/scripts/autocomplete.bash"
-  
+
   # Fallback to source directory if installed version not available
   if [[ ! -x "$helper" ]]; then
     local src_helper
     src_helper="$(script_dir)/scripts/autocomplete.bash"
     [[ -x "$src_helper" ]] && helper="$src_helper"
   fi
-  
+
   if [[ -x "$helper" ]]; then
     echo "🔁 Setting up autocomplete..."
     bash "$helper"
@@ -195,7 +211,7 @@ install_my_unicorn() {
   install_wrapper
   ensure_path_for_shells
   setup_autocomplete
-  
+
   local rc
   rc=$(detect_rc_file)
 
@@ -218,13 +234,13 @@ update_my_unicorn() {
 install_autocomplete() {
   echo "my-unicorn Autocomplete Installation"
   echo "========================================"
-  
+
   # Check if my-unicorn is installed
   if [[ ! -d "$INSTALL_DIR" ]]; then
     echo "❌ my-unicorn is not installed. Please run './setup.sh install' first."
     exit 1
   fi
-  
+
   if setup_autocomplete; then
     echo "✅ Autocomplete installation complete!"
     echo ""
@@ -238,15 +254,15 @@ install_autocomplete() {
 
 # -- Entry point -------------------------------------------------------------
 case "${1-}" in
-  install|"") install_my_unicorn ;;
-  update) update_my_unicorn ;;
-  autocomplete) install_autocomplete ;;
-  *)
-    cat <<EOF
+install | "") install_my_unicorn ;;
+update) update_my_unicorn ;;
+autocomplete) install_autocomplete ;;
+*)
+  cat <<EOF
 Usage: $(basename "$0") [install|update|autocomplete]
 
   install       Full installation with autocomplete
-  update        Update venv and autocomplete  
+  update        Update venv and autocomplete
   autocomplete  Install shell completion only
 
 Examples:
@@ -254,6 +270,6 @@ Examples:
   $(basename "$0") update             # Update virtual environment and autocomplete
   $(basename "$0") autocomplete       # Install completion for current shell
 EOF
-    exit 1
-    ;;
+  exit 1
+  ;;
 esac

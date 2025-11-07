@@ -552,25 +552,25 @@ async def test_perform_update_clones_to_repo_dir_not_subdirectory():
     mock_session = MagicMock()
     updater = SelfUpdater(mock_config, mock_session)
 
-    # Mock subprocess to capture git clone command
+    # Mock subprocess to capture git clone command only
     clone_command_args = []
 
     async def capture_clone_command(*args, **kwargs):
         """Capture the git clone command arguments."""
-        clone_command_args.extend(args)
+        # Only capture git clone commands, not setup.sh calls
+        if args and args[0] == "git" and "clone" in args:
+            clone_command_args.extend(args)
         mock_proc = MagicMock()
         mock_proc.wait = AsyncMock(return_value=0)
         mock_proc.returncode = 0
-        mock_proc.stdout = None
+        mock_proc.stdout = AsyncMock()
+        mock_proc.stdout.readline = AsyncMock(return_value=b"")
         return mock_proc
 
     with (
         patch("my_unicorn.upgrade.shutil.rmtree"),
-        patch("my_unicorn.upgrade.shutil.copytree"),
-        patch("my_unicorn.upgrade.shutil.copy2"),
         patch("pathlib.Path.mkdir"),
         patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.iterdir", return_value=[]),
         patch("pathlib.Path.chmod"),
         patch(
             "my_unicorn.upgrade.asyncio.create_subprocess_exec",
