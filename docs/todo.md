@@ -26,6 +26,7 @@
 
 ## in-progress
 
+- [ ] remove writing commits to release desc
 - [ ] better app.json config like owner, repo must be inside github dict
 - [ ] TEST: Never use the real user config logs, app location on pytest unittests which current is use them!
       it would be better to make the pytest logs like my-unicorn_pytest.log
