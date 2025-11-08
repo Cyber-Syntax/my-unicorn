@@ -2,38 +2,39 @@
 
 ## testing
 
-- [ ] clean unused code
-    - [x] locale, batch_mode on configs
-    - [ ] network retry etc.
-          this one is hard to implement, so I am thinking to remove it for now.
+- [ ] network retry etc.
+- [ ] API rate limiting
+
 - [ ] #TEST: version command logic is deprecated, so testing to use **version** library
 - [ ] #BUG: Rotation error on logs...
     - Currently, implemented to custom rotation logic more simple and efficient
       and also increased 1MB log to 10MB to increase the log size. Manual and pytest
       succesfully passed.
+
 - [ ] appimage build take times
     - [x] install/update show installation error reasons(show appimage build takes times)
     - [ ] take care the edge cases, maybe app not have appimage at all?
 - [ ] Remove overengineering
     - [ ] dataclasses
     - [ ] strategy
-          " If you only have a couple of algorithms and they rarely change, there’s no real reason to overcomplicate the program with new classes and interfaces
-          that come along with the pattern." by <https://refactoring.guru/design-patterns/strategy>
     - [x] template
-          "Template methods tend to be harder to maintain the more steps they have.
-          You might violate the Liskov Substitution Principle by suppressing a default step implementation via a subclass.
-          " by <https://refactoring.guru/design-patterns/template-method>
 
 ## in-progress
 
 - [ ] remove writing commits to release desc
+    - [x] removed commits
+    - [ ] make it work with keepachangelog template which that template not use v0.1.0 `v` prefix on its heading
+          so our github action bash script need to add itself when creating tags because conventional tags need v in front of them.
+
+- [ ] Better git branch structure for this project. Currently, we use the main branch as a stable as much as possible but maybe we could use main as development and keep a stable branch or use tags to install the stable branches which we update the script so much and change things that mostly break things, so we oftenly need a hotfixes... So, figure out a better way to manage branches and tags.
+
 - [ ] better app.json config like owner, repo must be inside github dict
 - [ ] TEST: Never use the real user config logs, app location on pytest unittests which current is use them!
       it would be better to make the pytest logs like my-unicorn_pytest.log
 
 - [ ] add INFO level logs for verification instead of DEBUG
 - [ ] #BUG: Cycle detected in import chain for cache.py
-- [ ] API rate limiting
+
 - [ ] refactor
       <https://refactoring.guru/refactoring/smells>
     - [x] general
@@ -52,13 +53,16 @@
 
 ## todo
 
+- [ ] #BUG: progress bar ui artifact fix
 - [ ] png need priority one because kde not show .svg on its bar when pinned
 - [ ] add autocompletion for the catalog apps
+
 - [ ] #BUG: post-processing spinner not turn correctly,
       it is start and stop, start and stop, it is like in a for loop or
       something like that, maybe it is happening because of the way we are handling the spinner.
       We update the post-processing and same time download section etc.
       probably something is wrong in the implementation of the spinner.
+
 - [ ] update.bash check network connection
 - [ ] update docs with mermaid, use copilot to create them it seems copilot handles mermaid pretty well
 - [ ] #BUG: is backup folder not created after new feature? test qownnotes when there is update available
@@ -67,7 +71,6 @@
 - [ ] #TEST: test.bash need another command --use-cache, --no-cache which remove and not remove
 - [ ] is it better to use functional programming?
 - [ ] dev: lets load global config on the app starts because we need to access those
-- [ ] dev: build with uv
 - [ ] dev(docs): libsecret also our prerequested dependency,
 - [ ] dev(improve): our logger use singleton
 - [ ] dev(test): manual test script need network exception error handling
@@ -82,14 +85,9 @@
     - [x] obsidian test
 - [ ] upgrade need auto easy update and notify like appimages
 - [ ] config structure refactor
-- [ ] log rotation fix
-- [ ] things tested and need updates
-    - [ ] general test
-    - [ ] fish terminal, kitty terminal not good with rich library but alacrity good(artifacts on bars)
-    - [x] auth log info, validation
-    - [ ] add my unicorn export path to fish shells
-    - [ ] kde wallet support via dbus-python, test in the shared folder 3. kdewallet isn't show any token saved which seems like we don't support ito. written script to keyring-my-unicorn folder, check that out.
-          dbus-python used on kdewallet saves, so we can add that to auth later as a support.
+- [ ] add my unicorn export path to fish shells
+- [ ] kde wallet support via dbus-python, test in the shared folder 3. kdewallet isn't show any token saved which seems like we don't support ito. written script to keyring-my-unicorn folder, check that out.
+      dbus-python used on kdewallet saves, so we can add that to auth later as a support.
 - [ ] #BUG: digest not became true on catalog installs if its use checksum_file with digest verify both
 - [ ] add verification passed or not to verification section on app-specific config
 - [ ] #BUG: upgrade command get stable cache 1.2.3 version for my-unicorn repo
@@ -100,24 +98,24 @@
 
 ## backlog
 
-- [ ] #BUG: Token need to be optional (container error, it might be related to dbus issue which container based not use secretservice dbus?)
-    - [x] when there is correctly setup gnome-keyring, it works.
+- [ ] dev: build with uv
 
-        ```
-        2025-10-31 12:04:00 - my_unicorn.backup - WARNING - warning:306 - Invalid version format detected, using lexicographic sorting
-        2025-10-31 12:04:00 - my_unicorn.auth - ERROR - error:321 - Failed to retrieve GitHub token from keyring: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
-        ```
+- [ ] Environment variable support
 
-        ```bash
-        # try to test it in container, and I confirm it is dbus issue
-        github_pat_aXCvasdfbcasdfXZCXVA^Cdg1231asdfascvasd123 # example github pat, not real
-        [devuser@arch-dev my-unicorn]$ my-unicorn auth --save-token
-        Enter your GitHub token (input hidden):
-        Confirm your GitHub token:
-        15:37:15 - my_unicorn.auth - ERROR - Failed to save GitHub token to keyring: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
-        15:37:15 - my_unicorn.cli.runner - ERROR - Unexpected error: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
-        ❌ Unexpected error: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
-        ```
+```bash
+# log
+2025-10-31 12:04:00 - my_unicorn.backup - WARNING - warning:306 - Invalid version format detected, using lexicographic sorting
+2025-10-31 12:04:00 - my_unicorn.auth - ERROR - error:321 - Failed to retrieve GitHub token from keyring: Environment variable DBUS_SESSION_BUS_ADDRESS is unse
+
+# try to test it in container, and I confirm it is dbus issue
+github_pat_aXCvasdfbcasdfXZCXVA^Cdg1231asdfascvasd123 # example github pat, not real
+[devuser@arch-dev my-unicorn]$ my-unicorn auth --save-token
+Enter your GitHub token (input hidden):
+Confirm your GitHub token:
+15:37:15 - my_unicorn.auth - ERROR - Failed to save GitHub token to keyring: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
+15:37:15 - my_unicorn.cli.runner - ERROR - Unexpected error: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
+❌ Unexpected error: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
+```
 
 - [ ] good cli design princibles
       <https://clig.dev/>
@@ -140,6 +138,11 @@
 
 ## done
 
+- [x] clean unused code
+    - [x] locale, batch_mode on configs
+- [x] auth log info, validation
+- [x] #BUG: Token need to be optional (container error, it might be related to dbus issue which container based not use secretservice dbus?)
+    - [x] when there is correctly setup gnome-keyring, it works.
 - [x] Start source code readonly on container
 - [x] test.bash -> update test not available because we remove before catalog install or url install
       so we need a better logic to handle this case
