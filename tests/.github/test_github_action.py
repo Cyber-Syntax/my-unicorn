@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
-"""Test script for GitHub Actions workflow that creates releases from CHANGELOG.md.
-
-This script simulates the bash logic from the workflow to test it locally.
-It validates the workflow behavior by extracting version information,
-commit messages, and generating release notes.
-
-Example:
-    python test_github_action_refactored.py
-
-Environment Variables:
-    GITHUB_TOKEN: Optional GitHub API token for username resolution
-
-"""
+"""Test GitHub Actions release workflow parser."""
 
 # Standard library imports
 import os
@@ -44,7 +32,8 @@ class GitHubActionTester:
         """Initialize the tester with GitHub token.
 
         Args:
-            github_token: GitHub API token for username resolution, or None to use environment.
+            github_token: GitHub API token for username resolution,
+            or None to use environment.
 
         """
         self.github_token = github_token or os.getenv("GITHUB_TOKEN")
@@ -100,13 +89,27 @@ class GitHubActionTester:
         if not content:
             return DEFAULT_VERSION
 
-        # Find first version header
+        # Try to find a bracketed header first: ## [1.2.3] or ## [1.2.3] - date
+        match = re.search(r"^##\s*\[([^\]]+)\]", content, re.MULTILINE)
+        if match:
+            # Return the inner value (e.g. 1.2.3)
+            return match.group(1).strip()
+
+        # Try to find a v-prefixed header: ## v1.2.3 or ## v1.2.3 - date
         match = re.search(
-            r"^## (v[0-9.]*[0-9](?:-[a-zA-Z0-9]*)*)", content, re.MULTILINE
+            r"^##\s*(v[0-9]+(?:\.[0-9]+)*(?:-[A-Za-z0-9]+)?)",
+            content,
+            re.MULTILINE,
         )
         if match:
-            version = match.group(1)
-            return version
+            return match.group(1).strip()
+
+        # As a fallback, try to find a plain numeric header: ## 1.2.3
+        match = re.search(
+            r"^##\s*([0-9]+\.[0-9]+(?:\.[0-9]+)*)", content, re.MULTILINE
+        )
+        if match:
+            return match.group(1).strip()
 
         return DEFAULT_FALLBACK_VERSION
 
@@ -128,13 +131,30 @@ class GitHubActionTester:
         notes = []
         capturing = False
 
+        # Normalize core version without leading 'v' for matching
+        # bracketed headers
+        core_version = version[1:] if version.startswith("v") else version
+
         for line in lines:
-            if line.startswith(f"## {version}"):
-                capturing = True
-                continue
-            elif line.startswith("## v") and capturing:
-                break
-            elif capturing:
+            # Detect a header that contains the version in one of these forms:
+            #  - ## [1.2.3] (maybe with date)
+            #  - ## v1.2.3 (maybe with date)
+            #  - ## 1.2.3 (maybe with date)
+            if not capturing:
+                if re.match(rf"^##\s*\[{re.escape(core_version)}\b", line):
+                    capturing = True
+                    continue
+                if re.match(rf"^##\s*v{re.escape(core_version)}\b", line):
+                    capturing = True
+                    continue
+                if re.match(rf"^##\s*{re.escape(core_version)}\b", line):
+                    capturing = True
+                    continue
+            else:
+                # Stop capturing when we encounter the next
+                # top-level version header
+                if re.match(r"^##\s+", line):
+                    break
                 notes.append(line.rstrip())
 
         result = "\n".join(notes).strip()
@@ -355,45 +375,24 @@ class GitHubActionTester:
             "other": other_commits,
         }
 
-    def _create_release_notes(self) -> tuple[str, str]:
-        """Create full release notes combining CHANGELOG and commits.
+    def _create_release_notes(self) -> tuple[str, str, str]:
+        """Create release notes from CHANGELOG and compute tag name.
 
         Returns:
-            tuple of (version, full_notes).
+            tuple of (version, tag_name, full_notes).
 
         """
         version = self._extract_version_from_changelog()
         changelog_notes = self._extract_notes_from_changelog(version)
-        previous_tag = self._get_previous_tag()
-        commits_dict = self._get_commits_with_usernames(previous_tag)
 
-        # Build categorized commits section
-        commits_section = ""
-        if commits_dict["features"]:
-            commits_section += (
-                "#### 🚀 Features\n"
-                + "\n".join(commits_dict["features"])
-                + "\n\n"
-            )
-        if commits_dict["bugfixes"]:
-            commits_section += (
-                "#### 🐛 Bug Fixes\n"
-                + "\n".join(commits_dict["bugfixes"])
-                + "\n\n"
-            )
-        if commits_dict["other"]:
-            commits_section += (
-                "#### 📝 Other Commits\n"
-                + "\n".join(commits_dict["other"])
-                + "\n\n"
-            )
+        # Ensure tag uses v-prefix
+        tag_name = version if version.startswith("v") else f"v{version}"
 
-        # Combine notes
+        # No commit aggregation in the test output anymore; only
+        # use changelog notes
         full_notes = changelog_notes
-        if commits_section:
-            full_notes += "\n\n### Commits\n" + commits_section.rstrip()
 
-        return version, full_notes
+        return version, tag_name, full_notes
 
     def test_workflow(self) -> dict[str, Any]:
         """Test the complete workflow logic.
@@ -411,17 +410,14 @@ class GitHubActionTester:
         # Test previous tag
         previous_tag = self._get_previous_tag()
 
-        # Test commit extraction
-        commits_dict = self._get_commits_with_usernames(previous_tag)
-
-        # Test full release notes
-        version, full_notes = self._create_release_notes()
+        # Test full release notes and tag name
+        version, tag_name, full_notes = self._create_release_notes()
 
         return {
             "version": version,
+            "tag_name": tag_name,
             "previous_tag": previous_tag,
             "changelog_notes": changelog_notes,
-            "commits": commits_dict,
             "full_notes": full_notes,
         }
 
@@ -440,6 +436,8 @@ def _write_test_results_to_file(
         with output_path.open("w", encoding=FILE_ENCODING) as f:
             f.write("# Release Test Output\n\n")
             f.write(f"**Version:** {results['version']}\n\n")
+            tag_name = results.get("tag_name", "None")
+            f.write(f"**Tag:** {tag_name}\n\n")
             previous_tag = results["previous_tag"] or "None"
             f.write(f"**Previous Tag:** {previous_tag}\n\n")
             f.write("## Release Notes\n\n")
@@ -458,18 +456,8 @@ def _display_results_summary(results: dict[str, Any]) -> None:
     print("Test completed successfully!")
     print(f"Version: {results['version']}")
 
-    commits = results["commits"]
-    total_commits = (
-        len(commits["features"])
-        + len(commits["bugfixes"])
-        + len(commits["other"])
-    )
-    print(
-        f"Commits found: {total_commits} "
-        f"(Features: {len(commits['features'])}, "
-        f"Bug Fixes: {len(commits['bugfixes'])}, "
-        f"Other: {len(commits['other'])})"
-    )
+    print(f"Previous tag: {results['previous_tag'] or 'None'}")
+    print(f"Tag to create: {results.get('tag_name', 'None')}")
 
     # Show preview
     print("Release Notes Preview:")
