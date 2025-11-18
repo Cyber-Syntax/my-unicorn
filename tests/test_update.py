@@ -683,10 +683,17 @@ class TestUpdateManager:
             patch("my_unicorn.update.GitHubAuthManager"),
             patch("my_unicorn.update.FileOperations"),
             patch("my_unicorn.update.BackupService"),
+            patch(
+                "my_unicorn.progress.get_progress_service"
+            ) as mock_get_progress,
             patch("my_unicorn.update.DownloadService") as mock_download_cls,
             patch("my_unicorn.update.IconHandler") as mock_icon_cls,
             patch("my_unicorn.update.VerificationService") as mock_verify_cls,
         ):
+            # Mock get_progress_service to return a mock progress service
+            mock_progress = MagicMock()
+            mock_get_progress.return_value = mock_progress
+
             update_manager = UpdateManager(mock_config_manager)
 
             mock_download = MagicMock()
@@ -702,7 +709,10 @@ class TestUpdateManager:
             update_manager._initialize_services(mock_session)
 
             # Verify services were created with correct parameters
-            mock_download_cls.assert_called_once_with(mock_session)
+            mock_get_progress.assert_called_once()
+            mock_download_cls.assert_called_once_with(
+                mock_session, mock_progress
+            )
             mock_icon_cls.assert_called_once_with(
                 mock_download, mock_download.progress_service
             )
