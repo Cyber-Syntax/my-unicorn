@@ -5,6 +5,7 @@ icons with progress tracking using the Rich library.
 """
 
 import asyncio
+import contextlib
 from pathlib import Path
 from typing import TypedDict
 from urllib.parse import urlparse
@@ -61,7 +62,7 @@ class DownloadService:
         show_progress: bool = False,
         progress_type: ProgressType = ProgressType.DOWNLOAD,
     ) -> None:
-        """Download a file from URL to destination.
+        """Download a file from URL to destination with retry logic.
 
         Args:
             url: URL to download from
@@ -70,11 +71,9 @@ class DownloadService:
             progress_type: Type of progress operation for categorization
 
         Raises:
-            aiohttp.ClientError: If download fails
+            aiohttp.ClientError: If download fails after all retry attempts
 
         """
-        headers: dict[str, str] = GitHubAuthManager.apply_auth({})
-
         # Load network configuration
         network_cfg = config_manager.load_global_config()["network"]
         retry_attempts = int(network_cfg.get("retry_attempts", 3))
@@ -88,49 +87,18 @@ class DownloadService:
             sock_connect=timeout_seconds,
         )
 
+        # Retry loop wraps entire download operation
         for attempt in range(1, retry_attempts + 1):
             try:
-                async with self.session.get(
-                    url, headers=headers, timeout=timeout
-                ) as response:
-                    _maybe = response.raise_for_status()
-                    if asyncio.iscoroutine(_maybe):
-                        await _maybe
-                    total = int(response.headers.get("Content-Length", 0))
+                # Attempt complete download (connection + all chunks)
+                await self._attempt_download(
+                    url, dest, show_progress, progress_type, timeout
+                )
 
-                    dest.parent.mkdir(parents=True, exist_ok=True)
+                # Success - break out of retry loop
+                logger.debug("✅ Download completed: %s", dest)
+                break
 
-                    logger.debug("📥 Downloading %s", dest.name)
-                    logger.debug("   URL: %s", url)
-                    logger.debug(
-                        "   Size: %s bytes"
-                        if total > 0
-                        else "   Size: Unknown",
-                        f"{total:,}" if total > 0 else "",
-                    )
-
-                    if (
-                        show_progress
-                        and total > 0
-                        and self.progress_service.is_active()
-                    ):
-                        await self._download_with_progress(
-                            response,
-                            dest,
-                            total,
-                            progress_type,
-                        )
-                    else:
-                        # Download without progress bar
-                        with open(dest, "wb") as f:
-                            async for chunk in response.content.iter_chunked(
-                                8192
-                            ):
-                                if chunk:
-                                    f.write(chunk)
-
-                    logger.debug("✅ Download completed: %s", dest)
-                    break
             except (aiohttp.ClientError, TimeoutError) as e:
                 logger.warning(
                     "Attempt %s/%s failed for %s: %s",
@@ -139,15 +107,117 @@ class DownloadService:
                     dest.name,
                     e,
                 )
+
+                # Clean up partial download if it exists
+                if dest.exists():
+                    logger.debug("🗑️  Removing partial download: %s", dest)
+                    try:
+                        dest.unlink()
+                    except Exception as cleanup_error:
+                        logger.warning(
+                            "Failed to remove partial file: %s",
+                            cleanup_error,
+                        )
+
                 if attempt == retry_attempts:
-                    logger.error("❌ Download failed: %s - %s", dest.name, e)
+                    logger.error(
+                        "❌ Download failed after %s attempts: %s - %s",
+                        retry_attempts,
+                        dest.name,
+                        e,
+                    )
                     raise
+
                 # Exponential backoff before retrying
                 backoff = 2**attempt
+                logger.info("⏳ Retrying in %s seconds...", backoff)
                 await asyncio.sleep(backoff)
+
             except Exception as e:
+                # Non-retryable errors (cleanup and raise immediately)
                 logger.error("❌ Download failed: %s - %s", dest.name, e)
+                if dest.exists():
+                    logger.debug("🗑️  Removing partial download: %s", dest)
+                    with contextlib.suppress(Exception):
+                        dest.unlink()
                 raise
+
+    async def _attempt_download(
+        self,
+        url: str,
+        dest: Path,
+        show_progress: bool,
+        progress_type: ProgressType,
+        timeout: aiohttp.ClientTimeout,
+    ) -> None:
+        """Perform a single download attempt without retry logic.
+
+        Args:
+            url: URL to download from
+            dest: Destination path
+            show_progress: Whether to show progress bar
+            progress_type: Type of progress operation
+            timeout: Timeout configuration
+
+        Raises:
+            aiohttp.ClientError: If HTTP request fails
+            TimeoutError: If download times out
+            Exception: For other download failures
+
+        """
+        headers: dict[str, str] = GitHubAuthManager.apply_auth({})
+
+        async with self.session.get(
+            url, headers=headers, timeout=timeout
+        ) as response:
+            _maybe = response.raise_for_status()
+            if asyncio.iscoroutine(_maybe):
+                await _maybe
+            total = int(response.headers.get("Content-Length", 0))
+
+            dest.parent.mkdir(parents=True, exist_ok=True)
+
+            logger.debug("📥 Downloading %s", dest.name)
+            logger.debug("   URL: %s", url)
+            logger.debug(
+                "   Size: %s bytes" if total > 0 else "   Size: Unknown",
+                f"{total:,}" if total > 0 else "",
+            )
+
+            if (
+                show_progress
+                and total > 0
+                and self.progress_service.is_active()
+            ):
+                await self._download_with_progress(
+                    response,
+                    dest,
+                    total,
+                    progress_type,
+                )
+            else:
+                await self._download_without_progress(response, dest)
+
+    async def _download_without_progress(
+        self,
+        response: aiohttp.ClientResponse,
+        dest: Path,
+    ) -> None:
+        """Download file without progress tracking.
+
+        Args:
+            response: HTTP response to read from
+            dest: Destination path for the file
+
+        Raises:
+            aiohttp.ClientError: If download fails
+            TimeoutError: If download times out
+
+        """
+        with open(dest, "wb") as f:
+            async for chunk in response.content.iter_chunked(CHUNK_SIZE):
+                if chunk:
+                    f.write(chunk)
 
     async def _download_with_progress(
         self,
@@ -164,79 +234,67 @@ class DownloadService:
             total: Total file size in bytes
             progress_type: Type of progress operation
 
-        """
-        # Convert bytes to MB for display
-        total_mb = total / (1024 * 1024)
+        Raises:
+            aiohttp.ClientError: If download fails
+            TimeoutError: If download times out
 
-        # Create progress task
+        """
+        # Create progress task with total in bytes
         task_id = await self.progress_service.add_task(
             name=dest.name,
             progress_type=progress_type,
-            total=total_mb,
+            total=total,  # Keep in bytes for accurate calculations
         )
 
         success = False
-        try:
-            downloaded_bytes = 0
+        downloaded_bytes = 0
 
+        try:
             chunk_count = 0
             last_progress_update = 0.0
 
             with open(dest, "wb") as f:
-                async for chunk in response.content.iter_chunked(8192):
+                async for chunk in response.content.iter_chunked(CHUNK_SIZE):
                     if chunk:
                         f.write(chunk)
                         downloaded_bytes += len(chunk)
                         chunk_count += 1
 
-                        # Update progress in MB (throttle updates to every
+                        # Update progress in bytes (throttle updates to every
                         # PROGRESS_MB_THRESHOLD MB or every 100 chunks)
-                        downloaded_mb = downloaded_bytes / (1024 * 1024)
+                        mb_threshold_bytes = (
+                            PROGRESS_MB_THRESHOLD * 1024 * 1024
+                        )
                         if (
-                            downloaded_mb - last_progress_update
-                            >= PROGRESS_MB_THRESHOLD
+                            downloaded_bytes - last_progress_update
+                            >= mb_threshold_bytes
                         ) or (chunk_count % 100 == 0):
                             await self.progress_service.update_task(
                                 task_id,
-                                completed=downloaded_mb,
+                                completed=downloaded_bytes,
                             )
-                            last_progress_update = downloaded_mb
+                            last_progress_update = downloaded_bytes
 
             # Always ensure final progress update with actual downloaded size
-            final_mb = downloaded_bytes / (1024 * 1024)
-
-            # Update task total and completion to match
-            # actual download size
             # This handles cases where Content-Length differs from actual size
             # (e.g. due to compression)
-            await self.progress_service.update_task_total(
-                task_id, new_total=final_mb, completed=final_mb
+            await self.progress_service.update_task(
+                task_id, total=downloaded_bytes, completed=downloaded_bytes
             )
             success = True
 
-        except TimeoutError as e:
-            logger.error("❌ Download timed out: %s", dest.name)
-            raise Exception(f"Download timed out: {dest.name}") from e
-        except aiohttp.ClientError as e:
-            logger.error(
-                "❌ Network error during download: %s - %s", dest.name, e
-            )
-            raise Exception(f"Network error: {e}") from e
-        except Exception as e:
-            logger.error("❌ Download failed during progress tracking: %s", e)
-            raise
         finally:
-            # Mark task as finished with the actual final total
-            # for accurate percentage display
-            final_mb = downloaded_bytes / (1024 * 1024) if success else 0.0
+            # Mark task as finished
+            description = None
+            if not success:
+                description = "download failed"
             await self.progress_service.finish_task(
                 task_id,
                 success=success,
-                final_total=final_mb if success else None,
+                description=description,
             )
-            # Give Rich time to update the display and prevent race
-            # conditions
-            await asyncio.sleep(0.2)
+            # Give time for display to update
+            await asyncio.sleep(0.1)
 
     async def download_appimage(
         self, asset: Asset, dest: Path, show_progress: bool = True

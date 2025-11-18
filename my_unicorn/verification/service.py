@@ -114,7 +114,6 @@ class VerificationService:
         )
 
         # Create progress task if needed
-        create_own_task = False
         if (
             self.progress_service
             and progress_task_id is None
@@ -123,7 +122,6 @@ class VerificationService:
             progress_task_id = (
                 await self.progress_service.create_verification_task(app_name)
             )
-            create_own_task = True
 
         # Update progress - starting verification
         if progress_task_id and self.progress_service:
@@ -150,11 +148,11 @@ class VerificationService:
             config, has_digest, has_checksum_files
         )
         if should_skip:
-            if progress_task_id and self.progress_service and create_own_task:
+            if progress_task_id and self.progress_service:
                 await self.progress_service.finish_task(
                     progress_task_id,
                     success=True,
-                    final_description=f"✅ {app_name} verification skipped",
+                    description="verification skipped",
                 )
             return VerificationResult(
                 passed=True,
@@ -267,11 +265,11 @@ class VerificationService:
 
         # If strong methods available but none passed, fail
         if strong_methods_available and not verification_passed:
-            if progress_task_id and self.progress_service and create_own_task:
+            if progress_task_id and self.progress_service:
                 await self.progress_service.finish_task(
                     progress_task_id,
                     success=False,
-                    final_description=f"❌ {app_name} verification failed",
+                    description="verification failed",
                 )
             available_methods = []
             if has_digest:
@@ -302,20 +300,18 @@ class VerificationService:
             )
 
         # Update progress - verification completed
-        if progress_task_id and self.progress_service and create_own_task:
+        if progress_task_id and self.progress_service:
             if overall_passed:
                 await self.progress_service.finish_task(
                     progress_task_id,
                     success=True,
-                    final_description=f"✅ {app_name} verification",
+                    description="verification passed",
                 )
             else:
                 await self.progress_service.finish_task(
                     progress_task_id,
                     success=False,
-                    final_description=(
-                        f"⚠️ {app_name} verification completed with warnings"
-                    ),
+                    description="verification completed with warnings",
                 )
 
         if overall_passed:

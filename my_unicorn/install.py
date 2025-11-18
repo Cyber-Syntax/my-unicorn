@@ -7,7 +7,6 @@ template method pattern with a simpler, more maintainable approach.
 import asyncio
 from datetime import datetime
 from pathlib import Path
-from sys import prefix
 from typing import Any
 
 from my_unicorn.desktop_entry import DesktopEntry
@@ -316,14 +315,18 @@ class InstallHandler:
         show_progress = options.get("show_progress", True)
         download_dir = options.get("download_dir", Path.cwd())
 
-        # Create progress task
-        task_id = None
+        # Create multi-phase progress tasks (verification + installation)
+        verification_task_id = None
+        installation_task_id = None
         progress_service = getattr(
             self.download_service, "progress_service", None
         )
         if show_progress and progress_service:
-            task_id = await progress_service.create_post_processing_task(
-                app_name
+            (
+                verification_task_id,
+                installation_task_id,
+            ) = await progress_service.create_installation_workflow(
+                app_name, with_verification=verify
             )
 
         try:
@@ -344,7 +347,7 @@ class InstallHandler:
                     app_config,
                     release_data,
                     app_name,
-                    task_id,
+                    verification_task_id,
                 )
                 if not verify_result["passed"]:
                     error_msg = verify_result.get("error", "Unknown error")
@@ -361,7 +364,7 @@ class InstallHandler:
             # 4. Extract icon
             logger.info("🎨 Extracting icon for %s", app_name)
             icon_result = await self._extract_icon_for_app(
-                install_path, app_name, app_config, task_id
+                install_path, app_name, app_config, installation_task_id
             )
 
             # 5. Create configuration
@@ -385,6 +388,12 @@ class InstallHandler:
             # Success!
             logger.info("✅ Successfully installed %s", app_name)
 
+            # Mark installation task as complete
+            if installation_task_id and progress_service:
+                await progress_service.finish_task(
+                    installation_task_id, success=True
+                )
+
             return {
                 "success": True,
                 "target": app_name,
@@ -402,12 +411,15 @@ class InstallHandler:
             logger.error(
                 "Installation workflow failed for %s: %s", app_name, error
             )
-            raise
 
-        finally:
-            # Cleanup progress
-            if task_id and progress_service:
-                await progress_service.finish_task(task_id, success=True)
+            # Mark installation task as failed
+            if installation_task_id and progress_service:
+                error_msg = str(error)
+                await progress_service.finish_task(
+                    installation_task_id, success=False, description=error_msg
+                )
+
+            raise
 
     async def _fetch_release_for_catalog(
         self, owner: str, repo: str

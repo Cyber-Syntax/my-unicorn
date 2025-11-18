@@ -75,19 +75,19 @@ class SimpleProgress:
         self,
         task_id: str,
         success: bool = True,
-        final_description: str | None = None,
+        description: str | None = None,
     ) -> None:
         """Finish a task.
 
         Args:
             task_id: Task identifier
             success: Whether the task completed successfully
-            final_description: Optional final description
+            description: Optional final description
 
         """
         if task_id in self.active_tasks:
             status = "✅" if success else "❌"
-            desc = final_description or self.active_tasks[task_id]
+            desc = description or self.active_tasks[task_id]
             print(f"\r{status} {desc}")
             del self.active_tasks[task_id]
 
@@ -436,7 +436,7 @@ class SelfUpdater:
                 self.progress.finish_task(
                     download_task_id,
                     success=clone_process.returncode == 0,
-                    final_description="Repository cloned successfully"
+                    description="Repository cloned successfully"
                     if clone_process.returncode == 0
                     else "Repository clone failed",
                 )
@@ -509,7 +509,7 @@ class SelfUpdater:
                 self.progress.finish_task(
                     install_task_id,
                     success=install_process.returncode == 0,
-                    final_description="Installation completed successfully"
+                    description="Installation completed successfully"
                     if install_process.returncode == 0
                     else "Installation failed",
                 )
@@ -536,7 +536,7 @@ class SelfUpdater:
                 self.progress.finish_task(
                     cleanup_task_id,
                     success=True,
-                    final_description="Cleanup completed",
+                    description="Cleanup completed",
                 )
 
             logger.info("Self-update completed successfully")

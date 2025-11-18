@@ -636,14 +636,16 @@ class ReleaseAPIClient:
             )
             if task_info:
                 new_completed = int(task_info.completed) + 1
-                await self.progress_service.update_task_total(
-                    self.shared_api_task_id, float(new_completed)
+                total = (
+                    int(task_info.total)
+                    if task_info.total > 0
+                    else new_completed
                 )
                 await self.progress_service.update_task(
                     self.shared_api_task_id,
                     completed=float(new_completed),
                     description=(
-                        f"🌐 {description} ({new_completed}/{new_completed})"
+                        f"🌐 {description} ({new_completed}/{total})"
                     ),
                 )
 
@@ -968,6 +970,15 @@ class ReleaseFetcher:
         if not ignore_cache:
             cached = await self._get_from_cache(cache_type="stable")
             if cached:
+                # Update shared progress even for cache hits
+                if (
+                    self.shared_api_task_id
+                    and self.progress_service
+                    and self.progress_service.is_active()
+                ):
+                    await self.api_client._update_shared_progress(
+                        f"Retrieved {self.owner}/{self.repo} (cached)"
+                    )
                 return cached
 
         release = await self.api_client.fetch_stable_release()
@@ -999,6 +1010,15 @@ class ReleaseFetcher:
         if not ignore_cache:
             cached = await self._get_from_cache(cache_type="prerelease")
             if cached:
+                # Update shared progress even for cache hits
+                if (
+                    self.shared_api_task_id
+                    and self.progress_service
+                    and self.progress_service.is_active()
+                ):
+                    await self.api_client._update_shared_progress(
+                        f"Retrieved {self.owner}/{self.repo} (cached)"
+                    )
                 return cached
 
         release = await self.api_client.fetch_prerelease()

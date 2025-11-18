@@ -1,72 +1,36 @@
-"""Progress display using Rich library for unified progress display.
+"""Progress display with ASCII rendering backend.
 
 This module provides a centralized progress display UI component that handles
-different types of operations with rich visual feedback using the Rich library.
+different types of operations with ASCII-based visual feedback.
 """
 
 import asyncio
 import contextlib
+import shutil
+import sys
 import time
 from collections import defaultdict, deque
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from enum import Enum, auto
-from pathlib import Path
-from typing import Any
-
-from rich.console import Console
-from rich.live import Live
-from rich.panel import Panel
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    ProgressColumn,
-    SpinnerColumn,
-    TaskID,
-    TextColumn,
-)
-from rich.table import Table
-from rich.text import Text
+from typing import TextIO
 
 from my_unicorn.logger import get_logger
+from my_unicorn.utils.progress_utils import (
+    format_eta,
+    format_percentage,
+    human_mib,
+    human_speed_bps,
+    render_bar,
+    truncate_text,
+)
 
 logger = get_logger(__name__)
 
 # Performance optimization constants
 SPEED_CACHE_LIMIT = 100
 ID_CACHE_LIMIT = 1000
-
-
-class SpeedColumn(ProgressColumn):
-    """Custom column to display download speed with optimized caching."""
-
-    def __init__(self) -> None:
-        """Initialize speed column with cache."""
-        super().__init__()
-        self._speed_cache: dict[float, Text] = {}
-
-    def render(self, task) -> Text:
-        """Render the speed for a task."""
-        speed = task.fields.get("speed", 0.0)
-        if speed is None or speed <= 0:
-            return Text("-- MB/s", style="dim")
-
-        # Return cached result if available
-        if speed in self._speed_cache:
-            return self._speed_cache[speed]
-
-        if speed >= 1.0:
-            text = Text(f"{speed:.1f} MB/s", style="cyan")
-        else:
-            text = Text(f"{speed * 1024:.0f} KB/s", style="cyan")
-
-        # Cache result with size limit to prevent unbounded growth
-        if len(self._speed_cache) < SPEED_CACHE_LIMIT:
-            self._speed_cache[speed] = text
-
-        return text
 
 
 class ProgressType(Enum):
@@ -78,6 +42,564 @@ class ProgressType(Enum):
     ICON_EXTRACTION = auto()
     INSTALLATION = auto()
     UPDATE = auto()
+
+
+@dataclass(slots=True)
+class TaskState:
+    """State information for a single task in the backend."""
+
+    task_id: str
+    name: str
+    progress_type: ProgressType
+    total: float = 0.0
+    completed: float = 0.0
+    description: str = ""
+    speed: float = 0.0  # bytes per second
+    success: bool | None = None
+    is_finished: bool = False
+    created_at: float = 0.0
+    last_update: float = 0.0
+    error_message: str = ""
+    # Multi-phase task tracking
+    parent_task_id: str | None = None  # For tracking related tasks
+    phase: int = 1  # Current phase (1 for verify, 2 for install)
+    total_phases: int = 1  # Total number of phases
+
+
+class AsciiProgressBackend:
+    """ASCII-based progress rendering backend.
+
+    Renders progress information using plain ASCII characters and ANSI
+    escape codes for terminal output. Tasks stay in fixed positions
+    and update in place.
+    """
+
+    def __init__(
+        self,
+        output: TextIO | None = None,
+        interactive: bool | None = None,
+        bar_width: int = 30,
+        max_name_width: int = 20,
+    ) -> None:
+        """Initialize ASCII progress backend.
+
+        Args:
+            output: Output stream (defaults to sys.stdout)
+            interactive: Whether to use interactive mode with cursor control
+                        (auto-detected from TTY if None)
+            bar_width: Width of progress bars in characters
+            max_name_width: Maximum width for task names (fallback value)
+
+        """
+        self.output = output or sys.stdout
+        self.interactive = (
+            interactive if interactive is not None else self.output.isatty()
+        )
+        self.bar_width = bar_width
+        self.max_name_width = max_name_width
+
+        self.tasks: dict[str, TaskState] = {}
+        self._task_order: list[str] = []  # Maintain insertion order
+        self._lock = asyncio.Lock()
+        self._last_output_lines = 0  # Track lines written for clearing
+
+    def add_task(
+        self,
+        task_id: str,
+        name: str,
+        progress_type: ProgressType,
+        total: float = 0.0,
+        parent_task_id: str | None = None,
+        phase: int = 1,
+        total_phases: int = 1,
+    ) -> None:
+        """Add a new task to track.
+
+        Args:
+            task_id: Unique task identifier
+            name: Task name
+            progress_type: Type of progress operation
+            total: Total units for the task
+            parent_task_id: Parent task ID for multi-phase operations
+            phase: Current phase number
+            total_phases: Total number of phases
+
+        """
+        task = TaskState(
+            task_id=task_id,
+            name=name,
+            progress_type=progress_type,
+            total=total,
+            created_at=time.time(),
+            last_update=time.time(),
+            parent_task_id=parent_task_id,
+            phase=phase,
+            total_phases=total_phases,
+        )
+        self.tasks[task_id] = task
+        if task_id not in self._task_order:
+            self._task_order.append(task_id)
+
+    def update_task(
+        self,
+        task_id: str,
+        completed: float | None = None,
+        total: float | None = None,
+        description: str | None = None,
+        speed: float | None = None,
+    ) -> None:
+        """Update task progress.
+
+        Args:
+            task_id: Task identifier
+            completed: Completed units (if updating)
+            total: Total units (if updating)
+            description: Task description (if updating)
+            speed: Download speed in bytes/sec (if updating)
+
+        """
+        if task_id not in self.tasks:
+            logger.warning(
+                "Attempted to update non-existent task: %s", task_id
+            )
+            return
+
+        task = self.tasks[task_id]
+        if completed is not None:
+            task.completed = completed
+        if total is not None:
+            task.total = total
+        if description is not None:
+            task.description = description
+        if speed is not None:
+            task.speed = speed
+        task.last_update = time.time()
+
+    def finish_task(
+        self,
+        task_id: str,
+        success: bool = True,
+        description: str | None = None,
+    ) -> None:
+        """Mark a task as finished.
+
+        Args:
+            task_id: Task identifier
+            success: Whether the task succeeded
+            description: Final description (error message if failed)
+
+        """
+        if task_id not in self.tasks:
+            logger.warning(
+                "Attempted to finish non-existent task: %s", task_id
+            )
+            return
+
+        task = self.tasks[task_id]
+        task.is_finished = True
+        task.success = success
+        if description is not None:
+            if not success and "Error:" not in description:
+                # Extract error message for cleaner display
+                task.error_message = description
+            task.description = description
+        task.last_update = time.time()
+
+    def _render_api_section(self) -> list[str]:
+        """Render API fetching section.
+
+        Returns:
+            List of output lines
+
+        """
+        api_tasks = [
+            t
+            for t in self._task_order
+            if self.tasks[t].progress_type == ProgressType.API_FETCHING
+        ]
+
+        if not api_tasks:
+            return []
+
+        lines = ["Fetching from API:"]
+        for task_id in api_tasks:
+            task = self.tasks[task_id]
+            name = truncate_text(task.name, 18)
+
+            # Show progress counter if we have total/completed
+            if task.total > 0:
+                completed = int(task.completed)
+                total = int(task.total)
+                # Treat task as retrieved either when explicitly finished
+                # or when completed bytes are greater than or equal to total.
+                if task.is_finished or completed >= total:
+                    # Check if data came from cache
+                    if "cached" in task.description.lower():
+                        status = f"{total}/{total}        Retrieved from cache"
+                    else:
+                        status = f"{total}/{total}        Retrieved"
+                else:
+                    status = f"{completed}/{total}        Fetching..."
+            elif task.is_finished:
+                # Check if data came from cache
+                if "cached" in task.description.lower():
+                    status = "Retrieved from cache"
+                else:
+                    status = "Retrieved"
+            else:
+                status = "Fetching..."
+
+            lines.append(f"{name:20} {status}")
+
+        lines.append("")
+        return lines
+
+    def _calculate_dynamic_name_width(
+        self, name: str, fixed_width: int
+    ) -> int:
+        """Calculate dynamic name width based on terminal size.
+
+        Args:
+            name: The task name to display
+            fixed_width: Width needed for fixed elements (size, speed, etc.)
+
+        Returns:
+            Width to use for name (either full length or truncated)
+
+        """
+        try:
+            terminal_width = shutil.get_terminal_size().columns
+        except (AttributeError, ValueError, OSError):
+            # Fallback if terminal size cannot be determined
+            terminal_width = 80
+
+        # Calculate available space for name
+        available_width = terminal_width - fixed_width
+
+        # Use the smaller of: available width or actual name length
+        # But ensure minimum of 15 characters for readability
+        min_width = 15
+        max_width = max(min_width, available_width)
+
+        return min(len(name), max_width)
+
+    def _render_downloads_section(self) -> list[str]:
+        """Render downloads section with progress bars.
+
+        Returns:
+            List of output lines
+
+        """
+        download_tasks = [
+            t
+            for t in self._task_order
+            if self.tasks[t].progress_type == ProgressType.DOWNLOAD
+        ]
+
+        if not download_tasks:
+            return []
+
+        # First pass: determine the maximum name width for alignment
+        max_name_width = 0
+        display_names = {}
+        for task_id in download_tasks:
+            task = self.tasks[task_id]
+            # Remove .AppImage extension from display name to save space
+            display_name = task.name
+            if display_name.endswith(".AppImage"):
+                display_name = display_name[:-9]  # Remove ".AppImage"
+            display_names[task_id] = display_name
+
+            # Calculate fixed width needed for right-aligned elements
+            # size(10) + speed(10) + eta(5) + bar(30+2) + pct(6) + status(1)
+            # + spacing between elements (6 spaces)
+            fixed_width = 10 + 10 + 5 + (self.bar_width + 2) + 6 + 1 + 6
+
+            # Get dynamic name width for this task
+            name_width = self._calculate_dynamic_name_width(
+                display_name, fixed_width
+            )
+            max_name_width = max(
+                max_name_width, min(name_width, len(display_name))
+            )
+
+        lines = ["Downloading:"]
+        for task_id in download_tasks:
+            task = self.tasks[task_id]
+            display_name = display_names[task_id]
+
+            # Truncate name if needed, then left-align to max width
+            name = truncate_text(display_name, max_name_width)
+
+            # Format size
+            size_str = (
+                f"{human_mib(task.total):>10}"
+                if task.total > 0
+                else "    --    "
+            )
+
+            # Format speed
+            speed_str = (
+                f"{human_speed_bps(task.speed):>10}"
+                if task.speed > 0
+                else "   --     "
+            )
+
+            # Calculate ETA
+            if task.speed > 0 and task.total > task.completed:
+                remaining_bytes = task.total - task.completed
+                eta_seconds = remaining_bytes / task.speed
+                eta_str = format_eta(eta_seconds)
+            else:
+                eta_str = "00:00"
+
+            # Format progress bar
+            bar = render_bar(task.completed, task.total, self.bar_width)
+            pct = format_percentage(task.completed, task.total)
+
+            # Status icon
+            if task.is_finished:
+                status = "✓" if task.success else "✖"
+            else:
+                status = " "
+
+            # Main line with left-aligned name and right-aligned columns
+            lines.append(
+                f"{name:<{max_name_width}} {size_str} {speed_str} "
+                f"{eta_str:>5} {bar} {pct:>6} {status}"
+            )
+
+            # Error line if failed
+            if task.is_finished and not task.success and task.error_message:
+                error_msg = truncate_text(task.error_message, 60)
+                lines.append(f"    Error: {error_msg}")
+
+        lines.append("")
+        return lines
+
+    def _render_processing_section(self) -> list[str]:
+        """Render installation/verification/post-processing section.
+
+        Returns:
+            List of output lines
+
+        """
+        post_tasks = [
+            t
+            for t in self._task_order
+            if self.tasks[t].progress_type
+            in (
+                ProgressType.VERIFICATION,
+                ProgressType.ICON_EXTRACTION,
+                ProgressType.INSTALLATION,
+                ProgressType.UPDATE,
+            )
+        ]
+
+        if not post_tasks:
+            return []
+
+        # Determine section header based on task types present
+        # Priority: Verifying > Installing > Processing
+        has_verification = any(
+            self.tasks[t].progress_type == ProgressType.VERIFICATION
+            for t in post_tasks
+        )
+        has_installation = any(
+            self.tasks[t].progress_type == ProgressType.INSTALLATION
+            for t in post_tasks
+        )
+
+        if has_verification and not has_installation:
+            section_header = "Verifying:"
+        elif has_installation:
+            section_header = "Installing:"
+        else:
+            section_header = "Processing:"
+
+        lines = [section_header]
+
+        # Spinner frames for in-progress tasks
+        spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        current_time = time.time()
+        spinner_idx = int(current_time * 4) % len(spinner_frames)
+        spinner = spinner_frames[spinner_idx]
+
+        # Group tasks by parent (app name) to track verification status
+        app_verification_status = {}
+        for task_id in post_tasks:
+            task = self.tasks[task_id]
+            if task.progress_type == ProgressType.VERIFICATION:
+                app_verification_status[task.name] = (
+                    task.is_finished,
+                    task.success,
+                )
+
+        for task_id in post_tasks:
+            task = self.tasks[task_id]
+
+            # Determine phase indicator and operation name
+            phase_str = f"({task.phase}/{task.total_phases})"
+
+            if task.progress_type == ProgressType.VERIFICATION:
+                operation = "Verifying"
+            elif task.progress_type == ProgressType.INSTALLATION:
+                operation = "Installing"
+            elif task.progress_type == ProgressType.ICON_EXTRACTION:
+                operation = "Extracting icon"
+            elif task.progress_type == ProgressType.UPDATE:
+                operation = "Updating"
+            else:
+                operation = "Processing"
+
+            # Calculate fixed width for phase(5) + operation(~16) + status(1)
+            # Format: "{phase} {operation} {name} {status}"
+            # Spacing: 3 spaces between elements
+            fixed_width = 5 + 1 + 16 + 1 + 1 + 1
+
+            # Get dynamic name width
+            name_width = self._calculate_dynamic_name_width(
+                task.name, fixed_width
+            )
+            name = truncate_text(task.name, name_width)
+
+            # Determine status symbol
+            if task.is_finished:
+                # Task itself is finished - show its result
+                status = "✓" if task.success else "✖"
+            elif (
+                task.progress_type == ProgressType.INSTALLATION
+                and task.name in app_verification_status
+            ):
+                # Installation task but verification is complete
+                verify_finished, verify_success = app_verification_status[
+                    task.name
+                ]
+                if verify_finished and not verify_success:
+                    # Verification failed, so installation won't run
+                    status = "✖"
+                else:
+                    # Verification passed, installation in progress
+                    status = spinner
+            else:
+                # Task in progress
+                status = spinner
+
+            lines.append(
+                f"{phase_str} {operation} {name:<{name_width}} {status}"
+            )
+
+            # Error line if failed
+            if task.is_finished and not task.success and task.error_message:
+                error_msg = truncate_text(task.error_message, 60)
+                lines.append(f"    Error: {error_msg}")
+
+        lines.append("")
+        return lines
+
+    def _build_output(self) -> str:
+        """Build complete output string.
+
+        Returns:
+            Complete output string with all sections
+
+        """
+        lines: list[str] = []
+
+        # Add sections only if they have content
+        api_lines = self._render_api_section()
+        download_lines = self._render_downloads_section()
+        processing_lines = self._render_processing_section()
+
+        # Only show sections that have tasks
+        if api_lines:
+            lines.extend(api_lines)
+        if download_lines:
+            lines.extend(download_lines)
+        if processing_lines:
+            lines.extend(processing_lines)
+
+        return "\n".join(lines)
+
+    def _clear_previous_output(self) -> None:
+        """Clear previously written lines in interactive mode."""
+        if not self.interactive or self._last_output_lines == 0:
+            return
+
+        # Clear all previous lines
+        # Use a more aggressive clearing approach for better terminal compatibility
+        for _ in range(self._last_output_lines):
+            self.output.write("\033[1A")  # Move cursor up one line
+            self.output.write("\033[2K")  # Clear entire line
+            self.output.write("\r")  # Move to start of line
+
+        # Ensure output is written immediately
+        self.output.flush()
+
+    def _write_interactive(self, output: str) -> None:
+        """Write output in interactive mode with cursor control.
+
+        Args:
+            output: Output string to write
+
+        """
+        self._clear_previous_output()
+
+        if output:
+            lines = output.split("\n")
+            # Filter out trailing empty string from split to get accurate count
+            if lines and lines[-1] == "":
+                lines = lines[:-1]
+
+            # Write all lines at once to minimize flickering
+            output_text = "\n".join(lines) + "\n"
+            self.output.write(output_text)
+            self.output.flush()
+
+            self._last_output_lines = len(lines)
+        else:
+            self._last_output_lines = 0
+
+    def _write_noninteractive(self, output: str) -> None:
+        """Write output in non-interactive mode (minimal output).
+
+        Args:
+            output: Output string to write
+
+        """
+        # In non-interactive mode, only write final summary
+        if "Summary:" in output:
+            self.output.write(output + "\n")
+            self.output.flush()
+
+    async def render_once(self) -> None:
+        """Render current state once.
+
+        This is the main rendering method that should be called periodically
+        to update the display.
+        """
+        async with self._lock:
+            output = self._build_output()
+
+            if not output:
+                return
+
+            if self.interactive:
+                self._write_interactive(output)
+            else:
+                self._write_noninteractive(output)
+
+    async def cleanup(self) -> None:
+        """Clean up and write final output."""
+        async with self._lock:
+            if self.interactive:
+                # Final render with all completed tasks
+                output = self._build_output()
+                if output:
+                    self._clear_previous_output()
+                    self.output.write(output + "\n")
+                    self.output.flush()
+                self._last_output_lines = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,7 +624,7 @@ class TaskInfo:
     """Task information with all metadata in one structure."""
 
     # Core task data
-    task_id: TaskID
+    task_id: str
     namespaced_id: str
     name: str
     progress_type: ProgressType
@@ -123,6 +645,11 @@ class TaskInfo:
         None  # (timestamp, speed) pairs
     )
 
+    # Multi-phase task tracking
+    parent_task_id: str | None = None
+    phase: int = 1
+    total_phases: int = 1
+
     def __post_init__(self) -> None:
         """Initialize speed history deque."""
         if self.speed_history is None:
@@ -130,69 +657,34 @@ class TaskInfo:
 
 
 class ProgressDisplay:
-    """Progress display UI component."""
+    """Progress display UI component using ASCII backend."""
 
     def __init__(
         self,
-        console: Console | None = None,
         config: ProgressConfig | None = None,
+        interactive: bool | None = None,
     ) -> None:
-        """Initialize progress display."""
-        self.console = console or Console()
+        """Initialize progress display.
+
+        Args:
+            config: Progress configuration
+            interactive: Whether to use interactive mode
+                        (auto-detected if None)
+
+        """
         self.config = config or ProgressConfig()
+        self._backend = AsciiProgressBackend(interactive=interactive)
 
-        # Reuse single speed column instance across progress bars
-        self._speed_column_cache = SpeedColumn()
-
-        # Progress instances for different operation types with complete isolation
-        self._api_progress = Progress(
-            TextColumn("[bold cyan]{task.description}"),
-            BarColumn(bar_width=30),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            console=self.console,
-        )
-
-        self._download_progress = Progress(
-            TextColumn("[bold blue]{task.description}"),
-            BarColumn(bar_width=30),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TextColumn("{task.completed:.1f}/{task.total:.1f} MB"),
-            self._speed_column_cache,  # Reuse single instance
-            console=self.console,
-        )
-
-        self._post_processing_progress = Progress(
-            TextColumn("{task.description}"),
-            SpinnerColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            console=self.console,
-        )
-
-        self._overall_progress = Progress(
-            TextColumn("[bold green]Overall Progress"),
-            BarColumn(bar_width=40),
-            MofNCompleteColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            console=self.console,
-        )
-
-        # State management with separate locks for better concurrency
-        self._live: Live | None = None
-        self._overall_task_id: TaskID | None = None
+        # State management
         self._tasks: dict[str, TaskInfo] = {}  # Use namespaced IDs as keys
         self._active: bool = False
-        self._ui_visible: bool = False
-        self._tasks_added: bool = False
+        self._task_lock = asyncio.Lock()
 
-        # Split locks for better performance
-        self._task_lock = asyncio.Lock()  # For task data operations
-        self._ui_lock = asyncio.Lock()  # For UI-related operations
-
-        # Task ID tracking to prevent collisions with optimized cache management
+        # Task ID tracking to prevent collisions
         self._task_counters: dict[ProgressType, int] = defaultdict(int)
         self._id_cache: dict[tuple[ProgressType, str], str] = {}
 
-        # Keep track of which tasks belong to which Progress instance
+        # Task sets for fast lookup
         self._task_sets: dict[ProgressType, set[str]] = {
             ProgressType.API_FETCHING: set(),
             ProgressType.DOWNLOAD: set(),
@@ -202,22 +694,23 @@ class ProgressDisplay:
             ProgressType.UPDATE: set(),
         }
 
-        # Legacy attributes for backward compatibility
-        self._api_task_ids = self._task_sets[ProgressType.API_FETCHING]
-        self._download_task_ids = self._task_sets[ProgressType.DOWNLOAD]
-        self._post_processing_task_ids = (
-            set()
-        )  # Combined for all post-processing types
-
-        # UI state management
-        self._layout_cache: Table | None = None
-        self._pending_ui_updates: bool = False
-        self._ui_update_task: asyncio.Task | None = None
+        # Background rendering task
+        self._render_task: asyncio.Task | None = None
+        self._stop_rendering: asyncio.Event = asyncio.Event()
 
     def _generate_namespaced_id(
         self, progress_type: ProgressType, name: str
     ) -> str:
-        """Generate a unique namespaced ID for a task with optimized caching."""
+        """Generate a unique namespaced ID for a task with optimized caching.
+
+        Args:
+            progress_type: Type of progress operation
+            name: Task name
+
+        Returns:
+            Unique namespaced ID
+
+        """
         # Check cache first
         cache_key = (progress_type, name)
         if cache_key in self._id_cache:
@@ -252,367 +745,63 @@ class ProgressDisplay:
         """Clear the ID generation cache."""
         self._id_cache.clear()
 
-    def _get_progress_for_type(self, progress_type: ProgressType) -> Progress:
-        """Get the appropriate Progress instance for a task type."""
-        if progress_type == ProgressType.API_FETCHING:
-            return self._api_progress
-        elif progress_type == ProgressType.DOWNLOAD:
-            return self._download_progress
-        # Verification, icon extraction, installation, and update use post-processing
-        return self._post_processing_progress
+    async def _render_loop(self) -> None:
+        """Background loop for rendering progress updates."""
+        interval = 1.0 / self.config.refresh_per_second
 
-    def _count_active_post_processing_tasks(self) -> int:
-        """Count active post-processing tasks for dynamic panel height calculation."""
-        post_processing_types = {
-            ProgressType.VERIFICATION,
-            ProgressType.ICON_EXTRACTION,
-            ProgressType.INSTALLATION,
-            ProgressType.UPDATE,
-        }
-        # Group tasks by app and count apps that have active tasks
-        app_has_active_task = set()
-        for task in self._tasks.values():
-            if (
-                task.progress_type in post_processing_types
-                and not task.is_finished
-            ):
-                app_name = self._extract_app_name_from_task(task)
-                app_has_active_task.add(app_name)
-        return len(app_has_active_task)
-
-    def _create_filtered_post_processing_display(
-        self, max_visible_tasks: int = 3
-    ) -> Progress:
-        """Create a Progress display showing one line per app (most recent task per app)."""
-        # Create a new Progress instance for filtered display
-        # Handle case where console might be None or mocked during testing
-        console_arg = (
-            self.console if hasattr(self.console, "get_time") else None
-        )
-        filtered_progress = Progress(
-            TextColumn("{task.description}"),
-            SpinnerColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            console=console_arg,
-        )
-
-        # Get all post-processing tasks (verification, icon extraction, installation, update)
-        post_processing_types = {
-            ProgressType.VERIFICATION,
-            ProgressType.ICON_EXTRACTION,
-            ProgressType.INSTALLATION,
-            ProgressType.UPDATE,
-        }
-
-        relevant_tasks = [
-            (namespaced_id, task)
-            for namespaced_id, task in self._tasks.items()
-            if task.progress_type in post_processing_types
-        ]
-
-        # Group tasks by app name (extract app name from task name/description)
-        app_tasks = {}
-        for namespaced_id, task in relevant_tasks:
-            app_name = self._extract_app_name_from_task(task)
-            if app_name not in app_tasks:
-                app_tasks[app_name] = []
-            app_tasks[app_name].append((namespaced_id, task))
-
-        # For each app, find the most recent task (by last_update time)
-        app_current_tasks = []
-        for app_name, tasks in app_tasks.items():
-            # Sort by last_update descending to get most recent first
-            tasks.sort(key=lambda x: x[1].last_update, reverse=True)
-            most_recent_task = tasks[0]  # Most recent task for this app
-            app_current_tasks.append(
-                (app_name, most_recent_task[0], most_recent_task[1])
-            )
-
-        # Sort apps by priority: active tasks first, then by last update descending
-        app_current_tasks.sort(
-            key=lambda x: (x[2].is_finished, -x[2].last_update)
-        )
-
-        # Add the most relevant app tasks to the filtered display (limit by max_visible_tasks)
-        for app_name, _namespaced_id, task in app_current_tasks[
-            :max_visible_tasks
-        ]:
-            # Create appropriate description with status indicator
-            if task.is_finished:
-                status_icon = "✅" if task.success else "❌"
-                description = f"{status_icon} {app_name}"
-            else:
-                description = task.description
-
-            # Add task to filtered progress with current state
-            task_id = filtered_progress.add_task(
-                description=description,
-                total=task.total,
-                completed=task.completed,
-                visible=True,
-            )
-
-            # Update the task to reflect current state
-            if task.is_finished:
-                filtered_progress.update(task_id, completed=task.total)
-
-        return filtered_progress
-
-    def _extract_app_name_from_task(self, task: TaskInfo) -> str:
-        """Extract app name from task name or description for grouping."""
-        # Task name patterns:
-        # "Verifying filename.AppImage" -> extract filename
-        # "app_name icon extraction" -> extract app_name
-        # "Installing app_name" -> extract app_name
-        # "Updating app_name" -> extract app_name
-        # "app_name post-processing" -> extract app_name
-
-        if "icon extraction" in task.name:
-            return task.name.replace(" icon extraction", "")
-        elif task.name.startswith("Installing "):
-            return task.name.replace("Installing ", "")
-        elif task.name.startswith("Updating "):
-            return task.name.replace("Updating ", "")
-        elif task.name.startswith("Verifying "):
-            # Extract filename without extension
-            filename = task.name.replace("Verifying ", "")
-            # Remove common extensions
-            for ext in [
-                ".AppImage",
-                ".tar.gz",
-                ".tar.xz",
-                ".zip",
-                ".deb",
-                ".rpm",
-            ]:
-                if filename.endswith(ext):
-                    filename = filename[: -len(ext)]
-            return filename
-        elif " post-processing" in task.name:
-            return task.name.replace(" post-processing", "")
-        else:
-            # Fallback: use task name as-is
-            return task.name
-
-    def _create_layout(self) -> Table:
-        """Create the Rich layout for all progress displays with optimized caching."""
-        # Return cached layout if no updates pending
-        if self._layout_cache is not None and not self._pending_ui_updates:
-            return self._layout_cache
-
-        # Pre-create static panels only once and cache them
-        if not hasattr(self, "_cached_panels"):
-            self._cached_panels = {
-                "overall": Panel.fit(
-                    self._overall_progress,
-                    title="[bold green]📊 Overall Progress",
-                    border_style="green",
-                    padding=(0, 1),
-                )
-                if self.config.show_overall
-                else None,
-                "api": Panel.fit(
-                    self._api_progress,
-                    title="[bold cyan]🌐 API Requests",
-                    border_style="cyan",
-                    padding=(0, 1),
-                )
-                if self.config.show_api_fetching
-                else None,
-                "downloads": Panel.fit(
-                    self._download_progress,
-                    title="[bold blue]📦 Downloads",
-                    border_style="blue",
-                    padding=(0, 1),
-                )
-                if self.config.show_downloads
-                else None,
-            }
-
-        # Create post-processing panel dynamically with filtered task display
-        if self.config.show_post_processing:
-            # Calculate how many tasks can fit in the panel height
-            panel_height = max(
-                5, self._count_active_post_processing_tasks() + 3
-            )
-            max_visible_tasks = max(
-                1, panel_height - 2
-            )  # Account for top and bottom borders
-
-            # Create filtered progress display showing most recent tasks
-            filtered_display = self._create_filtered_post_processing_display(
-                max_visible_tasks
-            )
-
-            processing_panel = Panel(
-                filtered_display,
-                title="[bold yellow]⚙️ Post-Processing",
-                border_style="yellow",
-                padding=(0, 1),
-                width=45,
-                height=panel_height,
-            )
-        else:
-            processing_panel = None
-
-        layout = Table.grid(padding=0)
-        layout.add_column()
-        # Add API and Post-Processing panels in a single row using a nested Table for tight layout
-        api_panel = self._cached_panels.get("api")
-        downloads_panel = self._cached_panels.get("downloads")
-        overall_panel = self._cached_panels.get("overall")
-
-        # Create a nested row for API + Post-Processing with no space
-        if api_panel and processing_panel:
-            row = Table.grid(padding=0)
-            row.add_column()
-            row.add_column()
-            row.add_row(api_panel, processing_panel)
-            layout.add_row(row)
-        elif api_panel:
-            layout.add_row(api_panel)
-        elif processing_panel:
-            layout.add_row(processing_panel)
-
-        # Downloads panel below
-        if downloads_panel:
-            layout.add_row(downloads_panel)
-        # Overall panel at the end if enabled
-        if overall_panel:
-            layout.add_row(overall_panel)
-
-        # Cache layout and clear pending updates flag
-        self._layout_cache = layout
-        self._pending_ui_updates = False
-        return layout
-
-    async def _batched_ui_update_loop(self) -> None:
-        """Background task to batch UI updates for better performance."""
-        while self._active:
-            await asyncio.sleep(self.config.ui_update_interval)
-            if (
-                self._pending_ui_updates
-                and self._live
-                and self._live.is_started
-            ):
-                try:
-                    updated_layout = self._create_layout()
-                    self._live.update(updated_layout)
-                    self._live.refresh()
-                except Exception as e:
-                    logger.debug("Error in batched UI update: %s", e)
-
-    async def _start_background_tasks(self) -> None:
-        """Start background tasks using optimized task management."""
-        if self.config.batch_ui_updates:
-            # For now, use standard asyncio.create_task for better compatibility
-            # TaskGroup requires more complex context management that can cause issues
-            self._ui_update_task = asyncio.create_task(
-                self._batched_ui_update_loop()
-            )
-
-    async def _stop_background_tasks(self) -> None:
-        """Stop background tasks with optimized cleanup."""
-        if not self._ui_update_task:
-            return
-
-        # Optimized cleanup for all Python versions
-        if not self._ui_update_task.done():
-            self._ui_update_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._ui_update_task
-
-        self._ui_update_task = None
-
-    def _schedule_ui_update(self) -> None:
-        """Schedule a UI update based on configuration."""
-        if self.config.batch_ui_updates:
-            self._pending_ui_updates = True
-        else:
-            self._refresh_live_display()
-
-    def _refresh_live_display(self) -> None:
-        """Refresh the Live display with current progress state."""
-        if self._live and self._live.is_started:
+        while not self._stop_rendering.is_set():
             try:
-                # Clear cache to force layout recreation
-                self._layout_cache = None
-                updated_layout = self._create_layout()
-                self._live.update(updated_layout)
-                self._live.refresh()
+                await self._backend.render_once()
+                await asyncio.sleep(interval)
+            except asyncio.CancelledError:
+                break
             except Exception as e:
-                logger.debug("Error refreshing live display: %s", e)
+                logger.debug("Error in render loop: %s", e)
 
     async def start_session(self, total_operations: int = 0) -> None:
-        """Start a progress display session with optimized task management."""
-        async with self._ui_lock:
-            if self._active:
-                logger.warning("Progress session already active")
-                return
+        """Start a progress display session.
 
-            if total_operations > 0:
-                self._overall_task_id = self._overall_progress.add_task(
-                    "Processing...",
-                    total=total_operations,
-                    completed=0,
-                )
+        Args:
+            total_operations: Total number of operations (currently unused)
 
-            # Create and start Live display
-            layout = self._create_layout()
-            self._live = Live(
-                layout,
-                refresh_per_second=self.config.refresh_per_second,
-                console=self.console,
-            )
-            self._live.start()
-            self._active = True
-            self._ui_visible = True
-            self._tasks_added = True
+        """
+        if self._active:
+            logger.warning("Progress session already active")
+            return
 
-            # Start background tasks using optimized method
-            await self._start_background_tasks()
+        self._active = True
+        self._stop_rendering.clear()
 
-            logger.debug(
-                "Progress session started with %d total operations",
-                total_operations,
-            )
+        # Start background rendering loop
+        self._render_task = asyncio.create_task(self._render_loop())
+
+        logger.debug(
+            "Progress session started with %d total operations",
+            total_operations,
+        )
 
     async def stop_session(self) -> None:
-        """Stop the progress display session with optimized cleanup."""
-        async with self._ui_lock:
-            if not self._active:
-                return
+        """Stop the progress display session."""
+        if not self._active:
+            return
 
-            self._active = False
+        self._active = False
+        self._stop_rendering.set()
 
-            # Stop background tasks with optimized cleanup
-            await self._stop_background_tasks()
+        # Stop rendering task
+        if self._render_task:
+            self._render_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._render_task
+            self._render_task = None
 
-            # Ensure final UI update before stopping to show completion states
-            if self._live and self._pending_ui_updates:
-                try:
-                    self._refresh_live_display()
-                    await asyncio.sleep(
-                        0.05
-                    )  # Brief pause to ensure rendering
-                except Exception as e:
-                    logger.debug("Error in final UI update: %s", e)
+        # Final cleanup render
+        await self._backend.cleanup()
 
-            if self._live:
-                self._live.stop()
-                self._live = None
+        # Clear cached state
+        self._clear_id_cache()
 
-            self._ui_visible = False
-            self._tasks_added = False
-            self._overall_task_id = None
-
-            # Clean up cached state
-            self._layout_cache = None
-            if hasattr(self, "_cached_panels"):
-                delattr(self, "_cached_panels")
-            self._clear_id_cache()
-
-            logger.debug("Progress session stopped")
+        logger.debug("Progress session stopped")
 
     async def add_task(
         self,
@@ -620,8 +809,25 @@ class ProgressDisplay:
         progress_type: ProgressType,
         total: float = 0.0,
         description: str | None = None,
+        parent_task_id: str | None = None,
+        phase: int = 1,
+        total_phases: int = 1,
     ) -> str:
-        """Add a new progress task with proper isolation."""
+        """Add a new progress task.
+
+        Args:
+            name: Task name
+            progress_type: Type of progress operation
+            total: Total units for the task
+            description: Task description
+            parent_task_id: Parent task ID for multi-phase operations
+            phase: Current phase number
+            total_phases: Total number of phases
+
+        Returns:
+            Unique namespaced task ID
+
+        """
         if not self._active:
             raise RuntimeError("Progress session not active")
 
@@ -636,30 +842,10 @@ class ProgressDisplay:
         # Generate unique namespaced ID
         namespaced_id = self._generate_namespaced_id(progress_type, name)
 
-        # Get progress instance
-        progress_instance = self._get_progress_for_type(progress_type)
-
-        # Prepare task creation arguments
-        add_task_kwargs = {
-            "description": description,
-            "total": total,
-            "completed": 0,
-        }
-
-        # Initialize speed field for download tasks
-        if progress_type == ProgressType.DOWNLOAD:
-            add_task_kwargs["speed"] = 0.0
-
-        try:
-            rich_task_id = progress_instance.add_task(**add_task_kwargs)
-        except Exception as e:
-            logger.error("Error creating progress task %s: %s", name, e)
-            raise RuntimeError(f"Failed to create progress task: {e}") from e
-
         # Create task info structure
         current_time = time.time()
         task_info = TaskInfo(
-            task_id=rich_task_id,
+            task_id=namespaced_id,
             namespaced_id=namespaced_id,
             name=name,
             progress_type=progress_type,
@@ -667,6 +853,10 @@ class ProgressDisplay:
             description=description,
             created_at=current_time,
             last_update=current_time,
+            last_speed_update=0.0,  # Initialize to 0 for immediate speed calc
+            parent_task_id=parent_task_id,
+            phase=phase,
+            total_phases=total_phases,
         )
 
         async with self._task_lock:
@@ -676,17 +866,16 @@ class ProgressDisplay:
             # Add to appropriate task set for fast lookup
             self._task_sets[progress_type].add(namespaced_id)
 
-            # Update legacy compatibility sets
-            if progress_type in {
-                ProgressType.VERIFICATION,
-                ProgressType.ICON_EXTRACTION,
-                ProgressType.INSTALLATION,
-                ProgressType.UPDATE,
-            }:
-                self._post_processing_task_ids.add(namespaced_id)
-
-        # Schedule UI update
-        self._schedule_ui_update()
+        # Add task to backend
+        self._backend.add_task(
+            task_id=namespaced_id,
+            name=name,
+            progress_type=progress_type,
+            total=total,
+            parent_task_id=parent_task_id,
+            phase=phase,
+            total_phases=total_phases,
+        )
 
         logger.debug(
             "Added %s task: %s (total: %.1f)",
@@ -697,347 +886,364 @@ class ProgressDisplay:
 
         return namespaced_id
 
-    def _calculate_speed_optimized(
-        self, task: TaskInfo, current_time: float
-    ) -> None:
-        """Calculate current download speed using lock-free optimized algorithm."""
-        # Skip if insufficient time has passed (reduces frequent calculations)
-        if (
-            current_time - task.last_speed_update
-            < self.config.speed_calculation_interval
-        ):
-            return
+    def _calculate_speed(
+        self, task_info: TaskInfo, completed: float, current_time: float
+    ) -> float:
+        """Calculate download speed using moving average.
 
-        # Ensure speed_history is initialized
-        if task.speed_history is None:
-            task.speed_history = deque(maxlen=self.config.max_speed_history)
+        Args:
+            task_info: Task information
+            completed: Completed bytes
+            current_time: Current timestamp
 
-        # Add current measurement to history
-        task.speed_history.append((current_time, task.completed))
-        task.last_speed_update = current_time
+        Returns:
+            Speed in bytes per second
 
-        # Calculate speed from oldest and newest measurements with minimum history
-        MIN_HISTORY_SIZE = 2
-        if len(task.speed_history) >= MIN_HISTORY_SIZE:
-            old_time, old_completed = task.speed_history[0]
-            new_time, new_completed = task.speed_history[-1]
+        """
+        # Calculate speed from last update
+        time_since_last = current_time - task_info.last_speed_update
+        bytes_delta = completed - task_info.completed
 
-            time_diff = new_time - old_time
-            completed_diff = new_completed - old_completed
+        # Need minimum time and progress to calculate speed
+        if time_since_last <= 0 or bytes_delta <= 0:
+            # Return current speed if available
+            if task_info.current_speed_mbps > 0:
+                return task_info.current_speed_mbps * (1024 * 1024)
+            return 0.0
 
-            if time_diff > 0 and completed_diff > 0:
-                # Use exponential moving average for smoother speed display
-                new_speed = completed_diff / time_diff
-                if task.current_speed_mbps > 0:
-                    # Smooth the speed with EMA (alpha = 0.3 for responsiveness)
-                    alpha = 0.3
-                    task.current_speed_mbps = (
-                        alpha * new_speed
-                        + (1 - alpha) * task.current_speed_mbps
-                    )
-                else:
-                    task.current_speed_mbps = new_speed
-            else:
-                task.current_speed_mbps = 0.0
+        speed_bps = bytes_delta / time_since_last
+
+        # Add to history
+        if task_info.speed_history is not None:
+            task_info.speed_history.append((current_time, speed_bps))
+
+        # Calculate moving average
+        if task_info.speed_history and len(task_info.speed_history) > 0:
+            speeds = [s for _, s in task_info.speed_history]
+            avg_speed = sum(speeds) / len(speeds)
+            return avg_speed
+
+        return speed_bps
 
     async def update_task(
         self,
-        namespaced_id: str,
+        task_id: str,
         completed: float | None = None,
-        advance: float | None = None,
+        total: float | None = None,
         description: str | None = None,
     ) -> None:
-        """Update a progress task with optimized lock-reduced implementation."""
-        if not self._active:
-            logger.warning(
-                "Cannot update task %s: Progress session not active",
-                namespaced_id,
-            )
-            return
+        """Update task progress.
 
-        # Pre-calculate values outside the lock to minimize lock time
-        current_time = time.time()
+        Args:
+            task_id: Task identifier
+            completed: Completed units (if updating)
+            total: Total units (if updating)
+            description: Task description (if updating)
 
-        # Fast path: check if task exists without lock first
-        task = self._tasks.get(namespaced_id)
-        if not task or task.is_finished:
-            return
-
-        # Prepare updates
-        old_completed = task.completed
-        needs_speed_calc = False
-
-        # Calculate new completed value
-        new_completed = task.completed
-        if completed is not None:
-            new_completed = max(0.0, min(completed, task.total))
-        elif advance is not None:
-            new_completed = max(0.0, min(task.completed + advance, task.total))
-
-        # Only acquire lock when we need to update
+        """
         async with self._task_lock:
-            # Re-check task state after acquiring lock
-            task = self._tasks.get(namespaced_id)
-            if not task or task.is_finished:
+            if task_id not in self._tasks:
+                logger.warning("Task not found: %s", task_id)
                 return
 
-            # Update task data atomically
-            task.completed = new_completed
+            task_info = self._tasks[task_id]
+            current_time = time.time()
+
+            # Calculate speed for download tasks
+            speed_bps = 0.0
+            if (
+                completed is not None
+                and task_info.progress_type == ProgressType.DOWNLOAD
+            ):
+                speed_bps = self._calculate_speed(
+                    task_info, completed, current_time
+                )
+                task_info.current_speed_mbps = speed_bps / (1024 * 1024)
+                task_info.last_speed_update = current_time
+
+            # Update task info
+            if completed is not None:
+                task_info.completed = completed
+            if total is not None:
+                task_info.total = total
             if description is not None:
-                task.description = description
-            task.last_update = current_time
+                task_info.description = description
+            task_info.last_update = current_time
 
-        # Mark for speed calculation if this is a download task with progress change
-        if (
-            task.progress_type == ProgressType.DOWNLOAD
-            and new_completed != old_completed
-        ):
-            needs_speed_calc = True
+        # Update backend
+        self._backend.update_task(
+            task_id=task_id,
+            completed=completed,
+            total=total,
+            description=description,
+            speed=speed_bps,
+        )
 
-        # Perform expensive operations outside the lock
-        update_kwargs: dict[str, Any] = {}
+    async def update_task_total(self, task_id: str, total: float) -> None:
+        """Update task total separately.
 
-        # Calculate speed outside lock if needed
-        if needs_speed_calc:
-            self._calculate_speed_optimized(task, current_time)
-            update_kwargs["speed"] = task.current_speed_mbps
+        Args:
+            task_id: Task identifier
+            total: New total value
 
-        # Prepare update parameters
-        if completed is not None:
-            update_kwargs["completed"] = new_completed
-        elif advance is not None and new_completed != old_completed:
-            update_kwargs["advance"] = new_completed - old_completed
-        if description is not None:
-            update_kwargs["description"] = task.description
-
-        # Update Rich UI outside the lock
-        if update_kwargs:
-            progress_instance = self._get_progress_for_type(task.progress_type)
-            try:
-                progress_instance.update(task.task_id, **update_kwargs)
-                self._schedule_ui_update()
-            except Exception as e:
-                logger.error(
-                    "Error updating progress for task %s: %s", task.name, e
-                )
-
-    async def update_task_total(
-        self,
-        namespaced_id: str,
-        new_total: float,
-        completed: float | None = None,
-    ) -> None:
-        """Update a task's total value and optionally its completion."""
-        async with self._task_lock:
-            task = self._tasks.get(namespaced_id)
-            if not task or task.is_finished:
-                return
-
-            task.total = max(0.0, new_total)
-            task.last_update = time.time()
-
-            if completed is not None:
-                task.completed = max(0.0, min(completed, new_total))
-            elif task.completed > new_total:
-                task.completed = new_total
-
-        # Update UI
-        progress_instance = self._get_progress_for_type(task.progress_type)
-        try:
-            progress_instance.update(task.task_id, total=task.total)
-            if completed is not None:
-                progress_instance.update(
-                    task.task_id, completed=task.completed
-                )
-            self._schedule_ui_update()
-        except Exception as e:
-            logger.error("Error updating task total for %s: %s", task.name, e)
+        """
+        await self.update_task(task_id, total=total)
 
     async def finish_task(
         self,
-        namespaced_id: str,
+        task_id: str,
         success: bool = True,
-        final_description: str | None = None,
-        final_total: float | None = None,
+        description: str | None = None,
     ) -> None:
-        """Mark a task as finished with proper section isolation."""
-        should_advance_overall = False
+        """Mark a task as finished.
 
+        Args:
+            task_id: Task identifier
+            success: Whether the task succeeded
+            description: Final description
+
+        """
         async with self._task_lock:
-            task = self._tasks.get(namespaced_id)
-            if not task or task.is_finished:
+            if task_id not in self._tasks:
+                logger.warning("Task not found: %s", task_id)
                 return
 
-            # Update task state
-            task.success = success
-            task.is_finished = True
-            task.last_update = time.time()
+            task_info = self._tasks[task_id]
+            task_info.is_finished = True
+            task_info.success = success
 
-            if final_total is not None and final_total > 0:
-                task.total = final_total
-                task.completed = final_total
-            else:
-                task.completed = task.total
+            if description is not None:
+                task_info.description = description
 
-            # Generate final description if not provided
-            if final_description is None:
-                status_icon = "✅" if success else "❌"
-                final_description = f"{status_icon} {task.name}"
+            # Mark as completed if successful
+            if success and task_info.total > 0:
+                task_info.completed = task_info.total
 
-            task.description = final_description
-            should_advance_overall = success
-
-        # Update UI
-        progress_instance = self._get_progress_for_type(task.progress_type)
-        try:
-            if final_total is not None and final_total > 0:
-                progress_instance.update(task.task_id, total=final_total)
-
-            progress_instance.update(
-                task.task_id,
-                completed=task.completed,
-                description=task.description,
-            )
-
-            # Force immediate UI update for task completion to prevent race conditions
-            self._refresh_live_display()
-
-            # Longer delay to ensure completion state is rendered before session ends
-            await asyncio.sleep(0.15)
-
-        except Exception as e:
-            logger.error(
-                "Error updating progress for task %s: %s", task.name, e
-            )
-
-        # Advance overall progress
-        if should_advance_overall:
-            await self._advance_overall_progress()
-
-        logger.info(
-            "Finished %s task: %s (success: %s)",
-            task.progress_type.name,
-            task.name,
-            success,
+        # Update backend
+        self._backend.finish_task(
+            task_id=task_id, success=success, description=description
         )
 
-    async def _advance_overall_progress(self) -> None:
-        """Advance the overall progress counter."""
-        if self._overall_task_id is not None and self._active:
-            try:
-                self._overall_progress.advance(self._overall_task_id, 1)
-            except Exception as e:
-                logger.debug("Error advancing overall progress: %s", e)
+        logger.debug(
+            "Finished task: %s (success: %s)",
+            task_id,
+            success,
+        )
 
     @asynccontextmanager
     async def session(
         self, total_operations: int = 0
     ) -> AsyncGenerator[None, None]:
-        """Context manager for progress session."""
+        """Context manager for progress session.
+
+        Args:
+            total_operations: Total number of operations
+
+        Yields:
+            None
+
+        """
+        await self.start_session(total_operations)
         try:
-            await self.start_session(total_operations)
             yield
         finally:
             await self.stop_session()
 
-    def get_task_info(self, namespaced_id: str) -> TaskInfo | None:
-        """Get task information by namespaced ID."""
-        return self._tasks.get(namespaced_id)
+    def get_task_info(self, task_id: str) -> TaskInfo | None:
+        """Get task information by ID.
+
+        Args:
+            task_id: Task identifier
+
+        Returns:
+            Task information or None if not found
+
+        """
+        return self._tasks.get(task_id)
 
     def is_active(self) -> bool:
-        """Check if progress session is active."""
+        """Check if progress session is active.
+
+        Returns:
+            True if active, False otherwise
+
+        """
         return self._active
 
     async def create_api_fetching_task(
-        self, endpoint: str, total_requests: int = 100
+        self, name: str, description: str | None = None
     ) -> str:
-        """Create an API fetching task."""
-        # Simplify endpoint display - extract meaningful part
-        display_name = (
-            endpoint.split("/")[-1].split("?")[0]
-            if "/" in endpoint
-            else endpoint
-        )
-
-        return await self.add_task(
-            name=f"Fetching {display_name}",
-            progress_type=ProgressType.API_FETCHING,
-            total=float(total_requests),
-            description=f"🌐 Fetching from API: {display_name}...",
-        )
-
-    async def create_verification_task(self, filename: str) -> str:
-        """Create a verification task."""
-        filename_only = Path(filename).name
-        return await self.add_task(
-            name=f"Verifying {filename_only}",
-            progress_type=ProgressType.VERIFICATION,
-            total=100.0,
-            description=f"🔍 Verifying {filename_only}...",
-        )
-
-    async def create_icon_extraction_task(self, app_name: str) -> str:
-        """Create an icon extraction task."""
-        return await self.add_task(
-            name=f"{app_name} icon extraction",
-            progress_type=ProgressType.ICON_EXTRACTION,
-            total=100.0,
-            description=f"🎨 Extracting {app_name} icon...",
-        )
-
-    async def create_post_processing_task(self, app_name: str) -> str:
-        """Create a combined post-processing task for an AppImage.
-
-        This combines verification, icon extraction, and installation
-        into a single progress bar.
+        """Create an API fetching task.
 
         Args:
-            app_name: Name of the application being processed
+            name: Task name
+            description: Task description
 
         Returns:
-            Task ID for the combined post-processing task
+            Task ID
 
         """
         return await self.add_task(
-            name=f"{app_name} post-processing",
-            progress_type=ProgressType.INSTALLATION,  # Use INSTALLATION as the primary type
-            total=100.0,
-            description=f"⚙️ Processing {app_name}...",
+            name=name,
+            progress_type=ProgressType.API_FETCHING,
+            description=description or f"Fetching {name}",
         )
+
+    async def create_verification_task(
+        self, name: str, description: str | None = None
+    ) -> str:
+        """Create a verification task.
+
+        Args:
+            name: Task name
+            description: Task description
+
+        Returns:
+            Task ID
+
+        """
+        return await self.add_task(
+            name=name,
+            progress_type=ProgressType.VERIFICATION,
+            description=description or f"Verifying {name}",
+        )
+
+    async def create_icon_extraction_task(
+        self, name: str, description: str | None = None
+    ) -> str:
+        """Create an icon extraction task.
+
+        Args:
+            name: Task name
+            description: Task description
+
+        Returns:
+            Task ID
+
+        """
+        return await self.add_task(
+            name=name,
+            progress_type=ProgressType.ICON_EXTRACTION,
+            description=description or f"Extracting icon for {name}",
+        )
+
+    async def create_post_processing_task(
+        self,
+        name: str,
+        progress_type: ProgressType = ProgressType.INSTALLATION,
+        description: str | None = None,
+    ) -> str:
+        """Create a post-processing task.
+
+        Args:
+            name: Task name
+            progress_type: Type of post-processing
+            description: Task description
+
+        Returns:
+            Task ID
+
+        """
+        return await self.add_task(
+            name=name,
+            progress_type=progress_type,
+            description=description or f"Processing {name}",
+        )
+
+    async def create_installation_workflow(
+        self, name: str, with_verification: bool = True
+    ) -> tuple[str | None, str]:
+        """Create a multi-phase installation workflow.
+
+        This creates linked verification and installation tasks for the
+        same app.
+        The verification task is phase 1/2, and installation is phase 2/2.
+
+        Args:
+            name: Application name
+            with_verification: Whether to create a verification task
+
+        Returns:
+            Tuple of (verification_task_id, installation_task_id)
+            verification_task_id will be None if with_verification=False
+
+        """
+        verification_task_id = None
+
+        if with_verification:
+            # Create verification task as phase 1/2
+            verification_task_id = await self.add_task(
+                name=name,
+                progress_type=ProgressType.VERIFICATION,
+                description=f"Verifying {name}",
+                phase=1,
+                total_phases=2,
+            )
+
+            # Create installation task as phase 2/2
+            installation_task_id = await self.add_task(
+                name=name,
+                progress_type=ProgressType.INSTALLATION,
+                description=f"Installing {name}",
+                parent_task_id=verification_task_id,
+                phase=2,
+                total_phases=2,
+            )
+        else:
+            # Create installation task as phase 1/1 (no verification)
+            installation_task_id = await self.add_task(
+                name=name,
+                progress_type=ProgressType.INSTALLATION,
+                description=f"Installing {name}",
+                phase=1,
+                total_phases=1,
+            )
+
+        return verification_task_id, installation_task_id
 
 
 # Global progress service instance
-_global_progress_service: ProgressDisplay | None = None
+_progress_service: ProgressDisplay | None = None
 
 
-def get_progress_service() -> ProgressDisplay:
-    """Get or create the global progress service instance."""
-    global _global_progress_service
-    if _global_progress_service is None:
-        _global_progress_service = ProgressDisplay()
-    return _global_progress_service
+def get_progress_service() -> ProgressDisplay | None:
+    """Get the global progress service instance.
+
+    Returns:
+        Progress service instance or None
+
+    """
+    return _progress_service
 
 
-def set_progress_service(service: ProgressDisplay) -> None:
-    """Set the global progress service instance."""
-    global _global_progress_service
-    _global_progress_service = service
+def set_progress_service(service: ProgressDisplay | None) -> None:
+    """Set the global progress service instance.
+
+    Args:
+        service: Progress service instance
+
+    """
+    global _progress_service  # noqa: PLW0603
+    _progress_service = service
 
 
 @asynccontextmanager
 async def progress_session(
     total_operations: int = 0,
-    console: Console | None = None,
-    config: ProgressConfig | None = None,
 ) -> AsyncGenerator[ProgressDisplay, None]:
-    """Context manager for isolated progress session."""
-    global _global_progress_service
-    service = ProgressDisplay(console=console, config=config)
-    old_service = _global_progress_service
-    _global_progress_service = service
+    """Context manager for creating and managing a progress session.
 
-    try:
-        async with service.session(total_operations):
-            yield service
-    finally:
-        _global_progress_service = old_service
+    Args:
+        total_operations: Total number of operations
+
+    Yields:
+        Progress display instance
+
+    """
+    service = get_progress_service()
+    if service is None:
+        service = ProgressDisplay()
+        set_progress_service(service)
+
+    async with service.session(total_operations):
+        yield service
