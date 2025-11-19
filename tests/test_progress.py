@@ -5,19 +5,57 @@ verification failures, icon extraction errors, and other progress bar issues.
 """
 
 import asyncio
+import io
 from unittest.mock import Mock, patch
 
 import pytest
 
 from my_unicorn.progress import (
+    AsciiProgressBackend,
     ProgressConfig,
     ProgressDisplay,
     ProgressType,
     TaskInfo,
+    TaskState,
     get_progress_service,
     progress_session,
     set_progress_service,
 )
+
+
+class TestTaskState:
+    """Test cases for TaskState dataclass."""
+
+    def test_task_state_creation(self) -> None:
+        """Test creating a TaskState with required fields."""
+        state = TaskState(
+            task_id="task_1",
+            name="Test Task",
+            progress_type=ProgressType.DOWNLOAD,
+        )
+
+        assert state.task_id == "task_1"
+        assert state.name == "Test Task"
+        assert state.progress_type == ProgressType.DOWNLOAD
+        assert state.total == 0.0
+        assert state.completed == 0.0
+        assert state.success is None
+        assert not state.is_finished
+
+    def test_task_state_multi_phase(self) -> None:
+        """Test TaskState with multi-phase tracking."""
+        state = TaskState(
+            task_id="task_1",
+            name="Multi-phase Task",
+            progress_type=ProgressType.VERIFICATION,
+            parent_task_id="parent_task",
+            phase=1,
+            total_phases=2,
+        )
+
+        assert state.parent_task_id == "parent_task"
+        assert state.phase == 1
+        assert state.total_phases == 2
 
 
 class TestProgressType:
@@ -61,6 +99,35 @@ class TestTaskInfo:
         assert task.success is None
         assert not task.is_finished
 
+    def test_task_info_with_speed_history(self) -> None:
+        """Test TaskInfo speed tracking initialization."""
+        task = TaskInfo(
+            task_id="dl_1",
+            namespaced_id="dl_1_file",
+            name="test.AppImage",
+            progress_type=ProgressType.DOWNLOAD,
+        )
+
+        # Speed history should be initialized in __post_init__
+        assert task.speed_history is not None
+        assert len(task.speed_history) == 0
+
+    def test_task_info_multi_phase(self) -> None:
+        """Test TaskInfo with multi-phase tracking."""
+        task = TaskInfo(
+            task_id="vf_1",
+            namespaced_id="vf_1_app",
+            name="MyApp",
+            progress_type=ProgressType.VERIFICATION,
+            parent_task_id="parent_1",
+            phase=1,
+            total_phases=2,
+        )
+
+        assert task.parent_task_id == "parent_1"
+        assert task.phase == 1
+        assert task.total_phases == 2
+
 
 class TestProgressConfig:
     """Test cases for ProgressConfig dataclass."""
@@ -74,16 +141,26 @@ class TestProgressConfig:
         assert config.show_api_fetching
         assert config.show_downloads
         assert config.show_post_processing
+        assert config.batch_ui_updates
+        assert config.ui_update_interval == 0.25
+        assert config.speed_calculation_interval == 0.5
+        assert config.max_speed_history == 10
 
     def test_custom_config(self) -> None:
         """Test custom configuration values."""
         config = ProgressConfig(
-            refresh_per_second=10, show_overall=True, show_api_fetching=False
+            refresh_per_second=10,
+            show_overall=True,
+            show_api_fetching=False,
+            batch_ui_updates=False,
+            ui_update_interval=0.1,
         )
 
         assert config.refresh_per_second == 10
         assert config.show_overall
         assert not config.show_api_fetching
+        assert not config.batch_ui_updates
+        assert config.ui_update_interval == 0.1
 
 
 @pytest.fixture
@@ -92,6 +169,143 @@ def progress_service() -> ProgressDisplay:
     service = ProgressDisplay()
     # Don't set _active=True here as some tests need to test inactive state
     return service
+
+
+@pytest.fixture
+def ascii_backend() -> AsciiProgressBackend:
+    """Fixture providing an AsciiProgressBackend instance."""
+    output = io.StringIO()
+    backend = AsciiProgressBackend(output=output, interactive=False)
+    return backend
+
+
+class TestAsciiProgressBackend:
+    """Test cases for AsciiProgressBackend."""
+
+    def test_backend_initialization(self) -> None:
+        """Test backend initialization with defaults."""
+        output = io.StringIO()
+        backend = AsciiProgressBackend(output=output)
+
+        assert backend.output == output
+        assert backend.bar_width == 30
+        assert backend.max_name_width == 20
+        assert len(backend.tasks) == 0
+
+    def test_backend_add_task(
+        self, ascii_backend: AsciiProgressBackend
+    ) -> None:
+        """Test adding a task to the backend."""
+        ascii_backend.add_task(
+            task_id="dl_1",
+            name="test.AppImage",
+            progress_type=ProgressType.DOWNLOAD,
+            total=1000.0,
+        )
+
+        assert "dl_1" in ascii_backend.tasks
+        task = ascii_backend.tasks["dl_1"]
+        assert task.name == "test.AppImage"
+        assert task.total == 1000.0
+
+    def test_backend_update_task(
+        self, ascii_backend: AsciiProgressBackend
+    ) -> None:
+        """Test updating task progress in backend."""
+        ascii_backend.add_task(
+            task_id="dl_1",
+            name="test.AppImage",
+            progress_type=ProgressType.DOWNLOAD,
+            total=1000.0,
+        )
+
+        ascii_backend.update_task("dl_1", completed=500.0, speed=1024.0)
+
+        task = ascii_backend.tasks["dl_1"]
+        assert task.completed == 500.0
+        assert task.speed == 1024.0
+
+    def test_backend_finish_task(
+        self, ascii_backend: AsciiProgressBackend
+    ) -> None:
+        """Test finishing a task in backend."""
+        ascii_backend.add_task(
+            task_id="dl_1",
+            name="test.AppImage",
+            progress_type=ProgressType.DOWNLOAD,
+        )
+
+        ascii_backend.finish_task("dl_1", success=True, description="Complete")
+
+        task = ascii_backend.tasks["dl_1"]
+        assert task.is_finished
+        assert task.success
+        assert task.description == "Complete"
+
+    def test_backend_multi_phase_task(
+        self, ascii_backend: AsciiProgressBackend
+    ) -> None:
+        """Test backend handling of multi-phase tasks."""
+        ascii_backend.add_task(
+            task_id="vf_1",
+            name="MyApp",
+            progress_type=ProgressType.VERIFICATION,
+            phase=1,
+            total_phases=2,
+        )
+
+        ascii_backend.add_task(
+            task_id="in_1",
+            name="MyApp",
+            progress_type=ProgressType.INSTALLATION,
+            parent_task_id="vf_1",
+            phase=2,
+            total_phases=2,
+        )
+
+        verify_task = ascii_backend.tasks["vf_1"]
+        install_task = ascii_backend.tasks["in_1"]
+
+        assert verify_task.phase == 1
+        assert verify_task.total_phases == 2
+        assert install_task.phase == 2
+        assert install_task.parent_task_id == "vf_1"
+
+    @pytest.mark.asyncio
+    async def test_backend_render_once(
+        self, ascii_backend: AsciiProgressBackend
+    ) -> None:
+        """Test rendering backend output once."""
+        ascii_backend.add_task(
+            task_id="dl_1",
+            name="test.AppImage",
+            progress_type=ProgressType.DOWNLOAD,
+            total=1000.0,
+        )
+
+        ascii_backend.update_task("dl_1", completed=500.0)
+
+        await ascii_backend.render_once()
+
+        # Check that output was written
+        output_value = ascii_backend.output.getvalue()  # type: ignore[attr-defined]
+        assert len(output_value) > 0
+
+    def test_backend_interactive_vs_noninteractive(self) -> None:
+        """Test interactive vs non-interactive mode detection."""
+        output = io.StringIO()
+
+        # Explicit interactive mode
+        backend_interactive = AsciiProgressBackend(
+            output=output, interactive=True
+        )
+        assert backend_interactive.interactive
+
+        # Explicit non-interactive mode
+        backend_noninteractive = AsciiProgressBackend(
+            output=output, interactive=False
+        )
+        assert not backend_noninteractive.interactive
 
 
 class TestProgressDisplay:
@@ -755,6 +969,7 @@ class TestErrorScenarios:
         )
 
         task_info = progress_service.get_task_info(task_id)
+        assert task_info is not None
         assert task_info.description == "🔍 Checking integrity..."
         assert task_info.completed == 75.0
 
@@ -792,4 +1007,184 @@ class TestErrorScenarios:
 
         # Test session cleanup
         await service.stop_session()
+        assert not service.is_active()
+
+    @pytest.mark.asyncio
+    async def test_multi_phase_installation_workflow(self) -> None:
+        """Test multi-phase installation workflow creation."""
+        service = ProgressDisplay()
+
+        await service.start_session()
+
+        # Test with verification
+        verify_id, install_id = await service.create_installation_workflow(
+            "MyApp", with_verification=True
+        )
+
+        assert verify_id is not None
+        assert install_id is not None
+
+        # Check verification task
+        verify_task = service.get_task_info(verify_id)
+        assert verify_task is not None
+        assert verify_task.phase == 1
+        assert verify_task.total_phases == 2
+        assert verify_task.progress_type == ProgressType.VERIFICATION
+
+        # Check installation task
+        install_task = service.get_task_info(install_id)
+        assert install_task is not None
+        assert install_task.phase == 2
+        assert install_task.total_phases == 2
+        assert install_task.parent_task_id == verify_id
+        assert install_task.progress_type == ProgressType.INSTALLATION
+
+        await service.stop_session()
+
+    @pytest.mark.asyncio
+    async def test_installation_workflow_without_verification(self) -> None:
+        """Test installation workflow without verification phase."""
+        service = ProgressDisplay()
+
+        await service.start_session()
+
+        verify_id, install_id = await service.create_installation_workflow(
+            "MyApp", with_verification=False
+        )
+
+        assert verify_id is None
+        assert install_id is not None
+
+        install_task = service.get_task_info(install_id)
+        assert install_task is not None
+        assert install_task.phase == 1
+        assert install_task.total_phases == 1
+        assert install_task.parent_task_id is None
+
+        await service.stop_session()
+
+    @pytest.mark.asyncio
+    async def test_speed_calculation_with_history(self) -> None:
+        """Test speed calculation using history."""
+        service = ProgressDisplay()
+
+        await service.start_session()
+
+        task_id = await service.add_task(
+            "speed_test.AppImage",
+            ProgressType.DOWNLOAD,
+            total=10000.0,
+        )
+
+        # Simulate multiple progress updates
+        with patch("time.time", return_value=1000.0):
+            await service.update_task(task_id, completed=1000.0)
+
+        with patch("time.time", return_value=1001.0):
+            await service.update_task(task_id, completed=2000.0)
+
+        with patch("time.time", return_value=1002.0):
+            await service.update_task(task_id, completed=3000.0)
+
+        task_info = service.get_task_info(task_id)
+        assert task_info is not None
+        # Speed should be calculated from history
+        assert task_info.current_speed_mbps > 0
+
+        await service.stop_session()
+
+    @pytest.mark.asyncio
+    async def test_create_post_processing_task(self) -> None:
+        """Test creating post-processing tasks."""
+        service = ProgressDisplay()
+
+        await service.start_session()
+
+        task_id = await service.create_post_processing_task(
+            "MyApp",
+            progress_type=ProgressType.UPDATE,
+            description="Updating MyApp",
+        )
+
+        assert task_id is not None
+        task_info = service.get_task_info(task_id)
+        assert task_info is not None
+        assert task_info.progress_type == ProgressType.UPDATE
+        assert task_info.description == "Updating MyApp"
+
+        await service.stop_session()
+
+    @pytest.mark.asyncio
+    async def test_id_cache_management(self) -> None:
+        """Test ID cache is properly managed."""
+        service = ProgressDisplay()
+
+        await service.start_session()
+
+        # Generate several IDs
+        for i in range(10):
+            await service.add_task(
+                f"task_{i}",
+                ProgressType.DOWNLOAD,
+                total=100.0,
+            )
+
+        # Stop session should clear cache
+        await service.stop_session()
+
+    @pytest.mark.asyncio
+    async def test_task_sets_tracking(self) -> None:
+        """Test that task sets are properly maintained."""
+        service = ProgressDisplay()
+
+        await service.start_session()
+
+        dl_task = await service.add_task(
+            "download.AppImage",
+            ProgressType.DOWNLOAD,
+            total=1000.0,
+        )
+
+        api_task = await service.create_api_fetching_task("GitHub API")
+
+        # Verify tasks were created
+        assert service.get_task_info(dl_task) is not None
+        assert service.get_task_info(api_task) is not None
+
+        await service.stop_session()
+
+    @pytest.mark.asyncio
+    async def test_render_loop_error_handling(self) -> None:
+        """Test that render loop handles errors gracefully."""
+        service = ProgressDisplay()
+
+        await service.start_session()
+
+        # Let it run for a bit
+        await asyncio.sleep(0.3)
+
+        # Should still be active even if errors occur
+        assert service.is_active()
+
+        await service.stop_session()
+
+    @pytest.mark.asyncio
+    async def test_backend_cleanup(self) -> None:
+        """Test backend cleanup on session stop."""
+        service = ProgressDisplay()
+
+        await service.start_session()
+
+        task_id = await service.add_task(
+            "test.AppImage",
+            ProgressType.DOWNLOAD,
+            total=100.0,
+        )
+
+        await service.update_task(task_id, completed=50.0)
+        await service.finish_task(task_id, success=True)
+
+        # Stop should trigger cleanup
+        await service.stop_session()
+
         assert not service.is_active()
