@@ -6,6 +6,7 @@ different types of operations with ASCII-based visual feedback.
 
 import asyncio
 import contextlib
+import os
 import shutil
 import sys
 import time
@@ -92,9 +93,21 @@ class AsciiProgressBackend:
 
         """
         self.output = output or sys.stdout
-        self.interactive = (
-            interactive if interactive is not None else self.output.isatty()
-        )
+        # Robust TTY / interactive detection:
+        # - Use provided `interactive` if explicit
+        # - Otherwise, ensure `output` exposes .isatty() and TERM is not 'dumb'
+        is_tty = False
+        try:
+            is_tty = bool(getattr(self.output, "isatty", lambda: False)())
+        except Exception:
+            is_tty = False
+
+        if interactive is not None:
+            self.interactive = bool(interactive)
+        else:
+            term = os.environ.get("TERM", "")
+            self.interactive = is_tty and term != "dumb"
+
         self.bar_width = bar_width
         self.max_name_width = max_name_width
 
@@ -102,6 +115,13 @@ class AsciiProgressBackend:
         self._task_order: list[str] = []  # Maintain insertion order
         self._lock = asyncio.Lock()
         self._last_output_lines = 0  # Track lines written for clearing
+
+        # Non-interactive output cache to avoid duplicate headers and spam
+        self._last_noninteractive_output: str = ""
+        self._last_noninteractive_write_time: float = 0.0
+        self._noninteractive_write_min_interval: float = 0.25
+        # Track which sections have been written to avoid duplicates
+        self._written_sections: set[str] = set()
 
     def add_task(
         self,
@@ -267,10 +287,14 @@ class AsciiProgressBackend:
             Width to use for name (either full length or truncated)
 
         """
-        try:
-            terminal_width = shutil.get_terminal_size().columns
-        except (AttributeError, ValueError, OSError):
-            # Fallback if terminal size cannot be determined
+        if self.interactive:
+            try:
+                terminal_width = shutil.get_terminal_size().columns
+            except (AttributeError, ValueError, OSError):
+                # Fallback if terminal size cannot be determined
+                terminal_width = 80
+        else:
+            # Use fixed width in non-interactive mode for consistent rendering
             terminal_width = 80
 
         # Calculate available space for name
@@ -323,7 +347,19 @@ class AsciiProgressBackend:
                 max_name_width, min(name_width, len(display_name))
             )
 
-        lines = ["Downloading:"]
+        # Count total and completed downloads from task states
+        total_downloads = len(download_tasks)
+        completed_downloads = sum(
+            1 for t in download_tasks if self.tasks[t].is_finished
+        )
+
+        # Show counter if we have multiple downloads
+        if total_downloads > 1:
+            header = f"Downloading ({completed_downloads}/{total_downloads}):"
+        else:
+            header = "Downloading:"
+
+        lines = [header]
         for task_id in download_tasks:
             task = self.tasks[task_id]
             display_name = display_names[task_id]
@@ -425,29 +461,54 @@ class AsciiProgressBackend:
         spinner_idx = int(current_time * 4) % len(spinner_frames)
         spinner = spinner_frames[spinner_idx]
 
-        # Group tasks by parent (app name) to track verification status
-        app_verification_status = {}
+        # Group tasks by app name to show only current phase per app
+        app_tasks: dict[str, list[TaskState]] = {}
         for task_id in post_tasks:
             task = self.tasks[task_id]
-            if task.progress_type == ProgressType.VERIFICATION:
-                app_verification_status[task.name] = (
-                    task.is_finished,
-                    task.success,
-                )
+            app_name = task.name
 
-        for task_id in post_tasks:
-            task = self.tasks[task_id]
+            if app_name not in app_tasks:
+                app_tasks[app_name] = []
+            app_tasks[app_name].append(task)
+
+        # Process each app, showing only the latest/current phase
+        for _app_name, tasks in app_tasks.items():
+            # Sort by phase to determine which task to show
+            # Multi-phase workflows: verification (1) → installation (2)
+            tasks_sorted = sorted(tasks, key=lambda t: t.phase)
+
+            # Find the current task to display:
+            # - If verification is not finished, show verification
+            # - If verification is finished, show installation
+            # - Otherwise show the latest task
+            current_task = None
+            for task in tasks_sorted:
+                if not task.is_finished:
+                    # Show first unfinished task
+                    current_task = task
+                    break
+                elif task.is_finished and not task.success:
+                    # Show failed task
+                    current_task = task
+                    break
+
+            # If all tasks are finished successfully, show the last one
+            if current_task is None and tasks_sorted:
+                current_task = tasks_sorted[-1]
+
+            if current_task is None:
+                continue
 
             # Determine phase indicator and operation name
-            phase_str = f"({task.phase}/{task.total_phases})"
+            phase_str = f"({current_task.phase}/{current_task.total_phases})"
 
-            if task.progress_type == ProgressType.VERIFICATION:
+            if current_task.progress_type == ProgressType.VERIFICATION:
                 operation = "Verifying"
-            elif task.progress_type == ProgressType.INSTALLATION:
+            elif current_task.progress_type == ProgressType.INSTALLATION:
                 operation = "Installing"
-            elif task.progress_type == ProgressType.ICON_EXTRACTION:
+            elif current_task.progress_type == ProgressType.ICON_EXTRACTION:
                 operation = "Extracting icon"
-            elif task.progress_type == ProgressType.UPDATE:
+            elif current_task.progress_type == ProgressType.UPDATE:
                 operation = "Updating"
             else:
                 operation = "Processing"
@@ -459,28 +520,14 @@ class AsciiProgressBackend:
 
             # Get dynamic name width
             name_width = self._calculate_dynamic_name_width(
-                task.name, fixed_width
+                current_task.name, fixed_width
             )
-            name = truncate_text(task.name, name_width)
+            name = truncate_text(current_task.name, name_width)
 
             # Determine status symbol
-            if task.is_finished:
+            if current_task.is_finished:
                 # Task itself is finished - show its result
-                status = "✓" if task.success else "✖"
-            elif (
-                task.progress_type == ProgressType.INSTALLATION
-                and task.name in app_verification_status
-            ):
-                # Installation task but verification is complete
-                verify_finished, verify_success = app_verification_status[
-                    task.name
-                ]
-                if verify_finished and not verify_success:
-                    # Verification failed, so installation won't run
-                    status = "✖"
-                else:
-                    # Verification passed, installation in progress
-                    status = spinner
+                status = "✓" if current_task.success else "✖"
             else:
                 # Task in progress
                 status = spinner
@@ -490,8 +537,12 @@ class AsciiProgressBackend:
             )
 
             # Error line if failed
-            if task.is_finished and not task.success and task.error_message:
-                error_msg = truncate_text(task.error_message, 60)
+            if (
+                current_task.is_finished
+                and not current_task.success
+                and current_task.error_message
+            ):
+                error_msg = truncate_text(current_task.error_message, 60)
                 lines.append(f"    Error: {error_msg}")
 
         lines.append("")
@@ -526,12 +577,10 @@ class AsciiProgressBackend:
         if not self.interactive or self._last_output_lines == 0:
             return
 
-        # Clear all previous lines
-        # Use a more aggressive clearing approach for better terminal compatibility
-        for _ in range(self._last_output_lines):
-            self.output.write("\033[1A")  # Move cursor up one line
-            self.output.write("\033[2K")  # Clear entire line
-            self.output.write("\r")  # Move to start of line
+        # Move cursor up to start of previous output
+        self.output.write(f"\033[{self._last_output_lines}A")
+        # Clear from cursor to end of screen
+        self.output.write("\033[J")
 
         # Ensure output is written immediately
         self.output.flush()
@@ -541,6 +590,9 @@ class AsciiProgressBackend:
 
         Args:
             output: Output string to write
+
+
+
 
         """
         self._clear_previous_output()
@@ -566,11 +618,63 @@ class AsciiProgressBackend:
         Args:
             output: Output string to write
 
+        Behavior:
+          - Write sections progressively as they update
+          - Track section content to detect changes
+          - Always emit Summary blocks immediately
+
         """
-        # In non-interactive mode, only write final summary
+        # Guard if output is not writable
+        if not hasattr(self.output, "write"):
+            return
+
+        now = time.time()
+
+        # Always show full summaries
         if "Summary:" in output:
-            self.output.write(output + "\n")
-            self.output.flush()
+            try:
+                self.output.write(output + "\n")
+                self.output.flush()
+            except Exception:
+                # Best-effort: swallow IO errors to avoid breaking flows
+                pass
+            finally:
+                self._last_noninteractive_output = output
+                self._last_noninteractive_write_time = now
+            return
+
+        # Skip empty output
+        if not output.strip():
+            return
+
+        # Parse sections from output to track what's new or changed
+        sections = output.split("\n\n")
+        new_or_updated_sections = []
+
+        for section in sections:
+            if not section.strip():
+                continue
+
+            # Create a signature for this section using full content
+            # This allows us to detect when a section's content changes
+            section_sig = section.strip()
+
+            # If this section content is new or changed, write it
+            if section_sig not in self._written_sections:
+                new_or_updated_sections.append(section)
+                self._written_sections.add(section_sig)
+
+        # Write only new or updated sections
+        if new_or_updated_sections:
+            try:
+                output_to_write = "\n\n".join(new_or_updated_sections)
+                self.output.write(output_to_write + "\n")
+                self.output.flush()
+                self._last_noninteractive_output = output
+                self._last_noninteractive_write_time = now
+            except Exception:
+                # Best-effort: ignore write failures
+                pass
 
     async def render_once(self) -> None:
         """Render current state once.
@@ -600,6 +704,9 @@ class AsciiProgressBackend:
                     self.output.write(output + "\n")
                     self.output.flush()
                 self._last_output_lines = 0
+
+            # Reset written sections for next session
+            self._written_sections.clear()
 
 
 @dataclass(frozen=True, slots=True)

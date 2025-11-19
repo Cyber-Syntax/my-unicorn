@@ -390,25 +390,18 @@ class UpdateManager:
         if show_progress:
             print(f"🔄 Checking {len(app_names)} app(s) for updates...")
 
-        semaphore = asyncio.Semaphore(
-            self.global_config["max_concurrent_downloads"]
-        )
-
         async with aiohttp.ClientSession() as session:
 
-            async def check_with_semaphore(app_name: str) -> UpdateInfo | None:
-                async with semaphore:
-                    try:
-                        return await self.check_single_update(
-                            app_name, session, refresh_cache=refresh_cache
-                        )
-                    except Exception as e:
-                        logger.error(
-                            "Update check failed for %s: %s", app_name, e
-                        )
-                        return None
+            async def check_single(app_name: str) -> UpdateInfo | None:
+                try:
+                    return await self.check_single_update(
+                        app_name, session, refresh_cache=refresh_cache
+                    )
+                except Exception as e:
+                    logger.error("Update check failed for %s: %s", app_name, e)
+                    return None
 
-            tasks = [check_with_semaphore(app) for app in app_names]
+            tasks = [check_single(app) for app in app_names]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Filter out None results and exceptions
@@ -669,7 +662,8 @@ class UpdateManager:
 
         try:
             # Create installation workflow tasks (verification + installation)
-            # similar to install command for consistent UX
+            # after download completes, similar to install command for consistent UX.
+            # This ensures the Installing section only appears after downloads finish.
             verification_task_id = None
             installation_task_id = None
             if progress_enabled:
@@ -1322,37 +1316,37 @@ class UpdateManager:
             async def update_with_semaphore(
                 app_name: str,
             ) -> tuple[str, bool, str | None]:
-                async with semaphore:
-                    # Use cached update info if available
-                    cached_info = update_info_map.get(app_name)
+                # Use cached update info if available
+                cached_info = update_info_map.get(app_name)
 
-                    # Increment API task progress for cached data
-                    if cached_info and self._shared_api_task_id:
-                        from .progress import get_progress_service
+                # Increment API task progress for cached data OUTSIDE semaphore
+                # API requests should not be throttled by download concurrency
+                if cached_info and self._shared_api_task_id:
+                    from .progress import get_progress_service
 
-                        progress_service = get_progress_service()
-                        if progress_service.is_active():
-                            try:
-                                task_info = progress_service.get_task_info(
-                                    self._shared_api_task_id
+                    progress_service = get_progress_service()
+                    if progress_service.is_active():
+                        try:
+                            task_info = progress_service.get_task_info(
+                                self._shared_api_task_id
+                            )
+                            if task_info:
+                                new_completed = int(task_info.completed) + 1
+                                total = (
+                                    int(task_info.total)
+                                    if task_info.total > 0
+                                    else new_completed
                                 )
-                                if task_info:
-                                    new_completed = (
-                                        int(task_info.completed) + 1
-                                    )
-                                    total = (
-                                        int(task_info.total)
-                                        if task_info.total > 0
-                                        else new_completed
-                                    )
-                                    await progress_service.update_task(
-                                        self._shared_api_task_id,
-                                        completed=float(new_completed),
-                                        description=f"🌐 Retrieved {app_name} (cached) ({new_completed}/{total})",
-                                    )
-                            except Exception:
-                                pass
+                                await progress_service.update_task(
+                                    self._shared_api_task_id,
+                                    completed=float(new_completed),
+                                    description=f"🌐 Retrieved {app_name} (cached) ({new_completed}/{total})",
+                                )
+                        except Exception:
+                            pass
 
+                # Apply semaphore only to download/install phase
+                async with semaphore:
                     success, error_reason = await self.update_single_app(
                         app_name, session, force, cached_info
                     )

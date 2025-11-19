@@ -1071,6 +1071,15 @@ class ReleaseFetcher:
         if not ignore_cache:
             cached = await self._get_from_cache(cache_type="prerelease")
             if cached:
+                # Update shared progress for cached prerelease
+                if (
+                    self.shared_api_task_id
+                    and self.progress_service
+                    and self.progress_service.is_active()
+                ):
+                    await self.api_client._update_shared_progress(
+                        f"Retrieved {self.owner}/{self.repo} (cached)"
+                    )
                 return cached
 
         release = await self.api_client.fetch_prerelease()
@@ -1096,6 +1105,15 @@ class ReleaseFetcher:
         if not ignore_cache:
             cached = await self._get_from_cache(cache_type="prerelease")
             if cached:
+                # Update shared progress for cached prerelease
+                if (
+                    self.shared_api_task_id
+                    and self.progress_service
+                    and self.progress_service.is_active()
+                ):
+                    await self.api_client._update_shared_progress(
+                        f"Retrieved {self.owner}/{self.repo} (cached)"
+                    )
                 return cached
 
         release = await self.api_client.fetch_prerelease()
@@ -1114,6 +1132,15 @@ class ReleaseFetcher:
         if not ignore_cache:
             cached = await self._get_from_cache(cache_type="stable")
             if cached:
+                # Update shared progress for cached stable release
+                if (
+                    self.shared_api_task_id
+                    and self.progress_service
+                    and self.progress_service.is_active()
+                ):
+                    await self.api_client._update_shared_progress(
+                        f"Retrieved {self.owner}/{self.repo} (cached)"
+                    )
                 return cached
 
         release = await self.api_client.fetch_stable_release()

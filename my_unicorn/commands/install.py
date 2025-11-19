@@ -174,7 +174,7 @@ class InstallCommand:
                 # Create API progress task with total number of apps
                 api_task_id = (
                     await self.progress_service.create_api_fetching_task(
-                        name="API assets",
+                        name="GitHub Releases",
                         description="🌐 Fetching release information...",
                     )
                 )

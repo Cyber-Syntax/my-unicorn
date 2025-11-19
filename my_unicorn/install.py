@@ -315,20 +315,6 @@ class InstallHandler:
         show_progress = options.get("show_progress", True)
         download_dir = options.get("download_dir", Path.cwd())
 
-        # Create multi-phase progress tasks (verification + installation)
-        verification_task_id = None
-        installation_task_id = None
-        progress_service = getattr(
-            self.download_service, "progress_service", None
-        )
-        if show_progress and progress_service:
-            (
-                verification_task_id,
-                installation_task_id,
-            ) = await progress_service.create_installation_workflow(
-                app_name, with_verification=verify
-            )
-
         try:
             # 1. Download
             download_path = download_dir / asset.name
@@ -336,6 +322,21 @@ class InstallHandler:
             downloaded_path = await self.download_service.download_appimage(
                 asset, download_path, show_progress=show_progress
             )
+
+            # Create multi-phase progress tasks (verification + installation)
+            # after download completes
+            verification_task_id = None
+            installation_task_id = None
+            progress_service = getattr(
+                self.download_service, "progress_service", None
+            )
+            if show_progress and progress_service:
+                (
+                    verification_task_id,
+                    installation_task_id,
+                ) = await progress_service.create_installation_workflow(
+                    app_name, with_verification=verify
+                )
 
             # 2. Verify
             verify_result = None
