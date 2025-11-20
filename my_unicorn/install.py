@@ -604,13 +604,18 @@ class InstallHandler:
         # Get rename preference
         rename = app_config.get("appimage", {}).get("rename", app_name)
 
-        # Ensure .appimage extension
-        if not rename.lower().endswith(".appimage"):
-            rename = f"{rename}.appimage"
+        # Clean base name (remove any provided extension) and delegate
+        # extension/casing handling to the storage service to keep behavior
+        # consistent with update logic.
+        clean_name = self.storage_service.get_clean_appimage_name(rename)
 
-        # Move to install directory
-        install_path = self.storage_service.move_to_install_dir(
-            temp_path, rename
+        # Move the downloaded file into the install directory first
+        moved_path = self.storage_service.move_to_install_dir(temp_path)
+
+        # Then perform AppImage-specific rename (this will add ".AppImage"
+        # with the correct casing if needed)
+        install_path = self.storage_service.rename_appimage(
+            moved_path, clean_name
         )
 
         return install_path
