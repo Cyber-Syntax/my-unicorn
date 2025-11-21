@@ -2,31 +2,43 @@
 
 ## testing
 
-- [ ] network retry etc.
 - [ ] API rate limiting
 
-- [ ] #TEST: version command logic is deprecated, so testing to use **version** library
-- [ ] #BUG: Rotation error on logs...
-    - Currently, implemented to custom rotation logic more simple and efficient
+- [ ] #BUG: progress bar ui artifact fix
+    - [x] Switch the text based progress bar to a more efficient one
+    - [x] After implementation text based, some other tests hangs, diagnose that and fix.
+    - [x] duplicate on ui progress bar not happens on alacritty and kitty but happens on the zed editor. Test the commited on other terminals and than test the current code changes on again in virt-manager
+    - [x] test on different terminals
+    - [x] update pytest to test the new progress bar implementation
+    - [ ] Clean complexity and publish
+
+- [ ] network retry etc.
+    - [x] Attempt is work as expected, when network connection come back, it starts the download again.
+    - [ ] Need to be test more deeply to confirm it work as expected
+
+- [x] remove writing commits to release desc
+    - [x] removed commits
+    - [x] make it work with keepachangelog template which that template not use v0.1.0 `v` prefix on its heading
+          so our github action bash script need to add itself when creating tags because conventional tags need v in front of them.
+
+- [x] #BUG: Rotation error on logs... - Currently, implemented to custom rotation logic more simple and efficient
       and also increased 1MB log to 10MB to increase the log size. Manual and pytest
       succesfully passed.
+    - [x] Fixed rotation error on logs
 
 - [ ] appimage build take times
     - [x] install/update show installation error reasons(show appimage build takes times)
     - [ ] take care the edge cases, maybe app not have appimage at all?
-- [ ] Remove overengineering
-    - [ ] dataclasses
-    - [ ] strategy
-    - [x] template
+
+- [ ] #TEST: version command logic is deprecated, so testing to use **version** library
 
 ## in-progress
 
-- [ ] remove writing commits to release desc
-    - [x] removed commits
-    - [ ] make it work with keepachangelog template which that template not use v0.1.0 `v` prefix on its heading
-          so our github action bash script need to add itself when creating tags because conventional tags need v in front of them.
+- [ ] add lock for one instance only to prevent multiple instance run at the same time
+    - [ ] 16G error log, because of 2 instance running at the same time.
 
-- [ ] Better git branch structure for this project. Currently, we use the main branch as a stable as much as possible but maybe we could use main as development and keep a stable branch or use tags to install the stable branches which we update the script so much and change things that mostly break things, so we oftenly need a hotfixes... So, figure out a better way to manage branches and tags.
+- [ ] Add progress bar for checksum file installations?
+- [ ] Clear all the examples, plan...
 
 - [ ] better app.json config like owner, repo must be inside github dict
 - [ ] TEST: Never use the real user config logs, app location on pytest unittests which current is use them!
@@ -35,27 +47,24 @@
 - [ ] add INFO level logs for verification instead of DEBUG
 - [ ] #BUG: Cycle detected in import chain for cache.py
 
-- [ ] refactor
+- [ ] Remove code smells
       <https://refactoring.guru/refactoring/smells>
-    - [x] general
-    - [x] logger
-    - [x] scripts
+    - [ ] contexts
     - [ ] config
     - [ ] handle FIXME, TODO for duplicate functions
-    - [x] service.progress already active
-    - [x] services
-    - [x] utils.py seperated folders
-    - [ ] strategies
-    - [x] reading code from top to bottom
-    - [x] functions instead of comments
-    - [ ] contexts
-    - [ ] remove license, contribution from readme.md because there is already markdown files for them
+
+- [ ] Better git branch structure for this project. Currently, we use the main branch as a stable as much as possible but maybe we could use main as development and keep a stable branch or use tags to install the stable branches which we update the script so much and change things that mostly break things, so we oftenly need a hotfixes... So, figure out a better way to manage branches and tags.
+  even define "
+  Rawhide is sometimes called "development" or "main" (as it’s the "main" branch in package git repositories).
+  " main branches as development? Lets make a stable branch and make user the install the stable release
 
 ## todo
 
-- [ ] #BUG: progress bar ui artifact fix
+- [ ] Simple video about cli tool workflow
+- [ ] Add option in config for [auth]
+- [ ] Max api request need to be 59 for non-token user, max api request need to be 100 or more for token user (need to check how much github allow concurrent requests)
 - [ ] png need priority one because kde not show .svg on its bar when pinned
-- [ ] add autocompletion for the catalog apps
+- [ ] add autocompletion for the catalog apps to autocomplete app names (e.g: `super<tab>-productivity`)
 
 - [ ] #BUG: post-processing spinner not turn correctly,
       it is start and stop, start and stop, it is like in a for loop or
@@ -86,7 +95,7 @@
 - [ ] upgrade need auto easy update and notify like appimages
 - [ ] config structure refactor
 - [ ] add my unicorn export path to fish shells
-- [ ] kde wallet support via dbus-python, test in the shared folder 3. kdewallet isn't show any token saved which seems like we don't support ito. written script to keyring-my-unicorn folder, check that out.
+- [ ] Add kde wallet support via dbus-python.
       dbus-python used on kdewallet saves, so we can add that to auth later as a support.
 - [ ] #BUG: digest not became true on catalog installs if its use checksum_file with digest verify both
 - [ ] add verification passed or not to verification section on app-specific config
@@ -99,7 +108,6 @@
 ## backlog
 
 - [ ] dev: build with uv
-
 - [ ] Environment variable support
 
 ```bash
@@ -134,10 +142,21 @@ Confirm your GitHub token:
     - if you are displaying tabular data, present an ncurses interface
     - (extremely important) shell completion for bash and zsh
 
-- [ ] typer, click libraries
-
 ## done
 
+- [x] Clean up code
+    - [x] general
+    - [x] logger
+    - [x] scripts
+    - [x] service.progress already active
+    - [x] services
+    - [x] utils.py seperated folders
+    - [x] reading code from top to bottom
+    - [x] functions instead of comments
+    - [x] remove license, contribution from readme.md because there is already markdown files for them
+
+- [x] Remove overengineering
+    - [x] template
 - [x] clean unused code
     - [x] locale, batch_mode on configs
 - [x] auth log info, validation

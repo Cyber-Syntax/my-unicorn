@@ -5,15 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.11.0-alpha]
+## [1.11.0-alpha] - 2025-11-20
 
 ### Added
 
-- Network retry support for improved reliability and resilience.
+- ASCII progress bar backend to replace rich progress UI.
+- Network retry and rate-limit support for GitHub API requests, including
+  configurable retry/backoff and improved resilience.
 
-## Changed
+### Changed
 
-- Updated changelog links
+- Reorganized and updated documentation.
+- Improved progress task names and progress handling in `install` and
+  `update` commands.
+
+### Removed
+
+- Removed the rich library to reduce dependencies and code maintainability.
+
+### Fixed
+
+- Delegate AppImage rename in install command to the storage service to fix
+  incorrect extension names during renames.
+
+### Migration guide
+
+Please reinstall (remove and install again) all of your apps after upgrading to this version to avoid any issues with the appimage extension naming issue from previous versions.
 
 ## [1.10.1-alpha]
 
@@ -449,7 +466,6 @@ Please change your current configuration files to the new format. The new format
 - refactor: improve better error handling on verify.py
 - chore: add copilot instructions
 
-[unreleased]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.11.0-alpha...HEAD
 [1.11.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.10.1-alpha...v1.11.0-alpha
 [1.10.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.10.0-alpha...v1.10.1-alpha
 [1.10.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.9.1-alpha...v1.10.0-alpha

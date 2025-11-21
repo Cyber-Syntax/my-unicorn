@@ -54,7 +54,7 @@ Project Structure:
     - install.py: Installation module
     - logger.py: Logging module
     - main.py: Main entry point for the application
-    - progress.py: Progress bar module using rich library
+    - progress.py: Progress bar module using ASCII backend
     - update.py: Update module that updates AppImages
     - upgrade.py: Upgrade module that upgrades my-unicorn
 - `scripts/`: Scripts for various tasks
