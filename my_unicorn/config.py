@@ -15,7 +15,7 @@ Requirements:
 import configparser
 from datetime import datetime
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import cast
 
 import orjson
 
@@ -39,6 +39,13 @@ from my_unicorn.constants import (
     SECTION_DEFAULT,
     SECTION_DIRECTORY,
     SECTION_NETWORK,
+)
+from my_unicorn.types import (
+    AppConfig,
+    CatalogEntry,
+    DirectoryConfig,
+    GlobalConfig,
+    NetworkConfig,
 )
 
 
@@ -142,106 +149,6 @@ class ConfigCommentManager:
             SECTION_NETWORK: {},
             SECTION_DIRECTORY: {},
         }
-
-
-class NetworkConfig(TypedDict):
-    """Network configuration options."""
-
-    retry_attempts: int
-    timeout_seconds: int
-
-
-class DirectoryConfig(TypedDict):
-    """Directory paths configuration."""
-
-    repo: Path
-    package: Path
-    download: Path
-    storage: Path
-    backup: Path
-    icon: Path
-    settings: Path
-    logs: Path
-    cache: Path
-    tmp: Path
-
-
-class GlobalConfig(TypedDict):
-    """Global application configuration."""
-
-    config_version: str
-    max_concurrent_downloads: int
-    max_backup: int
-    log_level: str
-    console_log_level: str
-    network: NetworkConfig
-    directory: DirectoryConfig
-
-
-class AppImageConfig(TypedDict):
-    """AppImage specific configuration."""
-
-    version: str
-    name: str
-    rename: str
-    name_template: str
-    characteristic_suffix: list[str]
-    installed_date: str
-    digest: str
-
-
-class GitHubConfig(TypedDict):
-    """GitHub API configuration options."""
-
-    repo: bool
-    prerelease: bool
-
-
-class VerificationConfig(TypedDict):
-    """Verification configuration options."""
-
-    digest: bool
-    skip: bool
-    checksum_file: str
-    checksum_hash_type: str
-
-
-class IconAsset(TypedDict):
-    """Icon configuration."""
-
-    url: str
-    name: str
-    installed: bool
-
-
-class AppConfig(TypedDict):
-    """Per-application configuration."""
-
-    owner: str
-    repo: str
-    config_version: str
-    appimage: AppImageConfig
-    github: GitHubConfig
-    verification: VerificationConfig
-    icon: IconAsset
-
-
-class CatalogAppImageConfig(TypedDict):
-    """AppImage configuration within catalog entry."""
-
-    rename: str
-    name_template: str
-    characteristic_suffix: list[str]
-
-
-class CatalogEntry(TypedDict):
-    """Catalog entry for an application."""
-
-    owner: str
-    repo: str
-    appimage: CatalogAppImageConfig
-    verification: VerificationConfig
-    icon: IconAsset | None
 
 
 class DirectoryManager:

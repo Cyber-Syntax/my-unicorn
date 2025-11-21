@@ -24,7 +24,7 @@ from my_unicorn.verification import VerificationService
 from .auth import GitHubAuthManager
 from .backup import BackupService
 from .config import ConfigManager
-from .download import DownloadService, IconAsset
+from .download import DownloadIconAsset, DownloadService
 from .file_ops import FileOperations
 from .github_client import Asset, AssetSelector, Release, ReleaseFetcher
 from .logger import get_logger
@@ -943,7 +943,7 @@ class UpdateManager:
         if not icon_filename:
             icon_filename = f"{app_name}.png"
 
-        icon_asset = IconAsset(
+        icon_asset = DownloadIconAsset(
             icon_filename=icon_filename,
             icon_url=icon_url,
         )
@@ -1142,7 +1142,7 @@ class UpdateManager:
         app_name: str,
         icon_dir: Path,
         appimage_path: Path,
-        icon_asset: IconAsset,
+        icon_asset: DownloadIconAsset,
         progress_task_id: str | None = None,
     ) -> tuple[Path | None, dict[str, Any]]:
         """Extract icon from AppImage or install from github.

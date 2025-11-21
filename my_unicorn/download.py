@@ -7,7 +7,6 @@ icons with progress tracking via the project's `ProgressDisplay` service.
 import asyncio
 import contextlib
 from pathlib import Path
-from typing import TypedDict
 from urllib.parse import urlparse
 
 import aiohttp
@@ -21,6 +20,7 @@ from my_unicorn.progress import (
     ProgressType,
     get_progress_service,
 )
+from my_unicorn.types import DownloadIconAsset
 
 logger = get_logger(__name__)
 
@@ -28,13 +28,6 @@ logger = get_logger(__name__)
 CHUNK_SIZE = 8192
 PROGRESS_MB_THRESHOLD = 0.5
 CONTENT_PREVIEW_MAX = 200
-
-
-class IconAsset(TypedDict):
-    """Type definition for icon asset information."""
-
-    icon_filename: str
-    icon_url: str
 
 
 class DownloadService:
@@ -321,7 +314,7 @@ class DownloadService:
         )
         return dest
 
-    async def download_icon(self, icon: IconAsset, dest: Path) -> Path:
+    async def download_icon(self, icon: DownloadIconAsset, dest: Path) -> Path:
         """Download an icon file.
 
         Args:
