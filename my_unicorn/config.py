@@ -314,6 +314,36 @@ class GlobalConfigManager:
             },
         }
 
+    def _create_config_from_defaults(
+        self, defaults: dict[str, str | dict[str, str]]
+    ) -> CommentAwareConfigParser:
+        """Create ConfigParser from defaults dictionary.
+
+        Args:
+            defaults: Default configuration values
+
+        Returns:
+            ConfigParser populated with defaults
+
+        """
+        config = CommentAwareConfigParser()
+
+        # Set flat defaults (skip nested dicts)
+        flat_defaults = {}
+        for key, value in defaults.items():
+            if not isinstance(value, dict):
+                flat_defaults[key] = str(value)
+        config.read_dict({SECTION_DEFAULT: flat_defaults})
+
+        # Add sections for nested configs
+        for key, value in defaults.items():
+            if isinstance(value, dict):
+                config.add_section(key)
+                for subkey, subvalue in value.items():
+                    config.set(key, subkey, str(subvalue))
+
+        return config
+
     def load_global_config(self) -> GlobalConfig:
         """Load global configuration from INI file.
 
@@ -343,23 +373,7 @@ class GlobalConfigManager:
                 user_config.read(self.directory_manager.settings_file)
 
             # Now set up config with defaults and user values
-            config = CommentAwareConfigParser()
-
-            # Set defaults
-            flat_defaults = {}
-            for key, value in defaults.items():
-                if isinstance(value, dict):
-                    # Skip nested dicts for configparser defaults
-                    continue
-                flat_defaults[key] = str(value)
-            config.read_dict({SECTION_DEFAULT: flat_defaults})
-
-            # Add sections for nested configs
-            for key, value in defaults.items():
-                if isinstance(value, dict):
-                    config.add_section(key)
-                    for subkey, subvalue in value.items():
-                        config.set(key, subkey, str(subvalue))
+            config = self._create_config_from_defaults(defaults)
 
             # Override with user settings
             config.read(self.directory_manager.settings_file)
@@ -367,22 +381,7 @@ class GlobalConfigManager:
             # Create default config file and set up config
             self.save_global_config(self._convert_to_global_config(defaults))
 
-            config = CommentAwareConfigParser()
-            # Convert nested dicts to flat structure for configparser
-            flat_defaults = {}
-            for key, value in defaults.items():
-                if isinstance(value, dict):
-                    # Skip nested dicts for configparser defaults
-                    continue
-                flat_defaults[key] = str(value)
-            config.read_dict({SECTION_DEFAULT: flat_defaults})
-
-            # Add sections for nested configs
-            for key, value in defaults.items():
-                if isinstance(value, dict):
-                    config.add_section(key)
-                    for subkey, subvalue in value.items():
-                        config.set(key, subkey, str(subvalue))
+            config = self._create_config_from_defaults(defaults)
 
         # After config loading, replay migration messages to logger
         self.migration.replay_messages_to_logger()

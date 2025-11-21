@@ -105,6 +105,25 @@ class AuthHandler(BaseCommandHandler):
             print(f"   ⚠️  Failed to fetch fresh rate limit info: {e}")
             return None
 
+    def _extract_core_rate_limit_info(
+        self, rate_limit_data: dict[str, object] | None
+    ) -> dict[str, object] | None:
+        """Extract core rate limit info from API response.
+
+        Returns:
+            Core rate limit dict or None if not found
+
+        """
+        if not isinstance(rate_limit_data, dict):
+            return None
+        resources = rate_limit_data.get("resources")
+        if not isinstance(resources, dict):
+            return None
+        core_info = resources.get("core")
+        if isinstance(core_info, dict):
+            return core_info
+        return None
+
     async def _display_rate_limit_info(
         self, rate_limit_data: dict[str, object] | None
     ) -> None:
@@ -137,40 +156,35 @@ class AuthHandler(BaseCommandHandler):
         else:
             # No cached/available rate limit info. Try to extract from the
             # fetched JSON payload (if available) as a fallback.
-            if isinstance(rate_limit_data, dict):
-                resources = rate_limit_data.get("resources")
-                if isinstance(resources, dict):
-                    core_info = resources.get("core")
-                    if isinstance(core_info, dict):
-                        limit = core_info.get("limit")
-                        remaining_from_payload = core_info.get("remaining")
-                        reset_ts = core_info.get("reset")
+            core_info = self._extract_core_rate_limit_info(rate_limit_data)
+            if core_info:
+                limit = core_info.get("limit")
+                remaining_from_payload = core_info.get("remaining")
+                reset_ts = core_info.get("reset")
 
-                        if remaining_from_payload is not None:
-                            print(
-                                "   🔢 Remaining requests: "
-                                + f"{remaining_from_payload}"
-                            )
-                            if reset_ts:
-                                reset_datetime = datetime.fromtimestamp(
-                                    reset_ts
-                                )
-                                reset_str = reset_datetime.strftime(
-                                    "%Y-%m-%d %H:%M:%S"
-                                )
-                                print(f"   ⏰ Resets at: {reset_str}")
-                            if limit is not None:
-                                print(
-                                    "   📋 Rate limit: "
-                                    + f"{remaining_from_payload}/{limit}"
-                                    + " requests"
-                                )
-                            # Warnings based on payload value
-                            if isinstance(remaining_from_payload, int):
-                                self._display_rate_limit_warnings(
-                                    remaining_from_payload
-                                )
-                            return
+                if remaining_from_payload is not None:
+                    print(
+                        "   🔢 Remaining requests: "
+                        + f"{remaining_from_payload}"
+                    )
+                    if reset_ts and isinstance(reset_ts, (int, float)):
+                        reset_datetime = datetime.fromtimestamp(reset_ts)
+                        reset_str = reset_datetime.strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
+                        print(f"   ⏰ Resets at: {reset_str}")
+                    if limit is not None:
+                        print(
+                            "   📋 Rate limit: "
+                            + f"{remaining_from_payload}/{limit}"
+                            + " requests"
+                        )
+                    # Warnings based on payload value
+                    if isinstance(remaining_from_payload, int):
+                        self._display_rate_limit_warnings(
+                            remaining_from_payload
+                        )
+                    return
 
             print("Unable to fetch rate limit information")
 
@@ -199,10 +213,7 @@ class AuthHandler(BaseCommandHandler):
         self, rate_limit_data: dict[str, object] | None, remaining: int
     ) -> None:
         """Display additional rate limit details if available."""
-        if isinstance(rate_limit_data, dict):
-            resources = rate_limit_data.get("resources")
-            if isinstance(resources, dict):
-                core_info = resources.get("core")
-                if isinstance(core_info, dict):
-                    limit = core_info.get("limit", 0)
-                    print(f"   📋 Rate limit: {remaining}/{limit} requests")
+        core_info = self._extract_core_rate_limit_info(rate_limit_data)
+        if core_info:
+            limit = core_info.get("limit", 0)
+            print(f"   📋 Rate limit: {remaining}/{limit} requests")
