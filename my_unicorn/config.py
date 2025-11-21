@@ -49,15 +49,29 @@ from my_unicorn.types import (
 )
 
 
+def _strip_inline_comment(value: str) -> str:
+    """Strip inline comments from configuration values.
+
+    Args:
+        value: Configuration value that may contain inline comment
+
+    Returns:
+        Value with inline comment removed (anything after '  #')
+
+    """
+    if "  #" in value:
+        return value.split("  #")[0].strip()
+    return value
+
+
 class CommentAwareConfigParser(configparser.ConfigParser):
     """ConfigParser that strips inline comments when reading values."""
 
     def get(self, section, option, **kwargs):
         """Get a configuration value with inline comments stripped."""
         value = super().get(section, option, **kwargs)
-        # Strip inline comments (anything after '  #')
-        if isinstance(value, str) and "  #" in value:
-            value = value.split("  #")[0].strip()
+        if isinstance(value, str):
+            value = _strip_inline_comment(value)
         return value
 
 
@@ -480,10 +494,11 @@ class GlobalConfigManager:
             # Add DEFAULT section items separately
             for key, raw_value in config.defaults().items():
                 # Strip inline comments from default values too
-                if isinstance(raw_value, str) and "  #" in raw_value:
-                    cleaned_value = raw_value.split("  #")[0].strip()
-                else:
-                    cleaned_value = raw_value
+                cleaned_value = (
+                    _strip_inline_comment(raw_value)
+                    if isinstance(raw_value, str)
+                    else raw_value
+                )
                 config_dict[key] = cleaned_value
         else:
             config_dict = config
@@ -491,9 +506,11 @@ class GlobalConfigManager:
         # Helper to strip comments from config values
         def strip_comments(value):
             """Strip inline comments from config values."""
-            if isinstance(value, str) and "  #" in value:
-                return value.split("  #")[0].strip()
-            return value
+            return (
+                _strip_inline_comment(value)
+                if isinstance(value, str)
+                else value
+            )
 
         # Helper function to safely get scalar config values
         def get_scalar_config(key: str, default: str | int) -> str | int:
