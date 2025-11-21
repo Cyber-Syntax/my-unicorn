@@ -31,7 +31,6 @@ DEFAULT_APPS_DIR_NAME: Final[str] = "apps"
 
 # Configuration defaults
 DEFAULT_LOG_LEVEL: Final[str] = "INFO"
-DEFAULT_BACKUP_COUNT: Final[int] = 3
 
 # Defaults used by the global config manager
 DEFAULT_MAX_CONCURRENT_DOWNLOADS: Final[int] = 5
@@ -241,9 +240,6 @@ BACKUP_METADATA_TMP_SUFFIX: Final[str] = ".json.tmp"
 
 # Temporary file suffix used when creating temp backup copies
 BACKUP_TEMP_SUFFIX: Final[str] = ".tmp"
-
-# Default datetime format used in backup metadata created timestamps
-BACKUP_METADATA_DATETIME_FORMAT: Final[str] = "%Y-%m-%dT%H:%M:%S"
 
 # Old flat backup filename glob for migration
 OLD_FLAT_BACKUP_GLOB: Final[str] = "*.backup.AppImage"

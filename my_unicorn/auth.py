@@ -326,7 +326,6 @@ class GitHubAuthManager:
             ),
         }
 
-    # TODO: implement this method to install logics
     def should_wait_for_rate_limit(self) -> bool:
         """Check if we should wait due to rate limiting."""
         if self._remaining_requests is None:

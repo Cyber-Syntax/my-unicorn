@@ -509,7 +509,6 @@ class InstallHandler:
         )
 
         # Use AssetSelector to find best AppImage
-        # TODO: appimage_asset naming would be better
         asset = AssetSelector.select_appimage_for_platform(
             release,
             preferred_suffixes=characteristic_suffix,

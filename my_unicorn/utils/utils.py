@@ -9,15 +9,7 @@ from pathlib import Path
 
 
 def sanitize_filename(filename: str) -> str:
-    """Sanitize filename by removing invalid characters.
-
-    Args:
-        filename: Original filename
-
-    Returns:
-        Sanitized filename safe for filesystem
-
-    """
+    """Remove invalid characters from filename for safe filesystem use."""
     # Remove invalid characters
     sanitized = re.sub(r'[<>:"/\\|?*]', "", filename)
 
@@ -37,15 +29,7 @@ BYTES_PER_UNIT = 1024.0
 
 
 def format_bytes(size: float) -> str:
-    """Format byte size in human readable format.
-
-    Args:
-        size: Size in bytes
-
-    Returns:
-        Formatted size string (e.g., "1.5 MB")
-
-    """
+    """Format byte size in human readable format (e.g., '1.5 MB')."""
     for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size < BYTES_PER_UNIT:
             return f"{size:.1f} {unit}"
@@ -54,21 +38,7 @@ def format_bytes(size: float) -> str:
 
 
 def extract_version_from_package_string(package_string: str) -> str | None:
-    """Extract version from package identifier string.
-
-    Handles formats like:
-    - "@standardnotes/desktop@3.198.1" -> "3.198.1"
-    - "package@1.2.3" -> "1.2.3"
-    - "v1.2.3" -> "1.2.3"
-    - "1.2.3" -> "1.2.3"
-
-    Args:
-        package_string: Package string that may contain version
-
-    Returns:
-        Extracted version string or None if not found
-
-    """
+    """Extract version from package string (e.g., 'pkg@1.2.3' -> '1.2.3')."""
     if not package_string:
         return None
 
@@ -88,15 +58,7 @@ def extract_version_from_package_string(package_string: str) -> str | None:
 
 
 def sanitize_version_string(version: str) -> str:
-    """Sanitize version string by removing invalid characters and prefixes.
-
-    Args:
-        version: Raw version string
-
-    Returns:
-        Sanitized version string
-
-    """
+    """Remove invalid characters and prefixes from version string."""
     if not version:
         return ""
 
@@ -116,15 +78,7 @@ def sanitize_version_string(version: str) -> str:
 
 
 def validate_version_string(version: str) -> bool:
-    """Validate version string format.
-
-    Args:
-        version: Version string to validate (should be pre-sanitized)
-
-    Returns:
-        True if valid version format
-
-    """
+    """Check if version string matches semantic version pattern."""
     if not version:
         return False
 
@@ -155,15 +109,7 @@ def extract_and_validate_version(package_string: str) -> str | None:
 
 
 def create_desktop_entry_name(app_name: str) -> str:
-    """Create desktop entry name from app name.
-
-    Args:
-        app_name: Application name (will be normalized to lowercase)
-
-    Returns:
-        Desktop entry filename (e.g., "siyuan.desktop", "qownnotes.desktop")
-
-    """
+    """Create desktop entry filename from app name (e.g., 'app.desktop')."""
     # Normalize to lowercase and clean up the name
     name = app_name.lower().strip()
 
@@ -254,28 +200,12 @@ def is_checksum_file(filename: str, require_appimage_base: bool = False) -> bool
 
 
 def is_appimage_file(filename: str) -> bool:
-    """Check if filename is an AppImage.
-
-    Args:
-        filename: Filename to check
-
-    Returns:
-        True if filename ends with .AppImage
-
-    """
+    """Check if filename ends with .AppImage."""
     return filename.lower().endswith(".appimage")
 
 
 def get_checksum_file_format_type(filename: str) -> str:
-    """Determine the format type of a checksum file.
-
-    Args:
-        filename: Checksum filename
-
-    Returns:
-        Format type: "yaml" or "traditional"
-
-    """
+    """Return 'yaml' or 'traditional' based on file extension."""
     if filename.lower().endswith((".yml", ".yaml")):
         return "yaml"
     return "traditional"
