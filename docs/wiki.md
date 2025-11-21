@@ -26,7 +26,7 @@
 - Logging: Detailed logging of operations for troubleshooting and auditing.
 - Desktop Entry Creation: Automatically create desktop entries for installed AppImages.
 - Icon Management: Extract icons from AppImages or download from specified URLs.
-- Progress Indicators: Visual progress bars for downloads and updates using the rich library.
+- Progress Indicators: Visual progress bars for downloads and updates.
 - Configuration Management: Store global and app-specific settings in configuration files for easy customization.
     - App Configuration: Store app-specific configurations in JSON files for easy management such as version, name, and verification settings.
     - Global Configuration: Store global settings in a configuration file for customization such as download directories, logging levels, and more.
@@ -173,7 +173,7 @@ my-unicorn backup --migrate
 > These dependencies are already installed when you used setup.sh to install my-unicorn.
 
 ```bash
-pip install aiohttp uvloop keyring orjson packaging rich
+pip install aiohttp uvloop keyring orjson packaging
 ```
 
 ### Cache Management

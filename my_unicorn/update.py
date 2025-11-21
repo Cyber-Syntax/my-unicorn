@@ -128,7 +128,10 @@ class UpdateManager:
             session: aiohttp session for downloads
 
         """
-        download_service = DownloadService(session)
+        from .progress import get_progress_service
+
+        progress_service = get_progress_service()
+        download_service = DownloadService(session, progress_service)
         # Get progress service from download service if available
         progress_service = getattr(download_service, "progress_service", None)
         self.icon_service = IconHandler(download_service, progress_service)
@@ -387,25 +390,18 @@ class UpdateManager:
         if show_progress:
             print(f"🔄 Checking {len(app_names)} app(s) for updates...")
 
-        semaphore = asyncio.Semaphore(
-            self.global_config["max_concurrent_downloads"]
-        )
-
         async with aiohttp.ClientSession() as session:
 
-            async def check_with_semaphore(app_name: str) -> UpdateInfo | None:
-                async with semaphore:
-                    try:
-                        return await self.check_single_update(
-                            app_name, session, refresh_cache=refresh_cache
-                        )
-                    except Exception as e:
-                        logger.error(
-                            "Update check failed for %s: %s", app_name, e
-                        )
-                        return None
+            async def check_single(app_name: str) -> UpdateInfo | None:
+                try:
+                    return await self.check_single_update(
+                        app_name, session, refresh_cache=refresh_cache
+                    )
+                except Exception as e:
+                    logger.error("Update check failed for %s: %s", app_name, e)
+                    return None
 
-            tasks = [check_with_semaphore(app) for app in app_names]
+            tasks = [check_single(app) for app in app_names]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Filter out None results and exceptions
@@ -504,7 +500,10 @@ class UpdateManager:
                     logger.debug("💾 Backup created: %s", backup_path)
 
             # Download AppImage
-            download_service = DownloadService(session)
+            from .progress import get_progress_service
+
+            progress_service = get_progress_service()
+            download_service = DownloadService(session, progress_service)
             self._initialize_services(session)
             downloaded_path = await download_service.download_appimage(
                 appimage_asset, download_path, show_progress=True
@@ -662,16 +661,20 @@ class UpdateManager:
         progress_enabled = progress_service.is_active()
 
         try:
-            # Create combined post-processing task if progress is enabled
-            post_processing_task_id = None
+            # Create installation workflow tasks (verification + installation)
+            # after download completes, similar to install command for consistent UX.
+            # This ensures the Installing section only appears after downloads finish.
+            verification_task_id = None
+            installation_task_id = None
             if progress_enabled:
-                post_processing_task_id = (
-                    await progress_service.create_post_processing_task(
-                        app_name
-                    )
+                (
+                    verification_task_id,
+                    installation_task_id,
+                ) = await progress_service.create_installation_workflow(
+                    app_name, with_verification=True
                 )
 
-            # Verify download if requested (20% of post-processing)
+            # Verify download if requested
             (
                 verification_results,
                 updated_verification_config,
@@ -686,16 +689,10 @@ class UpdateManager:
                 release_data,
                 downloaded_path,
                 progress_service,
-                post_processing_task_id,
+                verification_task_id,
             )
 
-            # Move to install directory and make executable (10%)
-            if post_processing_task_id and progress_enabled:
-                await progress_service.update_task(
-                    post_processing_task_id,
-                    completed=40.0,
-                    description=f"📁 Moving {app_name} to install directory...",
-                )
+            # Move to install directory and make executable
 
             self.storage_service.make_executable(downloaded_path)
             appimage_path = self.storage_service.move_to_install_dir(
@@ -707,7 +704,7 @@ class UpdateManager:
                 app_name, app_config, catalog_entry, appimage_path
             )
 
-            # Handle icon setup (30% of post-processing)
+            # Handle icon setup
             icon_path, updated_icon_config = await self._handle_icon_setup(
                 app_name,
                 app_config,
@@ -717,10 +714,10 @@ class UpdateManager:
                 icon_dir,
                 appimage_path,
                 progress_service,
-                post_processing_task_id,
+                installation_task_id,
             )
 
-            # Update configuration (20% of post-processing)
+            # Update configuration
             await self._handle_configuration_update(
                 app_name,
                 app_config,
@@ -731,25 +728,25 @@ class UpdateManager:
                 updated_verification_config,
                 updated_icon_config,
                 progress_service,
-                post_processing_task_id,
+                installation_task_id,
             )
 
-            # Create desktop entry (10% of post-processing)
+            # Create desktop entry
             await self._handle_desktop_entry(
                 app_name,
                 app_config,
                 appimage_path,
                 icon_path,
                 progress_service,
-                post_processing_task_id,
+                installation_task_id,
             )
 
-            # Finish post-processing task
-            if post_processing_task_id and progress_enabled:
+            # Finish installation task
+            if installation_task_id and progress_enabled:
                 await progress_service.finish_task(
-                    post_processing_task_id,
+                    installation_task_id,
                     success=True,
-                    final_description=f"✅ {app_name}",
+                    description=f"✅ {app_name}",
                 )
 
             # Store the computed hash
@@ -762,12 +759,12 @@ class UpdateManager:
             return True
 
         except Exception:
-            # Mark post-processing as failed if we have a progress task
-            if post_processing_task_id and progress_enabled:
+            # Mark installation as failed if we have a progress task
+            if installation_task_id and progress_enabled:
                 await progress_service.finish_task(
-                    post_processing_task_id,
+                    installation_task_id,
                     success=False,
-                    final_description=f"❌ {app_name} post-processing failed",
+                    description=f"❌ {app_name} installation failed",
                 )
             raise  # Re-raise the exception to be handled by the main method
 
@@ -783,7 +780,7 @@ class UpdateManager:
         release_data: Release,
         downloaded_path: Path,
         progress_service: Any,
-        post_processing_task_id: str | None,
+        verification_task_id: str | None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Handle file verification.
 
@@ -798,7 +795,7 @@ class UpdateManager:
             release_data: Release data
             downloaded_path: Path to downloaded file
             progress_service: Progress service
-            post_processing_task_id: Progress task ID or None
+            verification_task_id: Progress task ID or None
 
         Returns:
             Tuple of (verification_results, updated_verification_config)
@@ -821,12 +818,7 @@ class UpdateManager:
                 verification_config,
             )
 
-        if post_processing_task_id and progress_service.is_active():
-            await progress_service.update_task(
-                post_processing_task_id,
-                completed=10.0,
-                description=f"🔍 Verifying {app_name}...",
-            )
+        # Verification task updates are handled by verification service
 
         verification_results: dict[str, Any] = {}
         updated_verification_config: dict[str, Any] = {}
@@ -844,15 +836,10 @@ class UpdateManager:
                 update_info.original_tag_name,
                 app_name,
                 release_data=release_data,
-                progress_task_id=post_processing_task_id,
+                progress_task_id=verification_task_id,
             )
 
-            if post_processing_task_id and progress_service.is_active():
-                await progress_service.update_task(
-                    post_processing_task_id,
-                    completed=30.0,
-                    description=f"✅ {app_name} verification",
-                )
+            # Verification task completion is handled by verification service
 
         except Exception as e:
             logger.error("Verification failed for %s: %s", app_name, e)
@@ -909,7 +896,7 @@ class UpdateManager:
         icon_dir: Path,
         appimage_path: Path,
         progress_service: Any,
-        post_processing_task_id: str | None,
+        installation_task_id: str | None,
     ) -> tuple[Path | None, dict[str, Any] | None]:
         """Handle icon setup operations.
 
@@ -922,7 +909,7 @@ class UpdateManager:
             icon_dir: Icon directory path
             appimage_path: Path to AppImage
             progress_service: Progress service
-            post_processing_task_id: Progress task ID or None
+            installation_task_id: Progress task ID or None
 
         Returns:
             Tuple of (icon_path, updated_icon_config)
@@ -936,9 +923,9 @@ class UpdateManager:
         if not should_setup_icon:
             return None, None
 
-        if post_processing_task_id and progress_service.is_active():
+        if installation_task_id and progress_service.is_active():
             await progress_service.update_task(
-                post_processing_task_id,
+                installation_task_id,
                 completed=50.0,
                 description=f"🎨 Setting up {app_name} icon...",
             )
@@ -971,12 +958,12 @@ class UpdateManager:
             icon_dir=icon_dir,
             appimage_path=appimage_path,
             icon_asset=icon_asset,
-            progress_task_id=post_processing_task_id,
+            progress_task_id=installation_task_id,
         )
 
-        if post_processing_task_id and progress_service.is_active():
+        if installation_task_id and progress_service.is_active():
             await progress_service.update_task(
-                post_processing_task_id,
+                installation_task_id,
                 completed=70.0,
                 description=f"✅ {app_name} icon setup",
             )
@@ -992,9 +979,9 @@ class UpdateManager:
         icon_path: Path | None,
         verification_results: dict[str, Any],
         updated_verification_config: dict[str, Any],
-        updated_icon_config: dict[str, Any] | None,
+        updated_icon_config: dict[str, Any],
         progress_service: Any,
-        post_processing_task_id: str | None,
+        installation_task_id: str | None,
     ) -> None:
         """Handle configuration updates after successful processing.
 
@@ -1008,14 +995,14 @@ class UpdateManager:
             updated_verification_config: Updated verification config
             updated_icon_config: Updated icon config or None
             progress_service: Progress service
-            post_processing_task_id: Progress task ID or None
+            installation_task_id: Progress task ID or None
 
         """
-        if post_processing_task_id and progress_service.is_active():
+        if installation_task_id and progress_service.is_active():
             await progress_service.update_task(
-                post_processing_task_id,
-                completed=80.0,
-                description=f"📁 Creating configuration for {app_name}...",
+                installation_task_id,
+                completed=50.0,
+                description=f"📝 Creating desktop entry for {app_name}...",
             )
 
         # Store computed hash (will be empty dict if no asset provided)
@@ -1100,7 +1087,7 @@ class UpdateManager:
         appimage_path: Path,
         icon_path: Path | None,
         progress_service: Any,
-        post_processing_task_id: str | None,
+        installation_task_id: str | None,
     ) -> None:
         """Handle desktop entry creation.
 
@@ -1110,12 +1097,12 @@ class UpdateManager:
             appimage_path: Path to installed AppImage
             icon_path: Path to icon or None
             progress_service: Progress service
-            post_processing_task_id: Progress task ID or None
+            installation_task_id: Progress task ID or None
 
         """
-        if post_processing_task_id and progress_service.is_active():
+        if installation_task_id and progress_service.is_active():
             await progress_service.update_task(
-                post_processing_task_id,
+                installation_task_id,
                 completed=90.0,
                 description=f"📁 Creating desktop entry for {app_name}...",
             )
@@ -1329,9 +1316,37 @@ class UpdateManager:
             async def update_with_semaphore(
                 app_name: str,
             ) -> tuple[str, bool, str | None]:
+                # Use cached update info if available
+                cached_info = update_info_map.get(app_name)
+
+                # Increment API task progress for cached data OUTSIDE semaphore
+                # API requests should not be throttled by download concurrency
+                if cached_info and self._shared_api_task_id:
+                    from .progress import get_progress_service
+
+                    progress_service = get_progress_service()
+                    if progress_service.is_active():
+                        try:
+                            task_info = progress_service.get_task_info(
+                                self._shared_api_task_id
+                            )
+                            if task_info:
+                                new_completed = int(task_info.completed) + 1
+                                total = (
+                                    int(task_info.total)
+                                    if task_info.total > 0
+                                    else new_completed
+                                )
+                                await progress_service.update_task(
+                                    self._shared_api_task_id,
+                                    completed=float(new_completed),
+                                    description=f"🌐 Retrieved {app_name} (cached) ({new_completed}/{total})",
+                                )
+                        except Exception:
+                            pass
+
+                # Apply semaphore only to download/install phase
                 async with semaphore:
-                    # Use cached update info if available
-                    cached_info = update_info_map.get(app_name)
                     success, error_reason = await self.update_single_app(
                         app_name, session, force, cached_info
                     )

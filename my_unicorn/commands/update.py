@@ -117,20 +117,30 @@ class UpdateHandler(BaseCommandHandler):
             logger.debug("No updates needed for %s app(s)", len(update_infos))
             return
 
+        # Display update plan BEFORE starting progress session
+        # to avoid print() interference with progress display
+        self._display_update_plan(update_infos)
+
         # Only start progress session if there are apps to update
         async with progress_session():
             progress_service = get_progress_service()
 
             # Create shared API task
             api_task_id = await progress_service.create_api_fetching_task(
-                endpoint="API assets", total_requests=1
+                name="GitHub Releases",
+                description="🌐 Fetching release information...",
             )
+
+            # Set total to number of apps being updated
+            await progress_service.update_task(
+                api_task_id,
+                total=float(len(apps_to_update)),
+                completed=0.0,
+            )
+
             self.update_manager._shared_api_task_id = api_task_id
 
             try:
-                # Display update plan
-                self._display_update_plan(update_infos)
-
                 # Perform updates - pass update_infos to eliminate redundant
                 # cache lookups (optimization: reuses in-memory release data)
                 (

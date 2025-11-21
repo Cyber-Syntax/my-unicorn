@@ -80,23 +80,33 @@ async def test_update_handler_perform_updates(
         return_value=mock_update_infos
     )
     mock_update_manager.update_multiple_apps = AsyncMock(
-        return_value={"app1": True}
+        return_value=({"app1": True}, {})
     )
+
+    # Create proper async context manager mock
+    mock_session = AsyncMock()
+    mock_session.__aenter__ = AsyncMock(return_value=None)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
 
     with (
         patch(
             "my_unicorn.commands.update.UpdateHandler._get_target_apps",
             return_value=["app1"],
         ),
-        patch("my_unicorn.commands.update.progress_session"),
+        patch(
+            "my_unicorn.commands.update.progress_session",
+            return_value=mock_session,
+        ),
         patch(
             "my_unicorn.commands.update.get_progress_service"
         ) as mock_progress,
+        patch("my_unicorn.commands.update.UpdateHandler._display_update_plan"),
     ):
         mock_progress_instance = MagicMock()
         mock_progress_instance.create_api_fetching_task = AsyncMock(
             return_value="task_id"
         )
+        mock_progress_instance.update_task = AsyncMock()
         mock_progress_instance.finish_task = AsyncMock()
         mock_progress.return_value = mock_progress_instance
 

@@ -37,14 +37,14 @@ Turkish: [README.tr.md](README.tr.md)
 
     > `uv` would be used to install the dependencies to venv, it is more efficient than pip.
 
-        ```bash
-        # fedora
-        sudo dnf install uv
-        # arch
-        sudo pacman -S uv
-        # or `uv` astral official standalone installer
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        ```
+    ```bash
+    # fedora
+    sudo dnf install uv
+    # arch
+    sudo pacman -S uv
+    # or `uv` astral official standalone installer
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
 
 3.  Build as a package:
 

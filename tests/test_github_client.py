@@ -1,5 +1,9 @@
+"""Tests for GitHub API client functionality."""
+
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
+import aiohttp
 import pytest
 import pytest_asyncio
 
@@ -16,6 +20,34 @@ from my_unicorn.github_client import (
 def mock_session():
     """Provide a mock aiohttp.ClientSession."""
     return MagicMock()
+
+
+@pytest.fixture
+def mock_asyncio_sleep(monkeypatch):
+    """Mock asyncio.sleep to prevent real delays during tests."""
+
+    async def instant_sleep(seconds):
+        """Mock sleep that returns immediately."""
+
+    monkeypatch.setattr(asyncio, "sleep", instant_sleep)
+    return instant_sleep
+
+
+@pytest.fixture
+def mock_config(monkeypatch):
+    """Mock config_manager to return predictable test values."""
+    mock_config_data = {
+        "network": {"retry_attempts": "3", "timeout_seconds": "10"}
+    }
+
+    def mock_load_global_config():
+        return mock_config_data
+
+    monkeypatch.setattr(
+        "my_unicorn.github_client.config_manager.load_global_config",
+        mock_load_global_config,
+    )
+    return mock_config_data
 
 
 @pytest.mark.asyncio
@@ -476,13 +508,15 @@ async def test_fetch_latest_release_api_error(mock_session):
     )
     mock_session.get.return_value = mock_response
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError, match="No stable release found"):
         await fetcher.fetch_latest_release()
 
 
 @pytest.mark.asyncio
-async def test_fetch_latest_release_network_error(mock_session):
-    """Test fetch_latest_release handles network error (e.g., connection lost)."""
+async def test_fetch_latest_release_network_error(
+    mock_session, mock_asyncio_sleep, mock_config
+):
+    """Test fetch_latest_release handles network error."""
     fetcher = ReleaseFetcher(
         owner="Cyber-Syntax",
         repo="my-unicorn",
@@ -490,15 +524,15 @@ async def test_fetch_latest_release_network_error(mock_session):
         use_cache=False,
     )
     # Simulate aiohttp.ClientError (network error)
-    import aiohttp
-
     mock_session.get.side_effect = aiohttp.ClientError("Network down")
     with pytest.raises(aiohttp.ClientError):
         await fetcher.fetch_latest_release()
 
 
 @pytest.mark.asyncio
-async def test_fetch_latest_release_timeout(mock_session):
+async def test_fetch_latest_release_timeout(
+    mock_session, mock_asyncio_sleep, mock_config
+):
     """Test fetch_latest_release handles timeout error."""
     fetcher = ReleaseFetcher(
         owner="Cyber-Syntax",
@@ -506,8 +540,6 @@ async def test_fetch_latest_release_timeout(mock_session):
         session=mock_session,
         use_cache=False,
     )
-    import asyncio
-
     mock_session.get.side_effect = asyncio.TimeoutError
     with pytest.raises(asyncio.TimeoutError):
         await fetcher.fetch_latest_release()
@@ -539,7 +571,7 @@ async def test_fetch_latest_release_malformed_response(mock_session):
 
 
 def test_build_icon_url_and_extract_icon_filename():
-    """Test build_icon_url and extract_icon_filename produce correct results."""
+    """Test build_icon_url and extract_icon_filename."""
     icon_url = ReleaseFetcher.build_icon_url(
         "Cyber-Syntax", "my-unicorn", "icon.png"
     )
@@ -554,7 +586,6 @@ def test_build_icon_url_and_extract_icon_filename():
 @pytest.mark.asyncio
 async def test_github_client_get_latest_release(mock_session):
     """Test GitHubClient.get_latest_release returns release info."""
-    client = GitHubClient(mock_session)
-    # Optionally set repo URL if needed by the test, or skip this test if not supported
-    # If the method requires repo_url, this test should be adjusted to match the actual API.
-    # For now, we skip this test as the constructor does not support repo_url injection.
+    # Create client instance
+    GitHubClient(mock_session)
+    # Skip: constructor does not support repo_url injection yet

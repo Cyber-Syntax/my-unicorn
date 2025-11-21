@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0-alpha] - 2025-11-20
+
+### Added
+
+- ASCII progress bar backend to replace rich progress UI.
+- Network retry and rate-limit support for GitHub API requests, including
+  configurable retry/backoff and improved resilience.
+
+### Changed
+
+- Reorganized and updated documentation.
+- Improved progress task names and progress handling in `install` and
+  `update` commands.
+
+### Removed
+
+- Removed the rich library to reduce dependencies and code maintainability.
+
+### Fixed
+
+- Delegate AppImage rename in install command to the storage service to fix
+  incorrect extension names during renames.
+
+### Migration guide
+
+Please reinstall (remove and install again) all of your apps after upgrading to this version to avoid any issues with the appimage extension naming issue from previous versions.
+
 ## [1.10.1-alpha]
 
 ### Added
@@ -21,13 +48,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed a bug where the venv installation process could fail due to wrong directory usage on upgrade module.
   Now, the package upgrade process is uses setup.sh instead of upgrade module for better simplified installation process.
-  
+
 ### Removed
 
 - Locale and batch_mode on configuration which they was violate YAGNI. May be added back in the future if needed
 - Commit history writing to release notes
 
-## v1.10.0-alpha
+## [1.10.0-alpha]
 
 ### Changed
 
@@ -49,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 No manual migration steps are required for most users. If you have a custom setup that relies on deprecated module paths or templates,
 review your configuration and follow the repository README for update instructions.
 
-## v1.9.1-alpha
+## [1.9.1-alpha]
 
 ### Fixed
 
@@ -65,7 +92,7 @@ cd my-unicorn
 ./setup.sh install
 ```
 
-## v1.9.0-alpha
+## [1.9.0-alpha]
 
 ### Changed
 
@@ -90,7 +117,7 @@ cd my-unicorn
 
 - `tools/generate_pip_freeze.py` and utilities to help with dependency generation.
 
-## v1.8.0-alpha
+## [1.8.0-alpha]
 
 ### BREAKING CHANGES
 
@@ -106,15 +133,15 @@ cd my-unicorn
 ./setup.sh
 ```
 
-## v1.7.4-alpha
+## [1.7.4-alpha]
 
-## v1.7.3-alpha
+## [1.7.3-alpha]
 
-## v1.7.2-alpha
+## [1.7.2-alpha]
 
-## v1.7.1-alpha
+## [1.7.1-alpha]
 
-## v1.7.0-alpha
+## [1.7.0-alpha]
 
 # CHANGES
 
@@ -122,36 +149,36 @@ This release refactors the codebase for improved code readability, maintainabili
 
 - Removed size verification logic which it was not best practice to verify app integrity.
 
-## v1.6.0-alpha
+## [1.6.0-alpha]
 
 # BREAKING CHANGES
 
 This release introduces a comprehensive caching mechanism for GitHub release data, enhancing performance and reducing redundant API calls. The caching system is designed to store release information persistently, with a configurable time-to-live (TTL) to ensure data freshness. Additionally, the release includes significant improvements to the logging capabilities of the verification service, providing detailed insights into the verification process and asset handling.
 
-## v1.5.1-alpha
+## [1.5.1-alpha]
 
-## v1.5.0-alpha
+## [1.5.0-alpha]
 
 # BREAKING CHANGES
 
 This release implement new library rich for progress bar instead of tqdm.
 Please update my-unicorn via `my-unicorn self-update` to get the latest version.
 
-## v1.4.0-alpha
+## [1.4.0-alpha]
 
-## v1.3.0-alpha
+## [1.3.0-alpha]
 
-## v1.2.0-alpha
+## [1.2.0-alpha]
 
 ### CHANGES
 
 This release implement new icon extraction feature and implement new verfication service.
 
-## v1.1.3-alpha
+## [1.1.3-alpha]
 
-## v1.1.2-alpha
+## [1.1.2-alpha]
 
-## v1.1.0-alpha
+## [1.1.0-alpha]
 
 ### BREAKING CHANGES
 
@@ -172,9 +199,9 @@ Please read [wiki.md](docs/wiki.md) for more information how to use the new feat
 - If something goes wrong, migrate manually by moving the `~/Applications/backups` directory to `~/Applications/backups.old`
   than make sure to run migrate command again to migrate the new backups to the new format.
 
-## v1.0.1-alpha
+## [1.0.1-alpha]
 
-## v1.0.0-alpha
+## [1.0.0-alpha]
 
 ### BREAKING CHANGES
 
@@ -200,86 +227,86 @@ Please read the [wiki.md](docs/wiki.md) for more information.
 - Install the new version of the app with the instructions provided in the README.md.
 - Check the [wiki.md](docs/wiki.md) for more information how to use the app.
 
-## v0.15.2-alpha
+## [0.15.2-alpha]
 
-## v0.15.1-alpha
+## [0.15.1-alpha]
 
-## v0.15.0-alpha
+## [0.15.0-alpha]
 
-## v0.14.1-alpha
+## [0.14.1-alpha]
 
-## v0.14.0-alpha
+## [0.14.0-alpha]
 
-## v0.13.9-alpha
+## [0.13.9-alpha]
 
-## v0.13.8-alpha
+## [0.13.8-alpha]
 
-## v0.13.7-alpha
+## [0.13.7-alpha]
 
-## v0.13.6-alpha
+## [0.13.6-alpha]
 
-## v0.13.5-alpha
+## [0.13.5-alpha]
 
-## v0.13.4-alpha
+## [0.13.4-alpha]
 
-## v0.13.3-alpha
+## [0.13.3-alpha]
 
-## v0.13.2-alpha
+## [0.13.2-alpha]
 
-## v0.13.1-alpha
+## [0.13.1-alpha]
 
-## v0.13.0-alpha
+## [0.13.0-alpha]
 
 ### BREAKING CHANGES
 
 This release remove compability with kdewallet and salting for the tokens. Tokens are now stored in the gnome keyring only. This is done to simplify the code and improve security.
 
-## v0.12.3-alpha
+## [0.12.3-alpha]
 
 ### Changed
 
-## v0.12.2-alpha
+## [0.12.2-alpha]
 
 ### Changed
 
-## v0.12.1-alpha
+## [0.12.1-alpha]
 
 ### Changed
 
 This release fixes the cli command issues.
 
-## v0.12.0-alpha
+## [0.12.0-alpha]
 
 ### Changed
 
 This release add cli support and package support for python 3.12 and higher.
 
-## v0.11.1-alpha
+## [0.11.1-alpha]
 
 ### Changed
 
 This release fixed the super-productivity(14.0.3) appimage verification issue. There was a extarnal problem on the app itself while creating the .yml checksum file and it was a problem sometimes happens. Currently, the app is started to provide asset_digest which this fix is add the use_asset_digest method to verify the appimage. This will not affect existing functionality, but it will fix the issue with the super-productivity appimage verification.
 
-## v0.11.0-alpha
+## [0.11.0-alpha]
 
 ### Changed
 
 Cleaning up the codebase for better readability and maintainability.
 
-## v0.10.10-alpha
+## [0.10.10-alpha]
 
 ### BREAKING CHANGES
 
 Fixes the performance issue and concurrent issues. After this release we are no longer
 support python 3.11 and lower. This release completely switches to python 3.12 and higher.
 
-## v0.10.9-alpha
+## [0.10.9-alpha]
 
 ### Changed
 
 This release will not affect existing functionality, but it will fix the issue with the catalog module.
 
-## v0.10.8-alpha
+## [0.10.8-alpha]
 
 ### Changed
 
@@ -287,49 +314,49 @@ Implements GitHub API asset digest-based verification as the highest priority ve
 This will fix the issue with the zen browser appimage verification.
 Also, QOwnNotes migrate the verification method to the new GitHub API asset digest-based verification method and I can confirm that is also working for the QOwnNotes appimage.
 
-## v0.10.7-alpha
+## [0.10.7-alpha]
 
 ### Fixed
 
 Zen Browser verification issue with the appimage. This release will not affect existing functionality, but it will fix the issue with the Zen Browser appimage verification.
 
-## v0.10.6-alpha
+## [0.10.6-alpha]
 
 ### Changed
 
 Fixes the issue with asyncio event loop in the app and cleanup the failed appimage files.
 
-## v0.10.5-alpha
+## [0.10.5-alpha]
 
 ### Changed
 
 Updated dependencies to the latest versions. This will not affect existing functionality, but it will improve the performance and security of the app.
 
-## v0.10.4-alpha
+## [0.10.4-alpha]
 
 ### Changed
 
 Fixes github action duplicate commits in release notes. This release will make it workflow to show only PR commits in the release notes.
 
-## v0.10.3-alpha
+## [0.10.3-alpha]
 
 ### Changed
 
 Fix WeekToDo app 404 error. Also, added a output fix for the appimage who haven't provided by their developers in previous PR(forget to update changelog). This wouldn't require any changes to your existing configuration files.
 
-## v0.10.2-alpha
+## [0.10.2-alpha]
 
 ### Changed
 
 This will not affect existing functionality, but it will change the location of the logs. The logs will now be stored in `~/.local/state/myunicorn/` folder instead of repository dir. This is done to comply with the XDG Base Directory Specification.
 
-## v0.10.1-alpha
+## [0.10.1-alpha]
 
 ### Changed
 
 Added a new feature that allows github workflows to write who committed the changes to the release notes. Also created a test script to test the release notes generation. This will not affect existing functionality.
 
-## v0.10.0-alpha
+## [0.10.0-alpha]
 
 ### BREAKING CHANGES
 
@@ -368,25 +395,25 @@ This variables are used for comparing versions and handling the appimage exact n
 
 This change is not backward compatible, so you will need to update your existing app configs to the new format. You can use the `choice migrate` command to help with this migration
 
-## v0.9.2-alpha
+## [0.9.2-alpha]
 
 ### BREAKING CHANGES
 
 Update your config files with choice 8. This release includes refactoring of the code to improve readability and maintainability. I refactored the variable names to be more readable and meaningful.
 
-## v0.9.1-alpha
+## [0.9.1-alpha]
 
 ### Changed
 
 This release includes a fix for the issue where the standard notes app repo name was `app` which script was using repo name to name the appimage, config, desktop file and backup files. The script now uses app_id to name the appimage and similar files. Changes is not breaking because app_id is still fallback to repo name if app_id is not found. I encourage you to use app_id in your config file to avoid any confusion in the future and solve the standard notes app issue.
 
-## v0.9.0-alpha
+## [0.9.0-alpha]
 
 ### Changed
 
 Added a new feature that allows you to install AppImages from the catalog of compatible apps instead of dealing with URLs. This will not affect existing functionality.
 
-## v0.8.0-alpha
+## [0.8.0-alpha]
 
 # BREAKING CHANGES
 
@@ -394,7 +421,7 @@ Added download more than 1 app at a time feature. `max_concurrent_updates` is ad
 
 You can change this value to any number you want, but be cautious of the API rate limits: 60 requests per hour without a token and 5000 requests per hour with one. Also, you cannot update more than 100 apps concurrently due to GitHub's secondary rate limits.
 
-## v0.7.0-alpha
+## [0.7.0-alpha]
 
 # BREAKING CHANGES
 
@@ -402,7 +429,7 @@ New max_backup parameter in the settings.json file. This will be used to limit t
 
 Added github token usage for the app to increase the rate limit for the app. Please add your github token with app choice if you want to increase rate limit which would be 5000 requests per hour. If you do not add the token, the app will use the default rate limit of 60 requests per hour. Also if you don't use it, installation speed may be slower.
 
-## v0.6.5-alpha
+## [0.6.5-alpha]
 
 ### Changed
 
@@ -414,7 +441,7 @@ feat: create desktop entry files for AppImages
   AppImages.
 - Updated .gitignore to include AppImage files.
 
-## v0.6.4-alpha
+## [0.6.4-alpha]
 
 ### BREAKING CHANGES
 
@@ -430,7 +457,7 @@ Please change your current configuration files to the new format. The new format
 
 - feat!: Updated the global and app configuration paths to use XDG compliant directories.feat!: add
 
-## v0.6.3-alpha
+## [0.6.3-alpha]
 
 ### Changed
 
@@ -438,3 +465,66 @@ Please change your current configuration files to the new format. The new format
 - chore: add init files for path
 - refactor: improve better error handling on verify.py
 - chore: add copilot instructions
+
+[1.11.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.10.1-alpha...v1.11.0-alpha
+[1.10.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.10.0-alpha...v1.10.1-alpha
+[1.10.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.9.1-alpha...v1.10.0-alpha
+[1.9.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.9.0-alpha...v1.9.1-alpha
+[1.9.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.8.0-alpha...v1.9.0-alpha
+[1.8.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.7.4-alpha...v1.8.0-alpha
+[1.7.4-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.7.3-alpha...v1.7.4-alpha
+[1.7.3-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.7.2-alpha...v1.7.3-alpha
+[1.7.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.7.1-alpha...v1.7.2-alpha
+[1.7.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.7.0-alpha...v1.7.1-alpha
+[1.7.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.6.0-alpha...v1.7.0-alpha
+[1.6.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.5.1-alpha...v1.6.0-alpha
+[1.5.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.5.0-alpha...v1.5.1-alpha
+[1.5.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.4.0-alpha...v1.5.0-alpha
+[1.4.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.3.0-alpha...v1.4.0-alpha
+[1.3.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.2.0-alpha...v1.3.0-alpha
+[1.2.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.1.3-alpha...v1.2.0-alpha
+[1.1.3-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.1.2-alpha...v1.1.3-alpha
+[1.1.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.1.0-alpha...v1.1.2-alpha
+[1.1.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.0.1-alpha...v1.1.0-alpha
+[1.0.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.0.0-alpha...v1.0.1-alpha
+[1.0.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.15.2-alpha...v1.0.0-alpha
+[0.15.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.15.1-alpha...v0.15.2-alpha
+[0.15.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.15.0-alpha...v0.15.1-alpha
+[0.15.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.14.1-alpha...v0.15.0-alpha
+[0.14.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.14.0-alpha...v0.14.1-alpha
+[0.14.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.13.9-alpha...v0.14.0-alpha
+[0.13.9-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.13.8-alpha...v0.13.9-alpha
+[0.13.8-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.13.7-alpha...v0.13.8-alpha
+[0.13.7-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.13.6-alpha...v0.13.7-alpha
+[0.13.6-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.13.5-alpha...v0.13.6-alpha
+[0.13.5-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.13.4-alpha...v0.13.5-alpha
+[0.13.4-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.13.3-alpha...v0.13.4-alpha
+[0.13.3-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.13.2-alpha...v0.13.3-alpha
+[0.13.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.13.1-alpha...v0.13.2-alpha
+[0.13.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.13.0-alpha...v0.13.1-alpha
+[0.13.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.12.3-alpha...v0.13.0-alpha
+[0.12.3-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.12.2-alpha...v0.12.3-alpha
+[0.12.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.12.1-alpha...v0.12.2-alpha
+[0.12.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.12.0-alpha...v0.12.1-alpha
+[0.12.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.11.1-alpha...v0.12.0-alpha
+[0.11.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.11.0-alpha...v0.11.1-alpha
+[0.11.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.10.10-alpha...v0.11.0-alpha
+[0.10.10-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.10.9-alpha...v0.10.10-alpha
+[0.10.9-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.10.8-alpha...v0.10.9-alpha
+[0.10.8-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.10.7-alpha...v0.10.8-alpha
+[0.10.7-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.10.6-alpha...v0.10.7-alpha
+[0.10.6-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.10.5-alpha...v0.10.6-alpha
+[0.10.5-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.10.4-alpha...v0.10.5-alpha
+[0.10.4-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.10.3-alpha...v0.10.4-alpha
+[0.10.3-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.10.2-alpha...v0.10.3-alpha
+[0.10.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.10.1-alpha...v0.10.2-alpha
+[0.10.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.10.0-alpha...v0.10.1-alpha
+[0.10.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.9.2-alpha...v0.10.0-alpha
+[0.9.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.9.1-alpha...v0.9.2-alpha
+[0.9.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.9.0-alpha...v0.9.1-alpha
+[0.9.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.8.0-alpha...v0.9.0-alpha
+[0.8.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.7.0-alpha...v0.8.0-alpha
+[0.7.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.6.5-alpha...v0.7.0-alpha
+[0.6.5-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.6.4-alpha...v0.6.5-alpha
+[0.6.4-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.6.3-alpha...v0.6.4-alpha
+[0.6.3-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v0.6.2-alpha...v0.6.3-alpha

@@ -75,19 +75,19 @@ class SimpleProgress:
         self,
         task_id: str,
         success: bool = True,
-        final_description: str | None = None,
+        description: str | None = None,
     ) -> None:
         """Finish a task.
 
         Args:
             task_id: Task identifier
             success: Whether the task completed successfully
-            final_description: Optional final description
+            description: Optional final description
 
         """
         if task_id in self.active_tasks:
             status = "✅" if success else "❌"
-            desc = final_description or self.active_tasks[task_id]
+            desc = description or self.active_tasks[task_id]
             print(f"\r{status} {desc}")
             del self.active_tasks[task_id]
 
@@ -436,7 +436,7 @@ class SelfUpdater:
                 self.progress.finish_task(
                     download_task_id,
                     success=clone_process.returncode == 0,
-                    final_description="Repository cloned successfully"
+                    description="Repository cloned successfully"
                     if clone_process.returncode == 0
                     else "Repository clone failed",
                 )
@@ -509,7 +509,7 @@ class SelfUpdater:
                 self.progress.finish_task(
                     install_task_id,
                     success=install_process.returncode == 0,
-                    final_description="Installation completed successfully"
+                    description="Installation completed successfully"
                     if install_process.returncode == 0
                     else "Installation failed",
                 )
@@ -536,7 +536,7 @@ class SelfUpdater:
                 self.progress.finish_task(
                     cleanup_task_id,
                     success=True,
-                    final_description="Cleanup completed",
+                    description="Cleanup completed",
                 )
 
             logger.info("Self-update completed successfully")
@@ -577,8 +577,21 @@ async def get_self_updater(
 
         config_manager = default_config_manager
 
-    # Use a timeout for GitHub API requests
-    timeout = aiohttp.ClientTimeout(total=30)
+    # Use a timeout for GitHub API requests driven by configuration
+    try:
+        global_conf = config_manager.load_global_config()
+        network_cfg = global_conf.get("network", {})
+        timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
+    except Exception:
+        # Fall back to a sensible default if config lookup fails
+        timeout_seconds = 10
+
+    # Map configured base seconds to aiohttp timeouts (keeps previous defaults)
+    timeout = aiohttp.ClientTimeout(
+        total=timeout_seconds * 3,
+        sock_read=timeout_seconds * 2,
+        sock_connect=timeout_seconds,
+    )
     session = aiohttp.ClientSession(timeout=timeout)
 
     return SelfUpdater(config_manager, session, simple_progress)

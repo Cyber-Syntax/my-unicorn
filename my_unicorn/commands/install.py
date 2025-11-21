@@ -69,9 +69,17 @@ class InstallCommand:
         if self.download_service is None:
             # Use global progress service if progress is enabled
             if show_progress:
-                from ..progress import get_progress_service
+                from ..progress import (
+                    ProgressDisplay,
+                    get_progress_service,
+                    set_progress_service,
+                )
 
                 self.progress_service = get_progress_service()
+                # Create progress service if it doesn't exist
+                if self.progress_service is None:
+                    self.progress_service = ProgressDisplay()
+                    set_progress_service(self.progress_service)
                 self.download_service = DownloadService(
                     self.session, self.progress_service
                 )
@@ -163,12 +171,19 @@ class InstallCommand:
             # Each app typically has: download, verify, icon extraction, installation
             total_operations = apps_needing_work * 4
             async with self.progress_service.session(total_operations):
-                # Create minimal API progress task - let API calls drive the count
+                # Create API progress task with total number of apps
                 api_task_id = (
                     await self.progress_service.create_api_fetching_task(
-                        endpoint="API assets",
-                        total_requests=1,
+                        name="GitHub Releases",
+                        description="🌐 Fetching release information...",
                     )
+                )
+
+                # Set total to number of apps needing API calls
+                await self.progress_service.update_task(
+                    api_task_id,
+                    total=float(apps_needing_work),
+                    completed=0.0,
                 )
 
                 # Set shared API task for GitHub client
@@ -452,9 +467,13 @@ class InstallCommandHandler(BaseCommandHandler):
             install_dir = Path(self.global_config["directory"]["storage"])
             download_dir = Path(self.global_config["directory"]["download"])
 
-            # Create session with timeout configuration
+            # Create session with timeout configuration (driven by config)
+            network_cfg = self.global_config.get("network", {})
+            timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
             timeout = aiohttp.ClientTimeout(
-                total=1200, sock_read=60, sock_connect=30
+                total=timeout_seconds * 60,
+                sock_read=timeout_seconds * 3,
+                sock_connect=timeout_seconds,
             )
             max_concurrent = self.global_config.get(
                 "max_concurrent_downloads", 3

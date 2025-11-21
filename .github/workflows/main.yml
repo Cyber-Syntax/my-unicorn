@@ -87,11 +87,12 @@ jobs:
               id: check_release
               run: |
                   VERSION=${{ steps.changelog.outputs.version }}
-                  if gh release view $VERSION &>/dev/null; then
-                    echo "Release already exists: $VERSION"
+                  TAG="v$VERSION"
+                  if gh release view "$TAG" &>/dev/null; then
+                    echo "Release already exists: $TAG"
                     echo "exists=true" >> $GITHUB_OUTPUT
                   else
-                    echo "No existing release found for: $VERSION"
+                    echo "No existing release found for: $TAG"
                     echo "exists=false" >> $GITHUB_OUTPUT
                   fi
               env:
@@ -101,8 +102,8 @@ jobs:
               if: steps.changelog.outputs.is_unreleased != 'true' && steps.check_release.outputs.exists == 'false'
               uses: softprops/action-gh-release@v1
               with:
-                  tag_name: ${{ steps.changelog.outputs.version }}
-                  name: "Release ${{ steps.changelog.outputs.version }}"
+                  tag_name: v${{ steps.changelog.outputs.version }}
+                  name: "Release v${{ steps.changelog.outputs.version }}"
                   body: ${{ steps.changelog.outputs.notes }}
                   draft: false
                   prerelease: ${{ contains(steps.changelog.outputs.version, '-') }}

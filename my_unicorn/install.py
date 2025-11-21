@@ -7,9 +7,9 @@ template method pattern with a simpler, more maintainable approach.
 import asyncio
 from datetime import datetime
 from pathlib import Path
-from sys import prefix
 from typing import Any
 
+from my_unicorn.config import ConfigManager
 from my_unicorn.desktop_entry import DesktopEntry
 from my_unicorn.download import DownloadService
 from my_unicorn.exceptions import InstallationError
@@ -20,9 +20,12 @@ from my_unicorn.github_client import (
     GitHubClient,
     Release,
 )
-from my_unicorn.icon import IconHandler
+from my_unicorn.icon import IconConfig, IconHandler
 from my_unicorn.logger import get_logger
 from my_unicorn.verification import VerificationService
+
+# Minimum number of path parts expected for a GitHub owner/repo
+MIN_GITHUB_PARTS = 2
 
 logger = get_logger(__name__)
 
@@ -316,16 +319,6 @@ class InstallHandler:
         show_progress = options.get("show_progress", True)
         download_dir = options.get("download_dir", Path.cwd())
 
-        # Create progress task
-        task_id = None
-        progress_service = getattr(
-            self.download_service, "progress_service", None
-        )
-        if show_progress and progress_service:
-            task_id = await progress_service.create_post_processing_task(
-                app_name
-            )
-
         try:
             # 1. Download
             download_path = download_dir / asset.name
@@ -333,6 +326,21 @@ class InstallHandler:
             downloaded_path = await self.download_service.download_appimage(
                 asset, download_path, show_progress=show_progress
             )
+
+            # Create multi-phase progress tasks (verification + installation)
+            # after download completes
+            verification_task_id = None
+            installation_task_id = None
+            progress_service = getattr(
+                self.download_service, "progress_service", None
+            )
+            if show_progress and progress_service:
+                (
+                    verification_task_id,
+                    installation_task_id,
+                ) = await progress_service.create_installation_workflow(
+                    app_name, with_verification=verify
+                )
 
             # 2. Verify
             verify_result = None
@@ -344,7 +352,7 @@ class InstallHandler:
                     app_config,
                     release_data,
                     app_name,
-                    task_id,
+                    verification_task_id,
                 )
                 if not verify_result["passed"]:
                     error_msg = verify_result.get("error", "Unknown error")
@@ -361,7 +369,7 @@ class InstallHandler:
             # 4. Extract icon
             logger.info("🎨 Extracting icon for %s", app_name)
             icon_result = await self._extract_icon_for_app(
-                install_path, app_name, app_config, task_id
+                install_path, app_name, app_config, installation_task_id
             )
 
             # 5. Create configuration
@@ -385,6 +393,12 @@ class InstallHandler:
             # Success!
             logger.info("✅ Successfully installed %s", app_name)
 
+            # Mark installation task as complete
+            if installation_task_id and progress_service:
+                await progress_service.finish_task(
+                    installation_task_id, success=True
+                )
+
             return {
                 "success": True,
                 "target": app_name,
@@ -402,12 +416,15 @@ class InstallHandler:
             logger.error(
                 "Installation workflow failed for %s: %s", app_name, error
             )
-            raise
 
-        finally:
-            # Cleanup progress
-            if task_id and progress_service:
-                await progress_service.finish_task(task_id, success=True)
+            # Mark installation task as failed
+            if installation_task_id and progress_service:
+                error_msg = str(error)
+                await progress_service.finish_task(
+                    installation_task_id, success=False, description=error_msg
+                )
+
+            raise
 
     async def _fetch_release_for_catalog(
         self, owner: str, repo: str
@@ -591,13 +608,18 @@ class InstallHandler:
         # Get rename preference
         rename = app_config.get("appimage", {}).get("rename", app_name)
 
-        # Ensure .appimage extension
-        if not rename.lower().endswith(".appimage"):
-            rename = f"{rename}.appimage"
+        # Clean base name (remove any provided extension) and delegate
+        # extension/casing handling to the storage service to keep behavior
+        # consistent with update logic.
+        clean_name = self.storage_service.get_clean_appimage_name(rename)
 
-        # Move to install directory
-        install_path = self.storage_service.move_to_install_dir(
-            temp_path, rename
+        # Move the downloaded file into the install directory first
+        moved_path = self.storage_service.move_to_install_dir(temp_path)
+
+        # Then perform AppImage-specific rename (this will add ".AppImage"
+        # with the correct casing if needed)
+        install_path = self.storage_service.rename_appimage(
+            moved_path, clean_name
         )
 
         return install_path
@@ -622,8 +644,6 @@ class InstallHandler:
 
         """
         try:
-            from my_unicorn.icon import IconConfig
-
             icon_cfg = app_config.get("icon", {})
             extraction_enabled = icon_cfg.get("extraction", True)
             icon_url = icon_cfg.get("url")
@@ -636,8 +656,6 @@ class InstallHandler:
                 }
 
             # Get icon directory from config
-            from my_unicorn.config import ConfigManager
-
             config_mgr = ConfigManager()
             global_config = config_mgr.load_global_config()
             icon_dir = Path(global_config["directory"]["icon"])
@@ -847,7 +865,7 @@ class InstallHandler:
         try:
             # Parse owner/repo from URL
             parts = url.replace("https://github.com/", "").split("/")
-            if len(parts) < 2:
+            if len(parts) < MIN_GITHUB_PARTS:
                 raise InstallationError(f"Invalid GitHub URL format: {url}")
 
             owner, repo = parts[0], parts[1]
