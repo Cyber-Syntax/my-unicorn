@@ -96,8 +96,7 @@ class Asset:
             True if asset is an AppImage, False otherwise
 
         """
-        name_lower = self.name.lower()
-        return name_lower.endswith(".appimage")
+        return is_appimage_file(self.name)
 
 
 @dataclass(slots=True, frozen=True)
@@ -759,6 +758,11 @@ class ReleaseAPIClient:
 
         if last_exc:
             raise last_exc
+        # Explicitly return None when no result was obtained and no
+        # exception is available — helps static checkers (Pylance/pyright)
+        # recognize that this function always returns a value of the
+        # annotated `Any | None` type on all control paths.
+        return None
 
     async def fetch_stable_release(self) -> Release | None:
         """Fetch the latest stable release.
@@ -1296,7 +1300,7 @@ class GitHubClient:
                 repo,
                 e,
             )
-            raise
+            return None
 
     async def get_release_by_tag(
         self, owner: str, repo: str, tag: str

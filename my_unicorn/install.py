@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from my_unicorn.config import ConfigManager
 from my_unicorn.desktop_entry import DesktopEntry
 from my_unicorn.download import DownloadService
 from my_unicorn.exceptions import InstallationError
@@ -19,9 +20,12 @@ from my_unicorn.github_client import (
     GitHubClient,
     Release,
 )
-from my_unicorn.icon import IconHandler
+from my_unicorn.icon import IconConfig, IconHandler
 from my_unicorn.logger import get_logger
 from my_unicorn.verification import VerificationService
+
+# Minimum number of path parts expected for a GitHub owner/repo
+MIN_GITHUB_PARTS = 2
 
 logger = get_logger(__name__)
 
@@ -640,8 +644,6 @@ class InstallHandler:
 
         """
         try:
-            from my_unicorn.icon import IconConfig
-
             icon_cfg = app_config.get("icon", {})
             extraction_enabled = icon_cfg.get("extraction", True)
             icon_url = icon_cfg.get("url")
@@ -654,8 +656,6 @@ class InstallHandler:
                 }
 
             # Get icon directory from config
-            from my_unicorn.config import ConfigManager
-
             config_mgr = ConfigManager()
             global_config = config_mgr.load_global_config()
             icon_dir = Path(global_config["directory"]["icon"])
@@ -865,7 +865,7 @@ class InstallHandler:
         try:
             # Parse owner/repo from URL
             parts = url.replace("https://github.com/", "").split("/")
-            if len(parts) < 2:
+            if len(parts) < MIN_GITHUB_PARTS:
                 raise InstallationError(f"Invalid GitHub URL format: {url}")
 
             owner, repo = parts[0], parts[1]

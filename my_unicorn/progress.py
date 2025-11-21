@@ -29,8 +29,7 @@ from my_unicorn.utils.progress_utils import (
 
 logger = get_logger(__name__)
 
-# Performance optimization constants
-SPEED_CACHE_LIMIT = 100
+# caps the size of cached generated IDs to avoid unbounded growth.
 ID_CACHE_LIMIT = 1000
 
 
