@@ -128,6 +128,32 @@ class BackupMetadata:
         self.save(metadata)
         logger.debug("Added version %s to metadata", version)
 
+    def _sort_versions(
+        self, versions: list[str], reverse: bool = True
+    ) -> list[str]:
+        """Sort versions using semantic versioning with fallback.
+
+        Args:
+            versions: List of version strings to sort
+            reverse: Sort in descending order (newest first) if True
+
+        Returns:
+            Sorted list of version strings
+
+        """
+        if not versions:
+            return []
+
+        try:
+            return sorted(
+                versions, key=lambda x: Version(x), reverse=reverse
+            )
+        except InvalidVersion:
+            logger.warning(
+                "Invalid version format detected, using lexicographic sorting"
+            )
+            return sorted(versions, reverse=reverse)
+
     def get_latest_version(self) -> str | None:
         """Get the latest version from metadata.
 
@@ -141,18 +167,8 @@ class BackupMetadata:
         if not versions:
             return None
 
-        # Sort versions using packaging.version for proper semantic versioning
-        try:
-            sorted_versions = sorted(
-                versions, key=lambda x: Version(x), reverse=True
-            )
-            return sorted_versions[0]
-        except InvalidVersion:
-            # Fallback to lexicographic sorting if version parsing fails
-            logger.warning(
-                "Invalid version format detected, using lexicographic sorting"
-            )
-            return max(versions)
+        sorted_versions = self._sort_versions(versions, reverse=True)
+        return sorted_versions[0]
 
     def get_version_info(self, version: str) -> dict[str, Any] | None:
         """Get information for a specific version.
@@ -176,17 +192,7 @@ class BackupMetadata:
         """
         metadata = self.load()
         versions = list(metadata["versions"].keys())
-
-        if not versions:
-            return []
-
-        try:
-            return sorted(versions, key=lambda x: Version(x), reverse=True)
-        except InvalidVersion:
-            logger.warning(
-                "Invalid version format detected, using lexicographic sorting"
-            )
-            return sorted(versions, reverse=True)
+        return self._sort_versions(versions, reverse=True)
 
     def remove_version(self, version: str) -> bool:
         """Remove a version from metadata.
@@ -406,6 +412,118 @@ class BackupService:
             app_name, version, destination_dir
         )
 
+    def _backup_current_version(
+        self, destination_path: Path, app_name: str, current_version: str
+    ) -> None:
+        """Backup current version before restore if it exists.
+
+        Args:
+            destination_path: Path to current AppImage
+            app_name: Name of the application
+            current_version: Current version to backup
+
+        """
+        if not destination_path.exists():
+            return
+
+        logger.info(
+            "Backing up current version %s before restore...", current_version
+        )
+        try:
+            current_backup_path = self.create_backup(
+                destination_path, app_name, current_version
+            )
+            if current_backup_path:
+                logger.info(
+                    "Current version backed up to: %s", current_backup_path
+                )
+            else:
+                logger.warning(
+                    "Failed to backup current version, "
+                    "continuing with restore..."
+                )
+        except Exception as e:
+            logger.warning(
+                "Failed to backup current version: %s, "
+                "continuing with restore...",
+                e,
+            )
+
+    def _perform_atomic_restore(
+        self,
+        backup_path: Path,
+        destination_path: Path,
+        destination_dir: Path,
+        appimage_name: str,
+    ) -> None:
+        """Restore file atomically using temporary file.
+
+        Args:
+            backup_path: Path to backup file
+            destination_path: Final destination path
+            destination_dir: Destination directory
+            appimage_name: Name of the AppImage
+
+        Raises:
+            Exception: If restore fails
+
+        """
+        with tempfile.NamedTemporaryFile(
+            dir=destination_dir,
+            prefix=f".{appimage_name}_",
+            suffix=BACKUP_TEMP_SUFFIX,
+            delete=False,
+        ) as tmp_file:
+            temp_path = Path(tmp_file.name)
+
+        try:
+            shutil.copy2(backup_path, temp_path)
+            temp_path.replace(destination_path)
+            destination_path.chmod(0o755)
+        except Exception:
+            if temp_path.exists():
+                temp_path.unlink()
+            raise
+
+    def _update_config_after_restore(
+        self,
+        app_name: str,
+        version: str,
+        version_info: dict[str, Any],
+        app_config: dict[str, Any],
+        appimage_name: str,
+    ) -> None:
+        """Update app config with restored version info.
+
+        Args:
+            app_name: Name of the application
+            version: Restored version
+            version_info: Version metadata from backup
+            app_config: App configuration dictionary
+            appimage_name: Name of the AppImage
+
+        """
+        app_config["appimage"]["version"] = version
+        app_config["appimage"]["installed_date"] = datetime.now().isoformat()
+
+        if version_info.get("sha256"):
+            app_config["appimage"]["digest"] = (
+                f"sha256:{version_info['sha256']}"
+            )
+
+        if "name" not in app_config["appimage"]:
+            app_config["appimage"]["name"] = appimage_name
+
+        try:
+            self.config_manager.save_app_config(app_name, app_config)
+            logger.debug(
+                "Updated app config for %s with version %s", app_name, version
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to update app config for %s: %s", app_name, e
+            )
+
     def _restore_specific_version(
         self, app_name: str, version: str, destination_dir: Path
     ) -> Path | None:
@@ -465,7 +583,7 @@ class BackupService:
 
         appimage_config = app_config["appimage"]
 
-        # Use the rename field for the actual AppImage name, fallback to app_name
+        # Use the rename field for the actual AppImage name
         app_rename = appimage_config.get("rename", app_name)
         if not app_rename:
             app_rename = app_name
@@ -473,76 +591,23 @@ class BackupService:
         destination_path = destination_dir / appimage_name
         destination_dir.mkdir(parents=True, exist_ok=True)
 
-        # If current AppImage exists, backup it first with its current version
+        # Backup current version if different from restore version
         current_version = appimage_config.get("version", "unknown")
-        if destination_path.exists() and current_version != version:
-            logger.info(
-                "Backing up current version %s before restore...",
-                current_version,
+        if current_version != version:
+            self._backup_current_version(
+                destination_path, app_name, current_version
             )
-            try:
-                current_backup_path = self.create_backup(
-                    destination_path, app_name, current_version
-                )
-                if current_backup_path:
-                    logger.info(
-                        "Current version backed up to: %s", current_backup_path
-                    )
-                else:
-                    logger.warning(
-                        "Failed to backup current version, continuing with restore..."
-                    )
-            except Exception as e:
-                logger.warning(
-                    "Failed to backup current version: %s, continuing with restore...",
-                    e,
-                )
 
         # Restore file atomically
-        with tempfile.NamedTemporaryFile(
-            dir=destination_dir,
-            prefix=f".{appimage_name}_",
-            suffix=BACKUP_TEMP_SUFFIX,
-            delete=False,
-        ) as tmp_file:
-            temp_path = Path(tmp_file.name)
-
         try:
-            shutil.copy2(backup_path, temp_path)
-            temp_path.replace(destination_path)
-
-            # Make executable
-            destination_path.chmod(0o755)
-
-            # Update app config with restored version
-            app_config["appimage"]["version"] = version
-            app_config["appimage"]["installed_date"] = (
-                datetime.now().isoformat()
+            self._perform_atomic_restore(
+                backup_path, destination_path, destination_dir, appimage_name
             )
 
-            # Update digest if we have it from the backup metadata
-            if version_info.get("sha256"):
-                app_config["appimage"]["digest"] = (
-                    f"sha256:{version_info['sha256']}"
-                )
-
-            # Ensure required fields exist in app config
-            if "name" not in app_config["appimage"]:
-                app_config["appimage"]["name"] = appimage_name
-
-            # Save updated config
-            try:
-                self.config_manager.save_app_config(app_name, app_config)
-                logger.debug(
-                    "Updated app config for %s with version %s",
-                    app_name,
-                    version,
-                )
-            except Exception as e:
-                logger.error(
-                    "Failed to update app config for %s: %s", app_name, e
-                )
-                # Continue anyway, as the file restore was successful
+            # Update app config with restored version info
+            self._update_config_after_restore(
+                app_name, version, version_info, app_config, appimage_name
+            )
 
             logger.info(
                 "🔄 Restored %s v%s to %s", app_name, version, destination_path
@@ -551,9 +616,6 @@ class BackupService:
             return destination_path
 
         except Exception as e:
-            # Cleanup temp file on error
-            if temp_path.exists():
-                temp_path.unlink()
             logger.error("Failed to restore %s v%s: %s", app_name, version, e)
             raise
 

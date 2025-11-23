@@ -1,8 +1,8 @@
 """Configuration management for my-unicorn AppImage installer.
 
-This module handles both global INI configuration and per-app JSON configurations.
-It provides path resolution, validation, and default values as specified in the
-architecture documentation.
+This module handles both global INI configuration and per-app JSON
+configurations. It provides path resolution, validation, and default values
+as specified in the architecture documentation.
 
 The catalog system uses bundled catalog files (v2/catalog/*.json) rather than
 copying them to the user's config directory, reducing disk usage and ensuring
@@ -70,8 +70,7 @@ class CommentAwareConfigParser(configparser.ConfigParser):
     def get(self, section, option, **kwargs):
         """Get a configuration value with inline comments stripped."""
         value = super().get(section, option, **kwargs)
-        if isinstance(value, str):
-            value = _strip_inline_comment(value)
+        value = _strip_inline_comment(value)
         return value
 
 
@@ -134,8 +133,8 @@ class ConfigCommentManager:
 # Customize where my-unicorn stores files and directories.
 # Use absolute paths or paths starting with ~ for home directory.
 #
-# repo: Source code repository for my-unicorn cli (e.g git cloned repo)
-# package: Installation directory for my-unicorn itself (only necessary code files)
+# repo: Source code repository for my-unicorn cli (e.g git cloned)
+# package: Installation directory for my-unicorn (necessary code files)
 # download: Temporary download location for AppImages
 # storage: Where installed AppImages are stored
 # backup: Backup location for old AppImage versions
@@ -263,8 +262,7 @@ class DirectoryManager:
 
         """
         for directory in config["directory"].values():
-            if isinstance(directory, Path):
-                directory.mkdir(parents=True, exist_ok=True)
+            directory.mkdir(parents=True, exist_ok=True)
 
 
 class GlobalConfigManager:
@@ -493,12 +491,7 @@ class GlobalConfigManager:
             # Add DEFAULT section items separately
             for key, raw_value in config.defaults().items():
                 # Strip inline comments from default values too
-                cleaned_value = (
-                    _strip_inline_comment(raw_value)
-                    if isinstance(raw_value, str)
-                    else raw_value
-                )
-                config_dict[key] = cleaned_value
+                config_dict[key] = _strip_inline_comment(raw_value)
         else:
             config_dict = config
 
@@ -529,7 +522,7 @@ class GlobalConfigManager:
             # Only process known directory keys to avoid config values
             known_dir_keys = set(DIRECTORY_KEYS)
             for key, value in directory_dict.items():
-                if isinstance(value, str) and key in known_dir_keys:
+                if key in known_dir_keys:
                     cleaned_path = strip_comments(value)
                     directory_config[key] = self.directory_manager.expand_path(
                         cleaned_path
