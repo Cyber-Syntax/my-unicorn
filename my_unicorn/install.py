@@ -292,7 +292,7 @@ class InstallHandler:
         return await asyncio.gather(*tasks)
 
     @staticmethod
-    def _separate_targets_impl(
+    def separate_targets_impl(
         catalog_manager: Any, targets: list[str]
     ) -> tuple[list[str], list[str]]:
         """Separate targets into URL and catalog targets.
@@ -301,6 +301,7 @@ class InstallHandler:
         same logic easily (and tests can target the behavior).
 
         Args:
+            catalog_manager: Catalog manager instance
             targets: List of mixed targets (URLs or catalog names)
 
         Returns:
@@ -338,12 +339,21 @@ class InstallHandler:
     def separate_targets(
         self, targets: list[str]
     ) -> tuple[list[str], list[str]]:
-        return InstallHandler._separate_targets_impl(
+        """Separate targets into URL and catalog targets.
+
+        Args:
+            targets: List of mixed targets (URLs or catalog names)
+
+        Returns:
+            (url_targets, catalog_targets)
+
+        """
+        return InstallHandler.separate_targets_impl(
             self.catalog_manager, targets
         )
 
     @staticmethod
-    async def _check_apps_needing_work_impl(
+    async def check_apps_needing_work_impl(
         catalog_manager: Any,
         url_targets: list[str],
         catalog_targets: list[str],
@@ -352,6 +362,7 @@ class InstallHandler:
         """Check which apps actually need installation work.
 
         Args:
+            catalog_manager: Catalog manager instance
             url_targets: List of URL targets
             catalog_targets: List of catalog targets
             install_options: Installation options
@@ -398,7 +409,18 @@ class InstallHandler:
         catalog_targets: list[str],
         install_options: dict[str, Any],
     ) -> tuple[list[str], list[str], list[str]]:
-        return await InstallHandler._check_apps_needing_work_impl(
+        """Check which apps actually need installation work.
+
+        Args:
+            url_targets: List of URL targets
+            catalog_targets: List of catalog targets
+            install_options: Installation options
+
+        Returns:
+            (urls_needing_work, catalog_needing_work, already_installed)
+
+        """
+        return await InstallHandler.check_apps_needing_work_impl(
             self.catalog_manager, url_targets, catalog_targets, install_options
         )
 

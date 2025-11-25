@@ -30,7 +30,7 @@ async def test_check_apps_needing_work_with_adapter():
         urls_needing,
         catalog_needing,
         already_installed,
-    ) = await InstallHandler._check_apps_needing_work_impl(
+    ) = await InstallHandler.check_apps_needing_work_impl(
         catalog_adapter, url_targets, catalog_targets, install_options
     )
 
