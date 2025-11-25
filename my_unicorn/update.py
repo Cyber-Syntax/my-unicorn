@@ -205,15 +205,6 @@ class UpdateManager:
                 logger.warning("No config found for app: %s", app_name)
                 return None
 
-            # DEBUG: Log source immediately after loading from disk
-            original_source = app_config.get("source", "NOT_SET")
-            logger.debug(
-                f"🔍 DEBUG: Source immediately after loading config from disk: {original_source}"
-            )
-            logger.debug(
-                f"🔍 DEBUG: Full app_config keys: {list(app_config.keys())}"
-            )
-
             current_version = app_config["appimage"]["version"]
             owner = app_config["owner"]
             repo = app_config["repo"]
@@ -1223,10 +1214,7 @@ class UpdateManager:
         if self.verification_service is None:
             raise RuntimeError("Verification service not initialized")
 
-        logger.debug("🔄 About to call VerificationService.verify_file()")
-
         # Extract assets list from release_data if available
-        # Convert Release assets to dict format for compatibility with verification
         assets_list = []
         if release_data and release_data.assets:
             assets_list = release_data.assets
@@ -1260,11 +1248,7 @@ class UpdateManager:
             return result.methods, result.updated_config
 
         except Exception as e:
-            logger.error("❌ VerificationService.verify_file() failed: %s", e)
-            logger.error("   - Exception type: %s", type(e).__name__)
-            import traceback
-
-            logger.debug("   - Traceback: %s", traceback.format_exc())
+            logger.error("Verification failed for %s: %s", app_name, e)
             raise
 
     async def update_multiple_apps(

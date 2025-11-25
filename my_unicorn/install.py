@@ -86,7 +86,7 @@ class InstallHandler:
             # Fetch latest release (already filtered for x86_64 Linux)
             owner = app_config["owner"]
             repo = app_config["repo"]
-            release = await self._fetch_release_for_catalog(owner, repo)
+            release = await self._fetch_release(owner, repo)
 
             # Select best AppImage asset from compatible options
             characteristic_suffix = app_config.get("appimage", {}).get(
@@ -165,7 +165,7 @@ class InstallHandler:
             prerelease = url_info.get("prerelease", False)
 
             # Fetch latest release (already filtered for x86_64 Linux)
-            release = await self._fetch_release_for_url(owner, repo)
+            release = await self._fetch_release(owner, repo)
 
             # Select best AppImage (filters unstable versions for URLs)
             asset = self._select_best_asset(
@@ -426,19 +426,8 @@ class InstallHandler:
 
             raise
 
-    async def _fetch_release_for_catalog(
-        self, owner: str, repo: str
-    ) -> Release:
-        """Fetch release data from GitHub for catalog app.
-
-        Args:
-            owner: Repository owner
-            repo: Repository name
-
-        Returns:
-            Release object
-
-        """
+    async def _fetch_release(self, owner: str, repo: str) -> Release:
+        """Fetch release data from GitHub."""
         try:
             release = await self.github_client.get_latest_release(owner, repo)
             if not release:
@@ -449,20 +438,6 @@ class InstallHandler:
                 "Failed to fetch release for %s/%s: %s", owner, repo, error
             )
             raise
-
-    async def _fetch_release_for_url(self, owner: str, repo: str) -> Release:
-        """Fetch release data from GitHub for URL install.
-
-        Args:
-            owner: Repository owner
-            repo: Repository name
-
-        Returns:
-            Release object
-
-        """
-        # Same as catalog for now
-        return await self._fetch_release_for_catalog(owner, repo)
 
     def _select_best_asset(
         self,
