@@ -6,7 +6,9 @@ icons with progress tracking via the project's `ProgressDisplay` service.
 
 import asyncio
 import contextlib
+from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import TypeVar
 from urllib.parse import urlparse
 
 import aiohttp
@@ -21,6 +23,8 @@ from my_unicorn.progress import (
     get_progress_service,
 )
 from my_unicorn.types import DownloadIconAsset
+
+T = TypeVar("T")
 
 logger = get_logger(__name__)
 
@@ -67,107 +71,15 @@ class DownloadService:
             aiohttp.ClientError: If download fails after all retry attempts
 
         """
-        # Load network configuration
-        network_cfg = config_manager.load_global_config()["network"]
-        retry_attempts = int(network_cfg.get("retry_attempts", 3))
-        timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
 
-        # Derive timeouts from configured base seconds.
-        # Keep previous defaults via multipliers.
-        timeout = aiohttp.ClientTimeout(
-            total=timeout_seconds * 60,
-            sock_read=timeout_seconds * 3,
-            sock_connect=timeout_seconds,
-        )
+        def cleanup() -> None:
+            if dest.exists():
+                logger.debug("🗑️  Removing partial download: %s", dest)
+                with contextlib.suppress(Exception):
+                    dest.unlink()
 
-        # Retry loop wraps entire download operation
-        for attempt in range(1, retry_attempts + 1):
-            try:
-                # Attempt complete download (connection + all chunks)
-                await self._attempt_download(
-                    url, dest, show_progress, progress_type, timeout
-                )
-
-                # Success - break out of retry loop
-                logger.debug("✅ Download completed: %s", dest)
-                break
-
-            except (aiohttp.ClientError, TimeoutError) as e:
-                logger.warning(
-                    "Attempt %s/%s failed for %s: %s",
-                    attempt,
-                    retry_attempts,
-                    dest.name,
-                    e,
-                )
-
-                # Clean up partial download if it exists
-                if dest.exists():
-                    logger.debug("🗑️  Removing partial download: %s", dest)
-                    try:
-                        dest.unlink()
-                    except Exception as cleanup_error:
-                        logger.warning(
-                            "Failed to remove partial file: %s",
-                            cleanup_error,
-                        )
-
-                if attempt == retry_attempts:
-                    logger.error(
-                        "❌ Download failed after %s attempts: %s - %s",
-                        retry_attempts,
-                        dest.name,
-                        e,
-                    )
-                    raise
-
-                # Exponential backoff before retrying
-                backoff = 2**attempt
-                logger.info("⏳ Retrying in %s seconds...", backoff)
-                await asyncio.sleep(backoff)
-
-            except Exception as e:
-                # Non-retryable errors (cleanup and raise immediately)
-                logger.error("❌ Download failed: %s - %s", dest.name, e)
-                if dest.exists():
-                    logger.debug("🗑️  Removing partial download: %s", dest)
-                    with contextlib.suppress(Exception):
-                        dest.unlink()
-                raise
-
-    async def _attempt_download(
-        self,
-        url: str,
-        dest: Path,
-        show_progress: bool,
-        progress_type: ProgressType,
-        timeout: aiohttp.ClientTimeout,
-    ) -> None:
-        """Perform a single download attempt without retry logic.
-
-        Args:
-            url: URL to download from
-            dest: Destination path
-            show_progress: Whether to show progress bar
-            progress_type: Type of progress operation
-            timeout: Timeout configuration
-
-        Raises:
-            aiohttp.ClientError: If HTTP request fails
-            TimeoutError: If download times out
-            Exception: For other download failures
-
-        """
-        headers: dict[str, str] = GitHubAuthManager.apply_auth({})
-
-        async with self.session.get(
-            url, headers=headers, timeout=timeout
-        ) as response:
-            _maybe = response.raise_for_status()
-            if asyncio.iscoroutine(_maybe):
-                await _maybe
+        async def process(response: aiohttp.ClientResponse) -> None:
             total = int(response.headers.get("Content-Length", 0))
-
             dest.parent.mkdir(parents=True, exist_ok=True)
 
             logger.debug("📥 Downloading %s", dest.name)
@@ -190,6 +102,12 @@ class DownloadService:
                 )
             else:
                 await self._download_without_progress(response, dest)
+
+            logger.debug("✅ Download completed: %s", dest)
+
+        await self._make_request_with_retry(
+            url, process, dest.name, cleanup_callback=cleanup
+        )
 
     async def _download_without_progress(
         self,
@@ -382,9 +300,25 @@ class DownloadService:
             aiohttp.ClientError: If download fails
 
         """
-        headers = GitHubAuthManager.apply_auth({})
 
-        # Load network configuration
+        async def process(response: aiohttp.ClientResponse) -> str:
+            content = await response.text()
+            logger.debug("📄 Checksum file downloaded successfully")
+            logger.debug("   Status: %s", response.status)
+            logger.debug("   Content length: %d characters", len(content))
+            logger.debug(
+                "   Content preview: %s%s",
+                content[:CONTENT_PREVIEW_MAX],
+                "..." if len(content) > CONTENT_PREVIEW_MAX else "",
+            )
+            return content
+
+        return await self._make_request_with_retry(
+            checksum_url, process, f"checksum file {checksum_url}"
+        )
+
+    def _get_network_config(self) -> tuple[int, aiohttp.ClientTimeout]:
+        """Get network configuration (retries and timeout)."""
         network_cfg = config_manager.load_global_config()["network"]
         retry_attempts = int(network_cfg.get("retry_attempts", 3))
         timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
@@ -394,46 +328,60 @@ class DownloadService:
             sock_read=timeout_seconds * 3,
             sock_connect=timeout_seconds,
         )
+        return retry_attempts, timeout
+
+    async def _make_request_with_retry(
+        self,
+        url: str,
+        process_callback: Callable[[aiohttp.ClientResponse], Awaitable[T]],
+        description: str,
+        cleanup_callback: Callable[[], None] | None = None,
+    ) -> T:
+        """Make HTTP request with retry logic."""
+        retry_attempts, timeout = self._get_network_config()
+        headers = GitHubAuthManager.apply_auth({})
 
         for attempt in range(1, retry_attempts + 1):
             try:
                 async with self.session.get(
-                    checksum_url, headers=headers, timeout=timeout
+                    url, headers=headers, timeout=timeout
                 ) as response:
                     _maybe = response.raise_for_status()
                     if asyncio.iscoroutine(_maybe):
                         await _maybe
-                    content = await response.text()
+                    return await process_callback(response)
 
-                    logger.debug("📄 Checksum file downloaded successfully")
-                    logger.debug("   Status: %s", response.status)
-                    logger.debug(
-                        "   Content length: %d characters", len(content)
-                    )
-                    logger.debug(
-                        "   Content preview: %s%s",
-                        content[:CONTENT_PREVIEW_MAX],
-                        "..." if len(content) > CONTENT_PREVIEW_MAX else "",
-                    )
-
-                    return content
             except (aiohttp.ClientError, TimeoutError) as e:
                 logger.warning(
-                    "Attempt %s/%s failed downloading checksum %s: %s",
+                    "Attempt %s/%s failed for %s: %s",
                     attempt,
                     retry_attempts,
-                    checksum_url,
+                    description,
                     e,
                 )
+
+                if cleanup_callback:
+                    cleanup_callback()
+
                 if attempt == retry_attempts:
-                    logger.error("❌ Failed to download checksum file: %s", e)
-                    logger.error("   URL: %s", checksum_url)
+                    logger.error(
+                        "❌ %s failed after %s attempts: %s",
+                        description,
+                        retry_attempts,
+                        e,
+                    )
                     raise
-                await asyncio.sleep(2**attempt)
+
+                backoff = 2**attempt
+                logger.info("⏳ Retrying in %s seconds...", backoff)
+                await asyncio.sleep(backoff)
             except Exception as e:
-                logger.error("❌ Failed to download checksum file: %s", e)
-                logger.error("   URL: %s", checksum_url)
+                logger.error("❌ %s failed: %s", description, e)
+                if cleanup_callback:
+                    cleanup_callback()
                 raise
+
+        raise DownloadError(f"Failed to download {description}")
 
 
 class DownloadError(Exception):

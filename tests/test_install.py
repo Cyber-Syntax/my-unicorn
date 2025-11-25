@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from my_unicorn.file_ops import FileOperations
+from my_unicorn.github_client import Asset, Release
 from my_unicorn.install import InstallHandler
 
 
@@ -33,22 +34,23 @@ class TestInstallHandler:
         )
 
         github_client = Mock()
-        github_client.get_latest_release = AsyncMock(
-            return_value={
-                "tag_name": "1.0.0",
-                "original_tag_name": "v1.0.0",
-                "prerelease": False,
-                "assets": [
-                    {
-                        "name": "test.appimage",
-                        "browser_download_url": "https://example.com/test.appimage",
-                        "size": 1024,
-                    }
-                ],
-                "html_url": "https://github.com/test-owner/test-repo/"
-                "releases/tag/v1.0.0",
-            }
+        assets = [
+            Asset(
+                name="test.appimage",
+                size=1024,
+                digest="",
+                browser_download_url="https://example.com/test.appimage",
+            )
+        ]
+        release = Release(
+            owner="test-owner",
+            repo="test-repo",
+            version="1.0.0",
+            prerelease=False,
+            assets=assets,
+            original_tag_name="v1.0.0",
         )
+        github_client.get_latest_release = AsyncMock(return_value=release)
 
         catalog_manager = Mock()
         catalog_manager.get_app_config = Mock(

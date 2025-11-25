@@ -1229,16 +1229,7 @@ class UpdateManager:
         # Convert Release assets to dict format for compatibility with verification
         assets_list = []
         if release_data and release_data.assets:
-            # Convert Asset objects to dicts for verification service
-            for asset_obj in release_data.assets:
-                assets_list.append(
-                    {
-                        "name": asset_obj.name,
-                        "size": asset_obj.size,
-                        "browser_download_url": asset_obj.browser_download_url,
-                        "digest": asset_obj.digest or "",
-                    }
-                )
+            assets_list = release_data.assets
 
         try:
             logger.debug("🔍 Calling VerificationService.verify_file() with:")

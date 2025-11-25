@@ -33,6 +33,17 @@ logger = get_logger(__name__)
 # Constants
 HTTP_NOT_FOUND = 404
 
+UNSTABLE_VERSION_KEYWORDS = (
+    "experimental",
+    "beta",
+    "alpha",
+    "rc",
+    "pre",
+    "dev",
+    "test",
+    "nightly",
+)
+
 
 @dataclass(slots=True, frozen=True)
 class ChecksumFileInfo:
@@ -260,33 +271,6 @@ class AssetSelector:
     """Handles selection logic for choosing the best asset from a release."""
 
     @staticmethod
-    def find_all_appimages(release: Release) -> list[Asset]:
-        """Find all AppImage assets in a release.
-
-        Args:
-            release: Release to search
-
-        Returns:
-            List of all AppImage assets
-
-        """
-        return release.get_appimages()
-
-    @staticmethod
-    def find_first_appimage(release: Release) -> Asset | None:
-        """Find the first AppImage asset in a release.
-
-        Args:
-            release: Release to search
-
-        Returns:
-            First AppImage asset or None if no AppImages found
-
-        """
-        appimages = AssetSelector.find_all_appimages(release)
-        return appimages[0] if appimages else None
-
-    @staticmethod
     def select_appimage_for_platform(
         release: Release,
         preferred_suffixes: list[str] | None = None,
@@ -318,7 +302,7 @@ class AssetSelector:
             Best matching AppImage asset or None
 
         """
-        appimages = AssetSelector.find_all_appimages(release)
+        appimages = release.get_appimages()
 
         if not appimages:
             return None
@@ -332,9 +316,14 @@ class AssetSelector:
             candidates = AssetSelector._filter_unstable_versions(appimages)
         elif preferred_suffixes:
             # For catalog installs with suffixes, filter by them
-            candidates = AssetSelector._filter_by_preferred_suffixes(
-                appimages, preferred_suffixes
-            )
+            candidates = [
+                app
+                for suffix in preferred_suffixes
+                for app in appimages
+                if suffix.lower() in app.name.lower()
+            ]
+            if not candidates:
+                candidates = appimages
         else:
             candidates = appimages
 
@@ -349,38 +338,14 @@ class AssetSelector:
     @staticmethod
     def _filter_unstable_versions(appimages: list[Asset]) -> list[Asset]:
         """Filter out unstable version keywords."""
-        unstable_keywords = [
-            "experimental",
-            "beta",
-            "alpha",
-            "rc",
-            "pre",
-            "dev",
-            "test",
-            "nightly",
-        ]
         stable = [
             app
             for app in appimages
-            if not any(kw in app.name.lower() for kw in unstable_keywords)
+            if not any(
+                kw in app.name.lower() for kw in UNSTABLE_VERSION_KEYWORDS
+            )
         ]
         return stable if stable else appimages
-
-    @staticmethod
-    def _filter_by_preferred_suffixes(
-        appimages: list[Asset], preferred_suffixes: list[str] | None
-    ) -> list[Asset]:
-        """Filter assets by preferred suffixes."""
-        if not preferred_suffixes:
-            return appimages
-
-        matched = [
-            app
-            for suffix in preferred_suffixes
-            for app in appimages
-            if suffix.lower() in app.name.lower()
-        ]
-        return matched if matched else appimages
 
     @staticmethod
     def _find_explicit_amd64(appimages: list[Asset]) -> Asset | None:
@@ -1071,63 +1036,31 @@ class ReleaseFetcher:
         self, ignore_cache: bool
     ) -> Release | None:
         """Try to fetch prerelease first, then stable as fallback."""
-        # Try prerelease
-        if not ignore_cache:
-            cached = await self._get_from_cache(cache_type="prerelease")
-            if cached:
-                # Update shared progress for cached prerelease
-                if (
-                    self.shared_api_task_id
-                    and self.progress_service
-                    and self.progress_service.is_active()
-                ):
-                    await self.api_client._update_shared_progress(
-                        f"Retrieved {self.owner}/{self.repo} (cached)"
-                    )
-                return cached
-
-        release = await self.api_client.fetch_prerelease()
+        release = await self._fetch_prerelease_with_cache(ignore_cache)
         if release:
-            # Filter for platform compatibility before caching
-            release = release.filter_for_platform()
-            await self._save_to_cache(release, cache_type="prerelease")
             return release
-
-        # Fallback to stable
         return await self._fetch_stable_with_cache(ignore_cache)
 
     async def _try_stable_then_prerelease(
         self, ignore_cache: bool
     ) -> Release | None:
         """Try to fetch stable first, then prerelease as fallback."""
-        # Try stable
         release = await self._fetch_stable_with_cache(ignore_cache)
         if release:
             return release
+        return await self._fetch_prerelease_with_cache(ignore_cache)
 
-        # Fallback to prerelease
-        if not ignore_cache:
-            cached = await self._get_from_cache(cache_type="prerelease")
-            if cached:
-                # Update shared progress for cached prerelease
-                if (
-                    self.shared_api_task_id
-                    and self.progress_service
-                    and self.progress_service.is_active()
-                ):
-                    await self.api_client._update_shared_progress(
-                        f"Retrieved {self.owner}/{self.repo} (cached)"
-                    )
-                return cached
-
-        release = await self.api_client.fetch_prerelease()
-        if release:
-            # Filter for platform compatibility before caching
-            release = release.filter_for_platform()
-            await self._save_to_cache(release, cache_type="prerelease")
-            return release
-
-        return None
+    async def _update_progress_for_cache_hit(self) -> None:
+        """Update shared progress for cached release."""
+        if (
+            not self.shared_api_task_id
+            or not self.progress_service
+            or not self.progress_service.is_active()
+        ):
+            return
+        await self.api_client._update_shared_progress(
+            f"Retrieved {self.owner}/{self.repo} (cached)"
+        )
 
     async def _fetch_stable_with_cache(
         self, ignore_cache: bool
@@ -1136,15 +1069,7 @@ class ReleaseFetcher:
         if not ignore_cache:
             cached = await self._get_from_cache(cache_type="stable")
             if cached:
-                # Update shared progress for cached stable release
-                if (
-                    self.shared_api_task_id
-                    and self.progress_service
-                    and self.progress_service.is_active()
-                ):
-                    await self.api_client._update_shared_progress(
-                        f"Retrieved {self.owner}/{self.repo} (cached)"
-                    )
+                await self._update_progress_for_cache_hit()
                 return cached
 
         release = await self.api_client.fetch_stable_release()
@@ -1152,6 +1077,23 @@ class ReleaseFetcher:
             # Filter for platform compatibility before caching
             release = release.filter_for_platform()
             await self._save_to_cache(release, cache_type="stable")
+        return release
+
+    async def _fetch_prerelease_with_cache(
+        self, ignore_cache: bool
+    ) -> Release | None:
+        """Fetch prerelease with cache support."""
+        if not ignore_cache:
+            cached = await self._get_from_cache(cache_type="prerelease")
+            if cached:
+                await self._update_progress_for_cache_hit()
+                return cached
+
+        release = await self.api_client.fetch_prerelease()
+        if release:
+            # Filter for platform compatibility before caching
+            release = release.filter_for_platform()
+            await self._save_to_cache(release, cache_type="prerelease")
         return release
 
     async def fetch_specific_release(self, tag: str) -> Release:
@@ -1252,7 +1194,7 @@ class GitHubClient:
 
     async def get_latest_release(
         self, owner: str, repo: str
-    ) -> dict[str, Any] | None:
+    ) -> Release | None:
         """Get the latest release for a repository.
 
         Args:
@@ -1260,39 +1202,16 @@ class GitHubClient:
             repo: Repository name
 
         Returns:
-            Release data dictionary or None if not found
+            Release object or None if not found
 
         """
         try:
             fetcher = ReleaseFetcher(
                 owner, repo, self.session, self.shared_api_task_id
             )
-            release = await fetcher.fetch_latest_release_or_prerelease(
+            return await fetcher.fetch_latest_release_or_prerelease(
                 prefer_prerelease=False
             )
-
-            original_tag_name = (
-                release.original_tag_name or f"v{release.version}"
-            )
-
-            return {
-                "tag_name": release.version,
-                "original_tag_name": original_tag_name,
-                "prerelease": release.prerelease,
-                "assets": [
-                    {
-                        "name": asset.name,
-                        "size": asset.size,
-                        "digest": asset.digest,
-                        "browser_download_url": asset.browser_download_url,
-                    }
-                    for asset in release.assets
-                ],
-                "html_url": (
-                    f"https://github.com/{owner}/{repo}/"
-                    f"releases/tag/{original_tag_name}"
-                ),
-            }
         except Exception as e:
             logger.error(
                 "Failed to fetch latest release for %s/%s: %s",
@@ -1304,7 +1223,7 @@ class GitHubClient:
 
     async def get_release_by_tag(
         self, owner: str, repo: str, tag: str
-    ) -> dict[str, Any] | None:
+    ) -> Release | None:
         """Get a specific release by tag.
 
         Args:
@@ -1313,31 +1232,13 @@ class GitHubClient:
             tag: Release tag
 
         Returns:
-            Release data dictionary or None if not found
+            Release object or None if not found
 
         """
         try:
             fetcher = ReleaseFetcher(
                 owner, repo, self.session, self.shared_api_task_id
             )
-            release = await fetcher.fetch_specific_release(tag)
-
-            return {
-                "tag_name": release.version,
-                "original_tag_name": tag,
-                "prerelease": release.prerelease,
-                "assets": [
-                    {
-                        "name": asset.name,
-                        "size": asset.size,
-                        "digest": asset.digest,
-                        "browser_download_url": asset.browser_download_url,
-                    }
-                    for asset in release.assets
-                ],
-                "html_url": (
-                    f"https://github.com/{owner}/{repo}/releases/tag/{tag}"
-                ),
-            }
+            return await fetcher.fetch_specific_release(tag)
         except Exception:
             return None

@@ -75,7 +75,7 @@ class VerificationService:
         repo: str,
         tag_name: str,
         app_name: str,
-        assets: list[dict[str, Any]] | None = None,
+        assets: list[Asset] | None = None,
         progress_task_id: Any | None = None,
     ) -> VerificationResult:
         """Perform comprehensive file verification.
@@ -329,7 +329,7 @@ class VerificationService:
         self,
         asset: Asset,
         config: dict[str, Any],
-        assets: list[dict[str, Any]] | None = None,
+        assets: list[Asset] | None = None,
         owner: str | None = None,
         repo: str | None = None,
         tag_name: str | None = None,
@@ -402,16 +402,9 @@ class VerificationService:
                 "(digest not explicitly enabled)"
             )
             try:
-                # Convert assets to Asset objects
-                asset_objects: list[Asset] = []
-                for asset_data in assets:
-                    asset_obj = Asset.from_api_response(asset_data)
-                    if asset_obj:
-                        asset_objects.append(asset_obj)
-
                 # Use AssetSelector to detect checksum files
                 checksum_files = AssetSelector.detect_checksum_files(
-                    asset_objects, tag_name
+                    assets, tag_name
                 )
                 logger.debug(
                     "🔍 Auto-detected %d checksum files from assets",

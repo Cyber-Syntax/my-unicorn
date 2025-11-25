@@ -5,7 +5,6 @@ This module handles updating the my-unicorn package itself by fetching
 the latest release from GitHub, cloning the repository, and running
 the installer script in update mode.
 
-TODO: Switch to stable releases only when we publish stable versions
 Currently using prereleases until stable releases are available.
 """
 

@@ -86,14 +86,14 @@ class InstallHandler:
             # Fetch latest release (already filtered for x86_64 Linux)
             owner = app_config["owner"]
             repo = app_config["repo"]
-            release_data = await self._fetch_release_for_catalog(owner, repo)
+            release = await self._fetch_release_for_catalog(owner, repo)
 
             # Select best AppImage asset from compatible options
             characteristic_suffix = app_config.get("appimage", {}).get(
                 "characteristic_suffix", []
             )
             asset = self._select_best_asset(
-                release_data,
+                release,
                 characteristic_suffix,
                 owner,
                 repo,
@@ -104,7 +104,7 @@ class InstallHandler:
             return await self._install_workflow(
                 app_name=app_name,
                 asset=asset,
-                release_data=release_data,
+                release=release,
                 app_config=app_config,
                 source="catalog",
                 **options,
@@ -165,11 +165,11 @@ class InstallHandler:
             prerelease = url_info.get("prerelease", False)
 
             # Fetch latest release (already filtered for x86_64 Linux)
-            release_data = await self._fetch_release_for_url(owner, repo)
+            release = await self._fetch_release_for_url(owner, repo)
 
             # Select best AppImage (filters unstable versions for URLs)
             asset = self._select_best_asset(
-                release_data, [], owner, repo, installation_source="url"
+                release, [], owner, repo, installation_source="url"
             )
 
             # Create minimal app config for URL installs
@@ -199,7 +199,7 @@ class InstallHandler:
             return await self._install_workflow(
                 app_name=app_name,
                 asset=asset,
-                release_data=release_data,
+                release=release,
                 app_config=app_config,
                 source="url",
                 **options,
@@ -295,7 +295,7 @@ class InstallHandler:
         self,
         app_name: str,
         asset: Asset,
-        release_data: dict[str, Any],
+        release: Release,
         app_config: dict[str, Any],
         source: str,
         **options: Any,
@@ -305,7 +305,7 @@ class InstallHandler:
         Args:
             app_name: Name of the application
             asset: GitHub asset to download
-            release_data: Release information
+            release: Release information
             app_config: App configuration
             source: Install source ("catalog" or "url")
             **options: Install options
@@ -350,7 +350,7 @@ class InstallHandler:
                     downloaded_path,
                     asset,
                     app_config,
-                    release_data,
+                    release,
                     app_name,
                     verification_task_id,
                 )
@@ -378,7 +378,7 @@ class InstallHandler:
                 app_name=app_name,
                 app_path=install_path,
                 app_config=app_config,
-                release_data=release_data,
+                release=release,
                 verify_result=verify_result,
                 icon_result=icon_result,
                 source=source,
@@ -405,7 +405,7 @@ class InstallHandler:
                 "name": app_name,
                 "path": str(install_path),
                 "source": source,
-                "version": release_data.get("tag_name", "unknown"),
+                "version": release.version,
                 "verification": verify_result,
                 "icon": icon_result,
                 "config": config_result,
@@ -428,7 +428,7 @@ class InstallHandler:
 
     async def _fetch_release_for_catalog(
         self, owner: str, repo: str
-    ) -> dict[str, Any]:
+    ) -> Release:
         """Fetch release data from GitHub for catalog app.
 
         Args:
@@ -436,7 +436,7 @@ class InstallHandler:
             repo: Repository name
 
         Returns:
-            Release data dictionary
+            Release object
 
         """
         try:
@@ -450,9 +450,7 @@ class InstallHandler:
             )
             raise
 
-    async def _fetch_release_for_url(
-        self, owner: str, repo: str
-    ) -> dict[str, Any]:
+    async def _fetch_release_for_url(self, owner: str, repo: str) -> Release:
         """Fetch release data from GitHub for URL install.
 
         Args:
@@ -460,7 +458,7 @@ class InstallHandler:
             repo: Repository name
 
         Returns:
-            Release data dictionary
+            Release object
 
         """
         # Same as catalog for now
@@ -468,7 +466,7 @@ class InstallHandler:
 
     def _select_best_asset(
         self,
-        release_data: dict[str, Any],
+        release: Release,
         characteristic_suffix: list[str],
         owner: str,
         repo: str,
@@ -477,7 +475,7 @@ class InstallHandler:
         """Select best AppImage asset from release.
 
         Args:
-            release_data: Release information
+            release: Release object
             characteristic_suffix: List of characteristic suffixes
             owner: Repository owner
             repo: Repository name
@@ -487,26 +485,8 @@ class InstallHandler:
             Selected Asset
 
         """
-        assets = release_data.get("assets", [])
-        if not assets:
+        if not release.assets:
             raise InstallationError("No assets found in release")
-
-        # Convert dict assets to Asset objects
-        asset_objects = []
-        for asset_dict in assets:
-            asset = Asset.from_api_response(asset_dict)
-            if asset:
-                asset_objects.append(asset)
-
-        # Create minimal Release object for selection
-        release = Release(
-            owner=owner,
-            repo=repo,
-            version=release_data.get("tag_name", ""),
-            prerelease=release_data.get("prerelease", False),
-            assets=asset_objects,
-            original_tag_name=release_data.get("original_tag_name", ""),
-        )
 
         # Use AssetSelector to find best AppImage
         asset = AssetSelector.select_appimage_for_platform(
@@ -518,7 +498,6 @@ class InstallHandler:
             raise InstallationError(
                 "AppImage not found in release - may still be building"
             )
-
         return asset
 
     async def _verify_appimage(
@@ -526,7 +505,7 @@ class InstallHandler:
         file_path: Path,
         asset: Asset,
         app_config: dict[str, Any],
-        release_data: dict[str, Any],
+        release: Release,
         app_name: str,
         task_id: str | None,
     ) -> dict[str, Any]:
@@ -536,7 +515,7 @@ class InstallHandler:
             file_path: Path to downloaded file
             asset: GitHub asset information
             app_config: App configuration
-            release_data: Release data
+            release: Release data
             app_name: Application name
             task_id: Progress task ID
 
@@ -557,8 +536,8 @@ class InstallHandler:
             verification_config = app_config.get("verification", {})
 
             # Get tag name from release data
-            tag_name = release_data.get("original_tag_name", "unknown")
-            assets = release_data.get("assets", [])
+            tag_name = release.original_tag_name or "unknown"
+            assets = release.assets
 
             # Perform verification
             result = await verification_service.verify_file(
@@ -706,7 +685,7 @@ class InstallHandler:
         app_name: str,
         app_path: Path,
         app_config: dict[str, Any],
-        release_data: dict[str, Any],
+        release: Release,
         verify_result: dict[str, Any] | None,
         icon_result: dict[str, Any],
         source: str,
@@ -717,7 +696,7 @@ class InstallHandler:
             app_name: Application name
             app_path: Path to installed AppImage
             app_config: App configuration template
-            release_data: Release information
+            release: Release information
             verify_result: Verification result
             icon_result: Icon extraction result
             source: Install source
@@ -757,7 +736,7 @@ class InstallHandler:
             "repo": repo,
             "installed_path": str(app_path),
             "appimage": {
-                "version": release_data.get("tag_name", "unknown"),
+                "version": release.version,
                 "name": app_path.name,
                 "rename": app_config.get("appimage", {}).get(
                     "rename", app_name
