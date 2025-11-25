@@ -31,7 +31,7 @@ def mock_config_manager():
 
 
 @pytest.fixture
-def mock_global_config():
+def global_config():
     """Fixture to mock the global configuration."""
     from pathlib import Path
 
@@ -44,7 +44,7 @@ def mock_global_config():
 
 
 @pytest.fixture
-def remove_handler(mock_config_manager, mock_global_config):
+def remove_handler(mock_config_manager, global_config):
     """Fixture to create a RemoveHandler instance with mocked dependencies."""
     return RemoveHandler(
         config_manager=mock_config_manager,
@@ -55,11 +55,11 @@ def remove_handler(mock_config_manager, mock_global_config):
 
 @pytest.mark.asyncio
 async def test_remove_single_app_success(
-    remove_handler, mock_config_manager, mock_global_config
+    remove_handler, mock_config_manager, global_config
 ):
     """Test successful removal of a single app."""
-    storage_dir = mock_global_config["directory"]["storage"]
-    icon_dir = mock_global_config["directory"]["icon"]
+    storage_dir = global_config["directory"]["storage"]
+    icon_dir = global_config["directory"]["icon"]
 
     # Mock file existence and unlink behavior
     appimage_path = storage_dir / "test_app.AppImage"
@@ -104,15 +104,18 @@ async def test_remove_single_app_success(
         mock_config_manager.remove_app_config.assert_called_once_with(
             "test_app"
         )
+        # Verify that messages were printed for icon and backups (no backup_dir configured on command fixture)
+        mock_print.assert_any_call(f"✅ Removed icon: {icon_path}")
+        mock_print.assert_any_call("ℹ️  No backup directory configured")
 
 
 @pytest.mark.asyncio
 async def test_remove_single_app_keep_config(
-    remove_handler, mock_config_manager, mock_global_config
+    remove_handler, mock_config_manager, global_config
 ):
     """Test removal of a single app while keeping its config."""
-    storage_dir = mock_global_config["directory"]["storage"]
-    icon_dir = mock_global_config["directory"]["icon"]
+    storage_dir = global_config["directory"]["storage"]
+    icon_dir = global_config["directory"]["icon"]
 
     # Mock file existence and unlink behavior
     appimage_path = storage_dir / "test_app.AppImage"
@@ -142,15 +145,18 @@ async def test_remove_single_app_keep_config(
 
         # Verify config is not removed
         mock_config_manager.remove_app_config.assert_not_called()
+        # Verify printed messages for icon/backups (no backup_dir configured on command fixture)
+        mock_print.assert_any_call(f"✅ Removed icon: {icon_path}")
+        mock_print.assert_any_call("ℹ️  No backup directory configured")
 
 
 @pytest.mark.asyncio
 async def test_remove_icon_always_attempted(
-    remove_handler, mock_config_manager, mock_global_config
+    remove_handler, mock_config_manager, global_config
 ):
     """Test that icon is always attempted to be removed if icon config is present."""
-    storage_dir = mock_global_config["directory"]["storage"]
-    icon_dir = mock_global_config["directory"]["icon"]
+    storage_dir = global_config["directory"]["storage"]
+    icon_dir = global_config["directory"]["icon"]
 
     appimage_path = storage_dir / "test_app.AppImage"
     clean_appimage_path = storage_dir / "test_app.appimage"
@@ -201,11 +207,11 @@ async def test_remove_missing_app(remove_handler, mock_config_manager):
 
 @pytest.mark.asyncio
 async def test_remove_app_with_desktop_entry_error(
-    remove_handler, mock_config_manager, mock_global_config
+    remove_handler, mock_config_manager, global_config
 ):
     """Test removal of an app with a desktop entry removal error."""
-    storage_dir = mock_global_config["directory"]["storage"]
-    icon_dir = mock_global_config["directory"]["icon"]
+    storage_dir = global_config["directory"]["storage"]
+    icon_dir = global_config["directory"]["icon"]
 
     # Mock file existence and unlink behavior
     appimage_path = storage_dir / "test_app.AppImage"
