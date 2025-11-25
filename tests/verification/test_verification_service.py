@@ -119,42 +119,42 @@ class TestVerificationService:
     def sample_assets(self):
         """Sample GitHub assets for testing."""
         return [
-            {
-                "name": "Legcord-1.1.5-linux-x86_64.AppImage",
-                "browser_download_url": "https://github.com/Legcord/Legcord/releases/download/v1.1.5/Legcord-1.1.5-linux-x86_64.AppImage",
-                "size": 124457255,
-                "digest": "",
-            },
-            {
-                "name": "latest-linux.yml",
-                "browser_download_url": "https://github.com/Legcord/Legcord/releases/download/v1.1.5/latest-linux.yml",
-                "size": 1234,
-                "digest": "",
-            },
+            Asset(
+                name="Legcord-1.1.5-linux-x86_64.AppImage",
+                browser_download_url="https://github.com/Legcord/Legcord/releases/download/v1.1.5/Legcord-1.1.5-linux-x86_64.AppImage",
+                size=124457255,
+                digest=None,
+            ),
+            Asset(
+                name="latest-linux.yml",
+                browser_download_url="https://github.com/Legcord/Legcord/releases/download/v1.1.5/latest-linux.yml",
+                size=1234,
+                digest=None,
+            ),
         ]
 
     @pytest.fixture
     def sample_assets_with_both(self):
         """Sample GitHub assets with both YAML and traditional checksum files."""
         return [
-            {
-                "name": "app.AppImage",
-                "browser_download_url": "https://github.com/test/test/releases/download/v1.0.0/app.AppImage",
-                "size": 12345,
-                "digest": "",
-            },
-            {
-                "name": "latest-linux.yml",
-                "browser_download_url": "https://github.com/test/test/releases/download/v1.0.0/latest-linux.yml",
-                "size": 1234,
-                "digest": "",
-            },
-            {
-                "name": "SHA256SUMS.txt",
-                "browser_download_url": "https://github.com/test/test/releases/download/v1.0.0/SHA256SUMS.txt",
-                "size": 567,
-                "digest": "",
-            },
+            Asset(
+                name="app.AppImage",
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/app.AppImage",
+                size=12345,
+                digest=None,
+            ),
+            Asset(
+                name="latest-linux.yml",
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/latest-linux.yml",
+                size=1234,
+                digest=None,
+            ),
+            Asset(
+                name="SHA256SUMS.txt",
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/SHA256SUMS.txt",
+                size=567,
+                digest=None,
+            ),
         ]
 
     @pytest.fixture

@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from my_unicorn.github_client import Asset, Release
 from my_unicorn.install import InstallHandler
 
 
@@ -48,54 +49,51 @@ class TestMissingAppImageInstall:
         )
 
     @pytest.fixture
-    def mock_release_without_appimage(self) -> dict:
+    def mock_release_without_appimage(self) -> Release:
         """Create mock release data without AppImage assets.
 
         Based on AppFlowy 0.10.2 release that was published but
         AppImages were still building.
         """
-        return {
-            "url": "https://api.github.com/repos/AppFlowy-IO/AppFlowy/releases/256916097",
-            "id": 256916097,
-            "tag_name": "0.10.2",
-            "name": "v0.10.2",
-            "draft": False,
-            "prerelease": False,
-            "created_at": "2025-09-12T08:21:32Z",
-            "updated_at": "2025-10-24T07:49:54Z",
-            "published_at": "2025-10-24T07:49:54Z",
-            "assets": [],  # No assets yet - builds still in progress!
-            "tarball_url": "https://api.github.com/repos/AppFlowy-IO/AppFlowy/tarball/0.10.2",
-            "zipball_url": "https://api.github.com/repos/AppFlowy-IO/AppFlowy/zipball/0.10.2",
-            "body": "Release notes",
-        }
+        return Release(
+            owner="AppFlowy-IO",
+            repo="AppFlowy",
+            version="0.10.2",
+            prerelease=False,
+            assets=[],  # No assets yet - builds still in progress!
+            original_tag_name="0.10.2",
+        )
 
     @pytest.fixture
-    def mock_release_with_non_appimage_assets(self) -> dict:
+    def mock_release_with_non_appimage_assets(self) -> Release:
         """Create mock release with assets but no AppImage files."""
-        return {
-            "tag_name": "0.10.2",
-            "published_at": "2025-10-24T07:49:54Z",
-            "assets": [
-                {
-                    "name": "checksums.txt",
-                    "size": 1024,
-                    "browser_download_url": "https://example.com/checksums.txt",
-                    "content_type": "text/plain",
-                },
-                {
-                    "name": "release-notes.md",
-                    "size": 2048,
-                    "browser_download_url": "https://example.com/notes.md",
-                },
+        return Release(
+            owner="test",
+            repo="test",
+            version="0.10.2",
+            prerelease=False,
+            assets=[
+                Asset(
+                    name="checksums.txt",
+                    size=1024,
+                    browser_download_url="https://example.com/checksums.txt",
+                    digest=None,
+                ),
+                Asset(
+                    name="release-notes.md",
+                    size=2048,
+                    browser_download_url="https://example.com/notes.md",
+                    digest=None,
+                ),
             ],
-        }
+            original_tag_name="0.10.2",
+        )
 
     @pytest.mark.asyncio
     async def test_install_with_empty_assets_list(
         self,
         install_handler: InstallHandler,
-        mock_release_without_appimage: dict,
+        mock_release_without_appimage: Release,
     ) -> None:
         """Test install fails gracefully when release has no assets.
 
@@ -105,7 +103,7 @@ class TestMissingAppImageInstall:
         with (
             patch.object(
                 install_handler,
-                "_fetch_release_for_catalog",
+                "_fetch_release",
                 return_value=mock_release_without_appimage,
             ),
         ):
@@ -138,7 +136,7 @@ class TestMissingAppImageInstall:
         with (
             patch.object(
                 install_handler,
-                "_fetch_release_for_catalog",
+                "_fetch_release",
                 return_value=mock_release_with_non_appimage_assets,
             ),
         ):
@@ -212,45 +210,56 @@ class TestMissingAppImageInstall:
         )
 
         # Mock fetch_release to return different scenarios
-        async def fetch_release_side_effect(owner: str, repo: str) -> dict:
+        async def fetch_release_side_effect(owner: str, repo: str) -> Release:
             if repo == "repo1":
                 # Has AppImage
-                return {
-                    "tag_name": "v1.0.0",
-                    "published_at": "2025-10-24T07:00:00Z",
-                    "assets": [
-                        {
-                            "name": "app1-x86_64.AppImage",
-                            "size": 100000000,
-                            "browser_download_url": "https://example.com/app1.AppImage",
-                        }
+                return Release(
+                    owner=owner,
+                    repo=repo,
+                    version="v1.0.0",
+                    prerelease=False,
+                    assets=[
+                        Asset(
+                            name="app1-x86_64.AppImage",
+                            size=100000000,
+                            browser_download_url="https://example.com/app1.AppImage",
+                            digest=None,
+                        )
                     ],
-                }
+                    original_tag_name="v1.0.0",
+                )
             elif repo == "repo2":
                 # No assets yet - still building
-                return {
-                    "tag_name": "v2.0.0",
-                    "published_at": "2025-10-24T07:49:54Z",
-                    "assets": [],
-                }
+                return Release(
+                    owner=owner,
+                    repo=repo,
+                    version="v2.0.0",
+                    prerelease=False,
+                    assets=[],
+                    original_tag_name="v2.0.0",
+                )
             else:  # repo3
                 # Has non-AppImage assets only
-                return {
-                    "tag_name": "v3.0.0",
-                    "published_at": "2025-10-24T07:45:00Z",
-                    "assets": [
-                        {
-                            "name": "checksums.txt",
-                            "size": 1024,
-                            "browser_download_url": "https://example.com/checksums.txt",
-                        }
+                return Release(
+                    owner=owner,
+                    repo=repo,
+                    version="v3.0.0",
+                    prerelease=False,
+                    assets=[
+                        Asset(
+                            name="checksums.txt",
+                            size=1024,
+                            browser_download_url="https://example.com/checksums.txt",
+                            digest=None,
+                        )
                     ],
-                }
+                    original_tag_name="v3.0.0",
+                )
 
         with (
             patch.object(
                 install_handler,
-                "_fetch_release_for_catalog",
+                "_fetch_release",
                 side_effect=fetch_release_side_effect,
             ),
             patch.object(
@@ -323,12 +332,15 @@ class TestMissingAppImageInstall:
         with (
             patch.object(
                 install_handler,
-                "_fetch_release_for_catalog",
-                return_value={
-                    "tag_name": "0.10.2",
-                    "published_at": "2025-10-24T07:49:54Z",
-                    "assets": [],
-                },
+                "_fetch_release",
+                return_value=Release(
+                    owner="AppFlowy-IO",
+                    repo="AppFlowy",
+                    version="0.10.2",
+                    prerelease=False,
+                    assets=[],
+                    original_tag_name="0.10.2",
+                ),
             ),
         ):
             result = await install_handler.install_from_catalog(
