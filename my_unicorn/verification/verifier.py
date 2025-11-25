@@ -520,6 +520,31 @@ class Verifier:
         lines = content.strip().split("\n")
         logger.debug("   Total lines: %d", len(lines))
 
+        # Pre-compute relaxed variants for target filename to allow
+        # matching checksum files that omit build tokens (e.g. "-1").
+        def _generate_variants(name: str) -> set[str]:
+            variants = {name}
+            # Remove numeric build tokens like '-1' that appear before
+            # an architecture or before the extension, e.g.
+            # 'KeePassXC-2.7.11-1-x86_64.AppImage' ->
+            # 'KeePassXC-2.7.11-x86_64.AppImage'
+            import re
+
+            # pattern: hyphen + digits that are followed by -arch or .AppImage
+            variants.update(
+                re.sub(r"-\d+(?=-[a-z0-9_]+\.AppImage$)", "", name)
+                for _ in (0,)  # single expression to use re.sub
+            )
+            # Also try removing any '-<number>' before the extension
+            variants.add(re.sub(r"-\d+(?=\.AppImage$)", "", name))
+            # Try removing build tokens anywhere (conservative)
+            variants.add(re.sub(r"-\d+", "", name))
+
+            # Strip duplicates and empty
+            return {v for v in variants if v}
+
+        target_variants = _generate_variants(filename)
+
         for line_num, raw_line in enumerate(lines, 1):
             line = raw_line.strip()
             if not line or line.startswith("#"):
@@ -544,6 +569,18 @@ class Verifier:
                 f"/{filename}"
             ):
                 logger.debug("   ✅ Match found on line %d", line_num)
+                logger.debug("   Hash: %s", hash_value)
+                return hash_value
+
+            # Relaxed matching: compare generated filename variants
+            file_variants = _generate_variants(file_in_checksum)
+            # If any variant intersects, treat as a match
+            if target_variants.intersection(file_variants):
+                logger.debug(
+                    "   ⚠️ Relaxed match found on line %d (variants): %s",
+                    line_num,
+                    file_in_checksum,
+                )
                 logger.debug("   Hash: %s", hash_value)
                 return hash_value
 

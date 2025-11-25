@@ -372,19 +372,42 @@ class VerificationService:
         checksum_files = []
 
         if manual_checksum_file and manual_checksum_file.strip():
-            # Use manually configured checksum file
+            # Use manually configured checksum file. Support simple
+            # templating to avoid hard-coding old release filenames.
+            # Supported placeholders: {version}, {tag}, {asset_name}
+            resolved_name = manual_checksum_file
+            try:
+                if "{" in manual_checksum_file and tag_name:
+                    # Replace common placeholders safely
+                    resolved_name = manual_checksum_file.replace(
+                        "{version}", tag_name
+                    ).replace("{tag}", tag_name)
+                # asset name may be useful for templates
+                if (
+                    "{asset_name}" in resolved_name
+                    and asset
+                    and hasattr(asset, "name")
+                ):
+                    resolved_name = resolved_name.replace(
+                        "{asset_name}", asset.name
+                    )
+            except Exception:
+                # Fallback to literal value if formatting fails
+                resolved_name = manual_checksum_file
+
+            # Build URL from resolved filename
             if owner and repo and tag_name:
                 url = self._build_checksum_url(
-                    owner, repo, tag_name, manual_checksum_file
+                    owner, repo, tag_name, resolved_name
                 )
                 format_type = (
                     "yaml"
-                    if manual_checksum_file.lower().endswith((".yml", ".yaml"))
+                    if resolved_name.lower().endswith((".yml", ".yaml"))
                     else "traditional"
                 )
                 checksum_files.append(
                     ChecksumFileInfo(
-                        filename=manual_checksum_file,
+                        filename=resolved_name,
                         url=url,
                         format_type=format_type,
                     )
