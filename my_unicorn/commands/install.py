@@ -12,6 +12,8 @@ import aiohttp
 
 from my_unicorn.download import DownloadService
 from my_unicorn.file_ops import FileOperations
+from my_unicorn.install import InstallHandler
+from my_unicorn.utils.install_display import print_install_summary
 
 from ..exceptions import ValidationError
 from ..github_client import GitHubClient
@@ -112,9 +114,6 @@ class InstallCommand:
 
         logger.info("🚀 Starting installation of %d target(s)", len(targets))
 
-        # Separate targets into URLs and catalog apps
-        url_targets, catalog_targets = self._separate_targets(targets)
-
         # Prepare options with defaults
         install_options = {
             "show_progress": options.get("show_progress", True),
@@ -123,17 +122,26 @@ class InstallCommand:
             **options,
         }
 
+        # Ensure download service is configured for handler initialization
+        show_progress = bool(install_options["show_progress"])
+        self._initialize_services_with_progress(show_progress)
+
+        # Separate targets into URLs and catalog apps using the handler
+        url_targets, catalog_targets = self._separate_targets(targets)
+
         # Initialize services with progress configuration
         show_progress = bool(install_options["show_progress"])
         self._initialize_services_with_progress(show_progress)
 
         # Check which apps actually need work before starting progress
+        # `InstallHandler` is imported at module top-level
+
         (
             urls_needing_work,
             catalog_needing_work,
             already_installed,
-        ) = await self._check_apps_needing_work(
-            url_targets, catalog_targets, install_options
+        ) = await InstallHandler._check_apps_needing_work_impl(
+            self.catalog_manager, url_targets, catalog_targets, install_options
         )
 
         # Handle case where all apps are already installed
@@ -247,50 +255,12 @@ class InstallCommand:
             Tuple of (urls_needing_work, catalog_needing_work, already_installed)
 
         """
-        urls_needing_work = []
-        catalog_needing_work = []
-        already_installed = []
+        # Delegate to static helper (avoids requiring a full InstallHandler)
+        # `InstallHandler` is imported at module top-level
 
-        # For URLs, we currently don't have a way to check if they're installed
-        # So we assume all URLs need work
-        urls_needing_work = url_targets.copy()
-
-        # For catalog apps, check if they're already installed
-        for app_name in catalog_targets:
-            try:
-                # Get app config from catalog
-                app_config = self.catalog_manager.get_app_config(app_name)
-                if not app_config:
-                    catalog_needing_work.append(app_name)
-                    continue
-
-                # Check if app is already installed (unless force is specified)
-                if not install_options.get("force", False):
-                    installed_config = (
-                        self.catalog_manager.get_installed_app_config(app_name)
-                    )
-                    if installed_config:
-                        # Check if the installed app file still exists
-                        installed_path = Path(
-                            installed_config.get("installed_path", "")
-                        )
-                        if installed_path.exists():
-                            already_installed.append(app_name)
-                            continue
-
-                # App needs installation
-                catalog_needing_work.append(app_name)
-
-            except Exception as e:
-                logger.debug(
-                    "Error checking installation status for %s: %s",
-                    app_name,
-                    e,
-                )
-                # On error, assume it needs installation
-                catalog_needing_work.append(app_name)
-
-        return urls_needing_work, catalog_needing_work, already_installed
+        return await InstallHandler._check_apps_needing_work_impl(
+            self.catalog_manager, url_targets, catalog_targets, install_options
+        )
 
     async def _execute_installations(
         self,
@@ -312,7 +282,7 @@ class InstallCommand:
         # Create install service if not already created
         if self.install_service is None:
             from my_unicorn.icon import IconHandler
-            from my_unicorn.install import InstallHandler
+            # `InstallHandler` is imported at module top-level
 
             self.install_service = InstallHandler(
                 download_service=self.download_service,
@@ -350,93 +320,20 @@ class InstallCommand:
             ValidationError: If targets are invalid
 
         """
-        url_targets = []
-        catalog_targets = []
-        unknown_targets = []
+        # Delegate to static helper for separation; don't require a full
+        # InstallHandler instance to perform the operation.
+        from my_unicorn.install import InstallHandler
 
-        available_apps = self.catalog_manager.get_available_apps()
-
-        for target in targets:
-            if target.startswith("https://github.com/"):
-                url_targets.append(target)
-            elif target in available_apps:
-                catalog_targets.append(target)
-            else:
-                unknown_targets.append(target)
-
-        if unknown_targets:
-            unknown_list = ", ".join(unknown_targets)
-            raise ValidationError(
-                f"Unknown applications or invalid URLs: {unknown_list}. "
-                f"Use 'my-unicorn list' to see available apps."
+        try:
+            return InstallHandler._separate_targets_impl(
+                self.catalog_manager, targets
             )
+        except Exception as e:
+            # Convert to ValidationError for compatibility with tests/CLI behavior
+            raise ValidationError(str(e)) from e
 
-        return url_targets, catalog_targets
-
-    def _print_installation_summary(
-        self, results: list[dict[str, Any]]
-    ) -> None:
-        """Print installation summary with detailed error reasons.
-
-        Args:
-            results: List of installation results
-
-        """
-        if not results:
-            print("No installations completed")
-            return
-
-        # Categorize results
-        already_installed = [
-            r for r in results if r.get("status") == "already_installed"
-        ]
-        newly_installed = [
-            r
-            for r in results
-            if r.get("success", False)
-            and r.get("status") != "already_installed"
-        ]
-        failed = [r for r in results if not r.get("success", False)]
-
-        total = len(results)
-
-        # Handle the case where all apps are already installed
-        if len(already_installed) == total:
-            print(f"✅ All {total} specified app(s) are already installed:")
-            for result in already_installed:
-                print(f"   • {result.get('name', 'Unknown')}")
-            return
-
-        # Print summary header
-        print("\n📦 Installation Summary:")
-        print("-" * 50)
-
-        # Print detailed results with context-aware error messages
-        for result in results:
-            app_name = result.get("name", "Unknown")
-            if result.get("success", False):
-                if result.get("status") == "already_installed":
-                    print(f"{app_name:<25} ℹ️  Already installed")
-                else:
-                    version = result.get("version", "")
-                    if version:
-                        print(f"{app_name:<25} ✅ {version}")
-                    else:
-                        print(f"{app_name:<25} ✅ Installed")
-            else:
-                print(f"{app_name:<25} ❌ Installation failed")
-                # Display error reason if available
-                error = result.get("error", "Unknown error")
-                print(f"{'':>25}    → {error}")
-
-        # Print summary stats
-        print()
-        if newly_installed:
-            print(f"🎉 Successfully installed {len(newly_installed)} app(s)")
-        if already_installed:
-            print(f"ℹ️  {len(already_installed)} app(s) already installed")
-        if failed:
-            print(f"❌ {len(failed)} app(s) failed to install")
+    # Removed `_print_installation_summary` wrapper — use the module-level
+    # `print_install_summary` directly to keep the class minimal.
 
 
 class InstallCommandHandler(BaseCommandHandler):
@@ -524,7 +421,7 @@ class InstallCommandHandler(BaseCommandHandler):
                 results = await install_command.execute(targets, **options)
 
                 # Print installation summary AFTER progress completes
-                install_command._print_installation_summary(results)
+                print_install_summary(results)
 
                 # Check results and log appropriate messages
                 if not results:

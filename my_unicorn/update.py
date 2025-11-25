@@ -651,12 +651,12 @@ class UpdateManager:
         )
         progress_enabled = progress_service.is_active()
 
+        # Ensure these are defined prior to operations to avoid
+        # referencing them in exception handlers where they may
+        # otherwise be undefined.
+        verification_task_id = None
+        installation_task_id = None
         try:
-            # Create installation workflow tasks (verification + installation)
-            # after download completes, similar to install command for consistent UX.
-            # This ensures the Installing section only appears after downloads finish.
-            verification_task_id = None
-            installation_task_id = None
             if progress_enabled:
                 (
                     verification_task_id,

@@ -214,6 +214,104 @@ class TestInstallHandler:
                 assert result["source"] == "url"
                 assert "path" in result
 
+            @pytest.mark.asyncio
+            async def test_install_download_failure_does_not_raise_unboundlocal(
+                self, install_service, mock_services
+            ):
+                """Ensure download failure is handled and doesn't raise
+                UnboundLocalError referring to installation_task_id.
+                """
+                # Simulate async download raising an exception
+                mock_services[
+                    "download_service"
+                ].download_appimage = AsyncMock(
+                    side_effect=Exception("download failed")
+                )
+
+                with patch(
+                    "my_unicorn.install.VerificationService"
+                ) as mock_verification:
+                    mock_verification.return_value.verify_file = AsyncMock(
+                        return_value=Mock(
+                            passed=True, methods={}, updated_config={}
+                        )
+                    )
+
+                    res = await install_service.install_from_catalog(
+                        "test-app"
+                    )
+                    assert res["success"] is False
+                    assert (
+                        "download" in res.get("error", "").lower()
+                        or "failed" in res.get("error", "").lower()
+                    )
+
+    def test_separate_targets(self, install_service, mock_services):
+        """Test that separate_targets splits URLs and catalog names and
+        rejects unknown entries.
+        """
+        # Set catalog listing
+        mock_services["catalog_manager"].get_available_apps.return_value = {
+            "app1": {},
+            "app2": {},
+        }
+
+        url_targets, catalog_targets = install_service.separate_targets(
+            ["app1", "https://github.com/foo/bar"]
+        )
+        assert url_targets == ["https://github.com/foo/bar"]
+        assert catalog_targets == ["app1"]
+
+        # Unknown target should raise InstallationError
+        from my_unicorn.exceptions import InstallationError
+
+        with pytest.raises(InstallationError):
+            install_service.separate_targets(["missing-app"])
+
+    @pytest.mark.asyncio
+    async def test_check_apps_needing_work(
+        self, tmp_path, install_service, mock_services
+    ):
+        """Check logic for already-installed vs needing work."""
+        # Provide a catalog app with installed config that points to a real file
+        # Create a dummy installed file
+        installed_file = tmp_path / "app-installed.AppImage"
+        installed_file.write_text("x")
+
+        # Configure catalog manager responses
+        mock_services["catalog_manager"].get_app_config.return_value = {
+            "owner": "test-owner",
+            "repo": "test-repo",
+        }
+        mock_services[
+            "catalog_manager"
+        ].get_installed_app_config.return_value = {
+            "installed_path": str(installed_file),
+        }
+
+        (
+            urls_needing,
+            catalog_needing,
+            already,
+        ) = await install_service.check_apps_needing_work(
+            ["https://github.com/owner/repo"], ["app1"], {"force": False}
+        )
+
+        assert urls_needing == ["https://github.com/owner/repo"]
+        assert catalog_needing == []
+        assert already == ["app1"]
+
+        # If force=True, then even existing installs should be reinstalled
+        (
+            urls_needing,
+            catalog_needing,
+            already,
+        ) = await install_service.check_apps_needing_work(
+            [], ["app1"], {"force": True}
+        )
+        assert catalog_needing == ["app1"]
+        assert already == []
+
 
 def make_handler_with_storage(install_dir: Path) -> InstallHandler:
     """Create an InstallHandler using real FileOperations."""

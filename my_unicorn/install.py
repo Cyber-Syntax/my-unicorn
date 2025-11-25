@@ -291,6 +291,117 @@ class InstallHandler:
 
         return await asyncio.gather(*tasks)
 
+    @staticmethod
+    def _separate_targets_impl(
+        catalog_manager: Any, targets: list[str]
+    ) -> tuple[list[str], list[str]]:
+        """Separate targets into URL and catalog targets.
+
+        This is a helper on the service so CLI code can reuse the
+        same logic easily (and tests can target the behavior).
+
+        Args:
+            targets: List of mixed targets (URLs or catalog names)
+
+        Returns:
+            (url_targets, catalog_targets)
+
+        Raises:
+            InstallationError: If unknown targets are present
+
+        """
+        from my_unicorn.exceptions import InstallationError
+
+        url_targets: list[str] = []
+        catalog_targets: list[str] = []
+        unknown_targets: list[str] = []
+
+        available_apps = catalog_manager.get_available_apps()
+
+        for target in targets:
+            if target.startswith("https://github.com/"):
+                url_targets.append(target)
+            elif target in available_apps:
+                catalog_targets.append(target)
+            else:
+                unknown_targets.append(target)
+
+        if unknown_targets:
+            unknown_list = ", ".join(unknown_targets)
+            raise InstallationError(
+                f"Unknown applications or invalid URLs: {unknown_list}. Use 'my-unicorn list' to see available apps."
+            )
+
+        return url_targets, catalog_targets
+
+    # Backwards compatible instance wrapper
+    def separate_targets(
+        self, targets: list[str]
+    ) -> tuple[list[str], list[str]]:
+        return InstallHandler._separate_targets_impl(
+            self.catalog_manager, targets
+        )
+
+    @staticmethod
+    async def _check_apps_needing_work_impl(
+        catalog_manager: Any,
+        url_targets: list[str],
+        catalog_targets: list[str],
+        install_options: dict[str, Any],
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Check which apps actually need installation work.
+
+        Args:
+            url_targets: List of URL targets
+            catalog_targets: List of catalog targets
+            install_options: Installation options
+
+        Returns:
+            (urls_needing_work, catalog_needing_work, already_installed)
+
+        """
+        # Default behavior: all URLs need work
+        urls_needing_work: list[str] = list(url_targets)
+        catalog_needing_work: list[str] = []
+        already_installed: list[str] = []
+
+        for app_name in catalog_targets:
+            try:
+                app_config = catalog_manager.get_app_config(app_name)
+                if not app_config:
+                    catalog_needing_work.append(app_name)
+                    continue
+
+                if not install_options.get("force", False):
+                    installed_config = (
+                        catalog_manager.get_installed_app_config(app_name)
+                    )
+                    if installed_config:
+                        installed_path = Path(
+                            installed_config.get("installed_path", "")
+                        )
+                        if installed_path.exists():
+                            already_installed.append(app_name)
+                            continue
+
+                catalog_needing_work.append(app_name)
+            except Exception:
+                # If we can't determine the status, assume it needs work
+                catalog_needing_work.append(app_name)
+
+        return urls_needing_work, catalog_needing_work, already_installed
+
+    # Backwards compatible instance wrapper
+    async def check_apps_needing_work(
+        self,
+        url_targets: list[str],
+        catalog_targets: list[str],
+        install_options: dict[str, Any],
+    ) -> tuple[list[str], list[str], list[str]]:
+        return await InstallHandler._check_apps_needing_work_impl(
+            self.catalog_manager, url_targets, catalog_targets, install_options
+        )
+
     async def _install_workflow(
         self,
         app_name: str,
@@ -319,6 +430,11 @@ class InstallHandler:
         show_progress = options.get("show_progress", True)
         download_dir = options.get("download_dir", Path.cwd())
 
+        # Ensure task ids are always defined even if an early exception is
+        # raised (such as during download). This prevents UnboundLocalError
+        # in the exception handler that attempts to finish progress tasks.
+        verification_task_id = None
+        installation_task_id = None
         try:
             # 1. Download
             download_path = download_dir / asset.name
@@ -326,11 +442,6 @@ class InstallHandler:
             downloaded_path = await self.download_service.download_appimage(
                 asset, download_path, show_progress=show_progress
             )
-
-            # Create multi-phase progress tasks (verification + installation)
-            # after download completes
-            verification_task_id = None
-            installation_task_id = None
             progress_service = getattr(
                 self.download_service, "progress_service", None
             )
