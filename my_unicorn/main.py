@@ -1,7 +1,8 @@
 """Main CLI entry point for my-unicorn AppImage installer.
 
-This module provides the minimal entry point for the command-line interface,
-delegating all functionality to specialized command handlers and CLI components.
+This module provides the minimal entry point for the command-line
+interface, delegating all functionality to specialized command
+handlers and CLI components.
 """
 
 import sys
@@ -12,13 +13,26 @@ from .cli import CLIRunner
 
 
 async def async_main() -> None:
-    """Async main function for CLI execution."""
+    """Run the CLI asynchronously.
+
+    Initialize the CLI runner and execute the main command loop
+    asynchronously.
+    """
     runner = CLIRunner()
     await runner.run()
 
 
 def main() -> None:
-    """Main entry point for the CLI application."""
+    """Run the CLI application.
+
+    Install uvloop for improved async performance and run the CLI
+    asynchronously.
+
+    Raises:
+        KeyboardInterrupt: If the user cancels the operation.
+        Exception: For any unexpected errors during execution.
+
+    """
     try:
         # Use uvloop for better async performance
         uvloop.install()
