@@ -4,6 +4,9 @@ This module provides helper functions for formatting data and rendering
 ASCII-based progress bars without external UI dependencies.
 """
 
+# Standard library imports
+from collections import deque
+
 # Constants for byte conversions
 KIB = 1024
 MIB = 1024 * 1024
@@ -174,3 +177,57 @@ def pad_left(text: str, width: int) -> str:
 
     """
     return text.rjust(width)
+
+
+def calculate_speed(
+    prev_completed: float,
+    prev_time: float,
+    speed_history: deque | None,
+    completed: float,
+    current_time: float,
+    max_history: int = 10,
+) -> tuple[float, deque | None]:
+    """Calculate download speed (bytes/sec) using a moving-average history.
+
+    This is a pure helper: it does not modify the caller's deque in-place
+    but returns an updated history. Callers may choose to persist the
+    returned deque.
+
+    Args:
+        prev_completed: Previously recorded completed bytes
+        prev_time: Previously recorded timestamp (seconds)
+        speed_history: Optional deque of (timestamp, speed_bps) entries
+        completed: Current completed bytes
+        current_time: Current timestamp (seconds)
+        max_history: Maximum history length (used when creating a new deque)
+
+    Returns:
+        Tuple of (average_speed_bps, updated_history_deque_or_none)
+
+    """
+    # Quick guards: need positive time delta and positive progress delta
+    time_delta = current_time - prev_time
+    bytes_delta = completed - prev_completed
+
+    if time_delta <= 0 or bytes_delta <= 0:
+        # Nothing new to calculate; return zero and unchanged history
+        return 0.0, speed_history
+
+    raw_speed = bytes_delta / time_delta
+
+    # Prepare history deque (do not mutate caller's deque)
+    if speed_history is None:
+        new_hist = deque(maxlen=max_history)
+    else:
+        # copy to avoid mutating the caller's structure
+        new_hist = deque(speed_history, maxlen=max_history)
+
+    new_hist.append((current_time, raw_speed))
+
+    # Compute average over available speeds
+    speeds = [s for _, s in new_hist]
+    if speeds:
+        avg = sum(speeds) / len(speeds)
+        return avg, new_hist
+
+    return raw_speed, new_hist
