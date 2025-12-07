@@ -299,9 +299,9 @@ class TestVerificationService:
                 mock_verifier, "sha256:abc123", "testapp", False
             )
 
-            assert result["passed"] is True
-            assert result["hash"] == "sha256:abc123"
-            assert "GitHub API digest verification" in result["details"]
+            assert result.passed is True
+            assert result.hash == "sha256:abc123"
+            assert "GitHub API digest verification" in result.details
 
     @pytest.mark.asyncio
     async def test_verify_digest_failure(self, verification_service):
@@ -319,9 +319,9 @@ class TestVerificationService:
                 mock_verifier, "sha256:abc123", "testapp", False
             )
 
-            assert result["passed"] is False
-            assert result["hash"] == "sha256:abc123"
-            assert "Hash mismatch" in result["details"]
+            assert result.passed is False
+            assert result.hash == "sha256:abc123"
+            assert "Hash mismatch" in result.details
 
     @pytest.mark.asyncio
     async def test_verify_yaml_checksum_file(
@@ -355,9 +355,9 @@ class TestVerificationService:
                 "testapp",
             )
 
-            assert result["passed"] is True
-            assert "sha512:" in result["hash"]
-            assert "yaml checksum file" in result["details"]
+            assert result.passed is True
+            assert "sha512:" in result.hash
+            assert "yaml checksum file" in result.details
             mock_download_service.download_checksum_file.assert_called_once_with(
                 checksum_file.url
             )
@@ -399,9 +399,9 @@ class TestVerificationService:
                 "testapp",
             )
 
-            assert result["passed"] is True
-            assert result["hash"] == f"sha256:{expected_hash}"
-            assert "traditional checksum file" in result["details"]
+            assert result.passed is True
+            assert result.hash == f"sha256:{expected_hash}"
+            assert "traditional checksum file" in result.details
 
     @pytest.mark.asyncio
     async def test_verify_checksum_file_hash_mismatch(
@@ -435,8 +435,8 @@ class TestVerificationService:
                 "testapp",
             )
 
-            assert result["passed"] is False
-            assert result["details"]  # Just check it has details
+            assert result.passed is False
+            assert result.details  # Just check it has details
 
     @pytest.mark.asyncio
     async def test_verify_checksum_file_not_found(
@@ -467,8 +467,8 @@ class TestVerificationService:
                 "testapp",
             )
 
-            assert result["passed"] is False
-            assert result["details"]  # Just check it has details
+            assert result.passed is False
+            assert result.details  # Just check it has details
 
     @pytest.mark.asyncio
     async def test_verify_file_digest_priority(

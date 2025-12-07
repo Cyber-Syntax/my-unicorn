@@ -369,10 +369,65 @@ class Verifier:
 
         return False
 
+    def _try_hash_from_dict(self, data: dict, context: str = "") -> str | None:
+        """Extract hash from dict trying preferred algorithms in order.
+
+        Handles both direct hash values and nested hash dicts, converting
+        base64 to hex when needed.
+
+        Args:
+            data: Dictionary containing hash key-value pairs
+            context: Optional context string for logging
+
+        Returns:
+            Hex hash string or None if not found
+
+        """
+        for algo in HASH_PREFERENCE_ORDER:
+            if algo in data:
+                hash_value = data[algo]
+                if context:
+                    logger.debug("   Found %s hash %s", algo, context)
+                return self._normalize_hash_value(hash_value)
+
+        # Fallback: return first available hash if any
+        if data:
+            first_hash = next(iter(data.values()), None)
+            if first_hash:
+                return self._normalize_hash_value(first_hash)
+
+        return None
+
+    def _normalize_hash_value(self, hash_value: str) -> str:
+        """Normalize hash value by removing prefix and converting base64.
+
+        Args:
+            hash_value: Raw hash value (may be prefixed or base64)
+
+        Returns:
+            Normalized hex hash string
+
+        """
+        if not isinstance(hash_value, str):
+            return str(hash_value)
+
+        # Remove algorithm prefix if present (e.g., "sha256:hash")
+        if ":" in hash_value:
+            _, _, hash_value = hash_value.partition(":")
+
+        # Convert base64 to hex if needed
+        try:
+            return self._convert_base64_to_hex(hash_value)
+        except ValueError:
+            # If conversion fails, assume it's already hex
+            return hash_value
+
     def _parse_yaml_checksum_file(
         self, content: str, filename: str
     ) -> str | None:
         """Parse YAML format checksum file.
+
+        Delegates to specialized parsers based on YAML structure.
 
         Args:
             content: YAML content
@@ -393,99 +448,17 @@ class Verifier:
 
             # Check for root-level hash first (e.g., path: file, sha512: hash)
             if "files" not in data:
-                logger.debug("   No 'files' section in YAML")
-                # Check if this is a root-level hash structure
-                # e.g., path: filename, sha512: hash
-                if "path" in data and data["path"] == filename:
-                    logger.debug("   Found root-level hash structure")
-                    # Try to find hash in preferred order
-                    for algo in HASH_PREFERENCE_ORDER:
-                        if algo in data:
-                            hash_value = data[algo]
-                            logger.debug(
-                                "   Found %s hash at root level", algo
-                            )
-                            # Convert base64 to hex if needed
-                            try:
-                                return self._convert_base64_to_hex(hash_value)
-                            except ValueError:
-                                # If conversion fails, assume it's already hex
-                                return hash_value
-                logger.debug("   No matching hash found at root level")
-                return None
+                return self._parse_yaml_root_level(data, filename)
 
             files = data["files"]
             logger.debug("   Files section type: %s", type(files))
             logger.debug("   Looking for: %s", filename)
 
-            # Handle different YAML structures
+            # Delegate to specialized parsers based on files structure
             if isinstance(files, dict):
-                # Structure: files: {filename: hash, ...}
-                hash_value = files.get(filename)
-                if hash_value:
-                    logger.debug("   Found hash in dict structure")
-                    # Handle potential format like "sha256:hash" or just "hash"
-                    if isinstance(hash_value, str):
-                        # Remove algorithm prefix if present
-                        if ":" in hash_value:
-                            _, _, hash_value = hash_value.partition(":")
-                        # Convert base64 to hex if needed
-                        try:
-                            return self._convert_base64_to_hex(hash_value)
-                        except ValueError:
-                            # If conversion fails, assume it's already hex
-                            return hash_value
-                    elif isinstance(hash_value, dict):
-                        # Handle structure like {sha256: hash}
-                        # Try hash from default or first available algorithm
-                        for algo in HASH_PREFERENCE_ORDER:
-                            if algo in hash_value:
-                                hash_val = hash_value[algo]
-                                # Convert base64 to hex if needed
-                                try:
-                                    return self._convert_base64_to_hex(
-                                        hash_val
-                                    )
-                                except ValueError:
-                                    # If conversion fails, assume hex
-                                    return hash_val
-                        # Return first available hash
-                        first_hash = next(iter(hash_value.values()))
-                        try:
-                            return self._convert_base64_to_hex(first_hash)
-                        except ValueError:
-                            # If conversion fails, assume it's already hex
-                            return first_hash
+                return self._parse_yaml_files_dict(files, filename)
             elif isinstance(files, list):
-                # Structure: files: [{name: filename, hash: value}, ...]
-                # or files: [{url: filename, sha512: value}, ...]
-                for file_entry in files:
-                    if not isinstance(file_entry, dict):
-                        continue
-
-                    # Check both 'name' and 'url' fields for filename match
-                    file_name = file_entry.get("name") or file_entry.get("url")
-                    if file_name == filename:
-                        logger.debug("   Found hash in list structure")
-                        # Try to get hash from various possible keys
-                        hash_value = (
-                            file_entry.get("hash")
-                            or file_entry.get(YAML_DEFAULT_HASH)
-                            or file_entry.get("sha256")
-                        )
-                        if hash_value:
-                            # Remove algorithm prefix if present
-                            if (
-                                isinstance(hash_value, str)
-                                and ":" in hash_value
-                            ):
-                                _, _, hash_value = hash_value.partition(":")
-                            # Convert base64 to hex if needed
-                            try:
-                                return self._convert_base64_to_hex(hash_value)
-                            except ValueError:
-                                # If conversion fails, assume it's already hex
-                                return hash_value
+                return self._parse_yaml_files_list(files, filename)
 
             logger.debug("   Hash not found for %s in YAML", filename)
             return None
@@ -493,6 +466,84 @@ class Verifier:
         except yaml.YAMLError as e:
             logger.error("❌ Failed to parse YAML checksum file: %s", e)
             return None
+
+    def _parse_yaml_root_level(self, data: dict, filename: str) -> str | None:
+        """Parse YAML with hash at root level (e.g., path: file, sha512: hash).
+
+        Args:
+            data: Parsed YAML data
+            filename: Target filename to find
+
+        Returns:
+            Hash value or None if not found
+
+        """
+        logger.debug("   No 'files' section in YAML")
+        if "path" in data and data["path"] == filename:
+            logger.debug("   Found root-level hash structure")
+            result = self._try_hash_from_dict(data, "at root level")
+            if result:
+                return result
+
+        logger.debug("   No matching hash found at root level")
+        return None
+
+    def _parse_yaml_files_dict(self, files: dict, filename: str) -> str | None:
+        """Parse YAML files dict structure: {filename: hash, ...}.
+
+        Args:
+            files: Files dict from YAML
+            filename: Target filename to find
+
+        Returns:
+            Hash value or None if not found
+
+        """
+        hash_value = files.get(filename)
+        if not hash_value:
+            return None
+
+        logger.debug("   Found hash in dict structure")
+
+        if isinstance(hash_value, str):
+            return self._normalize_hash_value(hash_value)
+        elif isinstance(hash_value, dict):
+            return self._try_hash_from_dict(hash_value, "in nested dict")
+
+        return None
+
+    def _parse_yaml_files_list(self, files: list, filename: str) -> str | None:
+        """Parse YAML files list structure: [{url: filename, sha512: value}, ...].
+
+        Args:
+            files: Files list from YAML
+            filename: Target filename to find
+
+        Returns:
+            Hash value or None if not found
+
+        """
+        for file_entry in files:
+            if not isinstance(file_entry, dict):
+                continue
+
+            # Check both 'name' and 'url' fields for filename match
+            file_name = file_entry.get("name") or file_entry.get("url")
+            if file_name != filename:
+                continue
+
+            logger.debug("   Found hash in list structure")
+
+            # Try to get hash from various possible keys
+            hash_value = (
+                file_entry.get("hash")
+                or file_entry.get(YAML_DEFAULT_HASH)
+                or file_entry.get("sha256")
+            )
+            if hash_value:
+                return self._normalize_hash_value(hash_value)
+
+        return None
 
     def _parse_traditional_checksum_file(
         self, content: str, filename: str, hash_type: HashType
