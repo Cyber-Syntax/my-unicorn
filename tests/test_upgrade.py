@@ -327,27 +327,31 @@ async def test_check_for_update_up_to_date(
 
 @pytest.mark.asyncio
 async def test_perform_update_success(mock_config_manager, mock_session):
-    """Test perform_update returns True on success."""
+    """Test perform_update uses os.execvp with correct UV command."""
     updater = SelfUpdater(mock_config_manager, mock_session)
-    # Patch subprocess and file ops
-    with (
-        patch("my_unicorn.upgrade.shutil.rmtree"),
-        patch("my_unicorn.upgrade.shutil.copytree"),
-        patch("my_unicorn.upgrade.shutil.copy2"),
-        patch("pathlib.Path.mkdir"),
-        patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.chmod"),
-        patch(
-            "my_unicorn.upgrade.asyncio.create_subprocess_exec"
-        ) as mock_subproc,
-    ):
-        proc_mock = MagicMock()
-        proc_mock.wait = AsyncMock(return_value=0)
-        proc_mock.returncode = 0
-        proc_mock.stdout = None
-        mock_subproc.return_value = proc_mock
-        result = await updater.perform_update()
-        assert result is True
+
+    # Mock os.execvp to capture the command without actually executing it
+    with patch("my_unicorn.upgrade.os.execvp") as mock_execvp:
+        # os.execvp doesn't return on success, so we simulate by raising
+        # an exception to prevent actual execution
+        mock_execvp.side_effect = SystemExit(0)
+
+        try:
+            await updater.perform_update()
+        except SystemExit:
+            pass  # Expected when execvp is mocked
+
+        # Verify os.execvp was called with correct arguments
+        mock_execvp.assert_called_once_with(
+            "uv",
+            [
+                "uv",
+                "tool",
+                "install",
+                "git+https://github.com/Cyber-Syntax/my-unicorn",
+                "--upgrade",
+            ],
+        )
 
 
 @pytest.mark.asyncio
@@ -532,11 +536,13 @@ def test_upgrade_directories_are_distinct():
 
 
 @pytest.mark.asyncio
-async def test_perform_update_clones_to_repo_dir_not_subdirectory():
-    """Test that git clone uses repo_dir directly, not repo_dir/source/.
+async def test_perform_update_uses_uv_direct_install():
+    """Test that perform_update uses UV's direct GitHub installation.
 
-    CRITICAL: This test catches the v1.8.0 bug where cloning happened to
-    repo_dir/source/ instead of repo_dir/, causing file copy failures.
+    CRITICAL: This ensures we're using the new, correct approach:
+    - Uses 'uv tool install git+URL --upgrade'
+    - No git cloning required
+    - Delegates to UV for fetching and installing
     """
     mock_config = MagicMock()
     repo_dir = Path("/tmp/test-my-unicorn-repo")
@@ -552,61 +558,41 @@ async def test_perform_update_clones_to_repo_dir_not_subdirectory():
     mock_session = MagicMock()
     updater = SelfUpdater(mock_config, mock_session)
 
-    # Mock subprocess to capture git clone command only
-    clone_command_args = []
+    # Mock os.execvp to capture the command
+    with patch("my_unicorn.upgrade.os.execvp") as mock_execvp:
+        mock_execvp.side_effect = SystemExit(0)
 
-    async def capture_clone_command(*args, **kwargs):
-        """Capture the git clone command arguments."""
-        # Only capture git clone commands, not setup.sh calls
-        if args and args[0] == "git" and "clone" in args:
-            clone_command_args.extend(args)
-        mock_proc = MagicMock()
-        mock_proc.wait = AsyncMock(return_value=0)
-        mock_proc.returncode = 0
-        mock_proc.stdout = AsyncMock()
-        mock_proc.stdout.readline = AsyncMock(return_value=b"")
-        return mock_proc
+        try:
+            await updater.perform_update()
+        except SystemExit:
+            pass  # Expected
 
-    with (
-        patch("my_unicorn.upgrade.shutil.rmtree"),
-        patch("pathlib.Path.mkdir"),
-        patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.chmod"),
-        patch(
-            "my_unicorn.upgrade.asyncio.create_subprocess_exec",
-            side_effect=capture_clone_command,
-        ),
-    ):
-        await updater.perform_update()
+        # Verify the correct UV command is used
+        mock_execvp.assert_called_once()
+        call_args = mock_execvp.call_args
 
-        # Verify git clone was called with repo_dir, not repo_dir/source/
-        assert "git" in clone_command_args
-        assert "clone" in clone_command_args
+        # Check command structure
+        assert call_args[0][0] == "uv", "Should execute 'uv' command"
+        assert call_args[0][1] == [
+            "uv",
+            "tool",
+            "install",
+            "git+https://github.com/Cyber-Syntax/my-unicorn",
+            "--upgrade",
+        ], "Should use correct UV tool install arguments"
 
-        # Find the destination argument (last argument in git clone)
-        clone_dest = str(clone_command_args[-1])
-
-        # CRITICAL: Verify clone destination is repo_dir
-        assert clone_dest == str(repo_dir), (
-            f"Git clone should use {repo_dir}, not {clone_dest}"
-        )
-
-        # CRITICAL: Verify no 'source' subdirectory in clone destination
-        assert "/source" not in clone_dest, (
-            "Git clone should NOT use repo_dir/source/ (this was the bug)"
-        )
-        assert "\\source" not in clone_dest, (
-            "Git clone should NOT use repo_dir\\source\\ on Windows"
-        )
+        # CRITICAL: Verify no git clone is attempted
+        # (In the new implementation, we never call git)
 
 
 @pytest.mark.asyncio
-async def test_perform_update_copies_from_repo_dir_not_source_subdir():
-    """Test that file copying sources from repo_dir, not repo_dir/source/.
+async def test_perform_update_no_git_operations():
+    """Test that perform_update doesn't perform any git operations.
 
-    CRITICAL: This verifies that files are copied from the correct location:
-        - Correct: repo_dir/my_unicorn -> package_dir/my_unicorn
-        - Wrong:   repo_dir/source/my_unicorn -> package_dir/my_unicorn
+    CRITICAL: This verifies the new approach is simpler and more correct:
+    - No git clone required
+    - No file copying required
+    - UV handles everything through direct GitHub installation
     """
     mock_config = MagicMock()
     repo_dir = Path("/tmp/test-my-unicorn-repo")
@@ -622,58 +608,37 @@ async def test_perform_update_copies_from_repo_dir_not_source_subdir():
     mock_session = MagicMock()
     updater = SelfUpdater(mock_config, mock_session)
 
-    # Track copy operations
-    copy_sources = []
+    # Track if any git or file operations are attempted
+    git_called = False
+    shutil_called = False
 
-    def capture_copytree(src, dst, **kwargs):
-        """Capture copytree source paths."""
-        copy_sources.append(str(src))
+    def track_git(*args, **kwargs):
+        nonlocal git_called
+        git_called = True
 
-    def capture_copy2(src, dst, **kwargs):
-        """Capture copy2 source paths."""
-        copy_sources.append(str(src))
+    def track_shutil(*args, **kwargs):
+        nonlocal shutil_called
+        shutil_called = True
 
     with (
-        patch("my_unicorn.upgrade.shutil.rmtree"),
         patch(
-            "my_unicorn.upgrade.shutil.copytree",
-            side_effect=capture_copytree,
+            "my_unicorn.upgrade.asyncio.create_subprocess_exec",
+            side_effect=track_git,
         ),
-        patch("my_unicorn.upgrade.shutil.copy2", side_effect=capture_copy2),
-        patch("pathlib.Path.mkdir"),
-        patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.is_dir", return_value=True),
-        patch("pathlib.Path.is_file", return_value=False),
-        patch("pathlib.Path.iterdir", return_value=[]),
-        patch("pathlib.Path.chmod"),
-        patch(
-            "my_unicorn.upgrade.asyncio.create_subprocess_exec"
-        ) as mock_subproc,
+        patch("my_unicorn.upgrade.os.execvp") as mock_execvp,
     ):
-        mock_proc = MagicMock()
-        mock_proc.wait = AsyncMock(return_value=0)
-        mock_proc.returncode = 0
-        mock_proc.stdout = None
-        mock_subproc.return_value = mock_proc
+        mock_execvp.side_effect = SystemExit(0)
 
-        await updater.perform_update()
+        try:
+            await updater.perform_update()
+        except SystemExit:
+            pass
 
-        # Verify copy operations use repo_dir as source
-        for source_path in copy_sources:
-            # CRITICAL: Source should start with repo_dir
-            assert source_path.startswith(str(repo_dir)), (
-                f"Copy source should start with {repo_dir}, got {source_path}"
-            )
+        # CRITICAL: Verify no git operations
+        assert not git_called, "New implementation should NOT use git clone"
 
-            # CRITICAL: Source should NOT contain /source/ subdirectory
-            assert f"{repo_dir}/source/" not in source_path, (
-                f"Copy source should NOT use repo_dir/source/ "
-                f"(this was the bug), got {source_path}"
-            )
-            assert f"{repo_dir}\\source\\" not in source_path, (
-                f"Copy source should NOT use repo_dir\\source\\ on Windows, "
-                f"got {source_path}"
-            )
+        # Verify os.execvp was called (the new method)
+        mock_execvp.assert_called_once()
 
 
 def test_upgrade_directory_paths_are_pathlib_objects():

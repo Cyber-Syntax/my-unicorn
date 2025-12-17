@@ -2,14 +2,13 @@
 """my-unicorn cli upgrade module.
 
 This module handles updating the my-unicorn package itself by fetching
-the latest release from GitHub, cloning the repository, and running
-the installer script in update mode.
+the latest release from GitHub and using uv's direct installation feature.
 
 Currently using prereleases until stable releases are available.
 """
 
 import asyncio
-import shutil
+import os
 import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError
@@ -351,14 +350,13 @@ class SelfUpdater:
             if latest_version_obj > current_version_obj:
                 logger.debug("Update available: latest > current")
                 return True
-            elif latest_version_obj == current_version_obj:
+
+            if latest_version_obj == current_version_obj:
                 logger.debug("No update needed: versions are equal")
                 return False
-            else:
-                logger.debug(
-                    "No update needed: current > latest (dev version?)"
-                )
-                return False
+
+            logger.debug("No update needed: current > latest (dev version?)")
+            return False
 
         except (PackageNotFoundError, Exception) as e:
             logger.error("Error checking version: %s", e)
@@ -366,190 +364,64 @@ class SelfUpdater:
             return False
 
     async def perform_update(self) -> bool:
-        """Update by cloning repo and running setup.sh install.
+        """Update using UV's direct GitHub installation.
 
-        Simplified approach that delegates all
-        installation logic to setup.sh, eliminating code duplication.
+        This uses uv's modern tool installation from GitHub which:
+        - Fetches the latest version directly from GitHub
+        - Resolves and installs dependencies automatically
+        - No need for local repository cloning
+        - Follows best practices used by ruff, uv, and other modern
+          CLI tools
 
         Returns:
             True if update was successful, False otherwise
 
         """
-        repo_dir = self.global_config["directory"]["repo"]
-        installer_script = repo_dir / "setup.sh"
-
         logger.debug("Starting upgrade to my-unicorn...")
-        logger.debug("Repository directory: %s", repo_dir)
         logger.debug("UV available: %s", self._uv_available)
 
-        # Inform user about UV usage
-        if self._uv_available:
-            logger.info("UV detected - will use UV for faster installation")
-        else:
-            logger.info(
-                "Using pip for installation (install UV for faster updates)"
+        # Check UV availability first
+        if not self._uv_available:
+            logger.error("UV is required for upgrading my-unicorn")
+            print("❌ UV is required for upgrading my-unicorn")
+            print(
+                "Install UV first: "
+                "curl -LsSf https://astral.sh/uv/install.sh | sh"
             )
-
-        # Track progress
-        download_task_id = None
-        install_task_id = None
-        cleanup_task_id = None
+            return False
 
         try:
-            # 1) Prepare fresh repo directory
-            if repo_dir.exists():
-                logger.info("Removing old repo at %s", repo_dir)
-                shutil.rmtree(repo_dir)
-                logger.debug("Old repo directory removed successfully")
-
-            repo_dir.mkdir(parents=True)
-            logger.debug("Created fresh repo directory: %s", repo_dir)
-
-            # 2) Clone repository
+            # Show progress message
             if self.progress:
-                download_task_id = self.progress.start_task(
-                    "repo_clone", "Cloning repository from GitHub..."
+                task_id = self.progress.start_task(
+                    "upgrade", f"Upgrading my-unicorn from {GITHUB_URL}..."
                 )
-
-            logger.info("Cloning repository to %s", repo_dir)
-            clone_process = await asyncio.create_subprocess_exec(
-                "git",
-                "clone",
-                f"{GITHUB_URL}.git",
-                str(repo_dir),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            # Progress updates during clone
-            clone_task = asyncio.create_task(clone_process.wait())
-            if self.progress and download_task_id:
-                while not clone_task.done():
-                    self.progress.update_task(download_task_id)
-                    await asyncio.sleep(0.5)
-
-            await clone_task
-
-            if self.progress and download_task_id:
                 self.progress.finish_task(
-                    download_task_id,
-                    success=clone_process.returncode == 0,
-                    description="Repository cloned successfully"
-                    if clone_process.returncode == 0
-                    else "Repository clone failed",
-                )
-
-            if clone_process.returncode != 0:
-                logger.error("Git clone failed")
-                print("❌ Failed to download repository")
-                return False
-
-            # 3) Run setup.sh install from the cloned repo
-            if not installer_script.exists():
-                logger.error(
-                    "Installer script missing at %s", installer_script
-                )
-                print("❌ Installer script not found.")
-                return False
-
-            logger.debug("Making installer executable: %s", installer_script)
-            installer_script.chmod(0o755)
-
-            if self.progress:
-                install_msg = (
-                    "Running installation with UV..."
-                    if self._uv_available
-                    else "Running installation with pip..."
-                )
-                install_task_id = self.progress.start_task(
-                    "upgrade_installation",
-                    install_msg,
-                )
-
-            logger.info("Executing: bash %s install", installer_script)
-            install_process = await asyncio.create_subprocess_exec(
-                "bash",
-                str(installer_script),
-                "install",
-                cwd=str(repo_dir),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-
-            # Stream output with progress updates
-            if install_process.stdout:
-                while True:
-                    line = await install_process.stdout.readline()
-                    if not line:
-                        break
-                    line_str = line.decode().strip()
-                    logger.debug("Installer output: %s", line_str)
-
-                    if (
-                        self.progress
-                        and install_task_id
-                        and any(
-                            kw in line_str.lower()
-                            for kw in [
-                                "creating",
-                                "installing",
-                                "updating",
-                                "complete",
-                            ]
-                        )
-                    ):
-                        self.progress.update_task(install_task_id)
-
-            await install_process.wait()
-            logger.debug("Installer exit code: %s", install_process.returncode)
-
-            if self.progress and install_task_id:
-                self.progress.finish_task(
-                    install_task_id,
-                    success=install_process.returncode == 0,
-                    description="Installation completed successfully"
-                    if install_process.returncode == 0
-                    else "Installation failed",
-                )
-
-            if install_process.returncode != 0:
-                print(
-                    f"❌ Installer exited with code "
-                    f"{install_process.returncode}"
-                )
-                return False
-
-            # 4) Clean up cloned repository
-            if self.progress:
-                cleanup_task_id = self.progress.start_task(
-                    "cleanup", "Cleaning up temporary files..."
-                )
-
-            if repo_dir.exists():
-                logger.info("Cleaning up repo directory")
-                shutil.rmtree(repo_dir)
-                logger.debug("Repo directory cleanup completed")
-
-            if self.progress and cleanup_task_id:
-                self.progress.finish_task(
-                    cleanup_task_id,
+                    task_id,
                     success=True,
-                    description="Cleanup completed",
+                    description="Starting upgrade with uv...",
                 )
 
-            logger.info("Self-update completed successfully")
-            return True
+            logger.info(
+                "Executing: uv tool install git+%s --upgrade", GITHUB_URL
+            )
+            print(f"⚡ Upgrading my-unicorn from {GITHUB_URL}...")
+
+            # Use os.execvp to replace current process with uv upgrade
+            # This ensures the upgrade completes properly and is the
+            # recommended approach for self-upgrading CLI tools
+            os.execvp(
+                "uv",
+                ["uv", "tool", "install", f"git+{GITHUB_URL}", "--upgrade"],
+            )
+
+            # Note: Code after execvp won't execute if successful
+            # If we reach here, execvp failed
+            logger.error("Failed to execute uv upgrade")
+            print("❌ Failed to execute upgrade command")
+            return False
 
         except Exception as e:
-            # Finish any pending progress tasks
-            for task_id in [
-                download_task_id,
-                install_task_id,
-                cleanup_task_id,
-            ]:
-                if self.progress and task_id:
-                    self.progress.finish_task(task_id, success=False)
-
             logger.exception("Update failed: %s", e)
             print(f"❌ Update failed: {e}")
             return False
@@ -627,8 +499,7 @@ async def perform_self_update(refresh_cache: bool = False) -> bool:
         # First check if update is available
         if await updater.check_for_update(refresh_cache):
             return await updater.perform_update()
-        else:
-            return False
+        return False
     finally:
         await updater.session.close()
 
