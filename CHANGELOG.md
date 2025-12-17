@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.1-alpha]
+
+### Added
+
+- Added better tool support to pyproject.toml for ruff, uv and pytest.
+
+### Changed
+
+- Enhanced verification module with new configuration and result handling classes.
+- Enhanced progress display logic and added speed calculation utility.
+- Improved docstrings for clarity and consistency across auth, cli, and main modules.
+- Streamlined target separation and installation logic in InstallHandler and InstallCommand.
+- Enhanced installation logic by delegating target separation to utils and app status checks to InstallHandler.
+- Extracted removal logic into RemoveService.
+- Unified release fetching methods in InstallHandler and cleaned up debug logs in UpdateManager.
+- Streamlined download and installation logic, enhanced type safety, and improved asset handling.
+- Improved version sorting and backup logic in BackupService.
+- Extracted rate limit info extraction and config creation logic into separate methods.
+- Cleaned up unused constants and comments.
+- Extracted inline comment stripping logic into a separate function.
+- Centralized and streamlined type definitions, removed unused classes.
+
+### Fixed
+
+- Added checksum file handling with templating support and relaxed filename matching.
+
+### Removed
+
+- Removed default, unused settings on pyproject.toml.
+- Removed version constraints on pyproject.toml, now we use uv.lock for dependency management.
+
 ## [1.11.0-alpha]
 
 ### Added
