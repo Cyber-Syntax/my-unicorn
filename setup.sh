@@ -163,6 +163,7 @@ install_with_uv_tool() {
   
   cd "$src_dir"
   uv tool install .
+  setup_autocomplete
   
   echo "✅ Installation complete using uv tool."
   echo "Run 'my-unicorn --help' to get started."
@@ -183,6 +184,7 @@ update_with_uv_tool() {
   cd "$src_dir"
   git pull || echo "⚠️  Warning: Could not update git repository"
   uv tool install . --reinstall
+  setup_autocomplete
   
   echo "✅ Update complete using uv tool."
 }
