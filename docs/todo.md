@@ -2,6 +2,7 @@
 
 ## testing
 
+- [ ] dev: build with uv
 - [ ] API rate limiting
 - [ ] janitor code cleanup in progress:
     - [ ] test backup
@@ -36,7 +37,6 @@
     repo = /home/developer/.local/share/my-unicorn-repo
     package = /home/developer/.local/share/my-unicorn
 
-- [ ] move the src/ layout for better packaging and installation
 - [ ] remove icon download logic because we extract icon from appimage now.
 - [ ] add lock for one instance only to prevent multiple instance run at the same time
     - [ ] 16G error log, because of 2 instance running at the same time.
@@ -59,7 +59,6 @@
 
 - [ ] clean this todo list, make priority to BUGS first.
 - [ ] Make a better todo.md structure with priorities, labels etc.
-- [ ] dev: build with uv
 - [ ] #BUG: when there is one fail(keepassxc fails on checksum because external
       issue by devs) on verification but our ui not show when
       there is one verification success, so it might be better to show the failed and success.
@@ -141,6 +140,7 @@ Confirm your GitHub token:
 
 ## done
 
+- [x] move the src/ layout for better packaging and installation
 - [x] #BUG: digest not became true on catalog installs if its use checksum_file with digest verify both
 - [x] make sure skip not skip verification if there is verification option
     - [x] freetube test verify digest even it is skip: true on the catalog,

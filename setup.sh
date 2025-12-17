@@ -162,7 +162,7 @@ install_with_uv_tool() {
   fi
   
   cd "$src_dir"
-  uv tool install .
+  uv tool install git+https://github.com/Cyber-Syntax/my-unicorn
   setup_autocomplete
   
   echo "✅ Installation complete using uv tool."
@@ -183,7 +183,7 @@ update_with_uv_tool() {
   
   cd "$src_dir"
   git pull || echo "⚠️  Warning: Could not update git repository"
-  uv tool install . --reinstall
+  uv tool install git+https://github.com/Cyber-Syntax/my-unicorn --upgrade
   setup_autocomplete
   
   echo "✅ Update complete using uv tool."
