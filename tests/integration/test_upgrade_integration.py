@@ -1,13 +1,16 @@
 """Integration tests for upgrade functionality with version mocking.
 
 This module tests the complete upgrade flow including:
-- Directory structure (verify no source/ subdirectory bug)
 - Version progression (1.9.1 -> 1.9.2 -> 2.0.0 -> future)
-- File operations (copy from correct source to destination)
-- Installer execution (setup.sh can find required files)
+- Git clone operations (cloning latest release)
+- uv tool install --reinstall (modern isolated installation)
+- Repository cleanup after successful upgrade
 
 The tests use local project files to simulate git clone, and mock
 both current version and target version to test upgrade paths.
+
+Note: With uv tool install, files are installed in an isolated environment,
+not copied to a package_dir like the old setup.sh method.
 """
 
 import re
@@ -91,7 +94,7 @@ async def mock_git_clone_with_version(
 
 @pytest.fixture
 def mock_git_subprocess():
-    """Mock asyncio.create_subprocess_exec for git clone operations.
+    """Mock asyncio.create_subprocess_exec for git clone and uv tool install.
 
     Returns:
         callable: Async function that mocks subprocess execution
@@ -99,7 +102,7 @@ def mock_git_subprocess():
     """
 
     async def _mock_subprocess(*args, **kwargs):
-        """Mock subprocess that simulates git clone and setup.sh install.
+        """Mock subprocess that simulates git clone and uv tool install.
 
         Args:
             *args: Command arguments
@@ -110,7 +113,7 @@ def mock_git_subprocess():
 
         """
         # Extract the destination directory from git clone command
-        # Command format: ['git', 'clone', '--depth', '1', url, dest_dir]
+        # Command format: ['git', 'clone', url, dest_dir]
         if len(args) > 0 and args[0] == "git" and "clone" in args:
             dest_dir = Path(args[-1])  # Last argument is destination
 
@@ -127,36 +130,18 @@ def mock_git_subprocess():
             mock_process.wait = AsyncMock(return_value=0)
             return mock_process
 
-        # For setup.sh install calls, simulate installation
-        if len(args) > 0 and args[0] == "bash" and "install" in args:
-            # Get the working directory (repo_dir)
-            repo_dir = kwargs.get("cwd")
-            if repo_dir:
-                repo_path = Path(repo_dir)
-                # Find package_dir from config (parent of repo_dir usually)
-                # For testing, we derive it from the fixture structure
-                package_dir = repo_path.parent / "my-unicorn"
-
-                # Simulate what setup.sh install does:
-                # copy files to package_dir
-                package_dir.mkdir(parents=True, exist_ok=True)
-
-                # Copy my_unicorn, scripts, setup.sh, pyproject.toml
-                for item in [
-                    "my_unicorn",
-                    "scripts",
-                    "setup.sh",
-                    "pyproject.toml",
-                ]:
-                    src = repo_path / item
-                    dst = package_dir / item
-                    if src.exists():
-                        if src.is_dir():
-                            if dst.exists():
-                                shutil.rmtree(dst)
-                            shutil.copytree(src, dst)
-                        else:
-                            shutil.copy2(src, dst)
+        # For uv tool install --reinstall calls, simulate installation
+        # Command format: ['uv', 'tool', 'install', '--reinstall', repo_dir]
+        if (
+            len(args) > 0
+            and args[0] == "uv"
+            and "tool" in args
+            and "install" in args
+        ):
+            # uv tool install creates an isolated environment
+            # We don't need to simulate file copying since uv
+            # handles it internally. Just return success to indicate
+            # the tool was installed
 
             mock_process = AsyncMock()
             mock_process.returncode = 0
@@ -236,24 +221,19 @@ async def test_upgrade_version_progression(
         # Run the upgrade
         result = await updater.perform_update()
 
-        # CRITICAL ASSERTIONS: Verify directory structure
-        package_dir = temp_install_dirs["package"]
+        # CRITICAL ASSERTIONS: Verify upgrade process
 
         # 1. Verify upgrade succeeded
         assert result is True, (
             f"Upgrade from {current_version} to {new_version} should succeed"
         )
 
-        # 2. Verify files installed to correct location in package_dir
-        # (setup.sh install handles this now)
-        assert (package_dir / "my_unicorn").exists(), (
-            f"my_unicorn/ should exist in {package_dir}"
-        )
-        assert (package_dir / "setup.sh").exists(), (
-            f"setup.sh should exist in {package_dir}"
-        )
-        assert (package_dir / "scripts").exists(), (
-            f"scripts/ should exist in {package_dir}"
+        # 2. Verify repo directory was cloned (then cleaned up)
+        # With uv tool install, files are installed in isolated environment
+        # We just verify the upgrade process completed successfully
+        repo_dir = temp_install_dirs["repo"]
+        assert not repo_dir.exists(), (
+            "repo_dir should be cleaned up after successful upgrade"
         )
 
 
@@ -261,9 +241,9 @@ async def test_upgrade_version_progression(
 async def test_upgrade_clones_to_correct_directory(
     temp_install_dirs, mock_git_subprocess
 ):
-    """Verify upgrade uses setup.sh install from cloned repo.
+    """Verify upgrade uses uv tool install from cloned repo.
 
-    This is the core test for Phase 1: delegating installation to setup.sh.
+    This is the core test: clone repo, run uv tool install, cleanup.
 
     Args:
         temp_install_dirs: Temporary directory fixture
@@ -305,23 +285,9 @@ async def test_upgrade_clones_to_correct_directory(
         assert result is True, "Upgrade should succeed"
 
         # After successful upgrade, repo_dir is cleaned up
-        # So we verify files were installed to package_dir correctly
-        package_dir = temp_install_dirs["package"]
-
-        # CRITICAL: Verify files installed by setup.sh to package_dir
-        # Phase 1 delegates all installation to setup.sh install
-        assert (package_dir / "my_unicorn").exists(), (
-            "my_unicorn should be installed to package_dir"
-        )
-
-        # Verify setup.sh was installed
-        assert (package_dir / "setup.sh").exists(), (
-            "setup.sh should be installed to package_dir"
-        )
-
-        # Verify scripts directory was installed
-        assert (package_dir / "scripts").exists(), (
-            "scripts should be installed to package_dir"
+        repo_dir = temp_install_dirs["repo"]
+        assert not repo_dir.exists(), (
+            "repo_dir should be cleaned up after upgrade"
         )
 
 
@@ -329,7 +295,7 @@ async def test_upgrade_clones_to_correct_directory(
 async def test_upgrade_copies_files_correctly(
     temp_install_dirs, mock_git_subprocess
 ):
-    """Verify files are installed by setup.sh to package_dir.
+    """Verify upgrade process clones repo correctly.
 
     Args:
         temp_install_dirs: Temporary directory fixture
@@ -362,23 +328,15 @@ async def test_upgrade_copies_files_correctly(
         updater = SelfUpdater(config_manager, session)
 
         # Run perform_update()
-        await updater.perform_update()
+        result = await updater.perform_update()
 
-        package_dir = temp_install_dirs["package"]
+        # Verify upgrade succeeded
+        assert result is True, "Upgrade should succeed"
 
-        # Verify all required files exist in package_dir
-        # (installed by setup.sh install)
-        assert (package_dir / "my_unicorn").is_dir(), (
-            "my_unicorn/ directory should be installed"
-        )
-        assert (package_dir / "setup.sh").is_file(), (
-            "setup.sh file should be installed"
-        )
-        assert (package_dir / "scripts").is_dir(), (
-            "scripts/ directory should be installed"
-        )
-        assert (package_dir / "pyproject.toml").is_file(), (
-            "pyproject.toml file should be installed"
+        # Verify repo was cleaned up after installation
+        repo_dir = temp_install_dirs["repo"]
+        assert not repo_dir.exists(), (
+            "repo_dir should be cleaned up after upgrade"
         )
 
 
@@ -386,7 +344,7 @@ async def test_upgrade_copies_files_correctly(
 async def test_installer_finds_required_files(
     temp_install_dirs, mock_git_subprocess
 ):
-    """Verify setup.sh installs all required files during upgrade.
+    """Verify uv tool install process works during upgrade.
 
     Args:
         temp_install_dirs: Temporary directory fixture
@@ -419,20 +377,13 @@ async def test_installer_finds_required_files(
         updater = SelfUpdater(config_manager, session)
 
         # Run perform_update()
-        await updater.perform_update()
+        result = await updater.perform_update()
 
-        package_dir = temp_install_dirs["package"]
+        # Verify upgrade succeeded
+        assert result is True, "Upgrade should succeed"
 
-        # Verify setup.sh installed all required files
-        # (These are the files setup.sh install should create)
-        required_files = [
-            "my_unicorn",  # Source code directory
-            "scripts",  # Wrapper scripts
-            "pyproject.toml",  # Package configuration
-        ]
-
-        for file_name in required_files:
-            file_path = package_dir / file_name
-            assert file_path.exists(), (
-                f"setup.sh should have installed {file_name}"
-            )
+        # Verify repo was cleaned up
+        repo_dir = temp_install_dirs["repo"]
+        assert not repo_dir.exists(), (
+            "repo_dir should be cleaned up after upgrade"
+        )

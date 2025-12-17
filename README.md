@@ -17,23 +17,100 @@ Turkish: [README.tr.md](README.tr.md)
     - Super-Productivity, Siyuan, Joplin, Standard-notes, Logseq, QOwnNotes, Tagspaces, Zen-Browser, Zettlr, HeroicGamesLauncher, KDiskMark, AppFlowy, Obsidian, FreeTube
     - Applications without verification (developer doesn't provide hash):
         - WeekToDo
-    - More can be found in the [catalog](my_unicorn/catalog/) folder.
+    - More can be found in the [catalog](src/my_unicorn/catalog) folder.
 - **Supported hash types:**
     - sha256, sha512
 
 # 💡 Installation
 
+## Option 1: Install using uv (Recommended)
+
+> [!TIP]
+> This is the recommended method for production use. It installs my-unicorn as an isolated CLI tool.
+
+### Prerequisites
+
+Install `uv` if you haven't already:
+
+```bash
+# Fedora
+sudo dnf install uv
+
+# Arch Linux
+sudo pacman -S uv
+
+# Universal installer (Linux, macOS)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### Production Install
+
+**Method 1: Using setup.sh (easiest)**
+
+```bash
+cd ~/Downloads
+git clone https://github.com/Cyber-Syntax/my-unicorn.git
+cd my-unicorn
+./setup.sh uv-install
+```
+
+**Method 2: Direct uv command**
+
+```bash
+cd ~/Downloads
+git clone https://github.com/Cyber-Syntax/my-unicorn.git
+cd my-unicorn
+uv tool install .
+```
+
+### Updating
+
+**Using setup.sh:**
+
+```bash
+cd ~/Downloads/my-unicorn
+./setup.sh uv-update
+```
+
+**Direct uv command:**
+
+```bash
+cd ~/Downloads/my-unicorn
+git pull
+uv tool install . --reinstall
+```
+
+### Development Install (for contributors)
+
+**Using setup.sh:**
+
+```bash
+cd ~/Downloads/my-unicorn
+./setup.sh uv-editable
+```
+
+**Direct uv command:**
+
+```bash
+cd ~/Downloads/my-unicorn
+uv tool install --editable .
+```
+
+Changes to the source code will be reflected immediately without reinstalling.
+
+## Option 2: Traditional Installation (Legacy)
+
 > [!TIP]
 > Installer script uses venv to install the needed dependencies.
 
-1.  Open a terminal and clone this repo (make sure you have git installed):
+1. Open a terminal and clone this repo (make sure you have git installed):
 
     ```bash
     cd ~/Downloads &
     git clone https://github.com/Cyber-Syntax/my-unicorn.git
     ```
 
-2.  Install `uv` (RECOMMENDED):
+2. Install `uv` (RECOMMENDED):
 
     > `uv` would be used to install the dependencies to venv, it is more efficient than pip.
 
@@ -46,7 +123,7 @@ Turkish: [README.tr.md](README.tr.md)
     curl -LsSf https://astral.sh/uv/install.sh | sh
     ```
 
-3.  Build as a package:
+3. Build as a package:
 
     ```bash
     # Go to the project directory
@@ -55,7 +132,7 @@ Turkish: [README.tr.md](README.tr.md)
     ./setup.sh install
     ```
 
-4.  Start using my-unicorn:
+4. Start using my-unicorn:
 
     ```bash
     my-unicorn --help # to see the command options
@@ -71,7 +148,7 @@ Turkish: [README.tr.md](README.tr.md)
     - **Hash type:** Specify the hash type (e.g., sha512 for super-productivity).
     - **Hash verification issues:** If the hash verification fails, you can manually add the hash to the JSON file:
         - Look for the latest hash in the GitHub release page (e.g., [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
-        - Check the [catalog](my_unicorn/catalog/) folder for examples.
+        - Check the [catalog](src/my_unicorn/catalog) folder for examples.
 
 # **🙏 Support This Project**
 

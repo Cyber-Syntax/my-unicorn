@@ -21,7 +21,7 @@ English Description: [README.md](README.md)
             - Bağlantılı sorun: <https://github.com/FreeTubeApp/FreeTube/issues/4720>)
         - AppFlowy
         - Obsidian
-    - Daha fazlası [apps](my_unicorn/apps/) klasöründe bulunabilir.
+    - Daha fazlası [apps](src/my_unicorn/apps) klasöründe bulunabilir.
 - **Desteklenen Hash Türleri:**
     - sha256, sha512
 
@@ -101,7 +101,7 @@ my-unicorn migrate --force # Migrate configuration without confirmation
     - **Hash türü:** Hash türünü belirtin (örn. super-productivity için sha512).
     - **Hash doğrulama sorunları:** Eğer hash doğrulama başarısız olursa, hash'i manuel olarak JSON dosyasına ekleyebilirsiniz:
         - En son hash bilgisini GitHub sürüm sayfasında bulabilirsiniz (örn. [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
-        - Örnekler için [apps](my_unicorn/apps/) klasörüne bakabilirsiniz.
+        - Örnekler için [apps](src/my_unicorn/apps) klasörüne bakabilirsiniz.
 
 # **🙏 Bu Projeye Destek Olun**
 
