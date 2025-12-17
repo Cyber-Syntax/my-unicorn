@@ -149,6 +149,64 @@ has_uv() {
   command -v uv >/dev/null 2>&1
 }
 
+# Install using uv tool (recommended for production)
+install_with_uv_tool() {
+  echo "🚀 Installing my-unicorn using 'uv tool install'..."
+  local src_dir
+  src_dir="$(script_dir)"
+  
+  if ! has_uv; then
+    echo "❌ UV is not installed. Please install UV first:"
+    echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+  fi
+  
+  cd "$src_dir"
+  uv tool install .
+  
+  echo "✅ Installation complete using uv tool."
+  echo "Run 'my-unicorn --help' to get started."
+}
+
+# Update using uv tool (for production installations)
+update_with_uv_tool() {
+  echo "🔄 Updating my-unicorn using 'uv tool install --reinstall'..."
+  local src_dir
+  src_dir="$(script_dir)"
+  
+  if ! has_uv; then
+    echo "❌ UV is not installed. Please install UV first:"
+    echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+  fi
+  
+  cd "$src_dir"
+  git pull || echo "⚠️  Warning: Could not update git repository"
+  uv tool install . --reinstall
+  
+  echo "✅ Update complete using uv tool."
+}
+
+# Install using uv tool in editable mode (for development)
+install_with_uv_editable() {
+  echo "🔧 Installing my-unicorn in editable mode using 'uv tool install --editable'..."
+  local src_dir
+  src_dir="$(script_dir)"
+  
+  if ! has_uv; then
+    echo "❌ UV is not installed. Please install UV first:"
+    echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+  fi
+  
+  cd "$src_dir"
+  uv tool install --editable .
+  
+  echo "✅ Editable installation complete using uv tool."
+  echo "Changes to source code will be reflected immediately."
+  echo "Run 'my-unicorn --help' to get started."
+}
+
 # Create or update virtual environment and install package in editable mode
 setup_venv() {
   if has_uv; then
@@ -257,18 +315,27 @@ case "${1-}" in
 install | "") install_my_unicorn ;;
 update) update_my_unicorn ;;
 autocomplete) install_autocomplete ;;
+uv-install) install_with_uv_tool ;;
+uv-update) update_with_uv_tool ;;
+uv-editable) install_with_uv_editable ;;
 *)
   cat <<EOF
-Usage: $(basename "$0") [install|update|autocomplete]
+Usage: $(basename "$0") [install|update|autocomplete|uv-install|uv-update|uv-editable]
 
-  install       Full installation with autocomplete
+  install       Full installation with venv and autocomplete (default)
   update        Update venv and autocomplete
   autocomplete  Install shell completion only
+  uv-install    Install using 'uv tool install' (recommended for production)
+  uv-update     Update using 'uv tool install --reinstall' (production)
+  uv-editable   Install using 'uv tool install --editable' (development)
 
 Examples:
-  $(basename "$0") install            # Full installation (default)
-  $(basename "$0") update             # Update virtual environment and autocomplete
+  $(basename "$0") install            # Full venv-based installation (legacy)
+  $(basename "$0") update             # Update venv installation
   $(basename "$0") autocomplete       # Install completion for current shell
+  $(basename "$0") uv-install         # Install as isolated tool (recommended)
+  $(basename "$0") uv-update          # Update isolated tool installation
+  $(basename "$0") uv-editable        # Install in editable mode (contributors)
 EOF
   exit 1
   ;;
