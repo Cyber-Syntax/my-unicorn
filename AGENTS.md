@@ -16,35 +16,20 @@ This file provides guidance to agents when working with code in this repository.
 Critical: Run tests after any change to ensure nothing breaks.
 
 ```bash
-# Always activate venv before testing:
-source .venv/bin/activate
-
 # Run all tests:
-pytest -v -q --strict-markers
-
+uv run pytest -v -q --strict-markers
 # Run specific test file:
-pytest tests/test_config.py -v
-
+uv run pytest tests/test_config.py -v
 # Run specific test function:
-pytest tests/test_config.py::test_function_name -v
+uv run pytest tests/test_config.py::test_function_name -v
+# Run with coverage
+uv run pytest tests/python/ --cov=aps --cov-report=html
 ```
 
 ## Code Style Guidelines
 
-Style Rules:
-
-- Follow PEP 8 strictly
-- Max line length: 79 characters
-
-Type Annotations:
-
-- Use built-in types: `list[str]`, `dict[str, int]` (not `List`, `Dict`)
-- Use `from typing import TYPE_CHECKING` for imports only used in type hints
-
-Logging:
-
-- Use `%s` style formatting in logging: `logger.info("Message: %s", value)`
-- Never use f-strings in logging statements
+ Use built-in types: `list[str]`, `dict[str, int]` (not `List`, `Dict`)
+ Never use f-strings in logging statements, instead use `%s` formatting.
 
 ## Project Overview
 
@@ -111,10 +96,9 @@ Project Structure:
 - setup.sh: Setup script for installation my-unicorn
 - run.py: my-unicorn development entry point
 
-## Commands
+## Running the CLI
 
 ```bash
 # Running(development entry point) the application:
-python run.py --help
-python run.py install appflowy
+uv run my-unicorn --help
 ```

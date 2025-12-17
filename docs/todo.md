@@ -3,74 +3,72 @@
 ## testing
 
 - [ ] API rate limiting
-
+- [ ] janitor code cleanup in progress:
+    - [ ] test backup
+    - [ ] config
+    - [x] progress.py
 - [ ] #BUG: progress bar ui artifact fix
     - [x] Switch the text based progress bar to a more efficient one
     - [x] After implementation text based, some other tests hangs, diagnose that and fix.
     - [x] duplicate on ui progress bar not happens on alacritty and kitty but happens on the zed editor. Test the commited on other terminals and than test the current code changes on again in virt-manager
     - [x] test on different terminals
     - [x] update pytest to test the new progress bar implementation
-    - [ ] Clean complexity and publish
-
+    - [x] Clean complexity and publish
 - [ ] network retry etc.
     - [x] Attempt is work as expected, when network connection come back, it starts the download again.
     - [ ] Need to be test more deeply to confirm it work as expected
-
 - [x] remove writing commits to release desc
     - [x] removed commits
     - [x] make it work with keepachangelog template which that template not use v0.1.0 `v` prefix on its heading
-          so our github action bash script need to add itself when creating tags because conventional tags need v in front of them.
-
+        so our github action bash script need to add itself when creating tags because conventional tags need v in front of them.
 - [x] #BUG: Rotation error on logs... - Currently, implemented to custom rotation logic more simple and efficient
       and also increased 1MB log to 10MB to increase the log size. Manual and pytest
       succesfully passed.
     - [x] Fixed rotation error on logs
-
 - [ ] appimage build take times
     - [x] install/update show installation error reasons(show appimage build takes times)
     - [ ] take care the edge cases, maybe app not have appimage at all?
-
 - [ ] #TEST: version command logic is deprecated, so testing to use **version** library
 
 ## in-progress
 
+- [ ] move the src/ layout for better packaging and installation
+- [ ] remove icon download logic because we extract icon from appimage now.
 - [ ] add lock for one instance only to prevent multiple instance run at the same time
     - [ ] 16G error log, because of 2 instance running at the same time.
-
-- [ ] Add progress bar for checksum file installations?
 - [ ] Clear all the examples, plan...
-
 - [ ] better app.json config like owner, repo must be inside github dict
 - [ ] TEST: Never use the real user config logs, app location on pytest unittests which current is use them!
       it would be better to make the pytest logs like my-unicorn_pytest.log
-
 - [ ] add INFO level logs for verification instead of DEBUG
-- [ ] #BUG: Cycle detected in import chain for cache.py
-
-- [ ] Remove code smells
-      <https://refactoring.guru/refactoring/smells>
+- [ ] #BUG: Cycle, circular import detected in import chain for cache.py
+- [ ] Remove code smells: <https://refactoring.guru/refactoring/smells>
     - [ ] contexts
     - [ ] config
-    - [ ] handle FIXME, TODO for duplicate functions
-
+    - [x] handle FIXME, TODO for duplicate functions
 - [ ] Better git branch structure for this project. Currently, we use the main branch as a stable as much as possible but maybe we could use main as development and keep a stable branch or use tags to install the stable branches which we update the script so much and change things that mostly break things, so we oftenly need a hotfixes... So, figure out a better way to manage branches and tags.
-  even define "
-  Rawhide is sometimes called "development" or "main" (as it’s the "main" branch in package git repositories).
-  " main branches as development? Lets make a stable branch and make user the install the stable release
+      fedora define "Rawhide is sometimes called "development" or "main" (as it’s the "main" branch in package git repositories).
+      " main branches as development? Lets make a stable branch and make user the install the stable release
+      others define: "We consider origin/master to be the main branch where the source code of HEAD always reflects a production-ready state."
 
 ## todo
 
+- [ ] clean this todo list, make priority to BUGS first.
+- [ ] Make a better todo.md structure with priorities, labels etc.
+- [ ] dev: build with uv
+- [ ] #BUG: when there is one fail(keepassxc fails on checksum because external
+      issue by devs) on verification but our ui not show when
+      there is one verification success, so it might be better to show the failed and success.
+      Also need to fix ui progress bar created two time because of this issue.
+
+- [ ] Add progress bar for checksum file installations?
 - [ ] Simple video about cli tool workflow
 - [ ] Add option in config for [auth]
 - [ ] Max api request need to be 59 for non-token user, max api request need to be 100 or more for token user (need to check how much github allow concurrent requests)
 - [ ] png need priority one because kde not show .svg on its bar when pinned
 - [ ] add autocompletion for the catalog apps to autocomplete app names (e.g: `super<tab>-productivity`)
-
-- [ ] #BUG: post-processing spinner not turn correctly,
-      it is start and stop, start and stop, it is like in a for loop or
-      something like that, maybe it is happening because of the way we are handling the spinner.
-      We update the post-processing and same time download section etc.
-      probably something is wrong in the implementation of the spinner.
+- [ ] #BUG: `/tmp/.mount_appflobIOEjI/AppFlowy: error while loading shared libraries: libkeybinder-3.0.so.0: cannot open shared object file: No such file or directory`
+    - This is dependency issue, installing `keybinder3` solve the issue. I don't think I can do anything from my side, maybe document it on the docs.
 
 - [ ] update.bash check network connection
 - [ ] update docs with mermaid, use copilot to create them it seems copilot handles mermaid pretty well
@@ -87,27 +85,21 @@
 - [ ] good to use aiodns with aiohttp
 - [ ] might be better to use loguru
 - [ ] mv neovim to usr bin to use appimage neovim
-      mv /tmp/nvim.appimage /usr/local/bin/nvim
-- [ ] make sure skip not skip verification if there is verification option
-    - [x] freetube test verify digest even it is skip: true on the catalog,
-          and I still keep it skip purposely
-    - [x] obsidian test
+    mv /tmp/nvim.appimage /usr/local/bin/nvim
+
 - [ ] upgrade need auto easy update and notify like appimages
 - [ ] config structure refactor
 - [ ] add my unicorn export path to fish shells
 - [ ] Add kde wallet support via dbus-python.
       dbus-python used on kdewallet saves, so we can add that to auth later as a support.
-- [ ] #BUG: digest not became true on catalog installs if its use checksum_file with digest verify both
 - [ ] add verification passed or not to verification section on app-specific config
 - [ ] #BUG: upgrade command get stable cache 1.2.3 version for my-unicorn repo
 - [ ] #TEST: bdd style tests
 - [ ] #TEST: make sure standard-notes naming work as expected with new features like cache
 - [ ] read all the test from stratch with your examples to make sure they work as expected like examples not good current
-- [ ] circular import problem
 
 ## backlog
 
-- [ ] dev: build with uv
 - [ ] Environment variable support
 
 ```bash
@@ -129,12 +121,13 @@ Confirm your GitHub token:
       <https://clig.dev/>
       <https://www.amazon.com/UNIX-Programming-Addison-Wesley-Professional-Computng/dp/0131429019>
 
-    My advice as a user of CLI:
+  My advice as a user of CLI:
+
     - no emojis please, ever
-      Many people are more visually oriented, and are greatly aided by images and color.
-      A standard `NO_EMOJIS` environment variable could perhaps be used to help both camps, just like `NO_COLOR` is available today.
+    Many people are more visually oriented, and are greatly aided by images and color.
+    A standard `NO_EMOJIS` environment variable could perhaps be used to help both camps, just like `NO_COLOR` is available today.
     - if you want to make it look nice, use ANSI escape codes for color rather than emojis.
-      even then, don't use color alone to convey meaning because it will most likely get destroyed by whatever you're piping it to.
+    even then, don't use color alone to convey meaning because it will most likely get destroyed by whatever you're piping it to.
     - No, please don't use escape codes in your output. Use the library that is designed for this purpose: terminfo.
     - please take the time to write detailed man pages, not just a "--help" screen
     - implement "did you mean?" for typos (git style) and potentially dangerous commands
@@ -144,6 +137,11 @@ Confirm your GitHub token:
 
 ## done
 
+- [x] #BUG: digest not became true on catalog installs if its use checksum_file with digest verify both
+- [x] make sure skip not skip verification if there is verification option
+    - [x] freetube test verify digest even it is skip: true on the catalog,
+        and I still keep it skip purposely
+    - [x] obsidian test
 - [x] Clean up code
     - [x] general
     - [x] logger
@@ -154,7 +152,6 @@ Confirm your GitHub token:
     - [x] reading code from top to bottom
     - [x] functions instead of comments
     - [x] remove license, contribution from readme.md because there is already markdown files for them
-
 - [x] Remove overengineering
     - [x] template
 - [x] clean unused code
@@ -167,31 +164,29 @@ Confirm your GitHub token:
       so we need a better logic to handle this case
 - [x] BUG: two time installed print on new version
 
-    ```bash
-    ✅ All 2 specified app(s) are already installed:
-    • qownnotes
-    • legcord
-    ✅ All 2 specified app(s) are already installed:
-    • qownnotes
-    • legcord
-    ```
-
 ## Future Enhancements (Good-to-have)
 
 ### Asset detection, filtering, and prioritization
 
 1. **Configurable Architecture Support**
-    - Allow users to specify target architecture (ARM, x86_64, etc.)
-    - Useful for edge cases like Raspberry Pi users
+
+   - Allow users to specify target architecture (ARM, x86_64, etc.)
+   - Useful for edge cases like Raspberry Pi users
 
 2. **Smart Checksum Prioritization**
-    - Prefer SHA512 > SHA256 > MD5 when multiple checksums available
-    - Documented in filtering methods
+
+   - Prefer SHA512 > SHA256 > MD5 when multiple checksums available
+   - Documented in filtering methods
 
 3. **Cache Statistics Enhancement**
-    - Add metrics for filtered vs. total assets
-    - Show cache size savings in stats output
+
+   - Add metrics for filtered vs. total assets
+   - Show cache size savings in stats output
 
 4. **Pattern Configuration**
-    - Move platform patterns to configuration file
-    - Allow advanced users to customize filtering rules
+   - Move platform patterns to configuration file
+   - Allow advanced users to customize filtering rules
+
+## Future Improvements
+
+- [ ] Switch to stable releases only when we publish stable versions (currently using prereleases in upgrade module)
