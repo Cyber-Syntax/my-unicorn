@@ -615,7 +615,7 @@ wheels = [
 
 [[package]]
 name = "my-unicorn"
-version = "1.11.0a0"
+version = "1.12.0a0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohappyeyeballs" },
@@ -686,11 +686,11 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "aioresponses", marker = "python_full_version >= '3.12'" },
-    { name = "pytest", marker = "python_full_version >= '3.12'" },
-    { name = "pytest-asyncio", marker = "python_full_version >= '3.12'" },
-    { name = "pytest-cov", marker = "python_full_version >= '3.12'" },
-    { name = "pytest-mock", marker = "python_full_version >= '3.12'" },
+    { name = "aioresponses" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-mock" },
 ]
 lint = [{ name = "ruff" }]
 

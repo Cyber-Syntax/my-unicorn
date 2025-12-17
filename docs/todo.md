@@ -32,6 +32,10 @@
 
 ## in-progress
 
+- [ ] deprecate my-unicorn package and repo directories after migration to uv package manager:
+    repo = /home/developer/.local/share/my-unicorn-repo
+    package = /home/developer/.local/share/my-unicorn
+
 - [ ] move the src/ layout for better packaging and installation
 - [ ] remove icon download logic because we extract icon from appimage now.
 - [ ] add lock for one instance only to prevent multiple instance run at the same time
