@@ -1,3 +1,76 @@
+from my_unicorn.utils.progress_utils import calculate_speed
+
+
+def test_calculate_speed_zero_time_returns_zero():
+    avg, hist = calculate_speed(
+        prev_completed=100.0,
+        prev_time=1000.0,
+        speed_history=None,
+        completed=150.0,
+        current_time=1000.0,
+        max_history=5,
+    )
+
+    assert avg == 0.0
+    assert hist is None or len(hist) == 0
+
+
+def test_calculate_speed_negative_time_returns_zero():
+    avg, hist = calculate_speed(
+        prev_completed=100.0,
+        prev_time=1001.0,
+        speed_history=None,
+        completed=150.0,
+        current_time=1000.0,
+        max_history=5,
+    )
+
+    assert avg == 0.0
+
+
+def test_calculate_speed_zero_progress_returns_zero():
+    avg, hist = calculate_speed(
+        prev_completed=200.0,
+        prev_time=1000.0,
+        speed_history=None,
+        completed=200.0,
+        current_time=1001.0,
+        max_history=5,
+    )
+
+    assert avg == 0.0
+
+
+def test_calculate_speed_normal_and_history():
+    # First measurement
+    avg1, hist1 = calculate_speed(
+        prev_completed=0.0,
+        prev_time=1000.0,
+        speed_history=None,
+        completed=100.0,
+        current_time=1001.0,
+        max_history=5,
+    )
+
+    # raw speed should be 100 bytes/sec for this interval
+    assert abs(avg1 - 100.0) < 1e-6
+    assert hist1 is not None and len(hist1) == 1
+
+    # Second measurement - should average over history
+    avg2, hist2 = calculate_speed(
+        prev_completed=100.0,
+        prev_time=1001.0,
+        speed_history=hist1,
+        completed=300.0,
+        current_time=1003.0,
+        max_history=5,
+    )
+
+    # raw speeds were 100 (first interval) and 100 (second interval of 200/2s)
+    assert abs(avg2 - 100.0) < 1e-6
+    assert hist2 is not None and len(hist2) == 2
+
+
 """Comprehensive tests for progress_utils module.
 
 Tests cover all utility functions for ASCII rendering and data formatting

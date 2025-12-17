@@ -24,7 +24,7 @@ from my_unicorn.verification import VerificationService
 from .auth import GitHubAuthManager
 from .backup import BackupService
 from .config import ConfigManager
-from .download import DownloadService, IconAsset
+from .download import DownloadIconAsset, DownloadService
 from .file_ops import FileOperations
 from .github_client import Asset, AssetSelector, Release, ReleaseFetcher
 from .logger import get_logger
@@ -204,15 +204,6 @@ class UpdateManager:
             if not app_config:
                 logger.warning("No config found for app: %s", app_name)
                 return None
-
-            # DEBUG: Log source immediately after loading from disk
-            original_source = app_config.get("source", "NOT_SET")
-            logger.debug(
-                f"🔍 DEBUG: Source immediately after loading config from disk: {original_source}"
-            )
-            logger.debug(
-                f"🔍 DEBUG: Full app_config keys: {list(app_config.keys())}"
-            )
 
             current_version = app_config["appimage"]["version"]
             owner = app_config["owner"]
@@ -660,12 +651,12 @@ class UpdateManager:
         )
         progress_enabled = progress_service.is_active()
 
+        # Ensure these are defined prior to operations to avoid
+        # referencing them in exception handlers where they may
+        # otherwise be undefined.
+        verification_task_id = None
+        installation_task_id = None
         try:
-            # Create installation workflow tasks (verification + installation)
-            # after download completes, similar to install command for consistent UX.
-            # This ensures the Installing section only appears after downloads finish.
-            verification_task_id = None
-            installation_task_id = None
             if progress_enabled:
                 (
                     verification_task_id,
@@ -943,7 +934,7 @@ class UpdateManager:
         if not icon_filename:
             icon_filename = f"{app_name}.png"
 
-        icon_asset = IconAsset(
+        icon_asset = DownloadIconAsset(
             icon_filename=icon_filename,
             icon_url=icon_url,
         )
@@ -1142,7 +1133,7 @@ class UpdateManager:
         app_name: str,
         icon_dir: Path,
         appimage_path: Path,
-        icon_asset: IconAsset,
+        icon_asset: DownloadIconAsset,
         progress_task_id: str | None = None,
     ) -> tuple[Path | None, dict[str, Any]]:
         """Extract icon from AppImage or install from github.
@@ -1223,22 +1214,10 @@ class UpdateManager:
         if self.verification_service is None:
             raise RuntimeError("Verification service not initialized")
 
-        logger.debug("🔄 About to call VerificationService.verify_file()")
-
         # Extract assets list from release_data if available
-        # Convert Release assets to dict format for compatibility with verification
         assets_list = []
         if release_data and release_data.assets:
-            # Convert Asset objects to dicts for verification service
-            for asset_obj in release_data.assets:
-                assets_list.append(
-                    {
-                        "name": asset_obj.name,
-                        "size": asset_obj.size,
-                        "browser_download_url": asset_obj.browser_download_url,
-                        "digest": asset_obj.digest or "",
-                    }
-                )
+            assets_list = release_data.assets
 
         try:
             logger.debug("🔍 Calling VerificationService.verify_file() with:")
@@ -1269,11 +1248,7 @@ class UpdateManager:
             return result.methods, result.updated_config
 
         except Exception as e:
-            logger.error("❌ VerificationService.verify_file() failed: %s", e)
-            logger.error("   - Exception type: %s", type(e).__name__)
-            import traceback
-
-            logger.debug("   - Traceback: %s", traceback.format_exc())
+            logger.error("Verification failed for %s: %s", app_name, e)
             raise
 
     async def update_multiple_apps(

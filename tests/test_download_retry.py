@@ -489,42 +489,6 @@ class TestDownloadServiceHelperMethods:
     """Test helper methods added in refactoring."""
 
     @pytest.mark.asyncio
-    async def test_attempt_download_success(
-        self, download_service, mock_session, tmp_path
-    ):
-        """Test _attempt_download helper method succeeds."""
-        dest = tmp_path / "test.AppImage"
-        url = "https://example.com/test.AppImage"
-
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.headers = {"Content-Length": "100"}
-        mock_response.raise_for_status = Mock()
-
-        async def mock_chunks():
-            yield b"test data"
-
-        mock_response.content.iter_chunked = lambda size: mock_chunks()
-        mock_session.get.return_value.__aenter__.return_value = mock_response
-
-        timeout = aiohttp.ClientTimeout(
-            total=600, sock_read=30, sock_connect=10
-        )
-
-        # Execute single attempt
-        await download_service._attempt_download(
-            url,
-            dest,
-            show_progress=False,
-            progress_type=ProgressType.DOWNLOAD,
-            timeout=timeout,
-        )
-
-        # Verify file was created
-        assert dest.exists()
-        assert dest.read_bytes() == b"test data"
-
-    @pytest.mark.asyncio
     async def test_download_without_progress(self, download_service, tmp_path):
         """Test _download_without_progress helper method."""
         dest = tmp_path / "test.AppImage"

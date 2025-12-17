@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.download import DownloadService, IconAsset
+from my_unicorn.download import DownloadIconAsset, DownloadService
 from my_unicorn.icon import (
     AppImageIconExtractor,
     IconConfig,
@@ -617,7 +617,7 @@ class TestIconHandler:
         self, icon_service, mock_paths
     ):
         """Test successful GitHub icon download."""
-        icon_asset = IconAsset(
+        icon_asset = DownloadIconAsset(
             icon_filename="testapp.png",
             icon_url="https://github.com/test/repo/raw/main/icon.png",
         )
@@ -643,7 +643,7 @@ class TestIconHandler:
         self, icon_service, mock_paths
     ):
         """Test failed GitHub icon download."""
-        icon_asset = IconAsset(
+        icon_asset = DownloadIconAsset(
             icon_filename="testapp.png",
             icon_url="https://github.com/test/repo/raw/main/icon.png",
         )
@@ -665,7 +665,7 @@ class TestIconHandler:
         self, icon_service, mock_paths
     ):
         """Test GitHub download when no icon is returned."""
-        icon_asset = IconAsset(
+        icon_asset = DownloadIconAsset(
             icon_filename="testapp.png",
             icon_url="https://github.com/test/repo/raw/main/icon.png",
         )

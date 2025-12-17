@@ -1,7 +1,7 @@
 """CLI argument parser for my-unicorn.
 
-This module handles the parsing of command-line arguments and provides
-a clean interface for defining CLI commands and their options.
+Handles parsing of command-line arguments and provides a clean
+interface for defining CLI commands and their options.
 """
 
 import argparse
@@ -16,7 +16,8 @@ class CLIParser:
         """Initialize the CLI parser with global configuration.
 
         Args:
-            global_config: Global configuration dictionary
+            global_config (dict[str, Any]): Global configuration
+                dictionary.
 
         """
         self.global_config = global_config
@@ -25,7 +26,7 @@ class CLIParser:
         """Parse command-line arguments.
 
         Returns:
-            Parsed arguments namespace
+            Namespace: Parsed arguments namespace.
 
         """
         parser = self._create_main_parser()
@@ -39,7 +40,8 @@ class CLIParser:
         """Create the main argument parser.
 
         Returns:
-            The configured main ArgumentParser instance
+            argparse.ArgumentParser: The configured main ArgumentParser
+                instance.
 
         """
         return argparse.ArgumentParser(
@@ -77,9 +79,13 @@ Examples:
     def _add_global_options(self, parser: argparse.ArgumentParser) -> None:
         """Add global options to the main parser.
 
-        This includes the --version flag which prints the package version
-        and exits. We avoid using -v here to prevent conflict with
-        subcommand --verbose flags.
+        Adds the --version flag which prints the package version and
+        exits. Avoids using -v to prevent conflict with subcommand
+        --verbose flags.
+
+        Args:
+            parser (argparse.ArgumentParser): The main parser to add
+                options to.
 
         """
         # Use a long form flag only to avoid colliding with -v / --verbose
@@ -94,7 +100,8 @@ Examples:
         """Add all subcommands to the parser.
 
         Args:
-            parser: The main ArgumentParser instance to add subcommands to
+            parser (argparse.ArgumentParser): The main ArgumentParser
+                instance to add subcommands to.
 
         """
         subparsers = parser.add_subparsers(
@@ -115,7 +122,8 @@ Examples:
         """Add install command parser.
 
         Args:
-            subparsers: The subparsers object to add the install command to
+            subparsers: The subparsers object to add the install command
+                to.
 
         """
         install_parser = subparsers.add_parser(
@@ -138,7 +146,9 @@ Examples:
         install_parser.add_argument(
             "targets",
             nargs="+",
-            help="Catalog app names or GitHub repository URLs (comma-separated)",
+            help=(
+                "Catalog app names or GitHub repository URLs (comma-separated)"
+            ),
         )
         install_parser.add_argument(
             "--concurrency",
@@ -159,7 +169,10 @@ Examples:
         install_parser.add_argument(
             "--no-desktop",
             action="store_true",
-            help="Skip desktop entry creation (only affects install, not updates)",
+            help=(
+                "Skip desktop entry creation "
+                "(only affects install, not updates)"
+            ),
         )
         install_parser.add_argument(
             "--verbose",
@@ -171,7 +184,8 @@ Examples:
         """Add update command parser.
 
         Args:
-            subparsers: The subparsers object to add the update command to
+            subparsers: The subparsers object to add the update command
+                to.
 
         """
         update_parser = subparsers.add_parser(
@@ -189,7 +203,10 @@ Examples:
         update_parser.add_argument(
             "apps",
             nargs="*",
-            help="App names to update (comma-separated supported, empty to update all)",
+            help=(
+                "App names to update (comma-separated supported, "
+                "empty to update all)"
+            ),
         )
         update_parser.add_argument(
             "--check-only",
@@ -199,7 +216,10 @@ Examples:
         update_parser.add_argument(
             "--refresh-cache",
             action="store_true",
-            help="Bypass cache and fetch fresh data from GitHub API (useful for automated scripts)",
+            help=(
+                "Bypass cache and fetch fresh data from GitHub API "
+                "(useful for automated scripts)"
+            ),
         )
         update_parser.add_argument(
             "--verbose",
@@ -211,7 +231,8 @@ Examples:
         """Add upgrade command parser.
 
         Args:
-            subparsers: The subparsers object to add the upgrade command to
+            subparsers: The subparsers object to add the upgrade command
+                to.
 
         """
         upgrade_parser = subparsers.add_parser(
@@ -241,7 +262,8 @@ Examples:
         """Add list command parser.
 
         Args:
-            subparsers: The subparsers object to add the list command to
+            subparsers: The subparsers object to add the list command
+                to.
 
         """
         list_parser = subparsers.add_parser(
@@ -257,7 +279,8 @@ Examples:
         """Add remove command parser.
 
         Args:
-            subparsers: The subparsers object to add the remove command to
+            subparsers: The subparsers object to add the remove command
+                to.
 
         """
         remove_parser = subparsers.add_parser(
@@ -283,7 +306,8 @@ Examples:
         """Add backup command parser.
 
         Args:
-            subparsers: The subparsers object to add the backup command to
+            subparsers: The subparsers object to add the backup command
+                to.
 
         """
         backup_parser = subparsers.add_parser(
@@ -368,7 +392,8 @@ Examples:
         """Add auth command parser.
 
         Args:
-            subparsers: The subparsers object to add the auth command to
+            subparsers: The subparsers object to add the auth command
+                to.
 
         """
         auth_parser = subparsers.add_parser(
@@ -393,7 +418,8 @@ Examples:
         """Add config command parser.
 
         Args:
-            subparsers: The subparsers object to add the config command to
+            subparsers: The subparsers object to add the config command
+                to.
 
         """
         config_parser = subparsers.add_parser(
@@ -415,7 +441,8 @@ Examples:
         """Add cache command parser.
 
         Args:
-            subparsers: The subparsers object to add the cache command to
+            subparsers: The subparsers object to add the cache command
+                to.
 
         """
         cache_parser = subparsers.add_parser(
@@ -435,7 +462,10 @@ Examples:
         clear_group.add_argument(
             "app_name",
             nargs="?",
-            help="App name or owner/repo to clear (e.g., 'signal' or 'signalapp/Signal-Desktop')",
+            help=(
+                "App name or owner/repo to clear (e.g., 'freetube' or "
+                "'FreeTubeApp/FreeTube')"
+            ),
         )
         clear_group.add_argument(
             "--all", action="store_true", help="Clear all cache entries"

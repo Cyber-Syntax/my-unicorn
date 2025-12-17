@@ -855,7 +855,7 @@ class IconHandler:
         # Fallback to GitHub download if extraction failed/disabled or no icon found
         if not result_icon_path and icon_config.icon_url:
             # Import here to avoid circular dependency
-            from my_unicorn.download import IconAsset
+            from my_unicorn.download import DownloadIconAsset
 
             # Update progress - downloading from GitHub
             if progress_task_id and self.progress_service:
@@ -865,7 +865,7 @@ class IconHandler:
                     description=f"🎨 Downloading icon for {app_name}...",
                 )
 
-            icon_asset = IconAsset(
+            icon_asset = DownloadIconAsset(
                 icon_filename=icon_config.icon_filename,
                 icon_url=icon_config.icon_url,
             )

@@ -1,7 +1,7 @@
 """CLI runner for my-unicorn.
 
-This module orchestrates the execution of CLI commands by routing
-parsed arguments to the appropriate command handlers.
+Orchestrates the execution of CLI commands by routing parsed
+arguments to the appropriate command handlers.
 """
 
 import sys
@@ -30,7 +30,11 @@ class CLIRunner:
     """CLI command runner and orchestrator."""
 
     def __init__(self) -> None:
-        """Initialize CLI runner with shared dependencies."""
+        """Initialize CLI runner with shared dependencies.
+
+        Sets up configuration, authentication, update management,
+        logging, and command handlers.
+        """
         self.config_manager = ConfigManager()
         self.global_config = self.config_manager.load_global_config()
         self.auth_manager = auth_manager
@@ -43,7 +47,10 @@ class CLIRunner:
         self._init_command_handlers()
 
     def _setup_file_logging(self) -> None:
-        """Setup file logging based on global configuration."""
+        """Set up file logging based on global configuration.
+
+        Enables file logging if specified in the global configuration.
+        """
         log_config = self.global_config.get("logging", {})
         if log_config.get("file", {}).get("enabled", False):
             log_file = log_config["file"]["path"]
@@ -51,7 +58,11 @@ class CLIRunner:
             logger.setup_file_logging(log_file, log_level)
 
     def _init_command_handlers(self) -> None:
-        """Initialize all command handlers with shared dependencies."""
+        """Initialize all command handlers with shared dependencies.
+
+        Prepares command handler instances for each supported CLI
+        command.
+        """
         self.command_handlers = {
             "install": InstallCommandHandler(
                 self.config_manager, self.auth_manager, self.update_manager
@@ -83,7 +94,16 @@ class CLIRunner:
         }
 
     async def run(self) -> None:
-        """Run the CLI application."""
+        """Run the CLI application.
+
+        Parses arguments, handles global flags, validates commands,
+        and routes to the appropriate handler.
+
+        Raises:
+            KeyboardInterrupt: If the user cancels the operation.
+            Exception: For any unexpected errors during execution.
+
+        """
         try:
             # Parse command-line arguments
             parser = CLIParser(self.global_config)
@@ -97,9 +117,7 @@ class CLIRunner:
 
             # Validate command
             if not args.command:
-                print(
-                    "❌ No command specified. Use --help for usage information."
-                )
+                print("❌ No command specified. Use --help.")
                 sys.exit(1)
 
             # Route to appropriate command handler
@@ -114,7 +132,12 @@ class CLIRunner:
             sys.exit(1)
 
     async def _execute_command(self, args: Namespace) -> None:
-        """Execute the specified command with appropriate handler."""
+        """Execute the specified command with the appropriate handler.
+
+        Args:
+            args: Parsed command-line arguments namespace.
+
+        """
         command = args.command
 
         if command not in self.command_handlers:

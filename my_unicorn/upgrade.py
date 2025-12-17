@@ -5,7 +5,6 @@ This module handles updating the my-unicorn package itself by fetching
 the latest release from GitHub, cloning the repository, and running
 the installer script in update mode.
 
-TODO: Switch to stable releases only when we publish stable versions
 Currently using prereleases until stable releases are available.
 """
 
@@ -243,8 +242,7 @@ class SelfUpdater:
         """
         try:
             logger.info("Fetching latest release from GitHub...")
-            # TODO: Change to prefer_prerelease=False when we have stable releases
-            # would be better to have variable in settings.conf for user choice
+            # Using prerelease until stable versions are published
             release_data = (
                 await self.github_fetcher.fetch_latest_release_or_prerelease(
                     prefer_prerelease=True, ignore_cache=refresh_cache

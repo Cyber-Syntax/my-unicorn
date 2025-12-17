@@ -13,7 +13,7 @@
     "verification": {
         "digest": false,
         "skip": false,
-        "checksum_file": "KeePassXC-2.7.10-x86_64.AppImage.DIGEST",
+        "checksum_file": "KeePassXC-{version}-x86_64.AppImage.DIGEST",
         "checksum_hash_type": "sha256"
     },
     "icon": {

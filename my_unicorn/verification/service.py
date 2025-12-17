@@ -38,6 +38,70 @@ class VerificationConfig:
     checksum_hash_type: str = "sha256"
     digest_enabled: bool = False
 
+    @classmethod
+    def from_dict(cls, config: dict[str, Any]) -> VerificationConfig:
+        """Create VerificationConfig from a dictionary.
+
+        Args:
+            config: Dictionary with configuration values
+
+        Returns:
+            VerificationConfig instance
+
+        """
+        return cls(
+            skip=config.get("skip", False),
+            checksum_file=config.get("checksum_file"),
+            checksum_hash_type=config.get("checksum_hash_type", "sha256"),
+            digest_enabled=config.get("digest", False),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for backward compatibility.
+
+        Returns:
+            Dictionary with configuration values
+
+        """
+        return {
+            "skip": self.skip,
+            "checksum_file": self.checksum_file,
+            "checksum_hash_type": self.checksum_hash_type,
+            "digest": self.digest_enabled,
+        }
+
+
+@dataclass(slots=True, frozen=True)
+class MethodResult:
+    """Result of a single verification method attempt."""
+
+    passed: bool
+    hash: str
+    details: str
+    computed_hash: str | None = None
+    url: str | None = None
+    hash_type: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for backward compatibility.
+
+        Returns:
+            Dictionary representation
+
+        """
+        result: dict[str, Any] = {
+            "passed": self.passed,
+            "hash": self.hash,
+            "details": self.details,
+        }
+        if self.computed_hash:
+            result["computed_hash"] = self.computed_hash
+        if self.url:
+            result["url"] = self.url
+        if self.hash_type:
+            result["hash_type"] = self.hash_type
+        return result
+
 
 @dataclass(slots=True, frozen=True)
 class VerificationResult:
@@ -46,6 +110,33 @@ class VerificationResult:
     passed: bool
     methods: dict[str, Any]
     updated_config: dict[str, Any]
+
+
+@dataclass(slots=True)
+class VerificationContext:
+    """Internal context for verification state management.
+
+    Holds mutable state during verification process to reduce
+    parameter passing.
+    """
+
+    file_path: Path
+    asset: Asset
+    config: dict[str, Any]
+    owner: str
+    repo: str
+    tag_name: str
+    app_name: str
+    assets: list[Asset] | None
+    progress_task_id: Any | None
+    # Computed during preparation
+    has_digest: bool = False
+    checksum_files: list[ChecksumFileInfo] | None = None
+    verifier: Verifier | None = None
+    updated_config: dict[str, Any] | None = None
+    # Results
+    verification_passed: bool = False
+    verification_methods: dict[str, Any] | None = None
 
 
 class VerificationService:
@@ -75,7 +166,7 @@ class VerificationService:
         repo: str,
         tag_name: str,
         app_name: str,
-        assets: list[dict[str, Any]] | None = None,
+        assets: list[Asset] | None = None,
         progress_task_id: Any | None = None,
     ) -> VerificationResult:
         """Perform comprehensive file verification.
@@ -98,181 +189,271 @@ class VerificationService:
             Exception: If verification fails and strong methods available
 
         """
-        logger.debug("🔍 Starting verification for %s", app_name)
+        # Create context for verification state
+        context = VerificationContext(
+            file_path=file_path,
+            asset=asset,
+            config=config,
+            owner=owner,
+            repo=repo,
+            tag_name=tag_name,
+            app_name=app_name,
+            assets=assets,
+            progress_task_id=progress_task_id,
+            verification_methods={},
+        )
+
+        # Phase 1: Prepare verification
+        skip_result = await self._prepare_verification(context)
+        if skip_result:
+            return skip_result
+
+        # Phase 2: Execute verification methods
+        await self._execute_verification(context)
+
+        # Phase 3: Finalize and return result
+        return await self._finalize_verification(context)
+
+    async def _prepare_verification(
+        self, context: VerificationContext
+    ) -> VerificationResult | None:
+        """Prepare verification: detect methods, check skip conditions.
+
+        Args:
+            context: Verification context
+
+        Returns:
+            VerificationResult if should skip, None otherwise
+
+        """
+        logger.debug("🔍 Starting verification for %s", context.app_name)
         logger.debug(
             "   📋 Configuration: skip=%s, checksum_file='%s', "
             "digest_enabled=%s",
-            config.get("skip", False),
-            config.get("checksum_file", ""),
-            config.get("digest", False),
+            context.config.get("skip", False),
+            context.config.get("checksum_file", ""),
+            context.config.get("digest", False),
         )
-        logger.debug("   📦 Asset digest: %s", asset.digest or "None")
+        logger.debug("   📦 Asset digest: %s", context.asset.digest or "None")
         logger.debug(
             "   📂 Assets provided: %s (%d items)",
-            bool(assets),
-            len(assets) if assets else 0,
+            bool(context.assets),
+            len(context.assets) if context.assets else 0,
         )
 
         # Create progress task if needed
         if (
             self.progress_service
-            and progress_task_id is None
+            and context.progress_task_id is None
             and self.progress_service.is_active()
         ):
-            progress_task_id = (
-                await self.progress_service.create_verification_task(app_name)
+            context.progress_task_id = (
+                await self.progress_service.create_verification_task(
+                    context.app_name
+                )
             )
 
-        # Update progress - starting verification
-        if progress_task_id and self.progress_service:
-            await self.progress_service.update_task(
-                progress_task_id,
-                completed=10.0,
-                description=f"🔍 Analyzing {app_name}...",
-            )
+        await self._update_progress(
+            context.progress_task_id,
+            10.0,
+            f"🔍 Analyzing {context.app_name}...",
+        )
 
         # Detect available methods
-        has_digest, checksum_files = self._detect_available_methods(
-            asset, config, assets, owner, repo, tag_name
+        context.has_digest, context.checksum_files = (
+            self._detect_available_methods(
+                context.asset,
+                context.config,
+                context.assets,
+                context.owner,
+                context.repo,
+                context.tag_name,
+            )
         )
-        has_checksum_files = bool(checksum_files)
+        has_checksum_files = bool(context.checksum_files)
 
         logger.debug(
             "   Available methods: digest=%s, checksum_files=%d",
-            has_digest,
-            len(checksum_files),
+            context.has_digest,
+            len(context.checksum_files) if context.checksum_files else 0,
         )
 
         # Check if verification should be skipped
-        should_skip, updated_config = self._should_skip_verification(
-            config, has_digest, has_checksum_files
+        should_skip, context.updated_config = self._should_skip_verification(
+            context.config, context.has_digest, has_checksum_files
         )
         if should_skip:
-            if progress_task_id and self.progress_service:
-                await self.progress_service.finish_task(
-                    progress_task_id,
-                    success=True,
-                    description="verification skipped",
-                )
+            await self._finish_progress(
+                context.progress_task_id, True, "verification skipped"
+            )
             return VerificationResult(
                 passed=True,
                 methods={},
-                updated_config=updated_config,
+                updated_config=context.updated_config,
             )
 
-        verifier = Verifier(file_path)
-        verification_passed = False
-        verification_methods = {}
-        skip_configured = config.get("skip", False)
+        # Create verifier
+        context.verifier = Verifier(context.file_path)
+        await self._update_progress(
+            context.progress_task_id, 25.0, f"🔍 Reading {context.app_name}..."
+        )
 
-        # Update progress - creating verifier
-        if progress_task_id and self.progress_service:
-            await self.progress_service.update_task(
-                progress_task_id,
-                completed=25.0,
-                description=f"🔍 Reading {app_name}...",
-            )
+        return None
+
+    async def _execute_verification(
+        self, context: VerificationContext
+    ) -> None:
+        """Execute verification methods: digest and checksum files.
+
+        Args:
+            context: Verification context (modified in place)
+
+        """
+        skip_configured = context.config.get("skip", False)
 
         # Try digest verification first if available
-        if has_digest:
-            logger.debug("🔐 Digest verification available - attempting...")
-            if progress_task_id and self.progress_service:
-                await self.progress_service.update_task(
-                    progress_task_id,
-                    completed=40.0,
-                    description=f"🔍 Verifying digest for {app_name}...",
-                )
+        if context.has_digest:
+            await self._execute_digest_verification(context, skip_configured)
 
-            digest_result = await self._verify_digest(
-                verifier, asset.digest, app_name, skip_configured
-            )
-            if digest_result:
-                verification_methods["digest"] = digest_result
-                if digest_result["passed"]:
-                    verification_passed = True
-                    logger.debug("✅ Digest verification succeeded")
-                    updated_config["digest"] = True
-                else:
-                    logger.warning("❌ Digest verification failed")
+        # Try checksum file verification
+        if context.checksum_files:
+            await self._execute_checksum_verification(context)
+
+    async def _execute_digest_verification(
+        self, context: VerificationContext, skip_configured: bool
+    ) -> None:
+        """Execute digest verification.
+
+        Args:
+            context: Verification context (modified in place)
+            skip_configured: Whether skip was configured
+
+        """
+        logger.debug("🔐 Digest verification available - attempting...")
+        await self._update_progress(
+            context.progress_task_id,
+            40.0,
+            f"🔍 Verifying digest for {context.app_name}...",
+        )
+
+        digest_result = await self._verify_digest(
+            context.verifier,
+            context.asset.digest,
+            context.app_name,
+            skip_configured,
+        )
+        if digest_result:
+            context.verification_methods["digest"] = digest_result.to_dict()
+            if digest_result.passed:
+                context.verification_passed = True
+                logger.debug("✅ Digest verification succeeded")
+                context.updated_config["digest"] = True
+            else:
+                logger.warning("❌ Digest verification failed")
         else:
             logger.debug("i  No digest available for verification")
 
-        # Try checksum file verification with smart prioritization
-        if checksum_files:
+    async def _execute_checksum_verification(
+        self, context: VerificationContext
+    ) -> None:
+        """Execute checksum file verification.
+
+        Args:
+            context: Verification context (modified in place)
+
+        """
+        logger.debug(
+            "🔍 Checksum file verification available - found %d files",
+            len(context.checksum_files),
+        )
+        for cf in context.checksum_files:
             logger.debug(
-                "🔍 Checksum file verification available - found %d files",
-                len(checksum_files),
+                "   📄 Available: %s (%s format)",
+                cf.filename,
+                cf.format_type,
             )
-            for cf in checksum_files:
-                logger.debug(
-                    "   📄 Available: %s (%s format)",
-                    cf.filename,
-                    cf.format_type,
-                )
 
-            if progress_task_id and self.progress_service:
-                await self.progress_service.update_task(
-                    progress_task_id,
-                    completed=60.0,
-                    description=f"🔍 Verifying checksum for {app_name}...",
-                )
+        await self._update_progress(
+            context.progress_task_id,
+            60.0,
+            f"🔍 Verifying checksum for {context.app_name}...",
+        )
 
-            # Use original asset name for checksum lookups
-            original_asset_name = asset.name if asset.name else file_path.name
+        # Use original asset name for checksum lookups
+        original_asset_name = (
+            context.asset.name
+            if context.asset.name
+            else context.file_path.name
+        )
+        logger.debug(
+            "🔍 Using original asset name for checksum verification: %s",
+            original_asset_name,
+        )
+
+        # Prioritize checksum files
+        prioritized_files = self._prioritize_checksum_files(
+            context.checksum_files, original_asset_name
+        )
+
+        for i, checksum_file in enumerate(prioritized_files):
             logger.debug(
-                "🔍 Using original asset name for checksum verification: %s",
+                "🔍 Attempting checksum verification with: %s",
+                checksum_file.filename,
+            )
+            method_key = f"checksum_file_{i}" if i > 0 else "checksum_file"
+
+            checksum_result = await self._verify_checksum_file(
+                context.verifier,
+                checksum_file,
                 original_asset_name,
+                context.app_name,
             )
 
-            # Prioritize checksum files
-            prioritized_files = self._prioritize_checksum_files(
-                checksum_files, original_asset_name
-            )
-
-            for i, checksum_file in enumerate(prioritized_files):
-                logger.debug(
-                    "🔍 Attempting checksum verification with: %s",
-                    checksum_file.filename,
+            if checksum_result:
+                context.verification_methods[method_key] = (
+                    checksum_result.to_dict()
                 )
-                method_key = f"checksum_file_{i}" if i > 0 else "checksum_file"
+                if checksum_result.passed:
+                    context.verification_passed = True
+                    logger.debug(
+                        "✅ Checksum verification succeeded with: %s",
+                        checksum_file.filename,
+                    )
+                    context.updated_config["checksum_file"] = (
+                        checksum_file.filename
+                    )
+                    break
+                else:
+                    logger.warning(
+                        "❌ Checksum verification failed with: %s",
+                        checksum_file.filename,
+                    )
 
-                checksum_result = await self._verify_checksum_file(
-                    verifier, checksum_file, original_asset_name, app_name
-                )
+    async def _finalize_verification(
+        self, context: VerificationContext
+    ) -> VerificationResult:
+        """Finalize verification: check results, update progress.
 
-                if checksum_result:
-                    verification_methods[method_key] = checksum_result
-                    if checksum_result["passed"]:
-                        verification_passed = True
-                        logger.debug(
-                            "✅ Checksum verification succeeded with: %s",
-                            checksum_file.filename,
-                        )
-                        updated_config["checksum_file"] = (
-                            checksum_file.filename
-                        )
-                        break
-                    else:
-                        logger.warning(
-                            "❌ Checksum verification failed with: %s",
-                            checksum_file.filename,
-                        )
-        else:
-            logger.debug("i  No checksum files available for verification")
+        Args:
+            context: Verification context
 
-        # Determine overall verification result
-        strong_methods_available = has_digest or has_checksum_files
+        Returns:
+            VerificationResult with final status
+
+        Raises:
+            Exception: If strong methods available but none passed
+
+        """
+        has_checksum_files = bool(context.checksum_files)
+        strong_methods_available = context.has_digest or has_checksum_files
 
         # If strong methods available but none passed, fail
-        if strong_methods_available and not verification_passed:
-            if progress_task_id and self.progress_service:
-                await self.progress_service.finish_task(
-                    progress_task_id,
-                    success=False,
-                    description="verification failed",
-                )
+        if strong_methods_available and not context.verification_passed:
+            await self._finish_progress(
+                context.progress_task_id, False, "verification failed"
+            )
             available_methods = []
-            if has_digest:
+            if context.has_digest:
                 available_methods.append("digest")
             if has_checksum_files:
                 available_methods.append("checksum_files")
@@ -281,55 +462,109 @@ class VerificationService:
                 f"{', '.join(available_methods)}"
             )
 
-        overall_passed = verification_passed
+        overall_passed = context.verification_passed
 
         # Log final verification summary
-        logger.debug("📊 Verification summary for %s:", app_name)
+        self._log_verification_summary(
+            context, strong_methods_available, overall_passed
+        )
+
+        # Update progress
+        if overall_passed:
+            await self._finish_progress(
+                context.progress_task_id, True, "verification passed"
+            )
+            logger.debug("✅ Verification completed successfully")
+        else:
+            await self._finish_progress(
+                context.progress_task_id,
+                False,
+                "verification completed with warnings",
+            )
+            logger.warning("⚠️  Verification completed with warnings")
+
+        return VerificationResult(
+            passed=overall_passed,
+            methods=context.verification_methods,
+            updated_config=context.updated_config,
+        )
+
+    def _log_verification_summary(
+        self,
+        context: VerificationContext,
+        strong_methods_available: bool,
+        overall_passed: bool,
+    ) -> None:
+        """Log verification summary for debugging.
+
+        Args:
+            context: Verification context
+            strong_methods_available: Whether strong methods were available
+            overall_passed: Overall verification result
+
+        """
+        logger.debug("📊 Verification summary for %s:", context.app_name)
         logger.debug(
             "   🔐 Strong methods available: %s", strong_methods_available
         )
         logger.debug("   ✅ Verification passed: %s", overall_passed)
         logger.debug(
-            "   📋 Methods used: %s", list(verification_methods.keys())
+            "   📋 Methods used: %s", list(context.verification_methods.keys())
         )
-        for method, result in verification_methods.items():
+        for method, result in context.verification_methods.items():
             logger.debug(
                 "      %s: %s",
                 method,
                 "✅ PASS" if result.get("passed") else "❌ FAIL",
             )
 
-        # Update progress - verification completed
-        if progress_task_id and self.progress_service:
-            if overall_passed:
-                await self.progress_service.finish_task(
-                    progress_task_id,
-                    success=True,
-                    description="verification passed",
-                )
-            else:
-                await self.progress_service.finish_task(
-                    progress_task_id,
-                    success=False,
-                    description="verification completed with warnings",
-                )
+    async def _update_progress(
+        self,
+        task_id: Any | None,
+        completed: float,
+        description: str,
+    ) -> None:
+        """Update progress task if available.
 
-        if overall_passed:
-            logger.debug("✅ Verification completed successfully")
-        else:
-            logger.warning("⚠️  Verification completed with warnings")
+        Args:
+            task_id: Progress task ID (may be None)
+            completed: Completion percentage
+            description: Status description
 
-        return VerificationResult(
-            passed=overall_passed,
-            methods=verification_methods,
-            updated_config=updated_config,
-        )
+        """
+        if task_id and self.progress_service:
+            await self.progress_service.update_task(
+                task_id,
+                completed=completed,
+                description=description,
+            )
+
+    async def _finish_progress(
+        self,
+        task_id: Any | None,
+        success: bool,
+        description: str,
+    ) -> None:
+        """Finish progress task if available.
+
+        Args:
+            task_id: Progress task ID (may be None)
+            success: Whether task succeeded
+            description: Final status description
+
+        """
+        if task_id and self.progress_service:
+            await self.progress_service.finish_task(
+                task_id,
+                success=success,
+                description=description,
+            )
 
     def _detect_available_methods(
         self,
         asset: Asset,
         config: dict[str, Any],
-        assets: list[dict[str, Any]] | None = None,
+        assets: list[Asset] | None = None,
         owner: str | None = None,
         repo: str | None = None,
         tag_name: str | None = None,
@@ -348,11 +583,29 @@ class VerificationService:
             Tuple of (has_digest, checksum_files_list)
 
         """
+        has_digest = self._check_digest_availability(asset, config)
+        checksum_files = self._resolve_checksum_files(
+            asset, config, assets, owner, repo, tag_name
+        )
+        return has_digest, checksum_files
+
+    def _check_digest_availability(
+        self, asset: Asset, config: dict[str, Any]
+    ) -> bool:
+        """Check if digest verification is available.
+
+        Args:
+            asset: GitHub asset information
+            config: Verification configuration
+
+        Returns:
+            True if digest is available
+
+        """
         digest_value = asset.digest or ""
         has_digest = bool(digest_value and digest_value.strip())
         digest_requested = config.get("digest", False)
 
-        # Log digest availability vs configuration
         if digest_requested and not has_digest:
             logger.warning(
                 "⚠️  Digest verification requested but no digest available "
@@ -367,65 +620,141 @@ class VerificationService:
                 digest_value[:16] + "...",
             )
 
-        # Check for manually configured checksum file
-        manual_checksum_file = config.get("checksum_file")
-        checksum_files = []
+        return has_digest
 
+    def _resolve_checksum_files(
+        self,
+        asset: Asset,
+        config: dict[str, Any],
+        assets: list[Asset] | None,
+        owner: str | None,
+        repo: str | None,
+        tag_name: str | None,
+    ) -> list[ChecksumFileInfo]:
+        """Resolve checksum files from config or auto-detection.
+
+        Args:
+            asset: GitHub asset information
+            config: Verification configuration
+            assets: All GitHub release assets (optional)
+            owner: Repository owner (optional)
+            repo: Repository name (optional)
+            tag_name: Release tag name (optional)
+
+        Returns:
+            List of checksum file info
+
+        """
+        manual_checksum_file = config.get("checksum_file")
+
+        # Use manually configured checksum file if specified
         if manual_checksum_file and manual_checksum_file.strip():
-            # Use manually configured checksum file
-            if owner and repo and tag_name:
-                url = self._build_checksum_url(
-                    owner, repo, tag_name, manual_checksum_file
-                )
-                format_type = (
-                    "yaml"
-                    if manual_checksum_file.lower().endswith((".yml", ".yaml"))
-                    else "traditional"
-                )
-                checksum_files.append(
-                    ChecksumFileInfo(
-                        filename=manual_checksum_file,
-                        url=url,
-                        format_type=format_type,
-                    )
-                )
-        elif (
+            return self._resolve_manual_checksum_file(
+                manual_checksum_file, asset, owner, repo, tag_name
+            )
+
+        # Auto-detect if conditions are met
+        if (
             assets
             and owner
             and repo
             and tag_name
             and not config.get("digest", False)
         ):
-            # Auto-detect checksum files if digest not explicitly enabled
-            logger.debug(
-                "🔍 Auto-detecting checksum files "
-                "(digest not explicitly enabled)"
-            )
-            try:
-                # Convert assets to Asset objects
-                asset_objects: list[Asset] = []
-                for asset_data in assets:
-                    asset_obj = Asset.from_api_response(asset_data)
-                    if asset_obj:
-                        asset_objects.append(asset_obj)
+            return self._auto_detect_checksum_files(assets, tag_name)
 
-                # Use AssetSelector to detect checksum files
-                checksum_files = AssetSelector.detect_checksum_files(
-                    asset_objects, tag_name
-                )
-                logger.debug(
-                    "🔍 Auto-detected %d checksum files from assets",
-                    len(checksum_files),
-                )
-            except Exception as e:
-                logger.warning("Failed to auto-detect checksum files: %s", e)
-        elif assets and config.get("digest", False):
+        if assets and config.get("digest", False):
             logger.debug(
                 "i  Skipping auto-detection: "
                 "digest verification explicitly enabled"
             )
 
-        return has_digest, checksum_files
+        return []
+
+    def _resolve_manual_checksum_file(
+        self,
+        manual_checksum_file: str,
+        asset: Asset,
+        owner: str | None,
+        repo: str | None,
+        tag_name: str | None,
+    ) -> list[ChecksumFileInfo]:
+        """Resolve manually configured checksum file with template support.
+
+        Args:
+            manual_checksum_file: Configured checksum filename
+                (may have templates)
+            asset: GitHub asset information
+            owner: Repository owner
+            repo: Repository name
+            tag_name: Release tag name
+
+        Returns:
+            List with single checksum file info, or empty list
+
+        """
+        resolved_name = manual_checksum_file
+        try:
+            if "{" in manual_checksum_file and tag_name:
+                resolved_name = manual_checksum_file.replace(
+                    "{version}", tag_name
+                ).replace("{tag}", tag_name)
+            if (
+                "{asset_name}" in resolved_name
+                and asset
+                and hasattr(asset, "name")
+            ):
+                resolved_name = resolved_name.replace(
+                    "{asset_name}", asset.name
+                )
+        except Exception:
+            resolved_name = manual_checksum_file
+
+        if not (owner and repo and tag_name):
+            return []
+
+        url = self._build_checksum_url(owner, repo, tag_name, resolved_name)
+        format_type = (
+            "yaml"
+            if resolved_name.lower().endswith((".yml", ".yaml"))
+            else "traditional"
+        )
+        return [
+            ChecksumFileInfo(
+                filename=resolved_name,
+                url=url,
+                format_type=format_type,
+            )
+        ]
+
+    def _auto_detect_checksum_files(
+        self, assets: list[Asset], tag_name: str
+    ) -> list[ChecksumFileInfo]:
+        """Auto-detect checksum files from GitHub assets.
+
+        Args:
+            assets: GitHub release assets
+            tag_name: Release tag name
+
+        Returns:
+            List of detected checksum file info
+
+        """
+        logger.debug(
+            "🔍 Auto-detecting checksum files (digest not explicitly enabled)"
+        )
+        try:
+            checksum_files = AssetSelector.detect_checksum_files(
+                assets, tag_name
+            )
+            logger.debug(
+                "🔍 Auto-detected %d checksum files from assets",
+                len(checksum_files),
+            )
+            return checksum_files
+        except Exception as e:
+            logger.warning("Failed to auto-detect checksum files: %s", e)
+            return []
 
     def _build_checksum_url(
         self,
@@ -598,7 +927,7 @@ class VerificationService:
         digest: str,
         app_name: str,
         skip_configured: bool,
-    ) -> dict[str, Any] | None:
+    ) -> MethodResult | None:
         """Verify file using GitHub API digest.
 
         Args:
@@ -608,7 +937,7 @@ class VerificationService:
             skip_configured: Whether skip was configured
 
         Returns:
-            Verification result dict or None if failed
+            MethodResult or None if failed
 
         """
         try:
@@ -625,21 +954,21 @@ class VerificationService:
             verifier.verify_digest(digest)
             logger.debug("✅ Digest verification passed")
             logger.debug("   ✓ Digest match confirmed")
-            return {
-                "passed": True,
-                "hash": digest,
-                "computed_hash": actual_digest,
-                "details": "GitHub API digest verification",
-            }
+            return MethodResult(
+                passed=True,
+                hash=digest,
+                computed_hash=actual_digest,
+                details="GitHub API digest verification",
+            )
         except Exception as e:
             logger.error("❌ Digest verification failed: %s", e)
             logger.error("   Expected: %s", digest)
             logger.error("   AppImage: %s", verifier.file_path.name)
-            return {
-                "passed": False,
-                "hash": digest,
-                "details": str(e),
-            }
+            return MethodResult(
+                passed=False,
+                hash=digest,
+                details=str(e),
+            )
 
     async def _verify_checksum_file(
         self,
@@ -647,7 +976,7 @@ class VerificationService:
         checksum_file: ChecksumFileInfo,
         target_filename: str,
         app_name: str,
-    ) -> dict[str, Any] | None:
+    ) -> MethodResult | None:
         """Verify file using checksum file.
 
         Args:
@@ -657,7 +986,7 @@ class VerificationService:
             app_name: Application name for logging
 
         Returns:
-            Verification result dict or None if failed
+            MethodResult or None if failed
 
         """
         try:
@@ -700,14 +1029,14 @@ class VerificationService:
                     checksum_file.format_type,
                 )
                 logger.error("   🔍 Looking for: %s", target_filename)
-                return {
-                    "passed": False,
-                    "hash": "",
-                    "details": (
+                return MethodResult(
+                    passed=False,
+                    hash="",
+                    details=(
                         f"Hash not found for {target_filename} "
                         f"in checksum file"
                     ),
-                }
+                )
 
             logger.debug(
                 "🔍 Starting hash comparison for checksum file verification"
@@ -752,16 +1081,16 @@ class VerificationService:
                     checksum_file.format_type,
                 )
                 logger.debug("   ✓ Hash match confirmed")
-                return {
-                    "passed": True,
-                    "hash": f"{hash_type}:{computed_hash}",
-                    "details": (
+                return MethodResult(
+                    passed=True,
+                    hash=f"{hash_type}:{computed_hash}",
+                    details=(
                         f"Verified against {checksum_file.format_type} "
                         f"checksum file"
                     ),
-                    "url": checksum_file.url,
-                    "hash_type": hash_type,
-                }
+                    url=checksum_file.url,
+                    hash_type=hash_type,
+                )
             else:
                 logger.error("❌ Checksum file verification FAILED!")
                 logger.error(
@@ -772,16 +1101,16 @@ class VerificationService:
                 logger.error("   🔢 Expected hash: %s", expected_hash)
                 logger.error("   🧮 Computed hash: %s", computed_hash)
                 logger.error("   ❌ Hash mismatch detected")
-                return {
-                    "passed": False,
-                    "hash": f"{hash_type}:{computed_hash}",
-                    "details": f"Hash mismatch (expected: {expected_hash})",
-                }
+                return MethodResult(
+                    passed=False,
+                    hash=f"{hash_type}:{computed_hash}",
+                    details=f"Hash mismatch (expected: {expected_hash})",
+                )
 
         except Exception as e:
             logger.error("❌ Checksum file verification failed: %s", e)
-            return {
-                "passed": False,
-                "hash": "",
-                "details": str(e),
-            }
+            return MethodResult(
+                passed=False,
+                hash="",
+                details=str(e),
+            )

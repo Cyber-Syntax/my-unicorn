@@ -11,22 +11,15 @@ Live) validation to ensure data freshness while minimizing API calls.
 import contextlib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any
 
 import orjson
 
 from my_unicorn.config import ConfigManager
 from my_unicorn.logger import get_logger
+from my_unicorn.types import CacheEntry
 
 logger = get_logger(__name__)
-
-
-class CacheEntry(TypedDict):
-    """Cache entry structure for storing release data."""
-
-    cached_at: str  # ISO 8601 timestamp
-    ttl_hours: int  # Cache TTL in hours
-    release_data: dict[str, Any]  # GitHubReleaseDetails structure
 
 
 class ReleaseCacheManager:

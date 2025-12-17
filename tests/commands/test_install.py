@@ -56,8 +56,9 @@ async def test_execute_with_valid_targets(install_command, mock_dependencies):
     mock_dependencies["config_manager"].is_app_installed.return_value = False
 
     # Mock the internal execution method
-    with patch.object(
-        install_command, "_execute_installations", new_callable=AsyncMock
+    with patch(
+        "my_unicorn.install.InstallHandler.install_multiple",
+        new_callable=AsyncMock,
     ) as mock_execute:
         mock_execute.return_value = [
             {

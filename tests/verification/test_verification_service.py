@@ -119,42 +119,42 @@ class TestVerificationService:
     def sample_assets(self):
         """Sample GitHub assets for testing."""
         return [
-            {
-                "name": "Legcord-1.1.5-linux-x86_64.AppImage",
-                "browser_download_url": "https://github.com/Legcord/Legcord/releases/download/v1.1.5/Legcord-1.1.5-linux-x86_64.AppImage",
-                "size": 124457255,
-                "digest": "",
-            },
-            {
-                "name": "latest-linux.yml",
-                "browser_download_url": "https://github.com/Legcord/Legcord/releases/download/v1.1.5/latest-linux.yml",
-                "size": 1234,
-                "digest": "",
-            },
+            Asset(
+                name="Legcord-1.1.5-linux-x86_64.AppImage",
+                browser_download_url="https://github.com/Legcord/Legcord/releases/download/v1.1.5/Legcord-1.1.5-linux-x86_64.AppImage",
+                size=124457255,
+                digest=None,
+            ),
+            Asset(
+                name="latest-linux.yml",
+                browser_download_url="https://github.com/Legcord/Legcord/releases/download/v1.1.5/latest-linux.yml",
+                size=1234,
+                digest=None,
+            ),
         ]
 
     @pytest.fixture
     def sample_assets_with_both(self):
         """Sample GitHub assets with both YAML and traditional checksum files."""
         return [
-            {
-                "name": "app.AppImage",
-                "browser_download_url": "https://github.com/test/test/releases/download/v1.0.0/app.AppImage",
-                "size": 12345,
-                "digest": "",
-            },
-            {
-                "name": "latest-linux.yml",
-                "browser_download_url": "https://github.com/test/test/releases/download/v1.0.0/latest-linux.yml",
-                "size": 1234,
-                "digest": "",
-            },
-            {
-                "name": "SHA256SUMS.txt",
-                "browser_download_url": "https://github.com/test/test/releases/download/v1.0.0/SHA256SUMS.txt",
-                "size": 567,
-                "digest": "",
-            },
+            Asset(
+                name="app.AppImage",
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/app.AppImage",
+                size=12345,
+                digest=None,
+            ),
+            Asset(
+                name="latest-linux.yml",
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/latest-linux.yml",
+                size=1234,
+                digest=None,
+            ),
+            Asset(
+                name="SHA256SUMS.txt",
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/SHA256SUMS.txt",
+                size=567,
+                digest=None,
+            ),
         ]
 
     @pytest.fixture
@@ -299,9 +299,9 @@ class TestVerificationService:
                 mock_verifier, "sha256:abc123", "testapp", False
             )
 
-            assert result["passed"] is True
-            assert result["hash"] == "sha256:abc123"
-            assert "GitHub API digest verification" in result["details"]
+            assert result.passed is True
+            assert result.hash == "sha256:abc123"
+            assert "GitHub API digest verification" in result.details
 
     @pytest.mark.asyncio
     async def test_verify_digest_failure(self, verification_service):
@@ -319,9 +319,9 @@ class TestVerificationService:
                 mock_verifier, "sha256:abc123", "testapp", False
             )
 
-            assert result["passed"] is False
-            assert result["hash"] == "sha256:abc123"
-            assert "Hash mismatch" in result["details"]
+            assert result.passed is False
+            assert result.hash == "sha256:abc123"
+            assert "Hash mismatch" in result.details
 
     @pytest.mark.asyncio
     async def test_verify_yaml_checksum_file(
@@ -355,9 +355,9 @@ class TestVerificationService:
                 "testapp",
             )
 
-            assert result["passed"] is True
-            assert "sha512:" in result["hash"]
-            assert "yaml checksum file" in result["details"]
+            assert result.passed is True
+            assert "sha512:" in result.hash
+            assert "yaml checksum file" in result.details
             mock_download_service.download_checksum_file.assert_called_once_with(
                 checksum_file.url
             )
@@ -399,9 +399,9 @@ class TestVerificationService:
                 "testapp",
             )
 
-            assert result["passed"] is True
-            assert result["hash"] == f"sha256:{expected_hash}"
-            assert "traditional checksum file" in result["details"]
+            assert result.passed is True
+            assert result.hash == f"sha256:{expected_hash}"
+            assert "traditional checksum file" in result.details
 
     @pytest.mark.asyncio
     async def test_verify_checksum_file_hash_mismatch(
@@ -435,8 +435,8 @@ class TestVerificationService:
                 "testapp",
             )
 
-            assert result["passed"] is False
-            assert result["details"]  # Just check it has details
+            assert result.passed is False
+            assert result.details  # Just check it has details
 
     @pytest.mark.asyncio
     async def test_verify_checksum_file_not_found(
@@ -467,8 +467,8 @@ class TestVerificationService:
                 "testapp",
             )
 
-            assert result["passed"] is False
-            assert result["details"]  # Just check it has details
+            assert result.passed is False
+            assert result.details  # Just check it has details
 
     @pytest.mark.asyncio
     async def test_verify_file_digest_priority(

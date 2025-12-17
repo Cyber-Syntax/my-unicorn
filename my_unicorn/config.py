@@ -1,8 +1,8 @@
 """Configuration management for my-unicorn AppImage installer.
 
-This module handles both global INI configuration and per-app JSON configurations.
-It provides path resolution, validation, and default values as specified in the
-architecture documentation.
+This module handles both global INI configuration and per-app JSON
+configurations. It provides path resolution, validation, and default values
+as specified in the architecture documentation.
 
 The catalog system uses bundled catalog files (v2/catalog/*.json) rather than
 copying them to the user's config directory, reducing disk usage and ensuring
@@ -15,7 +15,7 @@ Requirements:
 import configparser
 from datetime import datetime
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import cast
 
 import orjson
 
@@ -40,6 +40,28 @@ from my_unicorn.constants import (
     SECTION_DIRECTORY,
     SECTION_NETWORK,
 )
+from my_unicorn.types import (
+    AppConfig,
+    CatalogEntry,
+    DirectoryConfig,
+    GlobalConfig,
+    NetworkConfig,
+)
+
+
+def _strip_inline_comment(value: str) -> str:
+    """Strip inline comments from configuration values.
+
+    Args:
+        value: Configuration value that may contain inline comment
+
+    Returns:
+        Value with inline comment removed (anything after '  #')
+
+    """
+    if "  #" in value:
+        return value.split("  #")[0].strip()
+    return value
 
 
 class CommentAwareConfigParser(configparser.ConfigParser):
@@ -48,9 +70,7 @@ class CommentAwareConfigParser(configparser.ConfigParser):
     def get(self, section, option, **kwargs):
         """Get a configuration value with inline comments stripped."""
         value = super().get(section, option, **kwargs)
-        # Strip inline comments (anything after '  #')
-        if isinstance(value, str) and "  #" in value:
-            value = value.split("  #")[0].strip()
+        value = _strip_inline_comment(value)
         return value
 
 
@@ -113,8 +133,8 @@ class ConfigCommentManager:
 # Customize where my-unicorn stores files and directories.
 # Use absolute paths or paths starting with ~ for home directory.
 #
-# repo: Source code repository for my-unicorn cli (e.g git cloned repo)
-# package: Installation directory for my-unicorn itself (only necessary code files)
+# repo: Source code repository for my-unicorn cli (e.g git cloned)
+# package: Installation directory for my-unicorn (necessary code files)
 # download: Temporary download location for AppImages
 # storage: Where installed AppImages are stored
 # backup: Backup location for old AppImage versions
@@ -142,106 +162,6 @@ class ConfigCommentManager:
             SECTION_NETWORK: {},
             SECTION_DIRECTORY: {},
         }
-
-
-class NetworkConfig(TypedDict):
-    """Network configuration options."""
-
-    retry_attempts: int
-    timeout_seconds: int
-
-
-class DirectoryConfig(TypedDict):
-    """Directory paths configuration."""
-
-    repo: Path
-    package: Path
-    download: Path
-    storage: Path
-    backup: Path
-    icon: Path
-    settings: Path
-    logs: Path
-    cache: Path
-    tmp: Path
-
-
-class GlobalConfig(TypedDict):
-    """Global application configuration."""
-
-    config_version: str
-    max_concurrent_downloads: int
-    max_backup: int
-    log_level: str
-    console_log_level: str
-    network: NetworkConfig
-    directory: DirectoryConfig
-
-
-class AppImageConfig(TypedDict):
-    """AppImage specific configuration."""
-
-    version: str
-    name: str
-    rename: str
-    name_template: str
-    characteristic_suffix: list[str]
-    installed_date: str
-    digest: str
-
-
-class GitHubConfig(TypedDict):
-    """GitHub API configuration options."""
-
-    repo: bool
-    prerelease: bool
-
-
-class VerificationConfig(TypedDict):
-    """Verification configuration options."""
-
-    digest: bool
-    skip: bool
-    checksum_file: str
-    checksum_hash_type: str
-
-
-class IconAsset(TypedDict):
-    """Icon configuration."""
-
-    url: str
-    name: str
-    installed: bool
-
-
-class AppConfig(TypedDict):
-    """Per-application configuration."""
-
-    owner: str
-    repo: str
-    config_version: str
-    appimage: AppImageConfig
-    github: GitHubConfig
-    verification: VerificationConfig
-    icon: IconAsset
-
-
-class CatalogAppImageConfig(TypedDict):
-    """AppImage configuration within catalog entry."""
-
-    rename: str
-    name_template: str
-    characteristic_suffix: list[str]
-
-
-class CatalogEntry(TypedDict):
-    """Catalog entry for an application."""
-
-    owner: str
-    repo: str
-    appimage: CatalogAppImageConfig
-    verification: VerificationConfig
-    icon: IconAsset | None
 
 
 class DirectoryManager:
@@ -342,8 +262,7 @@ class DirectoryManager:
 
         """
         for directory in config["directory"].values():
-            if isinstance(directory, Path):
-                directory.mkdir(parents=True, exist_ok=True)
+            directory.mkdir(parents=True, exist_ok=True)
 
 
 class GlobalConfigManager:
@@ -393,6 +312,36 @@ class GlobalConfigManager:
             },
         }
 
+    def _create_config_from_defaults(
+        self, defaults: dict[str, str | dict[str, str]]
+    ) -> CommentAwareConfigParser:
+        """Create ConfigParser from defaults dictionary.
+
+        Args:
+            defaults: Default configuration values
+
+        Returns:
+            ConfigParser populated with defaults
+
+        """
+        config = CommentAwareConfigParser()
+
+        # Set flat defaults (skip nested dicts)
+        flat_defaults = {}
+        for key, value in defaults.items():
+            if not isinstance(value, dict):
+                flat_defaults[key] = str(value)
+        config.read_dict({SECTION_DEFAULT: flat_defaults})
+
+        # Add sections for nested configs
+        for key, value in defaults.items():
+            if isinstance(value, dict):
+                config.add_section(key)
+                for subkey, subvalue in value.items():
+                    config.set(key, subkey, str(subvalue))
+
+        return config
+
     def load_global_config(self) -> GlobalConfig:
         """Load global configuration from INI file.
 
@@ -422,23 +371,7 @@ class GlobalConfigManager:
                 user_config.read(self.directory_manager.settings_file)
 
             # Now set up config with defaults and user values
-            config = CommentAwareConfigParser()
-
-            # Set defaults
-            flat_defaults = {}
-            for key, value in defaults.items():
-                if isinstance(value, dict):
-                    # Skip nested dicts for configparser defaults
-                    continue
-                flat_defaults[key] = str(value)
-            config.read_dict({SECTION_DEFAULT: flat_defaults})
-
-            # Add sections for nested configs
-            for key, value in defaults.items():
-                if isinstance(value, dict):
-                    config.add_section(key)
-                    for subkey, subvalue in value.items():
-                        config.set(key, subkey, str(subvalue))
+            config = self._create_config_from_defaults(defaults)
 
             # Override with user settings
             config.read(self.directory_manager.settings_file)
@@ -446,22 +379,7 @@ class GlobalConfigManager:
             # Create default config file and set up config
             self.save_global_config(self._convert_to_global_config(defaults))
 
-            config = CommentAwareConfigParser()
-            # Convert nested dicts to flat structure for configparser
-            flat_defaults = {}
-            for key, value in defaults.items():
-                if isinstance(value, dict):
-                    # Skip nested dicts for configparser defaults
-                    continue
-                flat_defaults[key] = str(value)
-            config.read_dict({SECTION_DEFAULT: flat_defaults})
-
-            # Add sections for nested configs
-            for key, value in defaults.items():
-                if isinstance(value, dict):
-                    config.add_section(key)
-                    for subkey, subvalue in value.items():
-                        config.set(key, subkey, str(subvalue))
+            config = self._create_config_from_defaults(defaults)
 
         # After config loading, replay migration messages to logger
         self.migration.replay_messages_to_logger()
@@ -573,20 +491,18 @@ class GlobalConfigManager:
             # Add DEFAULT section items separately
             for key, raw_value in config.defaults().items():
                 # Strip inline comments from default values too
-                if isinstance(raw_value, str) and "  #" in raw_value:
-                    cleaned_value = raw_value.split("  #")[0].strip()
-                else:
-                    cleaned_value = raw_value
-                config_dict[key] = cleaned_value
+                config_dict[key] = _strip_inline_comment(raw_value)
         else:
             config_dict = config
 
         # Helper to strip comments from config values
         def strip_comments(value):
             """Strip inline comments from config values."""
-            if isinstance(value, str) and "  #" in value:
-                return value.split("  #")[0].strip()
-            return value
+            return (
+                _strip_inline_comment(value)
+                if isinstance(value, str)
+                else value
+            )
 
         # Helper function to safely get scalar config values
         def get_scalar_config(key: str, default: str | int) -> str | int:
@@ -606,7 +522,7 @@ class GlobalConfigManager:
             # Only process known directory keys to avoid config values
             known_dir_keys = set(DIRECTORY_KEYS)
             for key, value in directory_dict.items():
-                if isinstance(value, str) and key in known_dir_keys:
+                if key in known_dir_keys:
                     cleaned_path = strip_comments(value)
                     directory_config[key] = self.directory_manager.expand_path(
                         cleaned_path

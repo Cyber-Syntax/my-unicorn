@@ -5,6 +5,7 @@ using digest verification and checksum file verification methods.
 """
 
 from my_unicorn.verification.service import (
+    MethodResult,
     VerificationConfig,
     VerificationResult,
     VerificationService,
@@ -12,8 +13,9 @@ from my_unicorn.verification.service import (
 from my_unicorn.verification.verifier import Verifier
 
 __all__ = [
+    "MethodResult",
     "Verifier",
-    "VerificationService",
-    "VerificationResult",
     "VerificationConfig",
+    "VerificationResult",
+    "VerificationService",
 ]

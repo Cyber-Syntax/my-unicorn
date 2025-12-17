@@ -86,14 +86,14 @@ class InstallHandler:
             # Fetch latest release (already filtered for x86_64 Linux)
             owner = app_config["owner"]
             repo = app_config["repo"]
-            release_data = await self._fetch_release_for_catalog(owner, repo)
+            release = await self._fetch_release(owner, repo)
 
             # Select best AppImage asset from compatible options
             characteristic_suffix = app_config.get("appimage", {}).get(
                 "characteristic_suffix", []
             )
             asset = self._select_best_asset(
-                release_data,
+                release,
                 characteristic_suffix,
                 owner,
                 repo,
@@ -104,7 +104,7 @@ class InstallHandler:
             return await self._install_workflow(
                 app_name=app_name,
                 asset=asset,
-                release_data=release_data,
+                release=release,
                 app_config=app_config,
                 source="catalog",
                 **options,
@@ -165,11 +165,11 @@ class InstallHandler:
             prerelease = url_info.get("prerelease", False)
 
             # Fetch latest release (already filtered for x86_64 Linux)
-            release_data = await self._fetch_release_for_url(owner, repo)
+            release = await self._fetch_release(owner, repo)
 
             # Select best AppImage (filters unstable versions for URLs)
             asset = self._select_best_asset(
-                release_data, [], owner, repo, installation_source="url"
+                release, [], owner, repo, installation_source="url"
             )
 
             # Create minimal app config for URL installs
@@ -199,7 +199,7 @@ class InstallHandler:
             return await self._install_workflow(
                 app_name=app_name,
                 asset=asset,
-                release_data=release_data,
+                release=release,
                 app_config=app_config,
                 source="url",
                 **options,
@@ -291,11 +291,144 @@ class InstallHandler:
 
         return await asyncio.gather(*tasks)
 
+    @staticmethod
+    def separate_targets_impl(
+        catalog_manager: Any, targets: list[str]
+    ) -> tuple[list[str], list[str]]:
+        """Separate targets into URL and catalog targets.
+
+        This is a helper on the service so CLI code can reuse the
+        same logic easily (and tests can target the behavior).
+
+        Args:
+            catalog_manager: Catalog manager instance
+            targets: List of mixed targets (URLs or catalog names)
+
+        Returns:
+            (url_targets, catalog_targets)
+
+        Raises:
+            InstallationError: If unknown targets are present
+
+        """
+        from my_unicorn.exceptions import InstallationError
+
+        url_targets: list[str] = []
+        catalog_targets: list[str] = []
+        unknown_targets: list[str] = []
+
+        available_apps = catalog_manager.get_available_apps()
+
+        for target in targets:
+            if target.startswith("https://github.com/"):
+                url_targets.append(target)
+            elif target in available_apps:
+                catalog_targets.append(target)
+            else:
+                unknown_targets.append(target)
+
+        if unknown_targets:
+            unknown_list = ", ".join(unknown_targets)
+            raise InstallationError(
+                f"Unknown applications or invalid URLs: {unknown_list}. Use 'my-unicorn list' to see available apps."
+            )
+
+        return url_targets, catalog_targets
+
+    # Backwards compatible instance wrapper
+    def separate_targets(
+        self, targets: list[str]
+    ) -> tuple[list[str], list[str]]:
+        """Separate targets into URL and catalog targets.
+
+        Args:
+            targets: List of mixed targets (URLs or catalog names)
+
+        Returns:
+            (url_targets, catalog_targets)
+
+        """
+        return InstallHandler.separate_targets_impl(
+            self.catalog_manager, targets
+        )
+
+    @staticmethod
+    async def check_apps_needing_work_impl(
+        catalog_manager: Any,
+        url_targets: list[str],
+        catalog_targets: list[str],
+        install_options: dict[str, Any],
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Check which apps actually need installation work.
+
+        Args:
+            catalog_manager: Catalog manager instance
+            url_targets: List of URL targets
+            catalog_targets: List of catalog targets
+            install_options: Installation options
+
+        Returns:
+            (urls_needing_work, catalog_needing_work, already_installed)
+
+        """
+        # Default behavior: all URLs need work
+        urls_needing_work: list[str] = list(url_targets)
+        catalog_needing_work: list[str] = []
+        already_installed: list[str] = []
+
+        for app_name in catalog_targets:
+            try:
+                app_config = catalog_manager.get_app_config(app_name)
+                if not app_config:
+                    catalog_needing_work.append(app_name)
+                    continue
+
+                if not install_options.get("force", False):
+                    installed_config = (
+                        catalog_manager.get_installed_app_config(app_name)
+                    )
+                    if installed_config:
+                        installed_path = Path(
+                            installed_config.get("installed_path", "")
+                        )
+                        if installed_path.exists():
+                            already_installed.append(app_name)
+                            continue
+
+                catalog_needing_work.append(app_name)
+            except Exception:
+                # If we can't determine the status, assume it needs work
+                catalog_needing_work.append(app_name)
+
+        return urls_needing_work, catalog_needing_work, already_installed
+
+    # Backwards compatible instance wrapper
+    async def check_apps_needing_work(
+        self,
+        url_targets: list[str],
+        catalog_targets: list[str],
+        install_options: dict[str, Any],
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Check which apps actually need installation work.
+
+        Args:
+            url_targets: List of URL targets
+            catalog_targets: List of catalog targets
+            install_options: Installation options
+
+        Returns:
+            (urls_needing_work, catalog_needing_work, already_installed)
+
+        """
+        return await InstallHandler.check_apps_needing_work_impl(
+            self.catalog_manager, url_targets, catalog_targets, install_options
+        )
+
     async def _install_workflow(
         self,
         app_name: str,
         asset: Asset,
-        release_data: dict[str, Any],
+        release: Release,
         app_config: dict[str, Any],
         source: str,
         **options: Any,
@@ -305,7 +438,7 @@ class InstallHandler:
         Args:
             app_name: Name of the application
             asset: GitHub asset to download
-            release_data: Release information
+            release: Release information
             app_config: App configuration
             source: Install source ("catalog" or "url")
             **options: Install options
@@ -319,6 +452,11 @@ class InstallHandler:
         show_progress = options.get("show_progress", True)
         download_dir = options.get("download_dir", Path.cwd())
 
+        # Ensure task ids are always defined even if an early exception is
+        # raised (such as during download). This prevents UnboundLocalError
+        # in the exception handler that attempts to finish progress tasks.
+        verification_task_id = None
+        installation_task_id = None
         try:
             # 1. Download
             download_path = download_dir / asset.name
@@ -326,11 +464,6 @@ class InstallHandler:
             downloaded_path = await self.download_service.download_appimage(
                 asset, download_path, show_progress=show_progress
             )
-
-            # Create multi-phase progress tasks (verification + installation)
-            # after download completes
-            verification_task_id = None
-            installation_task_id = None
             progress_service = getattr(
                 self.download_service, "progress_service", None
             )
@@ -350,7 +483,7 @@ class InstallHandler:
                     downloaded_path,
                     asset,
                     app_config,
-                    release_data,
+                    release,
                     app_name,
                     verification_task_id,
                 )
@@ -378,7 +511,7 @@ class InstallHandler:
                 app_name=app_name,
                 app_path=install_path,
                 app_config=app_config,
-                release_data=release_data,
+                release=release,
                 verify_result=verify_result,
                 icon_result=icon_result,
                 source=source,
@@ -405,7 +538,7 @@ class InstallHandler:
                 "name": app_name,
                 "path": str(install_path),
                 "source": source,
-                "version": release_data.get("tag_name", "unknown"),
+                "version": release.version,
                 "verification": verify_result,
                 "icon": icon_result,
                 "config": config_result,
@@ -426,19 +559,8 @@ class InstallHandler:
 
             raise
 
-    async def _fetch_release_for_catalog(
-        self, owner: str, repo: str
-    ) -> dict[str, Any]:
-        """Fetch release data from GitHub for catalog app.
-
-        Args:
-            owner: Repository owner
-            repo: Repository name
-
-        Returns:
-            Release data dictionary
-
-        """
+    async def _fetch_release(self, owner: str, repo: str) -> Release:
+        """Fetch release data from GitHub."""
         try:
             release = await self.github_client.get_latest_release(owner, repo)
             if not release:
@@ -450,25 +572,9 @@ class InstallHandler:
             )
             raise
 
-    async def _fetch_release_for_url(
-        self, owner: str, repo: str
-    ) -> dict[str, Any]:
-        """Fetch release data from GitHub for URL install.
-
-        Args:
-            owner: Repository owner
-            repo: Repository name
-
-        Returns:
-            Release data dictionary
-
-        """
-        # Same as catalog for now
-        return await self._fetch_release_for_catalog(owner, repo)
-
     def _select_best_asset(
         self,
-        release_data: dict[str, Any],
+        release: Release,
         characteristic_suffix: list[str],
         owner: str,
         repo: str,
@@ -477,7 +583,7 @@ class InstallHandler:
         """Select best AppImage asset from release.
 
         Args:
-            release_data: Release information
+            release: Release object
             characteristic_suffix: List of characteristic suffixes
             owner: Repository owner
             repo: Repository name
@@ -487,29 +593,10 @@ class InstallHandler:
             Selected Asset
 
         """
-        assets = release_data.get("assets", [])
-        if not assets:
+        if not release.assets:
             raise InstallationError("No assets found in release")
 
-        # Convert dict assets to Asset objects
-        asset_objects = []
-        for asset_dict in assets:
-            asset = Asset.from_api_response(asset_dict)
-            if asset:
-                asset_objects.append(asset)
-
-        # Create minimal Release object for selection
-        release = Release(
-            owner=owner,
-            repo=repo,
-            version=release_data.get("tag_name", ""),
-            prerelease=release_data.get("prerelease", False),
-            assets=asset_objects,
-            original_tag_name=release_data.get("original_tag_name", ""),
-        )
-
         # Use AssetSelector to find best AppImage
-        # TODO: appimage_asset naming would be better
         asset = AssetSelector.select_appimage_for_platform(
             release,
             preferred_suffixes=characteristic_suffix,
@@ -519,7 +606,6 @@ class InstallHandler:
             raise InstallationError(
                 "AppImage not found in release - may still be building"
             )
-
         return asset
 
     async def _verify_appimage(
@@ -527,7 +613,7 @@ class InstallHandler:
         file_path: Path,
         asset: Asset,
         app_config: dict[str, Any],
-        release_data: dict[str, Any],
+        release: Release,
         app_name: str,
         task_id: str | None,
     ) -> dict[str, Any]:
@@ -537,7 +623,7 @@ class InstallHandler:
             file_path: Path to downloaded file
             asset: GitHub asset information
             app_config: App configuration
-            release_data: Release data
+            release: Release data
             app_name: Application name
             task_id: Progress task ID
 
@@ -558,8 +644,8 @@ class InstallHandler:
             verification_config = app_config.get("verification", {})
 
             # Get tag name from release data
-            tag_name = release_data.get("original_tag_name", "unknown")
-            assets = release_data.get("assets", [])
+            tag_name = release.original_tag_name or "unknown"
+            assets = release.assets
 
             # Perform verification
             result = await verification_service.verify_file(
@@ -707,7 +793,7 @@ class InstallHandler:
         app_name: str,
         app_path: Path,
         app_config: dict[str, Any],
-        release_data: dict[str, Any],
+        release: Release,
         verify_result: dict[str, Any] | None,
         icon_result: dict[str, Any],
         source: str,
@@ -718,7 +804,7 @@ class InstallHandler:
             app_name: Application name
             app_path: Path to installed AppImage
             app_config: App configuration template
-            release_data: Release information
+            release: Release information
             verify_result: Verification result
             icon_result: Icon extraction result
             source: Install source
@@ -758,7 +844,7 @@ class InstallHandler:
             "repo": repo,
             "installed_path": str(app_path),
             "appimage": {
-                "version": release_data.get("tag_name", "unknown"),
+                "version": release.version,
                 "name": app_path.name,
                 "rename": app_config.get("appimage", {}).get(
                     "rename", app_name
