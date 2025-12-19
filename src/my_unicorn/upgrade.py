@@ -394,7 +394,7 @@ class SelfUpdater:
             # Show progress message
             if self.progress:
                 task_id = self.progress.start_task(
-                    "upgrade", f"Upgrading my-unicorn from {GITHUB_URL}..."
+                    "upgrade", "Upgrading my-unicorn..."
                 )
                 self.progress.finish_task(
                     task_id,
@@ -402,17 +402,15 @@ class SelfUpdater:
                     description="Starting upgrade with uv...",
                 )
 
-            logger.info(
-                "Executing: uv tool install git+%s --upgrade", GITHUB_URL
-            )
-            print(f"⚡ Upgrading my-unicorn from {GITHUB_URL}...")
+            logger.info("Executing: uv tool upgrade my-unicorn")
+            print("⚡ Upgrading my-unicorn...")
 
             # Use os.execvp to replace current process with uv upgrade
             # This ensures the upgrade completes properly and is the
             # recommended approach for self-upgrading CLI tools
             os.execvp(
                 "uv",
-                ["uv", "tool", "install", f"git+{GITHUB_URL}", "--upgrade"],
+                ["uv", "tool", "upgrade", "my-unicorn"],
             )
 
             # Note: Code after execvp won't execute if successful
