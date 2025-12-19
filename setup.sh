@@ -154,17 +154,17 @@ install_with_uv_tool() {
   echo "🚀 Installing my-unicorn using 'uv tool install'..."
   local src_dir
   src_dir="$(script_dir)"
-  
+
   if ! has_uv; then
     echo "❌ UV is not installed. Please install UV first:"
     echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
     exit 1
   fi
-  
+
   cd "$src_dir"
   uv tool install git+https://github.com/Cyber-Syntax/my-unicorn
   setup_autocomplete
-  
+
   echo "✅ Installation complete using uv tool."
   echo "Run 'my-unicorn --help' to get started."
 }
@@ -174,18 +174,18 @@ update_with_uv_tool() {
   echo "🔄 Updating my-unicorn using 'uv tool install --reinstall'..."
   local src_dir
   src_dir="$(script_dir)"
-  
+
   if ! has_uv; then
     echo "❌ UV is not installed. Please install UV first:"
     echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
     exit 1
   fi
-  
+
   cd "$src_dir"
   git pull || echo "⚠️  Warning: Could not update git repository"
-  uv tool install git+https://github.com/Cyber-Syntax/my-unicorn --upgrade
+  uv tool upgrade my-unicorn
   setup_autocomplete
-  
+
   echo "✅ Update complete using uv tool."
 }
 
@@ -194,16 +194,16 @@ install_with_uv_editable() {
   echo "🔧 Installing my-unicorn in editable mode using 'uv tool install --editable'..."
   local src_dir
   src_dir="$(script_dir)"
-  
+
   if ! has_uv; then
     echo "❌ UV is not installed. Please install UV first:"
     echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
     exit 1
   fi
-  
+
   cd "$src_dir"
   uv tool install --editable .
-  
+
   echo "✅ Editable installation complete using uv tool."
   echo "Changes to source code will be reflected immediately."
   echo "Run 'my-unicorn --help' to get started."

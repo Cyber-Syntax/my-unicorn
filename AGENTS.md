@@ -7,9 +7,11 @@ This file provides guidance to agents when working with code in this repository.
 1. KISS (Keep It Simple, Stupid): Aim for simplicity and clarity. Avoid unnecessary abstractions or metaprogramming.
 2. DRY (Don't Repeat Yourself): Reuse code appropriately but avoid over-engineering. Each command handler has single responsibility.
 3. YAGNI (You Aren't Gonna Need It): Always implement things when you actually need them, never when you just foresee that you need them.
-4. **ALWAYS** use `ruff check <filepath>` on each python file you modify to ensure proper formatting and linting.
-    - Use `ruff format <filepath>` on each python file you modify to ensure proper formatting.
-    - Use `ruff check --fix <filepath>` on each python file you modify to fix any fixable errors.
+4. ALWAYS use `ruff check <filepath>` on each Python file you modify to ensure proper linting and formatting:
+    - Use `ruff check --fix <filepath>` to automatically fix any fixable errors.
+    - Use `ruff format path/to/file.py` to format a specific file.
+    - Use `ruff format path/to/code/` to format all files in `path/to/code` (and any subdirectories).
+    - Use `ruff format` to format all files in the current directory.
 
 ## Testing Instructions
 
@@ -17,13 +19,14 @@ Critical: Run tests after any change to ensure nothing breaks.
 
 ```bash
 # Run all tests:
-uv run pytest -v -q --strict-markers
+uv run pytest
 # Run specific test file:
-uv run pytest tests/test_config.py -v
+uv run pytest tests/test_config.py
 # Run specific test function:
-uv run pytest tests/test_config.py::test_function_name -v
+uv run pytest tests/test_config.py::test_function_name
 # Run with coverage
-uv run pytest tests/python/ --cov=aps --cov-report=html
+uv run pytest tests/python/ --cov=aps.<folder>.<module>
+uv run pytest tests/cli/test_parser.py --cov=my_unicorn.cli.parser
 ```
 
 ## Code Style Guidelines
@@ -44,53 +47,53 @@ Architecture:
 - Binary location: `~/.local/bin/my-unicorn`
 - Source Code stored in `~/.local/share/my-unicorn/`
 - Configuration stored in `~/.config/my-unicorn/`
-    - settings.conf - Configuration file for my-unicorn cli
-    - cache/ - Cache files, filtered for AppImage/checksums only (Windows, mac removed)
-        - `AppFlowy-IO_AppFlowy.json` - AppFlowy cache config
-        - `zen-browser_desktop.json` - Zen Browser cache config
-    - logs/ - Log files for my-unicorn
-    - apps/ - AppImages state data folder (Keeps track of versions, checksum statuses)
-        - `appflowy.json` - AppFlowy app config
-        - `zen-browser.json` - Zen Browser app config
+  - settings.conf - Configuration file for my-unicorn cli
+  - cache/ - Cache files, filtered for AppImage/checksums only (Windows, mac removed)
+    - `AppFlowy-IO_AppFlowy.json` - AppFlowy cache config
+    - `zen-browser_desktop.json` - Zen Browser cache config
+  - logs/ - Log files for my-unicorn
+  - apps/ - AppImages state data folder (Keeps track of versions, checksum statuses)
+    - `appflowy.json` - AppFlowy app config
+    - `zen-browser.json` - Zen Browser app config
 
 Project Structure:
 
 - `my_unicorn/` - Main application directory (e.g. src)
-    - `catalog/` - AppImage catalog data (owner, repo, verification logic etc.)
-        - `appflowy.json` - AppFlowy catalog config
-        - `zen-browser.json` - Zen Browser catalog config
-    - `cli/` - CLI interface (parser, runner)
-    - `commands/` - Command handlers
-        - `auth.py` - Auth command handler
-        - `backup.py` - Backup command handler
-        - `base.py` - Base command handler
-        - `cache.py` - Cache command handler
-        - `config.py` - Config command handler
-        - `install.py` - Install command handler
-        - `list.py` - List command handler
-        - `remove.py` - Remove command handler
-        - `update.py` - Update command handler
-        - `upgrade.py` - Upgrade command handler
-    - `utils/` - Utility functions
-    - `verification/` - Checksum verification logic
-    - auth.py: Authentication handler module for github token management
-    - backup.py: Backup configuration module
-    - cache.py: Cache management module
-    - config.py: Configuration management module
-    - config_migration.py: Configuration migration module
-    - constants.py: Constants module
-    - desktop_entry.py: Desktop entry creation module
-    - download.py: Download module that downloads AppImage, checksum files
-    - exceptions.py: Exception handling module
-    - file_ops.py: File operations module
-    - github_client.py: GitHub API client module for requests
-    - icon.py: Icon management module
-    - install.py: Installation module
-    - logger.py: Logging module
-    - main.py: Main entry point for the application
-    - progress.py: Progress bar module with ASCII backend
-    - update.py: Update module that updates AppImages
-    - upgrade.py: Upgrade module that upgrades my-unicorn
+  - `catalog/` - AppImage catalog data (owner, repo, verification logic etc.)
+    - `appflowy.json` - AppFlowy catalog config
+    - `zen-browser.json` - Zen Browser catalog config
+  - `cli/` - CLI interface (parser, runner)
+  - `commands/` - Command handlers
+    - `auth.py` - Auth command handler
+    - `backup.py` - Backup command handler
+    - `base.py` - Base command handler
+    - `cache.py` - Cache command handler
+    - `config.py` - Config command handler
+    - `install.py` - Install command handler
+    - `list.py` - List command handler
+    - `remove.py` - Remove command handler
+    - `update.py` - Update command handler
+    - `upgrade.py` - Upgrade command handler
+  - `utils/` - Utility functions
+  - `verification/` - Checksum verification logic
+  - auth.py: Authentication handler module for github token management
+  - backup.py: Backup configuration module
+  - cache.py: Cache management module
+  - config.py: Configuration management module
+  - config_migration.py: Configuration migration module
+  - constants.py: Constants module
+  - desktop_entry.py: Desktop entry creation module
+  - download.py: Download module that downloads AppImage, checksum files
+  - exceptions.py: Exception handling module
+  - file_ops.py: File operations module
+  - github_client.py: GitHub API client module for requests
+  - icon.py: Icon management module
+  - install.py: Installation module
+  - logger.py: Logging module
+  - main.py: Main entry point for the application
+  - progress.py: Progress bar module with ASCII backend
+  - update.py: Update module that updates AppImages
+  - upgrade.py: Upgrade module that upgrades my-unicorn
 - `scripts/`: Scripts for various tasks
 - `tests/`: Test files written in Python using pytest
 - setup.sh: Setup script for installation my-unicorn

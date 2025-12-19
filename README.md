@@ -45,7 +45,10 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ### Production Install
 
-**Method 1: Using setup.sh (easiest)**
+#### Method 1: Using setup.sh (recommended)**
+>
+> [!NOTE]
+> This method also setup autocomplete for bash/zsh shells automatically.
 
 ```bash
 cd ~/Downloads
@@ -54,30 +57,21 @@ cd my-unicorn
 ./setup.sh uv-install
 ```
 
-**Method 2: Direct uv command**
+#### Method 2: Direct uv command
+>
+> [!NOTE]
+> This method does not setup autocomplete automatically. You need to set it up manually if needed.
 
 ```bash
-cd ~/Downloads
-git clone https://github.com/Cyber-Syntax/my-unicorn.git
-cd my-unicorn
-uv tool install .
+uv tool install git+https://github.com/Cyber-Syntax/my-unicorn
 ```
 
 ### Updating
 
-**Using setup.sh:**
+To update my-unicorn to the latest version, run:
 
 ```bash
-cd ~/Downloads/my-unicorn
-./setup.sh uv-update
-```
-
-**Direct uv command:**
-
-```bash
-cd ~/Downloads/my-unicorn
-git pull
-uv tool install . --reinstall
+my-unicorn upgrade
 ```
 
 ### Development Install (for contributors)
