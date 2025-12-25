@@ -1,14 +1,17 @@
-Turkish: [README.tr.md](README.tr.md)
+# **My Unicorn 🦄 - AppImage Manager for Linux**
 
 > [!CAUTION]
 >
-> - This project is in a **alpha phase** due to limited testing at this time.
-> - **Important:** Follow the instructions in the **Releases section** when updating the script.
-> - **Supported OS:** Currently, only Linux is supported.
+> - This project is in a **alpha phase** due to limited testing at this time but it is functional. Please report any issues you encounter.
+> - **Important:** Follow the instructions in the **Releases section** when updating the script to avoid potential issues.
+> - **Supported OS:** Currently, only Linux is supported and tested.
 
-# **🦄 About my-unicorn**
+Turkish: [README.tr.md](README.tr.md)
+
+## 📋 Overview
 
 > [!NOTE]
+>
 > My Unicorn is a command-line tool to manage AppImages on Linux. It allows users to install, update, and manage AppImages from GitHub repositories easily. It's designed to simplify the process of handling AppImages, making it more convenient for users to keep their applications up-to-date.
 >
 > - Detailed information: [wiki.md](docs/wiki.md)
@@ -21,11 +24,34 @@ Turkish: [README.tr.md](README.tr.md)
 - **Supported hash types:**
     - sha256, sha512
 
+## 🚀 Quick Start Example
+
+```bash
+my-unicorn install qownnotes
+Fetching from API:
+GitHub Releases      1/1 Retrieved
+
+Downloading:
+QOwnNotes-x86_64   41.5 MiB  10.8 MB/s 00:00 [==============================]   100% ✓
+
+Installing:
+(1/2) Verifying qownnotes ✓
+(2/2) Installing qownnotes ✓
+
+
+📦 Installation Summary:
+--------------------------------------------------
+qownnotes                 ✅ 25.12.7
+
+🎉 Successfully installed 1 app(s)
+```
+
 # 💡 Installation
 
 ## Option 1: Install using uv (Recommended)
 
 > [!TIP]
+>
 > This is the recommended method for production use. It installs my-unicorn as an isolated CLI tool.
 
 ### Prerequisites
@@ -95,6 +121,7 @@ Changes to the source code will be reflected immediately without reinstalling.
 ## Option 2: Traditional Installation (Legacy)
 
 > [!TIP]
+>
 > Installer script uses venv to install the needed dependencies.
 
 1. Open a terminal and clone this repo (make sure you have git installed):
@@ -135,6 +162,7 @@ Changes to the source code will be reflected immediately without reinstalling.
 ## For using uncompatible apps (installing with URL)
 
 > [!IMPORTANT]
+>
 > If you want to install an uncompatible app, you'll need to know some information about the application.
 
 - **GitHub URL:** The repository URL of the app (e.g., `https://github.com/johannesjo/super-productivity`).
