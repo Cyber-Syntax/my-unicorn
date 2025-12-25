@@ -492,5 +492,59 @@ def main() -> None:
         raise
 
 
+def test_integration_github_action_workflow() -> None:
+    """Integration test for GitHub Actions workflow.
+
+    This test validates the complete release workflow:
+    1. Version extraction from CHANGELOG.md
+    2. Release notes generation
+    3. Markdown output creation
+
+    """
+    tester = GitHubActionTester()
+    results = tester.test_workflow()
+
+    # Validate results
+    assert results["version"], "Version should not be empty"
+    assert results["tag_name"], "Tag name should not be empty"
+    assert results["full_notes"], "Release notes should not be empty"
+
+    # Write output for visual inspection
+    output_path = Path("test_github_release_desc.md")
+    _write_test_results_to_file(results, output_path)
+    assert output_path.exists(), "Markdown output file should be created"
+
+
+def test_extract_changelog_script_integration() -> None:
+    """Test extract_changelog.sh script integration.
+
+    Validates that the script can be called and produces
+    correct output for GitHub Actions.
+
+    """
+    script_path = Path("scripts/extract_changelog.sh")
+    assert script_path.exists(), "extract_changelog.sh should exist"
+
+    # Run the script with CHANGELOG.md
+    result = subprocess.run(
+        [str(script_path), "CHANGELOG.md"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+
+    # Should succeed
+    assert result.returncode == 0, f"Script failed: {result.stderr}"
+
+    # Should output version
+    assert "version=" in result.stdout, "Should output version"
+    assert "is_unreleased=" in result.stdout, "Should output is_unreleased"
+
+    # Should have notes (unless Unreleased)
+    if "is_unreleased=false" in result.stdout:
+        assert "notes<<" in result.stdout, "Should output notes"
+
+
 if __name__ == "__main__":
     main()
