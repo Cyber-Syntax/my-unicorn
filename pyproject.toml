@@ -57,7 +57,7 @@ documentation = "https://github.com/Cyber-Syntax/my-unicorn#readme"
 my-unicorn = "my_unicorn.main:main"
 
 [dependency-groups]
-dev = ["pytest","pytest-cov","pytest-mock","pytest-asyncio","aioresponses",]
+dev = ["pytest","pytest-cov","pytest-mock","pytest-asyncio","aioresponses","requests"]
 lint = ["ruff"]
 
 [build-system]

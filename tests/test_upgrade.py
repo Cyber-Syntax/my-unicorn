@@ -347,9 +347,8 @@ async def test_perform_update_success(mock_config_manager, mock_session):
             [
                 "uv",
                 "tool",
-                "install",
-                "git+https://github.com/Cyber-Syntax/my-unicorn",
-                "--upgrade",
+                "upgrade",
+                "my-unicorn",
             ],
         )
 
@@ -537,12 +536,11 @@ def test_upgrade_directories_are_distinct():
 
 @pytest.mark.asyncio
 async def test_perform_update_uses_uv_direct_install():
-    """Test that perform_update uses UV's direct GitHub installation.
+    """Test that perform_update uses UV's tool upgrade command.
 
-    CRITICAL: This ensures we're using the new, correct approach:
-    - Uses 'uv tool install git+URL --upgrade'
-    - No git cloning required
-    - Delegates to UV for fetching and installing
+    CRITICAL: This ensures we're using the correct approach:
+    - Uses 'uv tool upgrade my-unicorn'
+    - Delegates to UV for upgrading the tool
     """
     mock_config = MagicMock()
     repo_dir = Path("/tmp/test-my-unicorn-repo")
@@ -576,10 +574,9 @@ async def test_perform_update_uses_uv_direct_install():
         assert call_args[0][1] == [
             "uv",
             "tool",
-            "install",
-            "git+https://github.com/Cyber-Syntax/my-unicorn",
-            "--upgrade",
-        ], "Should use correct UV tool install arguments"
+            "upgrade",
+            "my-unicorn",
+        ], "Should use correct UV tool upgrade arguments"
 
         # CRITICAL: Verify no git clone is attempted
         # (In the new implementation, we never call git)
