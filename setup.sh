@@ -209,7 +209,7 @@ install_with_uv_editable() {
   echo "Run 'my-unicorn --help' to get started."
 }
 
-# Create or update virtual environment and install package in editable mode
+# Create or update virtual environment and install packages
 setup_venv() {
   if has_uv; then
     echo "🐍 Creating/updating virtual environment with UV in $VENV_DIR..."
@@ -217,8 +217,8 @@ setup_venv() {
     uv venv "$VENV_DIR" --clear
     # shellcheck source=/dev/null
     source "$BIN_DIR/activate"
-    echo "📦 Installing my-unicorn with UV (editable mode)..."
-    uv pip install -e "$INSTALL_DIR"
+    echo "📦 Installing my-unicorn with UV..."
+    uv pip install "$INSTALL_DIR"
     cd - >/dev/null
   else
     echo "🐍 Creating/updating virtual environment with pip in $VENV_DIR..."
@@ -226,8 +226,8 @@ setup_venv() {
     # shellcheck source=/dev/null
     source "$BIN_DIR/activate"
     python3 -m pip install --upgrade pip wheel
-    echo "📦 Installing my-unicorn (editable) into venv..."
-    python3 -m pip install -e "$INSTALL_DIR"
+    echo "📦 Installing my-unicorn into venv..."
+    python3 -m pip install "$INSTALL_DIR"
   fi
 }
 
