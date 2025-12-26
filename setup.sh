@@ -38,9 +38,6 @@ WRAPPER_SRC="$INSTALL_DIR/scripts/venv-wrapper.bash"
 # Destination of wrapper script in user's PATH
 WRAPPER_DST="$HOME/.local/bin/my-unicorn"
 
-# The line to add to shell rc files to ensure ~/.local/bin is in PATH
-EXPORT_LINE="export PATH=\"\$HOME/.local/bin:\$PATH\""
-
 # -- Helper functions --------------------------------------------------------
 
 # Log messages to stderr
@@ -57,67 +54,31 @@ script_dir() {
   dirname "$src"
 }
 
-# Detect which shell rc file to update for PATH (bash or zsh)
-detect_rc_file() {
-  local rc user_shell
-  user_shell="$(basename "${SHELL:-}")"
-  case "$user_shell" in
-  zsh)
-    rc="$HOME/.zshrc"
-    [[ -f "$HOME/.config/zsh/.zshrc" ]] && rc="$HOME/.config/zsh/.zshrc"
-    ;;
-  bash)
-    rc="$HOME/.bashrc"
-    ;;
-  *)
-    rc="$HOME/.bashrc"
-    ;;
-  esac
-  # Create the file if it doesn't exist
-  [[ ! -f "$rc" ]] && touch "$rc"
-  echo "$rc"
-}
-
-# Ensure PATH line is present in a given file
-# $1 = rc file path
-# $2 = position (optional: prepend|append, default append)
-ensure_path_in_file() {
-  local rc_file="$1"
-  local position="${2:-append}"
-
-  [[ ! -f "$rc_file" ]] && touch "$rc_file"
-
-  if ! grep -Fxq "$EXPORT_LINE" "$rc_file"; then
-    if [[ "$position" == "prepend" ]]; then
-      # Put PATH export at the very top
-      {
-        echo "# Added by my-unicorn installer"
-        echo "$EXPORT_LINE"
-        echo
-        cat "$rc_file"
-      } >"$rc_file.tmp" && mv "$rc_file.tmp" "$rc_file"
-      echo "Added PATH to top of $rc_file"
-    else
-      # Add PATH export at the bottom
-      printf '\n# Added by my-unicorn installer\n%s\n' "$EXPORT_LINE" >>"$rc_file"
-      echo "Added PATH to bottom of $rc_file"
-    fi
-  else
-    echo "ℹ️ PATH already configured in $rc_file"
+# Check if $HOME/.local/bin is in PATH and inform user if not
+check_local_bin_in_path() {
+  # Check if ~/.local/bin is already in PATH
+  if [[ ":$PATH:" == *":$HOME/.local/bin:"* ]]; then
+    echo "✅ $HOME/.local/bin is already in your PATH"
+    return 0
   fi
-}
+  
+  # Not in current PATH - inform the user
+  cat <<EOF
 
-# Ensure PATH is set for both bash and zsh shells
-# - Prepend for bashrc so it’s loaded before anything else
-# - Append for zshrc so it runs after bashrc in login shell chains
-ensure_path_for_shells() {
-  local bashrc="$HOME/.bashrc"
-  local zshrc="$HOME/.zshrc"
+⚠️  IMPORTANT: ~/.local/bin is not in your PATH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+To use 'my-unicorn' from anywhere, please add the following line to
+your shell configuration file (~/.bashrc, ~/.zshrc, ~/.zshenv, etc.):
 
-  [[ -f "$HOME/.config/zsh/.zshrc" ]] && zshrc="$HOME/.config/zsh/.zshrc"
+    export PATH="\$HOME/.local/bin:\$PATH"
 
-  ensure_path_in_file "$bashrc" prepend
-  ensure_path_in_file "$zshrc" append
+Then restart your shell or run:
+    source ~/.bashrc  (for bash)
+    source ~/.zshrc   (for zsh)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EOF
+  return 1
 }
 
 # Copy source files to install directory
@@ -163,6 +124,7 @@ install_with_uv_tool() {
 
   cd "$src_dir"
   uv tool install git+https://github.com/Cyber-Syntax/my-unicorn
+  check_local_bin_in_path
   setup_autocomplete
 
   echo "✅ Installation complete using uv tool."
@@ -203,6 +165,8 @@ install_with_uv_editable() {
 
   cd "$src_dir"
   uv tool install --editable .
+  check_local_bin_in_path
+  setup_autocomplete
 
   echo "✅ Editable installation complete using uv tool."
   echo "Changes to source code will be reflected immediately."
@@ -269,14 +233,10 @@ install_my_unicorn() {
   copy_source_to_install_dir
   setup_venv
   install_wrapper
-  ensure_path_for_shells
+  check_local_bin_in_path
   setup_autocomplete
 
-  local rc
-  rc=$(detect_rc_file)
-
   echo "✅ Installation complete."
-  echo "Restart your shell or run 'source $rc' to apply PATH."
   echo "Run 'my-unicorn --help' to get started."
 }
 
