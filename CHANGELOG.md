@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2025-12-25
+
+### Changed
+
+- Remove editable mode from setup.sh
+- Update upgrade process: Use 'uv tool upgrade' command and enhance test coverage
+- Enhance readme and update todo.md
+- Enhance ci workflow: add enhanced changelog extraction script, add comprehensive test for the ci and its scripts
+
 ## [1.12.2-alpha]
 
 ### Fixed
@@ -540,6 +549,7 @@ Please change your current configuration files to the new format. The new format
 - refactor: improve better error handling on verify.py
 - chore: add copilot instructions
 
+[Unreleased]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.2-alpha...HEAD
 [1.12.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.1-alpha...v1.12.2-alpha
 [1.12.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.0-alpha...v1.12.1-alpha
 [1.12.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.11.1-alpha...v1.12.0-alpha

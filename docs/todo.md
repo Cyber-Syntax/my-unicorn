@@ -16,7 +16,6 @@
 
 - [ ] P1: remove icon download logic because we extract icon from appimage now.
 - [ ] P1: Clear all the examples, plan...
-      it would be better to make the pytest logs like my-unicorn_pytest.log
 - [ ] P1: add INFO level logs for verification instead of DEBUG
 - [ ] P2: add lock for one instance only to prevent multiple instance run at the same time
     - [ ] 16G error log, because of 2 instance running at the same time.
@@ -133,6 +132,7 @@ Confirm your GitHub token:
 
 ## done
 
+- [x] fix the autocomplete zshrc local bin exporting
 - [ ] janitor code cleanup in progress:
     - [x] progress.py
 - [x] remove writing commits to release desc
