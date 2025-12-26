@@ -8,7 +8,7 @@
 #
 # Auto-detects container vs normal machine:
 #  - In container: uses installed 'my-unicorn' command
-#  - On normal machine: uses 'python3 run.py' for development
+#  - On normal machine: uses 'uv run my-unicorn' for development
 #
 # # Update specific apps to test update functionality
 # appflowy: Catalog + digest
@@ -88,10 +88,10 @@ run_cli() {
       return $?
     fi
     # fallback to repository script if installed binary not present
-    python3 "$APP_ROOT/run.py" "${args[@]}"
+    uv run my-unicorn "${args[@]}"
     return $?
   else
-    python3 "$APP_ROOT/run.py" "${args[@]}"
+    uv run my-unicorn "${args[@]}"
     return $?
   fi
 }
@@ -288,7 +288,7 @@ EXAMPLES:
 NOTES:
     - Auto-detects container vs normal machine
     - In containers: uses 'my-unicorn' command if available
-    - On normal machines: uses 'python3 run.py' for development
+    - On normal machines: uses 'uv run my-unicorn' for development
     - Logs are written to: $LOG_FILE
     - Set DEBUG=true environment variable for detailed logging
     - Tests run from: $APP_ROOT
