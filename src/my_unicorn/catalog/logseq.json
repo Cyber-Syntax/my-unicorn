@@ -1,28 +1,32 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "logseq",
+    "display_name": "logseq",
+    "description": ""
+  },
+  "source": {
+    "type": "github",
     "owner": "logseq",
     "repo": "logseq",
-    "appimage": {
-        "rename": "logseq",
-        "name_template": "{rename}-linux-x64-{latest_version}.AppImage",
-        "characteristic_suffix": [
-            "linux-x64",
-            "x86_64",
-            "amd64"
-        ]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": false,
-        "skip": false,
-        "checksum_file": "SHA256SUMS.txt",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "https://raw.githubusercontent.com/logseq/logseq/master/resources/icons/logseq.png",
-        "name": "logseq.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "{rename}-linux-x64-{latest_version}.AppImage",
+      "target_name": "logseq",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "checksum_file"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "logseq.png",
+    "download_url": "https://raw.githubusercontent.com/logseq/logseq/master/resources/icons/logseq.png"
+  }
 }

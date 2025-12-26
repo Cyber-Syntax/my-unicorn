@@ -1,26 +1,31 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "obsidian-releases",
+    "display_name": "obsidian-releases",
+    "description": ""
+  },
+  "source": {
+    "type": "github",
     "owner": "obsidianmd",
     "repo": "obsidian-releases",
-    "appimage": {
-        "rename": "obsidian",
-        "name_template": "{rename}-{latest_version}.AppImage",
-        "characteristic_suffix": [
-            ""
-        ]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "",
-        "name": "obsidian.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "{rename}-{latest_version}.AppImage",
+      "target_name": "obsidian",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "obsidian.png"
+  }
 }

@@ -70,8 +70,7 @@ class CommentAwareConfigParser(configparser.ConfigParser):
     def get(self, section, option, **kwargs):
         """Get a configuration value with inline comments stripped."""
         value = super().get(section, option, **kwargs)
-        value = _strip_inline_comment(value)
-        return value
+        return _strip_inline_comment(value)
 
 
 class ConfigCommentManager:
@@ -432,7 +431,7 @@ class GlobalConfigManager:
             # Cast the top-level config to a plain dict before indexing with
             # SECTION_* constants. Type checkers require string literals when
             # interacting with TypedDicts directly.
-            network_section = cast(dict, config)[SECTION_NETWORK]
+            network_section = cast("dict", config)[SECTION_NETWORK]
             network_data: dict[str, str] = {
                 "retry_attempts": str(network_section["retry_attempts"]),
                 "timeout_seconds": str(network_section["timeout_seconds"]),
@@ -450,7 +449,9 @@ class GlobalConfigManager:
             f.write(f"[{SECTION_DIRECTORY}]\n")
             directory_data: dict[str, str] = {
                 key: str(path)
-                for key, path in cast(dict, config)[SECTION_DIRECTORY].items()
+                for key, path in cast("dict", config)[
+                    SECTION_DIRECTORY
+                ].items()
             }
 
             for key, value in directory_data.items():
@@ -596,14 +597,20 @@ class GlobalConfigManager:
 class AppConfigManager:
     """Manages app-specific JSON configurations."""
 
-    def __init__(self, directory_manager: DirectoryManager) -> None:
+    def __init__(
+        self,
+        directory_manager: DirectoryManager,
+        catalog_manager: "CatalogManager | None" = None,
+    ) -> None:
         """Initialize app config manager.
 
         Args:
             directory_manager: Directory manager for path operations
+            catalog_manager: Catalog manager for loading catalog entries (optional for testing)
 
         """
         self.directory_manager = directory_manager
+        self.catalog_manager = catalog_manager
 
     def load_app_config(self, app_name: str) -> AppConfig | None:
         """Load app-specific configuration.
@@ -626,9 +633,42 @@ class AppConfigManager:
             with open(app_file, "rb") as f:
                 config_data = orjson.loads(f.read())
 
-            # Migrate old 'hash' field to 'digest' field
+            # Store original version to detect if migration occurred
+            original_version = config_data.get("config_version", "1.0.0")
+
+            # Migrate old 'hash' field to 'digest' field and v1->v2
             config_data = self._migrate_app_config(config_data)
-            return cast(AppConfig, config_data)
+
+            # Clean up v1 remnants after migration
+            migrated_version = config_data.get("config_version", "1.0.0")
+            if migrated_version.startswith("2."):
+                # Remove v1 fields that shouldn't be in v2 configs
+                v1_fields_to_remove = [
+                    "verification",  # Now in state.verification
+                    "appimage",  # Now in state or catalog
+                    "github",  # Now in source.prerelease
+                    "owner",  # Now in source.owner
+                    "repo",  # Now in source.repo
+                    "path",  # Now in state.installed_path
+                ]
+                for field in v1_fields_to_remove:
+                    config_data.pop(field, None)
+
+            # Save migrated config back to disk if version changed
+            if original_version != migrated_version:
+                # Lazy import to avoid circular dependency
+                from my_unicorn.logger import get_logger
+
+                logger = get_logger(__name__)
+                logger.debug(
+                    "Auto-migrated %s config from %s to %s",
+                    app_name,
+                    original_version,
+                    migrated_version,
+                )
+                self.save_app_config(app_name, cast("AppConfig", config_data))
+
+            return cast("AppConfig", config_data)
         except (Exception, OSError) as e:
             raise ValueError(
                 f"Failed to load app config for {app_name}: {e}"
@@ -687,8 +727,118 @@ class AppConfigManager:
             return True
         return False
 
+    def get_effective_config(self, app_name: str) -> dict:
+        """Get merged effective configuration.
+
+        This is the SINGLE source of truth for app configuration.
+        Merges: Catalog (if exists) + State + Overrides
+
+        Args:
+            app_name: Application name
+
+        Returns:
+            Merged configuration dictionary
+
+        Raises:
+            ValueError: If app config not found
+
+        Priority (low to high):
+            1. Catalog defaults (if catalog_ref exists)
+            2. Runtime state (version, paths, etc.)
+            3. User overrides (explicit customizations)
+
+        """
+        app_config = self.load_app_config(app_name)
+        if not app_config:
+            msg = f"No config found for {app_name}"
+            raise ValueError(msg)
+
+        effective = {}
+
+        # Step 1: Load catalog as base (if referenced)
+        catalog_ref = app_config.get("catalog_ref")
+        if catalog_ref and self.catalog_manager:
+            catalog = self.catalog_manager.load_catalog_entry(catalog_ref)
+            if catalog:
+                effective = self._deep_copy(catalog)
+
+        # Step 2: Merge overrides (for URL installs or user customizations)
+        overrides = app_config.get("overrides", {})
+        if overrides:
+            effective = self._deep_merge(effective, overrides)
+
+        # Step 3: Inject runtime state (version, paths, etc.)
+        state = app_config.get("state", {})
+        effective["state"] = state
+        effective["config_version"] = app_config.get("config_version")
+        # Note: Don't overwrite "source" key as it might be a dict in v2 format
+        # Only set it if not already present from catalog/overrides
+        if "source" not in effective:
+            effective["source"] = app_config.get("source")
+
+        return effective
+
+    def _deep_copy(self, obj: dict) -> dict:
+        """Deep copy dictionary.
+
+        Args:
+            obj: Dictionary to copy
+
+        Returns:
+            Deep copy of dictionary
+
+        """
+        import copy
+
+        return copy.deepcopy(obj)
+
+    def _deep_merge(self, base: dict, override: dict) -> dict:
+        """Deep merge override into base.
+
+        Args:
+            base: Base dictionary
+            override: Override dictionary
+
+        Returns:
+            Merged dictionary with override taking precedence
+
+        """
+        import copy
+
+        result = copy.deepcopy(base)
+
+        for key, value in override.items():
+            if (
+                key in result
+                and isinstance(result[key], dict)
+                and isinstance(value, dict)
+            ):
+                result[key] = self._deep_merge(result[key], value)
+            else:
+                result[key] = copy.deepcopy(value)
+
+        return result
+
+    def _get_major_version(self, version_str: str) -> int:
+        """Extract major version number from version string.
+
+        Args:
+            version_str: Version string like "2.0.0"
+
+        Returns:
+            Major version as integer (e.g., 2)
+
+        """
+        try:
+            return int(version_str.split(".")[0])
+        except (ValueError, IndexError):
+            return 1  # Default to v1 for malformed versions
+
     def _migrate_app_config(self, config_data: dict) -> dict:
         """Migrate old config format to new format.
+
+        Uses APP_CONFIG_VERSION constant for target version (DRY principle).
+        Automatically handles sequential migrations through major versions.
 
         Args:
             config_data: Raw config data from file
@@ -697,12 +847,194 @@ class AppConfigManager:
             Migrated config data
 
         """
-        # Migrate 'hash' field to 'digest' field in appimage section
+        from my_unicorn.constants import APP_CONFIG_VERSION
+
+        # Legacy migration: 'hash' field to 'digest' field in appimage section
         if "appimage" in config_data and "hash" in config_data["appimage"]:
             hash_value = config_data["appimage"].pop("hash")
             config_data["appimage"]["digest"] = hash_value
 
+        # Check version and migrate if needed
+        current_version = config_data.get("config_version", "1.0.0")
+
+        # Get major versions for comparison
+        current_major = self._get_major_version(current_version)
+        target_major = self._get_major_version(APP_CONFIG_VERSION)
+
+        # Already at target version or newer
+        if current_major >= target_major:
+            return config_data
+
+        # Migrate sequentially through versions
+        if current_major < target_major:
+            # v1 → v2 migration
+            if current_major == 1:
+                config_data = self._migrate_v1_to_v2(config_data)
+                current_major = 2
+
+            # Future migrations would go here:
+            # if current_major == 2:
+            #     config_data = self._migrate_v2_to_v3(config_data)
+            #     current_major = 3
+
         return config_data
+
+    def _migrate_v1_to_v2(self, old_config: dict) -> dict:
+        """Migrate v1.x flat structure to v2.0.0 hybrid structure.
+
+        Args:
+            old_config: v1.x config data
+
+        Returns:
+            v2.0.0 config data
+
+        """
+        from my_unicorn.constants import APP_CONFIG_VERSION
+
+        source = old_config.get("source", "catalog")
+        repo = old_config.get("repo", "").lower()
+
+        # Determine catalog reference
+        catalog_ref = None
+        if source == "catalog":
+            # For catalog installs, use repo name as reference
+            catalog_ref = repo
+            # Check if catalog actually exists (only if catalog_manager available)
+            if (
+                self.catalog_manager
+                and not self.catalog_manager.load_catalog_entry(catalog_ref)
+            ):
+                # Catalog missing - treat as URL install
+                source = "url"
+                catalog_ref = None
+
+        # Build state section from old config
+        appimage_old = old_config.get("appimage", {})
+        icon_old = old_config.get("icon", {})
+        verification_old = old_config.get("verification", {})
+
+        # Migrate verification to new format
+        verification_methods = []
+        if verification_old.get("skip", False):
+            verification_methods.append({"type": "skip", "status": "skipped"})
+
+        # Check if digest verification was done
+        if appimage_old.get("digest"):
+            digest_str = appimage_old["digest"]
+            algorithm = "sha256"  # default
+            digest_hash = digest_str
+
+            # Parse "sha256:hash" format
+            if ":" in digest_str:
+                algorithm, digest_hash = digest_str.split(":", 1)
+
+            verification_methods.append(
+                {
+                    "type": "digest",
+                    "status": "passed",
+                    "algorithm": algorithm,
+                    "expected": digest_hash,
+                    "computed": digest_hash,
+                    "source": "github_api",
+                }
+            )
+
+        new_config = {
+            "config_version": APP_CONFIG_VERSION,
+            "source": source,
+            "catalog_ref": catalog_ref,
+            "state": {
+                "version": appimage_old.get("version", "unknown"),
+                "installed_date": appimage_old.get("installed_date", ""),
+                "installed_path": old_config.get("path", ""),
+                "verification": {
+                    "passed": not verification_old.get("skip", False),
+                    "methods": verification_methods,
+                },
+                "icon": {
+                    "installed": icon_old.get("installed", False),
+                    "method": "download"
+                    if icon_old.get("url")
+                    else "extraction",
+                    "path": icon_old.get("path", ""),
+                },
+            },
+        }
+
+        # Add overrides for URL installs or if catalog doesn't exist
+        if source == "url" or not catalog_ref:
+            github_old = old_config.get("github", {})
+            new_config["overrides"] = {
+                "metadata": {
+                    "name": old_config.get("repo", ""),
+                    "display_name": old_config.get("repo", ""),
+                    "description": "",
+                },
+                "source": {
+                    "type": "github",
+                    "owner": old_config.get("owner", ""),
+                    "repo": old_config.get("repo", ""),
+                    "prerelease": github_old.get("prerelease", False),
+                },
+                "appimage": {
+                    "naming": {
+                        "template": appimage_old.get("name_template", ""),
+                        "target_name": appimage_old.get("rename", ""),
+                        "architectures": ["amd64", "x86_64"],
+                    }
+                },
+                "verification": {
+                    "method": "skip"
+                    if verification_old.get("skip")
+                    else "digest"
+                },
+                "icon": {
+                    "method": "download"
+                    if icon_old.get("url")
+                    else "extraction",
+                    "filename": icon_old.get("name", ""),
+                },
+            }
+
+            # Add URL if download method
+            if icon_old.get("url"):
+                new_config["overrides"]["icon"]["download_url"] = icon_old[
+                    "url"
+                ]
+
+        return new_config
+
+    def _compare_versions(self, version1: str, version2: str) -> int:
+        """Compare semantic versions.
+
+        Args:
+            version1: First version (e.g., "1.0.0")
+            version2: Second version (e.g., "2.0.0")
+
+        Returns:
+            -1 if v1 < v2, 0 if equal, 1 if v1 > v2
+
+        """
+
+        def parse_version(v: str) -> list[int]:
+            try:
+                return [int(x) for x in v.split(".")]
+            except ValueError:
+                return [0, 0, 0]
+
+        v1 = parse_version(version1)
+        v2 = parse_version(version2)
+
+        max_len = max(len(v1), len(v2))
+        v1.extend([0] * (max_len - len(v1)))
+        v2.extend([0] * (max_len - len(v2)))
+
+        for a, b in zip(v1, v2, strict=False):
+            if a < b:
+                return -1
+            if a > b:
+                return 1
+        return 0
 
 
 class CatalogManager:
@@ -736,7 +1068,7 @@ class CatalogManager:
 
         try:
             with open(catalog_file, "rb") as f:
-                return cast(CatalogEntry, orjson.loads(f.read()))
+                return cast("CatalogEntry", orjson.loads(f.read()))
         except (Exception, OSError) as e:
             raise ValueError(
                 f"Failed to load catalog entry for {app_name}: {e}"
@@ -777,8 +1109,11 @@ class ConfigManager:
         self.global_config_manager = GlobalConfigManager(
             self.directory_manager
         )
-        self.app_config_manager = AppConfigManager(self.directory_manager)
+        # Create catalog manager first as app_config_manager depends on it
         self.catalog_manager = CatalogManager(self.directory_manager)
+        self.app_config_manager = AppConfigManager(
+            self.directory_manager, self.catalog_manager
+        )
 
         # Initialize directories and validation
         self.directory_manager.ensure_user_directories()

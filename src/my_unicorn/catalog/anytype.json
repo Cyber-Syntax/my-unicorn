@@ -1,24 +1,31 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "anytype-ts",
+    "display_name": "anytype-ts",
+    "description": ""
+  },
+  "source": {
+    "type": "github",
     "owner": "anyproto",
     "repo": "anytype-ts",
-    "appimage": {
-        "rename": "anytype",
-        "name_template": "",
-        "characteristic_suffix": []
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "",
-        "name": "anytype.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "",
+      "target_name": "anytype",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "anytype.png"
+  }
 }

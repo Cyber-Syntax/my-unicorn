@@ -1,26 +1,32 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "weekToDo",
+    "display_name": "weekToDo",
+    "description": ""
+  },
+  "source": {
+    "type": "github",
     "owner": "manuelernestog",
     "repo": "weekToDo",
-    "appimage": {
-        "rename": "weektodo",
-        "name_template": "WeekToDo-{latest_version}.AppImage",
-        "characteristic_suffix": [
-            ""
-        ]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": false,
-        "skip": true,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "https://raw.githubusercontent.com/manuelernestog/weekToDo/master/public/icon.png",
-        "name": "weektodo.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "WeekToDo-{latest_version}.AppImage",
+      "target_name": "weektodo",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "skip"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "weektodo.png",
+    "download_url": "https://raw.githubusercontent.com/manuelernestog/weekToDo/master/public/icon.png"
+  }
 }

@@ -1,24 +1,31 @@
 {
-  "owner": "neovim",
-  "repo": "neovim",
-  "appimage": {
-    "rename": "neovim",
-    "name_template": "",
-    "characteristic_suffix": []
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "neovim",
+    "display_name": "neovim",
+    "description": ""
   },
-  "github": {
-    "repo": true,
+  "source": {
+    "type": "github",
+    "owner": "neovim",
+    "repo": "neovim",
     "prerelease": false
   },
+  "appimage": {
+    "naming": {
+      "template": "",
+      "target_name": "neovim",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
+    }
+  },
   "verification": {
-    "digest": true,
-    "skip": false,
-    "checksum_file": "",
-    "checksum_hash_type": "sha256"
+    "method": "digest"
   },
   "icon": {
-    "extraction": true,
-    "url": "",
-    "name": "neovim.png"
+    "method": "extraction",
+    "filename": "neovim.png"
   }
 }

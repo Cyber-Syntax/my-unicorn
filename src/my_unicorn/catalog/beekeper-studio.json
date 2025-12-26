@@ -1,24 +1,31 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "beekeeper-studio",
+    "display_name": "beekeeper-studio",
+    "description": ""
+  },
+  "source": {
+    "type": "github",
     "owner": "beekeeper-studio",
     "repo": "beekeeper-studio",
-    "appimage": {
-        "rename": "beekeeper-studio",
-        "name_template": "",
-        "characteristic_suffix": []
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "",
-        "name": "beekeeper-studio.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "",
+      "target_name": "beekeeper-studio",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "beekeeper-studio.png"
+  }
 }

@@ -1,26 +1,32 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "HeroicGamesLauncher",
+    "display_name": "HeroicGamesLauncher",
+    "description": ""
+  },
+  "source": {
+    "type": "github",
     "owner": "Heroic-Games-Launcher",
     "repo": "HeroicGamesLauncher",
-    "appimage": {
-        "rename": "heroicgameslauncher",
-        "name_template": "HeroicGamesLauncher-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": [
-            "x86_64"
-        ]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "https://raw.githubusercontent.com/Heroic-Games-Launcher/HeroicGamesLauncher/main/public/icon.png",
-        "name": "heroicgameslauncher.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "HeroicGamesLauncher-{characteristic_suffix}.AppImage",
+      "target_name": "heroicgameslauncher",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "heroicgameslauncher.png",
+    "download_url": "https://raw.githubusercontent.com/Heroic-Games-Launcher/HeroicGamesLauncher/main/public/icon.png"
+  }
 }

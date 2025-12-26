@@ -17,6 +17,9 @@ from typing import Final, Literal
 # Configuration version - single source of truth for config versioning
 CONFIG_VERSION: Final[str] = "1.0.2"
 
+# App state config version - separate from global config version
+APP_CONFIG_VERSION: Final[str] = "2.0.0"
+
 # Configuration directory and file names
 CONFIG_FILE_NAME: Final[str] = "settings.conf"
 

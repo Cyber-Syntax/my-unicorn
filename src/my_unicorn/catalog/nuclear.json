@@ -1,25 +1,31 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "nuclear",
+    "display_name": "nuclear",
+    "description": ""
+  },
+  "source": {
+    "type": "github",
     "owner": "nukeop",
     "repo": "nuclear",
-    "appimage": {
-      "rename": "nuclear",
-      "name_template": "",
-      "characteristic_suffix": []
-    },
-    "github": {
-      "repo": true,
-      "prerelease": true
-    },
-    "verification": {
-      "digest": true,
-      "skip": false,
-      "checksum_file": "",
-      "checksum_hash_type": "sha256"
-    },
-    "icon": {
-      "extraction": true,
-      "source": "extraction",
-      "url": "",
-      "name": "nuclear.png"
+    "prerelease": true
+  },
+  "appimage": {
+    "naming": {
+      "template": "",
+      "target_name": "nuclear",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "nuclear.png"
+  }
 }
