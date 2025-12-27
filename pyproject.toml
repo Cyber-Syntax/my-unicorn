@@ -16,6 +16,7 @@ dependencies = [
   "keyring",
   "packaging",
   "pyyaml",
+  "jsonschema",
   "aiohappyeyeballs",
   "aiosignal",
   "attrs",
@@ -69,7 +70,7 @@ managed = true
 required-environments = ["sys_platform == 'linux'"]
 
 [tool.setuptools.package-data]
-my_unicorn = ["catalog/*.json"]
+my_unicorn = ["catalog/*.json", "schemas/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
