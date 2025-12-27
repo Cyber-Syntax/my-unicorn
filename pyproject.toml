@@ -1,6 +1,6 @@
 [project]
 name = 'my-unicorn'
-version = '1.12.2-alpha'
+version = '2.0.0-alpha'
 license = { text = "GPL-3.0-or-later" }
 description = 'My Unicorn is a command-line tool to manage AppImages on Linux. It allows users to install, update, and manage AppImages from GitHub repositories easily. It is designed to simplify the process of handling AppImages, making it more convenient for users to keep their applications up-to-date.'
 keywords = ["appimage", "appimage-manager"]
@@ -16,6 +16,7 @@ dependencies = [
   "keyring",
   "packaging",
   "pyyaml",
+  "jsonschema",
   "aiohappyeyeballs",
   "aiosignal",
   "attrs",
@@ -69,7 +70,7 @@ managed = true
 required-environments = ["sys_platform == 'linux'"]
 
 [tool.setuptools.package-data]
-my_unicorn = ["catalog/*.json"]
+my_unicorn = ["catalog/*.json", "schemas/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,0 +1,49 @@
+{
+  "config_version": "2.0.0",
+  "source": "url",
+  "catalog_ref": null,
+  "state": {
+    "version": "2.2.0",
+    "installed_date": "2025-12-27T16:20:40.050783",
+    "installed_path": "/home/developer/Applications/weektodo.AppImage",
+    "verification": {
+      "passed": false,
+      "methods": []
+    },
+    "icon": {
+      "installed": true,
+      "method": "extraction",
+      "path": "/home/developer/Applications/icons/weektodo.png"
+    }
+  },
+  "overrides": {
+    "metadata": {
+      "name": "weektodo",
+      "display_name": "weektodo",
+      "description": ""
+    },
+    "source": {
+      "type": "github",
+      "owner": "manuelernestog",
+      "repo": "weektodo",
+      "prerelease": false
+    },
+    "appimage": {
+      "naming": {
+        "template": "",
+        "target_name": "weektodo",
+        "architectures": [
+          "amd64",
+          "x86_64"
+        ]
+      }
+    },
+    "verification": {
+      "method": "skip"
+    },
+    "icon": {
+      "method": "extraction",
+      "filename": "weektodo.png"
+    }
+  }
+}

@@ -12,7 +12,7 @@ _my_unicorn() {
         'install:Install AppImages from catalog or URLs'
         'update:Update installed AppImages'
         'upgrade:Upgrade my-unicorn itself'
-        'list:List installed AppImages'
+        'catalog:Browse AppImage catalog'
         'remove:Remove installed AppImages'
         'backup:Manage AppImage backups and restore'
         'cache:Manage release data cache for better performance'
@@ -58,9 +58,11 @@ _my_unicorn() {
                         '--help[Show help information]' \
                         '1:app app:_files'
                     ;;
-                list)
+                catalog)
                     _arguments \
-                        '(--available)--available[Show available applications from catalog]' \
+                        '(--installed --available --info)--installed[Show installed AppImages (default)]' \
+                        '(--installed --available --info)--available[Show available applications from catalog with descriptions]' \
+                        '(--installed --available --info)--info[Show detailed information about a specific app]:app name:' \
                         '--help[Show help information]' \
                         '1:app app:_files'
                     ;;

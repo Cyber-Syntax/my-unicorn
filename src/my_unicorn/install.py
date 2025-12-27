@@ -78,20 +78,24 @@ class InstallHandler:
 
         """
         try:
-            # Get app configuration
+            # Get app configuration (v2 format from catalog)
             app_config = self.catalog_manager.get_app_config(app_name)
             if not app_config:
                 raise InstallationError("App not found in catalog")
 
-            # Fetch latest release (already filtered for x86_64 Linux)
-            owner = app_config["owner"]
-            repo = app_config["repo"]
+            # Extract source info from v2 config
+            source_config = app_config.get("source", {})
+            owner = source_config.get("owner", "")
+            repo = source_config.get("repo", "")
+            characteristic_suffix = (
+                app_config.get("appimage", {})
+                .get("naming", {})
+                .get("architectures", [])
+            )
+
             release = await self._fetch_release(owner, repo)
 
             # Select best AppImage asset from compatible options
-            characteristic_suffix = app_config.get("appimage", {}).get(
-                "characteristic_suffix", []
-            )
             asset = self._select_best_asset(
                 release,
                 characteristic_suffix,
@@ -172,27 +176,35 @@ class InstallHandler:
                 release, [], owner, repo, installation_source="url"
             )
 
-            # Create minimal app config for URL installs
-            # Note: digest=False enables auto-detection of checksum files
-            # Verification service will use digest if available from API
+            # Create v2 format app config template for URL installs
+            # Note: verification method will auto-detect checksums
             app_config = {
-                "owner": owner,
-                "repo": repo,
-                "appimage": {
-                    "rename": app_name,
-                    "name_template": "",
-                    "characteristic_suffix": [],
+                "config_version": "2.0.0",
+                "metadata": {
+                    "name": app_name,
+                    "display_name": app_name,
+                    "description": "",
                 },
-                "github": {
+                "source": {
+                    "type": "github",
+                    "owner": owner,
+                    "repo": repo,
                     "prerelease": prerelease,
                 },
-                "verification": {
-                    "digest": False,
-                    "skip": False,
-                    "checksum_file": "",
-                    "checksum_hash_type": "sha256",
+                "appimage": {
+                    "naming": {
+                        "template": "",
+                        "target_name": app_name,
+                        "architectures": ["amd64", "x86_64"],
+                    }
                 },
-                "icon": {"extraction": True, "url": None},
+                "verification": {
+                    "method": "digest",  # Will auto-detect checksum files
+                },
+                "icon": {
+                    "method": "extraction",
+                    "filename": "",
+                },
             }
 
             # Install workflow
@@ -245,10 +257,9 @@ class InstallHandler:
                         return await self.install_from_url(
                             app_or_url, **options
                         )
-                    else:
-                        return await self.install_from_catalog(
-                            app_or_url, **options
-                        )
+                    return await self.install_from_catalog(
+                        app_or_url, **options
+                    )
                 except InstallationError as error:
                     logger.error(
                         "Installation error for %s: %s", app_or_url, error
@@ -540,6 +551,10 @@ class InstallHandler:
                 "source": source,
                 "version": release.version,
                 "verification": verify_result,
+                # Pass warning through if present
+                "warning": (
+                    verify_result.get("warning") if verify_result else None
+                ),
                 "icon": icon_result,
                 "config": config_result,
                 "desktop": desktop_result,
@@ -664,6 +679,7 @@ class InstallHandler:
                 "passed": result.passed,
                 "methods": result.methods,
                 "updated_config": result.updated_config,
+                "warning": result.warning,  # Include warning
             }
 
         except Exception as error:
@@ -798,7 +814,7 @@ class InstallHandler:
         icon_result: dict[str, Any],
         source: str,
     ) -> dict[str, Any]:
-        """Create app configuration - works for both catalog and URL.
+        """Create app configuration in v2.0.0 format.
 
         Args:
             app_name: Application name
@@ -807,79 +823,133 @@ class InstallHandler:
             release: Release information
             verify_result: Verification result
             icon_result: Icon extraction result
-            source: Install source
+            source: Install source ("catalog" or "url")
 
         Returns:
             Config creation result
 
         """
-        # Extract digest hash string from verification result
-        digest = None
-        if verify_result and verify_result.get("passed"):
-            methods = verify_result.get("methods", {})
-            if "digest" in methods:
-                # Extract just the hash string from digest verification result
-                digest_result = methods["digest"]
-                if isinstance(digest_result, dict):
-                    digest = digest_result.get("hash")
+        from my_unicorn.constants import APP_CONFIG_VERSION
+
+        # Determine catalog reference
+        catalog_ref = None
+        overrides = None
+
+        if source == "catalog":
+            # Use repo name as catalog reference (v2 format)
+            catalog_ref = app_config.get("source", {}).get("repo", "").lower()
+        else:
+            # URL install - need full overrides section
+            overrides = self._build_overrides_from_template(app_config)
+
+        # Build verification methods list
+        verification_methods = []
+        verification_passed = False
+        actual_verification_method = "skip"  # Default
+
+        if verify_result:
+            methods_data = verify_result.get("methods", {})
+
+            # Determine if verification actually passed
+            # If methods dict is empty, no verification happened
+            if methods_data:
+                verification_passed = verify_result.get("passed", False)
+                # Get actual method used from first method in results
+                actual_verification_method = (
+                    next(iter(methods_data.keys())) if methods_data else "skip"
+                )
+            else:
+                # No methods available - verification did not happen
+                verification_passed = False
+                actual_verification_method = "skip"
+
+            for method_type, method_result in methods_data.items():
+                method_entry = {"type": method_type}
+
+                if isinstance(method_result, dict):
+                    # Map verification result fields to config structure
+                    # MethodResult.to_dict() provides: passed, hash, details,
+                    # computed_hash, url, hash_type
+                    passed = method_result.get("passed", False)
+                    hash_type = method_result.get("hash_type", "")
+
+                    # Determine algorithm from hash_type or default to SHA256
+                    algorithm = hash_type.upper() if hash_type else "SHA256"
+
+                    # Determine verification source (where hash came from)
+                    verification_source = method_result.get("url", "")
+                    if not verification_source:
+                        if method_type == "digest":
+                            verification_source = "GitHub API"
+                        else:
+                            verification_source = ""
+
+                    method_entry.update(
+                        {
+                            "status": "passed" if passed else "failed",
+                            "algorithm": algorithm,
+                            "expected": method_result.get("hash", ""),
+                            "computed": method_result.get("computed_hash", ""),
+                            "source": verification_source,
+                        }
+                    )
                 else:
-                    digest = digest_result
-            elif "sha256" in methods:
-                digest = f"sha256:{methods['sha256']}"
+                    # Simple result
+                    method_entry["status"] = (
+                        "passed" if method_result else "failed"
+                    )
 
-        # Get updated verification config from verification result
-        updated_verification_config = app_config.get("verification", {})
-        if verify_result and "updated_config" in verify_result:
-            updated_verification_config.update(verify_result["updated_config"])
+                verification_methods.append(method_entry)
 
-        # Get owner/repo
-        owner = app_config.get("owner", "unknown")
-        repo = app_config.get("repo", "unknown")
+        # Build icon info
+        icon_method = "extraction"
+        if app_config.get("icon", {}).get("url"):
+            icon_method = "download"
 
-        # Build config data
+        # Build state section
         config_data = {
-            "config_version": "1.0.0",
+            "config_version": APP_CONFIG_VERSION,
             "source": source,
-            "owner": owner,
-            "repo": repo,
-            "installed_path": str(app_path),
-            "appimage": {
+            "catalog_ref": catalog_ref,
+            "state": {
                 "version": release.version,
-                "name": app_path.name,
-                "rename": app_config.get("appimage", {}).get(
-                    "rename", app_name
-                ),
-                "name_template": app_config.get("appimage", {}).get(
-                    "name_template", ""
-                ),
-                "characteristic_suffix": app_config.get("appimage", {}).get(
-                    "characteristic_suffix", []
-                ),
                 "installed_date": datetime.now().isoformat(),
-                "digest": digest,
-            },
-            "github": app_config.get("github", {}),
-            "verification": updated_verification_config,
-            "icon": {
-                "extraction": app_config.get("icon", {}).get(
-                    "extraction", True
-                ),
-                "url": app_config.get("icon", {}).get("url") or None,
-                "name": f"{app_name}.png",
-                "source": icon_result.get("source", "none"),
-                "installed": bool(icon_result.get("icon_path")),
-                "path": icon_result.get("icon_path"),
+                "installed_path": str(app_path),
+                "verification": {
+                    "passed": verification_passed,
+                    "methods": verification_methods,
+                },
+                "icon": {
+                    "installed": bool(icon_result.get("icon_path")),
+                    "method": icon_method,
+                    "path": icon_result.get("icon_path", ""),
+                },
             },
         }
 
+        # Add overrides for URL installs
+        if overrides:
+            # Update verification method with actual result
+            if "verification" in overrides:
+                overrides["verification"]["method"] = (
+                    actual_verification_method
+                )
+
+            # Update icon filename with actual result
+            if icon_result.get("icon_path") and "icon" in overrides:
+                icon_path = Path(icon_result["icon_path"])
+                overrides["icon"]["filename"] = icon_path.name
+
+            config_data["overrides"] = overrides
+
         # Save configuration
         try:
-            config_path = self.config_manager.save_app_config(
-                app_name, config_data
-            )
+            self.config_manager.save_app_config(app_name, config_data)
             return {
                 "success": True,
-                "config_path": str(config_path),
+                "config_path": str(
+                    self.config_manager.apps_dir / f"{app_name}.json"
+                ),
                 "config": config_data,
             }
         except Exception as error:
@@ -888,6 +958,67 @@ class InstallHandler:
                 "success": False,
                 "error": str(error),
             }
+
+    def _build_overrides_from_template(
+        self, app_config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Build overrides section from app config template.
+
+        Args:
+            app_config: App configuration template (v2 format)
+
+        Returns:
+            Overrides dictionary for v2.0.0 config
+
+        """
+        # Extract from v2 format
+        source_config = app_config.get("source", {})
+        owner = source_config.get("owner", "")
+        repo = source_config.get("repo", "")
+        prerelease = source_config.get("prerelease", False)
+
+        naming_config = app_config.get("appimage", {}).get("naming", {})
+        name_template = naming_config.get("template", "")
+        target_name = naming_config.get("target_name", "")
+
+        verification_config = app_config.get("verification", {})
+        verification_method = verification_config.get("method", "skip")
+
+        icon_config = app_config.get("icon", {})
+        icon_method = icon_config.get("method", "extraction")
+        icon_filename = icon_config.get("filename", "")
+        icon_url = icon_config.get("download_url", "")
+        overrides = {
+            "metadata": {
+                "name": repo,
+                "display_name": repo,
+                "description": "",
+            },
+            "source": {
+                "type": "github",
+                "owner": owner,
+                "repo": repo,
+                "prerelease": prerelease,
+            },
+            "appimage": {
+                "naming": {
+                    "template": name_template,
+                    "target_name": target_name,
+                    "architectures": ["amd64", "x86_64"],
+                }
+            },
+            "verification": {"method": verification_method},
+            "icon": {
+                "method": icon_method,
+                "filename": icon_filename,
+            },
+        }
+
+        # Add download URL if present
+        if icon_url:
+            overrides["icon"]["download_url"] = icon_url
+
+        return overrides
 
     def _create_desktop_entry_for_app(
         self,

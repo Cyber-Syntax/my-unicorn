@@ -1,0 +1,368 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/Cyber-Syntax/my-unicorn/schemas/app_state_v2.schema.json",
+    "title": "My Unicorn App State Schema v2.0.0",
+    "description": "Schema for app state configuration files that track installed AppImages",
+    "type": "object",
+    "required": [
+        "config_version",
+        "source",
+        "catalog_ref",
+        "state"
+    ],
+    "additionalProperties": false,
+    "properties": {
+        "config_version": {
+            "type": "string",
+            "const": "2.0.0",
+            "description": "Configuration format version"
+        },
+        "source": {
+            "type": "string",
+            "enum": [
+                "catalog",
+                "url"
+            ],
+            "description": "Installation source: catalog (bundled) or url (user-provided)"
+        },
+        "catalog_ref": {
+            "oneOf": [
+                {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Reference to catalog filename (without .json) when source is 'catalog'"
+                },
+                {
+                    "type": "null",
+                    "description": "Must be null when source is 'url'"
+                }
+            ]
+        },
+        "state": {
+            "type": "object",
+            "required": [
+                "version",
+                "installed_date",
+                "installed_path",
+                "verification",
+                "icon"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Installed AppImage version"
+                },
+                "installed_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "ISO 8601 datetime when the app was installed"
+                },
+                "installed_path": {
+                    "type": "string",
+                    "description": "Full path to installed AppImage (may be empty string)"
+                },
+                "verification": {
+                    "type": "object",
+                    "required": [
+                        "passed",
+                        "methods"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "passed": {
+                            "type": "boolean",
+                            "description": "Whether verification passed overall"
+                        },
+                        "methods": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "required": [
+                                    "type",
+                                    "status"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "digest",
+                                            "checksum_file",
+                                            "skip"
+                                        ],
+                                        "description": "Verification method type"
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "passed",
+                                            "failed",
+                                            "skipped"
+                                        ],
+                                        "description": "Verification result status"
+                                    },
+                                    "algorithm": {
+                                        "type": "string",
+                                        "description": "Hash algorithm used (sha256, sha512, etc.)"
+                                    },
+                                    "expected": {
+                                        "type": "string",
+                                        "description": "Expected hash value (for digest method)"
+                                    },
+                                    "computed": {
+                                        "type": "string",
+                                        "description": "Computed hash value (for digest method)"
+                                    },
+                                    "source": {
+                                        "type": "string",
+                                        "description": "Source of hash (e.g., 'github_api')"
+                                    },
+                                    "filename": {
+                                        "type": "string",
+                                        "description": "Checksum filename (for checksum_file method)"
+                                    }
+                                }
+                            },
+                            "description": "Array of verification method results"
+                        }
+                    }
+                },
+                "icon": {
+                    "type": "object",
+                    "required": [
+                        "installed",
+                        "method"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "installed": {
+                            "type": "boolean",
+                            "description": "Whether icon was successfully installed"
+                        },
+                        "method": {
+                            "type": "string",
+                            "enum": [
+                                "extraction",
+                                "download",
+                                "none"
+                            ],
+                            "description": "Method used to obtain icon"
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": "Path to installed icon file"
+                        }
+                    }
+                }
+            }
+        },
+        "overrides": {
+            "type": "object",
+            "description": "Full catalog-like configuration for URL-installed apps (required when source='url')",
+            "required": [
+                "metadata",
+                "source",
+                "appimage",
+                "verification",
+                "icon"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "metadata": {
+                    "type": "object",
+                    "required": [
+                        "name",
+                        "display_name"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "display_name": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "description": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "source": {
+                    "type": "object",
+                    "required": [
+                        "type",
+                        "owner",
+                        "repo",
+                        "prerelease"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": [
+                                "github"
+                            ]
+                        },
+                        "owner": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "repo": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "prerelease": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "appimage": {
+                    "type": "object",
+                    "required": [
+                        "naming"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "naming": {
+                            "type": "object",
+                            "required": [
+                                "target_name",
+                                "architectures"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                                "template": {
+                                    "type": "string"
+                                },
+                                "target_name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                },
+                                "architectures": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "verification": {
+                    "type": "object",
+                    "required": [
+                        "method"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "method": {
+                            "type": "string",
+                            "enum": [
+                                "digest",
+                                "checksum_file",
+                                "skip"
+                            ]
+                        },
+                        "checksum_file": {
+                            "type": "object",
+                            "required": [
+                                "filename",
+                                "algorithm"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                                "filename": {
+                                    "type": "string",
+                                    "minLength": 1
+                                },
+                                "algorithm": {
+                                    "type": "string",
+                                    "enum": [
+                                        "sha256",
+                                        "sha512",
+                                        "sha1",
+                                        "md5"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "icon": {
+                    "type": "object",
+                    "required": [
+                        "method",
+                        "filename"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "method": {
+                            "type": "string",
+                            "enum": [
+                                "extraction",
+                                "download"
+                            ]
+                        },
+                        "filename": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "download_url": {
+                            "type": "string",
+                            "format": "uri"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "allOf": [
+        {
+            "if": {
+                "properties": {
+                    "source": {
+                        "const": "catalog"
+                    }
+                }
+            },
+            "then": {
+                "properties": {
+                    "catalog_ref": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "not": {
+                    "required": [
+                        "overrides"
+                    ]
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "source": {
+                        "const": "url"
+                    }
+                }
+            },
+            "then": {
+                "properties": {
+                    "catalog_ref": {
+                        "type": "null"
+                    }
+                },
+                "required": [
+                    "overrides"
+                ]
+            }
+        }
+    ]
+}

@@ -1,26 +1,32 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "KDiskMark",
+    "display_name": "KDiskMark",
+    "description": "Simple disk benchmark tool with flexible options"
+  },
+  "source": {
+    "type": "github",
     "owner": "JonMagon",
     "repo": "KDiskMark",
-    "appimage": {
-        "rename": "kdiskmark",
-        "name_template": "kdiskmark-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": [
-            "x86_64"
-        ]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "https://raw.githubusercontent.com/JonMagon/KDiskMark/master/data/icons/128-apps-kdiskmark.png",
-        "name": "kdiskmark.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "kdiskmark-{characteristic_suffix}.AppImage",
+      "target_name": "kdiskmark",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "kdiskmark.png",
+    "download_url": "https://raw.githubusercontent.com/JonMagon/KDiskMark/master/data/icons/128-apps-kdiskmark.png"
+  }
 }

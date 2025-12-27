@@ -47,55 +47,66 @@ Architecture:
 - Binary location: `~/.local/bin/my-unicorn`
 - Source Code stored in `~/.local/share/my-unicorn/`
 - Configuration stored in `~/.config/my-unicorn/`
-  - settings.conf - Configuration file for my-unicorn cli
-  - cache/ - Cache files, filtered for AppImage/checksums only (Windows, mac removed)
-    - `AppFlowy-IO_AppFlowy.json` - AppFlowy cache config
-    - `zen-browser_desktop.json` - Zen Browser cache config
-  - logs/ - Log files for my-unicorn
-  - apps/ - AppImages state data folder (Keeps track of versions, checksum statuses)
-    - `appflowy.json` - AppFlowy app config
-    - `zen-browser.json` - Zen Browser app config
+    - settings.conf - Global configuration file (GLOBAL_CONFIG_VERSION="1.0.2")
+    - cache/ - Cache files, filtered for AppImage/checksums only (Windows, mac removed)
+        - `AppFlowy-IO_AppFlowy.json` - AppFlowy cache config
+        - `zen-browser_desktop.json` - Zen Browser cache config
+    - logs/ - Log files for my-unicorn
+    - apps/ - AppImages state data folder (APP_CONFIG_VERSION="2.0.0")
+        - `appflowy.json` - AppFlowy app config (v2 format)
+        - `zen-browser.json` - Zen Browser app config (v2 format)
+        - `backups/` - Config backups created during migration
 
 Project Structure:
 
 - `my_unicorn/` - Main application directory (e.g. src)
-  - `catalog/` - AppImage catalog data (owner, repo, verification logic etc.)
-    - `appflowy.json` - AppFlowy catalog config
-    - `zen-browser.json` - Zen Browser catalog config
-  - `cli/` - CLI interface (parser, runner)
-  - `commands/` - Command handlers
-    - `auth.py` - Auth command handler
-    - `backup.py` - Backup command handler
-    - `base.py` - Base command handler
-    - `cache.py` - Cache command handler
-    - `config.py` - Config command handler
-    - `install.py` - Install command handler
-    - `list.py` - List command handler
-    - `remove.py` - Remove command handler
-    - `update.py` - Update command handler
-    - `upgrade.py` - Upgrade command handler
-  - `utils/` - Utility functions
-  - `verification/` - Checksum verification logic
-  - auth.py: Authentication handler module for github token management
-  - backup.py: Backup configuration module
-  - cache.py: Cache management module
-  - config.py: Configuration management module
-  - config_migration.py: Configuration migration module
-  - constants.py: Constants module
-  - desktop_entry.py: Desktop entry creation module
-  - download.py: Download module that downloads AppImage, checksum files
-  - exceptions.py: Exception handling module
-  - file_ops.py: File operations module
-  - github_client.py: GitHub API client module for requests
-  - icon.py: Icon management module
-  - install.py: Installation module
-  - logger.py: Logging module
-  - main.py: Main entry point for the application
-  - progress.py: Progress bar module with ASCII backend
-  - update.py: Update module that updates AppImages
-  - upgrade.py: Upgrade module that upgrades my-unicorn
+    - `catalog/` - AppImage catalog data (owner, repo, verification logic etc.)
+        - `appflowy.json` - AppFlowy catalog config (v2 format with descriptions)
+        - `zen-browser.json` - Zen Browser catalog config (v2 format with descriptions)
+    - `cli/` - CLI interface (parser, runner)
+    - `commands/` - Command handlers
+        - `auth.py` - Auth command handler
+        - `backup.py` - Backup command handler
+        - `base.py` - Base command handler
+        - `cache.py` - Cache command handler
+        - `catalog.py` - Catalog command handler (renamed from list.py)
+        - `config.py` - Config command handler
+        - `install.py` - Install command handler
+        - `migrate.py` - Migrate command handler (v1→v2 config migration)
+        - `remove.py` - Remove command handler
+        - `update.py` - Update command handler
+        - `upgrade.py` - Upgrade command handler
+    - `migration/` - Config migration modules
+        - `base.py` - Common migration utilities
+        - `app_config.py` - App config v1→v2 migration
+        - `global_config.py` - Global config migration
+    - `schemas/` - JSON schemas for config validation
+        - `catalog_v1.schema.json` - v1 catalog schema
+        - `catalog_v2.schema.json` - v2 catalog schema
+        - `app_state_v1.schema.json` - v1 app state schema
+        - `app_state_v2.schema.json` - v2 app state schema
+    - `utils/` - Utility functions
+    - `verification/` - Checksum verification logic
+    - app_config_migration.py: Config migration module (v1→v2)
+    - auth.py: Authentication handler module for github token management
+    - backup.py: Backup configuration module
+    - cache.py: Cache management module
+    - config.py: Configuration management module
+    - constants.py: Constants module
+    - desktop_entry.py: Desktop entry creation module
+    - download.py: Download module that downloads AppImage, checksum files
+    - exceptions.py: Exception handling module
+    - file_ops.py: File operations module
+    - github_client.py: GitHub API client module for requests
+    - icon.py: Icon management module
+    - install.py: Installation module
+    - logger.py: Logging module
+    - main.py: Main entry point for the application
+    - progress.py: Progress bar module with ASCII backend
+    - update.py: Update module that updates AppImages
+    - upgrade.py: Upgrade module that upgrades my-unicorn
 - `scripts/`: Scripts for various tasks
-- `tests/`: Test files written in Python using pytest
+- `tests/`: Test files written in Python using pytest (910 tests passing)
 - setup.sh: Setup script for installation my-unicorn
 - run.py: my-unicorn development entry point
 

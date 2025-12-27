@@ -1,24 +1,32 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "QOwnNotes",
+    "display_name": "QOwnNotes",
+    "description": "Plain-text note-taking with Markdown and ownCloud integration"
+  },
+  "source": {
+    "type": "github",
     "owner": "pbek",
     "repo": "QOwnNotes",
-    "appimage": {
-        "rename": "qownnotes",
-        "name_template": "{repo}-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": ["x86_64.AppImage"]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "https://raw.githubusercontent.com/pbek/QOwnNotes/develop/icons/icon.png",
-        "name": "qownnotes.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "{repo}-{characteristic_suffix}.AppImage",
+      "target_name": "qownnotes",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "qownnotes.png",
+    "download_url": "https://raw.githubusercontent.com/pbek/QOwnNotes/develop/icons/icon.png"
+  }
 }

@@ -1,27 +1,32 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "siyuan",
+    "display_name": "siyuan",
+    "description": "Privacy-first personal knowledge management system"
+  },
+  "source": {
+    "type": "github",
     "owner": "siyuan-note",
     "repo": "siyuan",
-    "appimage": {
-        "rename": "siyuan",
-        "name_template": "{repo}-{latest_version}-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": [
-            "linux",
-            ""
-        ]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "https://raw.githubusercontent.com/siyuan-note/siyuan/master/app/src/assets/icon.png",
-        "name": "siyuan.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "{repo}-{latest_version}-{characteristic_suffix}.AppImage",
+      "target_name": "siyuan",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "siyuan.png",
+    "download_url": "https://raw.githubusercontent.com/siyuan-note/siyuan/master/app/src/assets/icon.png"
+  }
 }

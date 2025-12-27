@@ -548,7 +548,7 @@ class TestVerificationService:
         async def mock_download_side_effect(url):
             if "latest-linux.yml" in url:
                 return "invalid yaml content"
-            elif "SHA256SUMS.txt" in url:
+            if "SHA256SUMS.txt" in url:
                 return SIYUAN_SHA256SUMS_CONTENT
             return ""
 
@@ -678,7 +678,7 @@ releaseDate: '2025-05-26T17:26:48.710Z'"""
     async def test_verify_file_edge_case_empty_assets(
         self, verification_service, test_file_path
     ):
-        """Test with empty assets list - should fail without verification methods."""
+        """Test with empty assets list - should allow installation with warning."""
         asset = Asset(
             name="test.AppImage",
             size=12,
@@ -694,7 +694,7 @@ releaseDate: '2025-05-26T17:26:48.710Z'"""
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
 
-            # Should fail because no verification methods are available
+            # Should allow installation with warning when no verification methods available
             result = await verification_service.verify_file(
                 file_path=test_file_path,
                 asset=asset,
@@ -706,7 +706,7 @@ releaseDate: '2025-05-26T17:26:48.710Z'"""
                 assets=empty_assets,
             )
 
-            assert result.passed is False
+            assert result.passed is True  # Changed: allow installation
             assert result.methods == {}
 
     @pytest.mark.asyncio

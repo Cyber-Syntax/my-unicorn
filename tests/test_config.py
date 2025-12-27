@@ -15,7 +15,7 @@ from my_unicorn.config import (
     DirectoryManager,
     GlobalConfigManager,
 )
-from my_unicorn.constants import CONFIG_VERSION
+from my_unicorn.constants import GLOBAL_CONFIG_VERSION
 
 
 @pytest.fixture
@@ -30,28 +30,27 @@ def config_dir(tmp_path):
     dummy_catalog.write_bytes(
         orjson.dumps(
             {
-                "owner": "dummy",
-                "repo": "dummyrepo",
-                "appimage": {
-                    "rename": "dummy",
-                    "name_template": "",
-                    "characteristic_suffix": [],
+                "config_version": "2.0.0",
+                "metadata": {
+                    "name": "dummyapp",
+                    "display_name": "Dummy App",
+                    "description": "",
                 },
-                "github": {
-                    "repo": True,
+                "source": {
+                    "type": "github",
+                    "owner": "dummy",
+                    "repo": "dummyrepo",
                     "prerelease": False,
                 },
-                "verification": {
-                    "digest": False,
-                    "skip": False,
-                    "checksum_file": "",
-                    "checksum_hash_type": "sha256",
+                "appimage": {
+                    "naming": {
+                        "template": "",
+                        "target_name": "dummy",
+                        "architectures": ["amd64", "x86_64"],
+                    }
                 },
-                "icon": {
-                    "extraction": False,
-                    "url": "",
-                    "name": "dummy.png",
-                },
+                "verification": {"method": "digest"},
+                "icon": {"method": "extraction", "filename": "dummy.png"},
             }
         )
     )
@@ -78,35 +77,36 @@ def test_load_and_save_global_config(config_manager):
 
 
 def test_load_app_config_and_migration(config_manager):
-    """Test saving, loading, and migrating app config."""
+    """Test saving and loading app config with v2.0.0 format."""
     app_name = "testapp"
     app_config = {
-        "config_version": "1.0.0",
-        "appimage": {
-            "version": "1.2.3",
-            "name": "test.AppImage",
-            "rename": "test",
-            "name_template": "",
-            "characteristic_suffix": [],
-            "installed_date": "2024-01-01",
-            "digest": "abc123",
-            "hash": "should_migrate",
+        "config_version": "2.0.0",
+        "source": "catalog",
+        "catalog_ref": "testapp",
+        "state": {
+            "version": "1.0.0",
+            "installed_date": "2025-01-01T00:00:00",
+            "installed_path": "/path/to/app.AppImage",
+            "verification": {
+                "passed": True,
+                "methods": [
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                    }
+                ],
+            },
+            "icon": {"installed": False, "method": "extraction", "path": ""},
         },
-        "owner": "owner",
-        "repo": "repo",
-        "github": {"repo": True, "prerelease": False},
-        "verification": {
-            "digest": True,
-            "skip": False,
-            "checksum_file": "",
-            "checksum_hash_type": "sha256",
-        },
-        "icon": {"url": "", "name": "icon.png", "installed": True},
     }
     config_manager.save_app_config(app_name, app_config)
     loaded = config_manager.load_app_config(app_name)
-    assert loaded["appimage"]["digest"] == "should_migrate"
-    assert "hash" not in loaded["appimage"]
+
+    # Should load v2.0.0 config successfully
+    assert loaded["config_version"] == "2.0.0"
+    assert "state" in loaded
+    assert loaded["state"]["verification"]["passed"] is True
 
 
 def test_remove_app_config(config_manager):
@@ -114,14 +114,15 @@ def test_remove_app_config(config_manager):
     app_name = "toremove"
     app_config = {
         "config_version": "1.0.0",
+        "source": "catalog",
         "appimage": {
             "version": "1.0",
             "name": "toremove.AppImage",
             "rename": "toremove",
             "name_template": "",
             "characteristic_suffix": [],
-            "installed_date": "2024-01-01",
-            "digest": "abc",
+            "installed_date": "2024-01-01T12:00:00",
+            "digest": "sha256:abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
         },
         "owner": "owner",
         "repo": "repo",
@@ -149,14 +150,15 @@ def test_list_installed_apps(config_manager):
             name,
             {
                 "config_version": "1.0.0",
+                "source": "catalog",
                 "appimage": {
                     "version": "1.0",
                     "name": f"{name}.AppImage",
                     "rename": name,
                     "name_template": "",
                     "characteristic_suffix": [],
-                    "installed_date": "2024-01-01",
-                    "digest": "abc",
+                    "installed_date": "2024-01-01T12:00:00",
+                    "digest": "sha256:abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
                 },
                 "owner": "owner",
                 "repo": "repo",
@@ -184,8 +186,8 @@ def test_load_catalog_entry(config_manager):
     """Test loading catalog entry."""
     entry = config_manager.load_catalog_entry("dummyapp")
     assert entry is not None
-    assert entry["owner"] == "dummy"
-    assert entry["repo"] == "dummyrepo"
+    assert entry["source"]["owner"] == "dummy"
+    assert entry["source"]["repo"] == "dummyrepo"
 
 
 def test_ensure_directories_from_config(config_manager, tmp_path):
@@ -380,33 +382,40 @@ def test_app_config_manager(config_dir):
     app_name = "testapp"
     TEST_VERSION = "2.0.0"
     app_config = {
-        "config_version": "1.0.0",
-        "appimage": {
+        "config_version": "2.0.0",
+        "source": "catalog",
+        "catalog_ref": "testapp",
+        "state": {
             "version": TEST_VERSION,
-            "name": "test.AppImage",
-            "rename": "test",
-            "name_template": "",
-            "characteristic_suffix": [],
-            "installed_date": "2024-01-01",
-            "digest": "abc123",
+            "installed_date": "2024-01-01T12:00:00",
+            "installed_path": "",
+            "verification": {
+                "passed": True,
+                "methods": [
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                        "expected": "abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
+                        "computed": "abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
+                        "source": "github_api",
+                    }
+                ],
+            },
+            "icon": {
+                "installed": True,
+                "method": "extraction",
+                "path": "",
+            },
         },
-        "owner": "testowner",
-        "repo": "testrepo",
-        "github": {"repo": True, "prerelease": False},
-        "verification": {
-            "digest": True,
-            "skip": False,
-            "checksum_file": "",
-            "checksum_hash_type": "sha256",
-        },
-        "icon": {"url": "", "name": "icon.png", "installed": True},
     }
 
-    app_manager.save_app_config(app_name, cast(AppConfig, app_config))
+    app_manager.save_app_config(app_name, cast("AppConfig", app_config))
     loaded = app_manager.load_app_config(app_name)
     assert loaded is not None
-    assert loaded["appimage"]["version"] == TEST_VERSION
-    assert loaded["owner"] == "testowner"
+    # V2.0.0 format with state
+    assert loaded["config_version"] == "2.0.0"
+    assert loaded["state"]["version"] == TEST_VERSION
 
     # Test listing apps
     installed = app_manager.list_installed_apps()
@@ -432,28 +441,27 @@ def test_catalog_manager(config_dir):
     catalog_dir.mkdir()
 
     test_app_data = {
-        "owner": "testowner",
-        "repo": "testapp",
-        "appimage": {
-            "rename": "testapp",
-            "name_template": "",
-            "characteristic_suffix": [],
+        "config_version": "2.0.0",
+        "metadata": {
+            "name": "testapp",
+            "display_name": "Test App",
+            "description": "",
         },
-        "github": {
-            "repo": True,
+        "source": {
+            "type": "github",
+            "owner": "testowner",
+            "repo": "testapp",
             "prerelease": False,
         },
-        "verification": {
-            "digest": False,
-            "skip": False,
-            "checksum_file": "",
-            "checksum_hash_type": "sha256",
+        "appimage": {
+            "naming": {
+                "template": "",
+                "target_name": "testapp",
+                "architectures": ["amd64"],
+            }
         },
-        "icon": {
-            "extraction": False,
-            "url": "",
-            "name": "testapp.png",
-        },
+        "verification": {"method": "digest"},
+        "icon": {"method": "extraction", "filename": "testapp.png"},
     }
 
     test_catalog_file = catalog_dir / "testapp.json"
@@ -470,8 +478,8 @@ def test_catalog_manager(config_dir):
     # Test loading catalog entry
     entry = catalog_manager.load_catalog_entry("testapp")
     assert entry is not None
-    assert entry["owner"] == "testowner"
-    assert entry["repo"] == "testapp"
+    assert entry["source"]["owner"] == "testowner"
+    assert entry["source"]["repo"] == "testapp"
 
     # Test non-existent catalog entry
     nonexistent = catalog_manager.load_catalog_entry("nonexistent")
@@ -488,27 +496,29 @@ def test_config_manager_facade_integration(config_dir):
     test_catalog_file.write_bytes(
         orjson.dumps(
             {
-                "owner": "integration",
-                "repo": "test",
-                "appimage": {
-                    "rename": "integration_test",
-                    "name_template": "",
-                    "characteristic_suffix": [],
+                "config_version": "2.0.0",
+                "metadata": {
+                    "name": "integration_test",
+                    "display_name": "Integration Test",
+                    "description": "",
                 },
-                "github": {
-                    "repo": True,
+                "source": {
+                    "type": "github",
+                    "owner": "integration",
+                    "repo": "test",
                     "prerelease": False,
                 },
-                "verification": {
-                    "digest": False,
-                    "skip": False,
-                    "checksum_file": "",
-                    "checksum_hash_type": "sha256",
+                "appimage": {
+                    "naming": {
+                        "template": "",
+                        "target_name": "integration_test",
+                        "architectures": ["amd64", "x86_64"],
+                    }
                 },
+                "verification": {"method": "digest"},
                 "icon": {
-                    "extraction": False,
-                    "url": "",
-                    "name": "integration_test.png",
+                    "method": "extraction",
+                    "filename": "integration_test.png",
                 },
             }
         )
@@ -530,31 +540,41 @@ def test_config_manager_facade_integration(config_dir):
 
     # App config operations
     app_config = {
-        "config_version": "1.0.0",
-        "appimage": {
+        "config_version": "2.0.0",
+        "source": "catalog",
+        "catalog_ref": "integration_test",
+        "state": {
             "version": "1.0.0",
-            "name": "integration.AppImage",
-            "rename": "integration",
-            "installed_date": "2024-01-01",
-            "digest": "abc123",
+            "installed_date": "2024-01-01T12:00:00",
+            "installed_path": "",
+            "verification": {
+                "passed": True,
+                "methods": [
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                        "expected": "abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
+                        "computed": "abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
+                        "source": "github_api",
+                    }
+                ],
+            },
+            "icon": {
+                "installed": True,
+                "method": "extraction",
+                "path": "",
+            },
         },
-        "owner": "integration",
-        "repo": "test",
-        "github": {"repo": True, "prerelease": False},
-        "verification": {
-            "digest": True,
-            "skip": False,
-            "checksum_file": "",
-            "checksum_hash_type": "sha256",
-        },
-        "icon": {"url": "", "name": "icon.png", "installed": True},
     }
     config_manager.save_app_config(
-        "integration_test", cast(AppConfig, app_config)
+        "integration_test", cast("AppConfig", app_config)
     )
     loaded_app = config_manager.load_app_config("integration_test")
     assert loaded_app is not None
-    assert loaded_app["owner"] == "integration"
+    # After migration to v2.0.0, structure changes
+    assert loaded_app["config_version"] == "2.0.0"
+    assert loaded_app["state"]["version"] == "1.0.0"
 
     # Catalog operations
     catalog_apps = config_manager.list_catalog_apps()
@@ -562,7 +582,7 @@ def test_config_manager_facade_integration(config_dir):
 
     catalog_entry = config_manager.load_catalog_entry("integration_test")
     assert catalog_entry is not None
-    assert catalog_entry["repo"] == "test"
+    assert catalog_entry["source"]["repo"] == "test"
 
     # Directory operations
     assert config_manager.apps_dir.exists()
@@ -621,7 +641,7 @@ def test_needs_migration(config_dir):
     assert manager.migration._needs_migration("0.9.9") is True
 
     # Current version is same as default
-    assert manager.migration._needs_migration(CONFIG_VERSION) is False
+    assert manager.migration._needs_migration(GLOBAL_CONFIG_VERSION) is False
 
     # Current version is newer than default (shouldn't happen)
     assert manager.migration._needs_migration("2.0.0") is False

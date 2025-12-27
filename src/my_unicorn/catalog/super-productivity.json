@@ -1,27 +1,32 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "super-productivity",
+    "display_name": "super-productivity",
+    "description": "Advanced todo list app with integrated Timeboxing and time tracking capabilities."
+  },
+  "source": {
+    "type": "github",
     "owner": "johannesjo",
     "repo": "super-productivity",
-    "appimage": {
-        "rename": "super-productivity",
-        "name_template": "superProductivity-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": [
-            "x86_64",
-            "amd64"
-        ]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "https://raw.githubusercontent.com/johannesjo/super-productivity/master/src/assets/icons/favicon-192x192.png",
-        "name": "super-productivity.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "superProductivity-{characteristic_suffix}.AppImage",
+      "target_name": "super-productivity",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "super-productivity.png",
+    "download_url": "https://raw.githubusercontent.com/johannesjo/super-productivity/master/src/assets/icons/favicon-192x192.png"
+  }
 }

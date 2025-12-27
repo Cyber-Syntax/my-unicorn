@@ -5,14 +5,110 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2025-12-25
+## [2.0.0] - 2025-12-27
+
+### Breaking Changes
+
+- **Config Format Migration**: Application configuration format changed from v1.0.0 to v2.0.0
+    - Manual migration required via `my-unicorn migrate` command before use
+    - Automatic backups created during migration (.json.backup files)
+    - Config v2 uses hybrid structure: catalog apps store only state + catalog_ref, URL apps store full config in overrides
+- **Global Config**: Global configuration version updated to 1.0.2
+- **Command Rename**: `list` command deprecated in favor of `catalog` command (backward compatible alias maintained)
+
+### Added
+
+- **JSON Schema Validation**: Comprehensive validation for catalog and app state configurations
+    - Auto-detection of v1 vs v2 config formats
+    - Runtime validation at load/save operations
+    - Clear error messages with JSON path references
+    - IDE support via .schema.json files
+- **App Descriptions**: Added descriptions for all 27 catalog applications
+- **Catalog Command**: Enhanced `catalog` command with app descriptions
+    - `catalog --available` shows apps with descriptions
+    - `catalog --info <app-name>` displays detailed app information
+    - Backward compatible `list` alias maintained
+- **Migration Infrastructure**: Complete v1→v2 migration system
+    - Dedicated `migration/` package with modular structure
+    - Automatic backup creation before migration
+    - Support for both catalog and URL-installed apps
+    - Post-migration validation with schema checking
+- **Verification Warnings**: Installation proceeds with warnings when no verification methods available
+    - Clear security warnings for users
+    - Progress display shows ⚠ symbol for unverified installs
+    - Detailed logging for debugging
 
 ### Changed
 
-- Remove editable mode from setup.sh
-- Update upgrade process: Use 'uv tool upgrade' command and enhance test coverage
-- Enhance readme and update todo.md
-- Enhance ci workflow: add enhanced changelog extraction script, add comprehensive test for the ci and its scripts
+- **Setup.sh Update**: Remove editable mode on legacy installation from setup.sh
+- **Upgrade Process Update**: Use 'uv tool upgrade' command and enhance test coverage
+- **Documentation Enhancement**: Enhance readme and update todo.md
+- **CI Workflow Enhancement**: add enhanced changelog extraction script, add comprehensive test for the ci and its scripts
+- **Config Structure**: New hybrid v2 configuration format
+    - Catalog apps: Minimal config (state + catalog_ref pointing to catalog filename)
+    - URL apps: Full config stored in overrides section
+    - Improved separation of concerns and reduced duplication
+- **Verification State**: Enhanced verification tracking in app state
+    - Multiple verification methods tracked per installation
+    - Detailed status for each method (type, algorithm, hashes, source)
+    - Properly saves `passed: false` when no verification occurs
+- **Icon State**: Improved icon state tracking
+    - Method field indicates extraction vs download
+    - Accurate migration from v1 extraction boolean
+- **Migration Organization**: Refactored migration code into dedicated package
+    - `migration/base.py` - Common utilities
+    - `migration/app_config.py` - App config migration
+    - `migration/global_config.py` - Global config migration
+    - Eliminated code duplication
+
+### Fixed
+
+- **Icon Migration**: Fixed v1→v2 migration incorrectly setting icon.method to "download"
+    - Now correctly checks source field first, then falls back to extraction boolean
+    - Affects apps like tagspaces, super-productivity with extraction+URL
+- **Catalog App Verification**: Fixed checksum_file verification not preserved during migration
+    - Migration now consults catalog for correct verification method
+    - Apps like standard-notes properly migrated
+- **URL Install Config**: Fixed URL-installed apps creating empty overrides in source fields
+    - Now properly populates source section in overrides
+- **Migration Command**: Fixed migrate command failing on v1 configs
+    - Now reads raw JSON directly instead of using load_app_config validation
+- **Catalog Reference**: Fixed catalog apps incorrectly migrated as URL apps
+    - catalog_ref now maps to catalog filename (app_name), not repo name
+    - No overrides added to catalog apps during migration
+- Wrong name in catalog for Beekeeper Studio app, changed name from beekeper-studio to beekeeper-studio.
+
+### Migration Guide
+
+#### Migrating from v1.x to v2.0.0
+
+1. **Before upgrading**: Your existing v1 configs will continue to work for reading, but you should migrate them.
+
+2. **Run migration command**:
+
+   ```bash
+   my-unicorn migrate
+   ```
+
+3. **Migration process**:
+   - Automatically detects v1 configs in `~/.config/my-unicorn/apps/`
+   - Creates `.json.backup` files before migration
+   - Converts to v2 format with appropriate structure
+   - Validates migrated configs against JSON schema
+
+4. **After migration**:
+   - Review migrated configs in `~/.config/my-unicorn/apps/`
+   - Backups available in `~/.config/my-unicorn/apps/backups/`
+   - Use `catalog` command instead of `list` (alias still works)
+
+5. **Config structure changes**:
+   - Catalog apps: Only state + catalog_ref stored (metadata from catalog)
+   - URL apps: Full config in overrides section
+   - See docs/config.md for detailed v2 format documentation
+
+- Please manually update beekeeper-studio app config if you are using it. Both app state config name and `"catalog_ref": "beekeeper-studio",` or you could just remove and install again via `my-unicorn install beekeeper-studio`.
+
+For detailed migration information, see [docs/config.md](docs/config.md).
 
 ## [1.12.2-alpha]
 
@@ -51,7 +147,7 @@ To migrate to the new uv-based installation, please follow these steps:
 - Remove `~/.local/share/my-unicorn/` directory if it exists.
 - Remove `~/.local/share/my-unicorn-repo/` directory if it exists.
 
-2. Install via setup.sh script:
+1. Install via setup.sh script:
 
 ```bash
 ./setup.sh uv-install
@@ -549,7 +645,7 @@ Please change your current configuration files to the new format. The new format
 - refactor: improve better error handling on verify.py
 - chore: add copilot instructions
 
-[Unreleased]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.2-alpha...HEAD
+[2.0.0]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.2-alpha...v2.0.0
 [1.12.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.1-alpha...v1.12.2-alpha
 [1.12.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.0-alpha...v1.12.1-alpha
 [1.12.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.11.1-alpha...v1.12.0-alpha

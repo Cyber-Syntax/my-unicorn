@@ -66,8 +66,9 @@ Examples:
   %(prog)s upgrade
 
   # Other commands
-  %(prog)s list                # Show installed appimages
-  %(prog)s list --available    # Available appimages via catalog installation
+  %(prog)s catalog              # Show installed appimages
+  %(prog)s catalog --available  # Browse available appimages
+  %(prog)s catalog --info joplin  # Get detailed app information
 
   # Auth Token Management (use keyring library, only gnome-keyring tested)
   %(prog)s auth --save-token
@@ -111,7 +112,9 @@ Examples:
         self._add_install_command(subparsers)
         self._add_update_command(subparsers)
         self._add_upgrade_command(subparsers)
-        self._add_list_command(subparsers)
+        self._add_catalog_command(subparsers)
+        self._add_list_command(subparsers)  # Deprecated alias for catalog
+        self._add_migrate_command(subparsers)
         self._add_remove_command(subparsers)
         self._add_backup_command(subparsers)
         self._add_cache_command(subparsers)
@@ -258,8 +261,39 @@ Examples:
             "(useful for automated scripts)",
         )
 
+    def _add_catalog_command(self, subparsers) -> None:
+        """Add catalog command parser.
+
+        Args:
+            subparsers: The subparsers object to add the catalog command
+                to.
+
+        """
+        catalog_parser = subparsers.add_parser(
+            "catalog",
+            help="Browse AppImage catalog",
+            description="Browse available AppImages and show installed apps",
+        )
+        # Create mutually exclusive group for subcommands
+        catalog_group = catalog_parser.add_mutually_exclusive_group()
+        catalog_group.add_argument(
+            "--installed",
+            action="store_true",
+            help="Show installed AppImages (default)",
+        )
+        catalog_group.add_argument(
+            "--available",
+            action="store_true",
+            help="Show available applications from catalog with descriptions",
+        )
+        catalog_group.add_argument(
+            "--info",
+            metavar="APP",
+            help="Show detailed information about a specific app",
+        )
+
     def _add_list_command(self, subparsers) -> None:
-        """Add list command parser.
+        """Add list command parser (deprecated alias for catalog).
 
         Args:
             subparsers: The subparsers object to add the list command
@@ -267,12 +301,37 @@ Examples:
 
         """
         list_parser = subparsers.add_parser(
-            "list", help="List installed AppImages"
+            "list",
+            help="(Deprecated: use 'catalog') List installed AppImages",
         )
         list_parser.add_argument(
             "--available",
             action="store_true",
             help="Show available applications from catalog",
+        )
+
+    def _add_migrate_command(self, subparsers) -> None:
+        """Add migrate command parser.
+
+        Args:
+            subparsers: The subparsers object to add the migrate command
+                to.
+
+        """
+        migrate_parser = subparsers.add_parser(
+            "migrate",
+            help="Migrate configs to latest version",
+            description="Upgrade app and catalog configs to v2 format",
+        )
+        migrate_parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Show what would be migrated without making changes",
+        )
+        migrate_parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Force migration even if versions match",
         )
 
     def _add_remove_command(self, subparsers) -> None:

@@ -1,24 +1,31 @@
 {
-  "owner": "flameshot-org",
-  "repo": "flameshot",
-  "appimage": {
-    "rename": "flameshot",
-    "name_template": "",
-    "characteristic_suffix": []
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "flameshot",
+    "display_name": "flameshot",
+    "description": "Powerful yet simple screenshot tool with annotation"
   },
-  "github": {
-    "repo": true,
+  "source": {
+    "type": "github",
+    "owner": "flameshot-org",
+    "repo": "flameshot",
     "prerelease": false
   },
+  "appimage": {
+    "naming": {
+      "template": "",
+      "target_name": "flameshot",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
+    }
+  },
   "verification": {
-    "digest": true,
-    "skip": false,
-    "checksum_file": "",
-    "checksum_hash_type": "sha256"
+    "method": "digest"
   },
   "icon": {
-    "extraction": true,
-    "url": "",
-    "name": "flameshot.png"
+    "method": "extraction",
+    "filename": "flameshot.png"
   }
 }

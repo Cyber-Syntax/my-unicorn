@@ -13,7 +13,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from my_unicorn.config import config_manager
 from my_unicorn.constants import (
     DEFAULT_LOG_LEVEL,
     LOG_BACKUP_COUNT,
@@ -49,8 +48,10 @@ def _load_log_settings() -> tuple[str, str, Path]:
     )
 
     try:
+        from my_unicorn.config import config_manager
+
         global_config = config_manager.load_global_config()
-    except (OSError, KeyError, ValueError):
+    except (OSError, KeyError, ValueError, ImportError):
         return default_console_level, default_file_level, default_path
 
     console_level = str(

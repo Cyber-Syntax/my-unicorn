@@ -1,0 +1,26 @@
+{
+  "config_version": "2.0.0",
+  "source": "catalog",
+  "catalog_ref": "tagspaces",
+  "state": {
+    "version": "6.7.3",
+    "installed_date": "2025-12-07T09:55:18.962135",
+    "installed_path": "/home/developer/Applications/tagspaces.AppImage",
+    "verification": {
+      "passed": true,
+      "methods": [
+        {
+          "type": "checksum_file",
+          "status": "passed",
+          "algorithm": "sha256",
+          "filename": "SHA256SUMS.txt"
+        }
+      ]
+    },
+    "icon": {
+      "installed": true,
+      "method": "extraction",
+      "path": "/home/developer/Applications/icons/tagspaces.png"
+    }
+  }
+}

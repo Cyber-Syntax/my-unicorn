@@ -145,3 +145,121 @@ class CacheEntry(TypedDict):
     cached_at: str  # ISO 8601 timestamp
     ttl_hours: int  # Cache TTL in hours
     release_data: dict[str, Any]  # GitHubReleaseDetails structure
+
+
+# =============================================================================
+# Config V2.0.0 Types
+# =============================================================================
+
+
+class AppMetadata(TypedDict, total=False):
+    """Application metadata for v2.0.0 configs."""
+
+    name: str
+    display_name: str
+    description: str
+
+
+class SourceConfig(TypedDict):
+    """Source configuration for app retrieval."""
+
+    type: str  # "github"
+    owner: str
+    repo: str
+    prerelease: bool
+
+
+class NamingConfig(TypedDict):
+    """AppImage naming configuration."""
+
+    template: str
+    target_name: str
+    architectures: list[str]
+
+
+class AppImageConfigV2(TypedDict):
+    """AppImage configuration v2."""
+
+    naming: NamingConfig
+
+
+class VerificationMethod(TypedDict, total=False):
+    """Single verification method result."""
+
+    type: str  # "skip", "digest", "checksum_file"
+    status: str  # "passed", "failed", "skipped"
+    algorithm: str  # "sha256", "sha512"
+    expected: str
+    computed: str
+    source: str  # "github_api", "release_assets"
+
+
+class StateVerification(TypedDict):
+    """Verification state tracking."""
+
+    passed: bool
+    methods: list[VerificationMethod]
+
+
+class StateIcon(TypedDict):
+    """Icon state tracking."""
+
+    installed: bool
+    method: str  # "extraction", "download"
+    path: str
+
+
+class AppState(TypedDict):
+    """Runtime state for installed app."""
+
+    version: str
+    installed_date: str
+    installed_path: str
+    verification: StateVerification
+    icon: StateIcon
+
+
+class VerificationConfigV2(TypedDict, total=False):
+    """Verification configuration v2."""
+
+    method: str  # "skip", "digest", "checksum_file"
+    checksum_file: dict[str, Any]  # Only if method == "checksum_file"
+
+
+class IconConfigV2(TypedDict, total=False):
+    """Icon configuration v2."""
+
+    method: str  # "extraction", "download"
+    filename: str
+    download_url: str  # Only if method == "download"
+
+
+class AppOverrides(TypedDict, total=False):
+    """User overrides for catalog apps or full config for URL installs."""
+
+    metadata: AppMetadata
+    source: SourceConfig
+    appimage: AppImageConfigV2
+    verification: VerificationConfigV2
+    icon: IconConfigV2
+
+
+class AppConfigV2(TypedDict):
+    """App configuration v2.0.0."""
+
+    config_version: str
+    source: str  # "catalog" or "url"
+    catalog_ref: str | None
+    state: AppState
+    overrides: AppOverrides  # Optional for catalog, required for URL
+
+
+class CatalogEntryV2(TypedDict):
+    """Catalog entry v2.0.0."""
+
+    config_version: str
+    metadata: AppMetadata
+    source: SourceConfig
+    appimage: AppImageConfigV2
+    verification: VerificationConfigV2
+    icon: IconConfigV2

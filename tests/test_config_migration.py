@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from my_unicorn.config import DirectoryManager
-from my_unicorn.config_migration import ConfigMigration
-from my_unicorn.constants import CONFIG_VERSION
+from my_unicorn.constants import GLOBAL_CONFIG_VERSION
+from my_unicorn.migration.global_config import ConfigMigration
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ def migration(directory_manager):
 def sample_defaults():
     """Sample default configuration for testing."""
     return {
-        "config_version": CONFIG_VERSION,
+        "config_version": GLOBAL_CONFIG_VERSION,
         "log_level": "INFO",
         "console_log_level": "WARNING",
         "network": {"retry_attempts": "3", "timeout_seconds": "10"},
@@ -79,7 +79,7 @@ class TestConfigMigration:
 
     def test_needs_migration_false(self, migration):
         """Test migration is not needed for current or newer versions."""
-        assert migration._needs_migration(CONFIG_VERSION) is False
+        assert migration._needs_migration(GLOBAL_CONFIG_VERSION) is False
         assert migration._needs_migration("1.1.0") is False
 
     def test_compare_versions(self, migration):
@@ -91,7 +91,7 @@ class TestConfigMigration:
     def test_migrate_if_needed_no_migration(self, migration, sample_defaults):
         """Test migration when no migration is needed."""
         config = configparser.ConfigParser()
-        config["DEFAULT"] = {"config_version": CONFIG_VERSION}
+        config["DEFAULT"] = {"config_version": GLOBAL_CONFIG_VERSION}
 
         result = migration.migrate_if_needed(config, sample_defaults)
 
@@ -135,7 +135,7 @@ class TestConfigMigration:
         """Test that no changes are made when all fields exist."""
         config = configparser.ConfigParser()
         config["DEFAULT"] = {
-            "config_version": CONFIG_VERSION,
+            "config_version": GLOBAL_CONFIG_VERSION,
             "log_level": "INFO",
             "console_log_level": "WARNING",
         }
@@ -154,7 +154,7 @@ class TestConfigMigration:
         """Test validation of a valid configuration."""
         config = configparser.ConfigParser()
         config["DEFAULT"] = {
-            "config_version": CONFIG_VERSION,
+            "config_version": GLOBAL_CONFIG_VERSION,
             "log_level": "INFO",
             "console_log_level": "WARNING",
         }
@@ -172,7 +172,7 @@ class TestConfigMigration:
     def test_validate_merged_config_invalid(self, migration):
         """Test validation of an invalid configuration."""
         config = configparser.ConfigParser()
-        config["DEFAULT"] = {"config_version": CONFIG_VERSION}
+        config["DEFAULT"] = {"config_version": GLOBAL_CONFIG_VERSION}
         # Missing required sections and fields
 
         result = migration._validate_merged_config(config)

@@ -10,7 +10,7 @@ _my_unicorn_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     
     # Available commands
-    commands="install update upgrade list remove backup cache auth config"
+    commands="install update upgrade catalog remove backup cache auth config"
     
     # Global options
     local global_opts="--help --version"
@@ -19,7 +19,7 @@ _my_unicorn_completion() {
     local install_opts="--concurrency --no-icon --no-verify --no-desktop --verbose --help"
     local update_opts="--check-only --refresh-cache --verbose --help"
     local upgrade_opts="--check-only --help"
-    local list_opts="--available --help"
+    local catalog_opts="--installed --available --info --help"
     local remove_opts="--keep-config --help"
     local backup_opts="--restore-last --restore-version --list-backups --cleanup --info --migrate --help"
     local cache_opts="clear stats --help"
@@ -64,8 +64,16 @@ _my_unicorn_completion() {
         upgrade)
             mapfile -t COMPREPLY < <(compgen -W "${upgrade_opts}" -- "${cur}")
             ;;
-        list)
-            mapfile -t COMPREPLY < <(compgen -W "${list_opts}" -- "${cur}")
+        catalog)
+            case "${prev}" in
+                --info)
+                    # App name expected for --info
+                    COMPREPLY=()
+                    ;;
+                *)
+                    mapfile -t COMPREPLY < <(compgen -W "${catalog_opts}" -- "${cur}")
+                    ;;
+            esac
             ;;
         remove)
             if [[ ${cur} == -* ]]; then

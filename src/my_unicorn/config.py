@@ -22,7 +22,6 @@ import orjson
 from my_unicorn.constants import (
     CONFIG_DIR_NAME,
     CONFIG_FILE_NAME,
-    CONFIG_VERSION,
     DEFAULT_APPS_DIR_NAME,
     DEFAULT_CONFIG_SUBDIR,
     DEFAULT_CONSOLE_LOG_LEVEL,
@@ -30,6 +29,7 @@ from my_unicorn.constants import (
     DEFAULT_MAX_BACKUP,
     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
     DIRECTORY_KEYS,
+    GLOBAL_CONFIG_VERSION,
     ISO_DATETIME_FORMAT,
     KEY_CONFIG_VERSION,
     KEY_CONSOLE_LOG_LEVEL,
@@ -70,8 +70,7 @@ class CommentAwareConfigParser(configparser.ConfigParser):
     def get(self, section, option, **kwargs):
         """Get a configuration value with inline comments stripped."""
         value = super().get(section, option, **kwargs)
-        value = _strip_inline_comment(value)
-        return value
+        return _strip_inline_comment(value)
 
 
 class ConfigCommentManager:
@@ -91,7 +90,7 @@ class ConfigCommentManager:
 # You can modify these values to customize the behavior of the application.
 #
 # Last updated: {timestamp}
-# Configuration version: {CONFIG_VERSION}
+# Configuration version: {GLOBAL_CONFIG_VERSION}
 
 """
 
@@ -233,8 +232,11 @@ class DirectoryManager:
         Raises:
             FileNotFoundError: If catalog directory or files don't exist
             NotADirectoryError: If catalog path is not a directory
+            ValueError: If catalog entries fail schema validation
 
         """
+        from my_unicorn.schemas import SchemaValidationError, validate_catalog
+
         if not self._catalog_dir.exists():
             raise FileNotFoundError(
                 f"Bundled catalog directory not found: {self._catalog_dir}\n"
@@ -252,6 +254,26 @@ class DirectoryManager:
             raise FileNotFoundError(
                 f"No catalog entries found in: {self._catalog_dir}\n"
                 "Expected to find *.json files with app catalog entries."
+            )
+
+        # Validate all catalog files against schema
+        invalid_catalogs = []
+        for catalog_file in catalog_files:
+            try:
+                with open(catalog_file, "rb") as f:
+                    catalog_data = orjson.loads(f.read())
+                validate_catalog(catalog_data, catalog_file.stem)
+            except SchemaValidationError as e:
+                invalid_catalogs.append(f"{catalog_file.stem}: {e}")
+            except Exception as e:
+                invalid_catalogs.append(
+                    f"{catalog_file.stem}: Failed to load - {e}"
+                )
+
+        if invalid_catalogs:
+            raise ValueError(
+                "Invalid catalog entries found:\n"
+                + "\n".join(f"  - {err}" for err in invalid_catalogs)
             )
 
     def ensure_directories_from_config(self, config: GlobalConfig) -> None:
@@ -277,7 +299,7 @@ class GlobalConfigManager:
         """
         self.directory_manager = directory_manager
         # Import migration module here to avoid circular imports
-        from my_unicorn.config_migration import ConfigMigration
+        from my_unicorn.migration.global_config import ConfigMigration
 
         self.migration = ConfigMigration(directory_manager)
 
@@ -290,7 +312,7 @@ class GlobalConfigManager:
         """
         home = Path.home()
         return {
-            KEY_CONFIG_VERSION: CONFIG_VERSION,
+            KEY_CONFIG_VERSION: GLOBAL_CONFIG_VERSION,
             KEY_MAX_CONCURRENT_DOWNLOADS: str(
                 DEFAULT_MAX_CONCURRENT_DOWNLOADS
             ),
@@ -432,7 +454,7 @@ class GlobalConfigManager:
             # Cast the top-level config to a plain dict before indexing with
             # SECTION_* constants. Type checkers require string literals when
             # interacting with TypedDicts directly.
-            network_section = cast(dict, config)[SECTION_NETWORK]
+            network_section = cast("dict", config)[SECTION_NETWORK]
             network_data: dict[str, str] = {
                 "retry_attempts": str(network_section["retry_attempts"]),
                 "timeout_seconds": str(network_section["timeout_seconds"]),
@@ -450,7 +472,9 @@ class GlobalConfigManager:
             f.write(f"[{SECTION_DIRECTORY}]\n")
             directory_data: dict[str, str] = {
                 key: str(path)
-                for key, path in cast(dict, config)[SECTION_DIRECTORY].items()
+                for key, path in cast("dict", config)[
+                    SECTION_DIRECTORY
+                ].items()
             }
 
             for key, value in directory_data.items():
@@ -546,7 +570,7 @@ class GlobalConfigManager:
 
         return GlobalConfig(
             config_version=str(
-                get_scalar_config("config_version", CONFIG_VERSION)
+                get_scalar_config("config_version", GLOBAL_CONFIG_VERSION)
             ),
             max_concurrent_downloads=int(
                 get_scalar_config("max_concurrent_downloads", 5)
@@ -596,14 +620,20 @@ class GlobalConfigManager:
 class AppConfigManager:
     """Manages app-specific JSON configurations."""
 
-    def __init__(self, directory_manager: DirectoryManager) -> None:
+    def __init__(
+        self,
+        directory_manager: DirectoryManager,
+        catalog_manager: "CatalogManager | None" = None,
+    ) -> None:
         """Initialize app config manager.
 
         Args:
             directory_manager: Directory manager for path operations
+            catalog_manager: Catalog manager for loading catalog entries (optional for testing)
 
         """
         self.directory_manager = directory_manager
+        self.catalog_manager = catalog_manager
 
     def load_app_config(self, app_name: str) -> AppConfig | None:
         """Load app-specific configuration.
@@ -615,9 +645,15 @@ class AppConfigManager:
             App configuration or None if not found
 
         Raises:
-            ValueError: If config file is invalid
+            ValueError: If config file is invalid or needs migration
 
         """
+        from my_unicorn.constants import APP_CONFIG_VERSION
+        from my_unicorn.schemas import (
+            SchemaValidationError,
+            validate_app_state,
+        )
+
         app_file = self.directory_manager.apps_dir / f"{app_name}.json"
         if not app_file.exists():
             return None
@@ -626,9 +662,26 @@ class AppConfigManager:
             with open(app_file, "rb") as f:
                 config_data = orjson.loads(f.read())
 
-            # Migrate old 'hash' field to 'digest' field
-            config_data = self._migrate_app_config(config_data)
-            return cast(AppConfig, config_data)
+            # Validate config version (no auto-migration)
+            current_version = config_data.get("config_version")
+            if current_version != APP_CONFIG_VERSION:
+                msg = (
+                    f"Config for '{app_name}' is version {current_version}, "
+                    f"expected {APP_CONFIG_VERSION}. "
+                    f"Run 'my-unicorn migrate' to upgrade."
+                )
+                raise ValueError(msg)
+
+            # Validate against schema
+            validate_app_state(config_data, app_name)
+
+            return cast("AppConfig", config_data)
+        except SchemaValidationError as e:
+            msg = f"Invalid app config for {app_name}: {e}"
+            raise ValueError(msg) from e
+        except orjson.JSONDecodeError as e:
+            msg = f"Invalid JSON in app config for {app_name}: {e}"
+            raise ValueError(msg) from e
         except (Exception, OSError) as e:
             raise ValueError(
                 f"Failed to load app config for {app_name}: {e}"
@@ -645,11 +698,22 @@ class AppConfigManager:
             ValueError: If config cannot be saved
 
         """
+        from my_unicorn.schemas import (
+            SchemaValidationError,
+            validate_app_state,
+        )
+
         app_file = self.directory_manager.apps_dir / f"{app_name}.json"
 
         try:
+            # Validate before saving
+            validate_app_state(config, app_name)
+
             with open(app_file, "wb") as f:
                 f.write(orjson.dumps(config, option=orjson.OPT_INDENT_2))
+        except SchemaValidationError as e:
+            msg = f"Cannot save invalid app config for {app_name}: {e}"
+            raise ValueError(msg) from e
         except OSError as e:
             raise ValueError(
                 f"Failed to save app config for {app_name}: {e}"
@@ -687,22 +751,129 @@ class AppConfigManager:
             return True
         return False
 
-    def _migrate_app_config(self, config_data: dict) -> dict:
-        """Migrate old config format to new format.
+    def get_effective_config(self, app_name: str) -> dict:
+        """Get merged effective configuration.
+
+        This is the SINGLE source of truth for app configuration.
+        Merges: Catalog (if exists) + State + Overrides
 
         Args:
-            config_data: Raw config data from file
+            app_name: Application name
 
         Returns:
-            Migrated config data
+            Merged configuration dictionary
+
+        Raises:
+            ValueError: If app config not found
+
+        Priority (low to high):
+            1. Catalog defaults (if catalog_ref exists)
+            2. Runtime state (version, paths, etc.)
+            3. User overrides (explicit customizations)
 
         """
-        # Migrate 'hash' field to 'digest' field in appimage section
-        if "appimage" in config_data and "hash" in config_data["appimage"]:
-            hash_value = config_data["appimage"].pop("hash")
-            config_data["appimage"]["digest"] = hash_value
+        app_config = self.load_app_config(app_name)
+        if not app_config:
+            msg = f"No config found for {app_name}"
+            raise ValueError(msg)
 
-        return config_data
+        effective = {}
+
+        # Step 1: Load catalog as base (if referenced)
+        catalog_ref = app_config.get("catalog_ref")
+        if catalog_ref and self.catalog_manager:
+            catalog = self.catalog_manager.load_catalog_entry(catalog_ref)
+            if catalog:
+                effective = self._deep_copy(catalog)
+
+        # Step 2: Merge overrides (for URL installs or user customizations)
+        overrides = app_config.get("overrides", {})
+        if overrides:
+            effective = self._deep_merge(effective, overrides)
+
+        # Step 3: Inject runtime state (version, paths, etc.)
+        state = app_config.get("state", {})
+        effective["state"] = state
+        effective["config_version"] = app_config.get("config_version")
+
+        # Note: Do NOT copy the top-level "source" string field ("catalog" or "url")
+        # to effective config. The effective config should only have the nested
+        # source dict from catalog/overrides which contains {owner, repo, etc.}
+
+        return effective
+
+    def _deep_copy(self, obj: dict) -> dict:
+        """Deep copy dictionary.
+
+        Args:
+            obj: Dictionary to copy
+
+        Returns:
+            Deep copy of dictionary
+
+        """
+        import copy
+
+        return copy.deepcopy(obj)
+
+    def _deep_merge(self, base: dict, override: dict) -> dict:
+        """Deep merge override into base.
+
+        Args:
+            base: Base dictionary
+            override: Override dictionary
+
+        Returns:
+            Merged dictionary with override taking precedence
+
+        """
+        import copy
+
+        result = copy.deepcopy(base)
+
+        for key, value in override.items():
+            if (
+                key in result
+                and isinstance(result[key], dict)
+                and isinstance(value, dict)
+            ):
+                result[key] = self._deep_merge(result[key], value)
+            else:
+                result[key] = copy.deepcopy(value)
+
+        return result
+
+    def _compare_versions(self, version1: str, version2: str) -> int:
+        """Compare semantic versions.
+
+        Args:
+            version1: First version (e.g., "1.0.0")
+            version2: Second version (e.g., "2.0.0")
+
+        Returns:
+            -1 if v1 < v2, 0 if equal, 1 if v1 > v2
+
+        """
+
+        def parse_version(v: str) -> list[int]:
+            try:
+                return [int(x) for x in v.split(".")]
+            except ValueError:
+                return [0, 0, 0]
+
+        v1 = parse_version(version1)
+        v2 = parse_version(version2)
+
+        max_len = max(len(v1), len(v2))
+        v1.extend([0] * (max_len - len(v1)))
+        v2.extend([0] * (max_len - len(v2)))
+
+        for a, b in zip(v1, v2, strict=False):
+            if a < b:
+                return -1
+            if a > b:
+                return 1
+        return 0
 
 
 class CatalogManager:
@@ -730,13 +901,24 @@ class CatalogManager:
             ValueError: If catalog entry is invalid
 
         """
+        from my_unicorn.schemas import SchemaValidationError, validate_catalog
+
         catalog_file = self.directory_manager.catalog_dir / f"{app_name}.json"
         if not catalog_file.exists():
             return None
 
         try:
             with open(catalog_file, "rb") as f:
-                return cast(CatalogEntry, orjson.loads(f.read()))
+                catalog_data = orjson.loads(f.read())
+
+            # Validate against schema
+            validate_catalog(catalog_data, app_name)
+
+            return cast("CatalogEntry", catalog_data)
+        except SchemaValidationError as e:
+            raise ValueError(
+                f"Invalid catalog entry for {app_name}: {e}"
+            ) from e
         except (Exception, OSError) as e:
             raise ValueError(
                 f"Failed to load catalog entry for {app_name}: {e}"
@@ -777,8 +959,11 @@ class ConfigManager:
         self.global_config_manager = GlobalConfigManager(
             self.directory_manager
         )
-        self.app_config_manager = AppConfigManager(self.directory_manager)
+        # Create catalog manager first as app_config_manager depends on it
         self.catalog_manager = CatalogManager(self.directory_manager)
+        self.app_config_manager = AppConfigManager(
+            self.directory_manager, self.catalog_manager
+        )
 
         # Initialize directories and validation
         self.directory_manager.ensure_user_directories()

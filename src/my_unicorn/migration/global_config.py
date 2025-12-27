@@ -19,6 +19,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from my_unicorn.config import DirectoryManager
 
+from my_unicorn.logger import get_logger
+
+logger = get_logger(__name__)
 # Import from centralized constants module
 from my_unicorn.constants import (
     CONFIG_BACKUP_EXTENSION,
@@ -27,7 +30,7 @@ from my_unicorn.constants import (
     CONFIG_FALLBACK_OLD_VERSION,
     CONFIG_FALLBACK_PREVIOUS_VERSION,
     CONFIG_MIGRATION_PRINT_PREFIX,
-    CONFIG_VERSION,
+    GLOBAL_CONFIG_VERSION,
     KEY_CONFIG_VERSION,
     KEY_REPO,
     KEY_RETRY_ATTEMPTS,
@@ -105,7 +108,9 @@ class ConfigMigration:
             True if migration is needed
 
         """
-        return self._compare_versions(current_version, CONFIG_VERSION) < 0
+        return (
+            self._compare_versions(current_version, GLOBAL_CONFIG_VERSION) < 0
+        )
 
     def _compare_versions(self, version1: str, version2: str) -> int:
         """Compare two semantic version strings.
@@ -138,7 +143,7 @@ class ConfigMigration:
         for v1, v2 in zip(v1_parts, v2_parts, strict=True):
             if v1 < v2:
                 return -1
-            elif v1 > v2:
+            if v1 > v2:
                 return 1
         return 0
 
@@ -167,7 +172,7 @@ class ConfigMigration:
                 KEY_CONFIG_VERSION,
                 fallback=CONFIG_FALLBACK_PREVIOUS_VERSION,
             )
-            version_needs_update = current_version != CONFIG_VERSION
+            version_needs_update = current_version != GLOBAL_CONFIG_VERSION
 
             # If no fields need to be added and version is current, no
             # migration needed
@@ -182,11 +187,13 @@ class ConfigMigration:
 
             # Update config version if needed
             if version_needs_update:
-                user_config.set("DEFAULT", "config_version", CONFIG_VERSION)
+                user_config.set(
+                    "DEFAULT", "config_version", GLOBAL_CONFIG_VERSION
+                )
                 self._collect_message(
                     "INFO",
                     "Updated configuration version to %s",
-                    CONFIG_VERSION,
+                    GLOBAL_CONFIG_VERSION,
                 )
 
             # Validate merged configuration
@@ -398,7 +405,7 @@ class ConfigMigration:
             self._messages.clear()
         except Exception:
             # If logger still not available, keep messages for next attempt
-            # This can happen during testing or unusual initialization scenarios
+            # This can happen during testing or unusual init scenarios
             pass
 
     def clear_messages(self) -> None:

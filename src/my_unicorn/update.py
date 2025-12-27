@@ -19,6 +19,7 @@ except ImportError:
 
 
 from my_unicorn.icon import IconHandler
+from my_unicorn.migration.helpers import get_apps_needing_migration
 from my_unicorn.verification import VerificationService
 
 from .auth import GitHubAuthManager
@@ -205,50 +206,23 @@ class UpdateManager:
                 logger.warning("No config found for app: %s", app_name)
                 return None
 
-            current_version = app_config["appimage"]["version"]
-            owner = app_config["owner"]
-            repo = app_config["repo"]
+            # Get effective config (all configs are v2 after migration)
+            effective_config = (
+                self.config_manager.app_config_manager.get_effective_config(
+                    app_name
+                )
+            )
+            current_version = effective_config.get("state", {}).get(
+                "version", "unknown"
+            )
+            source_config = effective_config.get("source", {})
+            owner = source_config.get("owner", "unknown")
+            repo = source_config.get("repo", "unknown")
+            should_use_prerelease = source_config.get("prerelease", False)
 
             logger.debug(
                 "Checking updates for %s (%s/%s)", app_name, owner, repo
             )
-
-            # Check if app is configured to use GitHub API
-            should_use_github = True
-            should_use_prerelease = False
-
-            # Check catalog first (preferred)
-            catalog_entry = self.config_manager.load_catalog_entry(
-                app_config["repo"].lower()
-            )
-            if catalog_entry:
-                github_config = catalog_entry.get("github", {})
-                should_use_github = github_config.get("repo", True)
-                should_use_prerelease = github_config.get("prerelease", False)
-
-            # Fallback to app config for backward compatibility
-            if should_use_github and not should_use_prerelease:
-                # Check new github section first
-                app_github_config = app_config.get("github", {})
-                should_use_github = app_github_config.get(
-                    "repo", should_use_github
-                )
-                should_use_prerelease = app_github_config.get(
-                    "prerelease", False
-                )
-
-                # Fallback to old verification section for backward compatibility
-                if not should_use_prerelease:
-                    verification_config = app_config.get("verification", {})
-                    should_use_prerelease = verification_config.get(
-                        "prerelease", False
-                    )
-
-            if not should_use_github:
-                logger.error(
-                    "GitHub API disabled for %s (github.repo: false)", app_name
-                )
-                return None
 
             # NOTE: Catalog apps are optimized to avoid duplicate API calls:
             # - If catalog specifies prerelease=true, we call fetch_latest_prerelease() directly (1 API call)
@@ -370,6 +344,27 @@ class UpdateManager:
             List of UpdateInfo objects
 
         """
+        # Check for apps needing migration first
+        apps_dir = self.config_manager.directory_manager.apps_dir
+        apps_needing_migration = get_apps_needing_migration(apps_dir)
+
+        if apps_needing_migration:
+            logger.warning(
+                "Found %d app(s) with old config format. "
+                "Run 'my-unicorn migrate' to upgrade.",
+                len(apps_needing_migration),
+            )
+            print(
+                f"\n⚠️  Found {len(apps_needing_migration)} app(s) "
+                "with old config format."
+            )
+            print("   Run 'my-unicorn migrate' to upgrade these apps:")
+            for app_name, version in apps_needing_migration[:5]:
+                print(f"   - {app_name} (v{version})")
+            if len(apps_needing_migration) > 5:
+                print(f"   ... and {len(apps_needing_migration) - 5} more")
+            print()
+
         if app_names is None:
             app_names = self.config_manager.list_installed_apps()
 
@@ -478,9 +473,15 @@ class UpdateManager:
             download_path = download_dir / filename
 
             # Backup current version
-            current_appimage_path = (
-                storage_dir / app_config["appimage"]["name"]
+            # Config is guaranteed to be v2 after load_app_config() migration
+            installed_path_str = app_config.get("state", {}).get(
+                "installed_path", ""
             )
+            if installed_path_str:
+                current_appimage_path = Path(installed_path_str)
+            else:
+                # Fallback: construct from storage_dir and app_name
+                current_appimage_path = storage_dir / f"{app_name}.AppImage"
             if current_appimage_path.exists():
                 backup_path = self.backup_service.create_backup(
                     current_appimage_path,
@@ -524,8 +525,7 @@ class UpdateManager:
                     update_info.latest_version,
                 )
                 return True, None
-            else:
-                return False, "Post-download processing failed"
+            return False, "Post-download processing failed"
 
         except Exception as e:
             logger.error("Failed to update %s: %s", app_name, e)
@@ -544,31 +544,22 @@ class UpdateManager:
             Tuple of (owner, repo, catalog_entry, use_prerelease)
 
         """
-        owner = app_config["owner"]
-        repo = app_config["repo"]
+        # Get effective config (all configs are v2 after migration)
+        effective_config = (
+            self.config_manager.app_config_manager.get_effective_config(
+                app_name
+            )
+        )
+        source_config = effective_config.get("source", {})
+        owner = source_config.get("owner", "unknown")
+        repo = source_config.get("repo", "unknown")
+        should_use_prerelease = source_config.get("prerelease", False)
 
-        # Determine GitHub API settings
-        should_use_prerelease = False
-
-        # Check catalog first (preferred)
-        catalog_entry = self.config_manager.load_catalog_entry(repo.lower())
-        if catalog_entry:
-            github_config = catalog_entry.get("github", {})
-            if isinstance(github_config, dict):
-                should_use_prerelease = github_config.get("prerelease", False)
-
-        # Fallback to app config for backward compatibility
-        if not should_use_prerelease:
-            app_github_config = app_config.get("github", {})
-            should_use_prerelease = app_github_config.get("prerelease", False)
-
-            # Fallback to old verification section
-            if not should_use_prerelease:
-                verification_config = app_config.get("verification", {})
-                if isinstance(verification_config, dict):
-                    should_use_prerelease = verification_config.get(
-                        "prerelease", False
-                    )
+        # Load catalog entry if referenced
+        catalog_ref = effective_config.get("catalog_ref")
+        catalog_entry = None
+        if catalog_ref:
+            catalog_entry = self.config_manager.load_catalog_entry(catalog_ref)
 
         return owner, repo, catalog_entry, should_use_prerelease
 
@@ -860,12 +851,10 @@ class UpdateManager:
 
         """
         # Get rename configuration
+        # In v2, rename is only in catalog, not in app config
         rename_to = app_name  # fallback
         if catalog_entry and catalog_entry.get("appimage", {}).get("rename"):
             rename_to = catalog_entry["appimage"]["rename"]
-        else:
-            # Fallback to app config for backward compatibility
-            rename_to = app_config["appimage"].get("rename", app_name)
 
         if rename_to:
             clean_name = self.storage_service.get_clean_appimage_name(
@@ -1003,42 +992,14 @@ class UpdateManager:
         elif verification_results.get("checksum_file", {}).get("passed"):
             stored_hash = verification_results["checksum_file"]["hash"]
 
-        # Update verification config based on what was actually used
-        if updated_verification_config:
-            if "verification" not in app_config:
-                app_config["verification"] = {}
-
-            # Filter out root-level fields from verification section
-            filtered_verification_config = {
-                k: v
-                for k, v in updated_verification_config.items()
-                if k
-                not in [
-                    "source",
-                    "owner",
-                    "repo",
-                    "appimage",
-                    "icon",
-                    "github",
-                ]
-            }
-
-            if filtered_verification_config != updated_verification_config:
-                logger.warning(
-                    "🔧 FILTERED out root-level fields: "
-                    "Original: %s, Filtered: %s",
-                    updated_verification_config,
-                    filtered_verification_config,
-                )
-
-            app_config["verification"].update(filtered_verification_config)
-            logger.debug("🔧 Updated verification config for %s", app_name)
-
-        # Update app config
-        app_config["appimage"]["version"] = update_info.latest_version
-        app_config["appimage"]["name"] = appimage_path.name
-        app_config["appimage"]["installed_date"] = datetime.now().isoformat()
-        app_config["appimage"]["digest"] = stored_hash
+        # Update app config (v2 format)
+        # Config is guaranteed to be v2 after load_app_config() migration
+        if "state" not in app_config:
+            app_config["state"] = {}
+        app_config["state"]["version"] = update_info.latest_version
+        app_config["state"]["installed_path"] = str(appimage_path)
+        app_config["state"]["installed_date"] = datetime.now().isoformat()
+        # Note: Verification results are stored in state.verification during install
 
         # Update icon configuration
         if updated_icon_config:
@@ -1120,9 +1081,9 @@ class UpdateManager:
         """Get the hash to store from verification results or asset digest."""
         if verification_results.get("digest", {}).get("passed"):
             return verification_results["digest"]["hash"]
-        elif verification_results.get("checksum_file", {}).get("passed"):
+        if verification_results.get("checksum_file", {}).get("passed"):
             return verification_results["checksum_file"]["hash"]
-        elif appimage_asset.digest:
+        if appimage_asset.digest:
             return appimage_asset.digest
         return ""
 
