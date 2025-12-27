@@ -115,7 +115,7 @@ class AppConfigMigrator:
             "config_version": APP_CONFIG_VERSION,
             "source": source,
             "catalog_ref": catalog_ref,
-            "state": self._build_state_section(old_config),
+            "state": self._build_state_section(old_config, app_name, source),
         }
 
         # Add overrides only for URL installs
@@ -124,11 +124,15 @@ class AppConfigMigrator:
 
         return new_config
 
-    def _build_state_section(self, old_config: dict) -> dict:
+    def _build_state_section(
+        self, old_config: dict, app_name: str, source: str
+    ) -> dict:
         """Build state section from v1 config.
 
         Args:
             old_config: v1 config data
+            app_name: Name of the app being migrated
+            source: Source type (catalog or url)
 
         Returns:
             State section for v2 config
@@ -142,19 +146,24 @@ class AppConfigMigrator:
             "installed_date": appimage_old.get("installed_date", ""),
             "installed_path": old_config.get("installed_path", ""),
             "verification": self._build_verification_state(
-                old_config, appimage_old
+                old_config, appimage_old, app_name, source
             ),
             "icon": self._build_icon_state(icon_old),
         }
 
     def _build_verification_state(
-        self, old_config: dict, appimage_old: dict
+        self, old_config: dict, appimage_old: dict, app_name: str, source: str
     ) -> dict:
         """Build verification state from v1 config.
+
+        For catalog apps, loads catalog to get correct verification method.
+        For URL apps, uses v1 config data directly.
 
         Args:
             old_config: v1 config data
             appimage_old: v1 appimage section
+            app_name: Name of the app being migrated
+            source: Source type (catalog or url)
 
         Returns:
             Verification state for v2 config
@@ -163,12 +172,82 @@ class AppConfigMigrator:
         verification_old = old_config.get("verification", {})
         methods = []
 
+        # Handle skip case
         if verification_old.get("skip", False):
             methods.append({"type": "skip", "status": "skipped"})
+            return {
+                "passed": False,
+                "methods": methods,
+            }
+
+        # For catalog apps, consult catalog for verification method
+        if source == "catalog":
+            catalog_entry = (
+                self.config_manager.catalog_manager.load_catalog_entry(
+                    app_name
+                )
+            )
+            if catalog_entry:
+                catalog_verification = catalog_entry.get("verification", {})
+                method = catalog_verification.get("method", "digest")
+
+                # Build verification state based on catalog method
+                if method == "checksum_file":
+                    # Get checksum file details from v1 config
+                    checksum_file = verification_old.get("checksum_file", "")
+                    algorithm = verification_old.get(
+                        "checksum_hash_type", "sha256"
+                    )
+                    methods.append(
+                        {
+                            "type": "checksum_file",
+                            "status": "passed",
+                            "algorithm": algorithm,
+                            "filename": checksum_file,
+                        }
+                    )
+                elif method == "digest" and appimage_old.get("digest"):
+                    # Parse digest string (e.g., "sha256:hash")
+                    digest_str = appimage_old["digest"]
+                    algorithm = "sha256"
+                    digest_hash = digest_str
+
+                    if ":" in digest_str:
+                        algorithm, digest_hash = digest_str.split(":", 1)
+
+                    methods.append(
+                        {
+                            "type": "digest",
+                            "status": "passed",
+                            "algorithm": algorithm,
+                            "expected": digest_hash,
+                            "computed": digest_hash,
+                            "source": "github_api",
+                        }
+                    )
+            # Fallback if catalog not found or no verification specified
+            elif appimage_old.get("digest"):
+                digest_str = appimage_old["digest"]
+                algorithm = "sha256"
+                digest_hash = digest_str
+
+                if ":" in digest_str:
+                    algorithm, digest_hash = digest_str.split(":", 1)
+
+                methods.append(
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": algorithm,
+                        "expected": digest_hash,
+                        "computed": digest_hash,
+                        "source": "github_api",
+                    }
+                )
+        # For URL apps, use digest from v1 config if available
         elif appimage_old.get("digest"):
-            # Parse digest string (e.g., "sha256:hash")
             digest_str = appimage_old["digest"]
-            algorithm = "sha256"  # default
+            algorithm = "sha256"
             digest_hash = digest_str
 
             if ":" in digest_str:
@@ -186,9 +265,35 @@ class AppConfigMigrator:
             )
 
         return {
-            "passed": not verification_old.get("skip", False),
+            "passed": len(methods) > 0,
             "methods": methods,
         }
+
+    def _build_verification_config(self, verification_old: dict) -> dict:
+        """Build verification config from v1 verification section.
+
+        Args:
+            verification_old: v1 verification section
+
+        Returns:
+            Verification config for v2 overrides
+
+        """
+        if verification_old.get("skip"):
+            return {"method": "skip"}
+        if verification_old.get("checksum_file"):
+            return {
+                "method": "checksum_file",
+                "checksum_file": {
+                    "filename": verification_old["checksum_file"],
+                    "algorithm": verification_old.get(
+                        "checksum_hash_type", "sha256"
+                    ),
+                },
+            }
+        if verification_old.get("digest"):
+            return {"method": "digest"}
+        return {"method": "skip"}
 
     def _build_icon_state(self, icon_old: dict) -> dict:
         """Build icon state from v1 config.
@@ -221,6 +326,9 @@ class AppConfigMigrator:
         icon_old = old_config.get("icon", {})
         verification_old = old_config.get("verification", {})
 
+        # Determine verification method
+        verification_config = self._build_verification_config(verification_old)
+
         overrides = {
             "metadata": {
                 "name": old_config.get("repo", ""),
@@ -240,9 +348,7 @@ class AppConfigMigrator:
                     "architectures": ["amd64", "x86_64"],
                 }
             },
-            "verification": {
-                "method": "skip" if verification_old.get("skip") else "digest"
-            },
+            "verification": verification_config,
             "icon": {
                 "method": "download" if icon_old.get("url") else "extraction",
                 "filename": icon_old.get("name", ""),
