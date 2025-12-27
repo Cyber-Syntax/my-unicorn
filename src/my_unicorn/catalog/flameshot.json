@@ -3,7 +3,7 @@
   "metadata": {
     "name": "flameshot",
     "display_name": "flameshot",
-    "description": ""
+    "description": "Powerful yet simple screenshot tool with annotation"
   },
   "source": {
     "type": "github",

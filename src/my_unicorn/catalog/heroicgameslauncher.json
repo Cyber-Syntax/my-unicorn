@@ -3,7 +3,7 @@
   "metadata": {
     "name": "HeroicGamesLauncher",
     "display_name": "HeroicGamesLauncher",
-    "description": ""
+    "description": "Epic Games and GOG launcher for Linux"
   },
   "source": {
     "type": "github",

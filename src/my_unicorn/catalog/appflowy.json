@@ -3,7 +3,7 @@
   "metadata": {
     "name": "AppFlowy",
     "display_name": "AppFlowy",
-    "description": ""
+    "description": "Open source Notion alternative with offline-first approach"
   },
   "source": {
     "type": "github",

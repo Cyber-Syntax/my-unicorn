@@ -3,7 +3,7 @@
   "metadata": {
     "name": "weekToDo",
     "display_name": "weekToDo",
-    "description": ""
+    "description": "Minimalist weekly planner and to-do list"
   },
   "source": {
     "type": "github",

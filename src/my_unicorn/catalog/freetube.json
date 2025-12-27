@@ -3,7 +3,7 @@
   "metadata": {
     "name": "FreeTube",
     "display_name": "FreeTube",
-    "description": ""
+    "description": "Private YouTube client with no ads"
   },
   "source": {
     "type": "github",

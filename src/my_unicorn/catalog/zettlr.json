@@ -3,7 +3,7 @@
   "metadata": {
     "name": "Zettlr",
     "display_name": "Zettlr",
-    "description": ""
+    "description": "Open-source note-taking application that works with Markdown files."
   },
   "source": {
     "type": "github",

@@ -3,7 +3,7 @@
   "metadata": {
     "name": "cherrytree",
     "display_name": "cherrytree",
-    "description": ""
+    "description": "Hierarchical note taking application with rich text and syntax"
   },
   "source": {
     "type": "github",

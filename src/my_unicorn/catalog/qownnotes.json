@@ -3,7 +3,7 @@
   "metadata": {
     "name": "QOwnNotes",
     "display_name": "QOwnNotes",
-    "description": ""
+    "description": "Plain-text note-taking with Markdown and ownCloud integration"
   },
   "source": {
     "type": "github",

@@ -3,7 +3,7 @@
   "metadata": {
     "name": "keepassxc",
     "display_name": "keepassxc",
-    "description": ""
+    "description": "Cross-platform password manager"
   },
   "source": {
     "type": "github",

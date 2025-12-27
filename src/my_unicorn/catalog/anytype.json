@@ -3,7 +3,7 @@
   "metadata": {
     "name": "anytype-ts",
     "display_name": "anytype-ts",
-    "description": ""
+    "description": "Local-first all-in-one workspace for notes and tasks"
   },
   "source": {
     "type": "github",

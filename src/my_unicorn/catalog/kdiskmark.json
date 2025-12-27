@@ -3,7 +3,7 @@
   "metadata": {
     "name": "KDiskMark",
     "display_name": "KDiskMark",
-    "description": ""
+    "description": "Simple disk benchmark tool with flexible options"
   },
   "source": {
     "type": "github",

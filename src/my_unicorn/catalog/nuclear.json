@@ -3,7 +3,7 @@
   "metadata": {
     "name": "nuclear",
     "display_name": "nuclear",
-    "description": ""
+    "description": "Free music streaming player with YouTube and SoundCloud"
   },
   "source": {
     "type": "github",

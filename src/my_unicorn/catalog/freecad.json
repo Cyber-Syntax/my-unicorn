@@ -3,7 +3,7 @@
   "metadata": {
     "name": "FreeCAD",
     "display_name": "FreeCAD",
-    "description": ""
+    "description": "Parametric 3D CAD modeler"
   },
   "source": {
     "type": "github",

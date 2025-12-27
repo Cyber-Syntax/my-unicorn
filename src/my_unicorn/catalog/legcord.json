@@ -3,7 +3,7 @@
   "metadata": {
     "name": "Legcord",
     "display_name": "Legcord",
-    "description": ""
+    "description": "Custom Discord client with privacy and customization features"
   },
   "source": {
     "type": "github",

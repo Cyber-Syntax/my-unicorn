@@ -3,7 +3,7 @@
   "metadata": {
     "name": "neovim",
     "display_name": "neovim",
-    "description": ""
+    "description": "Hyperextensible Vim-based text editor"
   },
   "source": {
     "type": "github",

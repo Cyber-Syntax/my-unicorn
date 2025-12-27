@@ -3,7 +3,7 @@
   "metadata": {
     "name": "obsidian-releases",
     "display_name": "obsidian-releases",
-    "description": ""
+    "description": "Proprietary powerful knowledge base on top of local Markdown files"
   },
   "source": {
     "type": "github",
