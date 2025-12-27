@@ -21,8 +21,8 @@ def migrate_catalog_v1_to_v2(old_catalog: dict) -> dict:
         v2 catalog entry
 
     """
-    # Determine verification method
-    verification_method = _get_verification_method(old_catalog)
+    # Determine verification method and config
+    verification_config = _get_verification_config(old_catalog)
 
     # Build icon config
     icon_config = _get_icon_config(old_catalog)
@@ -51,29 +51,35 @@ def migrate_catalog_v1_to_v2(old_catalog: dict) -> dict:
                 "architectures": ["amd64", "x86_64"],
             }
         },
-        "verification": {"method": verification_method},
+        "verification": verification_config,
         "icon": icon_config,
     }
 
 
-def _get_verification_method(old_catalog: dict) -> str:
-    """Determine verification method from old config.
+def _get_verification_config(old_catalog: dict) -> dict:
+    """Determine verification config from old config.
 
     Args:
         old_catalog: v1 catalog entry
 
     Returns:
-        Verification method string
+        Verification config dict
 
     """
     verification = old_catalog.get("verification", {})
     if verification.get("skip"):
-        return "skip"
+        return {"method": "skip"}
     if verification.get("digest"):
-        return "digest"
+        return {"method": "digest"}
     if verification.get("checksum_file"):
-        return "checksum_file"
-    return "skip"
+        return {
+            "method": "checksum_file",
+            "checksum_file": {
+                "filename": verification["checksum_file"],
+                "algorithm": verification.get("checksum_hash_type", "sha256"),
+            },
+        }
+    return {"method": "skip"}
 
 
 def _get_icon_config(old_catalog: dict) -> dict:
@@ -118,7 +124,7 @@ def main():
             print(f"Migrating {catalog_file.name}...", end=" ")
 
             # Read old catalog
-            with open(catalog_file, encoding="utf-8") as f:
+            with catalog_file.open(encoding="utf-8") as f:
                 old_catalog = json.load(f)
 
             # Check if already v2
@@ -134,7 +140,7 @@ def main():
             new_catalog = migrate_catalog_v1_to_v2(old_catalog)
 
             # Write new catalog
-            with open(catalog_file, "w", encoding="utf-8") as f:
+            with catalog_file.open("w", encoding="utf-8") as f:
                 json.dump(new_catalog, f, indent=2)
                 f.write("\n")
 

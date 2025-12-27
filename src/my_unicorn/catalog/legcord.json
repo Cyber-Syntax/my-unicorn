@@ -22,7 +22,11 @@
     }
   },
   "verification": {
-    "method": "checksum_file"
+    "method": "checksum_file",
+    "checksum_file": {
+      "filename": "latest-linux.yml",
+      "algorithm": "sha512"
+    }
   },
   "icon": {
     "method": "extraction",

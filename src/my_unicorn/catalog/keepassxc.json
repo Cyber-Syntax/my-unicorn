@@ -22,7 +22,11 @@
     }
   },
   "verification": {
-    "method": "checksum_file"
+    "method": "checksum_file",
+    "checksum_file": {
+      "filename": "KeePassXC-{version}-x86_64.AppImage.DIGEST",
+      "algorithm": "sha256"
+    }
   },
   "icon": {
     "method": "extraction",

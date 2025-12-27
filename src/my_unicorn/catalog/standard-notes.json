@@ -22,7 +22,11 @@
     }
   },
   "verification": {
-    "method": "checksum_file"
+    "method": "checksum_file",
+    "checksum_file": {
+      "filename": "SHA256SUMS",
+      "algorithm": "sha256"
+    }
   },
   "icon": {
     "method": "extraction",
