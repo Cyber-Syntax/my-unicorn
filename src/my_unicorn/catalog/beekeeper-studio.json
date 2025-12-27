@@ -3,7 +3,7 @@
   "metadata": {
     "name": "beekeeper-studio",
     "display_name": "beekeeper-studio",
-    "description": ""
+    "description": "Cross platform SQL editor and database manager"
   },
   "source": {
     "type": "github",
