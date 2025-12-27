@@ -156,8 +156,8 @@ class AppConfigMigrator:
     ) -> dict:
         """Build verification state from v1 config.
 
-        For catalog apps, loads catalog to get correct verification method.
-        For URL apps, uses v1 config data directly.
+        Prioritizes actual verification data from v1 app state over catalog.
+        Catalog method="skip" doesn't prevent using digest if available.
 
         Args:
             old_config: v1 config data
@@ -172,7 +172,7 @@ class AppConfigMigrator:
         verification_old = old_config.get("verification", {})
         methods = []
 
-        # Handle skip case
+        # Handle explicit skip in v1 app state
         if verification_old.get("skip", False):
             methods.append({"type": "skip", "status": "skipped"})
             return {
@@ -180,72 +180,26 @@ class AppConfigMigrator:
                 "methods": methods,
             }
 
-        # For catalog apps, consult catalog for verification method
-        if source == "catalog":
-            catalog_entry = (
-                self.config_manager.catalog_manager.load_catalog_entry(
-                    app_name
-                )
+        # Check if v1 app state has actual verification data
+        has_digest = bool(appimage_old.get("digest"))
+        has_checksum = bool(verification_old.get("checksum_file"))
+        digest_verified = verification_old.get("digest", False)
+
+        # Priority 1: Use checksum file if available in v1 state
+        if has_checksum:
+            checksum_file = verification_old["checksum_file"]
+            algorithm = verification_old.get("checksum_hash_type", "sha256")
+            methods.append(
+                {
+                    "type": "checksum_file",
+                    "status": "passed",
+                    "algorithm": algorithm,
+                    "filename": checksum_file,
+                }
             )
-            if catalog_entry:
-                catalog_verification = catalog_entry.get("verification", {})
-                method = catalog_verification.get("method", "digest")
-
-                # Build verification state based on catalog method
-                if method == "checksum_file":
-                    # Get checksum file details from v1 config
-                    checksum_file = verification_old.get("checksum_file", "")
-                    algorithm = verification_old.get(
-                        "checksum_hash_type", "sha256"
-                    )
-                    methods.append(
-                        {
-                            "type": "checksum_file",
-                            "status": "passed",
-                            "algorithm": algorithm,
-                            "filename": checksum_file,
-                        }
-                    )
-                elif method == "digest" and appimage_old.get("digest"):
-                    # Parse digest string (e.g., "sha256:hash")
-                    digest_str = appimage_old["digest"]
-                    algorithm = "sha256"
-                    digest_hash = digest_str
-
-                    if ":" in digest_str:
-                        algorithm, digest_hash = digest_str.split(":", 1)
-
-                    methods.append(
-                        {
-                            "type": "digest",
-                            "status": "passed",
-                            "algorithm": algorithm,
-                            "expected": digest_hash,
-                            "computed": digest_hash,
-                            "source": "github_api",
-                        }
-                    )
-            # Fallback if catalog not found or no verification specified
-            elif appimage_old.get("digest"):
-                digest_str = appimage_old["digest"]
-                algorithm = "sha256"
-                digest_hash = digest_str
-
-                if ":" in digest_str:
-                    algorithm, digest_hash = digest_str.split(":", 1)
-
-                methods.append(
-                    {
-                        "type": "digest",
-                        "status": "passed",
-                        "algorithm": algorithm,
-                        "expected": digest_hash,
-                        "computed": digest_hash,
-                        "source": "github_api",
-                    }
-                )
-        # For URL apps, use digest from v1 config if available
-        elif appimage_old.get("digest"):
+        # Priority 2: Use digest if available in v1 state
+        elif has_digest and digest_verified:
+            # Parse digest string (e.g., "sha256:hash")
             digest_str = appimage_old["digest"]
             algorithm = "sha256"
             digest_hash = digest_str
@@ -263,9 +217,28 @@ class AppConfigMigrator:
                     "source": "github_api",
                 }
             )
+        # Priority 3: Catalog says skip but no actual verification in v1
+        # For catalog apps, check if catalog method is skip
+        elif source == "catalog":
+            catalog_entry = (
+                self.config_manager.catalog_manager.load_catalog_entry(
+                    app_name
+                )
+            )
+            if catalog_entry:
+                catalog_verification = catalog_entry.get("verification", {})
+                method = catalog_verification.get("method", "digest")
+
+                if method == "skip":
+                    methods.append({"type": "skip", "status": "skipped"})
+
+        # Ensure at least one method exists (required by v2 schema)
+        if not methods:
+            # Default to skip if no verification data available
+            methods.append({"type": "skip", "status": "skipped"})
 
         return {
-            "passed": len(methods) > 0,
+            "passed": len([m for m in methods if m["status"] == "passed"]) > 0,
             "methods": methods,
         }
 

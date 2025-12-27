@@ -1,0 +1,109 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/Cyber-Syntax/my-unicorn/schemas/cache_release.schema.json",
+    "title": "My Unicorn Release Cache Entry",
+    "description": "JSON Schema for GitHub release cache files (~/.config/my-unicorn/cache/releases/*.json)",
+    "type": "object",
+    "required": [
+        "cached_at",
+        "ttl_hours",
+        "release_data"
+    ],
+    "properties": {
+        "cached_at": {
+            "type": "string",
+            "description": "ISO 8601 timestamp with timezone when cache was created",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+[+-]\\d{2}:\\d{2}$"
+        },
+        "ttl_hours": {
+            "type": "integer",
+            "description": "Time-to-live in hours before cache expires",
+            "minimum": 1,
+            "maximum": 168
+        },
+        "release_data": {
+            "type": "object",
+            "description": "GitHub release information",
+            "required": [
+                "owner",
+                "repo",
+                "version",
+                "prerelease",
+                "assets"
+            ],
+            "properties": {
+                "owner": {
+                    "type": "string",
+                    "description": "GitHub repository owner/organization",
+                    "minLength": 1
+                },
+                "repo": {
+                    "type": "string",
+                    "description": "GitHub repository name",
+                    "minLength": 1
+                },
+                "version": {
+                    "type": "string",
+                    "description": "Release version (without 'v' prefix)",
+                    "minLength": 1
+                },
+                "prerelease": {
+                    "type": "boolean",
+                    "description": "Whether this is a pre-release version"
+                },
+                "assets": {
+                    "type": "array",
+                    "description": "List of AppImage assets and checksum files (may be empty if no compatible assets)",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "name",
+                            "size",
+                            "digest",
+                            "browser_download_url"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Asset filename (AppImage or checksum file)",
+                                "minLength": 1
+                            },
+                            "size": {
+                                "type": "integer",
+                                "description": "Asset size in bytes",
+                                "minimum": 1
+                            },
+                            "digest": {
+                                "oneOf": [
+                                    {
+                                        "type": "string",
+                                        "description": "Asset hash digest (format: algorithm:hash)",
+                                        "pattern": "^(sha256|sha512):[a-f0-9]{64,128}$"
+                                    },
+                                    {
+                                        "type": "null",
+                                        "description": "No digest available"
+                                    }
+                                ]
+                            },
+                            "browser_download_url": {
+                                "type": "string",
+                                "description": "Direct download URL for the asset",
+                                "format": "uri",
+                                "pattern": "^https://github\\.com/"
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                },
+                "original_tag_name": {
+                    "type": "string",
+                    "description": "Original Git tag name from GitHub (may include prefix like 'v')",
+                    "minLength": 1
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false
+}

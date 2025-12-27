@@ -232,8 +232,11 @@ class DirectoryManager:
         Raises:
             FileNotFoundError: If catalog directory or files don't exist
             NotADirectoryError: If catalog path is not a directory
+            ValueError: If catalog entries fail schema validation
 
         """
+        from my_unicorn.schemas import SchemaValidationError, validate_catalog
+
         if not self._catalog_dir.exists():
             raise FileNotFoundError(
                 f"Bundled catalog directory not found: {self._catalog_dir}\n"
@@ -251,6 +254,26 @@ class DirectoryManager:
             raise FileNotFoundError(
                 f"No catalog entries found in: {self._catalog_dir}\n"
                 "Expected to find *.json files with app catalog entries."
+            )
+
+        # Validate all catalog files against schema
+        invalid_catalogs = []
+        for catalog_file in catalog_files:
+            try:
+                with open(catalog_file, "rb") as f:
+                    catalog_data = orjson.loads(f.read())
+                validate_catalog(catalog_data, catalog_file.stem)
+            except SchemaValidationError as e:
+                invalid_catalogs.append(f"{catalog_file.stem}: {e}")
+            except Exception as e:
+                invalid_catalogs.append(
+                    f"{catalog_file.stem}: Failed to load - {e}"
+                )
+
+        if invalid_catalogs:
+            raise ValueError(
+                "Invalid catalog entries found:\n"
+                + "\n".join(f"  - {err}" for err in invalid_catalogs)
             )
 
     def ensure_directories_from_config(self, config: GlobalConfig) -> None:
@@ -626,6 +649,10 @@ class AppConfigManager:
 
         """
         from my_unicorn.constants import APP_CONFIG_VERSION
+        from my_unicorn.schemas import (
+            SchemaValidationError,
+            validate_app_state,
+        )
 
         app_file = self.directory_manager.apps_dir / f"{app_name}.json"
         if not app_file.exists():
@@ -645,7 +672,13 @@ class AppConfigManager:
                 )
                 raise ValueError(msg)
 
+            # Validate against schema
+            validate_app_state(config_data, app_name)
+
             return cast("AppConfig", config_data)
+        except SchemaValidationError as e:
+            msg = f"Invalid app config for {app_name}: {e}"
+            raise ValueError(msg) from e
         except orjson.JSONDecodeError as e:
             msg = f"Invalid JSON in app config for {app_name}: {e}"
             raise ValueError(msg) from e
@@ -665,11 +698,22 @@ class AppConfigManager:
             ValueError: If config cannot be saved
 
         """
+        from my_unicorn.schemas import (
+            SchemaValidationError,
+            validate_app_state,
+        )
+
         app_file = self.directory_manager.apps_dir / f"{app_name}.json"
 
         try:
+            # Validate before saving
+            validate_app_state(config, app_name)
+
             with open(app_file, "wb") as f:
                 f.write(orjson.dumps(config, option=orjson.OPT_INDENT_2))
+        except SchemaValidationError as e:
+            msg = f"Cannot save invalid app config for {app_name}: {e}"
+            raise ValueError(msg) from e
         except OSError as e:
             raise ValueError(
                 f"Failed to save app config for {app_name}: {e}"
@@ -857,13 +901,24 @@ class CatalogManager:
             ValueError: If catalog entry is invalid
 
         """
+        from my_unicorn.schemas import SchemaValidationError, validate_catalog
+
         catalog_file = self.directory_manager.catalog_dir / f"{app_name}.json"
         if not catalog_file.exists():
             return None
 
         try:
             with open(catalog_file, "rb") as f:
-                return cast("CatalogEntry", orjson.loads(f.read()))
+                catalog_data = orjson.loads(f.read())
+
+            # Validate against schema
+            validate_catalog(catalog_data, app_name)
+
+            return cast("CatalogEntry", catalog_data)
+        except SchemaValidationError as e:
+            raise ValueError(
+                f"Invalid catalog entry for {app_name}: {e}"
+            ) from e
         except (Exception, OSError) as e:
             raise ValueError(
                 f"Failed to load catalog entry for {app_name}: {e}"
