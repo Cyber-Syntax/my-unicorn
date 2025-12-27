@@ -6,9 +6,25 @@
 - Logger rotation logic
 - API rate limiting
 - Build with uv
+- test new github action for release
+- test new v2 config formats
 
 ## in-progress
 
+- [ ] P3: Catalog and app state config structure refactor
+    - [x] Move owner, repo to github section
+    - [x] Better structure
+    - [x] Migration logic automatically on old config detected(decided to make a seperate command)
+        - [x] Make a new plan for more simple migration logic
+        - [x] via script?
+        - [x] via code on startup? Current one `class AppConfigV2(TypedDict):` used like this. Seems like violate DRY prenciple.
+    - [x] Update docs
+    - [x] add description to catalogs
+    - [x] show description on list --available command
+
+- [ ] beekeper-studio.png is wrong, extract manually and find the correct icon
+- [ ] add remove --all command
+- [ ] Add option in global config for [auth]
 - [ ] What about threading usage on logging? Example: <https://github.com/Roulbac/uv-func/blob/main/src/uv_func/logging.py>
 - [ ] P1: deprecate my-unicorn package and repo directories after migration to uv package manager:
     repo = /home/developer/.local/share/my-unicorn-repo
@@ -39,25 +55,20 @@ Fetching from API:
 GitHub Releases      1/1 Retrieved
 ```
 
-- [ ] Improve our branch structure for this project. Currently, we use the main branch as stable as possible, but maybe it would be better to reserve main for development and
-create a separate stable branch or utilize tags to install stable branches. This is because we update our scripts so frequently, which often results in changes that break
-things, necessitating hotfixes. Let's explore ways to manage branches and tags more effectively.
-
-Some sources define 'Rawhide' as equivalent to either 'development' or 'main' (as it serves as the main branch in package git repositories).
-
-Others suggest that 'main branches should be development', proposing a stable branch for users to install the stable release instead.
-
-Alternatively, another perspective states that 'origin/master' is considered the main branch where the source code of HEAD always reflects a production-ready state.
-
 ## todo
+
+- [ ] use space-sperated to follow KISS principle?
+
+```bash
+  # Install from catalog (comma-separated or space-separated)
+  my-unicorn install appflowy,joplin,obsidian
+  my-unicorn install appflowy joplin obsidian
+  ```
 
 - [ ] sphinx for docs?
 - [ ] Make a better todo.md structure with priorities, labels etc.
 - [ ] clean this todo list, make priority to BUGS first.
 - [ ] P1: png need priority one because kde not show .svg on its bar when pinned
-- [ ] P3: config structure refactor
-    - [ ] Add option in config for [auth]
-    - [ ] Move owner, repo to github section
 - [ ] P4: remove legacy upgrade command
 - [ ] P3: #BUG: when there is one fail(keepassxc fails on checksum because external
       issue by devs) on verification but our ui not show when
@@ -69,7 +80,6 @@ Alternatively, another perspective states that 'origin/master' is considered the
 - [ ] #BUG: `/tmp/.mount_appflobIOEjI/AppFlowy: error while loading shared libraries: libkeybinder-3.0.so.0: cannot open shared object file: No such file or directory`
     - This is dependency issue, installing `keybinder3` solve the issue. I don't think I can do anything from my side, maybe document it on the docs.
 
-- [ ] dev(improve): rename list.py to catalog.py and all it's commands list to catalog
 - [ ] TEST: test probably use AppImageKit, better to make sure it is only used for though.
 - [ ] #TEST: test.bash need another command --use-cache, --no-cache which remove and not remove
 - [ ] is it better to use functional programming?
@@ -77,12 +87,10 @@ Alternatively, another perspective states that 'origin/master' is considered the
 - [ ] mv neovim to usr bin to use appimage neovim
     mv /tmp/nvim.appimage /usr/local/bin/nvim
 
-- [ ] Add kde wallet support via dbus-python.
-      dbus-python used on kdewallet saves, so we can add that to auth later as a support.
-- [ ] add verification passed or not to verification section on app-specific config
-
 ## backlog
 
+- [ ] Add kde wallet support via dbus-python.
+      dbus-python used on kdewallet saves, so we can add that to auth later as a support.
 - [ ] dev(docs): libsecret also our prerequested dependency,
 - [ ] P4: upgrade need auto easy update and notify like appimages
 - [ ] P4: Add progress bar for checksum file installations?
@@ -132,6 +140,8 @@ Confirm your GitHub token:
 
 ## done
 
+- [x] add verification passed or not to verification section on app-specific config
+- [x] dev(improve): rename list.py to catalog.py and all it's commands list to catalog
 - [x] fix the autocomplete zshrc local bin exporting
 - [ ] janitor code cleanup in progress:
     - [x] progress.py
