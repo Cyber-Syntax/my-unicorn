@@ -112,6 +112,7 @@ Examples:
         self._add_update_command(subparsers)
         self._add_upgrade_command(subparsers)
         self._add_list_command(subparsers)
+        self._add_migrate_command(subparsers)
         self._add_remove_command(subparsers)
         self._add_backup_command(subparsers)
         self._add_cache_command(subparsers)
@@ -273,6 +274,30 @@ Examples:
             "--available",
             action="store_true",
             help="Show available applications from catalog",
+        )
+
+    def _add_migrate_command(self, subparsers) -> None:
+        """Add migrate command parser.
+
+        Args:
+            subparsers: The subparsers object to add the migrate command
+                to.
+
+        """
+        migrate_parser = subparsers.add_parser(
+            "migrate",
+            help="Migrate configs to latest version",
+            description="Upgrade app and catalog configs to v2 format",
+        )
+        migrate_parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Show what would be migrated without making changes",
+        )
+        migrate_parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Force migration even if versions match",
         )
 
     def _add_remove_command(self, subparsers) -> None:

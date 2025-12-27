@@ -15,6 +15,7 @@ from ..commands.cache import CacheHandler
 from ..commands.config import ConfigHandler
 from ..commands.install import InstallCommandHandler
 from ..commands.list import ListHandler
+from ..commands.migrate import MigrateHandler
 from ..commands.remove import RemoveHandler
 from ..commands.update import UpdateHandler
 from ..commands.upgrade import UpgradeHandler
@@ -74,6 +75,9 @@ class CLIRunner:
                 self.config_manager, self.auth_manager, self.update_manager
             ),
             "list": ListHandler(
+                self.config_manager, self.auth_manager, self.update_manager
+            ),
+            "migrate": MigrateHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
             "remove": RemoveHandler(

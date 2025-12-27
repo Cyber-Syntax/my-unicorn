@@ -5,7 +5,7 @@ across the my-unicorn codebase. Constants are organized by logical categories
 and use typing.Final annotations to ensure immutability.
 
 Usage:
-    from my_unicorn.constants import CONFIG_VERSION
+    from my_unicorn.constants import GLOBAL_CONFIG_VERSION, APP_CONFIG_VERSION
 """
 
 from typing import Final, Literal
@@ -14,11 +14,17 @@ from typing import Final, Literal
 # Configuration Constants
 # =============================================================================
 
-# Configuration version - single source of truth for config versioning
-CONFIG_VERSION: Final[str] = "1.0.2"
+# Global settings config version (settings.conf)
+# This is separate from app state and catalog config versions
+GLOBAL_CONFIG_VERSION: Final[str] = "1.0.2"
 
-# App state config version - separate from global config version
+# App state config version (apps/*.json)
+# If actual version in file doesn't match, migration is needed
 APP_CONFIG_VERSION: Final[str] = "2.0.0"
+
+# Catalog config version (catalog/*.json)
+# If actual version in file doesn't match, migration is needed
+CATALOG_CONFIG_VERSION: Final[str] = "2.0.0"
 
 # Configuration directory and file names
 CONFIG_FILE_NAME: Final[str] = "settings.conf"

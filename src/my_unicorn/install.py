@@ -78,30 +78,20 @@ class InstallHandler:
 
         """
         try:
-            # Get app configuration (v1 or v2 format from catalog)
+            # Get app configuration (v2 format from catalog)
             app_config = self.catalog_manager.get_app_config(app_name)
             if not app_config:
                 raise InstallationError("App not found in catalog")
 
-            # Handle both v1 and v2 catalog formats
-            # v2: config_version="2.0.0", source.owner/repo
-            # v1: owner/repo at top level
-            if app_config.get("config_version") == "2.0.0":
-                source_config = app_config.get("source", {})
-                owner = source_config.get("owner", "")
-                repo = source_config.get("repo", "")
-                characteristic_suffix = (
-                    app_config.get("appimage", {})
-                    .get("naming", {})
-                    .get("architectures", [])
-                )
-            else:
-                # v1 format
-                owner = app_config.get("owner", "")
-                repo = app_config.get("repo", "")
-                characteristic_suffix = app_config.get("appimage", {}).get(
-                    "characteristic_suffix", []
-                )
+            # Extract source info from v2 config
+            source_config = app_config.get("source", {})
+            owner = source_config.get("owner", "")
+            repo = source_config.get("repo", "")
+            characteristic_suffix = (
+                app_config.get("appimage", {})
+                .get("naming", {})
+                .get("architectures", [])
+            )
 
             release = await self._fetch_release(owner, repo)
 
@@ -186,27 +176,35 @@ class InstallHandler:
                 release, [], owner, repo, installation_source="url"
             )
 
-            # Create minimal app config for URL installs
-            # Note: digest=False enables auto-detection of checksum files
-            # Verification service will use digest if available from API
+            # Create v2 format app config template for URL installs
+            # Note: verification method will auto-detect checksums
             app_config = {
-                "owner": owner,
-                "repo": repo,
-                "appimage": {
-                    "rename": app_name,
-                    "name_template": "",
-                    "characteristic_suffix": [],
+                "config_version": "2.0.0",
+                "metadata": {
+                    "name": app_name,
+                    "display_name": app_name,
+                    "description": "",
                 },
-                "github": {
+                "source": {
+                    "type": "github",
+                    "owner": owner,
+                    "repo": repo,
                     "prerelease": prerelease,
                 },
-                "verification": {
-                    "digest": False,
-                    "skip": False,
-                    "checksum_file": "",
-                    "checksum_hash_type": "sha256",
+                "appimage": {
+                    "naming": {
+                        "template": "",
+                        "target_name": app_name,
+                        "architectures": ["amd64", "x86_64"],
+                    }
                 },
-                "icon": {"extraction": True, "url": None},
+                "verification": {
+                    "method": "digest",  # Will auto-detect checksum files
+                },
+                "icon": {
+                    "method": "extraction",
+                    "filename": "",
+                },
             }
 
             # Install workflow
@@ -833,14 +831,8 @@ class InstallHandler:
         overrides = None
 
         if source == "catalog":
-            # Use repo name as catalog reference
-            # Handle both v1 and v2 catalog formats
-            if app_config.get("config_version") == "2.0.0":
-                catalog_ref = (
-                    app_config.get("source", {}).get("repo", "").lower()
-                )
-            else:
-                catalog_ref = app_config.get("repo", "").lower()
+            # Use repo name as catalog reference (v2 format)
+            catalog_ref = app_config.get("source", {}).get("repo", "").lower()
         else:
             # URL install - need full overrides section
             overrides = self._build_overrides_from_template(app_config)
@@ -944,58 +936,29 @@ class InstallHandler:
         """Build overrides section from app config template.
 
         Args:
-            app_config: App configuration template (v1 or v2 format)
+            app_config: App configuration template (v2 format)
 
         Returns:
             Overrides dictionary for v2.0.0 config
 
         """
-        # Handle both v1 and v2 catalog formats
-        if app_config.get("config_version") == "2.0.0":
-            # v2 format
-            source_config = app_config.get("source", {})
-            owner = source_config.get("owner", "")
-            repo = source_config.get("repo", "")
-            prerelease = source_config.get("prerelease", False)
+        # Extract from v2 format
+        source_config = app_config.get("source", {})
+        owner = source_config.get("owner", "")
+        repo = source_config.get("repo", "")
+        prerelease = source_config.get("prerelease", False)
 
-            naming_config = app_config.get("appimage", {}).get("naming", {})
-            name_template = naming_config.get("template", "")
-            target_name = naming_config.get("target_name", "")
+        naming_config = app_config.get("appimage", {}).get("naming", {})
+        name_template = naming_config.get("template", "")
+        target_name = naming_config.get("target_name", "")
 
-            verification_config = app_config.get("verification", {})
-            verification_method = verification_config.get("method", "skip")
+        verification_config = app_config.get("verification", {})
+        verification_method = verification_config.get("method", "skip")
 
-            icon_config = app_config.get("icon", {})
-            icon_method = icon_config.get("method", "extraction")
-            icon_filename = icon_config.get("filename", "")
-            icon_url = icon_config.get("download_url", "")
-        else:
-            # v1 format
-            owner = app_config.get("owner", "")
-            repo = app_config.get("repo", "")
-
-            appimage_config = app_config.get("appimage", {})
-            icon_config = app_config.get("icon", {})
-            verification_config = app_config.get("verification", {})
-            github_config = app_config.get("github", {})
-
-            prerelease = github_config.get("prerelease", False)
-            name_template = appimage_config.get("name_template", "")
-            target_name = appimage_config.get("rename", "")
-
-            # Determine verification method
-            verification_method = "skip"
-            if verification_config.get("digest"):
-                verification_method = "digest"
-            elif verification_config.get("checksum_file"):
-                verification_method = "checksum_file"
-
-            icon_method = (
-                "download" if icon_config.get("url") else "extraction"
-            )
-            icon_filename = icon_config.get("name", "")
-            icon_url = icon_config.get("url", "")
-
+        icon_config = app_config.get("icon", {})
+        icon_method = icon_config.get("method", "extraction")
+        icon_filename = icon_config.get("filename", "")
+        icon_url = icon_config.get("download_url", "")
         overrides = {
             "metadata": {
                 "name": repo,
