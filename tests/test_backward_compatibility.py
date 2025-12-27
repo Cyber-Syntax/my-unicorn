@@ -86,7 +86,10 @@ def test_save_and_load_v2_config(test_config_dir):
             "version": "1.0.0",
             "installed_date": "2025-01-01T00:00:00",
             "installed_path": "/path/to/app.AppImage",
-            "verification": {"passed": True, "methods": []},
+            "verification": {
+                "passed": True,
+                "methods": [{"type": "digest", "status": "passed"}],
+            },
             "icon": {"installed": False, "method": "extraction", "path": ""},
         },
     }
@@ -121,18 +124,33 @@ def test_effective_config_url_install(test_config_dir):
             "version": "1.0.0",
             "installed_date": "2025-01-01T00:00:00",
             "installed_path": "/path/to/app.AppImage",
-            "verification": {"passed": True, "methods": []},
+            "verification": {
+                "passed": True,
+                "methods": [{"type": "digest", "status": "passed"}],
+            },
             "icon": {"installed": False, "method": "extraction", "path": ""},
         },
         "overrides": {
-            "metadata": {"name": "test-app", "display_name": "Test App"},
+            "metadata": {
+                "name": "test-app",
+                "display_name": "Test App",
+                "description": "",
+            },
             "source": {
                 "type": "github",
                 "owner": "owner",
                 "repo": "test-app",
                 "prerelease": False,
             },
+            "appimage": {
+                "naming": {
+                    "template": "",
+                    "target_name": "test-app",
+                    "architectures": ["amd64"],
+                }
+            },
             "verification": {"method": "digest"},
+            "icon": {"method": "extraction", "filename": "test.png"},
         },
     }
 

@@ -30,28 +30,27 @@ def config_dir(tmp_path):
     dummy_catalog.write_bytes(
         orjson.dumps(
             {
-                "owner": "dummy",
-                "repo": "dummyrepo",
-                "appimage": {
-                    "rename": "dummy",
-                    "name_template": "",
-                    "characteristic_suffix": [],
+                "config_version": "2.0.0",
+                "metadata": {
+                    "name": "dummyapp",
+                    "display_name": "Dummy App",
+                    "description": "",
                 },
-                "github": {
-                    "repo": True,
+                "source": {
+                    "type": "github",
+                    "owner": "dummy",
+                    "repo": "dummyrepo",
                     "prerelease": False,
                 },
-                "verification": {
-                    "digest": False,
-                    "skip": False,
-                    "checksum_file": "",
-                    "checksum_hash_type": "sha256",
+                "appimage": {
+                    "naming": {
+                        "template": "",
+                        "target_name": "dummy",
+                        "architectures": ["amd64", "x86_64"],
+                    }
                 },
-                "icon": {
-                    "extraction": False,
-                    "url": "",
-                    "name": "dummy.png",
-                },
+                "verification": {"method": "digest"},
+                "icon": {"method": "extraction", "filename": "dummy.png"},
             }
         )
     )
@@ -82,37 +81,23 @@ def test_load_app_config_and_migration(config_manager):
     app_name = "testapp"
     app_config = {
         "config_version": "2.0.0",
-        "metadata": {
-            "name": "testapp",
-            "display_name": "Test App",
-            "description": "A test application",
-        },
-        "source": {
-            "type": "github",
-            "owner": "owner",
-            "repo": "repo",
-            "prerelease": False,
-        },
-        "appimage": {
-            "naming": {
-                "template": "",
-                "target_name": "",
-                "architectures": ["amd64", "x86_64"],
-            }
-        },
-        "verification": {"method": "digest"},
-        "icon": {
-            "method": "extraction",
-            "filename": "icon.png",
-        },
+        "source": "catalog",
+        "catalog_ref": "testapp",
         "state": {
-            "version": "",
+            "version": "1.0.0",
+            "installed_date": "2025-01-01T00:00:00",
+            "installed_path": "/path/to/app.AppImage",
             "verification": {
                 "passed": True,
-                "method": "digest",
-                "algorithm": "sha256",
-                "value": "",
+                "methods": [
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                    }
+                ],
             },
+            "icon": {"installed": False, "method": "extraction", "path": ""},
         },
     }
     config_manager.save_app_config(app_name, app_config)
@@ -129,14 +114,15 @@ def test_remove_app_config(config_manager):
     app_name = "toremove"
     app_config = {
         "config_version": "1.0.0",
+        "source": "catalog",
         "appimage": {
             "version": "1.0",
             "name": "toremove.AppImage",
             "rename": "toremove",
             "name_template": "",
             "characteristic_suffix": [],
-            "installed_date": "2024-01-01",
-            "digest": "abc",
+            "installed_date": "2024-01-01T12:00:00",
+            "digest": "sha256:abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
         },
         "owner": "owner",
         "repo": "repo",
@@ -164,14 +150,15 @@ def test_list_installed_apps(config_manager):
             name,
             {
                 "config_version": "1.0.0",
+                "source": "catalog",
                 "appimage": {
                     "version": "1.0",
                     "name": f"{name}.AppImage",
                     "rename": name,
                     "name_template": "",
                     "characteristic_suffix": [],
-                    "installed_date": "2024-01-01",
-                    "digest": "abc",
+                    "installed_date": "2024-01-01T12:00:00",
+                    "digest": "sha256:abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
                 },
                 "owner": "owner",
                 "repo": "repo",
@@ -199,8 +186,8 @@ def test_load_catalog_entry(config_manager):
     """Test loading catalog entry."""
     entry = config_manager.load_catalog_entry("dummyapp")
     assert entry is not None
-    assert entry["owner"] == "dummy"
-    assert entry["repo"] == "dummyrepo"
+    assert entry["source"]["owner"] == "dummy"
+    assert entry["source"]["repo"] == "dummyrepo"
 
 
 def test_ensure_directories_from_config(config_manager, tmp_path):
@@ -396,36 +383,29 @@ def test_app_config_manager(config_dir):
     TEST_VERSION = "2.0.0"
     app_config = {
         "config_version": "2.0.0",
-        "metadata": {
-            "name": "testapp",
-            "display_name": "Test App",
-            "description": "",
-        },
-        "source": {
-            "type": "github",
-            "owner": "testowner",
-            "repo": "testrepo",
-            "prerelease": False,
-        },
-        "appimage": {
-            "naming": {
-                "template": "",
-                "target_name": "",
-                "architectures": ["amd64", "x86_64"],
-            }
-        },
-        "verification": {"method": "digest"},
-        "icon": {
-            "method": "extraction",
-            "filename": "icon.png",
-        },
+        "source": "catalog",
+        "catalog_ref": "testapp",
         "state": {
             "version": TEST_VERSION,
+            "installed_date": "2024-01-01T12:00:00",
+            "installed_path": "",
             "verification": {
                 "passed": True,
-                "method": "digest",
-                "algorithm": "sha256",
-                "value": "abc123",
+                "methods": [
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                        "expected": "abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
+                        "computed": "abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
+                        "source": "github_api",
+                    }
+                ],
+            },
+            "icon": {
+                "installed": True,
+                "method": "extraction",
+                "path": "",
             },
         },
     }
@@ -461,28 +441,27 @@ def test_catalog_manager(config_dir):
     catalog_dir.mkdir()
 
     test_app_data = {
-        "owner": "testowner",
-        "repo": "testapp",
-        "appimage": {
-            "rename": "testapp",
-            "name_template": "",
-            "characteristic_suffix": [],
+        "config_version": "2.0.0",
+        "metadata": {
+            "name": "testapp",
+            "display_name": "Test App",
+            "description": "",
         },
-        "github": {
-            "repo": True,
+        "source": {
+            "type": "github",
+            "owner": "testowner",
+            "repo": "testapp",
             "prerelease": False,
         },
-        "verification": {
-            "digest": False,
-            "skip": False,
-            "checksum_file": "",
-            "checksum_hash_type": "sha256",
+        "appimage": {
+            "naming": {
+                "template": "",
+                "target_name": "testapp",
+                "architectures": ["amd64"],
+            }
         },
-        "icon": {
-            "extraction": False,
-            "url": "",
-            "name": "testapp.png",
-        },
+        "verification": {"method": "digest"},
+        "icon": {"method": "extraction", "filename": "testapp.png"},
     }
 
     test_catalog_file = catalog_dir / "testapp.json"
@@ -499,8 +478,8 @@ def test_catalog_manager(config_dir):
     # Test loading catalog entry
     entry = catalog_manager.load_catalog_entry("testapp")
     assert entry is not None
-    assert entry["owner"] == "testowner"
-    assert entry["repo"] == "testapp"
+    assert entry["source"]["owner"] == "testowner"
+    assert entry["source"]["repo"] == "testapp"
 
     # Test non-existent catalog entry
     nonexistent = catalog_manager.load_catalog_entry("nonexistent")
@@ -517,27 +496,29 @@ def test_config_manager_facade_integration(config_dir):
     test_catalog_file.write_bytes(
         orjson.dumps(
             {
-                "owner": "integration",
-                "repo": "test",
-                "appimage": {
-                    "rename": "integration_test",
-                    "name_template": "",
-                    "characteristic_suffix": [],
+                "config_version": "2.0.0",
+                "metadata": {
+                    "name": "integration_test",
+                    "display_name": "Integration Test",
+                    "description": "",
                 },
-                "github": {
-                    "repo": True,
+                "source": {
+                    "type": "github",
+                    "owner": "integration",
+                    "repo": "test",
                     "prerelease": False,
                 },
-                "verification": {
-                    "digest": False,
-                    "skip": False,
-                    "checksum_file": "",
-                    "checksum_hash_type": "sha256",
+                "appimage": {
+                    "naming": {
+                        "template": "",
+                        "target_name": "integration_test",
+                        "architectures": ["amd64", "x86_64"],
+                    }
                 },
+                "verification": {"method": "digest"},
                 "icon": {
-                    "extraction": False,
-                    "url": "",
-                    "name": "integration_test.png",
+                    "method": "extraction",
+                    "filename": "integration_test.png",
                 },
             }
         )
@@ -560,36 +541,29 @@ def test_config_manager_facade_integration(config_dir):
     # App config operations
     app_config = {
         "config_version": "2.0.0",
-        "metadata": {
-            "name": "integration_test",
-            "display_name": "Integration Test",
-            "description": "",
-        },
-        "source": {
-            "type": "github",
-            "owner": "integration",
-            "repo": "test",
-            "prerelease": False,
-        },
-        "appimage": {
-            "naming": {
-                "template": "",
-                "target_name": "",
-                "architectures": ["amd64", "x86_64"],
-            }
-        },
-        "verification": {"method": "digest"},
-        "icon": {
-            "method": "extraction",
-            "filename": "icon.png",
-        },
+        "source": "catalog",
+        "catalog_ref": "integration_test",
         "state": {
             "version": "1.0.0",
+            "installed_date": "2024-01-01T12:00:00",
+            "installed_path": "",
             "verification": {
                 "passed": True,
-                "method": "digest",
-                "algorithm": "sha256",
-                "value": "abc123",
+                "methods": [
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                        "expected": "abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
+                        "computed": "abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
+                        "source": "github_api",
+                    }
+                ],
+            },
+            "icon": {
+                "installed": True,
+                "method": "extraction",
+                "path": "",
             },
         },
     }
@@ -608,7 +582,7 @@ def test_config_manager_facade_integration(config_dir):
 
     catalog_entry = config_manager.load_catalog_entry("integration_test")
     assert catalog_entry is not None
-    assert catalog_entry["repo"] == "test"
+    assert catalog_entry["source"]["repo"] == "test"
 
     # Directory operations
     assert config_manager.apps_dir.exists()
