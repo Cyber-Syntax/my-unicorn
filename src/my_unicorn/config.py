@@ -276,7 +276,7 @@ class GlobalConfigManager:
         """
         self.directory_manager = directory_manager
         # Import migration module here to avoid circular imports
-        from my_unicorn.config_migration import ConfigMigration
+        from my_unicorn.migration.global_config import ConfigMigration
 
         self.migration = ConfigMigration(directory_manager)
 

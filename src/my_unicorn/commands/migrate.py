@@ -1,16 +1,17 @@
 """Migration command for upgrading app and catalog configs.
 
-This command provides a manual migration interface for users to upgrade
-their configuration files to the latest version. It uses the existing
-migration logic in config.py for safety and consistency.
+Provides manual migration interface for users upgrading configuration files.
+Creates backups before migration for safety.
 """
 
 from argparse import Namespace
 
-import orjson
-
 from my_unicorn.constants import APP_CONFIG_VERSION, CATALOG_CONFIG_VERSION
 from my_unicorn.logger import get_logger
+from my_unicorn.migration import base
+from my_unicorn.migration.app_config import AppConfigMigrator
+from my_unicorn.migration.catalog_config import migrate_catalog_v1_to_v2
+from my_unicorn.migration.helpers import get_apps_needing_migration
 
 from .base import BaseCommandHandler
 
@@ -31,7 +32,18 @@ class MigrateHandler(BaseCommandHandler):
             args: Parsed command-line arguments
 
         """
-        print(f"🔄 Migrating configs to v{APP_CONFIG_VERSION}...")
+        # Check which apps need migration
+        apps_to_migrate = get_apps_needing_migration(
+            self.config_manager.directory_manager.apps_dir
+        )
+
+        if not apps_to_migrate:
+            print("ℹ️  All app configs are already up to date")
+        else:
+            print(
+                f"🔄 Found {len(apps_to_migrate)} app(s) to migrate "
+                f"to v{APP_CONFIG_VERSION}..."
+            )
 
         # Step 1: Migrate app configs
         app_results = await self._migrate_app_configs()
@@ -61,8 +73,6 @@ class MigrateHandler(BaseCommandHandler):
             dict: {"migrated": int, "errors": int}
 
         """
-        from my_unicorn.app_config_migration import AppConfigMigrator
-
         apps = self.config_manager.app_config_manager.list_installed_apps()
 
         if not apps:
@@ -77,13 +87,13 @@ class MigrateHandler(BaseCommandHandler):
             try:
                 result = migrator.migrate_app(app_name)
 
+                # Only show apps that were actually migrated
                 if result["migrated"]:
                     print(
                         f"✅ {app_name}: v{result['from']} → v{result['to']}"
                     )
                     migrated += 1
-                else:
-                    print(f"ℹ️  {app_name}: already at v{APP_CONFIG_VERSION}")
+                # Silently skip apps already at target version
 
             except Exception as e:
                 print(f"❌ {app_name}: {e}")
@@ -111,37 +121,22 @@ class MigrateHandler(BaseCommandHandler):
 
             for catalog_file in catalog_files:
                 try:
-                    with catalog_file.open("rb") as f:
-                        catalog = orjson.loads(f.read())
-
+                    catalog = base.load_json_file(catalog_file)
                     current_version = catalog.get("config_version", "1.0.0")
 
-                    if current_version != CATALOG_CONFIG_VERSION:
-                        # Need to migrate
-                        # Use the migration logic from scripts
-                        migrated_catalog = self._migrate_catalog_v1_to_v2(
-                            catalog
-                        )
-
-                        # Save migrated catalog
-                        with catalog_file.open("wb") as f:
-                            f.write(
-                                orjson.dumps(
-                                    migrated_catalog,
-                                    option=orjson.OPT_INDENT_2,
-                                )
-                            )
+                    if base.needs_migration(
+                        current_version, CATALOG_CONFIG_VERSION
+                    ):
+                        # Migrate and save
+                        migrated_catalog = migrate_catalog_v1_to_v2(catalog)
+                        base.save_json_file(catalog_file, migrated_catalog)
 
                         print(
                             f"✅ {catalog_file.stem}: "
                             f"v{current_version} → v{CATALOG_CONFIG_VERSION}"
                         )
                         migrated += 1
-                    else:
-                        print(
-                            f"ℹ️  {catalog_file.stem}: "
-                            f"already at v{CATALOG_CONFIG_VERSION}"
-                        )
+                    # Silently skip catalogs already at target version
 
                 except Exception as e:
                     logger.error("Failed to migrate %s: %s", catalog_file, e)
@@ -154,80 +149,3 @@ class MigrateHandler(BaseCommandHandler):
             logger.error("Catalog migration failed: %s", e)
             print(f"❌ Catalog migration failed: {e}")
             return {"migrated": 0, "errors": 1}
-
-    def _migrate_catalog_v1_to_v2(self, old_catalog: dict) -> dict:
-        """Migrate catalog from v1 to v2 structure.
-
-        Args:
-            old_catalog: v1 catalog data
-
-        Returns:
-            v2 catalog data
-
-        """
-        appimage_old = old_catalog.get("appimage", {})
-        github_old = old_catalog.get("github", {})
-
-        return {
-            "config_version": CATALOG_CONFIG_VERSION,
-            "metadata": {
-                "name": old_catalog.get("repo", ""),
-                "display_name": old_catalog.get("repo", ""),
-                "description": "",
-            },
-            "source": {
-                "type": "github",
-                "owner": old_catalog.get("owner", ""),
-                "repo": old_catalog.get("repo", ""),
-                "prerelease": github_old.get("prerelease", False),
-            },
-            "appimage": {
-                "naming": {
-                    "template": appimage_old.get("name_template", ""),
-                    "target_name": appimage_old.get("rename", ""),
-                    "architectures": ["amd64", "x86_64"],
-                }
-            },
-            "verification": {
-                "method": self._get_verification_method(old_catalog)
-            },
-            "icon": self._get_icon_config(old_catalog),
-        }
-
-    def _get_verification_method(self, old_catalog: dict) -> str:
-        """Determine verification method from old config.
-
-        Args:
-            old_catalog: v1 catalog entry
-
-        Returns:
-            Verification method string
-
-        """
-        verification = old_catalog.get("verification", {})
-        if verification.get("skip"):
-            return "skip"
-        if verification.get("digest"):
-            return "digest"
-        if verification.get("checksum_file"):
-            return "checksum_file"
-        return "skip"
-
-    def _get_icon_config(self, old_catalog: dict) -> dict:
-        """Build icon config from old format.
-
-        Args:
-            old_catalog: v1 catalog entry
-
-        Returns:
-            Icon config dictionary
-
-        """
-        icon = old_catalog.get("icon", {})
-        config = {
-            "method": "extraction" if icon.get("extraction") else "download",
-            "filename": icon.get("name", ""),
-        }
-        if icon.get("url"):
-            config["download_url"] = icon["url"]
-        return config

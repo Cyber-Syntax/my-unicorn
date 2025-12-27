@@ -19,6 +19,7 @@ except ImportError:
 
 
 from my_unicorn.icon import IconHandler
+from my_unicorn.migration.helpers import get_apps_needing_migration
 from my_unicorn.verification import VerificationService
 
 from .auth import GitHubAuthManager
@@ -343,6 +344,27 @@ class UpdateManager:
             List of UpdateInfo objects
 
         """
+        # Check for apps needing migration first
+        apps_dir = self.config_manager.directory_manager.apps_dir
+        apps_needing_migration = get_apps_needing_migration(apps_dir)
+
+        if apps_needing_migration:
+            logger.warning(
+                "Found %d app(s) with old config format. "
+                "Run 'my-unicorn migrate' to upgrade.",
+                len(apps_needing_migration),
+            )
+            print(
+                f"\n⚠️  Found {len(apps_needing_migration)} app(s) "
+                "with old config format."
+            )
+            print("   Run 'my-unicorn migrate' to upgrade these apps:")
+            for app_name, version in apps_needing_migration[:5]:
+                print(f"   - {app_name} (v{version})")
+            if len(apps_needing_migration) > 5:
+                print(f"   ... and {len(apps_needing_migration) - 5} more")
+            print()
+
         if app_names is None:
             app_names = self.config_manager.list_installed_apps()
 

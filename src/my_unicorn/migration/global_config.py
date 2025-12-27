@@ -19,6 +19,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from my_unicorn.config import DirectoryManager
 
+from my_unicorn.logger import get_logger
+
+logger = get_logger(__name__)
 # Import from centralized constants module
 from my_unicorn.constants import (
     CONFIG_BACKUP_EXTENSION,
@@ -402,7 +405,7 @@ class ConfigMigration:
             self._messages.clear()
         except Exception:
             # If logger still not available, keep messages for next attempt
-            # This can happen during testing or unusual initialization scenarios
+            # This can happen during testing or unusual init scenarios
             pass
 
     def clear_messages(self) -> None:
