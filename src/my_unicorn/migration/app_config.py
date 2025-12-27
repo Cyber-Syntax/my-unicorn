@@ -305,9 +305,19 @@ class AppConfigMigrator:
             Icon state for v2 config
 
         """
+        # Determine icon method from v1 config
+        # Priority: source field > extraction boolean > default to extraction
+        source = icon_old.get("source", "")
+        if source in ("extraction", "download"):
+            method = source
+        elif icon_old.get("extraction"):
+            method = "extraction"
+        else:
+            method = "extraction"  # Default to extraction for safety
+
         return {
             "installed": icon_old.get("installed", False),
-            "method": "download" if icon_old.get("url") else "extraction",
+            "method": method,
             "path": icon_old.get("path", ""),
         }
 
