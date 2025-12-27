@@ -244,6 +244,19 @@ class TestUpdateManager:
             "github": {"use_github_api": True, "use_prerelease": False}
         }
 
+        # Mock app_config_manager.get_effective_config to return effective config
+        mock_app_config_manager = MagicMock()
+        mock_app_config_manager.get_effective_config.return_value = {
+            "config_version": "2.0.0",
+            "source": {
+                "owner": "test-owner",
+                "repo": "test-repo",
+                "prerelease": False,
+            },
+            "state": {"version": "1.0.0"},
+        }
+        mock_config_manager.app_config_manager = mock_app_config_manager
+
         mock_release_data = Release(
             owner="test-owner",
             repo="test-repo",
