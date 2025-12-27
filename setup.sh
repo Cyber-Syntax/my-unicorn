@@ -125,7 +125,15 @@ install_with_uv_tool() {
   cd "$src_dir"
   uv tool install git+https://github.com/Cyber-Syntax/my-unicorn
   check_local_bin_in_path
-  setup_autocomplete
+  
+  # For uv tool installs, run autocomplete setup from source directory
+  local autocomplete_helper="$src_dir/scripts/autocomplete.bash"
+  if [[ -x "$autocomplete_helper" ]]; then
+    echo "🔁 Setting up autocomplete..."
+    bash "$autocomplete_helper"
+  else
+    echo "⚠️  Warning: Autocomplete helper not found at $autocomplete_helper"
+  fi
 
   echo "✅ Installation complete using uv tool."
   echo "Run 'my-unicorn --help' to get started."
@@ -145,8 +153,16 @@ update_with_uv_tool() {
 
   cd "$src_dir"
   git pull || echo "⚠️  Warning: Could not update git repository"
-  uv tool upgrade my-unicorn
-  setup_autocomplete
+  uv tool upgrade my-unicorn || uv tool install --force .
+  
+  # For uv tool installs, run autocomplete setup from source directory
+  local autocomplete_helper="$src_dir/scripts/autocomplete.bash"
+  if [[ -x "$autocomplete_helper" ]]; then
+    echo "🔁 Setting up autocomplete..."
+    bash "$autocomplete_helper"
+  else
+    echo "⚠️  Warning: Autocomplete helper not found at $autocomplete_helper"
+  fi
 
   echo "✅ Update complete using uv tool."
 }
@@ -166,7 +182,15 @@ install_with_uv_editable() {
   cd "$src_dir"
   uv tool install --editable .
   check_local_bin_in_path
-  setup_autocomplete
+  
+  # For uv tool installs, run autocomplete setup from source directory
+  local autocomplete_helper="$src_dir/scripts/autocomplete.bash"
+  if [[ -x "$autocomplete_helper" ]]; then
+    echo "🔁 Setting up autocomplete..."
+    bash "$autocomplete_helper"
+  else
+    echo "⚠️  Warning: Autocomplete helper not found at $autocomplete_helper"
+  fi
 
   echo "✅ Editable installation complete using uv tool."
   echo "Changes to source code will be reflected immediately."

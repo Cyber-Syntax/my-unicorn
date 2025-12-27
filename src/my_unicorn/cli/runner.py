@@ -12,9 +12,9 @@ from ..auth import auth_manager
 from ..commands.auth import AuthHandler
 from ..commands.backup import BackupHandler
 from ..commands.cache import CacheHandler
+from ..commands.catalog import CatalogHandler
 from ..commands.config import ConfigHandler
 from ..commands.install import InstallCommandHandler
-from ..commands.list import ListHandler
 from ..commands.migrate import MigrateHandler
 from ..commands.remove import RemoveHandler
 from ..commands.update import UpdateHandler
@@ -74,7 +74,10 @@ class CLIRunner:
             "upgrade": UpgradeHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
-            "list": ListHandler(
+            "catalog": CatalogHandler(
+                self.config_manager, self.auth_manager, self.update_manager
+            ),
+            "list": CatalogHandler(  # Deprecated alias for catalog
                 self.config_manager, self.auth_manager, self.update_manager
             ),
             "migrate": MigrateHandler(

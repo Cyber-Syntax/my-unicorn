@@ -11,7 +11,22 @@ set -euo pipefail
 XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 INSTALL_DIR="${INSTALL_DIR:-$XDG_DATA_HOME/my-unicorn}"
-SRC_DIR="$INSTALL_DIR/autocomplete"
+
+# Detect source directory: prefer repository location if available
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_AUTOCOMPLETE="$(dirname "$SCRIPT_DIR")/autocomplete"
+
+if [[ -d "$REPO_AUTOCOMPLETE" && -f "$REPO_AUTOCOMPLETE/bash_autocomplete" ]]; then
+  # Running from repository
+  SRC_DIR="$REPO_AUTOCOMPLETE"
+elif [[ -d "$INSTALL_DIR/autocomplete" ]]; then
+  # Running from installed location
+  SRC_DIR="$INSTALL_DIR/autocomplete"
+else
+  echo "Error: Could not find autocomplete source files"
+  exit 1
+fi
+
 LOG_DIR="$XDG_DATA_HOME/my-unicorn/logs"
 
 # Defaults

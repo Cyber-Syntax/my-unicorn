@@ -6,9 +6,9 @@ the core functionality for each CLI command.
 
 from .auth import AuthHandler
 from .base import BaseCommandHandler
+from .catalog import CatalogHandler
 from .config import ConfigHandler
 from .install import InstallCommandHandler
-from .list import ListHandler
 from .remove import RemoveHandler
 from .update import UpdateHandler
 from .upgrade import UpgradeHandler
@@ -16,9 +16,9 @@ from .upgrade import UpgradeHandler
 __all__ = [
     "AuthHandler",
     "BaseCommandHandler",
+    "CatalogHandler",
     "ConfigHandler",
     "InstallCommandHandler",
-    "ListHandler",
     "RemoveHandler",
     "UpdateHandler",
     "UpgradeHandler",
