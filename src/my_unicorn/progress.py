@@ -500,22 +500,37 @@ class AsciiProgressBackend:
             current_task.progress_type, "Processing"
         )
 
-        status = (
-            ("✓" if current_task.success else "✖")
-            if current_task.is_finished
-            else spinner
-        )
+        # Determine status symbol
+        if current_task.is_finished:
+            # Check for warning case (success but with "not verified" message)
+            if (
+                current_task.success
+                and current_task.description
+                and "not verified" in current_task.description.lower()
+            ):
+                status = "⚠"
+            else:
+                status = "✓" if current_task.success else "✖"
+        else:
+            status = spinner
 
         name = truncate_text(current_task.name, name_width)
         lines.append(f"{phase_str} {operation} {name:<{name_width}} {status}")
 
-        if (
-            current_task.is_finished
-            and not current_task.success
-            and current_task.error_message
-        ):
-            error_msg = truncate_text(current_task.error_message, 60)
-            lines.append(f"    Error: {error_msg}")
+        # Show description for warning or error cases
+        if current_task.is_finished:
+            # For warning case (not verified)
+            if (
+                current_task.success
+                and current_task.description
+                and "not verified" in current_task.description.lower()
+            ):
+                msg = truncate_text(current_task.description, 60)
+                lines.append(f"    {msg}")
+            # For error case
+            elif not current_task.success and current_task.error_message:
+                error_msg = truncate_text(current_task.error_message, 60)
+                lines.append(f"    Error: {error_msg}")
 
         return lines
 

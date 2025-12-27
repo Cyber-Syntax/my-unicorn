@@ -27,6 +27,7 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
         if r.get("success", False) and r.get("status") != "already_installed"
     ]
     failed = [r for r in results if not r.get("success", False)]
+    with_warnings = [r for r in newly_installed if r.get("warning")]
 
     total = len(results)
 
@@ -50,6 +51,9 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
                     print(f"{app_name:<25} ✅ {version}")
                 else:
                     print(f"{app_name:<25} ✅ Installed")
+                # Show warning if present
+                if result.get("warning"):
+                    print(f"{'':>25}    ⚠️  {result['warning']}")
         else:
             print(f"{app_name:<25} ❌ Installation failed")
             error = result.get("error", "Unknown error")
@@ -58,6 +62,8 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
     print()
     if newly_installed:
         print(f"🎉 Successfully installed {len(newly_installed)} app(s)")
+    if with_warnings:
+        print(f"⚠️  {len(with_warnings)} app(s) installed with warnings")
     if already_installed:
         print(f"ℹ️  {len(already_installed)} app(s) already installed")
     if failed:

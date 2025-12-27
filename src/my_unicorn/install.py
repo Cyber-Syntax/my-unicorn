@@ -551,6 +551,10 @@ class InstallHandler:
                 "source": source,
                 "version": release.version,
                 "verification": verify_result,
+                # Pass warning through if present
+                "warning": (
+                    verify_result.get("warning") if verify_result else None
+                ),
                 "icon": icon_result,
                 "config": config_result,
                 "desktop": desktop_result,
@@ -675,6 +679,7 @@ class InstallHandler:
                 "passed": result.passed,
                 "methods": result.methods,
                 "updated_config": result.updated_config,
+                "warning": result.warning,  # Include warning
             }
 
         except Exception as error:
@@ -840,10 +845,23 @@ class InstallHandler:
         # Build verification methods list
         verification_methods = []
         verification_passed = False
+        actual_verification_method = "skip"  # Default
 
         if verify_result:
-            verification_passed = verify_result.get("passed", False)
             methods_data = verify_result.get("methods", {})
+
+            # Determine if verification actually passed
+            # If methods dict is empty, no verification happened
+            if methods_data:
+                verification_passed = verify_result.get("passed", False)
+                # Get actual method used from first method in results
+                actual_verification_method = (
+                    next(iter(methods_data.keys())) if methods_data else "skip"
+                )
+            else:
+                # No methods available - verification did not happen
+                verification_passed = False
+                actual_verification_method = "skip"
 
             for method_type, method_result in methods_data.items():
                 method_entry = {"type": method_type}
@@ -911,6 +929,17 @@ class InstallHandler:
 
         # Add overrides for URL installs
         if overrides:
+            # Update verification method with actual result
+            if "verification" in overrides:
+                overrides["verification"]["method"] = (
+                    actual_verification_method
+                )
+
+            # Update icon filename with actual result
+            if icon_result.get("icon_path") and "icon" in overrides:
+                icon_path = Path(icon_result["icon_path"])
+                overrides["icon"]["filename"] = icon_path.name
+
             config_data["overrides"] = overrides
 
         # Save configuration

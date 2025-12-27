@@ -110,6 +110,7 @@ class VerificationResult:
     passed: bool
     methods: dict[str, Any]
     updated_config: dict[str, Any]
+    warning: str | None = None  # Warning message if applicable
 
 
 @dataclass(slots=True)
@@ -137,6 +138,13 @@ class VerificationContext:
     # Results
     verification_passed: bool = False
     verification_methods: dict[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        """Initialize mutable state after dataclass creation."""
+        if self.verification_methods is None:
+            self.verification_methods = {}
+        if self.updated_config is None:
+            self.updated_config = self.config.copy()
 
 
 class VerificationService:
@@ -200,7 +208,6 @@ class VerificationService:
             app_name=app_name,
             assets=assets,
             progress_task_id=progress_task_id,
-            verification_methods={},
         )
 
         # Phase 1: Prepare verification
@@ -423,11 +430,10 @@ class VerificationService:
                         checksum_file.filename
                     )
                     break
-                else:
-                    logger.warning(
-                        "❌ Checksum verification failed with: %s",
-                        checksum_file.filename,
-                    )
+                logger.warning(
+                    "❌ Checksum verification failed with: %s",
+                    checksum_file.filename,
+                )
 
     async def _finalize_verification(
         self, context: VerificationContext
@@ -462,19 +468,43 @@ class VerificationService:
                 f"{', '.join(available_methods)}"
             )
 
-        overall_passed = context.verification_passed
+        # Determine overall result
+        # If no verification methods available, allow installation with warning
+        if not strong_methods_available:
+            overall_passed = True  # Allow installation to proceed
+            # Log for debugging only (not shown in terminal during progress)
+            logger.debug(
+                "No verification methods available for %s - "
+                "developer did not provide checksums or digest. "
+                "Installation will proceed without verification. "
+                "Security risk: File integrity cannot be verified.",
+                context.app_name,
+            )
+        else:
+            overall_passed = context.verification_passed
 
         # Log final verification summary
         self._log_verification_summary(
             context, strong_methods_available, overall_passed
         )
 
-        # Update progress
-        if overall_passed:
+        # Update progress with appropriate message and status
+        warning_message = None
+        if overall_passed and strong_methods_available:
             await self._finish_progress(
                 context.progress_task_id, True, "verification passed"
             )
             logger.debug("✅ Verification completed successfully")
+        elif overall_passed and not strong_methods_available:
+            # Mark as finished with warning message
+            warning_message = (
+                "Not verified - developer did not provide checksums"
+            )
+            await self._finish_progress(
+                context.progress_task_id,
+                True,
+                "not verified (dev did not provide checksums)",
+            )
         else:
             await self._finish_progress(
                 context.progress_task_id,
@@ -485,8 +515,9 @@ class VerificationService:
 
         return VerificationResult(
             passed=overall_passed,
-            methods=context.verification_methods,
-            updated_config=context.updated_config,
+            methods=context.verification_methods or {},
+            updated_config=context.updated_config or context.config,
+            warning=warning_message,
         )
 
     def _log_verification_summary(
@@ -508,10 +539,9 @@ class VerificationService:
             "   🔐 Strong methods available: %s", strong_methods_available
         )
         logger.debug("   ✅ Verification passed: %s", overall_passed)
-        logger.debug(
-            "   📋 Methods used: %s", list(context.verification_methods.keys())
-        )
-        for method, result in context.verification_methods.items():
+        methods = context.verification_methods or {}
+        logger.debug("   📋 Methods used: %s", list(methods.keys()))
+        for method, result in methods.items():
             logger.debug(
                 "      %s: %s",
                 method,
@@ -807,7 +837,7 @@ class VerificationService:
                 "(configured skip, no strong methods available)"
             )
             return True, updated_config
-        elif catalog_skip and (has_digest or has_checksum_files):
+        if catalog_skip and (has_digest or has_checksum_files):
             logger.debug(
                 "🔄 Overriding skip setting - "
                 "strong verification methods available"
@@ -1091,21 +1121,20 @@ class VerificationService:
                     url=checksum_file.url,
                     hash_type=hash_type,
                 )
-            else:
-                logger.error("❌ Checksum file verification FAILED!")
-                logger.error(
-                    "   📄 Checksum file: %s (%s format)",
-                    checksum_file.filename,
-                    checksum_file.format_type,
-                )
-                logger.error("   🔢 Expected hash: %s", expected_hash)
-                logger.error("   🧮 Computed hash: %s", computed_hash)
-                logger.error("   ❌ Hash mismatch detected")
-                return MethodResult(
-                    passed=False,
-                    hash=f"{hash_type}:{computed_hash}",
-                    details=f"Hash mismatch (expected: {expected_hash})",
-                )
+            logger.error("❌ Checksum file verification FAILED!")
+            logger.error(
+                "   📄 Checksum file: %s (%s format)",
+                checksum_file.filename,
+                checksum_file.format_type,
+            )
+            logger.error("   🔢 Expected hash: %s", expected_hash)
+            logger.error("   🧮 Computed hash: %s", computed_hash)
+            logger.error("   ❌ Hash mismatch detected")
+            return MethodResult(
+                passed=False,
+                hash=f"{hash_type}:{computed_hash}",
+                details=f"Hash mismatch (expected: {expected_hash})",
+            )
 
         except Exception as e:
             logger.error("❌ Checksum file verification failed: %s", e)
