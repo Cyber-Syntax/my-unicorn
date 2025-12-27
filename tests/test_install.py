@@ -106,12 +106,14 @@ class TestInstallHandler:
                 passed: bool
                 methods: dict
                 updated_config: dict
+                warning: str | None = None
 
             mock_verification.return_value.verify_file = AsyncMock(
                 return_value=MockVerificationResult(
                     passed=True,
                     methods={"sha256": "abc123"},
                     updated_config={},
+                    warning=None,
                 )
             )
 
@@ -154,12 +156,14 @@ class TestInstallHandler:
                 passed: bool
                 methods: dict
                 updated_config: dict
+                warning: str | None = None
 
             mock_verification.return_value.verify_file = AsyncMock(
                 return_value=MockVerificationResult(
                     passed=True,
                     methods={"sha256": "abc123"},
                     updated_config={},
+                    warning=None,
                 )
             )
 
@@ -192,12 +196,14 @@ class TestInstallHandler:
                 passed: bool
                 methods: dict
                 updated_config: dict
+                warning: str | None = None
 
             mock_verification.return_value.verify_file = AsyncMock(
                 return_value=MockVerificationResult(
                     passed=True,
                     methods={"sha256": "abc123"},
                     updated_config={},
+                    warning=None,
                 )
             )
 

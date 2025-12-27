@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from my_unicorn.config import DirectoryManager
-from my_unicorn.config_migration import ConfigMigration
 from my_unicorn.constants import GLOBAL_CONFIG_VERSION
+from my_unicorn.migration.global_config import ConfigMigration
 
 
 @pytest.fixture

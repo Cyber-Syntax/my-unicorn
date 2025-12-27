@@ -158,7 +158,7 @@ set_version() {
   fi
 
   info "Setting $app version to $version (for update test)"
-  jq --arg v "$version" '.appimage.version = $v' "$config_file" >"$config_file.tmp" &&
+  jq --arg v "$version" '.state.version = $v' "$config_file" >"$config_file.tmp" &&
     mv "$config_file.tmp" "$config_file"
 }
 
@@ -200,27 +200,26 @@ test_update() {
 # ======== Comprehensive Test Suites ========
 
 test_quick() {
-  info "=== Running Quick Tests (appflowy) ==="
+  info "=== Running Quick Tests (qownnotes) ==="
 
-  # Step 1: Remove appflowy for clean state
-  info "Step 1/5: Removing appflowy for clean URL install test"
-  remove_apps appflowy
-
+  # Step 1: Remove qownnotes for clean state
+  info "Step 1/5: Removing qownnotes for clean URL install test"
+  remove_apps qownnotes
   # Step 2: Test URL install
-  info "Step 2/5: Testing appflowy URL install"
-  run_cli install https://github.com/AppFlowy-IO/AppFlowy
+  info "Step 2/5: Testing qownnotes URL install"
+  run_cli install https://github.com/pbek/QOwnNotes
 
-  # Step 3: Remove appflowy for clean catalog test
-  info "Step 3/5: Removing appflowy for clean catalog install test"
-  remove_apps appflowy
+  # Step 3: Remove qownnotes for clean catalog test
+  info "Step 3/5: Removing qownnotes for clean catalog install test"
+  remove_apps qownnotes
 
   # Step 4: Test catalog install (keep installed for update test)
-  info "Step 4/5: Testing appflowy catalog install"
-  test_catalog_install appflowy
+  info "Step 4/5: Testing qownnotes catalog install"
+  test_catalog_install qownnotes
 
-  # Step 5: Test update (appflowy is already installed from catalog)
-  info "Step 5/5: Testing appflowy update"
-  test_update appflowy
+  # Step 5: Test update (qownnotes is already installed from catalog)
+  info "Step 5/5: Testing qownnotes update"
+  test_update qownnotes
 
   info "=== Quick tests completed successfully ==="
 }

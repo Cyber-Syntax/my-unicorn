@@ -1,3 +1,5 @@
+"""Tests for the list command handler."""
+
 from argparse import Namespace
 from unittest.mock import MagicMock
 
@@ -11,17 +13,18 @@ def mock_config_manager():
     """Fixture to mock the configuration manager."""
     config_manager = MagicMock()
     config_manager.list_catalog_apps.return_value = ["app1", "app2", "app3"]
-    config_manager.list_installed_apps.return_value = ["installed_app1", "installed_app2"]
-    config_manager.load_app_config.side_effect = (
-        lambda app: {
-            "appimage": {
-                "version": "1.0.0",
-                "installed_date": "2023-01-01T12:00:00Z",
-            }
-        }
-        if app.startswith("installed")
-        else None
-    )
+    config_manager.list_installed_apps.return_value = [
+        "installed_app1",
+        "installed_app2",
+    ]
+
+    def load_config(app):
+        if app.startswith("installed"):
+            raise ValueError(
+                f"Config for '{app}' is version 1.0.0, expected 2.0.0. Run 'my-unicorn migrate' to upgrade."
+            )
+
+    config_manager.load_app_config.side_effect = load_config
     return config_manager
 
 
@@ -60,8 +63,7 @@ async def test_list_installed_apps(list_handler, capsys):
     assert "📦 Installed AppImages:" in captured.out
     assert "installed_app1" in captured.out
     assert "installed_app2" in captured.out
-    assert "1.0.0" in captured.out
-    assert "2023-01-01" in captured.out
+    assert "run 'my-unicorn migrate'" in captured.out
 
 
 @pytest.mark.asyncio
