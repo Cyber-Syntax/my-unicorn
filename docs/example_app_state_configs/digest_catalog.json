@@ -1,0 +1,28 @@
+{
+  "config_version": "2.0.0",
+  "source": "catalog",
+  "catalog_ref": "flameshot",
+  "state": {
+    "version": "13.3.0",
+    "installed_date": "2025-12-27T15:30:07.003745",
+    "installed_path": "/home/developer/Applications/flameshot.AppImage",
+    "verification": {
+      "passed": true,
+      "methods": [
+        {
+          "type": "digest",
+          "status": "passed",
+          "algorithm": "SHA256",
+          "expected": "sha256:8bb380584b69bab28398e7c33ddd4e285dff7c0816c64918c9427762ce6735df",
+          "computed": "8bb380584b69bab28398e7c33ddd4e285dff7c0816c64918c9427762ce6735df",
+          "source": "github_api"
+        }
+      ]
+    },
+    "icon": {
+      "installed": true,
+      "method": "extraction",
+      "path": "/home/developer/Applications/icons/flameshot.png"
+    }
+  }
+}
