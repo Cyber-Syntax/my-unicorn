@@ -44,7 +44,9 @@ class TestIconMigration:
             "name": "super-productivity.png",
             "installed": True,
             "source": "extraction",  # This is the authoritative field
-            "path": "/home/developer/Applications/icons/super-productivity.png",
+            "path": (
+                "/home/developer/Applications/icons/super-productivity.png"
+            ),
             "extraction": True,
         }
 
@@ -58,11 +60,14 @@ class TestIconMigration:
         assert result["path"] == path
 
     def test_icon_download_with_url(self):
-        """Test migration when source explicitly says download."""
+        """Test migration when source explicitly says download.
+
+        Since v2 removed download method, map to "extraction".
+        """
         v1_icon = {
             "url": "https://example.com/icon.png",
             "name": "app.png",
-            "source": "download",  # Explicitly download
+            "source": "download",  # Explicitly download in v1
             "installed": True,
             "path": "/home/user/icons/app.png",
         }
@@ -70,7 +75,8 @@ class TestIconMigration:
         migrator = AppConfigMigrator(MagicMock())
         result = migrator._build_icon_state(v1_icon)
 
-        assert result["method"] == "download"
+        # v2 maps download to extraction
+        assert result["method"] == "extraction"
         assert result["installed"] is True
         assert result["path"] == "/home/user/icons/app.png"
 
@@ -138,6 +144,34 @@ class TestIconMigration:
         # Should fall back to extraction boolean
         assert result["method"] == "extraction"
 
+    def test_icon_freetube_download_source(self):
+        """Test freetube case: source=download should map to extraction.
+
+        Real freetube v1 config had source="download" but v2 schema
+        only accepts ["extraction", "none"]. Migration must map
+        download to extraction.
+        """
+        v1_icon = {
+            "extraction": False,
+            "url": (
+                "https://raw.githubusercontent.com/FreeTubeApp/"
+                "FreeTube/development/_icons/icon.svg"
+            ),
+            "name": "freetube.png",
+            "source": "download",  # This was in v1
+            "installed": True,
+            "path": "/home/developer/Applications/icons/freetube.png",
+        }
+
+        migrator = AppConfigMigrator(MagicMock())
+        result = migrator._build_icon_state(v1_icon)
+
+        # Must map download to extraction for v2 schema
+        assert result["method"] == "extraction"
+        assert result["installed"] is True
+        path = "/home/developer/Applications/icons/freetube.png"
+        assert result["path"] == path
+
 
 class TestVerificationMigration:
     """Test verification migration logic for v1 to v2."""
@@ -187,7 +221,7 @@ class TestVerificationMigration:
                     "verification": {"method": "skip"},
                     "icon": {
                         "method": "extraction",
-                        "filename": "freetube.svg",
+                        "filename": "freetube.png",
                     },
                 }
             )
@@ -209,7 +243,10 @@ class TestVerificationMigration:
                         "name_template": "{rename}-{latest_version}.AppImage",
                         "characteristic_suffix": ["amd64"],
                         "installed_date": "2025-11-20T17:24:38.772857",
-                        "digest": "sha256:2192afeea12f727f83044decbe0bdd92b0e98c78f6d22f9e613640419b16e44a",
+                        "digest": (
+                            "sha256:2192afeea12f727f83044decbe0bdd92"
+                            "b0e98c78f6d22f9e613640419b16e44a"
+                        ),
                     },
                     "github": {"repo": True, "prerelease": True},
                     "verification": {
@@ -247,9 +284,8 @@ class TestVerificationMigration:
         assert len(methods) == 1, "Should have exactly one verification method"
         assert methods[0]["type"] == "digest", "Should preserve digest from v1"
         assert methods[0]["status"] == "passed"
-        assert (
-            methods[0]["expected"]
-            == "2192afeea12f727f83044decbe0bdd92b0e98c78f6d22f9e613640419b16e44a"
+        assert methods[0]["expected"] == (
+            "2192afeea12f727f83044decbe0bdd92b0e98c78f6d22f9e613640419b16e44a"
         )
 
         # Verification should be marked as passed

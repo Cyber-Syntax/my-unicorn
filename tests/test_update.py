@@ -700,7 +700,6 @@ class TestUpdateManager:
                 "my_unicorn.progress.get_progress_service"
             ) as mock_get_progress,
             patch("my_unicorn.update.DownloadService") as mock_download_cls,
-            patch("my_unicorn.update.IconHandler") as mock_icon_cls,
             patch("my_unicorn.update.VerificationService") as mock_verify_cls,
         ):
             # Mock get_progress_service to return a mock progress service
@@ -713,25 +712,26 @@ class TestUpdateManager:
             mock_download_cls.return_value = mock_download
             mock_download.progress_service = MagicMock()
 
-            mock_icon = MagicMock()
             mock_verify = MagicMock()
-            mock_icon_cls.return_value = mock_icon
             mock_verify_cls.return_value = mock_verify
 
-            # Call the private method through a public interface
+            # Initialize services
             update_manager._initialize_services(mock_session)
 
+            # Verify DownloadService was initialized
+            mock_download_cls.assert_called_once()
+
+            # Verify VerificationService was initialized
+            mock_verify_cls.assert_called_once()
+            assert update_manager.verification_service is not None
+
             # Verify services were created with correct parameters
-            mock_get_progress.assert_called_once()
             mock_download_cls.assert_called_once_with(
                 mock_session, mock_progress
-            )
-            mock_icon_cls.assert_called_once_with(
-                mock_download, mock_download.progress_service
             )
             mock_verify_cls.assert_called_once_with(
                 mock_download, mock_download.progress_service
             )
 
-            assert update_manager.icon_service == mock_icon
+            # Verify that verification service was set
             assert update_manager.verification_service == mock_verify

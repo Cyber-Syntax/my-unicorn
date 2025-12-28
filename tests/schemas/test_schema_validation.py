@@ -71,9 +71,8 @@ class TestCatalogSchemaValidation:
                 },
             },
             "icon": {
-                "method": "download",
+                "method": "extraction",
                 "filename": "tagspaces.png",
-                "download_url": "https://example.com/icon.png",
             },
         }
 
@@ -180,8 +179,8 @@ class TestCatalogSchemaValidation:
 
         assert "checksum_file" in str(exc_info.value)
 
-    def test_download_url_missing_when_required(self):
-        """Test icon with download method but no download_url."""
+    def test_invalid_icon_method(self):
+        """Test icon with invalid method (download no longer supported)."""
         catalog = {
             "config_version": "2.0.0",
             "metadata": {"name": "test", "display_name": "Test"},
@@ -207,7 +206,7 @@ class TestCatalogSchemaValidation:
         with pytest.raises(SchemaValidationError) as exc_info:
             validate_catalog(catalog, "test")
 
-        assert "download_url" in str(exc_info.value)
+        assert "'download' is not one of ['extraction']" in str(exc_info.value)
 
 
 class TestAppStateSchemaValidation:

@@ -68,22 +68,12 @@ class TestInstallHandler:
             }
         )
 
-        icon_service = Mock()
-        icon_service.acquire_icon = AsyncMock(
-            return_value=Mock(
-                icon_path=Path("/icons/test.png"),
-                source="extracted",
-                config={},
-            )
-        )
-
         return {
             "download_service": download_service,
             "storage_service": storage_service,
             "config_manager": config_manager,
             "github_client": github_client,
             "catalog_manager": catalog_manager,
-            "icon_service": icon_service,
         }
 
     @pytest.fixture
@@ -335,7 +325,6 @@ def make_handler_with_storage(install_dir: Path) -> InstallHandler:
         config_manager=config_manager,
         github_client=github_client,
         catalog_manager=catalog_manager,
-        icon_service=icon_service,
     )
     return handler
 
