@@ -2,12 +2,6 @@
 
 This module provides icon extraction functionality from AppImage files.
 Icon management is handled through file_ops.extract_icon_from_appimage().
-
-Deprecated classes (to be removed in future versions):
-- IconHandler
-- IconManager
-- IconConfig
-- IconResult
 """
 
 from __future__ import annotations
@@ -16,17 +10,9 @@ import asyncio
 import re
 import shutil
 import tempfile
-from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import ClassVar
 
-from .constants import (
-    DEFAULT_ICON_EXTENSION,
-    ICON_SOURCE_EXTRACTION,
-    ICON_SOURCE_NONE,
-    SUPPORTED_EXTENSIONS,
-)
 from .logger import get_logger
 
 logger = get_logger(__name__)
@@ -129,7 +115,7 @@ class AppImageIconExtractor:
                 return await self._copy_icon(best_icon, dest_path)
 
             except IconExtractionError:
-                # Re-raise IconExtractionError as-is (already logged appropriately)
+                # Re-raise IconExtractionError as-is (already logged)
                 raise
             except Exception as e:
                 logger.error(
@@ -180,10 +166,11 @@ class AppImageIconExtractor:
                     and "supports only" in stderr_text
                 ):
                     logger.info(
-                        f"ℹ️  AppImage uses unsupported compression format: {appimage_path.name}"
+                        "i  AppImage uses unsupported compression format: %s",
+                        appimage_path.name,
                     )
                     logger.info(
-                        "ℹ️  This AppImage cannot be extracted for icon discovery"
+                        "i  AppImage cannot be extracted for icon discovery"
                     )
                     raise IconExtractionError(
                         "Unsupported AppImage compression format"
@@ -192,7 +179,8 @@ class AppImageIconExtractor:
                 # Check for other common extraction issues
                 if "Failed to open squashfs image" in stderr_text:
                     logger.info(
-                        f"ℹ️  Cannot open AppImage for extraction: {appimage_path.name}"
+                        "i  Cannot open AppImage for extraction: %s",
+                        appimage_path.name,
                     )
                     raise IconExtractionError(
                         "Cannot open AppImage squashfs filesystem"
@@ -200,12 +188,13 @@ class AppImageIconExtractor:
 
                 if "Invalid magic number" in stderr_text:
                     logger.info(
-                        "ℹ️  Invalid AppImage format: %s", appimage_path.name
+                        "i  Invalid AppImage format: %s", appimage_path.name
                     )
                     raise IconExtractionError("Invalid AppImage format")
 
                 # Generic extraction failure
-                error_msg = f"AppImage extraction failed with code {process.returncode}"
+                code = process.returncode
+                error_msg = f"AppImage extraction failed with code {code}"
                 if stderr_text:
                     error_msg += f": {stderr_text}"
                 logger.warning("⚠️  %s", error_msg)
@@ -336,7 +325,7 @@ class AppImageIconExtractor:
                 # Handle both absolute and relative symlinks
                 target = icon_path.readlink()
                 if target.is_absolute():
-                    # For absolute symlinks, make them relative to squashfs-root
+                    # Make absolute symlinks relative to squashfs-root
                     squashfs_root = icon_path
                     while (
                         squashfs_root.name != "squashfs-root"
@@ -463,338 +452,3 @@ class AppImageIconExtractor:
             raise IconExtractionError(
                 f"Failed to copy icon to {dest}: {e}"
             ) from e
-
-
-class IconManager:
-    """Manages icon acquisition from AppImages with GitHub fallback."""
-
-    def __init__(self, enable_extraction: bool = True) -> None:
-        """Initialize icon manager.
-
-        Args:
-            enable_extraction: Whether to enable AppImage icon extraction
-
-        """
-        self.enable_extraction: bool = enable_extraction
-        self.extractor: AppImageIconExtractor = AppImageIconExtractor()
-
-    async def extract_icon_only(
-        self, appimage_path: Path, dest_path: Path, app_name: str
-    ) -> Path | None:
-        """Extract icon from AppImage only (no fallback).
-
-        Args:
-            appimage_path: Path to AppImage file
-            dest_path: Destination for the extracted icon
-            app_name: Application name
-
-        Returns:
-            Path to extracted icon or None if extraction failed
-
-        """
-        if not self.enable_extraction:
-            logger.info("i  AppImage icon extraction is disabled")
-            return None
-
-        try:
-            return await self.extractor.extract_icon(
-                appimage_path, dest_path, app_name
-            )
-        except IconExtractionError as e:
-            error_msg = str(e)
-            if self.extractor.is_recoverable_error(error_msg):
-                logger.info("ℹ️  Cannot extract icon: %s", error_msg)
-            else:
-                logger.error("❌ Icon extraction failed: %s", e)
-            return None
-
-    def set_extraction_enabled(self, enabled: bool) -> None:
-        """Enable or disable AppImage icon extraction.
-
-        Args:
-            enabled: Whether to enable extraction
-
-        """
-        self.enable_extraction = enabled
-        status = "enabled" if enabled else "disabled"
-        logger.info("ℹ️  AppImage icon extraction %s", status)
-
-
-@dataclass(slots=True, frozen=True)
-class IconConfig:
-    """Icon configuration data."""
-
-    extraction_enabled: bool
-    icon_url: str | None
-    icon_filename: str
-    preserve_url_on_extraction: bool = False
-
-
-@dataclass(slots=True, frozen=True)
-class IconResult:
-    """Result of icon acquisition attempt."""
-
-    icon_path: Path | None
-    source: str  # "extraction" or "none"
-    config: dict[str, Any]
-
-
-class IconHandler:
-    """Handles icon acquisition orchestration."""
-
-    def __init__(self) -> None:
-        """Initialize icon handler."""
-        self._icon_manager_cache: IconManager | None = None
-
-    def _get_icon_manager(self) -> IconManager:
-        """Get cached icon manager instance."""
-        if self._icon_manager_cache is None:
-            self._icon_manager_cache = IconManager(enable_extraction=True)
-        return self._icon_manager_cache
-
-    @staticmethod
-    @lru_cache(maxsize=256)
-    def _extract_extension_from_url(icon_url: str) -> str:
-        """Extract file extension from URL with caching.
-
-        Args:
-            icon_url: URL to extract extension from
-
-        Returns:
-            File extension without dot, defaults to 'png'
-
-        """
-        try:
-            url_ext = Path(icon_url).suffix.lower()
-            return (
-                url_ext.lstrip(".")
-                if url_ext in SUPPORTED_EXTENSIONS
-                else DEFAULT_ICON_EXTENSION
-            )
-        except (ValueError, OSError):
-            return DEFAULT_ICON_EXTENSION
-
-    def _determine_extraction_preference(
-        self,
-        current_config: dict[str, Any],
-        catalog_entry: dict[str, Any] | None = None,
-    ) -> bool:
-        """Determine if icon extraction should be enabled.
-
-        Priority order:
-        1. Current app config setting
-        2. Catalog config setting
-        3. Default (True)
-
-        Args:
-            current_config: Current icon configuration
-            catalog_entry: Catalog entry configuration
-
-        Returns:
-            Whether extraction should be enabled
-
-        """
-        # Check current app config first
-        extraction = current_config.get("extraction")
-        if extraction is not None:
-            return bool(extraction)
-
-        # Check catalog config if available
-        if catalog_entry:
-            catalog_icon = catalog_entry.get("icon", {})
-            catalog_extraction = catalog_icon.get("extraction")
-            if catalog_extraction is not None:
-                return catalog_extraction
-
-        # Default to enabled
-        return True
-
-    def _generate_icon_filename(
-        self, app_name: str, icon_url: str | None = None
-    ) -> str:
-        """Generate icon filename based on app name and URL.
-
-        Args:
-            app_name: Application name
-            icon_url: Icon URL to detect extension from
-
-        Returns:
-            Generated filename
-
-        """
-        if icon_url:
-            icon_extension = self._extract_extension_from_url(icon_url)
-        else:
-            icon_extension = DEFAULT_ICON_EXTENSION
-
-        return f"{app_name}.{icon_extension}"
-
-    async def _attempt_extraction(
-        self,
-        appimage_path: Path,
-        dest_path: Path,
-        app_name: str,
-    ) -> Path | None:
-        """Attempt icon extraction from AppImage.
-
-        Args:
-            appimage_path: Path to AppImage file
-            dest_path: Destination path for extracted icon
-            app_name: Application name for logging
-
-        Returns:
-            Path to extracted icon or None if failed
-
-        """
-        try:
-            logger.info(
-                "🔍 Attempting icon extraction from AppImage: %s", app_name
-            )
-            extracted_icon = await self._get_icon_manager().extract_icon_only(
-                appimage_path=appimage_path,
-                dest_path=dest_path,
-                app_name=app_name,
-            )
-            if extracted_icon:
-                logger.info("✅ Icon extracted from AppImage for %s", app_name)
-                return extracted_icon
-        except (OSError, PermissionError) as e:
-            logger.info(
-                "⚠️  AppImage extraction failed for %s: %s", app_name, e
-            )
-        except Exception as e:
-            logger.warning(
-                "⚠️  Unexpected error during extraction for %s: %s", app_name, e
-            )
-
-        return None
-
-    def _build_updated_config(
-        self,
-        base_config: dict[str, Any],
-        icon_source: str,
-        icon_path: Path | None,
-        icon_filename: str,
-        icon_url: str | None,
-        extraction_enabled: bool,
-        preserve_url_on_extraction: bool,
-    ) -> dict[str, Any]:
-        """Build updated icon configuration.
-
-        Args:
-            base_config: Base configuration to update
-            icon_source: Source of acquired icon
-            icon_path: Path to acquired icon
-            icon_filename: Icon filename
-            icon_url: Icon URL
-            extraction_enabled: Whether extraction was enabled
-            preserve_url_on_extraction: Whether to preserve URL on extraction
-
-        Returns:
-            Updated configuration dictionary
-
-        """
-        # Use dict constructor for better performance than copy()
-        updated_config = dict(base_config)
-
-        # Batch update common fields
-        updated_config.update(
-            {
-                "source": icon_source,
-                "name": icon_filename,
-                "installed": icon_path is not None,
-                "path": str(icon_path) if icon_path else None,
-            }
-        )
-
-        # Set extraction and URL based on source
-        if icon_source == ICON_SOURCE_EXTRACTION:
-            updated_config["extraction"] = True
-            updated_config["url"] = (
-                icon_url if preserve_url_on_extraction else ""
-            )
-        else:
-            # No icon was acquired - preserve current settings
-            updated_config["extraction"] = extraction_enabled
-            updated_config["url"] = icon_url or ""
-
-        return updated_config
-
-    async def acquire_icon(
-        self,
-        icon_config: IconConfig,
-        app_name: str,
-        icon_dir: Path,
-        appimage_path: Path,
-        current_config: dict[str, Any] | None = None,
-        catalog_entry: dict[str, Any] | None = None,
-    ) -> IconResult:
-        """Acquire icon using extraction from AppImage.
-
-        Args:
-            icon_config: Icon configuration
-            app_name: Application name
-            icon_dir: Directory where icons should be saved
-            appimage_path: Path to AppImage for extraction
-            current_config: Current icon configuration (optional)
-            catalog_entry: Catalog entry for preference detection (optional)
-
-        Returns:
-            IconResult with acquired icon path and updated config
-
-        """
-        # Use empty dict as default to avoid mutable default argument issues
-        current_config = current_config or {}
-
-        # Determine extraction preference if not explicitly provided
-        extraction_enabled = icon_config.extraction_enabled
-        if catalog_entry:
-            extraction_enabled = self._determine_extraction_preference(
-                current_config, catalog_entry
-            )
-
-        logger.debug(
-            "🎨 Icon extraction for %s: enabled=%s",
-            app_name,
-            extraction_enabled,
-        )
-
-        dest_path = icon_dir / icon_config.icon_filename
-        icon_source = ICON_SOURCE_NONE
-        result_icon_path = None
-
-        # Try extraction if enabled
-        if extraction_enabled:
-            result_icon_path = await self._attempt_extraction(
-                appimage_path, dest_path, app_name
-            )
-            if result_icon_path:
-                icon_source = ICON_SOURCE_EXTRACTION
-
-        # Build updated configuration
-        updated_config = self._build_updated_config(
-            base_config=current_config,
-            icon_source=icon_source,
-            icon_path=result_icon_path,
-            icon_filename=icon_config.icon_filename,
-            icon_url=icon_config.icon_url,
-            extraction_enabled=extraction_enabled,
-            preserve_url_on_extraction=icon_config.preserve_url_on_extraction,
-        )
-
-        # Log results
-        if result_icon_path:
-            logger.debug(
-                "🎨 Icon acquisition completed for %s: source=%s, extraction=%s",
-                app_name,
-                icon_source,
-                updated_config["extraction"],
-            )
-        else:
-            logger.warning("⚠️  No icon acquired for %s", app_name)
-
-        return IconResult(
-            icon_path=result_icon_path,
-            source=icon_source,
-            config=updated_config,
-        )
