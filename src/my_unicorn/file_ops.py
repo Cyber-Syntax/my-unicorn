@@ -1,12 +1,13 @@
 """File operations for handling file system tasks.
 
 This module provides utilities for file operations such as making files executable,
-renaming, moving, creating backups, and other storage-related tasks.
+renaming, moving, creating backups, icon extraction, and other storage-related tasks.
 """
 
 import os
 from pathlib import Path
 
+from my_unicorn.icon import AppImageIconExtractor, IconExtractionError
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
@@ -137,3 +138,81 @@ class FileOperations:
         if clean_name.lower().endswith((".appimage", ".AppImage")):
             clean_name = clean_name[:-9]  # Remove .AppImage or .appimage
         return clean_name
+
+
+async def extract_icon_from_appimage(
+    appimage_path: Path,
+    icon_dir: Path,
+    app_name: str,
+    icon_filename: str | None = None,
+) -> Path | None:
+    """Extract icon from AppImage file.
+
+    This is a simple file operation that extracts an icon from an AppImage
+    and saves it to the configured icon directory. Should be called after
+    AppImage installation but before desktop entry creation.
+
+    Args:
+        appimage_path: Path to the installed AppImage
+        icon_dir: Directory where icons should be saved
+        app_name: Application name for icon matching
+        icon_filename: Optional custom icon filename (defaults to {app_name}.png)
+
+    Returns:
+        Path to extracted icon or None if extraction failed
+
+    """
+    if not appimage_path.exists():
+        logger.warning(
+            "AppImage not found for icon extraction: %s", appimage_path
+        )
+        return None
+
+    # Generate icon filename if not provided
+    if not icon_filename:
+        icon_filename = f"{app_name}.png"
+
+    dest_path = icon_dir / icon_filename
+
+    # Ensure icon directory exists
+    icon_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info("🔍 Extracting icon from AppImage: %s", appimage_path.name)
+
+    try:
+        # Use AppImageIconExtractor to perform extraction
+        extractor = AppImageIconExtractor()
+        extracted_icon = await extractor.extract_icon(
+            appimage_path=appimage_path,
+            dest_path=dest_path,
+            app_name=app_name,
+        )
+
+        if extracted_icon:
+            logger.info(
+                "✅ Icon extracted successfully: %s", extracted_icon.name
+            )
+            return extracted_icon
+
+        logger.info("ℹ️  No icon found in AppImage for %s", app_name)
+        return None
+
+    except IconExtractionError as e:
+        error_msg = str(e)
+        # Check if this is a recoverable error (unsupported compression, etc.)
+        extractor = AppImageIconExtractor()
+        if extractor.is_recoverable_error(error_msg):
+            logger.info(
+                "ℹ️  Cannot extract icon from %s: %s", app_name, error_msg
+            )
+        else:
+            logger.warning("⚠️  Icon extraction failed for %s: %s", app_name, e)
+        return None
+
+    except (OSError, PermissionError) as e:
+        logger.warning(
+            "⚠️  File operation error during icon extraction for %s: %s",
+            app_name,
+            e,
+        )
+        return None

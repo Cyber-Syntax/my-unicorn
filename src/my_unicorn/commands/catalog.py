@@ -149,8 +149,6 @@ class CatalogHandler(BaseCommandHandler):
         )
         if icon_method == "extraction":
             icon_display = "Embedded (extracted from AppImage)"
-        elif icon_method == "download":
-            icon_display = "Downloaded from repository"
         else:
             icon_display = "None"
 

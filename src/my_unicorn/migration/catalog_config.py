@@ -91,11 +91,9 @@ def _get_icon_config(old_catalog: dict) -> dict:
     """
     icon = old_catalog.get("icon", {})
     config = {
-        "method": "extraction" if icon.get("extraction") else "download",
+        "method": "extraction",
         "filename": icon.get("name", ""),
     }
-    if icon.get("url"):
-        config["download_url"] = icon["url"]
     return config
 
 

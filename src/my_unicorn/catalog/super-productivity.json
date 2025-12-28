@@ -26,7 +26,6 @@
   },
   "icon": {
     "method": "extraction",
-    "filename": "super-productivity.png",
-    "download_url": "https://raw.githubusercontent.com/johannesjo/super-productivity/master/src/assets/icons/favicon-192x192.png"
+    "filename": "super-productivity.png"
   }
 }

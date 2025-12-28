@@ -1,8 +1,13 @@
-"""Icon management system for AppImages
+"""Icon extraction from AppImage files.
 
-This module provides comprehensive icon handling by first attempting to extract
-icons directly from AppImage files, with GitHub download fallback and
-orchestration through IconHandler.
+This module provides icon extraction functionality from AppImage files.
+Icon management is handled through file_ops.extract_icon_from_appimage().
+
+Deprecated classes (to be removed in future versions):
+- IconHandler
+- IconManager
+- IconConfig
+- IconResult
 """
 
 from __future__ import annotations
@@ -19,7 +24,6 @@ from typing import Any, ClassVar
 from .constants import (
     DEFAULT_ICON_EXTENSION,
     ICON_SOURCE_EXTRACTION,
-    ICON_SOURCE_GITHUB,
     ICON_SOURCE_NONE,
     SUPPORTED_EXTENSIONS,
 )
@@ -37,8 +41,8 @@ class AppImageIconExtractor:
 
     # Icon format preferences (higher score = better)
     FORMAT_SCORES: ClassVar[dict[str, int]] = {
-        ".svg": 100,  # Scalable vector graphics - best quality
-        ".png": 50,  # Raster graphics - good quality
+        ".png": 100,  # Raster graphics - good quality
+        ".svg": 50,  # Scalable vector graphics - high quality
         ".ico": 30,  # Windows icon format
         ".xpm": 20,  # X11 pixmap format
         ".bmp": 10,  # Bitmap format - lowest quality
@@ -531,27 +535,15 @@ class IconResult:
     """Result of icon acquisition attempt."""
 
     icon_path: Path | None
-    source: str  # "extraction", "github", or "none"
+    source: str  # "extraction" or "none"
     config: dict[str, Any]
 
 
 class IconHandler:
     """Handles icon acquisition orchestration."""
 
-    def __init__(
-        self,
-        download_service: Any,
-        progress_service: Any | None = None,
-    ) -> None:
-        """Initialize icon handler.
-
-        Args:
-            download_service: Service for downloading icons from GitHub
-            progress_service: Optional progress service for tracking extraction
-
-        """
-        self.download_service = download_service
-        self.progress_service = progress_service
+    def __init__(self) -> None:
+        """Initialize icon handler."""
         self._icon_manager_cache: IconManager | None = None
 
     def _get_icon_manager(self) -> IconManager:
@@ -677,44 +669,6 @@ class IconHandler:
 
         return None
 
-    async def _attempt_github_download(
-        self,
-        icon_asset: Any,
-        dest_path: Path,
-        app_name: str,
-    ) -> Path | None:
-        """Attempt icon download from GitHub.
-
-        Args:
-            icon_asset: Icon asset information
-            dest_path: Destination path for downloaded icon
-            app_name: Application name for logging
-
-        Returns:
-            Path to downloaded icon or None if failed
-
-        """
-        try:
-            logger.info("📥 Downloading icon from GitHub: %s", app_name)
-            downloaded_icon = await self.download_service.download_icon(
-                icon_asset, dest_path
-            )
-            if downloaded_icon:
-                logger.info("✅ Icon downloaded from GitHub for %s", app_name)
-                return downloaded_icon
-        except (OSError, ConnectionError, TimeoutError) as e:
-            logger.warning(
-                "⚠️  GitHub icon download failed for %s: %s", app_name, e
-            )
-        except Exception as e:
-            logger.warning(
-                "⚠️  Unexpected error during GitHub download for %s: %s",
-                app_name,
-                e,
-            )
-
-        return None
-
     def _build_updated_config(
         self,
         base_config: dict[str, Any],
@@ -759,9 +713,6 @@ class IconHandler:
             updated_config["url"] = (
                 icon_url if preserve_url_on_extraction else ""
             )
-        elif icon_source == ICON_SOURCE_GITHUB:
-            updated_config["extraction"] = False
-            updated_config["url"] = icon_url or ""
         else:
             # No icon was acquired - preserve current settings
             updated_config["extraction"] = extraction_enabled
@@ -777,9 +728,8 @@ class IconHandler:
         appimage_path: Path,
         current_config: dict[str, Any] | None = None,
         catalog_entry: dict[str, Any] | None = None,
-        progress_task_id: Any | None = None,
     ) -> IconResult:
-        """Acquire icon using extraction with GitHub fallback.
+        """Acquire icon using extraction from AppImage.
 
         Args:
             icon_config: Icon configuration
@@ -788,7 +738,6 @@ class IconHandler:
             appimage_path: Path to AppImage for extraction
             current_config: Current icon configuration (optional)
             catalog_entry: Catalog entry for preference detection (optional)
-            progress_task_id: Optional progress task ID for tracking
 
         Returns:
             IconResult with acquired icon path and updated config
@@ -796,28 +745,6 @@ class IconHandler:
         """
         # Use empty dict as default to avoid mutable default argument issues
         current_config = current_config or {}
-
-        # Create progress task if progress service is available but no task ID provided
-        create_own_task = False
-        if (
-            self.progress_service
-            and progress_task_id is None
-            and self.progress_service.is_active()
-        ):
-            progress_task_id = (
-                await self.progress_service.create_icon_extraction_task(
-                    app_name
-                )
-            )
-            create_own_task = True
-
-        # Update progress - starting icon extraction
-        if progress_task_id and self.progress_service:
-            await self.progress_service.update_task(
-                progress_task_id,
-                completed=10.0,
-                description=f"🎨 Analyzing {app_name} icon...",
-            )
 
         # Determine extraction preference if not explicitly provided
         extraction_enabled = icon_config.extraction_enabled
@@ -836,52 +763,13 @@ class IconHandler:
         icon_source = ICON_SOURCE_NONE
         result_icon_path = None
 
-        # Try extraction first if enabled
+        # Try extraction if enabled
         if extraction_enabled:
-            # Update progress - extracting from AppImage
-            if progress_task_id and self.progress_service:
-                await self.progress_service.update_task(
-                    progress_task_id,
-                    completed=40.0,
-                    description=f"🎨 Extracting icon from {app_name}",
-                )
-
             result_icon_path = await self._attempt_extraction(
                 appimage_path, dest_path, app_name
             )
             if result_icon_path:
                 icon_source = ICON_SOURCE_EXTRACTION
-
-        # Fallback to GitHub download if extraction failed/disabled or no icon found
-        if not result_icon_path and icon_config.icon_url:
-            # Import here to avoid circular dependency
-            from my_unicorn.download import DownloadIconAsset
-
-            # Update progress - downloading from GitHub
-            if progress_task_id and self.progress_service:
-                await self.progress_service.update_task(
-                    progress_task_id,
-                    completed=70.0,
-                    description=f"🎨 Downloading icon for {app_name}...",
-                )
-
-            icon_asset = DownloadIconAsset(
-                icon_filename=icon_config.icon_filename,
-                icon_url=icon_config.icon_url,
-            )
-            result_icon_path = await self._attempt_github_download(
-                icon_asset, dest_path, app_name
-            )
-            if result_icon_path:
-                icon_source = ICON_SOURCE_GITHUB
-
-        # Update progress - finalizing
-        if progress_task_id and self.progress_service:
-            await self.progress_service.update_task(
-                progress_task_id,
-                completed=90.0,
-                description=f"🎨 Finalizing icon for {app_name}...",
-            )
 
         # Build updated configuration
         updated_config = self._build_updated_config(
@@ -893,21 +781,6 @@ class IconHandler:
             extraction_enabled=extraction_enabled,
             preserve_url_on_extraction=icon_config.preserve_url_on_extraction,
         )
-
-        # Update progress - completed (only finish task if we created it)
-        if progress_task_id and self.progress_service and create_own_task:
-            if result_icon_path:
-                await self.progress_service.finish_task(
-                    progress_task_id,
-                    success=True,
-                    description=f"✅ {app_name} icon extraction",
-                )
-            else:
-                await self.progress_service.finish_task(
-                    progress_task_id,
-                    success=False,
-                    description=f"❌ {app_name} icon extraction failed",
-                )
 
         # Log results
         if result_icon_path:

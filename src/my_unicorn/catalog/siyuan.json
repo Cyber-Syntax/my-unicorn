@@ -26,7 +26,6 @@
   },
   "icon": {
     "method": "extraction",
-    "filename": "siyuan.png",
-    "download_url": "https://raw.githubusercontent.com/siyuan-note/siyuan/master/app/src/assets/icon.png"
+    "filename": "siyuan.png"
   }
 }

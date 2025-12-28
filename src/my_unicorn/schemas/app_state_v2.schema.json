@@ -146,10 +146,9 @@
                             "type": "string",
                             "enum": [
                                 "extraction",
-                                "download",
                                 "none"
                             ],
-                            "description": "Method used to obtain icon"
+                            "description": "Method used to obtain icon (extraction or none)"
                         },
                         "path": {
                             "type": "string",

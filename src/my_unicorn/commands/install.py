@@ -12,7 +12,6 @@ import aiohttp
 
 from my_unicorn.download import DownloadService
 from my_unicorn.file_ops import FileOperations
-from my_unicorn.icon import IconHandler
 from my_unicorn.install import InstallHandler
 from my_unicorn.utils.install_display import print_install_summary
 
@@ -222,10 +221,6 @@ class InstallCommand:
                             config_manager=self.config_manager,
                             github_client=self.github_client,
                             catalog_manager=self.catalog_manager,
-                            icon_service=IconHandler(
-                                download_service=self.download_service,
-                                progress_service=self.progress_service,
-                            ),
                         )
 
                     results = await self.install_service.install_multiple(
@@ -256,10 +251,6 @@ class InstallCommand:
                     config_manager=self.config_manager,
                     github_client=self.github_client,
                     catalog_manager=self.catalog_manager,
-                    icon_service=IconHandler(
-                        download_service=self.download_service,
-                        progress_service=self.progress_service,
-                    ),
                 )
 
             results = await self.install_service.install_multiple(

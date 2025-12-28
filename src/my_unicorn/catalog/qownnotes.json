@@ -26,7 +26,6 @@
   },
   "icon": {
     "method": "extraction",
-    "filename": "qownnotes.png",
-    "download_url": "https://raw.githubusercontent.com/pbek/QOwnNotes/develop/icons/icon.png"
+    "filename": "qownnotes.png"
   }
 }

@@ -26,7 +26,6 @@
   },
   "icon": {
     "method": "extraction",
-    "filename": "heroicgameslauncher.png",
-    "download_url": "https://raw.githubusercontent.com/Heroic-Games-Launcher/HeroicGamesLauncher/main/public/icon.png"
+    "filename": "heroicgameslauncher.png"
   }
 }

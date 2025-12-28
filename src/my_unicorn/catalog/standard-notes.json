@@ -30,7 +30,6 @@
   },
   "icon": {
     "method": "extraction",
-    "filename": "standard-notes.png",
-    "download_url": "https://raw.githubusercontent.com/standardnotes/app/main/packages/clipper/images/icon128.png"
+    "filename": "standard-notes.png"
   }
 }

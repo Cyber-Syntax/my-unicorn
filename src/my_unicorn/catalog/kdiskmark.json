@@ -26,7 +26,6 @@
   },
   "icon": {
     "method": "extraction",
-    "filename": "kdiskmark.png",
-    "download_url": "https://raw.githubusercontent.com/JonMagon/KDiskMark/master/data/icons/128-apps-kdiskmark.png"
+    "filename": "kdiskmark.png"
   }
 }

@@ -13,14 +13,13 @@ from my_unicorn.config import ConfigManager
 from my_unicorn.desktop_entry import DesktopEntry
 from my_unicorn.download import DownloadService
 from my_unicorn.exceptions import InstallationError
-from my_unicorn.file_ops import FileOperations
+from my_unicorn.file_ops import FileOperations, extract_icon_from_appimage
 from my_unicorn.github_client import (
     Asset,
     AssetSelector,
     GitHubClient,
     Release,
 )
-from my_unicorn.icon import IconConfig, IconHandler
 from my_unicorn.logger import get_logger
 from my_unicorn.verification import VerificationService
 
@@ -40,7 +39,6 @@ class InstallHandler:
         config_manager: Any,
         github_client: GitHubClient,
         catalog_manager: Any,
-        icon_service: IconHandler | None = None,
     ) -> None:
         """Initialize install handler.
 
@@ -50,7 +48,6 @@ class InstallHandler:
             config_manager: Configuration manager
             github_client: GitHub API client
             catalog_manager: Catalog manager for app configs
-            icon_service: Service for icon operations
 
         """
         self.download_service = download_service
@@ -58,9 +55,6 @@ class InstallHandler:
         self.config_manager = config_manager
         self.github_client = github_client
         self.catalog_manager = catalog_manager
-        self.icon_service = icon_service or IconHandler(
-            download_service=download_service,
-        )
 
     async def install_from_catalog(
         self,
@@ -733,7 +727,7 @@ class InstallHandler:
         app_config: dict[str, Any],
         task_id: str | None,
     ) -> dict[str, Any]:
-        """Extract icon from AppImage or download.
+        """Extract icon from AppImage.
 
         Args:
             app_path: Path to installed AppImage
@@ -748,7 +742,6 @@ class InstallHandler:
         try:
             icon_cfg = app_config.get("icon", {})
             extraction_enabled = icon_cfg.get("extraction", True)
-            icon_url = icon_cfg.get("url")
 
             if not extraction_enabled:
                 return {
@@ -762,38 +755,31 @@ class InstallHandler:
             global_config = config_mgr.load_global_config()
             icon_dir = Path(global_config["directory"]["icon"])
 
-            # Create icon config
-            icon_config = IconConfig(
-                extraction_enabled=extraction_enabled,
-                icon_url=icon_url,
-                icon_filename=f"{app_name}.png",
-            )
+            # Determine icon filename
+            icon_filename = icon_cfg.get("filename", f"{app_name}.png")
 
-            # Use icon service to acquire icon
-            result = await self.icon_service.acquire_icon(
-                icon_config=icon_config,
-                app_name=app_name,
-                icon_dir=icon_dir,
+            # Extract icon using file operations
+            icon_path = await extract_icon_from_appimage(
                 appimage_path=app_path,
-                current_config=icon_cfg,
-                catalog_entry=app_config,
-                progress_task_id=task_id,
+                icon_dir=icon_dir,
+                app_name=app_name,
+                icon_filename=icon_filename,
             )
 
-            if result.icon_path:
+            if icon_path:
                 return {
                     "success": True,
-                    "source": result.source,
-                    "icon_path": str(result.icon_path),
+                    "source": "extraction",
+                    "icon_path": str(icon_path),
                 }
 
             return {
                 "success": False,
-                "source": result.source,
+                "source": "none",
                 "icon_path": None,
             }
 
-        except Exception as error:
+        except (OSError, PermissionError) as error:
             logger.warning(
                 "Icon extraction failed for %s: %s", app_name, error
             )
@@ -901,11 +887,6 @@ class InstallHandler:
 
                 verification_methods.append(method_entry)
 
-        # Build icon info
-        icon_method = "extraction"
-        if app_config.get("icon", {}).get("url"):
-            icon_method = "download"
-
         # Build state section
         config_data = {
             "config_version": APP_CONFIG_VERSION,
@@ -921,7 +902,7 @@ class InstallHandler:
                 },
                 "icon": {
                     "installed": bool(icon_result.get("icon_path")),
-                    "method": icon_method,
+                    "method": icon_result.get("source", "none"),
                     "path": icon_result.get("icon_path", ""),
                 },
             },

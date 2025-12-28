@@ -333,13 +333,9 @@ class AppConfigMigrator:
             },
             "verification": verification_config,
             "icon": {
-                "method": "download" if icon_old.get("url") else "extraction",
+                "method": "extraction",
                 "filename": icon_old.get("name", ""),
             },
         }
-
-        # Add URL if download method
-        if icon_old.get("url"):
-            overrides["icon"]["download_url"] = icon_old["url"]
 
         return overrides

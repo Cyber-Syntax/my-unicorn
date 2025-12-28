@@ -30,7 +30,6 @@
   },
   "icon": {
     "method": "extraction",
-    "filename": "zettlr.png",
-    "download_url": "https://raw.githubusercontent.com/Zettlr/Zettlr/master/resources/icons/png/256x256.png"
+    "filename": "zettlr.png"
   }
 }

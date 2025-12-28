@@ -18,7 +18,7 @@ except ImportError:
     InvalidVersion = None  # type: ignore
 
 
-from my_unicorn.icon import IconHandler
+from my_unicorn.file_ops import FileOperations, extract_icon_from_appimage
 from my_unicorn.migration.helpers import get_apps_needing_migration
 from my_unicorn.verification import VerificationService
 
@@ -26,7 +26,6 @@ from .auth import GitHubAuthManager
 from .backup import BackupService
 from .config import ConfigManager
 from .download import DownloadIconAsset, DownloadService
-from .file_ops import FileOperations
 from .github_client import Asset, AssetSelector, Release, ReleaseFetcher
 from .logger import get_logger
 
@@ -116,7 +115,6 @@ class UpdateManager:
         self._progress_service_param = progress_service
 
         # Initialize shared services - will be set when session is available
-        self.icon_service = None
         self.verification_service = None
 
         # Shared API progress task ID for consolidated API progress tracking
@@ -135,7 +133,6 @@ class UpdateManager:
         download_service = DownloadService(session, progress_service)
         # Get progress service from download service if available
         progress_service = getattr(download_service, "progress_service", None)
-        self.icon_service = IconHandler(download_service, progress_service)
         self.verification_service = VerificationService(
             download_service, progress_service
         )
@@ -1097,7 +1094,7 @@ class UpdateManager:
         icon_asset: DownloadIconAsset,
         progress_task_id: str | None = None,
     ) -> tuple[Path | None, dict[str, Any]]:
-        """Extract icon from AppImage or install from github.
+        """Extract icon from AppImage.
 
         Args:
             app_config: Application configuration
@@ -1112,33 +1109,31 @@ class UpdateManager:
             Tuple of (Path to acquired icon or None, updated icon config)
 
         """
-        from .icon import IconConfig
-
         current_icon_config = app_config.get("icon", {}) if app_config else {}
 
-        icon_config = IconConfig(
-            extraction_enabled=True,  # Will be determined by service
-            icon_url=icon_asset["icon_url"]
-            if icon_asset["icon_url"]
-            else None,
-            icon_filename=icon_asset["icon_filename"],
-            preserve_url_on_extraction=True,  # Preserve URL for future updates
-        )
-
-        if self.icon_service is None:
-            raise RuntimeError("Icon service not initialized")
-
-        result = await self.icon_service.acquire_icon(
-            icon_config=icon_config,
-            app_name=app_name,
-            icon_dir=icon_dir,
+        # Extract icon using file operations
+        icon_filename = icon_asset["icon_filename"]
+        icon_path = await extract_icon_from_appimage(
             appimage_path=appimage_path,
-            current_config=current_icon_config,
-            catalog_entry=catalog_entry,
-            progress_task_id=progress_task_id,
+            icon_dir=icon_dir,
+            app_name=app_name,
+            icon_filename=icon_filename,
         )
 
-        return result.icon_path, result.config
+        # Build updated icon config
+        updated_config = dict(current_icon_config)
+        updated_config.update(
+            {
+                "source": "extraction" if icon_path else "none",
+                "name": icon_filename,
+                "installed": icon_path is not None,
+                "path": str(icon_path) if icon_path else None,
+                "extraction": True,
+                "url": icon_asset.get("icon_url", ""),
+            }
+        )
+
+        return icon_path, updated_config
 
     async def _perform_update_verification(
         self,

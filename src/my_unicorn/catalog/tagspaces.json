@@ -30,7 +30,6 @@
   },
   "icon": {
     "method": "extraction",
-    "filename": "tagspaces.png",
-    "download_url": "https://raw.githubusercontent.com/tagspaces/tagspaces/master/assets/icon.png"
+    "filename": "tagspaces.png"
   }
 }

@@ -26,7 +26,6 @@
   },
   "icon": {
     "method": "extraction",
-    "filename": "zen-browser.svg",
-    "download_url": "https://raw.githubusercontent.com/zen-browser/desktop/dev/docs/assets/zen-black.svg"
+    "filename": "zen-browser.png"
   }
 }

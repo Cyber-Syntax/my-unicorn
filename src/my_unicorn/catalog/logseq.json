@@ -30,7 +30,6 @@
   },
   "icon": {
     "method": "extraction",
-    "filename": "logseq.png",
-    "download_url": "https://raw.githubusercontent.com/logseq/logseq/master/resources/icons/logseq.png"
+    "filename": "logseq.png"
   }
 }

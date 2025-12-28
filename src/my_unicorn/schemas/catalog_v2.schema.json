@@ -187,33 +187,15 @@
                 "method": {
                     "type": "string",
                     "enum": [
-                        "extraction",
-                        "download"
+                        "extraction"
                     ],
-                    "description": "How to obtain the icon"
+                    "description": "How to obtain the icon (extraction from AppImage only)"
                 },
                 "filename": {
                     "type": "string",
                     "minLength": 1,
                     "description": "Icon filename (e.g., 'obsidian.png')"
-                },
-                "download_url": {
-                    "type": "string",
-                    "format": "uri",
-                    "description": "URL to download icon from (required when method is 'download')"
                 }
-            },
-            "if": {
-                "properties": {
-                    "method": {
-                        "const": "download"
-                    }
-                }
-            },
-            "then": {
-                "required": [
-                    "download_url"
-                ]
             }
         }
     }

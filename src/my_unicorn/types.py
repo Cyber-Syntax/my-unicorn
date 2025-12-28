@@ -205,7 +205,7 @@ class StateIcon(TypedDict):
     """Icon state tracking."""
 
     installed: bool
-    method: str  # "extraction", "download"
+    method: str  # "extraction" or "none"
     path: str
 
 
@@ -229,9 +229,8 @@ class VerificationConfigV2(TypedDict, total=False):
 class IconConfigV2(TypedDict, total=False):
     """Icon configuration v2."""
 
-    method: str  # "extraction", "download"
+    method: str  # "extraction"
     filename: str
-    download_url: str  # Only if method == "download"
 
 
 class AppOverrides(TypedDict, total=False):
