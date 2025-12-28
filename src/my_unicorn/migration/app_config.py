@@ -280,10 +280,13 @@ class AppConfigMigrator:
         """
         # Determine icon method from v1 config
         # Priority: source field > extraction boolean > default to extraction
+        # Note: v1 "download" method is mapped to "extraction" in v2
+        # since v2 only supports extraction or none
         source = icon_old.get("source", "")
-        if source in ("extraction", "download"):
-            method = source
-        elif icon_old.get("extraction"):
+        if source == "download":
+            # Map deprecated download method to extraction
+            method = "extraction"
+        elif source == "extraction" or icon_old.get("extraction"):
             method = "extraction"
         else:
             method = "extraction"  # Default to extraction for safety
