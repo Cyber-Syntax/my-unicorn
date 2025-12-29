@@ -1426,48 +1426,6 @@ class ProgressDisplay:
             description=description or f"Verifying {name}",
         )
 
-    async def create_icon_extraction_task(
-        self, name: str, description: str | None = None
-    ) -> str:
-        """Create an icon extraction task.
-
-        Args:
-            name: Task name
-            description: Task description
-
-        Returns:
-            Task ID
-
-        """
-        return await self.add_task(
-            name=name,
-            progress_type=ProgressType.ICON_EXTRACTION,
-            description=description or f"Extracting icon for {name}",
-        )
-
-    async def create_post_processing_task(
-        self,
-        name: str,
-        progress_type: ProgressType = ProgressType.INSTALLATION,
-        description: str | None = None,
-    ) -> str:
-        """Create a post-processing task.
-
-        Args:
-            name: Task name
-            progress_type: Type of post-processing
-            description: Task description
-
-        Returns:
-            Task ID
-
-        """
-        return await self.add_task(
-            name=name,
-            progress_type=progress_type,
-            description=description or f"Processing {name}",
-        )
-
     async def create_installation_workflow(
         self, name: str, with_verification: bool = True
     ) -> tuple[str | None, str]:

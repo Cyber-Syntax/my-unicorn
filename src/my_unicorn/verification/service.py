@@ -2,6 +2,13 @@
 
 This module provides the main VerificationService that handles file
 verification using digest and checksum file methods.
+
+Logging Strategy:
+- logger.debug(): Developer debugging (method details, hashes, etc.)
+- logger.info(): User-facing verification milestones (for log files)
+- logger.warning(): Issues users should know about
+- Progress display uses finish_task() only - intermediate percentage updates
+  are not shown in the simplified KISS-compliant progress display.
 """
 
 from __future__ import annotations
@@ -260,12 +267,6 @@ class VerificationService:
                 )
             )
 
-        await self._update_progress(
-            context.progress_task_id,
-            10.0,
-            f"🔍 Analyzing {context.app_name}...",
-        )
-
         # Detect available methods
         context.has_digest, context.checksum_files = (
             self._detect_available_methods(
@@ -281,6 +282,12 @@ class VerificationService:
 
         logger.debug(
             "   Available methods: digest=%s, checksum_files=%d",
+            context.has_digest,
+            len(context.checksum_files) if context.checksum_files else 0,
+        )
+        logger.info(
+            "Verifying %s: digest=%s, checksum_files=%d",
+            context.app_name,
             context.has_digest,
             len(context.checksum_files) if context.checksum_files else 0,
         )
@@ -301,9 +308,6 @@ class VerificationService:
 
         # Create verifier
         context.verifier = Verifier(context.file_path)
-        await self._update_progress(
-            context.progress_task_id, 25.0, f"🔍 Reading {context.app_name}..."
-        )
 
         return None
 
@@ -337,11 +341,6 @@ class VerificationService:
 
         """
         logger.debug("🔐 Digest verification available - attempting...")
-        await self._update_progress(
-            context.progress_task_id,
-            40.0,
-            f"🔍 Verifying digest for {context.app_name}...",
-        )
 
         digest_result = await self._verify_digest(
             context.verifier,
@@ -354,9 +353,15 @@ class VerificationService:
             if digest_result.passed:
                 context.verification_passed = True
                 logger.debug("✅ Digest verification succeeded")
+                logger.info(
+                    "Digest verification passed for %s", context.app_name
+                )
                 context.updated_config["digest"] = True
             else:
                 logger.warning("❌ Digest verification failed")
+                logger.info(
+                    "Digest verification failed for %s", context.app_name
+                )
         else:
             logger.debug("i  No digest available for verification")
 
@@ -379,12 +384,6 @@ class VerificationService:
                 cf.filename,
                 cf.format_type,
             )
-
-        await self._update_progress(
-            context.progress_task_id,
-            60.0,
-            f"🔍 Verifying checksum for {context.app_name}...",
-        )
 
         # Use original asset name for checksum lookups
         original_asset_name = (
@@ -424,6 +423,11 @@ class VerificationService:
                     context.verification_passed = True
                     logger.debug(
                         "✅ Checksum verification succeeded with: %s",
+                        checksum_file.filename,
+                    )
+                    logger.info(
+                        "Checksum verification passed for %s using %s",
+                        context.app_name,
                         checksum_file.filename,
                     )
                     context.updated_config["checksum_file"] = (
@@ -495,6 +499,10 @@ class VerificationService:
                 context.progress_task_id, True, "verification passed"
             )
             logger.debug("✅ Verification completed successfully")
+            logger.info(
+                "Verification completed for %s: passed",
+                context.app_name,
+            )
         elif overall_passed and not strong_methods_available:
             # Mark as finished with warning message
             warning_message = (
@@ -505,6 +513,11 @@ class VerificationService:
                 True,
                 "not verified (dev did not provide checksums)",
             )
+            logger.info(
+                "Verification completed for %s: "
+                "skipped (no checksums provided)",
+                context.app_name,
+            )
         else:
             await self._finish_progress(
                 context.progress_task_id,
@@ -512,6 +525,10 @@ class VerificationService:
                 "verification completed with warnings",
             )
             logger.warning("⚠️  Verification completed with warnings")
+            logger.info(
+                "Verification completed for %s: failed",
+                context.app_name,
+            )
 
         return VerificationResult(
             passed=overall_passed,
@@ -546,27 +563,6 @@ class VerificationService:
                 "      %s: %s",
                 method,
                 "✅ PASS" if result.get("passed") else "❌ FAIL",
-            )
-
-    async def _update_progress(
-        self,
-        task_id: Any | None,
-        completed: float,
-        description: str,
-    ) -> None:
-        """Update progress task if available.
-
-        Args:
-            task_id: Progress task ID (may be None)
-            completed: Completion percentage
-            description: Status description
-
-        """
-        if task_id and self.progress_service:
-            await self.progress_service.update_task(
-                task_id,
-                completed=completed,
-                description=description,
             )
 
     async def _finish_progress(

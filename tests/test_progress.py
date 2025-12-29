@@ -592,8 +592,10 @@ class TestProgressDisplay:
         """Test creating an icon extraction task."""
         await progress_service.start_session()
 
-        task_id = await progress_service.create_icon_extraction_task(
-            "app_name"
+        task_id = await progress_service.add_task(
+            name="app_name",
+            progress_type=ProgressType.ICON_EXTRACTION,
+            description="Extracting icon for app_name",
         )
 
         assert task_id is not None
@@ -708,8 +710,10 @@ class TestProgressDisplay:
         """Test handling icon extraction error."""
         await progress_service.start_session()
 
-        task_id = await progress_service.create_icon_extraction_task(
-            "app_name"
+        task_id = await progress_service.add_task(
+            name="app_name",
+            progress_type=ProgressType.ICON_EXTRACTION,
+            description="Extracting icon for app_name",
         )
 
         # Simulate extraction failure
@@ -1111,8 +1115,8 @@ class TestErrorScenarios:
 
         await service.start_session()
 
-        task_id = await service.create_post_processing_task(
-            "MyApp",
+        task_id = await service.add_task(
+            name="MyApp",
             progress_type=ProgressType.UPDATE,
             description="Updating MyApp",
         )
@@ -1643,7 +1647,7 @@ class TestProgressCoverageExtras:
                 # Allow initial flush during clear, then raise afterwards
                 if self.calls <= 2:
                     self.calls += 1
-                    return None
+                    return
                 raise OSError("broken")
 
         out = BadOut()
