@@ -71,6 +71,7 @@ class InstallHandler:
             Installation result dictionary
 
         """
+        logger.debug("Starting catalog install: app=%s", app_name)
         try:
             # Get app configuration (v2 format from catalog)
             app_config = self.catalog_manager.get_app_config(app_name)
@@ -154,6 +155,7 @@ class InstallHandler:
             Installation result dictionary
 
         """
+        logger.debug("Starting URL install: url=%s", github_url)
         try:
             # Parse GitHub URL
             url_info = self._parse_github_url(github_url)
@@ -161,6 +163,12 @@ class InstallHandler:
             repo = url_info["repo"]
             app_name = url_info.get("app_name") or repo
             prerelease = url_info.get("prerelease", False)
+            logger.debug(
+                "Parsed GitHub URL: owner=%s, repo=%s, app_name=%s",
+                owner,
+                repo,
+                app_name,
+            )
 
             # Fetch latest release (already filtered for x86_64 Linux)
             release = await self._fetch_release(owner, repo)
@@ -457,6 +465,13 @@ class InstallHandler:
         show_progress = options.get("show_progress", True)
         download_dir = options.get("download_dir", Path.cwd())
 
+        logger.debug(
+            "Install workflow: app=%s, verify=%s, source=%s",
+            app_name,
+            verify,
+            source,
+        )
+
         # Ensure task ids are always defined even if an early exception is
         # raised (such as during download). This prevents UnboundLocalError
         # in the exception handler that attempts to finish progress tasks.
@@ -465,7 +480,7 @@ class InstallHandler:
         try:
             # 1. Download
             download_path = download_dir / asset.name
-            logger.info("📥 Downloading %s", app_name)
+            logger.info("Downloading %s", app_name)
             downloaded_path = await self.download_service.download_appimage(
                 asset, download_path, show_progress=show_progress
             )
@@ -483,7 +498,7 @@ class InstallHandler:
             # 2. Verify
             verify_result = None
             if verify:
-                logger.info("🔍 Verifying %s", app_name)
+                logger.info("Verifying %s", app_name)
                 verify_result = await self._verify_appimage(
                     downloaded_path,
                     asset,
@@ -499,19 +514,20 @@ class InstallHandler:
                     )
 
             # 3. Move to install directory
-            logger.info("📁 Installing %s", app_name)
+            logger.info("Installing %s", app_name)
             install_path = self._install_and_rename(
                 downloaded_path, app_name, app_config
             )
+            logger.debug("Installed to path: %s", install_path)
 
             # 4. Extract icon
-            logger.info("🎨 Extracting icon for %s", app_name)
+            logger.info("Extracting icon for %s", app_name)
             icon_result = await self._extract_icon_for_app(
                 install_path, app_name, app_config, installation_task_id
             )
 
             # 5. Create configuration
-            logger.info("📝 Creating config for %s", app_name)
+            logger.info("Creating config for %s", app_name)
             config_result = self._create_app_config(
                 app_name=app_name,
                 app_path=install_path,
@@ -523,13 +539,13 @@ class InstallHandler:
             )
 
             # 6. Create desktop entry
-            logger.info("🖥️  Creating desktop entry for %s", app_name)
+            logger.info("Creating desktop entry for %s", app_name)
             desktop_result = self._create_desktop_entry_for_app(
                 install_path, app_name, app_config, icon_result
             )
 
             # Success!
-            logger.info("✅ Successfully installed %s", app_name)
+            logger.info("Successfully installed %s", app_name)
 
             # Mark installation task as complete
             if installation_task_id and progress_service:
@@ -822,8 +838,8 @@ class InstallHandler:
         overrides = None
 
         if source == "catalog":
-            # Use repo name as catalog reference (v2 format)
-            catalog_ref = app_config.get("source", {}).get("repo", "").lower()
+            # Use catalog filename as reference (app_name is the catalog key)
+            catalog_ref = app_name
         else:
             # URL install - need full overrides section
             overrides = self._build_overrides_from_template(app_config)
