@@ -882,7 +882,7 @@ class InstallHandler:
                     verification_source = method_result.get("url", "")
                     if not verification_source:
                         if method_type == "digest":
-                            verification_source = "GitHub API"
+                            verification_source = "github_api"
                         else:
                             verification_source = ""
 
