@@ -9,7 +9,10 @@ import sys
 
 import uvloop
 
-from .cli import CLIRunner
+from my_unicorn.cli import CLIRunner
+from my_unicorn.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 async def async_main() -> None:
@@ -19,7 +22,13 @@ async def async_main() -> None:
     asynchronously.
     """
     runner = CLIRunner()
-    await runner.run()
+    logger.info("CLI started")
+    try:
+        await runner.run()
+        logger.info("CLI completed successfully")
+    except Exception:
+        logger.exception("CLI encountered an error")
+        raise
 
 
 def main() -> None:
@@ -38,10 +47,10 @@ def main() -> None:
         uvloop.install()
         uvloop.run(async_main())
     except KeyboardInterrupt:
-        print("\n⏹️  Operation cancelled by user")
+        logger.info("CLI cancelled by user")
         sys.exit(1)
-    except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+    except Exception:
+        logger.exception("❌ Unexpected error")
         sys.exit(1)
 
 

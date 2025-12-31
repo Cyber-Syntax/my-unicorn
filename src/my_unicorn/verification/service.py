@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from my_unicorn.constants import (
     DEFAULT_HASH_TYPE,
@@ -23,15 +23,13 @@ from my_unicorn.constants import (
     YAML_DEFAULT_HASH,
     HashType,
 )
-from my_unicorn.download import DownloadService
-from my_unicorn.github_client import (
-    Asset,
-    AssetSelector,
-    ChecksumFileInfo,
-)
+from my_unicorn.github_client import Asset, AssetSelector, ChecksumFileInfo
 from my_unicorn.logger import get_logger
-from my_unicorn.progress import ProgressDisplay
 from my_unicorn.verification.verifier import Verifier
+
+if TYPE_CHECKING:
+    from my_unicorn.download import DownloadService
+    from my_unicorn.progress import ProgressDisplay
 
 logger = get_logger(__name__, enable_file_logging=True)
 
@@ -240,17 +238,16 @@ class VerificationService:
             VerificationResult if should skip, None otherwise
 
         """
-        logger.debug("🔍 Starting verification for %s", context.app_name)
         logger.debug(
-            "   📋 Configuration: skip=%s, checksum_file='%s', "
-            "digest_enabled=%s",
+            "Starting verification: app=%s, skip=%s, checksum_file=%s, digest=%s",
+            context.app_name,
             context.config.get("skip", False),
             context.config.get("checksum_file", ""),
             context.config.get("digest", False),
         )
-        logger.debug("   📦 Asset digest: %s", context.asset.digest or "None")
+        logger.debug("Asset digest: %s", context.asset.digest or "None")
         logger.debug(
-            "   📂 Assets provided: %s (%d items)",
+            "Assets provided: %s (%d items)",
             bool(context.assets),
             len(context.assets) if context.assets else 0,
         )
@@ -340,7 +337,9 @@ class VerificationService:
             skip_configured: Whether skip was configured
 
         """
-        logger.debug("🔐 Digest verification available - attempting...")
+        logger.debug(
+            "Attempting digest verification: app=%s", context.app_name
+        )
 
         digest_result = await self._verify_digest(
             context.verifier,
@@ -352,13 +351,17 @@ class VerificationService:
             context.verification_methods["digest"] = digest_result.to_dict()
             if digest_result.passed:
                 context.verification_passed = True
-                logger.debug("✅ Digest verification succeeded")
+                logger.debug(
+                    "Digest verification passed: app=%s", context.app_name
+                )
                 logger.info(
                     "Digest verification passed for %s", context.app_name
                 )
                 context.updated_config["digest"] = True
             else:
-                logger.warning("❌ Digest verification failed")
+                logger.warning(
+                    "Digest verification failed: app=%s", context.app_name
+                )
                 logger.info(
                     "Digest verification failed for %s", context.app_name
                 )
@@ -380,7 +383,7 @@ class VerificationService:
         )
         for cf in context.checksum_files:
             logger.debug(
-                "   📄 Available: %s (%s format)",
+                "Available: %s (%s format)",
                 cf.filename,
                 cf.format_type,
             )
@@ -498,7 +501,10 @@ class VerificationService:
             await self._finish_progress(
                 context.progress_task_id, True, "verification passed"
             )
-            logger.debug("✅ Verification completed successfully")
+            logger.debug(
+                "Verification completed: app=%s, status=passed",
+                context.app_name,
+            )
             logger.info(
                 "Verification completed for %s: passed",
                 context.app_name,
@@ -524,7 +530,10 @@ class VerificationService:
                 False,
                 "verification completed with warnings",
             )
-            logger.warning("⚠️  Verification completed with warnings")
+            logger.warning(
+                "Verification completed with warnings: app=%s",
+                context.app_name,
+            )
             logger.info(
                 "Verification completed for %s: failed",
                 context.app_name,
@@ -551,7 +560,7 @@ class VerificationService:
             overall_passed: Overall verification result
 
         """
-        logger.debug("📊 Verification summary for %s:", context.app_name)
+        logger.debug("Verification summary: app=%s", context.app_name)
         logger.debug(
             "   🔐 Strong methods available: %s", strong_methods_available
         )
@@ -674,10 +683,23 @@ class VerificationService:
         manual_checksum_file = config.get("checksum_file")
 
         # Use manually configured checksum file if specified
-        if manual_checksum_file and manual_checksum_file.strip():
-            return self._resolve_manual_checksum_file(
-                manual_checksum_file, asset, owner, repo, tag_name
-            )
+        # Handle both v1 (string) and v2 (dict) formats
+        if manual_checksum_file:
+            if isinstance(manual_checksum_file, dict):
+                # v2 format: {"filename": "...", "algorithm": "..."}
+                filename = manual_checksum_file.get("filename", "")
+                if filename and filename.strip():
+                    return self._resolve_manual_checksum_file(
+                        filename, asset, owner, repo, tag_name
+                    )
+            elif (
+                isinstance(manual_checksum_file, str)
+                and manual_checksum_file.strip()
+            ):
+                # v1 format: plain string
+                return self._resolve_manual_checksum_file(
+                    manual_checksum_file, asset, owner, repo, tag_name
+                )
 
         # Auto-detect if conditions are met
         if (
@@ -967,19 +989,19 @@ class VerificationService:
 
         """
         try:
-            logger.debug("🔐 Attempting digest verification (from GitHub API)")
-            logger.debug("   📄 AppImage file: %s", verifier.file_path.name)
-            logger.debug("   🔢 Expected digest: %s", digest)
+            logger.debug("Attempting digest verification from GitHub API")
+            logger.debug("AppImage file: %s", verifier.file_path.name)
+            logger.debug("Expected digest: %s", digest)
             if skip_configured:
-                logger.debug("   Note: Using digest despite skip=true setting")
+                logger.debug("Note: Using digest despite skip=true setting")
 
             # Get actual file hash to compare
             actual_digest = verifier.compute_hash("sha256")
             logger.debug("   🧮 Computed digest: %s", actual_digest)
 
             verifier.verify_digest(digest)
-            logger.debug("✅ Digest verification passed")
-            logger.debug("   ✓ Digest match confirmed")
+            logger.debug("✓ Digest verification passed")
+            logger.debug("✓ Digest match confirmed")
             return MethodResult(
                 passed=True,
                 hash=digest,
@@ -987,9 +1009,9 @@ class VerificationService:
                 details="GitHub API digest verification",
             )
         except Exception as e:
-            logger.error("❌ Digest verification failed: %s", e)
-            logger.error("   Expected: %s", digest)
-            logger.error("   AppImage: %s", verifier.file_path.name)
+            logger.error("Digest verification failed: %s", e)
+            logger.error("Expected: %s", digest)
+            logger.error("AppImage: %s", verifier.file_path.name)
             return MethodResult(
                 passed=False,
                 hash=digest,
@@ -1017,7 +1039,7 @@ class VerificationService:
         """
         try:
             logger.debug(
-                "🔍 Verifying using checksum file: %s (%s format)",
+                "Verifying using checksum file: %s (%s format)",
                 checksum_file.filename,
                 checksum_file.format_type,
             )
@@ -1047,14 +1069,14 @@ class VerificationService:
             )
             if not expected_hash:
                 logger.error(
-                    "❌ Checksum file verification FAILED - hash not found!"
+                    "Checksum file verification FAILED - hash not found!"
                 )
                 logger.error(
                     "   📄 Checksum file: %s (%s format)",
                     checksum_file.filename,
                     checksum_file.format_type,
                 )
-                logger.error("   🔍 Looking for: %s", target_filename)
+                logger.error("Looking for: %s", target_filename)
                 return MethodResult(
                     passed=False,
                     hash="",
@@ -1065,7 +1087,7 @@ class VerificationService:
                 )
 
             logger.debug(
-                "🔍 Starting hash comparison for checksum file verification"
+                "Starting hash comparison for checksum file verification"
             )
             logger.debug(
                 "   📄 Checksum file: %s (%s format)",
@@ -1090,7 +1112,7 @@ class VerificationService:
             # Perform comparison
             hashes_match = computed_hash.lower() == expected_hash.lower()
             logger.debug(
-                "   🔄 Hash comparison: %s == %s → %s",
+                "Hash comparison: %s == %s → %s",
                 computed_hash.lower()[:32] + "...",
                 expected_hash.lower()[:32] + "...",
                 "MATCH" if hashes_match else "MISMATCH",
@@ -1098,15 +1120,15 @@ class VerificationService:
 
             if hashes_match:
                 logger.debug(
-                    "✅ Checksum file verification PASSED! (%s)",
+                    "✓ Checksum file verification PASSED! (%s)",
                     hash_type.upper(),
                 )
                 logger.debug(
-                    "   📄 Checksum file: %s (%s format)",
+                    "Checksum file: %s (%s format)",
                     checksum_file.filename,
                     checksum_file.format_type,
                 )
-                logger.debug("   ✓ Hash match confirmed")
+                logger.debug("✓ Hash match confirmed")
                 return MethodResult(
                     passed=True,
                     hash=f"{hash_type}:{computed_hash}",
@@ -1117,15 +1139,15 @@ class VerificationService:
                     url=checksum_file.url,
                     hash_type=hash_type,
                 )
-            logger.error("❌ Checksum file verification FAILED!")
+            logger.error("Checksum file verification FAILED")
             logger.error(
-                "   📄 Checksum file: %s (%s format)",
+                "Checksum file: %s (%s format)",
                 checksum_file.filename,
                 checksum_file.format_type,
             )
-            logger.error("   🔢 Expected hash: %s", expected_hash)
-            logger.error("   🧮 Computed hash: %s", computed_hash)
-            logger.error("   ❌ Hash mismatch detected")
+            logger.error("Expected hash: %s", expected_hash)
+            logger.error("Computed hash: %s", computed_hash)
+            logger.error("Hash mismatch detected")
             return MethodResult(
                 passed=False,
                 hash=f"{hash_type}:{computed_hash}",
@@ -1133,7 +1155,7 @@ class VerificationService:
             )
 
         except Exception as e:
-            logger.error("❌ Checksum file verification failed: %s", e)
+            logger.error("Checksum file verification failed: %s", e)
             return MethodResult(
                 passed=False,
                 hash="",

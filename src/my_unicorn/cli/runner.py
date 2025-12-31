@@ -4,24 +4,26 @@ Orchestrates the execution of CLI commands by routing parsed
 arguments to the appropriate command handlers.
 """
 
+import logging
 import sys
 from argparse import Namespace
 
-from .. import __version__
-from ..auth import auth_manager
-from ..commands.auth import AuthHandler
-from ..commands.backup import BackupHandler
-from ..commands.cache import CacheHandler
-from ..commands.catalog import CatalogHandler
-from ..commands.config import ConfigHandler
-from ..commands.install import InstallCommandHandler
-from ..commands.migrate import MigrateHandler
-from ..commands.remove import RemoveHandler
-from ..commands.update import UpdateHandler
-from ..commands.upgrade import UpgradeHandler
-from ..config import ConfigManager
-from ..logger import get_logger
-from ..update import UpdateManager
+from my_unicorn import __version__
+from my_unicorn.auth import auth_manager
+from my_unicorn.commands.auth import AuthHandler
+from my_unicorn.commands.backup import BackupHandler
+from my_unicorn.commands.cache import CacheHandler
+from my_unicorn.commands.catalog import CatalogHandler
+from my_unicorn.commands.config import ConfigHandler
+from my_unicorn.commands.install import InstallCommandHandler
+from my_unicorn.commands.migrate import MigrateHandler
+from my_unicorn.commands.remove import RemoveHandler
+from my_unicorn.commands.update import UpdateHandler
+from my_unicorn.commands.upgrade import UpgradeHandler
+from my_unicorn.config import ConfigManager
+from my_unicorn.logger import get_logger, update_logger_from_config
+from my_unicorn.update import UpdateManager
+
 from .parser import CLIParser
 
 logger = get_logger(__name__)
@@ -38,25 +40,15 @@ class CLIRunner:
         """
         self.config_manager = ConfigManager()
         self.global_config = self.config_manager.load_global_config()
+
+        # Update logger with config-based log levels
+        update_logger_from_config()
+
         self.auth_manager = auth_manager
         self.update_manager = UpdateManager(self.config_manager)
 
-        # Setup file logging
-        self._setup_file_logging()
-
         # Initialize command handlers
         self._init_command_handlers()
-
-    def _setup_file_logging(self) -> None:
-        """Set up file logging based on global configuration.
-
-        Enables file logging if specified in the global configuration.
-        """
-        log_config = self.global_config.get("logging", {})
-        if log_config.get("file", {}).get("enabled", False):
-            log_file = log_config["file"]["path"]
-            log_level = log_config["file"]["level"]
-            logger.setup_file_logging(log_file, log_level)
 
     def _init_command_handlers(self) -> None:
         """Initialize all command handlers with shared dependencies.
@@ -75,9 +67,6 @@ class CLIRunner:
                 self.config_manager, self.auth_manager, self.update_manager
             ),
             "catalog": CatalogHandler(
-                self.config_manager, self.auth_manager, self.update_manager
-            ),
-            "list": CatalogHandler(  # Deprecated alias for catalog
                 self.config_manager, self.auth_manager, self.update_manager
             ),
             "migrate": MigrateHandler(
@@ -124,18 +113,17 @@ class CLIRunner:
 
             # Validate command
             if not args.command:
-                print("❌ No command specified. Use --help.")
+                logger.error("No command specified")
                 sys.exit(1)
 
             # Route to appropriate command handler
             await self._execute_command(args)
 
         except KeyboardInterrupt:
-            print("\n⏹️  Operation cancelled by user")
+            logger.info("Operation cancelled by user via KeyboardInterrupt")
             sys.exit(1)
-        except Exception as e:
-            logger.error("Unexpected error: %s", e)
-            print(f"❌ Unexpected error: {e}")
+        except Exception:
+            logger.exception("Unexpected error")
             sys.exit(1)
 
     async def _execute_command(self, args: Namespace) -> None:
@@ -148,19 +136,28 @@ class CLIRunner:
         command = args.command
 
         if command not in self.command_handlers:
-            print(f"❌ Unknown command: {command}")
+            logger.error("Unknown command: %s", command)
             sys.exit(1)
 
         # Get command handler and execute
         handler = self.command_handlers[command]
 
-        # Set verbose logging if requested
+        # Set verbose logging if requested - find console handler
+        console_handler = None
+        original_level = None
         if hasattr(args, "verbose") and args.verbose:
-            logger.set_console_level_temporarily("DEBUG")
+            for h in logger.handlers:
+                if isinstance(h, logging.StreamHandler) and not isinstance(
+                    h, logging.FileHandler
+                ):
+                    console_handler = h
+                    original_level = h.level
+                    h.setLevel(logging.DEBUG)
+                    break
 
         try:
             await handler.execute(args)
         finally:
             # Restore normal logging level
-            if hasattr(args, "verbose") and args.verbose:
-                logger.restore_console_level()
+            if console_handler and original_level is not None:
+                console_handler.setLevel(original_level)

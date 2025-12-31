@@ -25,7 +25,7 @@ from my_unicorn.verification import VerificationService
 from .auth import GitHubAuthManager
 from .backup import BackupService
 from .config import ConfigManager
-from .download import DownloadIconAsset, DownloadService
+from .download import DownloadService
 from .github_client import Asset, AssetSelector, Release, ReleaseFetcher
 from .logger import get_logger
 
@@ -289,37 +289,32 @@ class UpdateManager:
                 release_data=release_data,  # Store for in-memory reuse
             )
 
+        except aiohttp.client_exceptions.ClientResponseError as e:
+            # Handle HTTP errors (401, 403, 404, etc.)
+            if e.status == 401:
+                logger.exception(
+                    "Failed to check updates for %s: Unauthorized (401). "
+                    "Your GitHub Personal Access Token (PAT) is invalid. "
+                    "Please set a valid token in your environment or configuration.",
+                    app_name,
+                )
+            else:
+                logger.exception(
+                    "Failed to check updates for %s: HTTP %d - %s",
+                    app_name,
+                    e.status,
+                    e.message,
+                )
+            return None
+
+        except ValueError as e:
+            # Handle specific ValueError cases (no releases, parsing errors, etc.)
+            logger.exception("Failed to check updates for %s: %s", app_name, e)
+            return None
+
         except Exception as e:
-            # Improved error handling for GitHub authentication errors
-
-            if (
-                isinstance(e, aiohttp.client_exceptions.ClientResponseError)
-                and getattr(e, "status", None) == 401
-            ):
-                # User-facing error message (no traceback)
-                logger.error(
-                    f"Failed to check updates for {app_name}: Unauthorized (401). "
-                    "This usually means your GitHub Personal Access Token (PAT) is invalid. "
-                    "Please set a valid token in your environment or configuration."
-                )
-                # Suppress traceback from console, log only to file
-                import traceback
-
-                logger.set_console_level_temporarily("CRITICAL")
-                logger.error(
-                    "Traceback for Unauthorized (401):\n%s",
-                    traceback.format_exc(),
-                )
-                logger.set_console_level_temporarily("WARNING")
-                return None
-            # Other errors: user-facing message
-            logger.error("Failed to check updates for %s: %s", app_name, e)
-            # Suppress traceback from console, log only to file
-            import traceback
-
-            logger.set_console_level_temporarily("CRITICAL")
-            logger.error("Traceback:\n%s", traceback.format_exc())
-            logger.set_console_level_temporarily("WARNING")
+            # Catch-all for unexpected errors
+            logger.exception("Failed to check updates for %s: %s", app_name, e)
             return None
 
     async def check_updates(
@@ -351,16 +346,17 @@ class UpdateManager:
                 "Run 'my-unicorn migrate' to upgrade.",
                 len(apps_needing_migration),
             )
-            print(
-                f"\n⚠️  Found {len(apps_needing_migration)} app(s) "
-                "with old config format."
+            logger.info(
+                "⚠️  Found %d app(s) with old config format.",
+                len(apps_needing_migration),
             )
-            print("   Run 'my-unicorn migrate' to upgrade these apps:")
+            logger.info("   Run 'my-unicorn migrate' to upgrade these apps:")
             for app_name, version in apps_needing_migration[:5]:
-                print(f"   - {app_name} (v{version})")
+                logger.info("   - %s (v%s)", app_name, version)
             if len(apps_needing_migration) > 5:
-                print(f"   ... and {len(apps_needing_migration) - 5} more")
-            print()
+                logger.info(
+                    "   ... and %d more", len(apps_needing_migration) - 5
+                )
 
         if app_names is None:
             app_names = self.config_manager.list_installed_apps()
@@ -371,7 +367,7 @@ class UpdateManager:
 
         # Show progress message if requested
         if show_progress:
-            print(f"🔄 Checking {len(app_names)} app(s) for updates...")
+            logger.info("🔄 Checking %d app(s) for updates...", len(app_names))
 
         async with aiohttp.ClientSession() as session:
 
@@ -486,7 +482,7 @@ class UpdateManager:
                     update_info.current_version,
                 )
                 if backup_path:
-                    logger.debug("💾 Backup created: %s", backup_path)
+                    logger.debug("Backup created: %s", backup_path)
 
             # Download AppImage
             from .progress import get_progress_service
@@ -692,8 +688,6 @@ class UpdateManager:
                 release_data,
                 icon_dir,
                 appimage_path,
-                progress_service,
-                installation_task_id,
             )
 
             # Update configuration
@@ -706,8 +700,6 @@ class UpdateManager:
                 verification_results,
                 updated_verification_config,
                 updated_icon_config,
-                progress_service,
-                installation_task_id,
             )
 
             # Create desktop entry
@@ -716,8 +708,6 @@ class UpdateManager:
                 app_config,
                 appimage_path,
                 icon_path,
-                progress_service,
-                installation_task_id,
             )
 
             # Finish installation task
@@ -733,7 +723,7 @@ class UpdateManager:
                 verification_results, appimage_asset
             )
             if stored_hash:
-                logger.debug("🔐 Updated stored hash: %s", stored_hash)
+                logger.debug("Updated stored hash: %s", stored_hash[:16])
 
             return True
 
@@ -872,8 +862,6 @@ class UpdateManager:
         release_data: Release,
         icon_dir: Path,
         appimage_path: Path,
-        progress_service: Any,
-        installation_task_id: str | None,
     ) -> tuple[Path | None, dict[str, Any] | None]:
         """Handle icon setup operations.
 
@@ -885,8 +873,6 @@ class UpdateManager:
             release_data: Release data
             icon_dir: Icon directory path
             appimage_path: Path to AppImage
-            progress_service: Progress service
-            installation_task_id: Progress task ID or None
 
         Returns:
             Tuple of (icon_path, updated_icon_config)
@@ -900,50 +886,13 @@ class UpdateManager:
         if not should_setup_icon:
             return None, None
 
-        if installation_task_id and progress_service.is_active():
-            await progress_service.update_task(
-                installation_task_id,
-                completed=50.0,
-                description=f"🎨 Setting up {app_name} icon...",
-            )
-
-        # Try to get info from catalog or generate defaults
-        icon_filename = None
-        icon_url = ""
-
-        if catalog_entry and catalog_entry.get("icon"):
-            catalog_icon = catalog_entry.get("icon", {})
-            if isinstance(catalog_icon, dict):
-                icon_filename = catalog_icon.get("name")
-                icon_url = catalog_icon.get("url", "")
-
-        if not icon_filename:
-            icon_filename = f"{app_name}.png"
-
-        icon_asset = DownloadIconAsset(
-            icon_filename=icon_filename,
-            icon_url=icon_url,
-        )
-        logger.debug(
-            f"🎨 Created icon asset from catalog/defaults: {icon_filename}"
-        )
-
         icon_path, updated_icon_config = await self._setup_update_icon(
             app_config=app_config,
             catalog_entry=catalog_entry,
             app_name=app_name,
             icon_dir=icon_dir,
             appimage_path=appimage_path,
-            icon_asset=icon_asset,
-            progress_task_id=installation_task_id,
         )
-
-        if installation_task_id and progress_service.is_active():
-            await progress_service.update_task(
-                installation_task_id,
-                completed=70.0,
-                description=f"✅ {app_name} icon setup",
-            )
 
         return icon_path, updated_icon_config
 
@@ -957,8 +906,6 @@ class UpdateManager:
         verification_results: dict[str, Any],
         updated_verification_config: dict[str, Any],
         updated_icon_config: dict[str, Any],
-        progress_service: Any,
-        installation_task_id: str | None,
     ) -> None:
         """Handle configuration updates after successful processing.
 
@@ -971,17 +918,8 @@ class UpdateManager:
             verification_results: Verification results
             updated_verification_config: Updated verification config
             updated_icon_config: Updated icon config or None
-            progress_service: Progress service
-            installation_task_id: Progress task ID or None
 
         """
-        if installation_task_id and progress_service.is_active():
-            await progress_service.update_task(
-                installation_task_id,
-                completed=50.0,
-                description=f"📝 Creating desktop entry for {app_name}...",
-            )
-
         # Store computed hash (will be empty dict if no asset provided)
         stored_hash = ""
         if verification_results.get("digest", {}).get("passed"):
@@ -1035,8 +973,6 @@ class UpdateManager:
         app_config: dict[str, Any],
         appimage_path: Path,
         icon_path: Path | None,
-        progress_service: Any,
-        installation_task_id: str | None,
     ) -> None:
         """Handle desktop entry creation.
 
@@ -1045,17 +981,8 @@ class UpdateManager:
             app_config: App configuration
             appimage_path: Path to installed AppImage
             icon_path: Path to icon or None
-            progress_service: Progress service
-            installation_task_id: Progress task ID or None
 
         """
-        if installation_task_id and progress_service.is_active():
-            await progress_service.update_task(
-                installation_task_id,
-                completed=90.0,
-                description=f"📁 Creating desktop entry for {app_name}...",
-            )
-
         try:
             from .desktop_entry import create_desktop_entry_for_app
 
@@ -1068,7 +995,7 @@ class UpdateManager:
                 config_manager=self.config_manager,
             )
         except Exception as e:
-            logger.warning("⚠️  Failed to update desktop entry: %s", e)
+            logger.warning("Failed to update desktop entry: %s", e)
 
     def _get_stored_hash(
         self,
@@ -1091,19 +1018,15 @@ class UpdateManager:
         app_name: str,
         icon_dir: Path,
         appimage_path: Path,
-        icon_asset: DownloadIconAsset,
-        progress_task_id: str | None = None,
     ) -> tuple[Path | None, dict[str, Any]]:
         """Extract icon from AppImage.
 
         Args:
             app_config: Application configuration
-            catalog_entry: Catalog entry if available
+            catalog_entry: Catalog entry if available (v2 format)
             app_name: Application name for icon filename
             icon_dir: Directory where icons should be saved
             appimage_path: Path to AppImage for icon extraction
-            icon_asset: Icon asset with filename and URL
-            progress_task_id: Optional combined post-processing task ID
 
         Returns:
             Tuple of (Path to acquired icon or None, updated icon config)
@@ -1111,8 +1034,15 @@ class UpdateManager:
         """
         current_icon_config = app_config.get("icon", {}) if app_config else {}
 
+        # Get icon filename from catalog or use default
+        icon_filename = f"{app_name}.png"  # Default
+
+        if catalog_entry and catalog_entry.get("icon"):
+            catalog_icon = catalog_entry.get("icon", {})
+            if isinstance(catalog_icon, dict):
+                icon_filename = catalog_icon.get("filename", icon_filename)
+
         # Extract icon using file operations
-        icon_filename = icon_asset["icon_filename"]
         icon_path = await extract_icon_from_appimage(
             appimage_path=appimage_path,
             icon_dir=icon_dir,
@@ -1129,7 +1059,6 @@ class UpdateManager:
                 "installed": icon_path is not None,
                 "path": str(icon_path) if icon_path else None,
                 "extraction": True,
-                "url": icon_asset.get("icon_url", ""),
             }
         )
 
@@ -1163,7 +1092,7 @@ class UpdateManager:
             Tuple of (verification_results, updated_verification_config)
 
         """
-        logger.debug("🔍 _perform_update_verification called for %s", app_name)
+        logger.debug("Performing update verification: app=%s", app_name)
         logger.debug("   📋 Verification config: %s", verification_config)
         logger.debug("   📦 Asset digest: %s", asset.digest or "None")
 
@@ -1176,7 +1105,9 @@ class UpdateManager:
             assets_list = release_data.assets
 
         try:
-            logger.debug("🔍 Calling VerificationService.verify_file() with:")
+            logger.debug(
+                "Calling VerificationService.verify_file for %s", app_name
+            )
             logger.debug("   - asset: %s", asset)
             logger.debug("   - config: %s", verification_config)
             logger.debug("   - assets_list: %d items", len(assets_list))

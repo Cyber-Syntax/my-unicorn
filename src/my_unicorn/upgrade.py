@@ -218,15 +218,6 @@ class SelfUpdater:
         except PackageNotFoundError:
             return "Package not found"
 
-    def display_version_info(self) -> None:
-        """Display the current version of my-unicorn."""
-        print("my-unicorn version: ", end="")
-        try:
-            print(self.get_formatted_version())
-        except Exception as e:
-            logger.exception("Failed to get version: %s", e)
-            print(f"Error: {e}")
-
     async def get_latest_release(
         self, refresh_cache: bool = False
     ) -> dict[str, Any] | None:
@@ -271,22 +262,12 @@ class SelfUpdater:
 
         except aiohttp.ClientResponseError as e:
             if e.status == HTTP_FORBIDDEN:
-                logger.error("GitHub API rate limit exceeded")
-                print(
-                    "".join(
-                        [
-                            "GitHub Rate limit exceeded. Please try "
-                            "again later ",
-                            "within 1 hour or use different network/VPN.",
-                        ]
-                    )
-                )
+                logger.exception("GitHub API rate limit exceeded")
             else:
-                logger.error("GitHub API error: %s", e)
-                print(f"GitHub API error: {e}")
+                logger.exception("GitHub API error")
             return None
         except Exception as e:
-            logger.error("Unexpected error fetching release: %s", e)
+            logger.exception("Unexpected error fetching release")
             print(f"Error connecting to GitHub: {e}")
             return None
 
