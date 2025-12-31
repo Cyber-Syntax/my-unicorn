@@ -392,11 +392,11 @@ class TestUpdateManager:
                     mock_logger.exception.assert_called()
 
     @pytest.mark.asyncio
-    async def test_check_updates_with_show_progress(
+    async def test_check_updates_shows_progress_message(
         self,
         mock_config_manager: MagicMock,
     ) -> None:
-        """Test check_updates with show_progress parameter."""
+        """Test check_updates always shows progress message."""
         mock_config_manager.list_installed_apps.return_value = ["app1", "app2"]
 
         update_info1 = UpdateInfo("app1", "1.0.0", "1.1.0", True)
@@ -417,7 +417,7 @@ class TestUpdateManager:
             ):
                 mock_check.side_effect = [update_info1, update_info2]
 
-                result = await update_manager.check_updates(show_progress=True)
+                result = await update_manager.check_updates()
 
                 assert len(result) == EXPECTED_APP_COUNT
                 # Verify progress message was logged
@@ -540,11 +540,11 @@ class TestUpdateManager:
                     assert result[0] == update_info1
 
     @pytest.mark.asyncio
-    async def test_check_updates_with_show_progress_no_apps(
+    async def test_check_updates_no_apps(
         self,
         mock_config_manager: MagicMock,
     ) -> None:
-        """Test check updates with progress when no apps installed."""
+        """Test check updates when no apps installed."""
         mock_config_manager.list_installed_apps.return_value = []
 
         with (
@@ -555,16 +555,16 @@ class TestUpdateManager:
             patch("builtins.print"),
         ):
             update_manager = UpdateManager(mock_config_manager)
-            result = await update_manager.check_updates(show_progress=True)
+            result = await update_manager.check_updates()
 
             assert result == []
 
     @pytest.mark.asyncio
-    async def test_check_updates_with_show_progress_enabled(
+    async def test_check_updates_shows_message(
         self,
         mock_config_manager: MagicMock,
     ) -> None:
-        """Test check updates with progress message enabled."""
+        """Test check updates shows progress message."""
         mock_config_manager.list_installed_apps.return_value = ["app1"]
         update_info = UpdateInfo("app1", "1.0.0", "1.1.0", True)
 
@@ -583,7 +583,7 @@ class TestUpdateManager:
             ):
                 mock_check.return_value = update_info
 
-                result = await update_manager.check_updates(show_progress=True)
+                result = await update_manager.check_updates()
 
                 assert len(result) == 1
                 assert result[0] == update_info

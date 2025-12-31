@@ -70,7 +70,7 @@ async def test_execute_with_valid_targets(install_command, mock_dependencies):
 
         targets = ["app1"]
         results = await install_command.execute(
-            targets, show_progress=False, verify_downloads=False
+            targets, verify_downloads=False
         )
 
         assert len(results) == 1
@@ -175,7 +175,7 @@ async def test_install_handler_execute_with_valid_targets(
     install_command_mock.execute.assert_called_once_with(
         ["app1", "https://github.com/mock/repo"],
         concurrent=3,
-        show_progress=True,
+        
         verify_downloads=True,
         force=False,
         update=False,

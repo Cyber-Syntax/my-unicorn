@@ -66,7 +66,6 @@ async def test_download_file_success(
     await service.download_file(
         url="http://example.com/file.bin",
         dest=tmp_file,
-        show_progress=True,
     )
 
     assert tmp_file.exists()
@@ -95,7 +94,6 @@ async def test_download_file_error(
         await service.download_file(
             url="http://example.com/file.bin",
             dest=tmp_file,
-            show_progress=True,
         )
 
 

@@ -56,7 +56,6 @@ async def test_update_handler_check_only_mode(
 
         mock_update_manager.check_updates.assert_awaited_once_with(
             app_names=["app1"],
-            show_progress=True,
             refresh_cache=False,
         )
 
