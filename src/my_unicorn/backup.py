@@ -19,14 +19,11 @@ from typing import Any
 from packaging.version import InvalidVersion, Version
 
 from .constants import (
-    APPIMAGE_SUFFIX,
     BACKUP_METADATA_CORRUPTED_SUFFIX,
     BACKUP_METADATA_FILENAME,
     BACKUP_METADATA_TMP_PREFIX,
     BACKUP_METADATA_TMP_SUFFIX,
     BACKUP_TEMP_SUFFIX,
-    CONFIG_BACKUP_EXTENSION,
-    OLD_FLAT_BACKUP_GLOB,
 )
 from .logger import get_logger
 
@@ -145,9 +142,7 @@ class BackupMetadata:
             return []
 
         try:
-            return sorted(
-                versions, key=lambda x: Version(x), reverse=reverse
-            )
+            return sorted(versions, key=Version, reverse=reverse)
         except InvalidVersion:
             logger.warning(
                 "Invalid version format detected, using lexicographic sorting"
@@ -276,9 +271,6 @@ class BackupService:
         self.config_manager = config_manager
         self.global_config = global_config
 
-        # Migration flag to handle old backup format
-        self._migration_checked = False
-
     def create_backup(
         self, file_path: Path, app_name: str, version: str | None = None
     ) -> Path | None:
@@ -295,9 +287,6 @@ class BackupService:
         """
         if not file_path.exists():
             return None
-
-        # Ensure migration is checked
-        self._ensure_migration()
 
         # Create app-specific backup directory
         backup_base_dir = Path(self.global_config["directory"]["backup"])
@@ -336,7 +325,7 @@ class BackupService:
             metadata = BackupMetadata(app_backup_dir)
             metadata.add_version(version, backup_filename, backup_path)
 
-            logger.info("💾 Backup created: %s (v%s)", backup_path, version)
+            logger.info("Backup created: %s (v%s)", backup_path, version)
 
             # Cleanup old backups after successful backup
             self._cleanup_old_backups_for_app(app_name, app_backup_dir)
@@ -369,9 +358,6 @@ class BackupService:
             Path to restored file or None if no backup exists
 
         """
-        # Ensure migration is checked
-        self._ensure_migration()
-
         backup_base_dir = Path(self.global_config["directory"]["backup"])
         app_backup_dir = backup_base_dir / app_name
 
@@ -520,9 +506,7 @@ class BackupService:
                 "Updated app config for %s with version %s", app_name, version
             )
         except Exception as e:
-            logger.error(
-                "Failed to update app config for %s: %s", app_name, e
-            )
+            logger.error("Failed to update app config for %s: %s", app_name, e)
 
     def _restore_specific_version(
         self, app_name: str, version: str, destination_dir: Path
@@ -610,9 +594,9 @@ class BackupService:
             )
 
             logger.info(
-                "🔄 Restored %s v%s to %s", app_name, version, destination_path
+                "Restored %s v%s to %s", app_name, version, destination_path
             )
-            logger.info("📝 Updated app configuration with restored version")
+            logger.info("Updated app configuration with restored version")
             return destination_path
 
         except Exception as e:
@@ -629,9 +613,6 @@ class BackupService:
             List of backup information dictionaries sorted by version (newest first)
 
         """
-        # Ensure migration is checked
-        self._ensure_migration()
-
         backup_base_dir = Path(self.global_config["directory"]["backup"])
         app_backup_dir = backup_base_dir / app_name
 
@@ -671,9 +652,6 @@ class BackupService:
             app_name: Specific app to clean up, or None for all apps
 
         """
-        # Ensure migration is checked
-        self._ensure_migration()
-
         backup_base_dir = Path(self.global_config["directory"]["backup"])
         max_backups = self.global_config["max_backup"]
 
@@ -746,116 +724,6 @@ class BackupService:
                             "Failed to remove backup %s: %s", backup_path, e
                         )
 
-    def migrate_old_backups(self) -> int:
-        """Migrate old flat backup structure to new folder-based structure.
-
-        Returns:
-            Number of backups migrated
-
-        """
-        backup_dir = Path(self.global_config["directory"]["backup"])
-
-        if not backup_dir.exists():
-            return 0
-
-        # Find old backup files (*.backup.AppImage)
-        old_backups = list(backup_dir.glob(OLD_FLAT_BACKUP_GLOB))
-
-        if not old_backups:
-            logger.debug("No old backups found to migrate")
-            return 0
-
-        logger.info(
-            "🔄 Migrating %d old backups to new format...", len(old_backups)
-        )
-
-        migrated_count = 0
-
-        for old_backup in old_backups:
-            try:
-                # Parse filename to extract app name and version
-                # Format: appname-version.backup.AppImage
-                filename = old_backup.stem  # Remove .AppImage
-                if filename.endswith(CONFIG_BACKUP_EXTENSION):
-                    filename = filename[: -len(CONFIG_BACKUP_EXTENSION)]
-                    # Remove backup extension (e.g. '.backup')
-
-                # Try to parse app name and version
-                # Strategy: Look for installed apps first, then fallback to parsing
-                app_name = None
-                version = "unknown"
-
-                if "-" in filename:
-                    # Try to match against installed apps first
-                    installed_apps = self.config_manager.list_installed_apps()
-                    for installed_app in installed_apps:
-                        if filename.startswith(installed_app + "-"):
-                            app_name = installed_app
-                            version_part = filename[len(installed_app) + 1 :]
-                            if version_part:
-                                version = version_part
-                            break
-
-                    # If no match found, use the first part as app name
-                    if app_name is None:
-                        parts = filename.split("-", 1)
-                        app_name = parts[0]
-                        if len(parts) > 1:
-                            version = parts[1]
-                else:
-                    app_name = filename
-                    version = "unknown"
-
-                # Validate app_name and version
-                if not app_name.strip():
-                    app_name = filename
-                    version = "unknown"
-
-                # Sanitize app_name
-                app_name = app_name.strip()
-
-                # Create new directory structure
-                app_backup_dir = backup_dir / app_name
-                app_backup_dir.mkdir(exist_ok=True)
-
-                # New filename format: appname-version.AppImage
-                new_filename = f"{app_name}-{version}{APPIMAGE_SUFFIX}"
-                new_path = app_backup_dir / new_filename
-
-                # Move file to new location
-                if not new_path.exists():
-                    old_backup.rename(new_path)
-
-                    # Create metadata entry
-                    metadata = BackupMetadata(app_backup_dir)
-                    metadata.add_version(version, new_filename, new_path)
-
-                    migrated_count += 1
-                    logger.debug("Migrated %s -> %s", old_backup, new_path)
-                else:
-                    # File already exists, remove old backup
-                    old_backup.unlink()
-                    logger.debug(
-                        "Removed duplicate old backup: %s", old_backup
-                    )
-
-            except Exception as e:
-                logger.error("Failed to migrate %s: %s", old_backup, e)
-
-        if migrated_count > 0:
-            logger.info(
-                "✅ Successfully migrated %d backups to new format",
-                migrated_count,
-            )
-
-        return migrated_count
-
-    def _ensure_migration(self) -> None:
-        """Ensure migration from old backup format is checked and performed if needed."""
-        if not self._migration_checked:
-            self.migrate_old_backups()
-            self._migration_checked = True
-
     def list_apps_with_backups(self) -> list[str]:
         """List all apps that have backups.
 
@@ -863,8 +731,6 @@ class BackupService:
             List of app names that have backup directories
 
         """
-        self._ensure_migration()
-
         backup_base_dir = Path(self.global_config["directory"]["backup"])
 
         if not backup_base_dir.exists():

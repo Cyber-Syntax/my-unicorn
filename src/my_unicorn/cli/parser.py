@@ -394,9 +394,6 @@ Examples:
   # Cleanup old backups
   %(prog)s --cleanup
   %(prog)s appflowy --cleanup
-
-  # Migrate old backup format
-  %(prog)s --migrate
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
@@ -439,12 +436,6 @@ Examples:
             "--info",
             action="store_true",
             help="Show detailed backup information",
-        )
-
-        action_group.add_argument(
-            "--migrate",
-            action="store_true",
-            help="Migrate old backup files to new folder-based format",
         )
 
     def _add_auth_command(self, subparsers) -> None:

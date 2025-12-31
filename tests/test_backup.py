@@ -23,7 +23,11 @@ def dummy_config(tmp_path):
         "max_backup": 2,
     }
     config_manager = MagicMock()
-    config_manager.list_installed_apps.return_value = ["app1", "app2", "freetube"]
+    config_manager.list_installed_apps.return_value = [
+        "app1",
+        "app2",
+        "freetube",
+    ]
     return config_manager, global_config, backup_dir, storage_dir
 
 
@@ -99,7 +103,9 @@ class TestBackupMetadata:
 
         versions = ["1.0.0", "2.1.0", "1.5.0"]
         for version in versions:
-            metadata.add_version(version, f"test-{version}.AppImage", test_file)
+            metadata.add_version(
+                version, f"test-{version}.AppImage", test_file
+            )
 
         sorted_versions = metadata.list_versions()
         assert sorted_versions == ["2.1.0", "1.5.0", "1.0.0"]  # Newest first
@@ -156,7 +162,9 @@ class TestBackupService:
         backup = backup_service.create_backup(file_path, "app1")
         assert backup is None
 
-    def test_restore_latest_backup(self, backup_service, dummy_config, sample_app_config):
+    def test_restore_latest_backup(
+        self, backup_service, dummy_config, sample_app_config
+    ):
         """Test restoring the latest backup."""
         config_manager, global_config, backup_dir, storage_dir = dummy_config
         config_manager.load_app_config.return_value = sample_app_config
@@ -173,7 +181,9 @@ class TestBackupService:
         metadata.add_version("1.2.2", "app1-1.2.2.AppImage", backup_file)
 
         # Restore
-        restored_path = backup_service.restore_latest_backup(app_name, storage_dir)
+        restored_path = backup_service.restore_latest_backup(
+            app_name, storage_dir
+        )
 
         assert restored_path is not None
         assert restored_path.name == "app1.AppImage"
@@ -206,14 +216,18 @@ class TestBackupService:
         metadata.add_version("1.2.1", "app1-1.2.1.AppImage", backup_file)
 
         # Restore (should backup current version first)
-        restored_path = backup_service.restore_specific_version(app_name, "1.2.1", storage_dir)
+        restored_path = backup_service.restore_specific_version(
+            app_name, "1.2.1", storage_dir
+        )
 
         assert restored_path is not None
         assert restored_path.read_text() == "old content"
 
         # Check that current version was backed up
         metadata_data = metadata.load()
-        assert "1.2.3" in metadata_data["versions"]  # Current version from config
+        assert (
+            "1.2.3" in metadata_data["versions"]
+        )  # Current version from config
 
     def test_cleanup_old_backups_folder_structure(
         self, backup_service, dummy_config, sample_app_config
@@ -235,12 +249,16 @@ class TestBackupService:
             backup_file.write_text(f"content {version}")
 
             # Add to metadata with different timestamps for sorting
-            metadata.add_version(version, f"app1-{version}.AppImage", backup_file)
+            metadata.add_version(
+                version, f"app1-{version}.AppImage", backup_file
+            )
 
             # Modify created timestamp for proper sorting
             metadata_data = metadata.load()
             timestamp = datetime.now() - timedelta(days=len(versions) - i - 1)
-            metadata_data["versions"][version]["created"] = timestamp.isoformat()
+            metadata_data["versions"][version]["created"] = (
+                timestamp.isoformat()
+            )
             metadata.save(metadata_data)
 
         # Cleanup
@@ -269,7 +287,9 @@ class TestBackupService:
             backup_file.write_text(f"content {version}")
 
             metadata = BackupMetadata(app_backup_dir)
-            metadata.add_version(version, f"app1-{version}.AppImage", backup_file)
+            metadata.add_version(
+                version, f"app1-{version}.AppImage", backup_file
+            )
 
         backup_service._cleanup_old_backups_for_app(app_name, app_backup_dir)
 
@@ -303,73 +323,6 @@ class TestBackupService:
         assert "size" in info
         assert "created" in info
 
-    def test_migration_from_old_format(self, backup_service, dummy_config):
-        """Test migration from old flat backup format."""
-        config_manager, global_config, backup_dir, storage_dir = dummy_config
-
-        # Create old format backups
-        old_backups = [
-            "app1-1.2.3.backup.AppImage",
-            "freetube-0.23.6.backup.AppImage",
-            "app2-2.0.0.backup.AppImage",
-        ]
-
-        for backup_name in old_backups:
-            old_file = backup_dir / backup_name
-            old_file.write_text(f"content of {backup_name}")
-
-        # Run migration
-        migrated_count = backup_service.migrate_old_backups()
-
-        assert migrated_count == len(old_backups)
-
-        # Check new structure was created
-        for app_name in ["app1", "freetube", "app2"]:
-            app_dir = backup_dir / app_name
-            assert app_dir.exists()
-            assert (app_dir / "metadata.json").exists()
-            assert len(list(app_dir.glob("*.AppImage"))) >= 1
-
-        # Check old files were removed
-        for backup_name in old_backups:
-            assert not (backup_dir / backup_name).exists()
-
-    def test_migration_complex_app_names(self, backup_service, dummy_config):
-        """Test migration with complex app names like FreeTube."""
-        config_manager, global_config, backup_dir, storage_dir = dummy_config
-
-        # Test cases for complex parsing
-        test_cases = [
-            ("freetube-0.23.6.backup.AppImage", "freetube", "0.23.6"),
-            ("my-complex-app-1.2.3-beta.backup.AppImage", "my-complex-app", "1.2.3-beta"),
-            ("single.backup.AppImage", "single", "unknown"),
-        ]
-
-        # Update mock to include these apps
-        config_manager.list_installed_apps.return_value = [
-            "freetube",
-            "my-complex-app",
-            "single",
-        ]
-
-        for filename, expected_app, expected_version in test_cases:
-            old_file = backup_dir / filename
-            old_file.write_text(f"content of {filename}")
-
-        migrated_count = backup_service.migrate_old_backups()
-        assert migrated_count == len(test_cases)
-
-        # Verify correct parsing
-        for filename, expected_app, expected_version in test_cases:
-            app_dir = backup_dir / expected_app
-            assert app_dir.exists(), f"Directory not created for {expected_app}"
-
-            metadata_file = app_dir / "metadata.json"
-            assert metadata_file.exists()
-
-            metadata = json.loads(metadata_file.read_text())
-            assert expected_version in metadata["versions"]
-
     def test_list_apps_with_backups(self, backup_service, dummy_config):
         """Test listing apps that have backups."""
         config_manager, global_config, backup_dir, storage_dir = dummy_config
@@ -385,7 +338,9 @@ class TestBackupService:
             backup_file.write_text("content")
 
             metadata = BackupMetadata(app_backup_dir)
-            metadata.add_version("1.0.0", f"{app_name}-1.0.0.AppImage", backup_file)
+            metadata.add_version(
+                "1.0.0", f"{app_name}-1.0.0.AppImage", backup_file
+            )
 
         # Create empty directory (should be ignored)
         empty_dir = backup_dir / "empty_app"
@@ -425,7 +380,9 @@ class TestBackupService:
         config_manager, global_config, backup_dir, storage_dir = dummy_config
         config_manager.load_app_config.return_value = None
 
-        result = backup_service.restore_latest_backup("nonexistent", storage_dir)
+        result = backup_service.restore_latest_backup(
+            "nonexistent", storage_dir
+        )
         assert result is None
 
     def test_restore_backup_integrity_failure(
@@ -451,5 +408,7 @@ class TestBackupService:
         backup_file.write_text("corrupted content")
 
         # Restore should fail due to integrity check
-        result = backup_service.restore_specific_version(app_name, "1.2.1", storage_dir)
+        result = backup_service.restore_specific_version(
+            app_name, "1.2.1", storage_dir
+        )
         assert result is None

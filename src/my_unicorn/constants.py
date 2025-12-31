@@ -250,10 +250,7 @@ BACKUP_METADATA_TMP_SUFFIX: Final[str] = ".json.tmp"
 # Temporary file suffix used when creating temp backup copies
 BACKUP_TEMP_SUFFIX: Final[str] = ".tmp"
 
-# Old flat backup filename glob for migration
-OLD_FLAT_BACKUP_GLOB: Final[str] = "*.backup.AppImage"
-
-# New AppImage filename suffix used when migrating (case sensitive)
+# AppImage filename suffix (case sensitive)
 APPIMAGE_SUFFIX: Final[str] = ".AppImage"
 
 # =============================================================================
