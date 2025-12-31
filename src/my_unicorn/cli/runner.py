@@ -10,6 +10,7 @@ from argparse import Namespace
 
 from my_unicorn import __version__
 from my_unicorn.auth import auth_manager
+from my_unicorn.cli.parser import CLIParser
 from my_unicorn.commands.auth import AuthHandler
 from my_unicorn.commands.backup import BackupHandler
 from my_unicorn.commands.cache import CacheHandler
@@ -23,8 +24,6 @@ from my_unicorn.commands.upgrade import UpgradeHandler
 from my_unicorn.config import ConfigManager
 from my_unicorn.logger import get_logger, update_logger_from_config
 from my_unicorn.update import UpdateManager
-
-from .parser import CLIParser
 
 logger = get_logger(__name__)
 

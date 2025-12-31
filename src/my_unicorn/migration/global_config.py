@@ -16,12 +16,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from my_unicorn.config import DirectoryManager
-
-from my_unicorn.logger import get_logger
-
-logger = get_logger(__name__)
 # Import from centralized constants module
 from my_unicorn.constants import (
     CONFIG_BACKUP_EXTENSION,
@@ -40,6 +34,12 @@ from my_unicorn.constants import (
     SECTION_DIRECTORY,
     SECTION_NETWORK,
 )
+from my_unicorn.logger import get_logger
+
+if TYPE_CHECKING:
+    from my_unicorn.config import DirectoryManager
+
+logger = get_logger(__name__)
 
 
 class ConfigMigration:
@@ -70,7 +70,12 @@ class ConfigMigration:
         # Print critical errors to console as fallback
         if level in ("ERROR", "CRITICAL"):
             formatted_msg = message % args if args else message
-            print(f"{CONFIG_MIGRATION_PRINT_PREFIX} {level}: {formatted_msg}")
+            logger.info(
+                "%s %s: %s",
+                CONFIG_MIGRATION_PRINT_PREFIX,
+                level,
+                formatted_msg,
+            )
 
     def migrate_if_needed(
         self,

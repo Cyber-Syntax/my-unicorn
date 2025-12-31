@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any, cast
 
 from my_unicorn.commands.base import BaseCommandHandler
-from my_unicorn.logger import get_logger
+from my_unicorn.logger import get_logger, temporary_console_level
 
 logger = get_logger(__name__)
 
@@ -41,41 +41,45 @@ class CatalogHandler(BaseCommandHandler):
         """List available apps from catalog with descriptions."""
         apps = self.config_manager.list_catalog_apps()
         logger.info("Listing %d available apps from catalog", len(apps))
-        print(f"📋 Available AppImages ({len(apps)} apps):\n")
 
-        if not apps:
-            print("  None found")
-            return
+        with temporary_console_level("INFO"):
+            logger.info("📋 Available AppImages (%d apps):", len(apps))
+            logger.info("")
 
-        # Load catalog entries with descriptions
-        app_info = []
-        for app in sorted(apps):
-            try:
-                catalog_entry = self.config_manager.load_catalog_entry(app)
-                if catalog_entry is None:
+            if not apps:
+                logger.info("  None found")
+                return
+
+            # Load catalog entries with descriptions
+            app_info = []
+            for app in sorted(apps):
+                try:
+                    catalog_entry = self.config_manager.load_catalog_entry(app)
+                    if catalog_entry is None:
+                        app_info.append((app, "Error loading catalog entry"))
+                        continue
+                    # Cast to dict to access v2 fields
+                    entry_dict = cast("dict[str, Any]", catalog_entry)
+                    metadata = entry_dict.get("metadata", {})
+                    description = (
+                        metadata.get("description", "")
+                        or "No description available"
+                    )
+                    app_info.append((app, description))
+                except (ValueError, KeyError) as e:
+                    logger.warning(
+                        "Failed to load catalog entry for %s: %s", app, e
+                    )
                     app_info.append((app, "Error loading catalog entry"))
-                    continue
-                # Cast to dict to access v2 fields
-                entry_dict = cast("dict[str, Any]", catalog_entry)
-                metadata = entry_dict.get("metadata", {})
-                description = (
-                    metadata.get("description", "")
-                    or "No description available"
-                )
-                app_info.append((app, description))
-            except (ValueError, KeyError) as e:
-                logger.warning(
-                    "Failed to load catalog entry for %s: %s", app, e
-                )
-                app_info.append((app, "Error loading catalog entry"))
 
-        # Display apps with descriptions
-        for app, description in app_info:
-            print(f"  {app:<24} - {description}")
+            # Display apps with descriptions
+            for app, description in app_info:
+                logger.info("  %s - %s", f"{app:<24}", description)
 
-        print(
-            "\n💡 Use 'my-unicorn catalog --info <app-name>' for detailed information"
-        )
+            logger.info("")
+            logger.info(
+                "💡 Use 'my-unicorn catalog --info <app-name>' for detailed information"
+            )
 
     async def _show_app_info(self, app_name: str) -> None:
         """Show detailed information about a specific app.
@@ -87,10 +91,12 @@ class CatalogHandler(BaseCommandHandler):
         try:
             catalog_entry = self.config_manager.load_catalog_entry(app_name)
             if catalog_entry is None:
-                print(f"❌ App '{app_name}' not found in catalog")
+                with temporary_console_level("INFO"):
+                    logger.info("❌ App '%s' not found in catalog", app_name)
                 return
         except ValueError as e:
-            print(f"❌ App '{app_name}' not found in catalog")
+            with temporary_console_level("INFO"):
+                logger.info("❌ App '%s' not found in catalog", app_name)
             logger.error(
                 "Failed to load catalog entry for %s: %s", app_name, e
             )
@@ -153,74 +159,87 @@ class CatalogHandler(BaseCommandHandler):
             icon_display = "None"
 
         # Display information
-        print(f"📦 {display_name}")
-        print()
-        print(f"  {description}")
-        print()
-        print(f"  Repository:     {repo_display}")
-        if repo_url != "N/A":
-            print(f"  URL:            {repo_url}")
-        print(f"  Status:         {status}")
-        print(f"  Verification:   {verify_display}")
-        print(f"  Icon:           {icon_display}")
-        print()
+        with temporary_console_level("INFO"):
+            logger.info("📦 %s", display_name)
+            logger.info("")
+            logger.info("  %s", description)
+            logger.info("")
+            logger.info("  Repository:     %s", repo_display)
+            if repo_url != "N/A":
+                logger.info("  URL:            %s", repo_url)
+            logger.info("  Status:         %s", status)
+            logger.info("  Verification:   %s", verify_display)
+            logger.info("  Icon:           %s", icon_display)
+            logger.info("")
 
-        if is_installed:
-            print("  ✓ Already installed")
-            print(f"  📝 Update: my-unicorn update {app_name}")
-        else:
-            print(f"  📥 Install: my-unicorn install {app_name}")
+            if is_installed:
+                logger.info("  ✓ Already installed")
+                logger.info("  📝 Update: my-unicorn update %s", app_name)
+            else:
+                logger.info("  📥 Install: my-unicorn install %s", app_name)
 
     async def _list_installed_apps(self) -> None:
         """List installed apps with version and date information."""
         apps = self.config_manager.list_installed_apps()
         logger.info("Listing %d installed apps", len(apps))
-        print("📦 Installed AppImages:")
 
-        if not apps:
-            print("  None found")
-            return
+        with temporary_console_level("INFO"):
+            logger.info("📦 Installed AppImages:")
 
-        for app in sorted(apps):
-            try:
-                config = self.config_manager.load_app_config(app)
-            except ValueError as e:
-                if "migrate" not in str(e).lower():
-                    raise
-                logger.info(
-                    "Detected v1 config for app '%s', prompting migration", app
-                )
-                print(f"  {app:<20} (v1 config: run 'my-unicorn migrate')")
-                continue
-            if config:
-                if "state" in config:
-                    # v2 format
-                    version = config["state"]["version"]  # type: ignore[typeddict-item]
-                    installed_date = config["state"].get(  # type: ignore[typeddict-item]
-                        "installed_date", "Unknown"
+            if not apps:
+                logger.info("  None found")
+                return
+
+            for app in sorted(apps):
+                try:
+                    config = self.config_manager.load_app_config(app)
+                except ValueError as e:
+                    if "migrate" not in str(e).lower():
+                        raise
+                    logger.info(
+                        "Detected v1 config for app '%s', prompting migration",
+                        app,
+                    )
+                    logger.info(
+                        "  %s (v1 config: run 'my-unicorn migrate')",
+                        f"{app:<20}",
+                    )
+                    continue
+                if config:
+                    if "state" in config:
+                        # v2 format
+                        version = config["state"]["version"]  # type: ignore[typeddict-item]
+                        installed_date = config["state"].get(  # type: ignore[typeddict-item]
+                            "installed_date", "Unknown"
+                        )
+                    else:
+                        # v1 format detected, prompt migration
+                        logger.info(
+                            "  %s (v1 config: run 'my-unicorn migrate')",
+                            f"{app:<20}",
+                        )
+                        continue
+
+                    # Format installation date
+                    if installed_date != "Unknown":
+                        try:
+                            date_obj = datetime.fromisoformat(
+                                installed_date.replace("Z", "+00:00")
+                            )
+                            installed_date = date_obj.strftime("%Y-%m-%d")
+                        except ValueError:
+                            pass
+
+                    formatted_version = self._format_version_display(version)
+                    logger.info(
+                        "  %s %s (%s)",
+                        f"{app:<20}",
+                        f"{formatted_version:<16}",
+                        installed_date,
                     )
                 else:
-                    # v1 format detected, prompt migration
-                    print(f"  {app:<20} (v1 config: run 'my-unicorn migrate')")
-                    continue
-
-                # Format installation date
-                if installed_date != "Unknown":
-                    try:
-                        date_obj = datetime.fromisoformat(
-                            installed_date.replace("Z", "+00:00")
-                        )
-                        installed_date = date_obj.strftime("%Y-%m-%d")
-                    except ValueError:
-                        pass
-
-                formatted_version = self._format_version_display(version)
-                print(
-                    f"  {app:<20} {formatted_version:<16} ({installed_date})"
-                )
-            else:
-                logger.warning("Config not found for app '%s'", app)
-                print(f"  {app:<20} (config error)")
+                    logger.warning("Config not found for app '%s'", app)
+                    logger.info("  %s (config error)", f"{app:<20}")
 
     def _format_version_display(self, version: str) -> str:
         """Format version information for display."""

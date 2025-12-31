@@ -22,6 +22,8 @@ from .config import ConfigManager, GlobalConfig
 from .github_client import ReleaseFetcher
 from .logger import get_logger
 
+logger = get_logger(__name__)
+
 
 class SimpleProgress:
     """Simple progress indicator using rotating slash characters."""
@@ -45,7 +47,7 @@ class SimpleProgress:
         """
         task_id = f"task_{len(self.active_tasks)}"
         self.active_tasks[task_id] = description
-        print(f"⚡ {description}")
+        logger.info("⚡ %s", description)
         return task_id
 
     def update_task(
@@ -62,11 +64,7 @@ class SimpleProgress:
             if description:
                 self.active_tasks[task_id] = description
             indicator = self.indicators[self.current % len(self.indicators)]
-            print(
-                f"\r{indicator} {self.active_tasks[task_id]}",
-                end="",
-                flush=True,
-            )
+            logger.info("%s %s", indicator, self.active_tasks[task_id])
             self.current += 1
 
     def finish_task(
@@ -86,11 +84,9 @@ class SimpleProgress:
         if task_id in self.active_tasks:
             status = "✅" if success else "❌"
             desc = description or self.active_tasks[task_id]
-            print(f"\r{status} {desc}")
+            logger.info("\r%s %s", status, desc)
             del self.active_tasks[task_id]
 
-
-logger = get_logger(__name__)
 
 GITHUB_OWNER = "Cyber-Syntax"
 GITHUB_REPO = "my-unicorn"
@@ -263,12 +259,16 @@ class SelfUpdater:
         except aiohttp.ClientResponseError as e:
             if e.status == HTTP_FORBIDDEN:
                 logger.exception("GitHub API rate limit exceeded")
+                logger.info(
+                    "GitHub Rate limit exceeded. Please try again later."
+                )
             else:
                 logger.exception("GitHub API error")
+                logger.info("GitHub API error: %s - %s", e.status, e.message)
             return None
         except Exception as e:
             logger.exception("Unexpected error fetching release")
-            print(f"Error connecting to GitHub: {e}")
+            logger.info("Error connecting to GitHub: %s", e)
             return None
 
     async def check_for_update(self, refresh_cache: bool = False) -> bool:
@@ -293,13 +293,8 @@ class SelfUpdater:
             latest_version_tag = None
         if not latest_version_tag:
             logger.error("Malformed release data - no tag_name found")
-            print(
-                "".join(
-                    [
-                        "Malformed release data! Reinstall manually or ",
-                        "open an issue on GitHub for help!",
-                    ]
-                )
+            logger.info(
+                "Malformed release data! Reinstall manually or open an issue on GitHub for help!"
             )
             return False
 
@@ -341,7 +336,7 @@ class SelfUpdater:
 
         except (PackageNotFoundError, Exception) as e:
             logger.error("Error checking version: %s", e)
-            print(f"Error: {e}")
+            logger.info("Error: %s", e)
             return False
 
     async def perform_update(self) -> bool:
@@ -364,10 +359,9 @@ class SelfUpdater:
         # Check UV availability first
         if not self._uv_available:
             logger.error("UV is required for upgrading my-unicorn")
-            print("❌ UV is required for upgrading my-unicorn")
-            print(
-                "Install UV first: "
-                "curl -LsSf https://astral.sh/uv/install.sh | sh"
+            logger.info("❌ UV is required for upgrading my-unicorn")
+            logger.info(
+                "Install UV first: curl -LsSf https://astral.sh/uv/install.sh | sh"
             )
             return False
 
@@ -384,7 +378,7 @@ class SelfUpdater:
                 )
 
             logger.info("Executing: uv tool upgrade my-unicorn")
-            print("⚡ Upgrading my-unicorn...")
+            logger.info("⚡ Upgrading my-unicorn...")
 
             # Use os.execvp to replace current process with uv upgrade
             # This ensures the upgrade completes properly and is the
@@ -397,12 +391,12 @@ class SelfUpdater:
             # Note: Code after execvp won't execute if successful
             # If we reach here, execvp failed
             logger.error("Failed to execute uv upgrade")
-            print("❌ Failed to execute upgrade command")
+            logger.info("❌ Failed to execute upgrade command")
             return False
 
         except Exception as e:
             logger.exception("Update failed: %s", e)
-            print(f"❌ Update failed: {e}")
+            logger.info("❌ Update failed: %s", e)
             return False
 
 
@@ -489,7 +483,7 @@ def display_current_version() -> None:
         version_str = get_version("my-unicorn")
         # Handle None return in Python 3.13+ for uninstalled packages
         if version_str is None:
-            print("Version information not available")
+            logger.info("Version information not available")
             return
         # Handle version with git info
         if "+" in version_str:
@@ -497,12 +491,12 @@ def display_current_version() -> None:
             formatted_version = f"{numbered_version} (git: {git_version})"
         else:
             formatted_version = version_str
-        print(f"my-unicorn version: {formatted_version}")
+        logger.info("my-unicorn version: %s", formatted_version)
     except PackageNotFoundError:
-        print("my-unicorn version: Package not found")
+        logger.info("my-unicorn version: Package not found")
     except Exception as e:
         logger.exception("Failed to display version: %s", e)
-        print(f"Error: {e}")
+        logger.info("Error: %s", e)
 
 
 # Legacy compatibility functions for CLI usage

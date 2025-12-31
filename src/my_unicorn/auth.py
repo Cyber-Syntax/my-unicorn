@@ -67,9 +67,8 @@ def setup_keyring() -> None:
             raise KeyringUnavailableError(
                 "Keyring unavailable in headless environment"
             ) from e
-        else:
-            logger.warning("Keyring setup failed: %s", e)
-            raise KeyringAccessError("Keyring setup failed") from e
+        logger.warning("Keyring setup failed: %s", e)
+        raise KeyringAccessError("Keyring setup failed") from e
 
 
 # Initialize the keyring backend (suppress exceptions at module load)
@@ -189,7 +188,7 @@ class GitHubAuthManager:
                 logger.error("Invalid GitHub token format provided.")
                 raise ValueError(
                     "Invalid GitHub token format. "
-                    + "Must be a valid GitHub token."
+                    "Must be a valid GitHub token."
                 )
 
             keyring.set_password(
@@ -203,17 +202,19 @@ class GitHubAuthManager:
             # Provide helpful message for keyring errors
             error_msg = str(e)
             if "DBUS" in error_msg or "DBus" in error_msg:
-                logger.error(
+                logger.exception(
                     "Keyring unavailable (headless environment): %s", e
                 )
-                print("\n❌ Keyring not available in headless environment")
-                print("💡 Future: Environment variable support coming soon")
-                print(
+                logger.info("❌ Keyring not available in headless environment")
+                logger.info(
+                    "💡 Future: Environment variable support coming soon"
+                )
+                logger.info(
                     "   (MY_UNICORN_GITHUB_TOKEN will be supported in a "
                     "future release)"
                 )
             else:
-                logger.error("Failed to save GitHub token to keyring: %s", e)
+                logger.exception("Failed to save GitHub token to keyring")
             raise
 
     @staticmethod
@@ -248,9 +249,8 @@ class GitHubAuthManager:
                     "GitHub token retrieved from keyring (value hidden)"
                 )
                 return token
-            else:
-                logger.debug("No token stored in keyring")
-                return None
+            logger.debug("No token stored in keyring")
+            return None
         except Exception as e:
             # Keyring unavailable is expected in headless environments
             if "DBUS" in str(e) or "DBus" in str(e):
@@ -289,14 +289,6 @@ class GitHubAuthManager:
                 "No GitHub token configured. API rate limits apply "
                 "(60 requests/hour). Use 'my-unicorn auth --save-token' "
                 "to increase the limit to 5000 requests/hour."
-            )
-            print(
-                "INFO: No GitHub token configured. API rate limits apply "
-                "(60 requests/hour)."
-            )
-            print(
-                "💡 Use 'my-unicorn auth --save-token' to increase the"
-                " limit to 5000 requests/hour."
             )
 
         return headers

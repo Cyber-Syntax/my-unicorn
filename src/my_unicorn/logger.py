@@ -327,6 +327,41 @@ class ColoredConsoleFormatter(logging.Formatter):
         return super().format(record)
 
 
+class SimpleConsoleFormatter(logging.Formatter):
+    """Minimal console formatter that only shows the message content.
+
+    This formatter is designed for temporary user-facing output where
+    timestamp, module name, and log level information would be redundant.
+    It outputs only the message content, making it ideal for commands
+    that use logger.info() as a replacement for print().
+
+    Usage:
+        Typically used automatically by temporary_console_level() when
+        simple_format=True (the default). Not normally instantiated directly.
+
+    Example Output:
+        Standard formatter: "21:30:08 - my_unicorn.update - INFO - Message"
+        Simple formatter:   "Message"
+
+    Thread Safety:
+        Safe for multi-threaded use as each format() call works on
+        a separate log record instance.
+
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record showing only the message.
+
+        Args:
+            record: The log record to format
+
+        Returns:
+            The message content only, without metadata
+
+        """
+        return record.getMessage()
+
+
 def setup_logging(
     name: str = "my_unicorn",
     console_level: str | None = None,
@@ -446,18 +481,23 @@ def setup_logging(
 
 @contextmanager
 def temporary_console_level(
-    level: str = "INFO", logger_name: str = "my_unicorn"
+    level: str = "INFO",
+    logger_name: str = "my_unicorn",
+    simple_format: bool = True,  # noqa: FBT001, FBT002
 ) -> Generator[None, None, None]:
     """Temporarily set console handler log level for user-facing output.
 
     This context manager is designed for commands that need to display
     information to users even when console_log_level is set to WARNING.
-    It temporarily adjusts console handler levels, then restores them.
+    It temporarily adjusts console handler levels and optionally switches
+    to a simplified format, then restores them.
 
     Args:
         level: Log level to set
             ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
-        logger_name: Logger to modify (default: "my_unicorn")
+        logger_name: Logger namespace to modify (default: "my_unicorn")
+        simple_format: Use SimpleConsoleFormatter to show only messages,
+            without timestamp/module/level prefix (default: True)
 
     Example:
         >>> from my_unicorn.logger import (
@@ -466,10 +506,13 @@ def temporary_console_level(
         ... )
         >>> logger = get_logger(__name__)
         >>>
+        >>> # Simple format (default) - only shows message
         >>> with temporary_console_level("INFO"):
-        ...     logger.info(
-        ...         "Visible even if console_log_level=WARNING"
-        ...     )
+        ...     logger.info("Clean output without metadata")
+        >>>
+        >>> # Full format - shows timestamp, module, level
+        >>> with temporary_console_level("INFO", simple_format=False):
+        ...     logger.info("Output with full metadata")
 
     Thread Safety:
         Not thread-safe. Avoid using in concurrent contexts.
@@ -488,25 +531,49 @@ def temporary_console_level(
 
     console_handlers = []
     original_levels = []
+    original_formatters = []
 
-    # Find all console handlers and save original levels
-    root_logger = logging.getLogger(logger_name)
-    for handler in root_logger.handlers:
-        if isinstance(handler, logging.StreamHandler) and not isinstance(
-            handler, RotatingFileHandler
-        ):
-            console_handlers.append(handler)
-            original_levels.append(handler.level)
-            handler.setLevel(getattr(logging, level))
+    # Create simple formatter if needed
+    simple_formatter = SimpleConsoleFormatter() if simple_format else None
+
+    # Find all console handlers in the logger namespace
+    # This includes both root and child loggers
+    for name, logger_instance in logging.Logger.manager.loggerDict.items():
+        # Only check loggers in our namespace
+        if not isinstance(logger_instance, logging.Logger):
+            continue
+        if not (name == logger_name or name.startswith(f"{logger_name}.")):
+            continue
+
+        # Find console handlers on this logger
+        for handler in logger_instance.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(
+                handler, RotatingFileHandler
+            ):
+                console_handlers.append(handler)
+                original_levels.append(handler.level)
+                original_formatters.append(handler.formatter)
+
+                # Set new level
+                handler.setLevel(getattr(logging, level))
+
+                # Set simple formatter if requested
+                if simple_formatter is not None:
+                    handler.setFormatter(simple_formatter)
 
     try:
         yield
     finally:
-        # Restore original levels
-        for handler, orig_level in zip(
-            console_handlers, original_levels, strict=False
+        # Restore original levels and formatters
+        for handler, orig_level, orig_formatter in zip(
+            console_handlers,
+            original_levels,
+            original_formatters,
+            strict=False,
         ):
             handler.setLevel(orig_level)
+            if orig_formatter is not None:
+                handler.setFormatter(orig_formatter)
 
 
 def get_logger(

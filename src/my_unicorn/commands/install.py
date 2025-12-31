@@ -15,7 +15,7 @@ from my_unicorn.exceptions import ValidationError
 from my_unicorn.file_ops import FileOperations
 from my_unicorn.github_client import GitHubClient
 from my_unicorn.install import InstallHandler
-from my_unicorn.logger import get_logger
+from my_unicorn.logger import get_logger, temporary_console_level
 from my_unicorn.progress import (
     ProgressDisplay,
     get_progress_service,
@@ -150,12 +150,13 @@ class InstallCommand:
 
         # Print info about already installed apps if there are some
         if already_installed:
-            print(
-                f"INFO: Skipping {len(already_installed)} "
-                "already installed app(s):"
-            )
-            for app_name in already_installed:
-                print(f"   • {app_name}")
+            with temporary_console_level("INFO"):
+                logger.info(
+                    "INFO: Skipping %s already installed app(s):",
+                    len(already_installed),
+                )
+                for app_name in already_installed:
+                    logger.info("   • %s", app_name)
 
         # Calculate operations only for apps that need work
         apps_needing_work = len(urls_needing_work) + len(catalog_needing_work)

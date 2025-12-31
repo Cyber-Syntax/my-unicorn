@@ -6,8 +6,9 @@ which checks for and performs upgrades of the my-unicorn tool.
 
 from argparse import Namespace
 
-from ..logger import get_logger
-from ..upgrade import check_for_self_update, perform_self_update
+from my_unicorn.logger import get_logger, temporary_console_level
+from my_unicorn.upgrade import check_for_self_update, perform_self_update
+
 from .base import BaseCommandHandler
 
 logger = get_logger(__name__)
@@ -37,19 +38,25 @@ class UpgradeHandler(BaseCommandHandler):
             refresh_cache: Whether to bypass cache and fetch fresh data
 
         """
-        print("🔍 Checking for my-unicorn upgrade...")
+        with temporary_console_level("INFO"):
+            logger.info("🔍 Checking for my-unicorn upgrade...")
 
-        try:
-            has_update = await check_for_self_update(refresh_cache)
+            try:
+                has_update = await check_for_self_update(refresh_cache)
 
-            if has_update:
-                print("\nRun 'my-unicorn upgrade' to install the upgrade.")
-            else:
-                print("✅ my-unicorn is up to date")
+                if has_update:
+                    logger.info("")
+                    logger.info(
+                        "Run 'my-unicorn upgrade' to install the upgrade."
+                    )
+                else:
+                    logger.info("✅ my-unicorn is up to date")
 
-        except Exception as e:
-            logger.error("Failed to check for upgrades: %s", e, exc_info=True)
-            print(f"❌ Failed to check for updates: {e}")
+            except Exception as e:
+                logger.error(
+                    "Failed to check for upgrades: %s", e, exc_info=True
+                )
+                logger.info("❌ Failed to check for updates: %s", e)
 
     async def _perform_upgrade(self, refresh_cache: bool = False) -> None:
         """Perform upgrade if available.
@@ -58,28 +65,30 @@ class UpgradeHandler(BaseCommandHandler):
             refresh_cache: Whether to bypass cache and fetch fresh data
 
         """
-        print("🔍 Checking for my-unicorn upgrade...")
+        with temporary_console_level("INFO"):
+            logger.info("🔍 Checking for my-unicorn upgrade...")
 
-        try:
-            has_update = await check_for_self_update(refresh_cache)
+            try:
+                has_update = await check_for_self_update(refresh_cache)
 
-            if not has_update:
-                print("✅ my-unicorn is already up to date")
-                return
+                if not has_update:
+                    logger.info("✅ my-unicorn is already up to date")
+                    return
 
-            print("\n🚀 Starting upgrade...")
-            success = await perform_self_update(refresh_cache)
+                logger.info("")
+                logger.info("🚀 Starting upgrade...")
+                success = await perform_self_update(refresh_cache)
 
-            if success:
-                print("✅ Upgrade completed successfully!")
-                print(
-                    "Please restart your terminal refresh the command cache."
-                )
-            else:
-                print(
-                    "❌ Upgrade failed. Please try again or update manually."
-                )
+                if success:
+                    logger.info("✅ Upgrade completed successfully!")
+                    logger.info(
+                        "Please restart your terminal refresh the command cache."
+                    )
+                else:
+                    logger.info(
+                        "❌ Upgrade failed. Please try again or update manually."
+                    )
 
-        except Exception as e:
-            logger.error("Upgrade failed: %s", e, exc_info=True)
-            print(f"❌ Upgrade failed: {e}")
+            except Exception as e:
+                logger.error("Upgrade failed: %s", e, exc_info=True)
+                logger.info("❌ Upgrade failed: %s", e)

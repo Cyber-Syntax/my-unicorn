@@ -382,9 +382,6 @@ class GlobalConfigManager:
             # Perform migration if needed (no circular import)
             if not self.migration.migrate_if_needed(user_config, defaults):
                 # Migration failed, fall back to defaults
-                print(
-                    "Configuration migration failed, using default settings."
-                )
                 self.save_global_config(
                     self._convert_to_global_config(defaults)
                 )

@@ -6,7 +6,8 @@ displaying current configuration and resetting to default values.
 
 from argparse import Namespace
 
-from ..logger import get_logger
+from my_unicorn.logger import get_logger, temporary_console_level
+
 from .base import BaseCommandHandler
 
 logger = get_logger(__name__)
@@ -17,23 +18,33 @@ class ConfigHandler(BaseCommandHandler):
 
     async def execute(self, args: Namespace) -> None:
         """Execute the config command."""
-        if args.show:
-            await self._show_config()
-        elif args.reset:
-            await self._reset_config()
+        with temporary_console_level("INFO"):
+            if args.show:
+                await self._show_config()
+            elif args.reset:
+                await self._reset_config()
 
     async def _show_config(self) -> None:
         """Display current configuration."""
-        print("📋 Current Configuration:")
-        print(f"  Config Version: {self.global_config['config_version']}")
-        print(
-            f"  Max Downloads: {self.global_config['max_concurrent_downloads']}"
+        logger.info("📋 Current Configuration:")
+        logger.info(
+            "  Config Version: %s", self.global_config["config_version"]
         )
-        print(f"  Log Level: {self.global_config['log_level']}")
-        print(f"  Storage Dir: {self.global_config['directory']['storage']}")
-        print(f"  Download Dir: {self.global_config['directory']['download']}")
-        print(f"  Icon Dir: {self.global_config['directory']['icon']}")
-        print(f"  Backup Dir: {self.global_config['directory']['backup']}")
+        logger.info(
+            "  Max Downloads: %s",
+            self.global_config["max_concurrent_downloads"],
+        )
+        logger.info("  Log Level: %s", self.global_config["log_level"])
+        logger.info(
+            "  Storage Dir: %s", self.global_config["directory"]["storage"]
+        )
+        logger.info(
+            "  Download Dir: %s", self.global_config["directory"]["download"]
+        )
+        logger.info("  Icon Dir: %s", self.global_config["directory"]["icon"])
+        logger.info(
+            "  Backup Dir: %s", self.global_config["directory"]["backup"]
+        )
 
     async def _reset_config(self) -> None:
         """Reset configuration to default values."""
@@ -43,4 +54,4 @@ class ConfigHandler(BaseCommandHandler):
 
         # Load fresh config (which will create defaults)
         self.config_manager.load_global_config()
-        print("✅ Configuration reset to defaults")
+        logger.info("✅ Configuration reset to defaults")

@@ -5,7 +5,7 @@ Simplified to use direct display functions instead of UpdateResult objects.
 
 from argparse import Namespace
 
-from my_unicorn.logger import get_logger
+from my_unicorn.logger import get_logger, temporary_console_level
 from my_unicorn.progress import get_progress_service, progress_session
 from my_unicorn.utils import display_update_error, display_update_summary
 
@@ -56,28 +56,29 @@ class UpdateHandler(BaseCommandHandler):
             refresh_cache: Whether to bypass cache.
 
         """
-        # Get target apps
-        target_apps = self._get_target_apps(app_names)
-        if not target_apps:
-            print("No apps to check.")
-            return
+        with temporary_console_level("INFO"):
+            # Get target apps
+            target_apps = self._get_target_apps(app_names)
+            if not target_apps:
+                logger.info("No apps to check.")
+                return
 
-        # Check for updates with progress message
-        update_infos = await self.update_manager.check_updates(
-            app_names=target_apps,
-            refresh_cache=refresh_cache,
-        )
+            # Check for updates with progress message
+            update_infos = await self.update_manager.check_updates(
+                app_names=target_apps,
+                refresh_cache=refresh_cache,
+            )
 
-        if not update_infos:
-            print("Failed to check for updates.")
-            return
+            if not update_infos:
+                logger.info("Failed to check for updates.")
+                return
 
-        # Display check results
-        self._display_check_results(update_infos)
+            # Display check results
+            self._display_check_results(update_infos)
 
-        logger.debug(
-            "Check operation completed for %s app(s)", len(update_infos)
-        )
+            logger.debug(
+                "Check operation completed for %s app(s)", len(update_infos)
+            )
 
     async def _perform_updates(
         self, app_names: list[str] | None, refresh_cache: bool
@@ -89,36 +90,42 @@ class UpdateHandler(BaseCommandHandler):
             refresh_cache: Whether to bypass cache.
 
         """
-        # Get target apps
-        target_apps = self._get_target_apps(app_names)
-        if not target_apps:
-            print("No apps to update.")
-            return
+        with temporary_console_level("INFO"):
+            # Get target apps
+            target_apps = self._get_target_apps(app_names)
+            if not target_apps:
+                logger.info("No apps to update.")
+                return
 
-        # Check for updates first (without progress bar)
-        update_infos = await self.update_manager.check_updates(
-            app_names=target_apps,
-            refresh_cache=refresh_cache,
-        )
+            # Check for updates first (without progress bar)
+            update_infos = await self.update_manager.check_updates(
+                app_names=target_apps,
+                refresh_cache=refresh_cache,
+            )
 
-        if not update_infos:
-            print("Failed to check for updates.")
-            return
+            if not update_infos:
+                logger.info("Failed to check for updates.")
+                return
 
-        # Filter to apps needing updates
-        apps_to_update = [
-            info.app_name for info in update_infos if info.has_update
-        ]
+            # Filter to apps needing updates
+            apps_to_update = [
+                info.app_name for info in update_infos if info.has_update
+            ]
 
-        # If no updates needed, return early without progress bar
-        if not apps_to_update:
-            print(f"\n✅ All {len(update_infos)} app(s) are up to date")
-            logger.debug("No updates needed for %s app(s)", len(update_infos))
-            return
+            # If no updates needed, return early without progress bar
+            if not apps_to_update:
+                logger.info("")  # Empty line
+                logger.info(
+                    "✅ All %s app(s) are up to date", len(update_infos)
+                )
+                logger.debug(
+                    "No updates needed for %s app(s)", len(update_infos)
+                )
+                return
 
-        # Display update plan BEFORE starting progress session
-        # to avoid print() interference with progress display
-        self._display_update_plan(update_infos)
+            # Display update plan BEFORE starting progress session
+            # to avoid print() interference with progress display
+            self._display_update_plan(update_infos)
 
         # Only start progress session if there are apps to update
         async with progress_session():
@@ -231,9 +238,9 @@ class UpdateHandler(BaseCommandHandler):
 
         # Print invalid apps
         if invalid_apps:
-            print(f"⚠️  Apps not found: {', '.join(invalid_apps)}")
+            logger.info("⚠️  Apps not found: %s", ", ".join(invalid_apps))
             if installed_apps:
-                print(f"   Installed apps: {', '.join(installed_apps)}")
+                logger.info("   Installed apps: %s", ", ".join(installed_apps))
 
         return valid_apps
 
@@ -262,13 +269,19 @@ class UpdateHandler(BaseCommandHandler):
             if len(version_info) > MAX_VERSION_DISPLAY_LENGTH:
                 version_info = version_info[:37] + "..."
 
-            print(f"{info.app_name:<20} {status:<20} {version_info}")
+            logger.info(
+                "%s %s %s",
+                f"{info.app_name:<20}",
+                f"{status:<20}",
+                version_info,
+            )
 
             if info.has_update:
                 has_updates = True
 
         if has_updates:
-            print("\nRun 'my-unicorn update' to install updates.")
+            logger.info("")
+            logger.info("Run 'my-unicorn update' to install updates.")
 
     def _display_update_plan(self, update_infos: list) -> None:
         """Display which apps will be updated.
@@ -280,11 +293,11 @@ class UpdateHandler(BaseCommandHandler):
         apps_with_updates = [info for info in update_infos if info.has_update]
 
         if apps_with_updates:
-            print(f"📦 Updating {len(apps_with_updates)} app(s):")
+            logger.info("📦 Updating %s app(s):", len(apps_with_updates))
             for info in apps_with_updates:
                 version_str = f"{info.current_version} → {info.latest_version}"
-                print(f"   • {info.app_name}: {version_str}")
-            print()  # Empty line
+                logger.info("   • %s: %s", info.app_name, version_str)
+            logger.info("")  # Empty line
 
     def _parse_app_names(self, args: Namespace) -> list[str]:
         """Parse app names from command arguments.

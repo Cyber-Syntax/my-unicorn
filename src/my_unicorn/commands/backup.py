@@ -8,7 +8,7 @@ from argparse import Namespace
 from pathlib import Path
 
 from my_unicorn.backup import BackupService
-from my_unicorn.logger import get_logger
+from my_unicorn.logger import get_logger, temporary_console_level
 
 from .base import BaseCommandHandler
 
@@ -267,32 +267,36 @@ class BackupHandler(BaseCommandHandler):
         try:
             backups = self.backup_service.get_backup_info(app_name)
 
-            if not backups:
-                print(f"No backups found for {app_name}")
-                return
+            with temporary_console_level("INFO"):
+                if not backups:
+                    logger.info("No backups found for %s", app_name)
+                    return
 
-            print(f"\nAvailable backups for {app_name}:")
-            print("=" * 60)
+                logger.info("")
+                logger.info("Available backups for %s:", app_name)
+                logger.info("=" * 60)
 
-            for backup in backups:
-                version = backup["version"]
-                size_mb = (
-                    backup["size"] / (1024 * 1024) if backup["size"] else 0
-                )
-                created = (
-                    backup["created"].strftime("%Y-%m-%d %H:%M:%S")
-                    if backup["created"]
-                    else "Unknown"
-                )
-                exists_symbol = "✅" if backup["exists"] else "❌"
+                for backup in backups:
+                    version = backup["version"]
+                    size_mb = (
+                        backup["size"] / (1024 * 1024) if backup["size"] else 0
+                    )
+                    created = (
+                        backup["created"].strftime("%Y-%m-%d %H:%M:%S")
+                        if backup["created"]
+                        else "Unknown"
+                    )
+                    exists_symbol = "✅" if backup["exists"] else "❌"
 
-                print(f"  {exists_symbol} v{version}")
-                print(f"     File: {backup['filename']}")
-                print(f"     Size: {size_mb:.1f} MB")
-                print(f"     Created: {created}")
-                if backup.get("sha256"):
-                    print(f"     SHA256: {backup['sha256'][:16]}...")
-                print()
+                    logger.info("  %s v%s", exists_symbol, version)
+                    logger.info("     File: %s", backup["filename"])
+                    logger.info("     Size: %.1f MB", size_mb)
+                    logger.info("     Created: %s", created)
+                    if backup.get("sha256"):
+                        logger.info(
+                            "     SHA256: %s...", backup["sha256"][:16]
+                        )
+                    logger.info("")
 
         except Exception as e:
             logger.error("❌ Failed to list backups for %s: %s", app_name, e)
@@ -304,24 +308,26 @@ class BackupHandler(BaseCommandHandler):
             app_name: Specific app to clean up, or None for all apps
 
         """
-        if app_name:
-            print(f"🔄 Cleaning up old backups for {app_name}...")
-        else:
-            print(" Cleaning up old backups for all apps...")
-
-        try:
-            self.backup_service.cleanup_old_backups(app_name)
-
-            max_backups = self.global_config["max_backup"]
-            if max_backups == 0:
-                print("✅ All backups removed (max_backup=0)")
+        with temporary_console_level("INFO"):
+            if app_name:
+                logger.info("🔄 Cleaning up old backups for %s...", app_name)
             else:
-                print(
-                    f"✅ Cleanup completed (keeping {max_backups} most recent backups)"
-                )
+                logger.info(" Cleaning up old backups for all apps...")
 
-        except Exception as e:
-            logger.error("❌ Failed to cleanup backups: %s", e)
+            try:
+                self.backup_service.cleanup_old_backups(app_name)
+
+                max_backups = self.global_config["max_backup"]
+                if max_backups == 0:
+                    logger.info("✅ All backups removed (max_backup=0)")
+                else:
+                    logger.info(
+                        "✅ Cleanup completed (keeping %s most recent backups)",
+                        max_backups,
+                    )
+
+            except Exception as e:
+                logger.error("❌ Failed to cleanup backups: %s", e)
 
     async def _handle_info(self, app_name: str) -> None:
         """Handle show backup info operation.
@@ -330,56 +336,65 @@ class BackupHandler(BaseCommandHandler):
             app_name: Name of the application
 
         """
-
         try:
             backups = self.backup_service.get_backup_info(app_name)
 
-            if not backups:
-                print(f"No backup information available for {app_name}")
-                return
+            with temporary_console_level("INFO"):
+                if not backups:
+                    logger.info(
+                        "No backup information available for %s", app_name
+                    )
+                    return
 
-            print(f"\n Backup Statistics for {app_name}:")
-            print("=" * 60)
+                logger.info("")
+                logger.info(" Backup Statistics for %s:", app_name)
+                logger.info("=" * 60)
 
-            total_backups = len(backups)
-            total_size = sum(b["size"] for b in backups if b["size"])
-            total_size_mb = total_size / (1024 * 1024)
+                total_backups = len(backups)
+                total_size = sum(b["size"] for b in backups if b["size"])
+                total_size_mb = total_size / (1024 * 1024)
 
-            oldest_backup = backups[-1] if backups else None
-            newest_backup = backups[0] if backups else None
+                oldest_backup = backups[-1] if backups else None
+                newest_backup = backups[0] if backups else None
 
-            print(f"  📦 Total backups: {total_backups}")
-            print(f"  📏 Total size: {total_size_mb:.1f} MB")
+                logger.info("  📦 Total backups: %s", total_backups)
+                logger.info("  📏 Total size: %.1f MB", total_size_mb)
 
-            if newest_backup:
-                latest_created = (
-                    newest_backup["created"].strftime("%Y-%m-%d %H:%M:%S")
-                    if newest_backup["created"]
-                    else "Unknown"
+                if newest_backup:
+                    latest_created = (
+                        newest_backup["created"].strftime("%Y-%m-%d %H:%M:%S")
+                        if newest_backup["created"]
+                        else "Unknown"
+                    )
+                    logger.info(
+                        "  🆕 Latest version: v%s (%s)",
+                        newest_backup["version"],
+                        latest_created,
+                    )
+
+                if total_backups > 1 and oldest_backup:
+                    oldest_created = (
+                        oldest_backup["created"].strftime("%Y-%m-%d %H:%M:%S")
+                        if oldest_backup["created"]
+                        else "Unknown"
+                    )
+                    logger.info(
+                        "  📜 Oldest version: v%s (%s)",
+                        oldest_backup["version"],
+                        oldest_created,
+                    )
+
+                # Backup configuration
+                max_backups = self.global_config["max_backup"]
+                backup_dir = self.global_config["directory"]["backup"]
+
+                logger.info("")
+                logger.info("⚙️  Configuration:")
+                logger.info("  📁 Backup directory: %s", backup_dir)
+                logger.info(
+                    "  🔄 Max backups kept: %s",
+                    max_backups if max_backups > 0 else "unlimited",
                 )
-                print(
-                    f"  🆕 Latest version: v{newest_backup['version']} ({latest_created})"
-                )
-
-            if total_backups > 1 and oldest_backup:
-                oldest_created = (
-                    oldest_backup["created"].strftime("%Y-%m-%d %H:%M:%S")
-                    if oldest_backup["created"]
-                    else "Unknown"
-                )
-                print(
-                    f"  📜 Oldest version: v{oldest_backup['version']} ({oldest_created})"
-                )
-
-            # Backup configuration
-            max_backups = self.global_config["max_backup"]
-            backup_dir = self.global_config["directory"]["backup"]
-
-            print("\n⚙️  Configuration:")
-            print(f"  📁 Backup directory: {backup_dir}")
-            print(
-                f"  🔄 Max backups kept: {max_backups if max_backups > 0 else 'unlimited'}"
-            )
 
         except Exception:
             logger.exception("❌ Failed to get backup info for %s", app_name)

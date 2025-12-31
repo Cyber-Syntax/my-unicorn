@@ -146,7 +146,7 @@ class RemoveService:
                 )
 
         if removed:
-            logger.info("Removed AppImage(s): %s", removed)
+            logger.debug("Removed AppImage(s): %s", removed)
         else:
             logger.debug(
                 "No AppImage files found: %s, %s",
@@ -167,7 +167,7 @@ class RemoveService:
             if owner and repo:
                 cache_manager = cache_module.get_cache_manager()
                 await cache_manager.clear_cache(owner, repo)
-                logger.info("Removed cache for %s/%s", owner, repo)
+                logger.debug("Removed cache for %s/%s", owner, repo)
                 return True
             logger.debug("Owner/repo missing; skip cache removal")
             return False
@@ -194,7 +194,7 @@ class RemoveService:
             backup_path = str(backup_dir)
             if backup_dir.exists():
                 shutil.rmtree(backup_dir)
-                logger.info("Removed backups for %s", app_name)
+                logger.debug("Removed backups for %s", app_name)
                 return True, backup_path
 
             return False, backup_path
@@ -217,7 +217,7 @@ class RemoveService:
                 self.config_manager,
             )
             if removed:
-                logger.info("Removed desktop entry for %s", app_name)
+                logger.debug("Removed desktop entry for %s", app_name)
             return bool(removed)
         except Exception as desk_exc:  # pragma: no cover - logging
             logger.warning(
@@ -248,7 +248,7 @@ class RemoveService:
 
             if icon_path and icon_path.exists():
                 icon_path.unlink()
-                logger.info("Removed icon: %s", icon_path)
+                logger.debug("Removed icon: %s", icon_path)
                 return True, icon_path_str
             return False, icon_path_str
         except Exception as icon_exc:  # pragma: no cover - logging
@@ -263,7 +263,7 @@ class RemoveService:
         try:
             removed = self.config_manager.remove_app_config(app_name)
             if removed:
-                logger.info("Removed config for %s", app_name)
+                logger.debug("Removed config for %s", app_name)
             return bool(removed)
         except Exception as cfg_exc:  # pragma: no cover - logging
             logger.warning(
