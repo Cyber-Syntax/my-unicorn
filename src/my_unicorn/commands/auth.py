@@ -6,7 +6,7 @@ removal, and status checking with rate limit information.
 
 import sys
 from argparse import Namespace
-from datetime import datetime
+from datetime import UTC, datetime
 
 import aiohttp
 
@@ -44,8 +44,8 @@ class AuthHandler(BaseCommandHandler):
         try:
             GitHubAuthManager.save_token()
             logger.info("GitHub token saved successfully.")
-        except ValueError as e:
-            logger.exception("Failed to save token: %s", e)
+        except ValueError:
+            logger.exception("Failed to save token")
             sys.exit(1)
 
     async def _remove_token(self) -> None:
@@ -53,8 +53,8 @@ class AuthHandler(BaseCommandHandler):
         try:
             GitHubAuthManager.remove_token()
             logger.info("GitHub token removed from keyring.")
-        except Exception as e:
-            logger.error(f"Error removing token: {e}")
+        except (ValueError, OSError):
+            logger.exception("Error removing token")
 
     async def _show_status(self) -> None:
         """Show authentication status and rate limit information.
@@ -77,7 +77,8 @@ class AuthHandler(BaseCommandHandler):
                     "Use 'my-unicorn auth --save-token' to set a token"
                 )
                 logger.debug(
-                    "No token configured. Fetching public GitHub rate limit info."
+                    "No token configured. "
+                    "Fetching public GitHub rate limit info."
                 )
 
             # Get fresh rate limit information (works with or without token)
@@ -87,10 +88,21 @@ class AuthHandler(BaseCommandHandler):
             await self._display_rate_limit_info(rate_limit_data)
 
     async def _fetch_fresh_rate_limit(self) -> dict[str, object] | None:
-        """Fetch fresh rate limit information from GitHub API."""
+        """Fetch fresh rate limit information from GitHub API.
+
+        Security features:
+        - Request timeout (30 seconds) to prevent hanging
+        - Proper exception handling to avoid information disclosure
+
+        Returns:
+            dict | None: Rate limit data from API or None on error.
+
+        """
         try:
-            async with aiohttp.ClientSession() as session:
-                headers = GitHubAuthManager.apply_auth({})
+            # Security: Add timeout to prevent indefinite hanging
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                headers = self.auth_manager.apply_auth({})
                 # Make a lightweight API call to get rate limit info
                 async with session.get(
                     "https://api.github.com/rate_limit", headers=headers
@@ -102,10 +114,12 @@ class AuthHandler(BaseCommandHandler):
                     logger.debug(
                         "Fetched fresh rate limit info from GitHub API."
                     )
-                    return await response.json()
-        except Exception as e:
-            logger.warning("Failed to fetch fresh rate limit info: %s", e)
-            logger.info("   ⚠️  Failed to fetch fresh rate limit info: %s", e)
+                    result: dict[str, object] = await response.json()
+                    return result
+        except (aiohttp.ClientError, OSError):
+            # Security: Sanitize error messages to avoid information disclosure
+            logger.warning("Failed to fetch fresh rate limit info")
+            logger.info("   ⚠️  Failed to connect to GitHub API")
             return None
 
     def _extract_core_rate_limit_info(
@@ -143,8 +157,8 @@ class AuthHandler(BaseCommandHandler):
             logger.info("   🔢 Remaining requests: %s", remaining)
 
             if reset_time:
-                reset_datetime = datetime.fromtimestamp(reset_time)
-                reset_str = reset_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                reset_datetime = datetime.fromtimestamp(reset_time, tz=UTC)
+                reset_str = reset_datetime.strftime("%Y-%m-%d %H:%M:%S UTC")
                 logger.info("   ⏰ Resets at: %s", reset_str)
 
             if reset_in is not None and reset_in > 0:
@@ -171,9 +185,11 @@ class AuthHandler(BaseCommandHandler):
                         "   🔢 Remaining requests: %s", remaining_from_payload
                     )
                     if reset_ts and isinstance(reset_ts, (int, float)):
-                        reset_datetime = datetime.fromtimestamp(reset_ts)
+                        reset_datetime = datetime.fromtimestamp(
+                            reset_ts, tz=UTC
+                        )
                         reset_str = reset_datetime.strftime(
-                            "%Y-%m-%d %H:%M:%S"
+                            "%Y-%m-%d %H:%M:%S UTC"
                         )
                         logger.info("   ⏰ Resets at: %s", reset_str)
                     if limit is not None:

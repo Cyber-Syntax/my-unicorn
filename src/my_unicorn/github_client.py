@@ -14,13 +14,12 @@ from typing import Any
 
 import aiohttp
 
+from my_unicorn.auth import GitHubAuthManager, auth_manager
+from my_unicorn.cache import get_cache_manager
 from my_unicorn.config import config_manager
-
-from .auth import GitHubAuthManager, auth_manager
-from .cache import get_cache_manager
-from .logger import get_logger
-from .progress import get_progress_service
-from .utils import (
+from my_unicorn.logger import get_logger
+from my_unicorn.progress import get_progress_service
+from my_unicorn.utils import (
     SPECIFIC_CHECKSUM_EXTENSIONS,
     extract_and_validate_version,
     get_checksum_file_format_type,
@@ -629,7 +628,7 @@ class ReleaseAPIClient:
             API response data or None if not found
 
         """
-        headers = GitHubAuthManager.apply_auth({})
+        headers = auth_manager.apply_auth({})
 
         # If rate-limit is low, wait before making the request
         try:

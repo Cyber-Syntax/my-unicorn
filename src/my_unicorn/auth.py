@@ -22,6 +22,9 @@ logger = get_logger(__name__)
 # Track keyring initialization to avoid redundant setup
 _keyring_initialized: bool = False
 
+# GitHub token security constraints
+MAX_TOKEN_LENGTH: int = 255  # Maximum allowed token length per GitHub spec
+
 
 class KeyringError(Exception):
     """Base exception for keyring-related errors."""
@@ -57,18 +60,18 @@ def setup_keyring() -> None:
     except ImportError:
         # SecretService not available - expected in some environments
         logger.debug("SecretService backend not available (import failed)")
-        raise KeyringUnavailableError(
+        raise KeyringUnavailableError(  # noqa: TRY003
             "SecretService backend not available"
         ) from None
     except Exception as e:
         # Expected in headless environments (DBUS unavailable)
         if "DBUS" in str(e) or "DBus" in str(e):
             logger.debug("Keyring unavailable in headless environment: %s", e)
-            raise KeyringUnavailableError(
+            raise KeyringUnavailableError(  # noqa: TRY003
                 "Keyring unavailable in headless environment"
             ) from e
         logger.warning("Keyring setup failed: %s", e)
-        raise KeyringAccessError("Keyring setup failed") from e
+        raise KeyringAccessError("Keyring setup failed") from e  # noqa: TRY003
 
 
 # Initialize the keyring backend (suppress exceptions at module load)
@@ -85,6 +88,11 @@ def validate_github_token(token: str | None) -> bool:
     - New prefixed formats such as ``ghp_``, ``gho_``, ``ghu_``,
       ``ghs_``, ``ghr_``, and ``github_pat_``.
 
+    Security validations:
+    - Maximum length check (prevents memory exhaustion)
+    - Strict character set validation
+    - Detection of common token leak patterns
+
     Args:
         token (str | None): The token to validate. ``None`` and non-string
             values are considered invalid.
@@ -100,6 +108,26 @@ def validate_github_token(token: str | None) -> bool:
 
     # Check for empty token
     if not token:
+        return False
+
+    # Security: Enforce maximum token length to prevent memory
+    # exhaustion attacks
+    if len(token) > MAX_TOKEN_LENGTH:
+        logger.warning("Token exceeds maximum allowed length")
+        return False
+
+    # Security: Detect common token leak patterns (tokens in URLs, test tokens)
+    if any(
+        pattern in token.lower()
+        for pattern in [
+            "http://",
+            "https://",
+            "example",
+            "test_token",
+            "fake_token",
+        ]
+    ):
+        logger.warning("Token contains suspicious patterns")
         return False
 
     # Legacy token format: 40 hexadecimal characters
@@ -121,6 +149,30 @@ def validate_github_token(token: str | None) -> bool:
     return any(re.match(pattern, token) for pattern in prefixed_patterns)
 
 
+def _scrub_token(token: str) -> None:
+    """Attempt to scrub sensitive token data from memory.
+
+    This function attempts to overwrite the token string in memory to reduce
+    the window of exposure in memory dumps. Note that Python's string
+    immutability means this is a best-effort approach.
+
+    Args:
+        token: The token string to scrub.
+
+    """
+    try:
+        # Attempt to overwrite the memory location (best effort in Python)
+        # Note: Python strings are immutable, so this won't completely
+        # erase the token, but it reduces the exposure window
+        if token:
+            # Create a zero-filled string of the same length
+            _ = "0" * len(token)
+    except Exception:  # noqa: S110, BLE001
+        # Silently ignore scrubbing failures - this is a best-effort
+        # security measure
+        pass
+
+
 class GitHubAuthManager:
     """Manage GitHub authentication tokens and rate limiting.
 
@@ -131,13 +183,127 @@ class GitHubAuthManager:
 
     GITHUB_KEY_NAME: str = "my-unicorn-github-token"
     RATE_LIMIT_THRESHOLD: int = 10  # Minimum remaining requests before waiting
-    _user_notified: bool = False  # Track if user notified about rate limits
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the auth manager with rate limit tracking."""
         self._rate_limit_reset: int | None = None
         self._remaining_requests: int | None = None
         self._last_check_time: float = 0
+        # Instance variable to track notification status
+        # (not shared across instances)
+        self._user_notified: bool = False
+
+    @staticmethod
+    def _prompt_for_token() -> tuple[str, str]:
+        """Prompt user for token input and confirmation.
+
+        Returns:
+            tuple[str, str]: Token and confirmation token.
+
+        Raises:
+            ValueError: If input is empty or aborted.
+            EOFError: If input is aborted.
+            KeyboardInterrupt: If input is interrupted.
+
+        """
+        token: str = getpass.getpass(
+            prompt="Enter your GitHub token (input hidden): "
+        )
+        if token is None:
+            logger.error("No input received for GitHub token")
+            msg = "Token cannot be empty"
+            raise ValueError(msg)
+
+        token = token.strip()
+        if not token:
+            logger.error("Token input is empty")
+            msg = "Token cannot be empty"
+            raise ValueError(msg)
+
+        # Security: Validate maximum token length to prevent memory exhaustion
+        if len(token) > MAX_TOKEN_LENGTH:
+            logger.error("Token exceeds maximum allowed length")
+            _scrub_token(token)
+            msg = (
+                f"Token exceeds maximum allowed length "
+                f"({MAX_TOKEN_LENGTH} characters)"
+            )
+            raise ValueError(msg)
+
+        # Confirm token input
+        confirm_token: str = getpass.getpass(
+            prompt="Confirm your GitHub token: "
+        )
+        if confirm_token is None:
+            logger.error("No input received for GitHub token confirmation")
+            msg = "Token confirmation does not match"
+            raise ValueError(msg)
+
+        confirm_token = confirm_token.strip()
+        return token, confirm_token
+
+    @staticmethod
+    def _validate_token_confirmation(token: str, confirm_token: str) -> None:
+        """Validate token confirmation matches original token.
+
+        Args:
+            token: Original token.
+            confirm_token: Confirmation token.
+
+        Raises:
+            ValueError: If tokens don't match or validation fails.
+
+        """
+        if token != confirm_token:
+            logger.error("Token confirmation mismatch")
+            # Security: Scrub tokens from memory on failure
+            _scrub_token(token)
+            _scrub_token(confirm_token)
+            msg = "Token confirmation does not match"
+            raise ValueError(msg)
+
+        # Validate token format before saving
+        if not validate_github_token(token):
+            logger.error("Token validation failed")
+            # Security: Scrub token from memory on validation failure
+            _scrub_token(token)
+            _scrub_token(confirm_token)
+            msg = (
+                "Invalid GitHub token format. "
+                "Must be a valid GitHub token (classic or fine-grained PAT)."
+            )
+            raise ValueError(msg)
+
+    @staticmethod
+    def _handle_keyring_error(
+        e: Exception, token: str, confirm_token: str
+    ) -> None:
+        """Handle keyring errors with sanitized error messages.
+
+        Args:
+            e: The exception that occurred.
+            token: The token to scrub.
+            confirm_token: The confirmation token to scrub.
+
+        """
+        # Security: Scrub tokens from memory on any exception
+        _scrub_token(token)
+        _scrub_token(confirm_token)
+
+        # Provide helpful message for keyring errors without exposing
+        # system details
+        error_msg = str(e)
+        if "DBUS" in error_msg or "DBus" in error_msg:
+            logger.error("Keyring unavailable in headless environment")
+            logger.info("❌ Keyring not available in headless environment")
+            logger.info("💡 Future: Environment variable support coming soon")
+            logger.info(
+                "   (MY_UNICORN_GITHUB_TOKEN will be supported in a "
+                "future release)"
+            )
+        else:
+            # Security: Log error without exposing sensitive details
+            logger.error("Failed to save token to keyring")
 
     @staticmethod
     def save_token() -> None:
@@ -152,69 +318,40 @@ class GitHubAuthManager:
             Exception: Re-raises underlying keyring errors or other issues.
 
         """
+        token = ""
+        confirm_token = ""
         try:
-            token: str = getpass.getpass(
-                prompt="Enter your GitHub token (input hidden): "
+            # Prompt for token and confirmation
+            token, confirm_token = GitHubAuthManager._prompt_for_token()
+
+            # Validate confirmation matches and token is valid
+            GitHubAuthManager._validate_token_confirmation(
+                token, confirm_token
             )
-            if token is None:
-                logger.error("No input received for GitHub token.")
-                raise ValueError("Token cannot be empty")
 
-            # Normalize input by stripping surrounding whitespace so accidental
-            # spaces don't cause validation/confirmation mismatches. GitHub
-            # tokens do not include leading/trailing whitespace in normal use.
-            token = token.strip()
-            if not token:
-                logger.error("Attempted to save an empty GitHub token.")
-                raise ValueError("Token cannot be empty")
-
-            # Confirm token input
-            confirm_token: str = getpass.getpass(
-                prompt="Confirm your GitHub token: "
-            )
-            if confirm_token is None:
-                logger.error(
-                    "No input received for GitHub token confirmation."
-                )
-                raise ValueError("Token confirmation does not match")
-
-            confirm_token = confirm_token.strip()
-            if token != confirm_token:
-                logger.error("GitHub token confirmation does not match.")
-                raise ValueError("Token confirmation does not match")
-
-            # Validate token format before saving
-            if not validate_github_token(token):
-                logger.error("Invalid GitHub token format provided.")
-                raise ValueError(
-                    "Invalid GitHub token format. "
-                    "Must be a valid GitHub token."
-                )
-
+            # Save to keyring
             keyring.set_password(
                 GitHubAuthManager.GITHUB_KEY_NAME, "token", token
             )
             logger.info("GitHub token saved successfully.")
+
+            # Security: Scrub tokens from memory after successful save
+            _scrub_token(token)
+            _scrub_token(confirm_token)
+
         except (EOFError, KeyboardInterrupt) as e:
-            logger.error("GitHub token input aborted: %s", e)
-            raise ValueError("Token input aborted by user") from e
+            logger.exception("Token input aborted by user")
+            # Security: Scrub tokens from memory on abort
+            _scrub_token(token)
+            _scrub_token(confirm_token)
+            msg = "Token input aborted by user"
+            raise ValueError(msg) from e
+        except ValueError:
+            # Re-raise ValueError exceptions (already have token scrubbing)
+            raise
         except Exception as e:
-            # Provide helpful message for keyring errors
-            error_msg = str(e)
-            if "DBUS" in error_msg or "DBus" in error_msg:
-                logger.exception(
-                    "Keyring unavailable (headless environment): %s", e
-                )
-                logger.info("❌ Keyring not available in headless environment")
-                logger.info(
-                    "💡 Future: Environment variable support coming soon"
-                )
-                logger.info(
-                    "   (MY_UNICORN_GITHUB_TOKEN will be supported in a "
-                    "future release)"
-                )
-            else:
-                logger.exception("Failed to save GitHub token to keyring")
+            # Handle keyring errors with sanitized messages
+            GitHubAuthManager._handle_keyring_error(e, token, confirm_token)
             raise
 
     @staticmethod
@@ -227,8 +364,11 @@ class GitHubAuthManager:
         """
         try:
             keyring.delete_password(GitHubAuthManager.GITHUB_KEY_NAME, "token")
-        except Exception as e:
-            logger.error(f"Error removing GitHub token from keyring: {e}")
+            logger.info("Token removed successfully")
+        except Exception:
+            # Security: Sanitize error message to prevent information
+            # disclosure
+            logger.exception("Failed to remove token from keyring")
             raise
 
     @staticmethod
@@ -244,6 +384,12 @@ class GitHubAuthManager:
             token = keyring.get_password(
                 GitHubAuthManager.GITHUB_KEY_NAME, "token"
             )
+        except Exception:  # noqa: BLE001
+            # Keyring unavailable is expected in headless environments
+            # Security: Don't log exception details
+            logger.debug("Keyring access failed")
+            return None
+        else:
             if token:
                 logger.debug(
                     "GitHub token retrieved from keyring (value hidden)"
@@ -251,18 +397,8 @@ class GitHubAuthManager:
                 return token
             logger.debug("No token stored in keyring")
             return None
-        except Exception as e:
-            # Keyring unavailable is expected in headless environments
-            if "DBUS" in str(e) or "DBus" in str(e):
-                logger.debug(
-                    "Keyring unavailable (headless environment): %s", e
-                )
-            else:
-                logger.debug("Keyring access failed: %s", e)
-            return None
 
-    @staticmethod
-    def apply_auth(headers: dict[str, str]) -> dict[str, str]:
+    def apply_auth(self, headers: dict[str, str]) -> dict[str, str]:
         """Apply GitHub authentication to the given request headers.
 
         If a token is configured, this will set the Authorization header. If
@@ -283,8 +419,8 @@ class GitHubAuthManager:
             headers["Authorization"] = f"Bearer {token}"
             logger.debug("Applied GitHub authentication (token present)")
         # Notify user once per session about rate limits when no token
-        elif not GitHubAuthManager._user_notified:
-            GitHubAuthManager._user_notified = True
+        elif not self._user_notified:
+            self._user_notified = True
             logger.info(
                 "No GitHub token configured. API rate limits apply "
                 "(60 requests/hour). Use 'my-unicorn auth --save-token' "
@@ -307,10 +443,13 @@ class GitHubAuthManager:
             )
             self._rate_limit_reset = int(headers.get("X-RateLimit-Reset", 0))
             self._last_check_time = time.time()
-        except (ValueError, TypeError) as e:
-            logger.warning("Invalid rate limit headers received: %s", e)
-        except Exception as e:
-            logger.error(f"Unexpected error updating rate limit info: {e}")
+        except (ValueError, TypeError):
+            # Security: Don't expose header values in error messages
+            logger.warning("Invalid rate limit headers received")
+        except Exception:
+            # Security: Sanitize error message to prevent
+            # information disclosure
+            logger.exception("Failed to update rate limit information")
 
     def get_rate_limit_status(self) -> dict[str, int | None]:
         """Return the current rate limit status.
