@@ -1,10 +1,10 @@
 """File operations for handling file system tasks.
 
-This module provides utilities for file operations such as making files executable,
-renaming, moving, creating backups, icon extraction, and other storage-related tasks.
+This module provides utilities for file operations such as making files
+executable, renaming, moving, creating backups, icon extraction, and other
+storage-related tasks.
 """
 
-import os
 from pathlib import Path
 
 from my_unicorn.icon import AppImageIconExtractor, IconExtractionError
@@ -32,9 +32,9 @@ class FileOperations:
             path: Path to file to make executable
 
         """
-        logger.debug("🔧 Making executable: %s", path.name)
-        os.chmod(path, 0o755)
-        logger.debug("✅ File permissions updated")
+        logger.debug("Making executable: %s", path.name)
+        path.chmod(0o755)
+        logger.debug("File permissions updated: %s", path.name)
 
     def move_file(self, source: Path, destination: Path) -> Path:
         """Move file from source to destination.
@@ -55,11 +55,11 @@ class FileOperations:
 
         # If target exists, remove it
         if destination.exists():
-            logger.debug("🗑️  Removing existing file: %s", destination)
+            logger.debug("Removing existing file: %s", destination)
             destination.unlink()
 
         # Move file
-        logger.debug("📦 Moving file: %s → %s", source, destination)
+        logger.debug("Moving file: %s -> %s", source.name, destination.name)
         source.rename(destination)
         return destination
 
@@ -93,16 +93,16 @@ class FileOperations:
         """
         new_path = current_path.parent / new_name
 
-        logger.debug("🏷️  Renaming file: %s → %s", current_path.name, new_name)
+        logger.debug("Renaming file: %s -> %s", current_path.name, new_name)
 
         if current_path.exists():
             # Remove target if it exists (for updates)
             if new_path.exists() and new_path != current_path:
-                logger.debug("🗑️  Removing existing file: %s", new_path)
+                logger.debug("Removing existing file: %s", new_path)
                 new_path.unlink()
 
             current_path.rename(new_path)
-            logger.debug("✅ Renamed to: %s", new_path)
+            logger.debug("Renamed successfully: %s", new_path.name)
 
         return new_path
 
@@ -111,7 +111,7 @@ class FileOperations:
 
         Args:
             current_path: Current AppImage path
-            new_name: New name for the AppImage (extension will be added if missing)
+            new_name: New name for the AppImage (extension added if missing)
 
         Returns:
             New path after rename
@@ -135,9 +135,7 @@ class FileOperations:
         """
         clean_name = rename.strip()
         # Remove any existing extensions to avoid double extensions
-        if clean_name.lower().endswith((".appimage", ".AppImage")):
-            clean_name = clean_name[:-9]  # Remove .AppImage or .appimage
-        return clean_name
+        return clean_name.removesuffix(".AppImage").removesuffix(".appimage")
 
 
 async def extract_icon_from_appimage(
@@ -156,7 +154,7 @@ async def extract_icon_from_appimage(
         appimage_path: Path to the installed AppImage
         icon_dir: Directory where icons should be saved
         app_name: Application name for icon matching
-        icon_filename: Optional custom icon filename (defaults to {app_name}.png)
+        icon_filename: Icon filename or None (defaults to app_name.png)
 
     Returns:
         Path to extracted icon or None if extraction failed
@@ -177,7 +175,7 @@ async def extract_icon_from_appimage(
     # Ensure icon directory exists
     icon_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info("🔍 Extracting icon from AppImage: %s", appimage_path.name)
+    logger.info("Extracting icon from AppImage: %s", appimage_path.name)
 
     try:
         # Use AppImageIconExtractor to perform extraction
@@ -194,25 +192,25 @@ async def extract_icon_from_appimage(
             )
             return extracted_icon
 
-        logger.info("ℹ️  No icon found in AppImage for %s", app_name)
-        return None
-
     except IconExtractionError as e:
         error_msg = str(e)
         # Check if this is a recoverable error (unsupported compression, etc.)
         extractor = AppImageIconExtractor()
         if extractor.is_recoverable_error(error_msg):
             logger.info(
-                "ℹ️  Cannot extract icon from %s: %s", app_name, error_msg
+                "️  Cannot extract icon from %s: %s", app_name, error_msg
             )
         else:
-            logger.warning("⚠️  Icon extraction failed for %s: %s", app_name, e)
+            logger.warning("Icon extraction failed for %s: %s", app_name, e)
         return None
 
     except (OSError, PermissionError) as e:
         logger.warning(
-            "⚠️  File operation error during icon extraction for %s: %s",
+            "️  File operation error during icon extraction for %s: %s",
             app_name,
             e,
         )
+        return None
+    else:
+        logger.info("No icon found in AppImage for %s", app_name)
         return None

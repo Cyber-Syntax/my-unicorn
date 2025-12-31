@@ -78,14 +78,14 @@ class AppImageIconExtractor:
 
         """
         if not appimage_path.exists():
-            logger.error("❌ AppImage not found: %s", appimage_path)
+            logger.error("AppImage not found: %s", appimage_path)
             return None
 
         if not appimage_path.is_file():
-            logger.error("❌ AppImage path is not a file: %s", appimage_path)
+            logger.error("AppImage path is not a file: %s", appimage_path)
             return None
 
-        logger.info("🔍 Extracting icon from AppImage: %s", appimage_path.name)
+        logger.info("Extracting icon from AppImage: %s", appimage_path.name)
 
         with tempfile.TemporaryDirectory(
             prefix="my-unicorn-icon-"
@@ -100,15 +100,13 @@ class AppImageIconExtractor:
                 squashfs_root = temp_path / "squashfs-root"
                 if not squashfs_root.exists():
                     logger.warning(
-                        "⚠️  No squashfs-root directory found after extraction"
+                        "No squashfs-root directory found after extraction"
                     )
                     return None
 
                 best_icon = self._find_best_icon(squashfs_root, app_name)
                 if not best_icon:
-                    logger.warning(
-                        "⚠️  No suitable icon found for %s", app_name
-                    )
+                    logger.warning("No suitable icon found for %s", app_name)
                     return None
 
                 # Copy icon to destination
@@ -118,14 +116,12 @@ class AppImageIconExtractor:
                 # Re-raise IconExtractionError as-is (already logged)
                 raise
             except Exception as e:
-                logger.error(
-                    "❌ Failed to extract icon from %s: %s",
+                logger.exception(
+                    "❌ Failed to extract icon from %s",
                     appimage_path.name,
-                    e,
                 )
-                raise IconExtractionError(
-                    f"Icon extraction failed: {e}"
-                ) from e
+                error_msg = f"Icon extraction failed: {e}"
+                raise IconExtractionError(error_msg) from e
 
     async def _extract_appimage(
         self, appimage_path: Path, temp_dir: Path
@@ -166,47 +162,45 @@ class AppImageIconExtractor:
                     and "supports only" in stderr_text
                 ):
                     logger.info(
-                        "i  AppImage uses unsupported compression format: %s",
+                        "AppImage uses unsupported compression format: %s",
                         appimage_path.name,
                     )
                     logger.info(
-                        "i  AppImage cannot be extracted for icon discovery"
+                        "AppImage cannot be extracted for icon discovery"
                     )
-                    raise IconExtractionError(
-                        "Unsupported AppImage compression format"
-                    )
+                    msg = "Unsupported AppImage compression format"
+                    raise IconExtractionError(msg)
 
                 # Check for other common extraction issues
                 if "Failed to open squashfs image" in stderr_text:
                     logger.info(
-                        "i  Cannot open AppImage for extraction: %s",
+                        "Cannot open AppImage for extraction: %s",
                         appimage_path.name,
                     )
-                    raise IconExtractionError(
-                        "Cannot open AppImage squashfs filesystem"
-                    )
+                    msg = "Cannot open AppImage squashfs filesystem"
+                    raise IconExtractionError(msg)
 
                 if "Invalid magic number" in stderr_text:
                     logger.info(
-                        "i  Invalid AppImage format: %s", appimage_path.name
+                        "Invalid AppImage format: %s", appimage_path.name
                     )
-                    raise IconExtractionError("Invalid AppImage format")
+                    msg = "Invalid AppImage format"
+                    raise IconExtractionError(msg)
 
                 # Generic extraction failure
                 code = process.returncode
                 error_msg = f"AppImage extraction failed with code {code}"
                 if stderr_text:
                     error_msg += f": {stderr_text}"
-                logger.warning("⚠️  %s", error_msg)
+                logger.warning("%s", error_msg)
                 raise IconExtractionError(error_msg)
 
-            logger.debug("✅ AppImage extracted successfully to %s", temp_dir)
+            logger.debug("AppImage extracted successfully to %s", temp_dir)
 
         except (TimeoutError, OSError) as e:
-            logger.warning("⚠️  Failed to execute AppImage extraction: %s", e)
-            raise IconExtractionError(
-                f"Failed to execute AppImage extraction: {e}"
-            ) from e
+            logger.warning("Failed to execute AppImage extraction: %s", e)
+            error_msg = f"Failed to execute AppImage extraction: {e}"
+            raise IconExtractionError(error_msg) from e
 
     def _find_best_icon(
         self, squashfs_root: Path, app_name: str
@@ -253,13 +247,15 @@ class AppImageIconExtractor:
         # Score and select the best icon
         best_icon = self._select_best_icon(candidate_icons)
         logger.info(
-            "🎨 Selected icon: %s (score: %s)",
+            "Selected icon: %s (score: %s)",
             best_icon["path"],
             best_icon["score"],
         )
 
         best_icon_path = best_icon["path"]
-        assert isinstance(best_icon_path, Path)  # Type guard for mypy
+        if not isinstance(best_icon_path, Path):
+            msg = "Invalid icon path type"
+            raise IconExtractionError(msg)
         return best_icon_path
 
     def _scan_directory_for_icons(
@@ -402,12 +398,15 @@ class AppImageIconExtractor:
 
         """
         if not candidates:
-            raise IconExtractionError("No icon candidates available")
+            msg = "No icon candidates available"
+            raise IconExtractionError(msg)
 
         # Sort by score (highest first)
         def get_score(candidate: dict[str, int | Path]) -> int:
             score = candidate["score"]
-            assert isinstance(score, int)
+            if not isinstance(score, int):
+                msg = "Invalid score type"
+                raise TypeError(msg)
             return score
 
         candidates.sort(key=get_score, reverse=True)
@@ -446,9 +445,8 @@ class AppImageIconExtractor:
             _ = shutil.copy2(source, dest)
             logger.info("✅ Icon extracted and copied: %s", dest)
 
-            return dest
-
         except (OSError, shutil.Error) as e:
-            raise IconExtractionError(
-                f"Failed to copy icon to {dest}: {e}"
-            ) from e
+            error_msg = f"Failed to copy icon to {dest}: {e}"
+            raise IconExtractionError(error_msg) from e
+        else:
+            return dest
