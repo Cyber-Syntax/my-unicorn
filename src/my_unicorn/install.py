@@ -984,7 +984,7 @@ class InstallHandler:
         icon_config = app_config.get("icon", {})
         icon_method = icon_config.get("method", "extraction")
         icon_filename = icon_config.get("filename", "")
-        icon_url = icon_config.get("download_url", "")
+
         overrides = {
             "metadata": {
                 "name": repo,
@@ -1010,10 +1010,6 @@ class InstallHandler:
                 "filename": icon_filename,
             },
         }
-
-        # Add download URL if present
-        if icon_url:
-            overrides["icon"]["download_url"] = icon_url
 
         return overrides
 

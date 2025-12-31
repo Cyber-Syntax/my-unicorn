@@ -1,7 +1,7 @@
-"""Download service for handling AppImage and icon downloads.
+"""Download service for handling AppImage downloads.
 
 This module provides a service for downloading AppImage files and associated
-icons with progress tracking via the project's `ProgressDisplay` service.
+checksum files with progress tracking via the project's `ProgressDisplay` service.
 """
 
 import asyncio
@@ -22,7 +22,6 @@ from my_unicorn.progress import (
     ProgressType,
     get_progress_service,
 )
-from my_unicorn.types import DownloadIconAsset
 
 T = TypeVar("T")
 
@@ -74,7 +73,7 @@ class DownloadService:
 
         def cleanup() -> None:
             if dest.exists():
-                logger.debug("🗑️  Removing partial download: %s", dest)
+                logger.debug("Removing partial download: %s", dest)
                 with contextlib.suppress(Exception):
                     dest.unlink()
 
@@ -82,7 +81,7 @@ class DownloadService:
             total = int(response.headers.get("Content-Length", 0))
             dest.parent.mkdir(parents=True, exist_ok=True)
 
-            logger.debug("📥 Downloading %s", dest.name)
+            logger.debug("Downloading file: %s", dest.name)
             logger.debug("   URL: %s", url)
             logger.debug(
                 "   Size: %s bytes" if total > 0 else "   Size: Unknown",
@@ -103,7 +102,7 @@ class DownloadService:
             else:
                 await self._download_without_progress(response, dest)
 
-            logger.debug("✅ Download completed: %s", dest)
+            logger.debug("Download completed: %s", dest)
 
         await self._make_request_with_retry(
             url, process, dest.name, cleanup_callback=cleanup
@@ -232,49 +231,6 @@ class DownloadService:
         )
         return dest
 
-    async def download_icon(self, icon: DownloadIconAsset, dest: Path) -> Path:
-        """Download an icon file.
-
-        Args:
-            icon: Icon asset information
-            dest: Destination path for the icon
-
-        Returns:
-            Path to downloaded icon
-
-        Raises:
-            aiohttp.ClientError: If download fails
-
-        """
-        # Check if icon already exists
-        if dest.exists():
-            logger.info("✅ Icon already exists: %s", dest)
-            return dest
-
-        try:
-            await self.download_file(
-                icon["icon_url"],
-                dest,
-                show_progress=False,  # Icons are usually small
-                progress_type=ProgressType.DOWNLOAD,
-            )
-
-            # Verify the file was actually created and has content
-            if not dest.exists():
-                raise Exception(f"Downloaded file does not exist: {dest}")
-
-            file_size = dest.stat().st_size
-            if file_size == 0:
-                raise Exception(f"Downloaded file is empty: {dest}")
-
-            logger.info(
-                "✅ Icon downloaded: %s (%s bytes)", dest, f"{file_size:,}"
-            )
-            return dest
-        except Exception as e:
-            logger.error("❌ Failed to download icon: %s", e)
-            raise
-
     def get_filename_from_url(self, url: str) -> str:
         """Extract filename from URL.
 
@@ -303,7 +259,7 @@ class DownloadService:
 
         async def process(response: aiohttp.ClientResponse) -> str:
             content = await response.text()
-            logger.debug("📄 Checksum file downloaded successfully")
+            logger.debug("Checksum file downloaded successfully")
             logger.debug("   Status: %s", response.status)
             logger.debug("   Content length: %d characters", len(content))
             logger.debug(
@@ -364,24 +320,26 @@ class DownloadService:
                     cleanup_callback()
 
                 if attempt == retry_attempts:
-                    logger.error(
-                        "❌ %s failed after %s attempts: %s",
+                    logger.exception(
+                        "❌ %s failed after %s attempts",
                         description,
                         retry_attempts,
-                        e,
                     )
-                    raise
+                    msg = f"Failed to download {description}"
+                    raise DownloadError(msg) from e
 
                 backoff = 2**attempt
-                logger.info("⏳ Retrying in %s seconds...", backoff)
+                logger.info("Retrying in %s seconds...", backoff)
                 await asyncio.sleep(backoff)
             except Exception as e:
-                logger.error("❌ %s failed: %s", description, e)
+                logger.exception("%s failed", description)
                 if cleanup_callback:
                     cleanup_callback()
-                raise
+                msg = f"Failed to download {description}"
+                raise DownloadError(msg) from e
 
-        raise DownloadError(f"Failed to download {description}")
+        msg = f"Failed to download {description}"
+        raise DownloadError(msg)
 
 
 class DownloadError(Exception):

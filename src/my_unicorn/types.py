@@ -92,13 +92,6 @@ class ConfigIconAsset(TypedDict):
     installed: bool
 
 
-class DownloadIconAsset(TypedDict):
-    """Icon asset information for download operations."""
-
-    icon_filename: str
-    icon_url: str
-
-
 # =============================================================================
 # Application Configuration Types
 # =============================================================================

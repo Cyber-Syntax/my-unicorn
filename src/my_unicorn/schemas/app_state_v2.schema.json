@@ -305,16 +305,12 @@
                             "type": "string",
                             "enum": [
                                 "extraction",
-                                "download"
+                                "none"
                             ]
                         },
                         "filename": {
                             "type": "string",
                             "minLength": 1
-                        },
-                        "download_url": {
-                            "type": "string",
-                            "format": "uri"
                         }
                     }
                 }

@@ -1126,31 +1126,6 @@ class ReleaseFetcher:
         return await self.api_client.fetch_default_branch()
 
     @staticmethod
-    def build_icon_url(
-        owner: str, repo: str, icon_path: str, branch: str | None = None
-    ) -> str:
-        """Build GitHub raw URL for an icon file.
-
-        Args:
-            owner: Repository owner
-            repo: Repository name
-            icon_path: Path to the icon file within the repository
-            branch: Branch name (defaults to 'main')
-
-        Returns:
-            Full GitHub raw URL for the icon
-
-        """
-        if branch is None:
-            branch = "main"
-
-        clean_path = icon_path.lstrip("/")
-        return (
-            f"https://raw.githubusercontent.com/{owner}/"
-            f"{repo}/{branch}/{clean_path}"
-        )
-
-    @staticmethod
     def extract_icon_filename(icon_path: str, app_name: str) -> str:
         """Extract or generate icon filename from path.
 
