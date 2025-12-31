@@ -18,24 +18,23 @@ except ImportError:
     InvalidVersion = None  # type: ignore
 
 
+from my_unicorn.auth import GitHubAuthManager
+from my_unicorn.backup import BackupService
+from my_unicorn.config import ConfigManager
+from my_unicorn.download import DownloadService
 from my_unicorn.file_ops import FileOperations
+from my_unicorn.github_client import Asset, Release, ReleaseFetcher
+from my_unicorn.logger import get_logger
 from my_unicorn.migration.helpers import get_apps_needing_migration
-from my_unicorn.verification import VerificationService
-from my_unicorn.workflows import (
+from my_unicorn.utils.appimage_setup import (
     create_desktop_entry,
-    extract_github_config,
     rename_appimage,
-    select_best_appimage_asset,
     setup_appimage_icon,
-    verify_appimage_download,
 )
-
-from .auth import GitHubAuthManager
-from .backup import BackupService
-from .config import ConfigManager
-from .download import DownloadService
-from .github_client import Asset, Release, ReleaseFetcher
-from .logger import get_logger
+from my_unicorn.utils.asset_selection import select_best_appimage_asset
+from my_unicorn.utils.github_ops import extract_github_config
+from my_unicorn.utils.verification import verify_appimage_download
+from my_unicorn.verification import VerificationService
 
 logger = get_logger(__name__)
 

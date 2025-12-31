@@ -14,15 +14,15 @@ from my_unicorn.exceptions import InstallationError
 from my_unicorn.file_ops import FileOperations
 from my_unicorn.github_client import Asset, GitHubClient, Release
 from my_unicorn.logger import get_logger
-from my_unicorn.verification import VerificationService
-from my_unicorn.workflows import (
+from my_unicorn.utils.appimage_setup import (
     create_desktop_entry,
-    parse_github_url,
     rename_appimage,
-    select_best_appimage_asset,
     setup_appimage_icon,
-    verify_appimage_download,
 )
+from my_unicorn.utils.asset_selection import select_best_appimage_asset
+from my_unicorn.utils.github_ops import parse_github_url
+from my_unicorn.utils.verification import verify_appimage_download
+from my_unicorn.verification import VerificationService
 
 logger = get_logger(__name__)
 
