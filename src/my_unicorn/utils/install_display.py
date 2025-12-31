@@ -3,13 +3,13 @@
 This module provides helper functions for printing installation-related
 summaries and messages. It intentionally focuses on install flows to be
 consistent with other display helpers (e.g., `update_displays.py`).
+
+Uses print() directly to avoid conflicts with logger context managers
+and progress display systems.
 """
+# ruff: noqa: T201
 
 from typing import Any
-
-from my_unicorn.logger import get_logger
-
-logger = get_logger(__name__)
 
 
 def _categorize_results(results: list[dict[str, Any]]) -> dict[str, list]:
@@ -35,11 +35,9 @@ def _categorize_results(results: list[dict[str, Any]]) -> dict[str, list]:
 
 def _print_all_already_installed(results: list[dict[str, Any]]) -> None:
     """Print message when all apps are already installed."""
-    logger.info(
-        "✅ All %s specified app(s) are already installed:", len(results)
-    )
+    print(f"✅ All {len(results)} specified app(s) are already installed:")
     for result in results:
-        logger.info("   • %s", result.get("name", "Unknown"))
+        print(f"   • {result.get('name', 'Unknown')}")
 
 
 def _print_result_line(result: dict[str, Any]) -> None:
@@ -47,39 +45,37 @@ def _print_result_line(result: dict[str, Any]) -> None:
     app_name = result.get("name", "Unknown")
 
     if not result.get("success", False):
-        logger.info("%-25s ❌ Installation failed", app_name)
+        print(f"{app_name:<25} ❌ Installation failed")
         error = result.get("error", "Unknown error")
-        logger.info("%-25s    → %s", "", error)
+        print(f"{'':25}    → {error}")
         return
 
     if result.get("status") == "already_installed":
-        logger.info("%-25s ℹ️  Already installed", app_name)  # noqa: RUF001
+        print(f"{app_name:<25} ℹ️  Already installed")  # noqa: RUF001
         return
 
     version = result.get("version", "")
     status_msg = f"✅ {version}" if version else "✅ Installed"
-    logger.info("%-25s %s", app_name, status_msg)
+    print(f"{app_name:<25} {status_msg}")
 
     if result.get("warning"):
-        logger.info("%-25s    ⚠️  %s", "", result["warning"])
+        print(f"{'':25}    ⚠️  {result['warning']}")
 
 
 def _print_statistics(categories: dict[str, list]) -> None:
     """Print final installation statistics."""
-    logger.info("")
+    print()
     if categories["newly_installed"]:
         count = len(categories["newly_installed"])
-        logger.info("🎉 Successfully installed %s app(s)", count)
+        print(f"🎉 Successfully installed {count} app(s)")
     if categories["with_warnings"]:
         count = len(categories["with_warnings"])
-        logger.info("⚠️  %s app(s) installed with warnings", count)
+        print(f"⚠️  {count} app(s) installed with warnings")
     if categories["already_installed"]:
         count = len(categories["already_installed"])
-        logger.info("ℹ️  %s app(s) already installed", count)  # noqa: RUF001
+        print(f"ℹ️  {count} app(s) already installed")  # noqa: RUF001
     if categories["failed"]:
-        logger.info(
-            "❌ %s app(s) failed to install", len(categories["failed"])
-        )
+        print(f"❌ {len(categories['failed'])} app(s) failed to install")
 
 
 def print_install_summary(results: list[dict[str, Any]]) -> None:
@@ -89,7 +85,7 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
     the function name better communicates that this is install-specific.
     """
     if not results:
-        logger.info("No installations completed")
+        print("No installations completed")
         return
 
     categories = _categorize_results(results)
@@ -98,9 +94,9 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
         _print_all_already_installed(results)
         return
 
-    logger.info("")
-    logger.info("📦 Installation Summary:")
-    logger.info("-" * 50)
+    print()
+    print("📦 Installation Summary:")
+    print("-" * 50)
 
     for result in results:
         _print_result_line(result)

@@ -7,6 +7,7 @@ Note:
     These functions use print() for direct console output to ensure
     messages are always visible to users regardless of logger configuration.
 """
+# ruff: noqa: T201
 
 from typing import TYPE_CHECKING
 
