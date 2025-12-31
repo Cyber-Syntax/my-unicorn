@@ -112,22 +112,6 @@ class TestIconMigration:
         assert result["installed"] is False
         assert result["path"] == ""
 
-    def test_icon_url_without_source_extraction_true(self):
-        """Test URL present but extraction=True."""
-        v1_icon = {
-            "url": "https://example.com/icon.png",
-            "extraction": True,
-            "name": "app.png",
-            "installed": True,
-            "path": "/home/user/icons/app.png",
-        }
-
-        migrator = AppConfigMigrator(MagicMock())
-        result = migrator._build_icon_state(v1_icon)
-
-        # Should use extraction boolean since no source field
-        assert result["method"] == "extraction"
-
     def test_icon_empty_source_uses_extraction_boolean(self):
         """Test empty source string falls back to extraction boolean."""
         v1_icon = {

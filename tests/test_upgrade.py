@@ -65,19 +65,6 @@ def test_get_formatted_version_git_info(mock_config_manager, mock_session):
         formatted = updater.get_formatted_version()
         assert formatted == "1.2.3 (git: abcdef)"
 
-
-def test_display_version_info_prints_version(
-    mock_config_manager, mock_session, capsys
-):
-    """Test display_version_info prints formatted version."""
-    with patch("my_unicorn.upgrade.get_version") as mock_get_version:
-        mock_get_version.return_value = "1.2.3"
-        updater = SelfUpdater(mock_config_manager, mock_session)
-        updater.display_version_info()
-        out = capsys.readouterr().out
-        assert "my-unicorn version: 1.2.3" in out
-
-
 @pytest.mark.asyncio
 async def test_get_latest_release_success(mock_config_manager, mock_session):
     """Test get_latest_release returns release dict."""

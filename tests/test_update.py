@@ -389,7 +389,7 @@ class TestUpdateManager:
 
                     assert result is None
                     # Verify specific auth error handling
-                    mock_logger.error.assert_called()
+                    mock_logger.exception.assert_called()
 
     @pytest.mark.asyncio
     async def test_check_updates_with_show_progress(
@@ -413,16 +413,16 @@ class TestUpdateManager:
                 patch.object(
                     update_manager, "check_single_update", new=AsyncMock()
                 ) as mock_check,
-                patch("builtins.print") as mock_print,
+                patch("my_unicorn.update.logger") as mock_logger,
             ):
                 mock_check.side_effect = [update_info1, update_info2]
 
                 result = await update_manager.check_updates(show_progress=True)
 
                 assert len(result) == EXPECTED_APP_COUNT
-                # Verify progress message was printed
-                mock_print.assert_called_once_with(
-                    "🔄 Checking 2 app(s) for updates..."
+                # Verify progress message was logged
+                mock_logger.info.assert_called_once_with(
+                    "🔄 Checking %d app(s) for updates...", 2
                 )
 
     @pytest.mark.asyncio
@@ -579,7 +579,7 @@ class TestUpdateManager:
                 patch.object(
                     update_manager, "check_single_update", new=AsyncMock()
                 ) as mock_check,
-                patch("builtins.print") as mock_print,
+                patch("my_unicorn.update.logger") as mock_logger,
             ):
                 mock_check.return_value = update_info
 
@@ -587,9 +587,9 @@ class TestUpdateManager:
 
                 assert len(result) == 1
                 assert result[0] == update_info
-                # Verify progress message was printed
-                mock_print.assert_called_once_with(
-                    "🔄 Checking 1 app(s) for updates..."
+                # Verify progress message was logged
+                mock_logger.info.assert_called_once_with(
+                    "🔄 Checking %d app(s) for updates...", 1
                 )
 
     @pytest.mark.asyncio

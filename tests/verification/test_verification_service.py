@@ -237,6 +237,41 @@ class TestVerificationService:
         assert checksum_files[0].filename == "manual-checksums.txt"
         assert checksum_files[0].format_type == "traditional"
 
+    def test_detect_available_methods_v2_checksum_file_dict(
+        self, verification_service
+    ):
+        """Test detection with v2 format dict checksum_file configuration.
+
+        This is a regression test for the bug where v2 catalog format
+        uses a dict for checksum_file with 'filename' and 'algorithm' keys,
+        but the code was treating it as a string and calling .strip() on it.
+        """
+        asset = Asset(
+            name="test.AppImage",
+            size=124457255,
+            browser_download_url="https://github.com/owner/repo/releases/download/v1.0.0/test.AppImage",
+            digest=None,
+        )
+        # v2 format: checksum_file is a dict
+        config = {
+            "checksum_file": {
+                "filename": "latest-linux.yml",
+                "algorithm": "sha512",
+            }
+        }
+
+        has_digest, checksum_files = (
+            verification_service._detect_available_methods(
+                asset, config, None, "owner", "repo", "v1.0.0"
+            )
+        )
+
+        assert has_digest is False
+        assert len(checksum_files) == 1
+        assert checksum_files[0].filename == "latest-linux.yml"
+        # YAML files should be detected based on extension
+        assert checksum_files[0].format_type in ["yaml", "traditional"]
+
     def test_detect_available_methods_backward_compatibility(
         self, verification_service
     ):

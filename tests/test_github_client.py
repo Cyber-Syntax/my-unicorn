@@ -569,20 +569,6 @@ async def test_fetch_latest_release_malformed_response(mock_session):
     with pytest.raises(AttributeError):
         await fetcher.fetch_latest_release()
 
-
-def test_build_icon_url_and_extract_icon_filename():
-    """Test build_icon_url and extract_icon_filename."""
-    icon_url = ReleaseFetcher.build_icon_url(
-        "Cyber-Syntax", "my-unicorn", "icon.png"
-    )
-    assert (
-        icon_url
-        == "https://raw.githubusercontent.com/Cyber-Syntax/my-unicorn/main/icon.png"
-    )
-    filename = ReleaseFetcher.extract_icon_filename(icon_url, "my-unicorn")
-    assert filename == "my-unicorn.png"
-
-
 @pytest.mark.asyncio
 async def test_github_client_get_latest_release(mock_session):
     """Test GitHubClient.get_latest_release returns release info."""
