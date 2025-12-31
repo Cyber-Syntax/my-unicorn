@@ -31,6 +31,7 @@ logger = get_logger(__name__)
 CHUNK_SIZE = 8192
 PROGRESS_MB_THRESHOLD = 0.5
 CONTENT_PREVIEW_MAX = 200
+MIN_SIZE_FOR_PROGRESS = 1_048_576  # 1MB threshold for showing progress bars
 
 
 class DownloadService:
@@ -55,7 +56,6 @@ class DownloadService:
         self,
         url: str,
         dest: Path,
-        show_progress: bool = False,
         progress_type: ProgressType = ProgressType.DOWNLOAD,
     ) -> None:
         """Download a file from URL to destination with retry logic.
@@ -63,7 +63,6 @@ class DownloadService:
         Args:
             url: URL to download from
             dest: Destination path
-            show_progress: Whether to show progress bar
             progress_type: Type of progress operation for categorization
 
         Raises:
@@ -88,9 +87,9 @@ class DownloadService:
                 f"{total:,}" if total > 0 else "",
             )
 
+            # Show progress for files > 1MB when progress service is active
             if (
-                show_progress
-                and total > 0
+                total > MIN_SIZE_FOR_PROGRESS
                 and self.progress_service.is_active()
             ):
                 await self._download_with_progress(
@@ -206,15 +205,12 @@ class DownloadService:
             # Give time for display to update
             await asyncio.sleep(0.1)
 
-    async def download_appimage(
-        self, asset: Asset, dest: Path, show_progress: bool = True
-    ) -> Path:
+    async def download_appimage(self, asset: Asset, dest: Path) -> Path:
         """Download an AppImage file.
 
         Args:
             asset: GitHub asset containing download information
             dest: Destination path for the AppImage
-            show_progress: Whether to show download progress
 
         Returns:
             Path to downloaded AppImage
@@ -226,7 +222,6 @@ class DownloadService:
         await self.download_file(
             asset.browser_download_url,
             dest,
-            show_progress=show_progress,
             progress_type=ProgressType.DOWNLOAD,
         )
         return dest

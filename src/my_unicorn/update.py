@@ -351,7 +351,6 @@ class UpdateManager:
     async def check_updates(
         self,
         app_names: list[str] | None = None,
-        show_progress: bool = False,
         refresh_cache: bool = False,
     ) -> list[UpdateInfo]:
         """Check for updates for all or specified apps.
@@ -359,7 +358,6 @@ class UpdateManager:
         Args:
             app_names: List of app names to check, or None for all installed
                 apps
-            show_progress: If True, display progress message
             refresh_cache: If True, bypass cache and fetch fresh data from
                 API
 
@@ -376,8 +374,7 @@ class UpdateManager:
             logger.info("No installed apps found")
             return []
 
-        if show_progress:
-            logger.info("🔄 Checking %d app(s) for updates...", len(app_names))
+        logger.info("🔄 Checking %d app(s) for updates...", len(app_names))
 
         async with aiohttp.ClientSession() as session:
 
@@ -551,7 +548,7 @@ class UpdateManager:
             download_service = DownloadService(session, progress_service)
             self._initialize_services(session)
             downloaded_path = await download_service.download_appimage(
-                appimage_asset, download_path, show_progress=True
+                appimage_asset, download_path
             )
             if not downloaded_path:
                 return False, "Download failed"

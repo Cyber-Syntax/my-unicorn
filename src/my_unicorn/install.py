@@ -63,7 +63,7 @@ class InstallHandler:
 
         Args:
             app_name: Name of app in catalog
-            **options: Install options (verify_downloads, show_progress, etc.)
+            **options: Install options (verify_downloads, etc.)
 
         Returns:
             Installation result dictionary
@@ -499,7 +499,6 @@ class InstallHandler:
         """
         # Get options
         verify = options.get("verify_downloads", True)
-        show_progress = options.get("show_progress", True)
         download_dir = options.get("download_dir", Path.cwd())
 
         logger.debug(
@@ -519,12 +518,12 @@ class InstallHandler:
             download_path = download_dir / asset.name
             logger.info("Downloading %s", app_name)
             downloaded_path = await self.download_service.download_appimage(
-                asset, download_path, show_progress=show_progress
+                asset, download_path
             )
             progress_service = getattr(
                 self.download_service, "progress_service", None
             )
-            if show_progress and progress_service:
+            if progress_service:
                 (
                     verification_task_id,
                     installation_task_id,

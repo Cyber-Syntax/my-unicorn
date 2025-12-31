@@ -5,9 +5,10 @@ Simplified to use direct display functions instead of UpdateResult objects.
 
 from argparse import Namespace
 
-from ..logger import get_logger
-from ..progress import get_progress_service, progress_session
-from ..utils import display_update_error, display_update_summary
+from my_unicorn.logger import get_logger
+from my_unicorn.progress import get_progress_service, progress_session
+from my_unicorn.utils import display_update_error, display_update_summary
+
 from .base import BaseCommandHandler
 
 logger = get_logger(__name__)
@@ -64,7 +65,6 @@ class UpdateHandler(BaseCommandHandler):
         # Check for updates with progress message
         update_infos = await self.update_manager.check_updates(
             app_names=target_apps,
-            show_progress=True,
             refresh_cache=refresh_cache,
         )
 
@@ -98,7 +98,6 @@ class UpdateHandler(BaseCommandHandler):
         # Check for updates first (without progress bar)
         update_infos = await self.update_manager.check_updates(
             app_names=target_apps,
-            show_progress=True,
             refresh_cache=refresh_cache,
         )
 

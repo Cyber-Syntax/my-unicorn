@@ -11,18 +11,18 @@ from typing import Any
 import aiohttp
 
 from my_unicorn.download import DownloadService
+from my_unicorn.exceptions import ValidationError
 from my_unicorn.file_ops import FileOperations
+from my_unicorn.github_client import GitHubClient
 from my_unicorn.install import InstallHandler
-from my_unicorn.utils.install_display import print_install_summary
-
-from ..exceptions import ValidationError
-from ..github_client import GitHubClient
-from ..logger import get_logger
-from ..progress import (
+from my_unicorn.logger import get_logger
+from my_unicorn.progress import (
     ProgressDisplay,
     get_progress_service,
     set_progress_service,
 )
+from my_unicorn.utils.install_display import print_install_summary
+
 from .base import BaseCommandHandler
 
 logger = get_logger(__name__)
@@ -66,27 +66,6 @@ class InstallCommand:
             None  # Will be InstallHandler from services
         )
 
-    def _initialize_services_with_progress(self, show_progress: bool) -> None:
-        """Initialize services with progress service if needed.
-
-        Args:
-            show_progress: Whether to enable progress display
-
-        """
-        if self.download_service is None:
-            # Use global progress service if progress is enabled
-            if show_progress:
-                self.progress_service = get_progress_service()
-                # Create progress service if it doesn't exist
-                if self.progress_service is None:
-                    self.progress_service = ProgressDisplay()
-                    set_progress_service(self.progress_service)
-                self.download_service = DownloadService(
-                    self.session, self.progress_service
-                )
-            else:
-                self.download_service = DownloadService(self.session)
-
     async def execute(
         self, targets: list[str], **options: Any
     ) -> list[dict[str, Any]]:
@@ -96,7 +75,6 @@ class InstallCommand:
             targets: List of catalog application names or direct URLs
             **options: Installation options including:
                 - concurrent: Maximum concurrent installations (default: 3)
-                - show_progress: Whether to show progress bars (default: True)
                 - verify_downloads: Whether to verify downloads (default: True)
                 - force: Force reinstall existing apps (default: False)
                 - update: Check for updates (default: False)
@@ -115,27 +93,22 @@ class InstallCommand:
 
         # Prepare options with defaults
         install_options = {
-            "show_progress": options.get("show_progress", True),
             "verify_downloads": options.get("verify_downloads", True),
             "download_dir": self.download_dir,
             **options,
         }
 
         # Initialize services with progress configuration
-        show_progress = bool(install_options["show_progress"])
         if self.download_service is None:
-            # Use global progress service if progress is enabled
-            if show_progress:
-                self.progress_service = get_progress_service()
-                # Create progress service if it doesn't exist
-                if self.progress_service is None:
-                    self.progress_service = ProgressDisplay()
-                    set_progress_service(self.progress_service)
-                self.download_service = DownloadService(
-                    self.session, self.progress_service
-                )
-            else:
-                self.download_service = DownloadService(self.session)
+            # Always use global progress service
+            self.progress_service = get_progress_service()
+            # Create progress service if it doesn't exist
+            if self.progress_service is None:
+                self.progress_service = ProgressDisplay()
+                set_progress_service(self.progress_service)
+            self.download_service = DownloadService(
+                self.session, self.progress_service
+            )
 
         # Separate targets into URLs and catalog apps
         try:
@@ -189,7 +162,7 @@ class InstallCommand:
 
         # Execute installations with progress session only if there's
         # work to do
-        if show_progress and self.progress_service and apps_needing_work > 0:
+        if self.progress_service and apps_needing_work > 0:
             # Each app typically has: download, verify, icon extraction,
             # installation
             total_operations = apps_needing_work * 4
@@ -346,7 +319,6 @@ class InstallCommandHandler(BaseCommandHandler):
 
                 options = {
                     "concurrent": concurrent_value,
-                    "show_progress": True,  # Always show progress for install
                     "verify_downloads": not getattr(args, "no_verify", False),
                     "force": False,  # Install doesn't have force option
                     "update": False,  # This is install, not update
@@ -358,7 +330,6 @@ class InstallCommandHandler(BaseCommandHandler):
                     "   Max concurrent installations: %d", concurrent_value
                 )
                 logger.info("   Max connections per host: %d", max_concurrent)
-                logger.info("   Show progress: %s", options["show_progress"])
 
                 results = await install_command.execute(targets, **options)
 
