@@ -73,13 +73,14 @@ class TestAuthHandler:
 
         args = Namespace(save_token=False, remove_token=False, status=True)
 
-        with patch("builtins.print") as mock_print:
+        with patch("my_unicorn.commands.auth.logger") as mock_logger:
             await auth_handler.execute(args)
 
         mock_is_authenticated.assert_called_once()
         mock_fetch_fresh_rate_limit.assert_called_once()
-        mock_print.assert_any_call("✅ GitHub token is configured")
-        mock_print.assert_any_call("\n📊 GitHub API Rate Limit Status:")
+        mock_logger.info.assert_any_call("✅ GitHub token is configured")
+        mock_logger.info.assert_any_call("")
+        mock_logger.info.assert_any_call("📊 GitHub API Rate Limit Status:")
 
     @patch(
         "my_unicorn.commands.auth.AuthHandler._fetch_fresh_rate_limit",
@@ -100,12 +101,12 @@ class TestAuthHandler:
 
         args = Namespace(save_token=False, remove_token=False, status=True)
 
-        with patch("builtins.print") as mock_print:
+        with patch("my_unicorn.commands.auth.logger") as mock_logger:
             await auth_handler.execute(args)
 
         auth_handler.auth_manager.is_authenticated.assert_called_once()
-        mock_print.assert_any_call("❌ No GitHub token configured")
-        mock_print.assert_any_call(
+        mock_logger.info.assert_any_call("❌ No GitHub token configured")
+        mock_logger.info.assert_any_call(
             "Use 'my-unicorn auth --save-token' to set a token"
         )
 

@@ -106,13 +106,9 @@ class TestMissingAppImageUpdate:
                 "check_single_update",
                 return_value=update_info,
             ),
-            patch.object(
-                UpdateManager,
-                "_get_github_info",
-                return_value=("AppFlowy-IO", "AppFlowy", None, False),
-            ),
-            patch.object(
-                UpdateManager, "_find_appimage_asset", return_value=None
+            patch(
+                "my_unicorn.update.select_best_appimage_asset",
+                return_value=None,
             ),
         ):
             update_manager = UpdateManager(mock_config_manager)

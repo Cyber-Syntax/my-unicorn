@@ -106,8 +106,8 @@ def test_update_rate_limit_info_valid(auth_manager):
     with patch("time.time", return_value=1234560000):
         auth_manager.update_rate_limit_info(headers)
         status = auth_manager.get_rate_limit_status()
-    assert status["remaining"] == 42  # noqa: PLR2004
-    assert status["reset_time"] == 1234567890  # noqa: PLR2004
+    assert status["remaining"] == 42
+    assert status["reset_time"] == 1234567890
 
 
 def test_update_rate_limit_info_invalid(auth_manager):
@@ -143,14 +143,14 @@ def test_get_wait_time_with_reset(auth_manager):
     auth_manager._remaining_requests = 0
     with patch("time.time", return_value=now):
         wait = auth_manager.get_wait_time()
-    assert wait == 60  # noqa: PLR2004 - 50 + 10 = 60
+    assert wait == 60
 
 
 def test_get_wait_time_default(auth_manager):
     """Test get_wait_time returns default if no reset time."""
     auth_manager._rate_limit_reset = None
     wait = auth_manager.get_wait_time()
-    assert wait == 60  # noqa: PLR2004
+    assert wait == 60
 
 
 def test_is_authenticated_true(monkeypatch, auth_manager):
@@ -453,7 +453,7 @@ def test_apply_auth_notifies_once(monkeypatch):
         assert info_calls_second == 1  # Same count (no new notification)
 
 
-def test_save_token_dbus_unavailable(monkeypatch, auth_manager, capsys):
+def test_save_token_dbus_unavailable(monkeypatch, auth_manager):
     """Test save_token provides helpful message for DBUS errors."""
     valid_token = "ghp_" + "A" * 40
     monkeypatch.setattr("getpass.getpass", lambda prompt: valid_token)
@@ -466,13 +466,20 @@ def test_save_token_dbus_unavailable(monkeypatch, auth_manager, capsys):
 
     monkeypatch.setattr("keyring.set_password", mock_set_password)
 
-    with pytest.raises(DBusError):
-        auth_manager.save_token()
+    with patch("my_unicorn.auth.logger") as mock_logger:
+        with pytest.raises(DBusError):
+            auth_manager.save_token()
 
-    # Check that helpful message was printed
-    captured = capsys.readouterr()
-    assert "Keyring not available in headless environment" in captured.out
-    assert "Future: Environment variable support coming soon" in captured.out
+        # Check that helpful message was logged
+        info_calls = [str(call) for call in mock_logger.info.call_args_list]
+        assert any(
+            "Keyring not available in headless environment" in call
+            for call in info_calls
+        )
+        assert any(
+            "Future: Environment variable support coming soon" in call
+            for call in info_calls
+        )
 
 
 def test_setup_keyring_import_error(monkeypatch):

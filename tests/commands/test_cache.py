@@ -31,7 +31,9 @@ class TestCacheHandler:
         """Create a CacheHandler instance for testing."""
         mock_auth_manager = MagicMock()
         mock_update_manager = MagicMock()
-        return CacheHandler(mock_config_manager, mock_auth_manager, mock_update_manager)
+        return CacheHandler(
+            mock_config_manager, mock_auth_manager, mock_update_manager
+        )
 
     @pytest.fixture
     def mock_cache_manager(self):
@@ -57,7 +59,8 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
             ),
             patch("my_unicorn.commands.cache.logger") as mock_logger,
         ):
@@ -71,18 +74,25 @@ class TestCacheHandler:
         self, cache_handler, mock_cache_manager
     ):
         """Test cache clear with specific app in owner/repo format."""
-        args = Namespace(cache_action="clear", all=False, app_name="owner/repo")
+        args = Namespace(
+            cache_action="clear", all=False, app_name="owner/repo"
+        )
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
             ),
             patch("my_unicorn.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
-            mock_cache_manager.clear_cache.assert_called_once_with("owner", "repo")
-            mock_logger.info.assert_called_with("✅ Cleared cache for %s/%s", "owner", "repo")
+            mock_cache_manager.clear_cache.assert_called_once_with(
+                "owner", "repo"
+            )
+            mock_logger.info.assert_called_with(
+                "✅ Cleared cache for %s/%s", "owner", "repo"
+            )
 
     @pytest.mark.asyncio
     async def test_execute_clear_specific_app_lookup(
@@ -98,13 +108,16 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
             ),
             patch("my_unicorn.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
-            mock_cache_manager.clear_cache.assert_called_once_with("test-owner", "test-repo")
+            mock_cache_manager.clear_cache.assert_called_once_with(
+                "test-owner", "test-repo"
+            )
             mock_logger.info.assert_called_with(
                 "✅ Cleared cache for %s/%s", "test-owner", "test-repo"
             )
@@ -114,13 +127,16 @@ class TestCacheHandler:
         self, cache_handler, mock_cache_manager, mock_config_manager
     ):
         """Test cache clear with app that doesn't exist."""
-        args = Namespace(cache_action="clear", all=False, app_name="nonexistent")
+        args = Namespace(
+            cache_action="clear", all=False, app_name="nonexistent"
+        )
 
         mock_config_manager.load_app_config.return_value = None
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
             ),
             patch("my_unicorn.commands.cache.logger") as mock_logger,
             patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
@@ -132,22 +148,28 @@ class TestCacheHandler:
                 [
                     call("App %s not found", "nonexistent"),
                     call(
-                        "Cache operation failed: %s", mock_logger.error.call_args_list[1][0][1]
+                        "Cache operation failed: %s",
+                        mock_logger.error.call_args_list[1][0][1],
                     ),
                 ]
             )
             # Check that the second call is a TypeError
-            assert isinstance(mock_logger.error.call_args_list[1][0][1], TypeError)
+            assert isinstance(
+                mock_logger.error.call_args_list[1][0][1], TypeError
+            )
             mock_exit.assert_called_with(1)
 
     @pytest.mark.asyncio
-    async def test_execute_clear_no_parameters(self, cache_handler, mock_cache_manager):
+    async def test_execute_clear_no_parameters(
+        self, cache_handler, mock_cache_manager
+    ):
         """Test cache clear with no --all flag and no app name."""
         args = Namespace(cache_action="clear", all=False, app_name=None)
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
             ),
             patch("my_unicorn.commands.cache.logger") as mock_logger,
             patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
@@ -160,40 +182,50 @@ class TestCacheHandler:
             mock_exit.assert_called_with(1)
 
     @pytest.mark.asyncio
-    async def test_execute_stats(self, cache_handler, mock_cache_manager, capsys):
+    async def test_execute_stats(self, cache_handler, mock_cache_manager):
         """Test cache stats command."""
         args = Namespace(cache_action="stats")
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
             ),
             patch("my_unicorn.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
             mock_cache_manager.get_cache_stats.assert_called_once()
-            mock_logger.info.assert_any_call("📁 Cache Directory: %s", "/tmp/cache/releases")
+            mock_logger.info.assert_any_call(
+                "📁 Cache Directory: %s", "/tmp/cache/releases"
+            )
             # Check for log entries without emojis (actual implementation)
-            mock_logger.info.assert_any_call("Total Entries: %d", 5)
-            mock_logger.info.assert_any_call("TTL Hours: %d", 24)
+            mock_logger.info.assert_any_call("Total Entries: %s", 5)
+            mock_logger.info.assert_any_call("TTL Hours: %s", 24)
 
     @pytest.mark.asyncio
-    async def test_execute_stats_with_entries(self, cache_handler, mock_cache_manager, capsys):
+    async def test_execute_stats_with_entries(
+        self, cache_handler, mock_cache_manager
+    ):
         """Test cache stats command with cache entries present."""
         args = Namespace(cache_action="stats")
 
-        with patch(
-            "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+        with (
+            patch(
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
+            ),
+            patch("my_unicorn.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
-            captured = capsys.readouterr()
-            assert "✅ Fresh Entries: 3" in captured.out
-            assert "⏰ Expired Entries: 2" in captured.out
+            mock_logger.info.assert_any_call("✅ Fresh Entries: %s", 3)
+            mock_logger.info.assert_any_call("⏰ Expired Entries: %s", 2)
 
     @pytest.mark.asyncio
-    async def test_execute_stats_no_entries(self, cache_handler, mock_cache_manager, capsys):
+    async def test_execute_stats_no_entries(
+        self, cache_handler, mock_cache_manager
+    ):
         """Test cache stats command with no cache entries."""
         args = Namespace(cache_action="stats")
 
@@ -207,17 +239,20 @@ class TestCacheHandler:
             "ttl_hours": 24,
         }
 
-        with patch(
-            "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+        with (
+            patch(
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
+            ),
+            patch("my_unicorn.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
-            captured = capsys.readouterr()
-            assert "📭 No cache entries found" in captured.out
+            mock_logger.info.assert_any_call("📭 No cache entries found")
 
     @pytest.mark.asyncio
     async def test_execute_stats_with_corrupted_entries(
-        self, cache_handler, mock_cache_manager, capsys
+        self, cache_handler, mock_cache_manager
     ):
         """Test cache stats command with corrupted entries."""
         args = Namespace(cache_action="stats")
@@ -232,16 +267,21 @@ class TestCacheHandler:
             "ttl_hours": 24,
         }
 
-        with patch(
-            "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+        with (
+            patch(
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
+            ),
+            patch("my_unicorn.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
-            captured = capsys.readouterr()
-            assert "❌ Corrupted Entries: 1" in captured.out
+            mock_logger.info.assert_any_call("❌ Corrupted Entries: %s", 1)
 
     @pytest.mark.asyncio
-    async def test_execute_stats_with_error(self, cache_handler, mock_cache_manager, capsys):
+    async def test_execute_stats_with_error(
+        self, cache_handler, mock_cache_manager
+    ):
         """Test cache stats command with error in stats."""
         args = Namespace(cache_action="stats")
 
@@ -256,31 +296,42 @@ class TestCacheHandler:
             "error": "Permission denied",
         }
 
-        with patch(
-            "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+        with (
+            patch(
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
+            ),
+            patch("my_unicorn.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
-            captured = capsys.readouterr()
-            assert "⚠️ Error getting stats: Permission denied" in captured.out
+            mock_logger.info.assert_any_call(
+                "⚠️ Error getting stats: %s", "Permission denied"
+            )
 
     @pytest.mark.asyncio
-    async def test_execute_stats_exception(self, cache_handler, mock_cache_manager):
+    async def test_execute_stats_exception(
+        self, cache_handler, mock_cache_manager
+    ):
         """Test cache stats command with exception."""
         args = Namespace(cache_action="stats")
 
-        mock_cache_manager.get_cache_stats.side_effect = Exception("Test error")
+        test_exception = Exception("Test error")
+        mock_cache_manager.get_cache_stats.side_effect = test_exception
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
             ),
             patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
-            patch("builtins.print") as mock_print,
+            patch("my_unicorn.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
-            mock_print.assert_called_with("❌ Failed to get cache stats: Test error")
+            mock_logger.info.assert_called_with(
+                "❌ Failed to get cache stats: %s", test_exception
+            )
             mock_exit.assert_called_with(1)
 
     @pytest.mark.asyncio
@@ -294,7 +345,9 @@ class TestCacheHandler:
         ):
             await cache_handler.execute(args)
 
-            mock_logger.error.assert_called_with("Unknown cache action: %s", "unknown")
+            mock_logger.error.assert_called_with(
+                "Unknown cache action: %s", "unknown"
+            )
             mock_exit.assert_called_with(1)
 
     @pytest.mark.asyncio
@@ -303,7 +356,9 @@ class TestCacheHandler:
         args = Namespace(cache_action="stats")
 
         with (
-            patch("my_unicorn.commands.cache.get_cache_manager") as mock_get_manager,
+            patch(
+                "my_unicorn.commands.cache.get_cache_manager"
+            ) as mock_get_manager,
             patch("my_unicorn.commands.cache.logger") as mock_logger,
             patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
         ):
@@ -311,7 +366,9 @@ class TestCacheHandler:
 
             await cache_handler.execute(args)
 
-            mock_logger.info.assert_called_with("Cache operation interrupted by user")
+            mock_logger.info.assert_called_with(
+                "Cache operation interrupted by user"
+            )
             mock_exit.assert_called_with(130)
 
     @pytest.mark.asyncio
@@ -320,7 +377,9 @@ class TestCacheHandler:
         args = Namespace(cache_action="stats")
 
         with (
-            patch("my_unicorn.commands.cache.get_cache_manager") as mock_get_manager,
+            patch(
+                "my_unicorn.commands.cache.get_cache_manager"
+            ) as mock_get_manager,
             patch("my_unicorn.commands.cache.logger") as mock_logger,
             patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
         ):
@@ -330,7 +389,9 @@ class TestCacheHandler:
             await cache_handler.execute(args)
 
             # The actual implementation logs the Exception object, not just the string
-            mock_logger.error.assert_called_with("Cache operation failed: %s", test_exception)
+            mock_logger.error.assert_called_with(
+                "Cache operation failed: %s", test_exception
+            )
             mock_exit.assert_called_with(1)
 
     def test_parse_app_name_with_slash(self, cache_handler):
@@ -339,7 +400,9 @@ class TestCacheHandler:
         assert owner == "owner"
         assert repo == "repo"
 
-    def test_parse_app_name_lookup_success(self, cache_handler, mock_config_manager):
+    def test_parse_app_name_lookup_success(
+        self, cache_handler, mock_config_manager
+    ):
         """Test parsing app name with successful lookup."""
         mock_config_manager.load_app_config.return_value = {
             "owner": "test-owner",
@@ -350,7 +413,9 @@ class TestCacheHandler:
         assert owner == "test-owner"
         assert repo == "test-repo"
 
-    def test_parse_app_name_lookup_failure(self, cache_handler, mock_config_manager):
+    def test_parse_app_name_lookup_failure(
+        self, cache_handler, mock_config_manager
+    ):
         """Test parsing app name with failed lookup."""
         mock_config_manager.load_app_config.return_value = None
 
@@ -360,20 +425,27 @@ class TestCacheHandler:
         ):
             # The implementation has a bug where it continues execution after sys.exit(1)
             # when sys.exit is mocked, leading to a TypeError
-            with pytest.raises(TypeError, match="'NoneType' object is not subscriptable"):
+            with pytest.raises(
+                TypeError, match="'NoneType' object is not subscriptable"
+            ):
                 cache_handler._parse_app_name("nonexistent")
 
-            mock_logger.error.assert_called_with("App %s not found", "nonexistent")
+            mock_logger.error.assert_called_with(
+                "App %s not found", "nonexistent"
+            )
             mock_exit.assert_called_with(1)
 
     @pytest.mark.asyncio
-    async def test_handle_clear_all_apps(self, cache_handler, mock_cache_manager):
+    async def test_handle_clear_all_apps(
+        self, cache_handler, mock_cache_manager
+    ):
         """Test _handle_clear method with --all flag."""
         args = Namespace(all=True, app_name=None)
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
             ),
             patch("my_unicorn.commands.cache.logger") as mock_logger,
         ):
@@ -383,29 +455,39 @@ class TestCacheHandler:
             mock_logger.info.assert_called_with("✅ Cleared all cache entries")
 
     @pytest.mark.asyncio
-    async def test_handle_clear_specific_app(self, cache_handler, mock_cache_manager):
+    async def test_handle_clear_specific_app(
+        self, cache_handler, mock_cache_manager
+    ):
         """Test _handle_clear method with specific app."""
         args = Namespace(all=False, app_name="owner/repo")
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
             ),
             patch("my_unicorn.commands.cache.logger") as mock_logger,
         ):
             await cache_handler._handle_clear(args)
 
-            mock_cache_manager.clear_cache.assert_called_once_with("owner", "repo")
-            mock_logger.info.assert_called_with("✅ Cleared cache for %s/%s", "owner", "repo")
+            mock_cache_manager.clear_cache.assert_called_once_with(
+                "owner", "repo"
+            )
+            mock_logger.info.assert_called_with(
+                "✅ Cleared cache for %s/%s", "owner", "repo"
+            )
 
     @pytest.mark.asyncio
-    async def test_handle_clear_no_params(self, cache_handler, mock_cache_manager):
+    async def test_handle_clear_no_params(
+        self, cache_handler, mock_cache_manager
+    ):
         """Test _handle_clear method with no parameters."""
         args = Namespace(all=False, app_name=None)
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
             ),
             patch("my_unicorn.commands.cache.logger") as mock_logger,
             patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
@@ -418,30 +500,38 @@ class TestCacheHandler:
             mock_exit.assert_called_with(1)
 
     @pytest.mark.asyncio
-    async def test_handle_stats_success(self, cache_handler, mock_cache_manager):
+    async def test_handle_stats_success(
+        self, cache_handler, mock_cache_manager
+    ):
         """Test _handle_stats method success case."""
         args = Namespace()
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
             ),
             patch("my_unicorn.commands.cache.logger") as mock_logger,
         ):
             await cache_handler._handle_stats(args)
 
             mock_cache_manager.get_cache_stats.assert_called_once()
-            mock_logger.info.assert_any_call("📁 Cache Directory: %s", "/tmp/cache/releases")
+            mock_logger.info.assert_any_call(
+                "📁 Cache Directory: %s", "/tmp/cache/releases"
+            )
 
     @pytest.mark.asyncio
-    async def test_integration_clear_and_stats(self, cache_handler, mock_cache_manager):
+    async def test_integration_clear_and_stats(
+        self, cache_handler, mock_cache_manager
+    ):
         """Test integration between clear and stats operations."""
         # First clear cache
         clear_args = Namespace(cache_action="clear", all=True, app_name=None)
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager", return_value=mock_cache_manager
+                "my_unicorn.commands.cache.get_cache_manager",
+                return_value=mock_cache_manager,
             ),
             patch("my_unicorn.commands.cache.logger") as mock_logger,
         ):

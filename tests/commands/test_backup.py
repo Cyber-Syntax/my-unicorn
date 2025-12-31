@@ -733,7 +733,7 @@ class TestBackupHandler:
 
     @pytest.mark.asyncio
     async def test_commands_produce_visible_output(
-        self, backup_handler, mock_config_manager, temp_config, capsys
+        self, backup_handler, mock_config_manager, temp_config, mocker
     ):
         """Test that commands produce visible output."""
         global_config, backup_dir, storage_dir = temp_config
@@ -753,6 +753,8 @@ class TestBackupHandler:
             "1.2.3", f"{app_name}-1.2.3.AppImage", backup_file
         )
 
+        mock_logger = mocker.patch("my_unicorn.commands.backup.logger")
+
         # Test --info command output
         args = MagicMock()
         args.app_name = app_name
@@ -763,29 +765,36 @@ class TestBackupHandler:
         args.info = True
 
         await backup_handler.execute(args)
-        captured = capsys.readouterr()
 
-        assert "Backup Statistics for testapp" in captured.out
-        assert "Total backups: 1" in captured.out
-        assert "Configuration:" in captured.out
+        mock_logger.info.assert_any_call(
+            " Backup Statistics for %s:", "testapp"
+        )
+        mock_logger.info.assert_any_call("  📦 Total backups: %s", 1)
+        mock_logger.info.assert_any_call("⚙️  Configuration:")
 
         # Test --list-backups command output
+        mock_logger.reset_mock()
         args.info = False
         args.list_backups = True
 
         await backup_handler.execute(args)
-        captured = capsys.readouterr()
 
-        assert "Available backups for testapp" in captured.out
-        assert "v1.2.3" in captured.out
-        assert "SHA256:" in captured.out
+        mock_logger.info.assert_any_call(
+            "Available backups for %s:", "testapp"
+        )
+        mock_logger.info.assert_any_call("  %s v%s", mocker.ANY, "1.2.3")
+        mock_logger.info.assert_any_call("     SHA256: %s...", mocker.ANY)
 
         # Test --cleanup command output
+        mock_logger.reset_mock()
         args.list_backups = False
         args.cleanup = True
 
         await backup_handler.execute(args)
-        captured = capsys.readouterr()
 
-        assert "Cleaning up old backups for testapp" in captured.out
-        assert "Cleanup completed" in captured.out
+        mock_logger.info.assert_any_call(
+            "🔄 Cleaning up old backups for %s...", "testapp"
+        )
+        mock_logger.info.assert_any_call(
+            "✅ Cleanup completed (keeping %s most recent backups)", 3
+        )

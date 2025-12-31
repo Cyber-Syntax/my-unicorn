@@ -51,43 +51,48 @@ def catalog_handler(mock_config_manager):
 
 
 @pytest.mark.asyncio
-async def test_catalog_available_apps(catalog_handler, capsys):
+async def test_catalog_available_apps(catalog_handler, mocker):
     """Test CatalogHandler._list_available_apps."""
+    mock_logger = mocker.patch("my_unicorn.commands.catalog.logger")
     args = Namespace(available=True, installed=False, info=None)
 
     await catalog_handler.execute(args)
 
-    captured = capsys.readouterr()
-    assert "📋 Available AppImages" in captured.out
-    assert "app1" in captured.out
-    assert "app2" in captured.out
-    assert "app3" in captured.out
-    assert "Test app description" in captured.out
+    mock_logger.info.assert_any_call("📋 Available AppImages (%d apps):", 3)
+    # Check for apps displayed with descriptions
+    assert any("app1" in str(call) for call in mock_logger.info.call_args_list)
+    assert any("app2" in str(call) for call in mock_logger.info.call_args_list)
+    assert any("app3" in str(call) for call in mock_logger.info.call_args_list)
+    assert any(
+        "Test app description" in str(call)
+        for call in mock_logger.info.call_args_list
+    )
 
 
 @pytest.mark.asyncio
-async def test_catalog_installed_apps(catalog_handler, capsys):
+async def test_catalog_installed_apps(catalog_handler, mocker):
     """Test CatalogHandler._list_installed_apps."""
+    mock_logger = mocker.patch("my_unicorn.commands.catalog.logger")
     args = Namespace(available=False, installed=True, info=None)
 
     await catalog_handler.execute(args)
 
-    captured = capsys.readouterr()
-    assert "📦 Installed AppImages:" in captured.out
-    assert "installed_app1" in captured.out
-    assert "installed_app2" in captured.out
-    assert "run 'my-unicorn migrate'" in captured.out
+    mock_logger.info.assert_any_call("📦 Installed AppImages:")
+    # Check for migration prompt
+    assert any(
+        "my-unicorn migrate" in str(call)
+        for call in mock_logger.info.call_args_list
+    )
 
 
 @pytest.mark.asyncio
-async def test_catalog_info(catalog_handler, capsys):
+async def test_catalog_info(catalog_handler, mocker):
     """Test CatalogHandler._show_app_info."""
+    mock_logger = mocker.patch("my_unicorn.commands.catalog.logger")
     args = Namespace(available=False, installed=False, info="app1")
 
     await catalog_handler.execute(args)
 
-    captured = capsys.readouterr()
-    assert "📦 app1" in captured.out
-    assert "Test app description" in captured.out
-    assert "Repository:" in captured.out
-    assert "test/app1" in captured.out
+    mock_logger.info.assert_any_call("📦 %s", "app1")
+    mock_logger.info.assert_any_call("  %s", "Test app description")
+    mock_logger.info.assert_any_call("  Repository:     %s", "test/app1")

@@ -25,12 +25,13 @@ async def test_execute_check_only_update_available(mocker) -> None:
         "my_unicorn.commands.upgrade.check_for_self_update",
         new=AsyncMock(return_value=True),
     )
+    mock_logger = mocker.patch("my_unicorn.commands.upgrade.logger")
     args = Namespace(check_only=True)
-    print_mock = mocker.patch("builtins.print")
     await handler.execute(args)
-    print_mock.assert_any_call("🔍 Checking for my-unicorn upgrade...")
-    print_mock.assert_any_call(
-        "\nRun 'my-unicorn upgrade' to install the upgrade."
+    mock_logger.info.assert_any_call("🔍 Checking for my-unicorn upgrade...")
+    mock_logger.info.assert_any_call("")
+    mock_logger.info.assert_any_call(
+        "Run 'my-unicorn upgrade' to install the upgrade."
     )
 
 
@@ -44,10 +45,10 @@ async def test_execute_check_only_no_update(mocker) -> None:
         "my_unicorn.commands.upgrade.check_for_self_update",
         new=AsyncMock(return_value=False),
     )
+    mock_logger = mocker.patch("my_unicorn.commands.upgrade.logger")
     args = Namespace(check_only=True)
-    print_mock = mocker.patch("builtins.print")
     await handler.execute(args)
-    print_mock.assert_any_call("✅ my-unicorn is up to date")
+    mock_logger.info.assert_any_call("✅ my-unicorn is up to date")
 
 
 @pytest.mark.asyncio
@@ -71,11 +72,12 @@ async def test_execute_perform_update_success(mocker) -> None:
         "my_unicorn.commands.upgrade.perform_self_update",
         side_effect=fake_perform_self_update,
     )
+    mock_logger = mocker.patch("my_unicorn.commands.upgrade.logger")
     args = Namespace(check_only=False)
-    print_mock = mocker.patch("builtins.print")
     await handler.execute(args)
-    print_mock.assert_any_call("\n🚀 Starting upgrade...")
-    print_mock.assert_any_call("✅ Upgrade completed successfully!")
+    mock_logger.info.assert_any_call("")
+    mock_logger.info.assert_any_call("🚀 Starting upgrade...")
+    mock_logger.info.assert_any_call("✅ Upgrade completed successfully!")
 
 
 @pytest.mark.asyncio
@@ -88,10 +90,10 @@ async def test_execute_perform_update_no_update(mocker) -> None:
         "my_unicorn.commands.upgrade.check_for_self_update",
         new=AsyncMock(return_value=False),
     )
+    mock_logger = mocker.patch("my_unicorn.commands.upgrade.logger")
     args = Namespace(check_only=False)
-    print_mock = mocker.patch("builtins.print")
     await handler.execute(args)
-    print_mock.assert_any_call("✅ my-unicorn is already up to date")
+    mock_logger.info.assert_any_call("✅ my-unicorn is already up to date")
 
 
 @pytest.mark.asyncio
@@ -115,9 +117,9 @@ async def test_execute_perform_update_failure(mocker) -> None:
         "my_unicorn.commands.upgrade.perform_self_update",
         side_effect=fake_perform_self_update,
     )
+    mock_logger = mocker.patch("my_unicorn.commands.upgrade.logger")
     args = Namespace(check_only=False)
-    print_mock = mocker.patch("builtins.print")
     await handler.execute(args)
-    print_mock.assert_any_call(
+    mock_logger.info.assert_any_call(
         "❌ Upgrade failed. Please try again or update manually."
     )

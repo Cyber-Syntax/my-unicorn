@@ -116,7 +116,7 @@ class TestInstallHandler:
             )
 
             with patch(
-                "my_unicorn.workflows.appimage_setup.DesktopEntry"
+                "my_unicorn.utils.appimage_setup.DesktopEntry"
             ) as mock_desktop:
                 mock_desktop.return_value.create = Mock(
                     return_value=Path("/desktop/test.desktop")
@@ -168,7 +168,7 @@ class TestInstallHandler:
             )
 
             with patch(
-                "my_unicorn.workflows.appimage_setup.DesktopEntry"
+                "my_unicorn.utils.appimage_setup.DesktopEntry"
             ) as mock_desktop:
                 mock_desktop.return_value.create_desktop_file = Mock(
                     return_value=Path("/desktop/test.desktop")
@@ -210,7 +210,7 @@ class TestInstallHandler:
             )
 
             with patch(
-                "my_unicorn.workflows.appimage_setup.DesktopEntry"
+                "my_unicorn.utils.appimage_setup.DesktopEntry"
             ) as mock_desktop:
                 mock_desktop.return_value.create_desktop_file = Mock(
                     return_value=Path("/desktop/test.desktop")

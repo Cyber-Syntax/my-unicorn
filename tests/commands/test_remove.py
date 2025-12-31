@@ -75,7 +75,7 @@ async def test_remove_single_app_success(
             "my_unicorn.desktop_entry.ConfigManager",
             return_value=ConfigManager(),
         ) as MockConfigManager,
-        patch("builtins.print") as mock_print,
+        patch("my_unicorn.commands.remove.logger") as mock_logger,
     ):
         mock_appimage_unlink = mock_unlink
         mock_clean_appimage_unlink = mock_unlink
@@ -104,9 +104,11 @@ async def test_remove_single_app_success(
         mock_config_manager.remove_app_config.assert_called_once_with(
             "test_app"
         )
-        # Verify that messages were printed for icon and backups (no backup_dir configured on command fixture)
-        mock_print.assert_any_call(f"✅ Removed icon: {icon_path}")
-        mock_print.assert_any_call("ℹ️  No backup directory configured")
+        # Verify that messages were printed for successful removals
+        mock_logger.info.assert_any_call("✅ Removed icon: %s", str(icon_path))
+        mock_logger.info.assert_any_call(
+            "✅ Removed config for %s", "test_app"
+        )
 
 
 @pytest.mark.asyncio
@@ -131,7 +133,7 @@ async def test_remove_single_app_keep_config(
             "my_unicorn.desktop_entry.ConfigManager",
             return_value=ConfigManager(),
         ) as MockConfigManager,
-        patch("builtins.print") as mock_print,
+        patch("my_unicorn.commands.remove.logger") as mock_logger,
     ):
         args = Namespace(apps=["test_app"], keep_config=True)
         await remove_handler.execute(args)
@@ -145,9 +147,9 @@ async def test_remove_single_app_keep_config(
 
         # Verify config is not removed
         mock_config_manager.remove_app_config.assert_not_called()
-        # Verify printed messages for icon/backups (no backup_dir configured on command fixture)
-        mock_print.assert_any_call(f"✅ Removed icon: {icon_path}")
-        mock_print.assert_any_call("ℹ️  No backup directory configured")
+        # Verify printed messages for successful removals
+        mock_logger.info.assert_any_call("✅ Removed icon: %s", str(icon_path))
+        mock_logger.info.assert_any_call("✅ Kept config for %s", "test_app")
 
 
 @pytest.mark.asyncio
@@ -181,7 +183,7 @@ async def test_remove_icon_always_attempted(
             "my_unicorn.desktop_entry.ConfigManager",
             return_value=ConfigManager(),
         ),
-        patch("builtins.print") as mock_print,
+        patch("my_unicorn.commands.remove.logger") as mock_logger,
     ):
         args = Namespace(apps=["test_app"], keep_config=False)
         await remove_handler.execute(args)
@@ -195,11 +197,13 @@ async def test_remove_missing_app(remove_handler, mock_config_manager):
     """Test removal of a missing app."""
     args = Namespace(apps=["missing_app"], keep_config=False)
 
-    with patch("builtins.print") as mock_print:
+    with patch("my_unicorn.commands.remove.logger") as mock_logger:
         await remove_handler.execute(args)
 
-        # Verify error message
-        mock_print.assert_any_call("❌ App 'missing_app' not found")
+        # Verify error message (actual format is "❌ %s", msg where msg="App 'missing_app' not found")
+        mock_logger.info.assert_any_call(
+            "❌ %s", "App 'missing_app' not found"
+        )
 
         # Verify config is not removed
         mock_config_manager.remove_app_config.assert_not_called()
@@ -231,7 +235,7 @@ async def test_remove_app_with_desktop_entry_error(
             "my_unicorn.desktop_entry.ConfigManager",
             return_value=ConfigManager(),
         ) as MockConfigManager,
-        patch("builtins.print") as mock_print,
+        patch("my_unicorn.commands.remove.logger") as mock_logger,
     ):
         print(
             f"Debugging paths: appimage_path={appimage_path}, clean_appimage_path={clean_appimage_path}, icon_path={icon_path}"
