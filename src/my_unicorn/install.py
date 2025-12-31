@@ -9,22 +9,20 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from my_unicorn.config import ConfigManager
-from my_unicorn.desktop_entry import DesktopEntry
 from my_unicorn.download import DownloadService
 from my_unicorn.exceptions import InstallationError
-from my_unicorn.file_ops import FileOperations, extract_icon_from_appimage
-from my_unicorn.github_client import (
-    Asset,
-    AssetSelector,
-    GitHubClient,
-    Release,
-)
+from my_unicorn.file_ops import FileOperations
+from my_unicorn.github_client import Asset, GitHubClient, Release
 from my_unicorn.logger import get_logger
 from my_unicorn.verification import VerificationService
-
-# Minimum number of path parts expected for a GitHub owner/repo
-MIN_GITHUB_PARTS = 2
+from my_unicorn.workflows import (
+    create_desktop_entry,
+    parse_github_url,
+    rename_appimage,
+    select_best_appimage_asset,
+    setup_appimage_icon,
+    verify_appimage_download,
+)
 
 logger = get_logger(__name__)
 
@@ -91,13 +89,13 @@ class InstallHandler:
             release = await self._fetch_release(owner, repo)
 
             # Select best AppImage asset from compatible options
-            asset = self._select_best_asset(
+            asset = select_best_appimage_asset(
                 release,
-                characteristic_suffix,
-                owner,
-                repo,
+                preferred_suffixes=characteristic_suffix,
                 installation_source="catalog",
             )
+            # Asset is guaranteed non-None (raise_on_not_found=True by default)
+            assert asset is not None
 
             # Install workflow
             return await self._install_workflow(
@@ -158,7 +156,7 @@ class InstallHandler:
         logger.debug("Starting URL install: url=%s", github_url)
         try:
             # Parse GitHub URL
-            url_info = self._parse_github_url(github_url)
+            url_info = parse_github_url(github_url)
             owner = url_info["owner"]
             repo = url_info["repo"]
             app_name = url_info.get("app_name") or repo
@@ -174,9 +172,11 @@ class InstallHandler:
             release = await self._fetch_release(owner, repo)
 
             # Select best AppImage (filters unstable versions for URLs)
-            asset = self._select_best_asset(
-                release, [], owner, repo, installation_source="url"
+            asset = select_best_appimage_asset(
+                release, installation_source="url"
             )
+            # Asset is guaranteed non-None (raise_on_not_found=True by default)
+            assert asset is not None
 
             # Create v2 format app config template for URL installs
             # Note: verification method will auto-detect checksums
@@ -266,23 +266,9 @@ class InstallHandler:
                     logger.error(
                         "Installation error for %s: %s", app_or_url, error
                     )
-                    # Context-aware error message
-                    error_msg = str(error)
-                    if "not found in catalog" in error_msg.lower():
-                        error_msg = "App not found in catalog"
-                    elif "no assets found" in error_msg.lower():
-                        error_msg = "No assets found in release - may still be building"
-                    elif "no suitable appimage" in error_msg.lower():
-                        error_msg = "AppImage not found in release - may still be building"
-                    elif "already installed" in error_msg.lower():
-                        error_msg = "Already installed"
-                    return {
-                        "success": False,
-                        "target": app_or_url,
-                        "name": app_or_url,
-                        "error": error_msg,
-                        "source": "url" if is_url else "catalog",
-                    }
+                    return self._build_install_error_result(
+                        error, app_or_url, is_url
+                    )
                 except Exception as error:
                     logger.error(
                         "Unexpected error installing %s: %s", app_or_url, error
@@ -303,6 +289,57 @@ class InstallHandler:
             tasks.append(install_one(url, is_url=True))
 
         return await asyncio.gather(*tasks)
+
+    @staticmethod
+    def _get_user_friendly_error(error: InstallationError) -> str:
+        """Convert InstallationError to user-friendly message.
+
+        Args:
+            error: Installation error to convert
+
+        Returns:
+            User-friendly error message
+
+        """
+        error_msg = str(error).lower()
+        error_mappings = [
+            ("not found in catalog", "App not found in catalog"),
+            (
+                "no assets found",
+                "No assets found in release - may still be building",
+            ),
+            (
+                "no suitable appimage",
+                "AppImage not found in release - may still be building",
+            ),
+            ("already installed", "Already installed"),
+        ]
+        for pattern, message in error_mappings:
+            if pattern in error_msg:
+                return message
+        return str(error)
+
+    def _build_install_error_result(
+        self, error: InstallationError, target: str, is_url: bool
+    ) -> dict[str, Any]:
+        """Build error result dict for failed installation.
+
+        Args:
+            error: The installation error
+            target: The app name or URL that failed
+            is_url: Whether target is a URL
+
+        Returns:
+            Error result dictionary
+
+        """
+        return {
+            "success": False,
+            "target": target,
+            "name": target,
+            "error": self._get_user_friendly_error(error),
+            "source": "url" if is_url else "catalog",
+        }
 
     @staticmethod
     def separate_targets_impl(
@@ -499,13 +536,25 @@ class InstallHandler:
             verify_result = None
             if verify:
                 logger.info("Verifying %s", app_name)
-                verify_result = await self._verify_appimage(
-                    downloaded_path,
-                    asset,
-                    app_config,
-                    release,
-                    app_name,
-                    verification_task_id,
+
+                # Create verification service
+                verification_service = VerificationService(
+                    download_service=self.download_service,
+                    progress_service=getattr(
+                        self.download_service, "progress_service", None
+                    ),
+                )
+
+                verify_result = await verify_appimage_download(
+                    file_path=downloaded_path,
+                    asset=asset,
+                    release=release,
+                    app_name=app_name,
+                    verification_service=verification_service,
+                    verification_config=app_config.get("verification"),
+                    owner=app_config.get("owner", ""),
+                    repo=app_config.get("repo", ""),
+                    progress_task_id=verification_task_id,
                 )
                 if not verify_result["passed"]:
                     error_msg = verify_result.get("error", "Unknown error")
@@ -513,17 +562,34 @@ class InstallHandler:
                         f"Verification failed: {error_msg}"
                     )
 
-            # 3. Move to install directory
+            # 3. Move to install directory and rename
             logger.info("Installing %s", app_name)
-            install_path = self._install_and_rename(
-                downloaded_path, app_name, app_config
+            # Move file to install directory first
+            moved_path = self.storage_service.move_to_install_dir(
+                downloaded_path
+            )
+            # Then rename according to configuration
+            install_path = rename_appimage(
+                appimage_path=moved_path,
+                app_name=app_name,
+                app_config=app_config,
+                catalog_entry=None,
+                storage_service=self.storage_service,
             )
             logger.debug("Installed to path: %s", install_path)
 
             # 4. Extract icon
             logger.info("Extracting icon for %s", app_name)
-            icon_result = await self._extract_icon_for_app(
-                install_path, app_name, app_config, installation_task_id
+            # Get icon directory from config
+            global_config = self.config_manager.load_global_config()
+            icon_dir = Path(global_config["directory"]["icon"])
+
+            icon_result = await setup_appimage_icon(
+                appimage_path=install_path,
+                app_name=app_name,
+                icon_dir=icon_dir,
+                app_config=app_config,
+                catalog_entry=None,
             )
 
             # 5. Create configuration
@@ -540,8 +606,11 @@ class InstallHandler:
 
             # 6. Create desktop entry
             logger.info("Creating desktop entry for %s", app_name)
-            desktop_result = self._create_desktop_entry_for_app(
-                install_path, app_name, app_config, icon_result
+            desktop_result = create_desktop_entry(
+                appimage_path=install_path,
+                app_name=app_name,
+                icon_result=icon_result,
+                config_manager=self.config_manager,
             )
 
             # Success!
@@ -597,215 +666,6 @@ class InstallHandler:
             )
             raise
 
-    def _select_best_asset(
-        self,
-        release: Release,
-        characteristic_suffix: list[str],
-        owner: str,
-        repo: str,
-        installation_source: str = "catalog",
-    ) -> Asset:
-        """Select best AppImage asset from release.
-
-        Args:
-            release: Release object
-            characteristic_suffix: List of characteristic suffixes
-            owner: Repository owner
-            repo: Repository name
-            installation_source: Installation source ("catalog" or "url")
-
-        Returns:
-            Selected Asset
-
-        """
-        if not release.assets:
-            raise InstallationError("No assets found in release")
-
-        # Use AssetSelector to find best AppImage
-        asset = AssetSelector.select_appimage_for_platform(
-            release,
-            preferred_suffixes=characteristic_suffix,
-            installation_source=installation_source,
-        )
-        if not asset:
-            raise InstallationError(
-                "AppImage not found in release - may still be building"
-            )
-        return asset
-
-    async def _verify_appimage(
-        self,
-        file_path: Path,
-        asset: Asset,
-        app_config: dict[str, Any],
-        release: Release,
-        app_name: str,
-        task_id: str | None,
-    ) -> dict[str, Any]:
-        """Verify downloaded AppImage.
-
-        Args:
-            file_path: Path to downloaded file
-            asset: GitHub asset information
-            app_config: App configuration
-            release: Release data
-            app_name: Application name
-            task_id: Progress task ID
-
-        Returns:
-            Verification result
-
-        """
-        try:
-            # Create verification service
-            verification_service = VerificationService(
-                download_service=self.download_service,
-                progress_service=getattr(
-                    self.download_service, "progress_service", None
-                ),
-            )
-
-            # Get verification config
-            verification_config = app_config.get("verification", {})
-
-            # Get tag name from release data
-            tag_name = release.original_tag_name or "unknown"
-            assets = release.assets
-
-            # Perform verification
-            result = await verification_service.verify_file(
-                file_path=file_path,
-                asset=asset,
-                config=verification_config,
-                owner=app_config.get("owner", ""),
-                repo=app_config.get("repo", ""),
-                tag_name=tag_name,
-                app_name=app_name,
-                assets=assets,
-                progress_task_id=task_id,
-            )
-
-            return {
-                "passed": result.passed,
-                "methods": result.methods,
-                "updated_config": result.updated_config,
-                "warning": result.warning,  # Include warning
-            }
-
-        except Exception as error:
-            logger.error("Verification failed for %s: %s", app_name, error)
-            return {
-                "passed": False,
-                "error": str(error),
-                "methods": {},
-            }
-
-    def _install_and_rename(
-        self,
-        temp_path: Path,
-        app_name: str,
-        app_config: dict[str, Any],
-    ) -> Path:
-        """Move file to install directory with proper naming.
-
-        Args:
-            temp_path: Temporary download path
-            app_name: Application name
-            app_config: App configuration
-
-        Returns:
-            Final install path
-
-        """
-        # Get rename preference
-        rename = app_config.get("appimage", {}).get("rename", app_name)
-
-        # Clean base name (remove any provided extension) and delegate
-        # extension/casing handling to the storage service to keep behavior
-        # consistent with update logic.
-        clean_name = self.storage_service.get_clean_appimage_name(rename)
-
-        # Move the downloaded file into the install directory first
-        moved_path = self.storage_service.move_to_install_dir(temp_path)
-
-        # Then perform AppImage-specific rename (this will add ".AppImage"
-        # with the correct casing if needed)
-        install_path = self.storage_service.rename_appimage(
-            moved_path, clean_name
-        )
-
-        return install_path
-
-    async def _extract_icon_for_app(
-        self,
-        app_path: Path,
-        app_name: str,
-        app_config: dict[str, Any],
-        task_id: str | None,
-    ) -> dict[str, Any]:
-        """Extract icon from AppImage.
-
-        Args:
-            app_path: Path to installed AppImage
-            app_name: Application name
-            app_config: App configuration
-            task_id: Progress task ID
-
-        Returns:
-            Icon extraction result
-
-        """
-        try:
-            icon_cfg = app_config.get("icon", {})
-            extraction_enabled = icon_cfg.get("extraction", True)
-
-            if not extraction_enabled:
-                return {
-                    "success": False,
-                    "source": "none",
-                    "icon_path": None,
-                }
-
-            # Get icon directory from config
-            config_mgr = ConfigManager()
-            global_config = config_mgr.load_global_config()
-            icon_dir = Path(global_config["directory"]["icon"])
-
-            # Determine icon filename
-            icon_filename = icon_cfg.get("filename", f"{app_name}.png")
-
-            # Extract icon using file operations
-            icon_path = await extract_icon_from_appimage(
-                appimage_path=app_path,
-                icon_dir=icon_dir,
-                app_name=app_name,
-                icon_filename=icon_filename,
-            )
-
-            if icon_path:
-                return {
-                    "success": True,
-                    "source": "extraction",
-                    "icon_path": str(icon_path),
-                }
-
-            return {
-                "success": False,
-                "source": "none",
-                "icon_path": None,
-            }
-
-        except (OSError, PermissionError) as error:
-            logger.warning(
-                "Icon extraction failed for %s: %s", app_name, error
-            )
-            return {
-                "success": False,
-                "source": "none",
-                "icon_path": None,
-                "error": str(error),
-            }
-
     def _create_app_config(
         self,
         app_name: str,
@@ -833,75 +693,16 @@ class InstallHandler:
         """
         from my_unicorn.constants import APP_CONFIG_VERSION
 
-        # Determine catalog reference
-        catalog_ref = None
-        overrides = None
+        # Determine catalog reference and overrides
+        catalog_ref = app_name if source == "catalog" else None
+        overrides = (
+            None
+            if source == "catalog"
+            else self._build_overrides_from_template(app_config)
+        )
 
-        if source == "catalog":
-            # Use catalog filename as reference (app_name is the catalog key)
-            catalog_ref = app_name
-        else:
-            # URL install - need full overrides section
-            overrides = self._build_overrides_from_template(app_config)
-
-        # Build verification methods list
-        verification_methods = []
-        verification_passed = False
-        actual_verification_method = "skip"  # Default
-
-        if verify_result:
-            methods_data = verify_result.get("methods", {})
-
-            # Determine if verification actually passed
-            # If methods dict is empty, no verification happened
-            if methods_data:
-                verification_passed = verify_result.get("passed", False)
-                # Get actual method used from first method in results
-                actual_verification_method = (
-                    next(iter(methods_data.keys())) if methods_data else "skip"
-                )
-            else:
-                # No methods available - verification did not happen
-                verification_passed = False
-                actual_verification_method = "skip"
-
-            for method_type, method_result in methods_data.items():
-                method_entry = {"type": method_type}
-
-                if isinstance(method_result, dict):
-                    # Map verification result fields to config structure
-                    # MethodResult.to_dict() provides: passed, hash, details,
-                    # computed_hash, url, hash_type
-                    passed = method_result.get("passed", False)
-                    hash_type = method_result.get("hash_type", "")
-
-                    # Determine algorithm from hash_type or default to SHA256
-                    algorithm = hash_type.upper() if hash_type else "SHA256"
-
-                    # Determine verification source (where hash came from)
-                    verification_source = method_result.get("url", "")
-                    if not verification_source:
-                        if method_type == "digest":
-                            verification_source = "github_api"
-                        else:
-                            verification_source = ""
-
-                    method_entry.update(
-                        {
-                            "status": "passed" if passed else "failed",
-                            "algorithm": algorithm,
-                            "expected": method_result.get("hash", ""),
-                            "computed": method_result.get("computed_hash", ""),
-                            "source": verification_source,
-                        }
-                    )
-                else:
-                    # Simple result
-                    method_entry["status"] = (
-                        "passed" if method_result else "failed"
-                    )
-
-                verification_methods.append(method_entry)
+        # Build verification state
+        verification_state = self._build_verification_state(verify_result)
 
         # Build state section
         config_data = {
@@ -913,8 +714,8 @@ class InstallHandler:
                 "installed_date": datetime.now().isoformat(),
                 "installed_path": str(app_path),
                 "verification": {
-                    "passed": verification_passed,
-                    "methods": verification_methods,
+                    "passed": verification_state["passed"],
+                    "methods": verification_state["methods"],
                 },
                 "icon": {
                     "installed": bool(icon_result.get("icon_path")),
@@ -928,9 +729,9 @@ class InstallHandler:
         if overrides:
             # Update verification method with actual result
             if "verification" in overrides:
-                overrides["verification"]["method"] = (
-                    actual_verification_method
-                )
+                overrides["verification"]["method"] = verification_state[
+                    "actual_method"
+                ]
 
             # Update icon filename with actual result
             if icon_result.get("icon_path") and "icon" in overrides:
@@ -955,6 +756,80 @@ class InstallHandler:
                 "success": False,
                 "error": str(error),
             }
+
+    @staticmethod
+    def _build_method_entry(
+        method_type: str, method_result: Any
+    ) -> dict[str, Any]:
+        """Build verification method entry from result.
+
+        Args:
+            method_type: Type of verification (digest, checksum_file)
+            method_result: Result data (dict or simple bool)
+
+        Returns:
+            Method entry dictionary for config
+
+        """
+        method_entry: dict[str, Any] = {"type": method_type}
+
+        if not isinstance(method_result, dict):
+            method_entry["status"] = "passed" if method_result else "failed"
+            return method_entry
+
+        passed = method_result.get("passed", False)
+        hash_type = method_result.get("hash_type", "")
+        algorithm = hash_type.upper() if hash_type else "SHA256"
+
+        verification_source = method_result.get("url", "")
+        if not verification_source:
+            verification_source = (
+                "github_api" if method_type == "digest" else ""
+            )
+
+        method_entry.update(
+            {
+                "status": "passed" if passed else "failed",
+                "algorithm": algorithm,
+                "expected": method_result.get("hash", ""),
+                "computed": method_result.get("computed_hash", ""),
+                "source": verification_source,
+            }
+        )
+        return method_entry
+
+    def _build_verification_state(
+        self, verify_result: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        """Build verification state from verification result.
+
+        Args:
+            verify_result: Verification result dictionary or None
+
+        Returns:
+            Dictionary with 'passed', 'methods', and 'actual_method' keys
+
+        """
+        if not verify_result:
+            return {"passed": False, "methods": [], "actual_method": "skip"}
+
+        methods_data = verify_result.get("methods", {})
+        if not methods_data:
+            return {"passed": False, "methods": [], "actual_method": "skip"}
+
+        verification_passed = verify_result.get("passed", False)
+        actual_method = next(iter(methods_data.keys()), "skip")
+
+        verification_methods = [
+            self._build_method_entry(method_type, method_result)
+            for method_type, method_result in methods_data.items()
+        ]
+
+        return {
+            "passed": verification_passed,
+            "methods": verification_methods,
+            "actual_method": actual_method,
+        }
 
     def _build_overrides_from_template(
         self, app_config: dict[str, Any]
@@ -1012,80 +887,3 @@ class InstallHandler:
         }
 
         return overrides
-
-    def _create_desktop_entry_for_app(
-        self,
-        app_path: Path,
-        app_name: str,
-        app_config: dict[str, Any],
-        icon_result: dict[str, Any],
-    ) -> dict[str, Any]:
-        """Create desktop entry for application.
-
-        Args:
-            app_path: Path to installed AppImage
-            app_name: Application name
-            app_config: App configuration
-            icon_result: Icon extraction result
-
-        Returns:
-            Desktop entry creation result
-
-        """
-        try:
-            # Get icon path
-            icon_path = None
-            if icon_result.get("icon_path"):
-                icon_path = Path(icon_result["icon_path"])
-
-            # Create desktop entry
-            desktop = DesktopEntry(
-                app_name=app_name,
-                appimage_path=app_path,
-                icon_path=icon_path,
-                config_manager=self.config_manager,
-            )
-
-            desktop_path = desktop.create_desktop_file()
-
-            return {
-                "success": True,
-                "desktop_path": str(desktop_path),
-            }
-
-        except Exception as error:
-            logger.error(
-                "Failed to create desktop entry for %s: %s", app_name, error
-            )
-            return {
-                "success": False,
-                "error": str(error),
-            }
-
-    def _parse_github_url(self, url: str) -> dict[str, str]:
-        """Parse GitHub URL to extract owner and repo.
-
-        Args:
-            url: GitHub repository URL
-
-        Returns:
-            Dictionary with owner, repo, and app_name
-
-        """
-        try:
-            # Parse owner/repo from URL
-            parts = url.replace("https://github.com/", "").split("/")
-            if len(parts) < MIN_GITHUB_PARTS:
-                raise InstallationError(f"Invalid GitHub URL format: {url}")
-
-            owner, repo = parts[0], parts[1]
-            app_name = repo.lower()
-
-            return {
-                "owner": owner,
-                "repo": repo,
-                "app_name": app_name,
-            }
-        except Exception as error:
-            logger.error("Failed to parse GitHub URL %s: %s", url, error)
-            raise InstallationError(f"Invalid GitHub URL: {url}") from error

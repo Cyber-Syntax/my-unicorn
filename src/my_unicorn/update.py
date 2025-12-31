@@ -18,15 +18,23 @@ except ImportError:
     InvalidVersion = None  # type: ignore
 
 
-from my_unicorn.file_ops import FileOperations, extract_icon_from_appimage
+from my_unicorn.file_ops import FileOperations
 from my_unicorn.migration.helpers import get_apps_needing_migration
 from my_unicorn.verification import VerificationService
+from my_unicorn.workflows import (
+    create_desktop_entry,
+    extract_github_config,
+    rename_appimage,
+    select_best_appimage_asset,
+    setup_appimage_icon,
+    verify_appimage_download,
+)
 
 from .auth import GitHubAuthManager
 from .backup import BackupService
 from .config import ConfigManager
 from .download import DownloadService
-from .github_client import Asset, AssetSelector, Release, ReleaseFetcher
+from .github_client import Asset, Release, ReleaseFetcher
 from .logger import get_logger
 
 logger = get_logger(__name__)
@@ -317,6 +325,29 @@ class UpdateManager:
             logger.exception("Failed to check updates for %s: %s", app_name, e)
             return None
 
+    def _warn_about_migration(self) -> None:
+        """Check and warn about apps needing migration."""
+        apps_dir = self.config_manager.directory_manager.apps_dir
+        apps_needing_migration = get_apps_needing_migration(apps_dir)
+
+        if not apps_needing_migration:
+            return
+
+        logger.warning(
+            "Found %d app(s) with old config format. "
+            "Run 'my-unicorn migrate' to upgrade.",
+            len(apps_needing_migration),
+        )
+        logger.info(
+            "⚠️  Found %d app(s) with old config format.",
+            len(apps_needing_migration),
+        )
+        logger.info("   Run 'my-unicorn migrate' to upgrade these apps:")
+        for app_name, version in apps_needing_migration[:5]:
+            logger.info("   - %s (v%s)", app_name, version)
+        if len(apps_needing_migration) > 5:
+            logger.info("   ... and %d more", len(apps_needing_migration) - 5)
+
     async def check_updates(
         self,
         app_names: list[str] | None = None,
@@ -336,27 +367,7 @@ class UpdateManager:
             List of UpdateInfo objects
 
         """
-        # Check for apps needing migration first
-        apps_dir = self.config_manager.directory_manager.apps_dir
-        apps_needing_migration = get_apps_needing_migration(apps_dir)
-
-        if apps_needing_migration:
-            logger.warning(
-                "Found %d app(s) with old config format. "
-                "Run 'my-unicorn migrate' to upgrade.",
-                len(apps_needing_migration),
-            )
-            logger.info(
-                "⚠️  Found %d app(s) with old config format.",
-                len(apps_needing_migration),
-            )
-            logger.info("   Run 'my-unicorn migrate' to upgrade these apps:")
-            for app_name, version in apps_needing_migration[:5]:
-                logger.info("   - %s (v%s)", app_name, version)
-            if len(apps_needing_migration) > 5:
-                logger.info(
-                    "   ... and %d more", len(apps_needing_migration) - 5
-                )
+        self._warn_about_migration()
 
         if app_names is None:
             app_names = self.config_manager.list_installed_apps()
@@ -365,7 +376,6 @@ class UpdateManager:
             logger.info("No installed apps found")
             return []
 
-        # Show progress message if requested
         if show_progress:
             logger.info("🔄 Checking %d app(s) for updates...", len(app_names))
 
@@ -384,14 +394,89 @@ class UpdateManager:
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Filter out None results and exceptions
-        update_infos = []
+        update_infos = [
+            result for result in results if isinstance(result, UpdateInfo)
+        ]
         for result in results:
-            if isinstance(result, UpdateInfo):
-                update_infos.append(result)
-            elif isinstance(result, Exception):
+            if isinstance(result, Exception):
                 logger.error("Update check failed: %s", result)
 
         return update_infos
+
+    async def _prepare_update_context(
+        self,
+        app_name: str,
+        session: aiohttp.ClientSession,
+        force: bool,
+        update_info: UpdateInfo | None,
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        """Prepare context for update operation.
+
+        Args:
+            app_name: Name of the app to update
+            session: aiohttp session
+            force: Force update even if no new version
+            update_info: Optional pre-fetched update info
+
+        Returns:
+            Tuple of (context dict, error message). Context is None on error.
+
+        """
+        # Load app configuration
+        app_config = self.config_manager.load_app_config(app_name)
+        if not app_config:
+            logger.error("No config found for app: %s", app_name)
+            return None, "Configuration not found"
+
+        # Use cached update info if provided, otherwise check for updates
+        if not update_info:
+            update_info = await self.check_single_update(app_name, session)
+            if not update_info:
+                return None, "Failed to check for updates"
+
+        # Check if update is needed
+        if not update_info.has_update and not force:
+            logger.info("%s is already up to date", app_name)
+            return {"skip": True, "success": True}, None
+
+        # Get effective config and extract GitHub info
+        effective_config = (
+            self.config_manager.app_config_manager.get_effective_config(
+                app_name
+            )
+        )
+        owner, repo, _ = extract_github_config(effective_config)
+
+        # Load catalog entry if referenced
+        catalog_ref = effective_config.get("catalog_ref")
+        catalog_entry = (
+            self.config_manager.load_catalog_entry(catalog_ref)
+            if catalog_ref
+            else None
+        )
+
+        # Find AppImage asset from cached release data
+        appimage_asset = select_best_appimage_asset(
+            update_info.release_data,
+            catalog_entry=catalog_entry,
+            installation_source="url",
+            raise_on_not_found=False,
+        )
+        if not appimage_asset:
+            logger.error("No AppImage found for %s", app_name)
+            return (
+                None,
+                "AppImage not found in release - may still be building",
+            )
+
+        return {
+            "app_config": app_config,
+            "update_info": update_info,
+            "owner": owner,
+            "repo": repo,
+            "catalog_entry": catalog_entry,
+            "appimage_asset": appimage_asset,
+        }, None
 
     async def update_single_app(
         self,
@@ -413,46 +498,22 @@ class UpdateManager:
 
         """
         try:
-            # Load app configuration
-            app_config = self.config_manager.load_app_config(app_name)
-            if not app_config:
-                logger.error("No config found for app: %s", app_name)
-                return False, "Configuration not found"
-
-            # Use cached update info if provided, otherwise check for updates
-            if not update_info:
-                update_info = await self.check_single_update(app_name, session)
-                if not update_info:
-                    return False, "Failed to check for updates"
-
-            # Check if update is needed
-            if not update_info.has_update and not force:
-                logger.info("%s is already up to date", app_name)
+            # Prepare update context
+            context, error = await self._prepare_update_context(
+                app_name, session, force, update_info
+            )
+            if error:
+                return False, error
+            if context.get("skip"):
                 return True, None
 
-            # Get GitHub configuration
-            (
-                owner,
-                repo,
-                catalog_entry,
-                use_prerelease,
-            ) = await self._get_github_info(app_name, app_config)
-
-            # Find AppImage asset from cached release data
-            appimage_asset = self._find_appimage_asset(
-                update_info.release_data, catalog_entry
-            )
-            if not appimage_asset:
-                logger.error("No AppImage found for %s", app_name)
-                # Context-aware error message for missing AppImage
-                error_msg = (
-                    "AppImage not found in release - may still be building"
-                )
-                return False, error_msg
+            # Extract from context
+            app_config = context["app_config"]
+            update_info = context["update_info"]
+            appimage_asset = context["appimage_asset"]
 
             # Setup paths
             storage_dir = Path(self.global_config["directory"]["storage"])
-            backup_dir = Path(self.global_config["directory"]["backup"])
             icon_dir = Path(self.global_config["directory"]["icon"])
             download_dir = Path(self.global_config["directory"]["download"])
 
@@ -466,15 +527,14 @@ class UpdateManager:
             download_path = download_dir / filename
 
             # Backup current version
-            # Config is guaranteed to be v2 after load_app_config() migration
             installed_path_str = app_config.get("state", {}).get(
                 "installed_path", ""
             )
-            if installed_path_str:
-                current_appimage_path = Path(installed_path_str)
-            else:
-                # Fallback: construct from storage_dir and app_name
-                current_appimage_path = storage_dir / f"{app_name}.AppImage"
+            current_appimage_path = (
+                Path(installed_path_str)
+                if installed_path_str
+                else storage_dir / f"{app_name}.AppImage"
+            )
             if current_appimage_path.exists():
                 backup_path = self.backup_service.create_backup(
                     current_appimage_path,
@@ -501,9 +561,9 @@ class UpdateManager:
                 app_name=app_name,
                 app_config=app_config,
                 update_info=update_info,
-                owner=owner,
-                repo=repo,
-                catalog_entry=catalog_entry,
+                owner=context["owner"],
+                repo=context["repo"],
+                catalog_entry=context["catalog_entry"],
                 appimage_asset=appimage_asset,
                 release_data=update_info.release_data,
                 icon_dir=icon_dir,
@@ -523,77 +583,6 @@ class UpdateManager:
         except Exception as e:
             logger.error("Failed to update %s: %s", app_name, e)
             return False, f"Update failed: {e}"
-
-    async def _get_github_info(
-        self, app_name: str, app_config: dict[str, Any]
-    ) -> tuple[str, str, dict[str, Any] | None, bool]:
-        """Get GitHub repository information and settings.
-
-        Args:
-            app_name: Name of the app
-            app_config: App configuration dictionary
-
-        Returns:
-            Tuple of (owner, repo, catalog_entry, use_prerelease)
-
-        """
-        # Get effective config (all configs are v2 after migration)
-        effective_config = (
-            self.config_manager.app_config_manager.get_effective_config(
-                app_name
-            )
-        )
-        source_config = effective_config.get("source", {})
-        owner = source_config.get("owner", "unknown")
-        repo = source_config.get("repo", "unknown")
-        should_use_prerelease = source_config.get("prerelease", False)
-
-        # Load catalog entry if referenced
-        catalog_ref = effective_config.get("catalog_ref")
-        catalog_entry = None
-        if catalog_ref:
-            catalog_entry = self.config_manager.load_catalog_entry(catalog_ref)
-
-        return owner, repo, catalog_entry, should_use_prerelease
-
-    def _find_appimage_asset(
-        self,
-        release_data: Release,
-        catalog_entry: dict[str, Any] | None = None,
-    ) -> Asset | None:
-        """Find best AppImage asset from release data using selection logic.
-
-        For updates, we always prefer stable versions over experimental/beta
-        builds to ensure consistency with initial catalog installations.
-
-        Args:
-            release_data: Release object from GitHub API
-            catalog_entry: Optional catalog entry for preferred suffixes
-
-        Returns:
-            Best AppImage Asset object or None if not found
-
-        """
-        if not release_data or not release_data.assets:
-            return None
-
-        # Get preferred suffixes from catalog if available
-        preferred_suffixes = None
-        if catalog_entry and catalog_entry.get("appimage"):
-            appimage_config = catalog_entry["appimage"]
-            if isinstance(appimage_config, dict):
-                preferred_suffixes = appimage_config.get("preferred_suffixes")
-
-        # Select best AppImage from compatible options
-        # (already filtered for x86_64 Linux by cache layer)
-        # Use "url" source to filter unstable versions during updates
-        best_asset = AssetSelector.select_appimage_for_platform(
-            release_data,
-            preferred_suffixes=preferred_suffixes,
-            installation_source="url",  # Filter experimental versions
-        )
-
-        return best_asset
 
     async def _process_post_download(
         self,
@@ -650,21 +639,21 @@ class UpdateManager:
                 )
 
             # Verify download if requested
-            (
-                verification_results,
-                updated_verification_config,
-            ) = await self._handle_verification(
-                app_name,
-                app_config,
-                catalog_entry,
-                owner,
-                repo,
-                update_info,
-                appimage_asset,
-                release_data,
-                downloaded_path,
-                progress_service,
-                verification_task_id,
+            verify_result = await verify_appimage_download(
+                file_path=downloaded_path,
+                asset=appimage_asset,
+                release=release_data,
+                app_name=app_name,
+                verification_service=self.verification_service,
+                verification_config=app_config.get("verification"),
+                catalog_entry=catalog_entry,
+                owner=owner,
+                repo=repo,
+                progress_task_id=verification_task_id,
+            )
+            verification_results = verify_result.get("methods", {})
+            updated_verification_config = verify_result.get(
+                "updated_config", {}
             )
 
             # Move to install directory and make executable
@@ -675,20 +664,32 @@ class UpdateManager:
             )
 
             # Rename to clean name using catalog configuration
-            appimage_path = self._handle_renaming(
-                app_name, app_config, catalog_entry, appimage_path
+            appimage_path = rename_appimage(
+                appimage_path=appimage_path,
+                app_name=app_name,
+                app_config=app_config,
+                catalog_entry=catalog_entry,
+                storage_service=self.storage_service,
             )
 
             # Handle icon setup
-            icon_path, updated_icon_config = await self._handle_icon_setup(
-                app_name,
-                app_config,
-                catalog_entry,
-                appimage_asset,
-                release_data,
-                icon_dir,
-                appimage_path,
+            icon_result = await setup_appimage_icon(
+                appimage_path=appimage_path,
+                app_name=app_name,
+                icon_dir=icon_dir,
+                app_config=app_config,
+                catalog_entry=catalog_entry,
             )
+            icon_path = (
+                Path(icon_result["path"]) if icon_result.get("path") else None
+            )
+            updated_icon_config = {
+                "source": icon_result.get("source", "none"),
+                "installed": icon_result.get("installed", False),
+                "path": icon_result.get("path"),
+                "extraction": icon_result.get("extraction", False),
+                "name": icon_result.get("name", ""),
+            }
 
             # Update configuration
             await self._handle_configuration_update(
@@ -703,12 +704,20 @@ class UpdateManager:
             )
 
             # Create desktop entry
-            await self._handle_desktop_entry(
-                app_name,
-                app_config,
-                appimage_path,
-                icon_path,
-            )
+            try:
+                create_desktop_entry(
+                    appimage_path=appimage_path,
+                    app_name=app_name,
+                    icon_result={
+                        "icon_path": str(icon_path) if icon_path else None,
+                        "path": str(icon_path) if icon_path else None,
+                    },
+                    config_manager=self.config_manager,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to update desktop entry for %s", app_name
+                )
 
             # Finish installation task
             if installation_task_id and progress_enabled:
@@ -736,165 +745,6 @@ class UpdateManager:
                     description=f"❌ {app_name} installation failed",
                 )
             raise  # Re-raise the exception to be handled by the main method
-
-    async def _handle_verification(
-        self,
-        app_name: str,
-        app_config: dict[str, Any],
-        catalog_entry: dict[str, Any] | None,
-        owner: str,
-        repo: str,
-        update_info: UpdateInfo,
-        appimage_asset: Asset,
-        release_data: Release,
-        downloaded_path: Path,
-        progress_service: Any,
-        verification_task_id: str | None,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Handle file verification.
-
-        Args:
-            app_name: Name of the app
-            app_config: App configuration
-            catalog_entry: Catalog entry or None
-            owner: GitHub owner
-            repo: GitHub repository
-            update_info: Update information
-            appimage_asset: AppImage Asset object
-            release_data: Release data
-            downloaded_path: Path to downloaded file
-            progress_service: Progress service
-            verification_task_id: Progress task ID or None
-
-        Returns:
-            Tuple of (verification_results, updated_verification_config)
-
-        """
-        # Load verification config from catalog or app config
-        verification_config: dict[str, Any] = {}
-        if catalog_entry and catalog_entry.get("verification"):
-            verification_config = dict(catalog_entry["verification"])
-            logger.debug(
-                "📋 Using catalog verification config for %s: %s",
-                app_name,
-                verification_config,
-            )
-        else:
-            verification_config = app_config.get("verification", {})
-            logger.debug(
-                "📋 Using app config verification config for %s: %s",
-                app_name,
-                verification_config,
-            )
-
-        # Verification task updates are handled by verification service
-
-        verification_results: dict[str, Any] = {}
-        updated_verification_config: dict[str, Any] = {}
-
-        try:
-            (
-                verification_results,
-                updated_verification_config,
-            ) = await self._perform_update_verification(
-                downloaded_path,
-                appimage_asset,
-                verification_config,
-                owner,
-                repo,
-                update_info.original_tag_name,
-                app_name,
-                release_data=release_data,
-                progress_task_id=verification_task_id,
-            )
-
-            # Verification task completion is handled by verification service
-
-        except Exception as e:
-            logger.error("Verification failed for %s: %s", app_name, e)
-            # Continue with update even if verification fails
-            verification_results = {}
-            updated_verification_config = {}
-
-        return verification_results, updated_verification_config
-
-    def _handle_renaming(
-        self,
-        app_name: str,
-        app_config: dict[str, Any],
-        catalog_entry: dict[str, Any] | None,
-        appimage_path: Path,
-    ) -> Path:
-        """Handle AppImage renaming based on configuration.
-
-        Args:
-            app_name: Name of the app
-            app_config: App configuration
-            catalog_entry: Catalog entry or None
-            appimage_path: Path to AppImage
-
-        Returns:
-            Path to renamed AppImage
-
-        """
-        # Get rename configuration
-        # In v2, rename is only in catalog, not in app config
-        rename_to = app_name  # fallback
-        if catalog_entry and catalog_entry.get("appimage", {}).get("rename"):
-            rename_to = catalog_entry["appimage"]["rename"]
-
-        if rename_to:
-            clean_name = self.storage_service.get_clean_appimage_name(
-                rename_to
-            )
-            appimage_path = self.storage_service.rename_appimage(
-                appimage_path, clean_name
-            )
-
-        return appimage_path
-
-    async def _handle_icon_setup(
-        self,
-        app_name: str,
-        app_config: dict[str, Any],
-        catalog_entry: dict[str, Any] | None,
-        appimage_asset: Asset,
-        release_data: Release,
-        icon_dir: Path,
-        appimage_path: Path,
-    ) -> tuple[Path | None, dict[str, Any] | None]:
-        """Handle icon setup operations.
-
-        Args:
-            app_name: Name of the app
-            app_config: App configuration
-            catalog_entry: Catalog entry or None
-            appimage_asset: AppImage Asset object
-            release_data: Release data
-            icon_dir: Icon directory path
-            appimage_path: Path to AppImage
-
-        Returns:
-            Tuple of (icon_path, updated_icon_config)
-
-        """
-        # Check if icon setup should be attempted
-        should_setup_icon = app_config.get("icon", {}).get("installed") or (
-            catalog_entry and catalog_entry.get("icon", {}).get("extraction")
-        )
-
-        if not should_setup_icon:
-            return None, None
-
-        icon_path, updated_icon_config = await self._setup_update_icon(
-            app_config=app_config,
-            catalog_entry=catalog_entry,
-            app_name=app_name,
-            icon_dir=icon_dir,
-            appimage_path=appimage_path,
-        )
-
-        return icon_path, updated_icon_config
 
     async def _handle_configuration_update(
         self,
@@ -936,23 +786,22 @@ class UpdateManager:
         app_config["state"]["installed_date"] = datetime.now().isoformat()
         # Note: Verification results are stored in state.verification during install
 
-        # Update icon configuration
+        # Update icon configuration in state.icon (v2 format)
         if updated_icon_config:
-            previous_icon_status = app_config.get("icon", {}).get(
-                "installed", False
-            )
-            if "icon" not in app_config:
-                app_config["icon"] = {}
-
-            # Update icon config with new settings from update process
-            app_config["icon"].update(updated_icon_config)
+            # Map workflow utility result to v2 schema format
+            # v2 schema only allows: installed, method, path
+            app_config["state"]["icon"] = {
+                "installed": updated_icon_config.get("installed", False),
+                "method": updated_icon_config.get("source", "none"),
+                "path": updated_icon_config.get("path", ""),
+            }
 
             if icon_path:
                 logger.debug(
-                    "🎨 Icon updated for %s: source=%s, extraction=%s",
+                    "🎨 Icon updated for %s: method=%s, installed=%s",
                     app_name,
-                    updated_icon_config.get("source", "unknown"),
-                    updated_icon_config.get("extraction", False),
+                    app_config["state"]["icon"]["method"],
+                    app_config["state"]["icon"]["installed"],
                 )
 
         self.config_manager.save_app_config(app_name, app_config)
@@ -966,36 +815,6 @@ class UpdateManager:
                 app_name,
                 e,
             )
-
-    async def _handle_desktop_entry(
-        self,
-        app_name: str,
-        app_config: dict[str, Any],
-        appimage_path: Path,
-        icon_path: Path | None,
-    ) -> None:
-        """Handle desktop entry creation.
-
-        Args:
-            app_name: Name of the app
-            app_config: App configuration
-            appimage_path: Path to installed AppImage
-            icon_path: Path to icon or None
-
-        """
-        try:
-            from .desktop_entry import create_desktop_entry_for_app
-
-            create_desktop_entry_for_app(
-                app_name=app_name,
-                appimage_path=appimage_path,
-                icon_path=icon_path,
-                comment=f"{app_name.title()} AppImage Application",
-                categories=["Utility"],
-                config_manager=self.config_manager,
-            )
-        except Exception as e:
-            logger.warning("Failed to update desktop entry: %s", e)
 
     def _get_stored_hash(
         self,
@@ -1011,132 +830,40 @@ class UpdateManager:
             return appimage_asset.digest
         return ""
 
-    async def _setup_update_icon(
-        self,
-        app_config: Any,
-        catalog_entry: Any,
-        app_name: str,
-        icon_dir: Path,
-        appimage_path: Path,
-    ) -> tuple[Path | None, dict[str, Any]]:
-        """Extract icon from AppImage.
+    async def _update_cached_progress(self, app_name: str) -> None:
+        """Update progress for cached update info.
 
         Args:
-            app_config: Application configuration
-            catalog_entry: Catalog entry if available (v2 format)
-            app_name: Application name for icon filename
-            icon_dir: Directory where icons should be saved
-            appimage_path: Path to AppImage for icon extraction
-
-        Returns:
-            Tuple of (Path to acquired icon or None, updated icon config)
+            app_name: Name of the app being processed
 
         """
-        current_icon_config = app_config.get("icon", {}) if app_config else {}
+        if not self._shared_api_task_id:
+            return
 
-        # Get icon filename from catalog or use default
-        icon_filename = f"{app_name}.png"  # Default
+        from .progress import get_progress_service
 
-        if catalog_entry and catalog_entry.get("icon"):
-            catalog_icon = catalog_entry.get("icon", {})
-            if isinstance(catalog_icon, dict):
-                icon_filename = catalog_icon.get("filename", icon_filename)
-
-        # Extract icon using file operations
-        icon_path = await extract_icon_from_appimage(
-            appimage_path=appimage_path,
-            icon_dir=icon_dir,
-            app_name=app_name,
-            icon_filename=icon_filename,
-        )
-
-        # Build updated icon config
-        updated_config = dict(current_icon_config)
-        updated_config.update(
-            {
-                "source": "extraction" if icon_path else "none",
-                "name": icon_filename,
-                "installed": icon_path is not None,
-                "path": str(icon_path) if icon_path else None,
-                "extraction": True,
-            }
-        )
-
-        return icon_path, updated_config
-
-    async def _perform_update_verification(
-        self,
-        path: Path,
-        asset: dict[str, Any],
-        verification_config: dict[str, Any],
-        owner: str,
-        repo: str,
-        tag_name: str,
-        app_name: str,
-        release_data: Release | None = None,
-        progress_task_id: str | None = None,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Perform update verification using priority-based approach.
-
-        Args:
-            path: Path to downloaded file
-            asset: GitHub asset information
-            verification_config: Current verification configuration
-            owner: Repository owner
-            repo: Repository name
-            tag_name: Release tag name
-            download_service: Download service instance
-            app_name: Application name
-
-        Returns:
-            Tuple of (verification_results, updated_verification_config)
-
-        """
-        logger.debug("Performing update verification: app=%s", app_name)
-        logger.debug("   📋 Verification config: %s", verification_config)
-        logger.debug("   📦 Asset digest: %s", asset.digest or "None")
-
-        if self.verification_service is None:
-            raise RuntimeError("Verification service not initialized")
-
-        # Extract assets list from release_data if available
-        assets_list = []
-        if release_data and release_data.assets:
-            assets_list = release_data.assets
+        progress_service = get_progress_service()
+        if not progress_service or not progress_service.is_active():
+            return
 
         try:
-            logger.debug(
-                "Calling VerificationService.verify_file for %s", app_name
+            task_info = progress_service.get_task_info(
+                self._shared_api_task_id
             )
-            logger.debug("   - asset: %s", asset)
-            logger.debug("   - config: %s", verification_config)
-            logger.debug("   - assets_list: %d items", len(assets_list))
+            if not task_info:
+                return
 
-            result = await self.verification_service.verify_file(
-                file_path=path,
-                asset=asset,
-                config=verification_config,
-                owner=owner,
-                repo=repo,
-                tag_name=tag_name,
-                app_name=app_name,
-                assets=assets_list,
-                progress_task_id=progress_task_id,
+            new_completed = int(task_info.completed) + 1
+            total = (
+                int(task_info.total) if task_info.total > 0 else new_completed
             )
-
-            logger.debug(
-                "✅ VerificationService.verify_file() completed successfully"
+            await progress_service.update_task(
+                self._shared_api_task_id,
+                completed=float(new_completed),
+                description=f"🌐 Retrieved {app_name} (cached) ({new_completed}/{total})",
             )
-            logger.debug("   - result.passed: %s", result.passed)
-            logger.debug(
-                "   - result.methods: %s", list(result.methods.keys())
-            )
-
-            return result.methods, result.updated_config
-
-        except Exception as e:
-            logger.error("Verification failed for %s: %s", app_name, e)
-            raise
+        except Exception:
+            pass
 
     async def update_multiple_apps(
         self,
@@ -1161,11 +888,11 @@ class UpdateManager:
         semaphore = asyncio.Semaphore(
             self.global_config["max_concurrent_downloads"]
         )
-        results = {}
-        error_reasons = {}
+        results: dict[str, bool] = {}
+        error_reasons: dict[str, str] = {}
 
         # Create lookup map for update infos
-        update_info_map = {}
+        update_info_map: dict[str, UpdateInfo] = {}
         if update_infos:
             update_info_map = {info.app_name: info for info in update_infos}
             logger.debug(
@@ -1178,36 +905,12 @@ class UpdateManager:
             async def update_with_semaphore(
                 app_name: str,
             ) -> tuple[str, bool, str | None]:
-                # Use cached update info if available
                 cached_info = update_info_map.get(app_name)
 
-                # Increment API task progress for cached data OUTSIDE semaphore
-                # API requests should not be throttled by download concurrency
-                if cached_info and self._shared_api_task_id:
-                    from .progress import get_progress_service
+                # Update progress for cached data outside semaphore
+                if cached_info:
+                    await self._update_cached_progress(app_name)
 
-                    progress_service = get_progress_service()
-                    if progress_service.is_active():
-                        try:
-                            task_info = progress_service.get_task_info(
-                                self._shared_api_task_id
-                            )
-                            if task_info:
-                                new_completed = int(task_info.completed) + 1
-                                total = (
-                                    int(task_info.total)
-                                    if task_info.total > 0
-                                    else new_completed
-                                )
-                                await progress_service.update_task(
-                                    self._shared_api_task_id,
-                                    completed=float(new_completed),
-                                    description=f"🌐 Retrieved {app_name} (cached) ({new_completed}/{total})",
-                                )
-                        except Exception:
-                            pass
-
-                # Apply semaphore only to download/install phase
                 async with semaphore:
                     success, error_reason = await self.update_single_app(
                         app_name, session, force, cached_info
@@ -1225,8 +928,6 @@ class UpdateManager:
                         error_reasons[app_name] = error_reason
                 elif isinstance(result, Exception):
                     logger.error("Update task failed: %s", result)
-                    # Extract app name from exception if possible
-                    error_msg = f"Task failed: {result}"
-                    error_reasons["unknown"] = error_msg
+                    error_reasons["unknown"] = f"Task failed: {result}"
 
         return results, error_reasons
