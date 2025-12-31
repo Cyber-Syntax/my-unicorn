@@ -9,18 +9,18 @@ import hashlib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ..constants import (
+from my_unicorn.constants import (
     DEFAULT_HASH_TYPE,
     HASH_PREFERENCE_ORDER,
     SUPPORTED_HASH_ALGORITHMS,
     YAML_DEFAULT_HASH,
     HashType,
 )
-from ..logger import get_logger
-from ..utils import format_bytes
+from my_unicorn.logger import get_logger
+from my_unicorn.utils import format_bytes
 
 if TYPE_CHECKING:
-    from ..download import DownloadService
+    from my_unicorn.download import DownloadService
 
 
 # Try to import yaml for YAML checksum file support
@@ -29,7 +29,7 @@ try:
 
     _YAML_AVAILABLE = True
 except ImportError:
-    yaml = None  # type: ignore[assignment]
+    yaml = None
     _YAML_AVAILABLE = False
 
 
@@ -457,7 +457,7 @@ class Verifier:
             # Delegate to specialized parsers based on files structure
             if isinstance(files, dict):
                 return self._parse_yaml_files_dict(files, filename)
-            elif isinstance(files, list):
+            if isinstance(files, list):
                 return self._parse_yaml_files_list(files, filename)
 
             logger.debug("   Hash not found for %s in YAML", filename)
@@ -507,7 +507,7 @@ class Verifier:
 
         if isinstance(hash_value, str):
             return self._normalize_hash_value(hash_value)
-        elif isinstance(hash_value, dict):
+        if isinstance(hash_value, dict):
             return self._try_hash_from_dict(hash_value, "in nested dict")
 
         return None
@@ -670,12 +670,10 @@ class Verifier:
         filename_part = parts[1]
 
         # Remove binary mode indicator if present
-        if filename_part.startswith("*"):
-            filename_part = filename_part[1:]
+        filename_part = filename_part.removeprefix("*")
 
         # Remove leading ./ if present
-        if filename_part.startswith("./"):
-            filename_part = filename_part[2:]
+        filename_part = filename_part.removeprefix("./")
 
         return hash_value, filename_part
 

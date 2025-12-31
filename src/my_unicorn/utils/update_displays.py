@@ -2,6 +2,10 @@
 
 This module provides functions for formatting and displaying update results
 in a consistent manner across all update operations.
+
+Note:
+    These functions use print() for direct console output to ensure
+    messages are always visible to users regardless of logger configuration.
 """
 
 from typing import TYPE_CHECKING
@@ -165,12 +169,11 @@ def _get_update_status(
     """
     if info.app_name in updated_apps:
         return "✅ Updated"
-    elif info.app_name in failed_apps:
+    if info.app_name in failed_apps:
         return "❌ Failed"
-    elif info.has_update:
+    if info.has_update:
         return "📦 Update available"
-    else:
-        return "✅ Up to date"
+    return "✅ Up to date"
 
 
 def _format_update_version_info(info: "UpdateInfo") -> str:
