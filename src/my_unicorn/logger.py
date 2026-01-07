@@ -47,7 +47,7 @@ from contextlib import contextmanager
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from my_unicorn.constants import (
+from my_unicorn.domain.constants import (
     DEFAULT_LOG_LEVEL,
     LOG_BACKUP_COUNT,
     LOG_COLORS,

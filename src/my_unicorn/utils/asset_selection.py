@@ -13,7 +13,7 @@ Functions:
 from typing import Any
 
 from my_unicorn.exceptions import InstallationError
-from my_unicorn.github_client import Asset, AssetSelector, Release
+from my_unicorn.infrastructure.github import Asset, AssetSelector, Release
 
 
 def select_best_appimage_asset(

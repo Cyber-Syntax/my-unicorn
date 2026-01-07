@@ -9,21 +9,21 @@ import sys
 from argparse import Namespace
 
 from my_unicorn import __version__
-from my_unicorn.auth import auth_manager
+from my_unicorn.cli.commands.auth import AuthHandler
+from my_unicorn.cli.commands.backup import BackupHandler
+from my_unicorn.cli.commands.cache import CacheHandler
+from my_unicorn.cli.commands.catalog import CatalogHandler
+from my_unicorn.cli.commands.config import ConfigHandler
+from my_unicorn.cli.commands.install import InstallCommandHandler
+from my_unicorn.cli.commands.migrate import MigrateHandler
+from my_unicorn.cli.commands.remove import RemoveHandler
+from my_unicorn.cli.commands.update import UpdateHandler
+from my_unicorn.cli.commands.upgrade import UpgradeHandler
 from my_unicorn.cli.parser import CLIParser
-from my_unicorn.commands.auth import AuthHandler
-from my_unicorn.commands.backup import BackupHandler
-from my_unicorn.commands.cache import CacheHandler
-from my_unicorn.commands.catalog import CatalogHandler
-from my_unicorn.commands.config import ConfigHandler
-from my_unicorn.commands.install import InstallCommandHandler
-from my_unicorn.commands.migrate import MigrateHandler
-from my_unicorn.commands.remove import RemoveHandler
-from my_unicorn.commands.update import UpdateHandler
-from my_unicorn.commands.upgrade import UpgradeHandler
 from my_unicorn.config import ConfigManager
+from my_unicorn.infrastructure.auth import auth_manager
 from my_unicorn.logger import get_logger, update_logger_from_config
-from my_unicorn.update import UpdateManager
+from my_unicorn.workflows.update import UpdateManager
 
 logger = get_logger(__name__)
 

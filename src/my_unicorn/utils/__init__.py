@@ -12,7 +12,7 @@ This package provides common utility functions including:
 
 # Import all utility functions from utils.py
 # Import update display functions
-from .update_displays import (
+from my_unicorn.ui.display_update import (
     display_update_details,
     display_update_error,
     display_update_progress,
@@ -20,6 +20,7 @@ from .update_displays import (
     display_update_summary,
     display_update_warning,
 )
+
 from .utils import (
     BYTES_PER_UNIT,
     CHECKSUM_FILE_PATTERNS,
