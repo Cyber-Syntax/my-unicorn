@@ -121,7 +121,9 @@ Examples:
         self._add_auth_command(subparsers)
         self._add_config_command(subparsers)
 
-    def _add_install_command(self, subparsers) -> None:
+    def _add_install_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add install command parser.
 
         Args:
@@ -183,7 +185,9 @@ Examples:
             help="Show detailed logging during installation",
         )
 
-    def _add_update_command(self, subparsers) -> None:
+    def _add_update_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add update command parser.
 
         Args:
@@ -230,7 +234,9 @@ Examples:
             help="Show detailed logging during update",
         )
 
-    def _add_upgrade_command(self, subparsers) -> None:
+    def _add_upgrade_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add upgrade command parser.
 
         Args:
@@ -261,7 +267,9 @@ Examples:
             "(useful for automated scripts)",
         )
 
-    def _add_catalog_command(self, subparsers) -> None:
+    def _add_catalog_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add catalog command parser.
 
         Args:
@@ -292,7 +300,9 @@ Examples:
             help="Show detailed information about a specific app",
         )
 
-    def _add_list_command(self, subparsers) -> None:
+    def _add_list_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add list command parser (deprecated alias for catalog).
 
         Args:
@@ -310,7 +320,9 @@ Examples:
             help="Show available applications from catalog",
         )
 
-    def _add_migrate_command(self, subparsers) -> None:
+    def _add_migrate_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add migrate command parser.
 
         Args:
@@ -334,7 +346,9 @@ Examples:
             help="Force migration even if versions match",
         )
 
-    def _add_remove_command(self, subparsers) -> None:
+    def _add_remove_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add remove command parser.
 
         Args:
@@ -361,7 +375,9 @@ Examples:
             help="Keep configuration files",
         )
 
-    def _add_backup_command(self, subparsers) -> None:
+    def _add_backup_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add backup command parser.
 
         Args:
@@ -438,7 +454,9 @@ Examples:
             help="Show detailed backup information",
         )
 
-    def _add_auth_command(self, subparsers) -> None:
+    def _add_auth_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add auth command parser.
 
         Args:
@@ -464,7 +482,9 @@ Examples:
             "--status", action="store_true", help="Show authentication status"
         )
 
-    def _add_config_command(self, subparsers) -> None:
+    def _add_config_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add config command parser.
 
         Args:
@@ -487,7 +507,9 @@ Examples:
             help="Reset configuration to defaults",
         )
 
-    def _add_cache_command(self, subparsers) -> None:
+    def _add_cache_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add cache command parser.
 
         Args:
