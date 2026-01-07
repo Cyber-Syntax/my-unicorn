@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from my_unicorn.commands.config import ConfigHandler
+from my_unicorn.cli.commands.config import ConfigHandler
 
 
 @pytest.fixture
@@ -68,7 +68,7 @@ def handler(mock_config_manager):
 @pytest.mark.asyncio
 async def test_execute_show(monkeypatch, handler, mocker):
     h, _ = handler
-    mock_logger = mocker.patch("my_unicorn.commands.config.logger")
+    mock_logger = mocker.patch("my_unicorn.cli.commands.config.logger")
     args = Namespace(show=True, reset=False)
 
     await h.execute(args)
@@ -84,7 +84,7 @@ async def test_execute_show(monkeypatch, handler, mocker):
 @pytest.mark.asyncio
 async def test_execute_reset(monkeypatch, handler, mocker):
     h, called = handler
-    mock_logger = mocker.patch("my_unicorn.commands.config.logger")
+    mock_logger = mocker.patch("my_unicorn.cli.commands.config.logger")
     args = Namespace(show=False, reset=True)
 
     # Mock file operations using monkeypatch
@@ -107,7 +107,7 @@ async def test_execute_reset(monkeypatch, handler, mocker):
 @pytest.mark.asyncio
 async def test_execute_no_flags(handler, mocker):
     h, called = handler
-    mock_logger = mocker.patch("my_unicorn.commands.config.logger")
+    mock_logger = mocker.patch("my_unicorn.cli.commands.config.logger")
     args = Namespace(show=False, reset=False)
 
     # Should not raise or log anything

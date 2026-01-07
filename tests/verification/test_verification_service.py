@@ -3,13 +3,13 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-from my_unicorn.github_client import Asset, ChecksumFileInfo
-from my_unicorn.verification.service import (
+from my_unicorn.domain.verification.service import (
     VerificationConfig,
     VerificationResult,
     VerificationService,
 )
+
+from my_unicorn.infrastructure.github import Asset, ChecksumFileInfo
 
 # Test data constants
 LEGCORD_YAML_CONTENT = """version: 1.1.5
@@ -324,7 +324,7 @@ class TestVerificationService:
     async def test_verify_digest_success(self, verification_service):
         """Test successful digest verification."""
         with patch(
-            "my_unicorn.verification.verifier.Verifier"
+            "my_unicorn.domain.verification.verifier.Verifier"
         ) as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
@@ -342,7 +342,7 @@ class TestVerificationService:
     async def test_verify_digest_failure(self, verification_service):
         """Test failed digest verification."""
         with patch(
-            "my_unicorn.verification.verifier.Verifier"
+            "my_unicorn.domain.verification.verifier.Verifier"
         ) as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
@@ -374,7 +374,7 @@ class TestVerificationService:
         )
 
         with patch(
-            "my_unicorn.verification.verifier.Verifier"
+            "my_unicorn.domain.verification.verifier.Verifier"
         ) as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
@@ -417,7 +417,7 @@ class TestVerificationService:
         )
 
         with patch(
-            "my_unicorn.verification.verifier.Verifier"
+            "my_unicorn.domain.verification.verifier.Verifier"
         ) as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
@@ -454,7 +454,7 @@ class TestVerificationService:
         )
 
         with patch(
-            "my_unicorn.verification.verifier.Verifier"
+            "my_unicorn.domain.verification.verifier.Verifier"
         ) as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
@@ -489,7 +489,7 @@ class TestVerificationService:
         )
 
         with patch(
-            "my_unicorn.verification.verifier.Verifier"
+            "my_unicorn.domain.verification.verifier.Verifier"
         ) as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
@@ -724,7 +724,7 @@ releaseDate: '2025-05-26T17:26:48.710Z'"""
         empty_assets = []
 
         with patch(
-            "my_unicorn.verification.verifier.Verifier"
+            "my_unicorn.domain.verification.verifier.Verifier"
         ) as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier
@@ -762,7 +762,7 @@ releaseDate: '2025-05-26T17:26:48.710Z'"""
         )
 
         with patch(
-            "my_unicorn.verification.verifier.Verifier"
+            "my_unicorn.domain.verification.verifier.Verifier"
         ) as mock_verifier_class:
             mock_verifier = MagicMock()
             mock_verifier_class.return_value = mock_verifier

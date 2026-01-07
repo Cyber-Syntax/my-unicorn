@@ -9,13 +9,13 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from my_unicorn.upgrade import SelfUpdater
+from my_unicorn.workflows.upgrade import SelfUpdater
 
 
 class TestUVDetection:
     """Test UV availability detection."""
 
-    @patch("my_unicorn.upgrade.subprocess.run")
+    @patch("my_unicorn.workflows.upgrade.subprocess.run")
     def test_uv_available(self, mock_run):
         """Test UV detection when UV is installed."""
         # Mock successful UV version check
@@ -44,7 +44,7 @@ class TestUVDetection:
             timeout=5,
         )
 
-    @patch("my_unicorn.upgrade.subprocess.run")
+    @patch("my_unicorn.workflows.upgrade.subprocess.run")
     def test_uv_not_available_file_not_found(self, mock_run):
         """Test UV detection when UV is not installed."""
         # Mock FileNotFoundError when UV is not found
@@ -63,7 +63,7 @@ class TestUVDetection:
         # Verify UV was not detected
         assert updater._uv_available is False
 
-    @patch("my_unicorn.upgrade.subprocess.run")
+    @patch("my_unicorn.workflows.upgrade.subprocess.run")
     def test_uv_not_available_timeout(self, mock_run):
         """Test UV detection when command times out."""
         # Mock timeout error
@@ -82,7 +82,7 @@ class TestUVDetection:
         # Verify UV was not detected
         assert updater._uv_available is False
 
-    @patch("my_unicorn.upgrade.subprocess.run")
+    @patch("my_unicorn.workflows.upgrade.subprocess.run")
     def test_uv_not_available_non_zero_exit(self, mock_run):
         """Test UV detection when command fails."""
         # Mock failed UV version check
@@ -108,7 +108,7 @@ class TestUVDetection:
 class TestUVIntegration:
     """Test UV integration in upgrade workflow."""
 
-    @patch("my_unicorn.upgrade.subprocess.run")
+    @patch("my_unicorn.workflows.upgrade.subprocess.run")
     def test_updater_logs_uv_status(self, mock_run, caplog):
         """Test that updater logs UV availability status."""
         # Mock UV available
@@ -136,7 +136,7 @@ class TestUVIntegration:
             "UV is available" in record.message for record in caplog.records
         )
 
-    @patch("my_unicorn.upgrade.subprocess.run")
+    @patch("my_unicorn.workflows.upgrade.subprocess.run")
     def test_updater_logs_uv_not_available(self, mock_run, caplog):
         """Test that updater logs when UV is not available."""
         # Mock UV not available

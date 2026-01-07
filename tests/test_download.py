@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import pytest_asyncio
 
-from my_unicorn.download import DownloadService
-from my_unicorn.github_client import Asset
+from my_unicorn.infrastructure.download import DownloadService
+from my_unicorn.infrastructure.github import Asset
 
 
 @pytest_asyncio.fixture
@@ -23,7 +23,7 @@ def mock_session():
 @pytest_asyncio.fixture
 def patch_logger():
     """Patch get_logger to avoid real logging output."""
-    with patch("my_unicorn.download.get_logger") as mock_logger:
+    with patch("my_unicorn.infrastructure.download.get_logger") as mock_logger:
         yield mock_logger
 
 
@@ -31,7 +31,7 @@ def patch_logger():
 def patch_progress_service():
     """Patch progress service to avoid real progress bars."""
     with patch(
-        "my_unicorn.download.get_progress_service"
+        "my_unicorn.infrastructure.download.get_progress_service"
     ) as mock_progress_service:
         mock_service = MagicMock()
         mock_service.add_task = AsyncMock(return_value="task-id")
@@ -126,7 +126,7 @@ async def test_download_appimage_success(
 
 def test_get_filename_from_url():
     """Test get_filename_from_url extracts filename."""
-    from my_unicorn.download import DownloadService
+    from my_unicorn.infrastructure.download import DownloadService
 
     service = DownloadService(MagicMock())
     url = "https://github.com/owner/repo/releases/download/v1.0.0/app.AppImage"
@@ -168,7 +168,7 @@ async def test_download_checksum_file_error(mock_session, patch_logger):
 
 def test_download_error_exception():
     """Test DownloadError can be raised and caught."""
-    from my_unicorn.download import DownloadError
+    from my_unicorn.infrastructure.download import DownloadError
 
     try:
         raise DownloadError("fail")

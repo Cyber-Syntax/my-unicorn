@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from my_unicorn.schemas import validate_cache_release
+from my_unicorn.config.schemas import validate_cache_release
 
 
 @pytest.fixture

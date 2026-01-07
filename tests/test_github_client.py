@@ -7,7 +7,7 @@ import aiohttp
 import pytest
 import pytest_asyncio
 
-from my_unicorn.github_client import (
+from my_unicorn.infrastructure.github import (
     Asset,
     AssetSelector,
     ChecksumFileInfo,
@@ -44,7 +44,7 @@ def mock_config(monkeypatch):
         return mock_config_data
 
     monkeypatch.setattr(
-        "my_unicorn.github_client.config_manager.load_global_config",
+        "my_unicorn.config.config_manager.load_global_config",
         mock_load_global_config,
     )
     return mock_config_data
@@ -568,6 +568,7 @@ async def test_fetch_latest_release_malformed_response(mock_session):
     # Should raise AttributeError when trying to call .get() on non-dict
     with pytest.raises(AttributeError):
         await fetcher.fetch_latest_release()
+
 
 @pytest.mark.asyncio
 async def test_github_client_get_latest_release(mock_session):

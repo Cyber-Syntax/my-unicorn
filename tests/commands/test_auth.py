@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aioresponses import aioresponses
 
-from my_unicorn.commands.auth import AuthHandler
+from my_unicorn.cli.commands.auth import AuthHandler
 
 
 @pytest.mark.asyncio
@@ -27,7 +27,7 @@ class TestAuthHandler:
         handler.auth_manager = auth_manager  # Link the mock properly
         return handler
 
-    @patch("my_unicorn.commands.auth.GitHubAuthManager.save_token")
+    @patch("my_unicorn.cli.commands.auth.GitHubAuthManager.save_token")
     async def test_save_token(self, mock_save_token, auth_handler):
         """Test saving a GitHub token."""
         mock_save_token.return_value = None
@@ -37,7 +37,7 @@ class TestAuthHandler:
 
         mock_save_token.assert_called_once()
 
-    @patch("my_unicorn.commands.auth.GitHubAuthManager.remove_token")
+    @patch("my_unicorn.cli.commands.auth.GitHubAuthManager.remove_token")
     async def test_remove_token(self, mock_remove_token, auth_handler):
         """Test removing a GitHub token."""
         mock_remove_token.return_value = None
@@ -48,10 +48,10 @@ class TestAuthHandler:
         mock_remove_token.assert_called_once()
 
     @patch(
-        "my_unicorn.commands.auth.AuthHandler._fetch_fresh_rate_limit",
+        "my_unicorn.cli.commands.auth.AuthHandler._fetch_fresh_rate_limit",
         new_callable=AsyncMock,
     )
-    @patch("my_unicorn.commands.auth.GitHubAuthManager.is_authenticated")
+    @patch("my_unicorn.cli.commands.auth.GitHubAuthManager.is_authenticated")
     async def test_show_status_authenticated(
         self, mock_is_authenticated, mock_fetch_fresh_rate_limit, auth_handler
     ):
@@ -73,7 +73,7 @@ class TestAuthHandler:
 
         args = Namespace(save_token=False, remove_token=False, status=True)
 
-        with patch("my_unicorn.commands.auth.logger") as mock_logger:
+        with patch("my_unicorn.cli.commands.auth.logger") as mock_logger:
             await auth_handler.execute(args)
 
         mock_is_authenticated.assert_called_once()
@@ -83,7 +83,7 @@ class TestAuthHandler:
         mock_logger.info.assert_any_call("📊 GitHub API Rate Limit Status:")
 
     @patch(
-        "my_unicorn.commands.auth.AuthHandler._fetch_fresh_rate_limit",
+        "my_unicorn.cli.commands.auth.AuthHandler._fetch_fresh_rate_limit",
         new_callable=AsyncMock,
     )
     async def test_show_status_not_authenticated(
@@ -101,7 +101,7 @@ class TestAuthHandler:
 
         args = Namespace(save_token=False, remove_token=False, status=True)
 
-        with patch("my_unicorn.commands.auth.logger") as mock_logger:
+        with patch("my_unicorn.cli.commands.auth.logger") as mock_logger:
             await auth_handler.execute(args)
 
         auth_handler.auth_manager.is_authenticated.assert_called_once()

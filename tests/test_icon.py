@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from my_unicorn.icon import (
+from my_unicorn.infrastructure.icon import (
     AppImageIconExtractor,
     IconExtractionError,
 )

@@ -364,28 +364,28 @@ def test_quick(tracker: TestTracker) -> None:
     logger.info("=" * 60)
     logger.info("")
 
-    # Step 1: Remove qownnotes for clean state
-    logger.info("Step 1/5: Removing qownnotes for clean URL install test")
+    # Step 1: Test update
+    logger.info("Step 1/5: Testing qownnotes update")
+    result = test_update("qownnotes")
+    tracker.record("QOwnNotes update", result)
+
+    # Step 2: Remove qownnotes for clean state
+    logger.info("Step 2/5: Removing qownnotes for clean URL install test")
     remove_apps("qownnotes")
 
-    # Step 2: Test URL install
-    logger.info("Step 2/5: Testing qownnotes URL install")
+    # Step 3: Test URL install
+    logger.info("Step 3/5: Testing qownnotes URL install")
     result = test_url_install("qownnotes", "https://github.com/pbek/QOwnNotes")
     tracker.record("QOwnNotes URL install", result)
 
-    # Step 3: Remove qownnotes for clean catalog test
-    logger.info("Step 3/5: Removing qownnotes for clean catalog install test")
+    # Step 4: Remove qownnotes for clean catalog test
+    logger.info("Step 4/5: Removing qownnotes for clean catalog install test")
     remove_apps("qownnotes")
 
-    # Step 4: Test catalog install
-    logger.info("Step 4/5: Testing qownnotes catalog install")
+    # Step 5: Test catalog install
+    logger.info("Step 5/5: Testing qownnotes catalog install")
     result = test_catalog_install("qownnotes")
     tracker.record("QOwnNotes catalog install", result)
-
-    # Step 5: Test update
-    logger.info("Step 5/5: Testing qownnotes update")
-    result = test_update("qownnotes")
-    tracker.record("QOwnNotes update", result)
 
     logger.info("")
     logger.info("Quick tests completed")

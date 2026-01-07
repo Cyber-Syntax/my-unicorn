@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from my_unicorn.github_client import Asset, Release
-from my_unicorn.install import InstallHandler
+from my_unicorn.infrastructure.github import Asset, Release
+from my_unicorn.workflows.install import InstallHandler
 
 
 class TestMissingAppImageInstall:

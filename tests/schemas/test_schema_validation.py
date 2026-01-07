@@ -2,7 +2,7 @@
 
 import pytest
 
-from my_unicorn.schemas import (
+from my_unicorn.config.schemas import (
     SchemaValidationError,
     validate_app_state,
     validate_catalog,

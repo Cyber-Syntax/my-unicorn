@@ -1,4 +1,4 @@
-from my_unicorn.utils.progress_utils import calculate_speed
+from my_unicorn.ui.progress import calculate_speed
 
 
 def test_calculate_speed_zero_time_returns_zero():
@@ -77,8 +77,7 @@ Tests cover all utility functions for ASCII rendering and data formatting
 including edge cases and boundary conditions.
 """
 
-
-from my_unicorn.utils.progress_utils import (
+from my_unicorn.ui.progress import (
     GIB,
     KIB,
     MIB,

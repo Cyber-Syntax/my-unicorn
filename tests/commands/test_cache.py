@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 
-from my_unicorn.commands.cache import CacheHandler
+from my_unicorn.cli.commands.cache import CacheHandler
 
 
 class TestCacheHandler:
@@ -59,10 +59,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
@@ -80,10 +80,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
@@ -108,10 +108,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
@@ -135,11 +135,11 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
-            patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.sys.exit") as mock_exit,
         ):
             await cache_handler.execute(args)
 
@@ -168,11 +168,11 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
-            patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.sys.exit") as mock_exit,
         ):
             await cache_handler.execute(args)
 
@@ -188,10 +188,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
@@ -212,10 +212,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
@@ -241,10 +241,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
@@ -269,10 +269,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
@@ -298,10 +298,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
@@ -321,11 +321,11 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.sys.exit") as mock_exit,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(args)
 
@@ -340,8 +340,8 @@ class TestCacheHandler:
         args = Namespace(cache_action="unknown")
 
         with (
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
-            patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.sys.exit") as mock_exit,
         ):
             await cache_handler.execute(args)
 
@@ -357,10 +357,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager"
+                "my_unicorn.cli.commands.cache.get_cache_manager"
             ) as mock_get_manager,
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
-            patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.sys.exit") as mock_exit,
         ):
             mock_get_manager.side_effect = KeyboardInterrupt()
 
@@ -378,10 +378,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager"
+                "my_unicorn.cli.commands.cache.get_cache_manager"
             ) as mock_get_manager,
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
-            patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.sys.exit") as mock_exit,
         ):
             test_exception = Exception("General error")
             mock_get_manager.side_effect = test_exception
@@ -420,8 +420,8 @@ class TestCacheHandler:
         mock_config_manager.load_app_config.return_value = None
 
         with (
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
-            patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.sys.exit") as mock_exit,
         ):
             # The implementation has a bug where it continues execution after sys.exit(1)
             # when sys.exit is mocked, leading to a TypeError
@@ -444,10 +444,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
         ):
             await cache_handler._handle_clear(args)
 
@@ -463,10 +463,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
         ):
             await cache_handler._handle_clear(args)
 
@@ -486,11 +486,11 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
-            patch("my_unicorn.commands.cache.sys.exit") as mock_exit,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.sys.exit") as mock_exit,
         ):
             await cache_handler._handle_clear(args)
 
@@ -508,10 +508,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
         ):
             await cache_handler._handle_stats(args)
 
@@ -530,10 +530,10 @@ class TestCacheHandler:
 
         with (
             patch(
-                "my_unicorn.commands.cache.get_cache_manager",
+                "my_unicorn.cli.commands.cache.get_cache_manager",
                 return_value=mock_cache_manager,
             ),
-            patch("my_unicorn.commands.cache.logger") as mock_logger,
+            patch("my_unicorn.cli.commands.cache.logger") as mock_logger,
         ):
             await cache_handler.execute(clear_args)
             mock_cache_manager.clear_cache.assert_called_once_with()

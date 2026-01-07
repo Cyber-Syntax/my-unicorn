@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from my_unicorn.commands.catalog import CatalogHandler
+from my_unicorn.cli.commands.catalog import CatalogHandler
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def catalog_handler(mock_config_manager):
 @pytest.mark.asyncio
 async def test_catalog_available_apps(catalog_handler, mocker):
     """Test CatalogHandler._list_available_apps."""
-    mock_logger = mocker.patch("my_unicorn.commands.catalog.logger")
+    mock_logger = mocker.patch("my_unicorn.cli.commands.catalog.logger")
     args = Namespace(available=True, installed=False, info=None)
 
     await catalog_handler.execute(args)
@@ -72,7 +72,7 @@ async def test_catalog_available_apps(catalog_handler, mocker):
 @pytest.mark.asyncio
 async def test_catalog_installed_apps(catalog_handler, mocker):
     """Test CatalogHandler._list_installed_apps."""
-    mock_logger = mocker.patch("my_unicorn.commands.catalog.logger")
+    mock_logger = mocker.patch("my_unicorn.cli.commands.catalog.logger")
     args = Namespace(available=False, installed=True, info=None)
 
     await catalog_handler.execute(args)
@@ -88,7 +88,7 @@ async def test_catalog_installed_apps(catalog_handler, mocker):
 @pytest.mark.asyncio
 async def test_catalog_info(catalog_handler, mocker):
     """Test CatalogHandler._show_app_info."""
-    mock_logger = mocker.patch("my_unicorn.commands.catalog.logger")
+    mock_logger = mocker.patch("my_unicorn.cli.commands.catalog.logger")
     args = Namespace(available=False, installed=False, info="app1")
 
     await catalog_handler.execute(args)

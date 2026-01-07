@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from my_unicorn import auth as auth_module
-from my_unicorn.auth import (
+from my_unicorn.infrastructure import auth as auth_module
+from my_unicorn.infrastructure.auth import (
     GitHubAuthManager,
     KeyringAccessError,
     KeyringUnavailableError,
@@ -288,7 +288,7 @@ def test_setup_keyring_unavailable_dbus(monkeypatch):
     monkeypatch.setattr("keyring.set_keyring", mock_set_keyring)
 
     # Should raise KeyringUnavailableError and log at DEBUG
-    with patch("my_unicorn.auth.logger") as mock_logger:
+    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
         with pytest.raises(KeyringUnavailableError):
             setup_keyring()
         # Verify DEBUG log, not ERROR or WARNING for DBUS errors
@@ -312,7 +312,7 @@ def test_setup_keyring_access_error(monkeypatch):
     monkeypatch.setattr("keyring.set_keyring", mock_set_keyring)
 
     # Should raise KeyringAccessError and log at WARNING
-    with patch("my_unicorn.auth.logger") as mock_logger:
+    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
         with pytest.raises(KeyringAccessError):
             setup_keyring()
         # Verify WARNING log for non-DBUS errors
@@ -332,7 +332,7 @@ def test_get_token_keyring_unavailable(monkeypatch, auth_manager):
     monkeypatch.setattr("keyring.get_password", mock_get_password)
 
     # Should return None, not raise
-    with patch("my_unicorn.auth.logger") as mock_logger:
+    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
         token = auth_manager.get_token()
         assert token is None
         # Verify DEBUG log, not ERROR
@@ -350,7 +350,7 @@ def test_get_token_no_token_stored(monkeypatch, auth_manager):
     monkeypatch.setattr("keyring.get_password", lambda k, u: None)
 
     # Should return None and log DEBUG
-    with patch("my_unicorn.auth.logger") as mock_logger:
+    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
         token = auth_manager.get_token()
         assert token is None
         # Verify DEBUG log about no token stored
@@ -372,7 +372,7 @@ def test_get_token_other_exception(monkeypatch, auth_manager):
     monkeypatch.setattr("keyring.get_password", mock_get_password)
 
     # Should return None, not raise
-    with patch("my_unicorn.auth.logger") as mock_logger:
+    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
         token = auth_manager.get_token()
         assert token is None
         # Verify DEBUG log about keyring access failure
@@ -416,7 +416,7 @@ def test_apply_auth_with_token(monkeypatch, auth_manager):
 
     headers = {"User-Agent": "test"}
 
-    with patch("my_unicorn.auth.logger") as mock_logger:
+    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
         result = auth_manager.apply_auth(headers)
 
         # Should add Authorization header
@@ -438,7 +438,7 @@ def test_apply_auth_notifies_once(monkeypatch):
     # Create a new manager instance (starts with _user_notified = False)
     auth_manager = GitHubAuthManager()
 
-    with patch("my_unicorn.auth.logger") as mock_logger:
+    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
         # First call - should notify
         auth_manager.apply_auth({})
         info_calls_first = mock_logger.info.call_count
@@ -464,7 +464,7 @@ def test_save_token_dbus_unavailable(monkeypatch, auth_manager):
 
     monkeypatch.setattr("keyring.set_password", mock_set_password)
 
-    with patch("my_unicorn.auth.logger") as mock_logger:
+    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
         with pytest.raises(DBusError):
             auth_manager.save_token()
 
@@ -495,7 +495,7 @@ def test_setup_keyring_import_error(monkeypatch):
     monkeypatch.setattr("keyring.set_keyring", mock_set_keyring)
 
     # Should raise KeyringUnavailableError and log at DEBUG
-    with patch("my_unicorn.auth.logger") as mock_logger:
+    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
         with pytest.raises(KeyringUnavailableError):
             setup_keyring()
         # Verify DEBUG log for ImportError

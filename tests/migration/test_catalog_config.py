@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from my_unicorn.config import ConfigManager
-from my_unicorn.constants import CATALOG_CONFIG_VERSION
-from my_unicorn.migration.catalog_config import (
+from my_unicorn.domain.constants import CATALOG_CONFIG_VERSION
+from my_unicorn.config.migration.catalog_config import (
     CatalogMigrator,
     _get_icon_config,
     _get_verification_method,

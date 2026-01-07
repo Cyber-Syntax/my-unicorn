@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from my_unicorn.backup import BackupMetadata, BackupService
+from my_unicorn.workflows.backup import BackupMetadata, BackupService
 
 
 @pytest.fixture

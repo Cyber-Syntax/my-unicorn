@@ -1,185 +1,105 @@
+"""Tests for install command handler."""
+
 from argparse import Namespace
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.commands.install import InstallCommand, InstallCommandHandler
-from my_unicorn.exceptions import ValidationError
+from my_unicorn.cli.commands.install import InstallCommandHandler
 
 
 @pytest.fixture
-def mock_dependencies():
-    """Fixture to mock dependencies for InstallCommand."""
-    session = AsyncMock()
-    github_client = MagicMock()
-    catalog_manager = MagicMock()
-    config_manager = MagicMock()
-    install_dir = Path("/mock/install/dir")
-    download_dir = Path("/mock/download/dir")
-
-    return {
-        "session": session,
-        "github_client": github_client,
-        "catalog_manager": catalog_manager,
-        "config_manager": config_manager,
-        "install_dir": install_dir,
-        "download_dir": download_dir,
+def mock_config_manager() -> MagicMock:
+    """Fixture for mock config manager."""
+    mock = MagicMock()
+    mock.load_global_config.return_value = {
+        "directory": {
+            "storage": "/tmp/storage",
+            "download": "/tmp/download",
+        },
+        "max_concurrent_downloads": 3,
+        "network": {
+            "timeout_seconds": 10,
+        },
     }
+    return mock
 
 
 @pytest.fixture
-def install_command(mock_dependencies):
-    """Fixture to create an InstallCommand instance with mocked dependencies."""
-    deps = mock_dependencies
-    return InstallCommand(
-        session=deps["session"],
-        github_client=deps["github_client"],
-        catalog_manager=deps["catalog_manager"],
-        config_manager=deps["config_manager"],
-        install_dir=deps["install_dir"],
-        download_dir=deps["download_dir"],
-    )
-
-
-@pytest.mark.asyncio
-async def test_execute_with_valid_targets(install_command, mock_dependencies):
-    """Test InstallCommand.execute with valid catalog app."""
-    mock_dependencies["catalog_manager"].get_available_apps.return_value = {
-        "app1": {},
-    }
-    mock_dependencies["catalog_manager"].load_catalog_entry.return_value = {
-        "owner": "mock",
-        "repo": "app1",
-        "asset_patterns": ["*.AppImage"],
-    }
-    mock_dependencies["config_manager"].is_app_installed.return_value = False
-
-    # Mock the internal execution method
-    with patch(
-        "my_unicorn.install.InstallHandler.install_multiple",
-        new_callable=AsyncMock,
-    ) as mock_execute:
-        mock_execute.return_value = [
-            {
-                "success": True,
-                "name": "app1",
-                "version": "1.0.0",
-            }
-        ]
-
-        targets = ["app1"]
-        results = await install_command.execute(
-            targets, verify_downloads=False
-        )
-
-        assert len(results) == 1
-        assert results[0]["success"] is True
-        assert results[0]["name"] == "app1"
-
-
-@pytest.mark.asyncio
-async def test_execute_with_invalid_targets(
-    install_command, mock_dependencies
-):
-    """Test InstallCommand.execute with invalid targets."""
-    mock_dependencies["catalog_manager"].get_available_apps.return_value = {
-        "app1": {},
-        "app2": {},
-    }
-
-    targets = ["invalid_app"]
-    with pytest.raises(ValidationError) as excinfo:
-        await install_command.execute(targets)
-
-    assert "Unknown applications or invalid URLs: invalid_app" in str(
-        excinfo.value
-    )
-
-
-@pytest.mark.asyncio
-async def test_execute_no_targets(install_command):
-    """Test InstallCommand.execute with no targets."""
-    with pytest.raises(ValidationError) as excinfo:
-        await install_command.execute([])
-
-    assert "No installation targets provided" in str(excinfo.value)
-
-
-@pytest.mark.asyncio
-async def test_install_handler_execute_with_no_targets(
-    monkeypatch, mock_dependencies
-):
-    """Test InstallCommandHandler.execute with no targets."""
-    handler = InstallCommandHandler(
-        config_manager=mock_dependencies["config_manager"],
+def install_handler(mock_config_manager: MagicMock) -> InstallCommandHandler:
+    """Fixture to create InstallCommandHandler with mocked dependencies."""
+    return InstallCommandHandler(
+        config_manager=mock_config_manager,
         auth_manager=MagicMock(),
         update_manager=MagicMock(),
     )
+
+
+@pytest.mark.asyncio
+async def test_install_handler_no_targets(
+    install_handler: InstallCommandHandler,
+) -> None:
+    """Test InstallCommandHandler with no targets."""
     args = Namespace(targets=[])
 
-    logger_mock = MagicMock()
-    monkeypatch.setattr("my_unicorn.commands.install.logger", logger_mock)
+    with patch("my_unicorn.cli.commands.install.logger") as mock_logger:
+        await install_handler.execute(args)
 
-    await handler.execute(args)
-
-    logger_mock.error.assert_called_once_with("❌ No targets specified.")
-    logger_mock.info.assert_called_once_with(
-        "💡 Use 'my-unicorn list' to see available catalog apps."
-    )
+        mock_logger.error.assert_called_once_with("❌ No targets specified.")
+        mock_logger.info.assert_called_once_with(
+            "💡 Use 'my-unicorn list' to see available catalog apps."
+        )
 
 
 @pytest.mark.asyncio
-async def test_install_handler_execute_with_valid_targets(
-    monkeypatch, mock_dependencies
-):
-    """Test InstallCommandHandler.execute with valid targets."""
-    handler = InstallCommandHandler(
-        config_manager=mock_dependencies["config_manager"],
-        auth_manager=MagicMock(),
-        update_manager=MagicMock(),
-    )
+async def test_install_handler_with_targets(
+    install_handler: InstallCommandHandler,
+) -> None:
+    """Test InstallCommandHandler executes installation successfully."""
     args = Namespace(
-        targets=["app1", "https://github.com/mock/repo"],
+        targets=["app1"],
         concurrency=3,
         no_verify=False,
     )
 
-    mock_dependencies["catalog_manager"].get_available_apps.return_value = {
-        "app1": {},
-        "app2": {},
-    }
-    mock_dependencies["catalog_manager"].get_app_config.return_value = {
-        "mock": "config"
-    }
-    mock_dependencies["session"].get = AsyncMock(
-        return_value=MagicMock(status=200)
-    )
-    mock_dependencies["github_client"].get_repo = AsyncMock(
-        return_value={"mock": "repo"}
-    )
+    mock_results = [{"success": True, "name": "app1", "version": "1.0.0"}]
 
-    install_command_mock = MagicMock()
-    install_command_mock.execute = AsyncMock(return_value=[{"success": True}])
+    with (
+        patch(
+            "my_unicorn.cli.commands.install.create_http_session"
+        ) as mock_session,
+        patch(
+            "my_unicorn.cli.commands.install.InstallApplicationService"
+        ) as mock_service_class,
+        patch("my_unicorn.cli.commands.install.get_progress_service"),
+        patch("my_unicorn.cli.commands.install.print_install_summary"),
+    ):
+        # Setup async context manager for session
+        mock_session_instance = MagicMock()
+        mock_session.return_value.__aenter__ = AsyncMock(
+            return_value=mock_session_instance
+        )
+        mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
 
-    monkeypatch.setattr(
-        "my_unicorn.commands.install.InstallCommand",
-        lambda *args, **kwargs: install_command_mock,
+        # Setup install service
+        mock_service = MagicMock()
+        mock_service.install = AsyncMock(return_value=mock_results)
+        mock_service_class.return_value = mock_service
+
+        await install_handler.execute(args)
+
+        # Verify service.install was called
+        mock_service.install.assert_awaited_once()
+        call_args = mock_service.install.call_args
+        assert call_args[0][0] == ["app1"]  # targets
+
+
+def test_expand_comma_separated_targets(
+    install_handler: InstallCommandHandler,
+) -> None:
+    """Test _expand_comma_separated_targets method."""
+    targets = ["app1,app2", "app3"]
+    expanded = install_handler._expand_comma_separated_targets(  # noqa: SLF001
+        targets
     )
-
-    logger_mock = MagicMock()
-    monkeypatch.setattr("my_unicorn.commands.install.logger", logger_mock)
-
-    await handler.execute(args)
-
-    install_command_mock.execute.assert_called_once_with(
-        ["app1", "https://github.com/mock/repo"],
-        concurrent=3,
-        
-        verify_downloads=True,
-        force=False,
-        update=False,
-    )
-    logger_mock.info.assert_called_with(
-        "All installations completed successfully"
-    )
+    assert expanded == ["app1", "app2", "app3"]

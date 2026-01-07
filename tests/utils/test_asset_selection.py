@@ -3,8 +3,8 @@
 import pytest
 
 from my_unicorn.exceptions import InstallationError
-from my_unicorn.github_client import Asset, Release
-from my_unicorn.utils.asset_selection import select_best_appimage_asset
+from my_unicorn.infrastructure.github import Asset, Release
+from my_unicorn.workflows.shared import select_best_appimage_asset
 
 
 def create_mock_release(assets: list[Asset] | None = None) -> Release:

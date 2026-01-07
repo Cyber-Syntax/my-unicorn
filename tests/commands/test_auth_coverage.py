@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import aiohttp
 import pytest
 
-from my_unicorn.commands.auth import AuthHandler
+from my_unicorn.cli.commands.auth import AuthHandler
 
 
 @pytest.mark.asyncio
@@ -26,8 +26,8 @@ class TestAuthHandlerErrorPaths:
         )
         return handler
 
-    @patch("my_unicorn.commands.auth.GitHubAuthManager.save_token")
-    @patch("my_unicorn.commands.auth.sys.exit")
+    @patch("my_unicorn.cli.commands.auth.GitHubAuthManager.save_token")
+    @patch("my_unicorn.cli.commands.auth.sys.exit")
     async def test_save_token_value_error(
         self, mock_exit, mock_save_token, auth_handler, caplog
     ):
@@ -44,7 +44,7 @@ class TestAuthHandlerErrorPaths:
             for record in caplog.records
         )
 
-    @patch("my_unicorn.commands.auth.GitHubAuthManager.remove_token")
+    @patch("my_unicorn.cli.commands.auth.GitHubAuthManager.remove_token")
     async def test_remove_token_value_error(
         self, mock_remove_token, auth_handler, caplog
     ):
@@ -60,7 +60,7 @@ class TestAuthHandlerErrorPaths:
             for record in caplog.records
         )
 
-    @patch("my_unicorn.commands.auth.GitHubAuthManager.remove_token")
+    @patch("my_unicorn.cli.commands.auth.GitHubAuthManager.remove_token")
     async def test_remove_token_os_error(
         self, mock_remove_token, auth_handler, caplog
     ):
@@ -81,7 +81,7 @@ class TestAuthHandlerErrorPaths:
     ):
         """Test fetch_fresh_rate_limit handles ClientError."""
         with patch(
-            "my_unicorn.commands.auth.aiohttp.ClientSession"
+            "my_unicorn.cli.commands.auth.aiohttp.ClientSession"
         ) as mock_session_class:
             mock_session = MagicMock()
             mock_session_class.return_value.__aenter__.return_value = (
@@ -105,7 +105,7 @@ class TestAuthHandlerErrorPaths:
                 for record in caplog.records
             )
 
-    @patch("my_unicorn.commands.auth.aiohttp.ClientSession")
+    @patch("my_unicorn.cli.commands.auth.aiohttp.ClientSession")
     async def test_fetch_fresh_rate_limit_os_error(
         self, mock_session_class, auth_handler, caplog
     ):
@@ -172,9 +172,9 @@ class TestAuthHandlerErrorPaths:
             "reset": 1700000000,
         }
 
-    @patch("my_unicorn.commands.auth.AuthHandler._display_rate_limit_warnings")
+    @patch("my_unicorn.cli.commands.auth.AuthHandler._display_rate_limit_warnings")
     @patch(
-        "my_unicorn.commands.auth.AuthHandler._display_additional_rate_limit_details"
+        "my_unicorn.cli.commands.auth.AuthHandler._display_additional_rate_limit_details"
     )
     async def test_display_rate_limit_info_no_cached_data(
         self, mock_details, mock_warnings, auth_handler, caplog

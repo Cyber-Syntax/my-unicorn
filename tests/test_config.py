@@ -15,7 +15,7 @@ from my_unicorn.config import (
     DirectoryManager,
     GlobalConfigManager,
 )
-from my_unicorn.constants import GLOBAL_CONFIG_VERSION
+from my_unicorn.domain.constants import GLOBAL_CONFIG_VERSION
 
 
 @pytest.fixture

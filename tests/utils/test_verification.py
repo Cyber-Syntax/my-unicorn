@@ -12,7 +12,7 @@ class TestVerifyAppimageDownload:
 
     async def test_verify_appimage_download_from_catalog(self):
         """Test verify_appimage_download using catalog config."""
-        from my_unicorn.utils.verification import verify_appimage_download
+        from my_unicorn.workflows.shared import verify_appimage_download
 
         file_path = Path("/tmp/test.AppImage")
         asset = MagicMock(digest="sha256:abc123")
@@ -41,7 +41,7 @@ class TestVerifyAppimageDownload:
 
     async def test_verify_appimage_download_from_config(self):
         """Test verify_appimage_download using app config."""
-        from my_unicorn.utils.verification import verify_appimage_download
+        from my_unicorn.workflows.shared import verify_appimage_download
 
         file_path = Path("/tmp/test.AppImage")
         asset = MagicMock(digest=None)
@@ -69,7 +69,7 @@ class TestVerifyAppimageDownload:
 
     async def test_verify_appimage_download_extraction_from_catalog(self):
         """Test that owner/repo are extracted from catalog when not provided."""
-        from my_unicorn.utils.verification import verify_appimage_download
+        from my_unicorn.workflows.shared import verify_appimage_download
 
         file_path = Path("/tmp/test.AppImage")
         asset = MagicMock(digest=None)
@@ -100,7 +100,7 @@ class TestVerifyAppimageDownload:
 
     async def test_verify_appimage_download_error_handling(self):
         """Test verify_appimage_download error handling."""
-        from my_unicorn.utils.verification import verify_appimage_download
+        from my_unicorn.workflows.shared import verify_appimage_download
 
         file_path = Path("/tmp/test.AppImage")
         asset = MagicMock(digest=None)
@@ -126,7 +126,7 @@ class TestVerifyAppimageDownload:
 
     async def test_verify_appimage_download_with_progress_task(self):
         """Test verify_appimage_download with progress task ID."""
-        from my_unicorn.utils.verification import verify_appimage_download
+        from my_unicorn.workflows.shared import verify_appimage_download
 
         file_path = Path("/tmp/test.AppImage")
         asset = MagicMock(digest="sha256:abc")
@@ -153,7 +153,7 @@ class TestVerifyAppimageDownload:
 
     async def test_verify_appimage_download_no_config(self):
         """Test verify_appimage_download with no verification config."""
-        from my_unicorn.utils.verification import verify_appimage_download
+        from my_unicorn.workflows.shared import verify_appimage_download
 
         file_path = Path("/tmp/test.AppImage")
         asset = MagicMock(digest=None)
@@ -180,7 +180,7 @@ class TestVerifyAppimageDownload:
 
     async def test_verify_appimage_download_tag_name_handling(self):
         """Test that tag_name is extracted correctly from release."""
-        from my_unicorn.utils.verification import verify_appimage_download
+        from my_unicorn.workflows.shared import verify_appimage_download
 
         file_path = Path("/tmp/test.AppImage")
         asset = MagicMock(digest=None)
@@ -205,7 +205,7 @@ class TestVerifyAppimageDownload:
 
     async def test_verify_appimage_download_unknown_tag(self):
         """Test handling of None tag_name in release."""
-        from my_unicorn.utils.verification import verify_appimage_download
+        from my_unicorn.workflows.shared import verify_appimage_download
 
         file_path = Path("/tmp/test.AppImage")
         asset = MagicMock(digest=None)

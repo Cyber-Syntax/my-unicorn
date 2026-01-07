@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from my_unicorn.migration.app_config import AppConfigMigrator
+from my_unicorn.config.migration.app_config import AppConfigMigrator
 
 
 class TestIconMigration:

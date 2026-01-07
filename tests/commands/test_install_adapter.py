@@ -4,9 +4,9 @@ from typing import Any
 
 import pytest
 
-from my_unicorn.commands.install import CatalogManagerAdapter
+from my_unicorn.cli.commands.install import CatalogManagerAdapter
 from my_unicorn.config import config_manager
-from my_unicorn.install import InstallHandler
+from my_unicorn.workflows.install import InstallHandler
 
 
 @pytest.mark.asyncio

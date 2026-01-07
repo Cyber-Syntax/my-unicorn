@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from my_unicorn.constants import APP_CONFIG_VERSION
-from my_unicorn.migration.helpers import (
+from my_unicorn.domain.constants import APP_CONFIG_VERSION
+from my_unicorn.config.migration.helpers import (
     get_apps_needing_migration,
     get_config_version,
     needs_app_migration,

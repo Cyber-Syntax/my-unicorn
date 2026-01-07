@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.commands.migrate import MigrateHandler
+from my_unicorn.cli.commands.migrate import MigrateHandler
 from my_unicorn.config import ConfigManager
 
 
@@ -57,7 +57,7 @@ class TestMigrateHandler:
         config_manager.app_config_manager.list_installed_apps.return_value = []
 
         with patch(
-            "my_unicorn.commands.migrate.get_apps_needing_migration"
+            "my_unicorn.cli.commands.migrate.get_apps_needing_migration"
         ) as mock_get_apps:
             mock_get_apps.return_value = []
 
@@ -78,7 +78,7 @@ class TestMigrateHandler:
         ]
 
         with patch(
-            "my_unicorn.commands.migrate.get_apps_needing_migration"
+            "my_unicorn.cli.commands.migrate.get_apps_needing_migration"
         ) as mock_get_apps:
             mock_get_apps.return_value = [("testapp", "1.0.0")]
 
@@ -117,7 +117,7 @@ class TestMigrateHandler:
         ]
 
         with patch(
-            "my_unicorn.commands.migrate.get_apps_needing_migration"
+            "my_unicorn.cli.commands.migrate.get_apps_needing_migration"
         ) as mock_get_apps:
             mock_get_apps.return_value = [("testapp", "1.0.0")]
 
@@ -153,7 +153,7 @@ class TestMigrateHandler:
         ]
 
         with patch(
-            "my_unicorn.commands.migrate.get_apps_needing_migration"
+            "my_unicorn.cli.commands.migrate.get_apps_needing_migration"
         ) as mock_get_apps:
             mock_get_apps.return_value = []
 
@@ -200,7 +200,7 @@ class TestMigrateHandler:
         ]
 
         with patch(
-            "my_unicorn.commands.migrate.AppConfigMigrator"
+            "my_unicorn.cli.commands.migrate.AppConfigMigrator"
         ) as mock_migrator_class:
             mock_migrator = MagicMock()
             mock_migrator_class.return_value = mock_migrator
@@ -227,7 +227,7 @@ class TestMigrateHandler:
         ]
 
         with patch(
-            "my_unicorn.commands.migrate.AppConfigMigrator"
+            "my_unicorn.cli.commands.migrate.AppConfigMigrator"
         ) as mock_migrator_class:
             mock_migrator = MagicMock()
             mock_migrator_class.return_value = mock_migrator
@@ -254,7 +254,7 @@ class TestMigrateHandler:
         ]
 
         with patch(
-            "my_unicorn.commands.migrate.AppConfigMigrator"
+            "my_unicorn.cli.commands.migrate.AppConfigMigrator"
         ) as mock_migrator_class:
             mock_migrator = MagicMock()
             mock_migrator_class.return_value = mock_migrator
@@ -292,22 +292,22 @@ class TestMigrateHandler:
         )
 
         with patch(
-            "my_unicorn.commands.migrate.base.load_json_file"
+            "my_unicorn.cli.commands.migrate.base.load_json_file"
         ) as mock_load:
             mock_load.return_value = {"config_version": "1.0.0"}
 
             with patch(
-                "my_unicorn.commands.migrate.base.needs_migration"
+                "my_unicorn.cli.commands.migrate.base.needs_migration"
             ) as mock_needs:
                 mock_needs.return_value = True
 
                 with patch(
-                    "my_unicorn.commands.migrate.migrate_catalog_v1_to_v2"
+                    "my_unicorn.cli.commands.migrate.migrate_catalog_v1_to_v2"
                 ) as mock_migrate:
                     mock_migrate.return_value = {"config_version": "2.0.0"}
 
                     with patch(
-                        "my_unicorn.commands.migrate.base.save_json_file"
+                        "my_unicorn.cli.commands.migrate.base.save_json_file"
                     ) as mock_save:
                         result = await handler._migrate_catalog_configs()
 
@@ -330,12 +330,12 @@ class TestMigrateHandler:
         catalog_file.write_text('{"config_version": "2.0.0"}')
 
         with patch(
-            "my_unicorn.commands.migrate.base.load_json_file"
+            "my_unicorn.cli.commands.migrate.base.load_json_file"
         ) as mock_load:
             mock_load.return_value = {"config_version": "2.0.0"}
 
             with patch(
-                "my_unicorn.commands.migrate.base.needs_migration"
+                "my_unicorn.cli.commands.migrate.base.needs_migration"
             ) as mock_needs:
                 mock_needs.return_value = False
 
@@ -356,7 +356,7 @@ class TestMigrateHandler:
         catalog_file.write_text('{"config_version": "1.0.0"}')
 
         with patch(
-            "my_unicorn.commands.migrate.base.load_json_file"
+            "my_unicorn.cli.commands.migrate.base.load_json_file"
         ) as mock_load:
             mock_load.side_effect = ValueError("Failed to load")
 

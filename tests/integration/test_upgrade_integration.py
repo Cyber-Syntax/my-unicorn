@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from my_unicorn.upgrade import SelfUpdater
+from my_unicorn.workflows.upgrade import SelfUpdater
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ async def test_upgrade_version_progression(temp_install_dirs):
 
     """
     with (
-        patch("my_unicorn.upgrade.os.execvp") as mock_execvp,
+        patch("my_unicorn.workflows.upgrade.os.execvp") as mock_execvp,
     ):
         mock_execvp.side_effect = SystemExit(0)
 
@@ -99,7 +99,7 @@ async def test_upgrade_clones_to_correct_directory(temp_install_dirs):
 
     """
     with (
-        patch("my_unicorn.upgrade.os.execvp") as mock_execvp,
+        patch("my_unicorn.workflows.upgrade.os.execvp") as mock_execvp,
     ):
         mock_execvp.side_effect = SystemExit(0)
 
@@ -134,7 +134,7 @@ async def test_upgrade_copies_files_correctly(temp_install_dirs):
 
     """
     with (
-        patch("my_unicorn.upgrade.os.execvp") as mock_execvp,
+        patch("my_unicorn.workflows.upgrade.os.execvp") as mock_execvp,
     ):
         mock_execvp.side_effect = SystemExit(0)
 
@@ -169,7 +169,7 @@ async def test_installer_finds_required_files(temp_install_dirs):
 
     """
     with (
-        patch("my_unicorn.upgrade.os.execvp") as mock_execvp,
+        patch("my_unicorn.workflows.upgrade.os.execvp") as mock_execvp,
     ):
         mock_execvp.side_effect = SystemExit(0)
 

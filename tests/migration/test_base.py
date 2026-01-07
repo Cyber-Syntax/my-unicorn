@@ -6,7 +6,7 @@ from pathlib import Path
 import orjson
 import pytest
 
-from my_unicorn.migration.base import (
+from my_unicorn.config.migration.base import (
     compare_versions,
     create_backup,
     load_json_file,

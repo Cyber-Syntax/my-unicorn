@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from my_unicorn.commands.base import BaseCommandHandler
+from my_unicorn.cli.commands.base import BaseCommandHandler
 
 
 class DummyHandler(BaseCommandHandler):

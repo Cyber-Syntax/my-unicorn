@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from my_unicorn.constants import LOG_BACKUP_COUNT, LOG_ROTATION_THRESHOLD_BYTES
+from my_unicorn.domain.constants import LOG_BACKUP_COUNT, LOG_ROTATION_THRESHOLD_BYTES
 from my_unicorn.logger import clear_logger_state, setup_logging
 
 # Constants for test thresholds
