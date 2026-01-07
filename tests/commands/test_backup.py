@@ -69,27 +69,54 @@ def backup_handler(
 
 @pytest.fixture
 def sample_app_config():
-    """Sample app configuration."""
+    """Sample app configuration (v2 format)."""
     return {
-        "config_version": "1.0.0",
+        "config_version": "2.0.0",
         "source": "catalog",
-        "appimage": {
+        "catalog_ref": "appflowy",
+        "state": {
             "version": "1.2.3",
-            "name": "appflowy.AppImage",
-            "rename": "appflowy",
-            "name_template": "",
-            "characteristic_suffix": [],
             "installed_date": "2024-08-19T12:50:44.179839",
-            "digest": "sha256:abc123def456",
+            "installed_path": "/path/to/storage/appflowy.AppImage",
+            "verification": {
+                "passed": True,
+                "methods": [
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                        "expected": "abc123def456",
+                        "computed": "abc123def456",
+                        "source": "github_api",
+                    }
+                ],
+            },
+            "icon": {
+                "installed": True,
+                "method": "extraction",
+                "path": "/path/to/icon.png",
+            },
         },
-        "owner": "AppFlowy-IO",
-        "repo": "AppFlowy",
-        "github": {"repo": True, "prerelease": False},
-        "verification": {"digest": True, "skip": False},
-        "icon": {
-            "name": "appflowy.png",
-            "url": "",
-            "path": "/path/to/icon.png",
+        "overrides": {
+            "metadata": {
+                "name": "appflowy",
+                "display_name": "AppFlowy",
+            },
+            "source": {
+                "type": "github",
+                "owner": "AppFlowy-IO",
+                "repo": "AppFlowy",
+                "prerelease": False,
+            },
+            "appimage": {
+                "rename": "appflowy",
+            },
+            "verification": {
+                "methods": ["digest"],
+            },
+            "icon": {
+                "method": "extraction",
+            },
         },
     }
 
@@ -645,9 +672,10 @@ class TestBackupHandler:
             backup_file,
         )
 
-        # Mock config with different current version
+        # Mock config with different current version (v2 structure)
         current_config = sample_app_config.copy()
-        current_config["appimage"]["version"] = (
+        current_config["state"] = current_config["state"].copy()
+        current_config["state"]["version"] = (
             "1.2.3"  # Different from restore version
         )
 

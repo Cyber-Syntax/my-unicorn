@@ -19,13 +19,14 @@ from typing import Any
 from packaging.version import InvalidVersion, Version
 
 from .constants import (
+    APP_CONFIG_VERSION,
     BACKUP_METADATA_CORRUPTED_SUFFIX,
     BACKUP_METADATA_FILENAME,
     BACKUP_METADATA_TMP_PREFIX,
     BACKUP_METADATA_TMP_SUFFIX,
     BACKUP_TEMP_SUFFIX,
 )
-from .logger import get_logger
+from .logger import get_logger, temporary_console_level
 
 logger = get_logger(__name__)
 
@@ -272,7 +273,11 @@ class BackupService:
         self.global_config = global_config
 
     def create_backup(
-        self, file_path: Path, app_name: str, version: str | None = None
+        self,
+        file_path: Path,
+        app_name: str,
+        version: str | None = None,
+        skip_cleanup: bool = False,
     ) -> Path | None:
         """Create versioned backup of existing file.
 
@@ -280,6 +285,7 @@ class BackupService:
             file_path: Path to file to backup
             app_name: Name of the application
             version: Version string to include in backup name
+            skip_cleanup: If True, skip cleanup of old backups (default: False)
 
         Returns:
             Path to backup file or None if no existing file
@@ -296,11 +302,21 @@ class BackupService:
         # Determine version
         if not version:
             app_config = self.config_manager.load_app_config(app_name)
-            version = (
-                app_config.get("appimage", {}).get("version", "unknown")
-                if app_config
-                else "unknown"
-            )
+            if app_config:
+                # Check config version to determine structure
+                config_version = app_config.get("config_version", "1.0.0")
+                if config_version == "2.0.0":
+                    # v2 config: version is in state section
+                    version = app_config.get("state", {}).get(
+                        "version", "unknown"
+                    )
+                else:
+                    # v1 config: version is in appimage section
+                    version = app_config.get("appimage", {}).get(
+                        "version", "unknown"
+                    )
+            else:
+                version = "unknown"
 
         # Create backup filename
         stem = file_path.stem
@@ -327,8 +343,9 @@ class BackupService:
 
             logger.info("Backup created: %s (v%s)", backup_path, version)
 
-            # Cleanup old backups after successful backup
-            self._cleanup_old_backups_for_app(app_name, app_backup_dir)
+            # Cleanup old backups after successful backup (unless skipped)
+            if not skip_cleanup:
+                self._cleanup_old_backups_for_app(app_name, app_backup_dir)
 
             return backup_path
 
@@ -416,8 +433,9 @@ class BackupService:
             "Backing up current version %s before restore...", current_version
         )
         try:
+            # Skip cleanup during restore - will cleanup after restore succeeds
             current_backup_path = self.create_backup(
-                destination_path, app_name, current_version
+                destination_path, app_name, current_version, skip_cleanup=True
             )
             if current_backup_path:
                 logger.info(
@@ -485,20 +503,47 @@ class BackupService:
             app_name: Name of the application
             version: Restored version
             version_info: Version metadata from backup
-            app_config: App configuration dictionary
+            app_config: App configuration dictionary (v2 format)
             appimage_name: Name of the AppImage
 
         """
-        app_config["appimage"]["version"] = version
-        app_config["appimage"]["installed_date"] = datetime.now().isoformat()
+        # v2 config: update state section
+        state = app_config.get("state", {})
+        state["version"] = version
+        state["installed_date"] = datetime.now().isoformat()
 
+        # Update verification if we have sha256
         if version_info.get("sha256"):
-            app_config["appimage"]["digest"] = (
-                f"sha256:{version_info['sha256']}"
-            )
+            verification = state.get("verification", {})
+            methods = verification.get("methods", [])
 
-        if "name" not in app_config["appimage"]:
-            app_config["appimage"]["name"] = appimage_name
+            # Update or add digest verification method
+            digest_method_found = False
+            for method in methods:
+                if method.get("type") == "digest":
+                    method["expected"] = version_info["sha256"]
+                    method["computed"] = version_info["sha256"]
+                    method["status"] = "passed"
+                    digest_method_found = True
+                    break
+
+            if not digest_method_found:
+                methods.append(
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                        "expected": version_info["sha256"],
+                        "computed": version_info["sha256"],
+                        "source": "backup_restore",
+                    }
+                )
+
+            verification["methods"] = methods
+            verification["passed"] = True
+            state["verification"] = verification
+
+        app_config["state"] = state
 
         try:
             self.config_manager.save_app_config(app_name, app_config)
@@ -557,18 +602,48 @@ class BackupService:
             logger.error("App configuration not found for %s", app_name)
             return None
 
-        # Validate app config structure
-        if "appimage" not in app_config:
+        # Check config version to detect v1 vs v2
+        config_version = app_config.get("config_version", "1.0.0")
+        if config_version != APP_CONFIG_VERSION:
             logger.error(
-                "Invalid app configuration for %s: missing 'appimage' section",
+                "App configuration for %s uses old v%s format",
                 app_name,
+                config_version,
             )
+            with temporary_console_level("INFO"):
+                logger.info("")
+                logger.info("⚠️  Old Configuration Format Detected")
+                logger.info("")
+                logger.info(
+                    "The app '%s' uses config version %s (current: %s).",
+                    app_name,
+                    config_version,
+                    APP_CONFIG_VERSION,
+                )
+                logger.info(
+                    "Please run the migration command to upgrade to v2:"
+                )
+                logger.info("")
+                logger.info("  my-unicorn migrate")
+                logger.info("")
             return None
 
-        appimage_config = app_config["appimage"]
+        # v2 config structure: extract necessary fields from state and overrides
+        state = app_config.get("state", {})
+        catalog_ref = app_config.get("catalog_ref")
+
+        # Get rename from catalog or overrides
+        if catalog_ref:
+            # Catalog-based install: need to load catalog for rename field
+            # For now, use app_name as fallback
+            app_rename = app_name
+        else:
+            # URL-based install: get from overrides
+            overrides = app_config.get("overrides", {})
+            appimage_config = overrides.get("appimage", {})
+            app_rename = appimage_config.get("rename", app_name)
 
         # Use the rename field for the actual AppImage name
-        app_rename = appimage_config.get("rename", app_name)
         if not app_rename:
             app_rename = app_name
         appimage_name = f"{app_rename}.AppImage"
@@ -576,7 +651,7 @@ class BackupService:
         destination_dir.mkdir(parents=True, exist_ok=True)
 
         # Backup current version if different from restore version
-        current_version = appimage_config.get("version", "unknown")
+        current_version = state.get("version", "unknown")
         if current_version != version:
             self._backup_current_version(
                 destination_path, app_name, current_version
@@ -592,6 +667,11 @@ class BackupService:
             self._update_config_after_restore(
                 app_name, version, version_info, app_config, appimage_name
             )
+
+            # Cleanup old backups after successful restore
+            backup_base_dir = Path(self.global_config["directory"]["backup"])
+            app_backup_dir = backup_base_dir / app_name
+            self._cleanup_old_backups_for_app(app_name, app_backup_dir)
 
             logger.info(
                 "Restored %s v%s to %s", app_name, version, destination_path
