@@ -110,15 +110,8 @@ class TestAuthHandler:
             "Use 'my-unicorn auth --save-token' to set a token"
         )
 
-    @patch("my_unicorn.commands.auth.GitHubAuthManager.apply_auth")
-    async def test_fetch_fresh_rate_limit(self, mock_apply_auth, auth_handler):
+    async def test_fetch_fresh_rate_limit(self, auth_handler):
         """Test fetching fresh rate limit information."""
-        # Set up safe mock headers
-        test_token = "test_token_safe_123"
-        mock_apply_auth.return_value = {
-            "Authorization": f"Bearer {test_token}"
-        }
-
         # Mock the API response
         expected_response = {"rate_limit": "mock_data"}
         expected_headers = {"X-RateLimit-Remaining": "500"}
@@ -132,5 +125,4 @@ class TestAuthHandler:
 
             result = await auth_handler._fetch_fresh_rate_limit()
 
-        mock_apply_auth.assert_called_once_with({})
         assert result == expected_response

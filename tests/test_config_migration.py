@@ -63,13 +63,14 @@ class TestConfigMigration:
         assert message == "Test message %s"
         assert args == ("arg1",)
 
-    def test_collect_message_critical_prints(self, migration, capsys):
-        """Test that critical messages are printed to console."""
+    def test_collect_message_critical_prints(self, migration, caplog):
+        """Test that critical messages are logged to console."""
         migration._collect_message("ERROR", "Critical error: %s", "problem")
 
-        captured = capsys.readouterr()
-        assert (
-            "Config Migration ERROR: Critical error: problem" in captured.out
+        # Check that the message was logged (now uses logger.info instead of print)
+        assert any(
+            "Config Migration ERROR: Critical error: problem" in record.message
+            for record in caplog.records
         )
 
     def test_needs_migration_true(self, migration):

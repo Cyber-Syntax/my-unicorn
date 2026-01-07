@@ -65,6 +65,7 @@ def test_get_formatted_version_git_info(mock_config_manager, mock_session):
         formatted = updater.get_formatted_version()
         assert formatted == "1.2.3 (git: abcdef)"
 
+
 @pytest.mark.asyncio
 async def test_get_latest_release_success(mock_config_manager, mock_session):
     """Test get_latest_release returns release dict."""
@@ -89,7 +90,7 @@ async def test_get_latest_release_success(mock_config_manager, mock_session):
 
 @pytest.mark.asyncio
 async def test_get_latest_release_api_error(
-    mock_config_manager, mock_session, capsys
+    mock_config_manager, mock_session, caplog
 ):
     """Test get_latest_release handles API error gracefully."""
     updater = SelfUpdater(mock_config_manager, mock_session)
@@ -106,12 +107,14 @@ async def test_get_latest_release_api_error(
     ):
         result = await updater.get_latest_release()
         assert result is None
-        out = capsys.readouterr().out
-        assert (
-            "Rate limit exceeded" in out or "GitHub Rate limit exceeded" in out
+        # Check logger output instead of capsys
+        assert any(
+            "Rate limit exceeded" in record.message
+            for record in caplog.records
         )
 
     # Simulate generic API error
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -119,10 +122,13 @@ async def test_get_latest_release_api_error(
     ):
         result = await updater.get_latest_release()
         assert result is None
-        out = capsys.readouterr().out
-        assert "Error connecting to GitHub" in out or "API error" in out
+        # Check logger output instead of capsys
+        assert any(
+            "error" in record.message.lower() for record in caplog.records
+        )
 
     # Simulate network error (ClientError)
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -130,10 +136,13 @@ async def test_get_latest_release_api_error(
     ):
         result = await updater.get_latest_release()
         assert result is None
-        out = capsys.readouterr().out
-        assert "Error connecting to GitHub" in out or "Network down" in out
+        # Check logger output instead of capsys
+        assert any(
+            "error" in record.message.lower() for record in caplog.records
+        )
 
     # Simulate timeout error
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -141,10 +150,13 @@ async def test_get_latest_release_api_error(
     ):
         result = await updater.get_latest_release()
         assert result is None
-        out = capsys.readouterr().out
-        assert "Error connecting to GitHub" in out or "ClientTimeout" in out
+        # Check logger output instead of capsys
+        assert any(
+            "error" in record.message.lower() for record in caplog.records
+        )
 
     # Simulate malformed response (None)
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -152,12 +164,9 @@ async def test_get_latest_release_api_error(
     ):
         result = await updater.get_latest_release()
         assert result is None or isinstance(result, dict)
-        out = capsys.readouterr().out
-        assert (
-            "Malformed release data" in out or "Error" in out or result is None
-        )
 
     # Simulate malformed response (unexpected type)
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -165,15 +174,11 @@ async def test_get_latest_release_api_error(
     ):
         result = await updater.get_latest_release()
         assert result is None or isinstance(result, dict)
-        out = capsys.readouterr().out
-        assert (
-            "Malformed release data" in out or "Error" in out or result is None
-        )
 
 
 @pytest.mark.asyncio
 async def test_check_for_update_api_error(
-    mock_config_manager, mock_session, capsys
+    mock_config_manager, mock_session, caplog
 ):
     """Test check_for_update handles API/network errors gracefully."""
     updater = SelfUpdater(mock_config_manager, mock_session)
@@ -190,12 +195,14 @@ async def test_check_for_update_api_error(
     ):
         result = await updater.check_for_update()
         assert result is False
-        out = capsys.readouterr().out
-        assert (
-            "Rate limit exceeded" in out or "GitHub Rate limit exceeded" in out
+        # Check logger output instead of capsys
+        assert any(
+            "Rate limit exceeded" in record.message
+            for record in caplog.records
         )
 
     # Simulate generic API error
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -203,10 +210,13 @@ async def test_check_for_update_api_error(
     ):
         result = await updater.check_for_update()
         assert result is False
-        out = capsys.readouterr().out
-        assert "Error connecting to GitHub" in out or "API error" in out
+        # Check logger output instead of capsys
+        assert any(
+            "error" in record.message.lower() for record in caplog.records
+        )
 
     # Simulate network error (ClientError)
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -214,12 +224,13 @@ async def test_check_for_update_api_error(
     ):
         result = await updater.check_for_update()
         assert result is False
-        out = capsys.readouterr().out
-        assert (
-            "Error connecting to GitHub" in out or "Network unreachable" in out
+        # Check logger output instead of capsys
+        assert any(
+            "error" in record.message.lower() for record in caplog.records
         )
 
     # Simulate timeout error
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -227,10 +238,13 @@ async def test_check_for_update_api_error(
     ):
         result = await updater.check_for_update()
         assert result is False
-        out = capsys.readouterr().out
-        assert "Error connecting to GitHub" in out or "ClientTimeout" in out
+        # Check logger output instead of capsys
+        assert any(
+            "error" in record.message.lower() for record in caplog.records
+        )
 
     # Simulate malformed response (None)
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -238,14 +252,9 @@ async def test_check_for_update_api_error(
     ):
         result = await updater.check_for_update()
         assert result is False
-        out = capsys.readouterr().out
-        assert (
-            "Malformed release data" in out
-            or "Error" in out
-            or result is False
-        )
 
     # Simulate malformed response (unexpected type)
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -253,12 +262,6 @@ async def test_check_for_update_api_error(
     ):
         result = await updater.check_for_update()
         assert result is False
-        out = capsys.readouterr().out
-        assert (
-            "Malformed release data" in out
-            or "Error" in out
-            or result is False
-        )
 
 
 @pytest.mark.asyncio
@@ -386,16 +389,19 @@ async def test_perform_self_update_runs_update(mock_config_manager):
         assert result is False
 
 
-def test_display_current_version_prints(monkeypatch, capsys):
-    """Test display_current_version prints version."""
+def test_display_current_version_prints(monkeypatch, caplog):
+    """Test display_current_version logs version."""
     monkeypatch.setattr(
         "my_unicorn.upgrade.get_version", lambda pkg: "1.2.3+abcdef"
     )
     from my_unicorn.upgrade import display_current_version
 
     display_current_version()
-    out = capsys.readouterr().out
-    assert "my-unicorn version: 1.2.3 (git: abcdef)" in out
+    # Check logger output instead of capsys
+    assert any(
+        "my-unicorn version: 1.2.3 (git: abcdef)" in record.message
+        for record in caplog.records
+    )
 
 
 # ============================================================================

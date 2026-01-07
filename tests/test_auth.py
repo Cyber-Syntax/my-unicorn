@@ -337,7 +337,7 @@ def test_get_token_keyring_unavailable(monkeypatch, auth_manager):
         assert token is None
         # Verify DEBUG log, not ERROR
         debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
-        assert any("headless" in call for call in debug_calls)
+        assert any("Keyring access failed" in call for call in debug_calls)
         assert mock_logger.error.call_count == 0
 
 
@@ -389,8 +389,8 @@ def test_apply_auth_no_token(monkeypatch, auth_manager):
     """
     monkeypatch.setattr("keyring.get_password", lambda k, u: None)
 
-    # Reset the notification flag
-    GitHubAuthManager._user_notified = False
+    # Reset the notification flag (instance variable)
+    auth_manager._user_notified = False
 
     headers = {"User-Agent": "test"}
     result = auth_manager.apply_auth(headers)
@@ -399,8 +399,8 @@ def test_apply_auth_no_token(monkeypatch, auth_manager):
     assert "Authorization" not in result
     # Should keep existing headers
     assert result["User-Agent"] == "test"
-    # Notification flag should be set
-    assert GitHubAuthManager._user_notified is True
+    # Notification flag should be set on instance
+    assert auth_manager._user_notified is True
 
 
 def test_apply_auth_with_token(monkeypatch, auth_manager):
@@ -412,7 +412,7 @@ def test_apply_auth_with_token(monkeypatch, auth_manager):
     monkeypatch.setattr("keyring.get_password", lambda k, u: "ghp_test123")
 
     # Reset the notification flag
-    GitHubAuthManager._user_notified = False
+    auth_manager._user_notified = False
 
     headers = {"User-Agent": "test"}
 
@@ -424,7 +424,7 @@ def test_apply_auth_with_token(monkeypatch, auth_manager):
         # Should not notify user
         assert mock_logger.info.call_count == 0
         # Notification flag should remain False
-        assert GitHubAuthManager._user_notified is False
+        assert auth_manager._user_notified is False
 
 
 def test_apply_auth_notifies_once(monkeypatch):
@@ -435,9 +435,7 @@ def test_apply_auth_notifies_once(monkeypatch):
     """
     monkeypatch.setattr("keyring.get_password", lambda k, u: None)
 
-    # Reset the notification flag
-    GitHubAuthManager._user_notified = False
-
+    # Create a new manager instance (starts with _user_notified = False)
     auth_manager = GitHubAuthManager()
 
     with patch("my_unicorn.auth.logger") as mock_logger:
