@@ -5,7 +5,7 @@ template method pattern with a simpler, more maintainable approach.
 """
 
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -710,7 +710,7 @@ class InstallHandler:
             "catalog_ref": catalog_ref,
             "state": {
                 "version": release.version,
-                "installed_date": datetime.now().isoformat(),
+                "installed_date": datetime.now(tz=UTC).isoformat(),
                 "installed_path": str(app_path),
                 "verification": {
                     "passed": verification_state["passed"],

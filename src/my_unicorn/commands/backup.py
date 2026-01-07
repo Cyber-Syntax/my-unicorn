@@ -108,7 +108,7 @@ class BackupHandler(BaseCommandHandler):
         app_config = self.config_manager.load_app_config(app_name)
         if not app_config:
             logger.error("❌ App '%s' is not installed", app_name)
-            logger.info("Use 'list' to see installed applications")
+            logger.info("Use 'my-unicorn catalog' to see installed applications")
             return
 
         try:

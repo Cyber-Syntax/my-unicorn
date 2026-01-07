@@ -136,14 +136,18 @@ async def setup_appimage_icon(
         }
     else:
         if icon_path:
+            # Ensure icon_path is a Path object for .name access
+            icon_path_obj = (
+                Path(icon_path) if isinstance(icon_path, str) else icon_path
+            )
             return {
                 "success": True,
                 "source": "extraction",
-                "icon_path": str(icon_path),
-                "path": str(icon_path),
+                "icon_path": str(icon_path_obj),
+                "path": str(icon_path_obj),
                 "installed": True,
                 "extraction": True,
-                "name": icon_path.name,
+                "name": icon_filename,  # Use configured filename
             }
 
         return {
