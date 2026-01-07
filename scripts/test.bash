@@ -15,8 +15,9 @@
 # qownnotes: Catalog + digest
 # legcord: Catalog + checksum_file via latest-linux.yml
 # keepassxc: URL + checksum_file via x.AppImage.DIGEST
+# neovim: URL + digest
 # freetube: Catalog/URL + always beta app + digest test. 
-# tagspaces: Catalog + Digest and checksum_file via SHA256SUMS.txt
+# flameshot: Catalog + digest
 # logseq: Catalog + checksum_file via SHA256SUMS.txt
 # standard-notes: Catalog + checksum_file via SHA256SUMS.txt 
 #                + special naming logic  which repo name is desktop
@@ -227,27 +228,27 @@ test_quick() {
 test_all() {
   info "=== Running All Comprehensive Tests ==="
 
-  # Test multiple URL installs: nuclear + keepassxc
-  info "--- Testing URL installs (nuclear + keepassxc) ---"
+  # Test multiple URL installs: neovim + keepassxc
+  info "--- Testing URL installs (neovim + keepassxc) ---"
 
   info "Step 1/2: Removing apps for clean URL install test"
-  remove_apps nuclear keepassxc
+  remove_apps neovim keepassxc
 
   info "Step 2/2: Testing concurrent URL installs"
-  run_cli install https://github.com/nukeop/nuclear https://github.com/keepassxreboot/keepassxc
+  run_cli install https://github.com/neovim/neovim https://github.com/keepassxreboot/keepassxc
 
   # Test multiple catalog installs
-  info "--- Testing catalog installs (legcord + tagspaces + (already installed appflowy)) ---"
+  info "--- Testing catalog installs (legcord + flameshot + (already installed appflowy)) ---"
 
   info "Step 1/2: Removing apps for clean catalog install test"
-  remove_apps legcord tagspaces
+  remove_apps legcord flameshot
 
   info "Step 2/2: Testing multiple catalog install"
-  test_catalog_install legcord tagspaces appflowy standard-notes
+  test_catalog_install legcord flameshot appflowy standard-notes
 
   # Test updates for multiple apps
   info "--- Testing updates for multiple apps ---"
-  test_update legcord tagspaces keepassxc appflowy standard-notes
+  test_update legcord flameshot keepassxc appflowy standard-notes
 
   info "=== All comprehensive tests completed ==="
 }
@@ -276,9 +277,9 @@ TEST FLOW:
 
     All Tests:
         1. appflowy: remove -> URL install -> remove -> catalog install -> update
-        2. URL installs: remove (nuclear, keepassxc) -> concurrent URL install
-        3. Catalog installs: remove (legcord, tagspaces) -> catalog install
-        4. Updates: test updates for legcord, tagspaces, keepassxc
+        2. URL installs: remove (neovim, keepassxc) -> concurrent URL install
+        3. Catalog installs: remove (legcord, flameshot) -> catalog install
+        4. Updates: test updates for legcord, flameshot, keepassxc
 
 EXAMPLES:
     $0 --quick                       # Run quick tests (appflowy only)
