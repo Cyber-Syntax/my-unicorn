@@ -31,8 +31,9 @@ uv run pytest tests/cli/test_parser.py --cov=my_unicorn.cli.parser
 
 ## Code Style Guidelines
 
- Use built-in types: `list[str]`, `dict[str, int]` (not `List`, `Dict`)
- Never use f-strings in logging statements, instead use `%s` formatting.
+- Use built-in types: `list[str]`, `dict[str, int]`
+- Use `%s` style formatting in logging statements
+- Use `logger.exception("message")` in exception handlers to log stack traces
 
 ## Project Overview
 
@@ -42,34 +43,32 @@ Key Technologies:
 
 - Python 3.12+ with asyncio/aiohttp for async operations
 
-Architecture:
+Configuration Structure:
 
-- Binary location: `~/.local/bin/my-unicorn`
-- Source Code stored in `~/.local/share/my-unicorn/`
 - Configuration stored in `~/.config/my-unicorn/`
     - settings.conf - Global configuration file (GLOBAL_CONFIG_VERSION="1.0.2")
-    - cache/ - Cache files, filtered for AppImage/checksums only (Windows, mac removed)
+    - cache/releases/ - Cache files, filtered for AppImage/checksums only (Windows, mac removed)
         - `AppFlowy-IO_AppFlowy.json` - AppFlowy cache config
         - `zen-browser_desktop.json` - Zen Browser cache config
     - logs/ - Log files for my-unicorn
     - apps/ - AppImages state data folder (APP_CONFIG_VERSION="2.0.0")
-        - `appflowy.json` - AppFlowy app config (v2 format)
-        - `zen-browser.json` - Zen Browser app config (v2 format)
+        - `appflowy.json` - AppFlowy app config
+        - `zen-browser.json` - Zen Browser app config
         - `backups/` - Config backups created during migration
 
 Project Structure:
 
-- `my_unicorn/` - Main application directory (e.g. src)
+- `src/my_unicorn/` - Main application directory
     - `catalog/` - AppImage catalog data (owner, repo, verification logic etc.)
-        - `appflowy.json` - AppFlowy catalog config (v2 format with descriptions)
-        - `zen-browser.json` - Zen Browser catalog config (v2 format with descriptions)
+        - `appflowy.json` - AppFlowy catalog config
+        - `zen-browser.json` - Zen Browser catalog config
     - `cli/` - CLI interface (parser, runner)
     - `commands/` - Command handlers
         - `auth.py` - Auth command handler
         - `backup.py` - Backup command handler
         - `base.py` - Base command handler
         - `cache.py` - Cache command handler
-        - `catalog.py` - Catalog command handler (renamed from list.py)
+        - `catalog.py` - Catalog command handler
         - `config.py` - Config command handler
         - `install.py` - Install command handler
         - `migrate.py` - Migrate command handler (v1→v2 config migration)
@@ -85,6 +84,8 @@ Project Structure:
         - `catalog_v2.schema.json` - v2 catalog schema
         - `app_state_v1.schema.json` - v1 app state schema
         - `app_state_v2.schema.json` - v2 app state schema
+        - `cache_release.schema.json` - Cache release schema
+        - `validator.py` - JSON schema validator module
     - `utils/` - Utility functions
     - `verification/` - Checksum verification logic
     - app_config_migration.py: Config migration module (v1→v2)
@@ -108,7 +109,6 @@ Project Structure:
 - `scripts/`: Scripts for various tasks
 - `tests/`: Test files written in Python using pytest (910 tests passing)
 - setup.sh: Setup script for installation my-unicorn
-- run.py: my-unicorn development entry point
 
 ## Running the CLI
 

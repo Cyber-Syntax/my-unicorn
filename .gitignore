@@ -3,9 +3,8 @@ memory-bank/
 backups
 plan
 # ignore appimages
-*AppImage
 *.AppImage*
-*appimage*
+*.appimage
 # ignore flowchart
 *xopp*
 # ignore vscode

@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2025-12-27
+## [Unreleased]
 
 ### Breaking Changes
 
@@ -60,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `migration/app_config.py` - App config migration
     - `migration/global_config.py` - Global config migration
     - Eliminated code duplication
+- **Renamed Command**: Renamed deprecated `list` command with `catalog`.
+    - Use new `catalog` command instead of `list` (there is no alias for `list` command anymore)
 
 ### Fixed
 
@@ -78,11 +80,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - No overrides added to catalog apps during migration
 - Wrong name in catalog for Beekeeper Studio app, changed name from beekeper-studio to beekeeper-studio.
 
+### Removed
+
+- **Legacy Config Support**: Removed support for v1 configuration format
+    - Post-migration, only v2 configs accepted
+    - Simplifies codebase and maintenance
+
+    - Alias maintained for backward compatibility
+    - Encourages use of new command with enhanced features
+- **Old Migration Code**: Removed legacy migration code from main modules
+    - All migration logic now in dedicated `migration/` package
+    - Cleaner separation of concerns
+- **icon download logic**: Removed icon download logic because we extract icon from appimage now.
+- **Backup Migration**: Removed automatic migration from old flat backup format to folder-based structure
+    - Users with old backups (*.backup.AppImage) should manually reorganize them if needed
+    - New installations and users who already migrated are unaffected
+    - Backup system now exclusively uses folder-based structure with metadata.json
+
 ### Migration Guide
 
 #### Migrating from v1.x to v2.0.0
 
-1. **Before upgrading**: Your existing v1 configs will continue to work for reading, but you should migrate them.
+1. **beekeeper-studio name**:
+    - (Recommended) If you use beekeeper-studio, remove the app before migration to v2.0.0 and reinstall after migration to avoid issues.
+    - You can manually rename your config and desktop files for Beekeeper Studio if you migrated before reinstalling:
+      1. Rename `~/.config/my-unicorn/apps/beekeper-studio.json` to `beekeeper-studio.json`.
+      2. Rename `~/.local/share/applications/beekeper-studio.desktop` to `beekeeper-studio.desktop`.
+      3. Update `catalog_ref` field in the config file to `beekeeper-studio`.
 
 2. **Run migration command**:
 
@@ -105,8 +129,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Catalog apps: Only state + catalog_ref stored (metadata from catalog)
    - URL apps: Full config in overrides section
    - See docs/config.md for detailed v2 format documentation
-
-- Please manually update beekeeper-studio app config if you are using it. Both app state config name and `"catalog_ref": "beekeeper-studio",` or you could just remove and install again via `my-unicorn install beekeeper-studio`.
 
 For detailed migration information, see [docs/config.md](docs/config.md).
 
