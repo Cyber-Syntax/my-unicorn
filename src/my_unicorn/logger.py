@@ -3,10 +3,21 @@
 This module provides structured logging with:
 - Colored console output with ANSI color codes
 - File rotation using standard RotatingFileHandler
+- Async-safe logging via QueueHandler/QueueListener
+  (prevents event loop blocking)
 - Structured format for debugging (function name, line numbers)
 - Configuration-based log levels
-- Thread-safe singleton pattern for logger instances
+- Thread-safe singleton pattern for root logger initialization
 - Hierarchical logger naming (e.g., my_unicorn.install, my_unicorn.download)
+
+Architecture:
+    Application → QueueHandler → Queue → QueueListener Thread
+                                              ↓
+                                    Console + File Handlers
+
+    This design prevents async code from blocking on file I/O or
+    handler operations. All loggers (root + children) write to a
+    shared queue, processed asynchronously.
 
 Usage:
     Basic usage in any module:
@@ -32,19 +43,37 @@ Environment Variables:
         Note: This is primarily for testing purposes.
         Use settings.conf for production configuration.
 
-Important:
-    - Always use %-style formatting (lazy evaluation) for better performance
-    - Never use f-strings in logging calls: logger.info("Message %s", value)
-    - Logger instances are thread-safe and use singleton pattern per name
-    - Child loggers (e.g., my_unicorn.install) propagate to parent logger
+IMPORTANT RULES FOR CONTRIBUTORS:
+    1. Always use: logger = get_logger(__name__)
+    2. Never call logging.basicConfig()
+    3. Never attach handlers to child loggers
+       (only root has handlers)
+    4. Never use f-strings in log calls:
+       logger.info(f"Bad {x}")
+       Always use %-formatting: logger.info("Good %s", x)
+    5. Handlers are ONLY attached to root 'my_unicorn' logger
+       via QueueListener
+    6. Child loggers automatically propagate to parent
+       (Python logging handles this)
+    7. QueueHandler prevents async code from blocking on I/O
+
+Thread Safety:
+    - Logger instances are thread-safe (Python logging guarantees)
+    - Root logger initialization uses threading.Lock
+    - QueueListener runs in separate thread for async safety
+    - Child loggers propagate to parent automatically
 """
 
+import atexit
+import contextlib
 import logging
+import queue
 import sys
 import threading
+import time
 from collections.abc import Generator
 from contextlib import contextmanager
-from logging.handlers import RotatingFileHandler
+from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 from pathlib import Path
 
 from my_unicorn.domain.constants import (
@@ -60,17 +89,90 @@ from my_unicorn.domain.constants import (
 
 
 class _LoggerState:
-    """Container for logger state (avoids module-level mutable globals)."""
+    """Container for logger state (avoids module-level mutable globals).
+
+    Attributes:
+        lock: Thread lock for singleton initialization
+        root_initialized: Whether root logger has been set up
+        config_applied: Whether config file settings have been loaded
+        queue_listener: Background thread processing log records
+        log_queue: Queue for async-safe log record processing
+
+    """
 
     def __init__(self) -> None:
         """Initialize logger state."""
-        self.instances: dict[str, logging.Logger] = {}
         self.lock = threading.Lock()
         self.root_initialized = False
+        self.config_applied = False
+        self.queue_listener: QueueListener | None = None
+        self.log_queue: queue.Queue | None = None
 
 
 # Global logger state
 _state = _LoggerState()
+
+
+def flush_all_handlers() -> None:
+    """Flush all handlers in the QueueListener to ensure writes complete.
+
+    This function ensures that all pending log records in the queue are
+    processed and all file handlers have written their buffers to disk.
+    Critical for tests and scenarios where immediate file persistence is
+    required.
+
+    The function:
+    1. Waits for queue to be empty (all records dequeued)
+    2. Explicitly flushes each handler's buffer to disk
+    3. Gives queue listener thread time to process final records
+
+    Thread Safety:
+        Safe to call from any thread. No lock required as it only
+        reads _state.queue_listener and calls thread-safe methods.
+
+    Example:
+        >>> logger.info("Important message")
+        >>> flush_all_handlers()  # Ensure message is on disk
+        >>> # Now safe to read log file
+
+    Note:
+        This is particularly important when using QueueListener because
+        records may be dequeued but not yet written to disk.
+
+    """
+    if _state.queue_listener is not None and _state.log_queue is not None:
+        # Wait for queue to be empty (all records dequeued)
+        # QueueListener doesn't use task_done(), so poll the queue
+        timeout = 5.0  # Maximum wait time
+        start_time = time.time()
+        while not _state.log_queue.empty():
+            if time.time() - start_time > timeout:
+                break
+            time.sleep(0.01)  # Small sleep to avoid busy-waiting
+
+        # Give queue listener thread time to process final records
+        time.sleep(0.1)
+
+        # Flush all handlers to ensure writes complete
+        for handler in _state.queue_listener.handlers:
+            with contextlib.suppress(OSError, ValueError):
+                # Ignore flush errors (handler closed/unavailable)
+                handler.flush()
+
+
+def _cleanup_logging() -> None:
+    """Clean up QueueListener on application exit.
+
+    Registered with atexit to ensure proper shutdown.
+    """
+    if _state.queue_listener is not None:
+        flush_all_handlers()
+        _state.queue_listener.stop()
+        _state.queue_listener = None
+
+
+# Register cleanup handler
+atexit.register(_cleanup_logging)
 
 
 def _load_log_settings() -> tuple[str, str, Path]:
@@ -185,44 +287,86 @@ def _create_file_handler(
         return file_handler
 
 
-def _create_child_logger(name: str) -> logging.Logger:
-    """Create child logger that propagates to parent.
+def _setup_root_logger(
+    console_level: str,
+    file_level: str,
+    log_file: Path,
+    enable_file_logging: bool,  # noqa: FBT001
+) -> None:
+    """Initialize root logger with handlers via QueueListener.
+
+    This function is called exactly once to set up the root logger.
+    All handlers are attached here and process records from the queue.
 
     Args:
-        name: Child logger name (e.g., "my_unicorn.install")
+        console_level: Console log level (e.g., "INFO", "WARNING")
+        file_level: File log level (e.g., "DEBUG", "INFO")
+        log_file: Path to log file
+        enable_file_logging: Whether to enable file logging
 
-    Returns:
-        Configured child logger with propagation enabled
+    Raises:
+        ConfigurationError: If handler setup fails
 
     """
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)  # Let handlers filter
-    logger.propagate = True  # Propagate to parent
-    return logger
+    # Get root logger
+    root_logger = logging.getLogger("my_unicorn")
+    root_logger.setLevel(logging.DEBUG)  # Capture all, filter at handlers
+    root_logger.propagate = False  # Terminal node
+
+    # Remove any existing handlers (for test isolation)
+    for handler in root_logger.handlers[:]:
+        handler.close()
+        root_logger.removeHandler(handler)
+
+    # Create handlers that will process records from queue
+    handlers = []
+
+    # Console handler
+    console_handler = _create_console_handler(console_level)
+    handlers.append(console_handler)
+
+    # File handler (if enabled)
+    if enable_file_logging:
+        file_handler = _create_file_handler(log_file, file_level, "my_unicorn")
+        handlers.append(file_handler)
+
+    # Create queue and listener
+    _state.log_queue = queue.Queue(-1)  # Unbounded queue
+    _state.queue_listener = QueueListener(
+        _state.log_queue,
+        *handlers,
+        respect_handler_level=True,
+    )
+    _state.queue_listener.start()
+
+    # Attach QueueHandler to root logger
+    queue_handler = QueueHandler(_state.log_queue)
+    root_logger.addHandler(queue_handler)
+
+    _state.root_initialized = True
 
 
-def update_logger_from_config(logger_name: str = "my_unicorn") -> None:
-    """Update existing logger with settings from global config.
+def update_logger_from_config() -> None:
+    """Update logger handler levels from global config.
 
-    This should be called after both logger and config modules are initialized
-    to apply config-based log levels. Updates all child loggers as well.
+    This should be called after both logger and config modules are
+    initialized to apply config-based log levels. Only updates handler
+    levels, never adds/removes handlers.
 
     The function safely handles circular import issues by importing
     config_manager locally. If configuration loading fails, the logger
     continues with existing settings without raising an exception.
 
-    Args:
-        logger_name: Name of the root logger to update (default: "my_unicorn")
-
     Example:
         >>> from my_unicorn.logger import update_logger_from_config
         >>> # After config is initialized
         >>> update_logger_from_config()
-        >>> # All loggers now use settings from config file
+        >>> # All handlers now use settings from config file
 
     Note:
         Silently ignores any errors during config loading to prevent
         logging configuration from breaking the application startup.
+        Sets _state.config_applied = True on success.
 
     """
     try:
@@ -240,17 +384,9 @@ def update_logger_from_config(logger_name: str = "my_unicorn") -> None:
         console_level = getattr(logging, console_level_str, logging.WARNING)
         file_level = getattr(logging, file_level_str, logging.INFO)
 
-        # Update all loggers in the my_unicorn namespace
-        for name, logger_instance in logging.Logger.manager.loggerDict.items():
-            # Only update loggers in our namespace
-            if not isinstance(logger_instance, logging.Logger):
-                continue
-            # Match "my_unicorn" namespace
-            if not (name == logger_name or name.startswith(f"{logger_name}.")):
-                continue
-
-            # Update handler levels for this logger
-            for handler in logger_instance.handlers:
+        # Update handlers in the QueueListener
+        if _state.queue_listener is not None:
+            for handler in _state.queue_listener.handlers:
                 if isinstance(
                     handler, logging.StreamHandler
                 ) and not isinstance(handler, RotatingFileHandler):
@@ -259,6 +395,9 @@ def update_logger_from_config(logger_name: str = "my_unicorn") -> None:
                 elif isinstance(handler, RotatingFileHandler):
                     # File handler
                     handler.setLevel(file_level)
+
+        # Mark config as applied
+        _state.config_applied = True
 
     except (ImportError, KeyError, AttributeError):
         # Config module not fully initialized yet - use bootstrap defaults
@@ -369,42 +508,40 @@ def setup_logging(
     log_file: Path | None = None,
     enable_file_logging: bool = True,  # noqa: FBT001, FBT002
 ) -> logging.Logger:
-    """Configure logging with console and file handlers.
+    """Configure logging with async-safe QueueHandler architecture.
 
-    Uses singleton pattern for thread-safe logger creation.
+    This function ensures the root logger is initialized exactly once,
+    then returns the appropriate logger instance. Child loggers are
+    created automatically by Python's logging system and propagate to
+    the root.
 
-    This function implements a thread-safe singleton pattern to ensure only
-    one logger instance exists per name. For hierarchical loggers (e.g.,
-    "my_unicorn.install"), child loggers propagate to their parent.
-
-    Handler Configuration:
+    Handler Configuration (via QueueListener):
         - Console Handler: StreamHandler with colored output to stdout
         - File Handler: RotatingFileHandler with 10MB rotation, 5 backups
+        - Queue Handler: Non-blocking handler on all loggers
 
     Logger Hierarchy:
-        - Root logger: "my_unicorn" (handlers attached here)
+        - Root logger: "my_unicorn" (QueueHandler → Queue → Listener)
         - Child loggers: "my_unicorn.install", "my_unicorn.download"
-          (propagate to root)
+          (auto-propagate to root)
 
     Thread Safety:
-        Uses _logger_lock to ensure thread-safe logger creation and
-        registration. Multiple threads can safely call this function
-        concurrently.
+        Uses _state.lock to ensure thread-safe root logger initialization.
+        Multiple threads can safely call this function concurrently.
 
     Args:
         name: Logger name, typically __name__ for module-level loggers
-        console_level: Console log level (e.g., "DEBUG", "INFO", "WARNING")
-        file_level: File log level (e.g., "DEBUG", "INFO")
+        console_level: Console log level ("DEBUG", "INFO", "WARNING")
+        file_level: File log level ("DEBUG", "INFO")
         log_file: Path to log file
             (default: ~/.config/my-unicorn/logs/my-unicorn.log)
-        enable_file_logging: Whether to enable file logging (default: True)
+        enable_file_logging: Whether to enable file logging
 
     Returns:
-        Configured logger instance from the singleton registry
+        Logger instance (singleton per name via logging.getLogger)
 
     Raises:
         ConfigurationError: If file logging setup fails
-            (e.g., permission denied)
 
     Example:
         >>> logger = setup_logging(
@@ -415,74 +552,38 @@ def setup_logging(
         >>> logger.info("Starting installation for %s", app_name)
 
     Note:
-        - Logger instances are cached in _logger_instances registry
-        - Child loggers are created with propagate=True
-          (inherit parent handlers)
-        - Root logger is created with propagate=False (terminal node)
+        - Root logger initialized once, child loggers created on-demand
+        - Python's logging.getLogger handles logger singleton behavior
+        - QueueHandler prevents blocking on I/O in async contexts
 
     See Also:
-        - get_logger(): Convenience wrapper for setup_logging()
-        - update_logger_from_config(): Update logger settings from config file
+        - get_logger(): Recommended convenience wrapper
+        - update_logger_from_config(): Apply config file settings
 
     """
     with _state.lock:
-        # Return existing logger if already configured
-        if name in _state.instances:
-            return _state.instances[name]
+        # Initialize root logger if not already done
+        if not _state.root_initialized:
+            # Load default configuration if not provided
+            if console_level is None or file_level is None or log_file is None:
+                cfg_console, cfg_file, cfg_path = _load_log_settings()
+                console_level = console_level or cfg_console
+                file_level = file_level or cfg_file
+                log_file = log_file or cfg_path
 
-        # Handle child logger creation (propagates to parent)
-        is_child_logger = (
-            name != "my_unicorn"
-            and "." in name
-            and "my_unicorn" in _state.instances
-        )
-        if is_child_logger:
-            logger = _create_child_logger(name)
-            _state.instances[name] = logger
-            return logger
+            # Set up root logger with QueueListener
+            _setup_root_logger(
+                console_level, file_level, log_file, enable_file_logging
+            )
 
-        # Return cached root logger if already initialized
-        if name == "my_unicorn" and _state.root_initialized:
-            return _state.instances.get(name, logging.getLogger(name))
-
-        # Load default configuration if not provided
-        if console_level is None or file_level is None or log_file is None:
-            cfg_console, cfg_file, cfg_path = _load_log_settings()
-            console_level = console_level or cfg_console
-            file_level = file_level or cfg_file
-            log_file = log_file or cfg_path
-
-        # Initialize root logger
-        logger = logging.getLogger(name)
-        logger.setLevel(logging.DEBUG)  # Capture all, filter at handler level
-        logger.propagate = False  # Don't propagate to root logger
-
-        # Remove existing handlers
-        for handler in logger.handlers[:]:
-            handler.close()
-            logger.removeHandler(handler)
-
-        # Add console handler
-        console_handler = _create_console_handler(console_level)
-        logger.addHandler(console_handler)
-
-        # Add file handler if enabled
-        if enable_file_logging and log_file:
-            file_handler = _create_file_handler(log_file, file_level, name)
-            logger.addHandler(file_handler)
-
-        # Store in registry and mark as initialized
-        _state.instances[name] = logger
-        if name == "my_unicorn":
-            _state.root_initialized = True
-
-        return logger
+    # Return the requested logger (let logging.getLogger handle it)
+    # Python's logging automatically handles parent-child relationships
+    return logging.getLogger(name)
 
 
 @contextmanager
 def temporary_console_level(
     level: str = "INFO",
-    logger_name: str = "my_unicorn",
     simple_format: bool = True,  # noqa: FBT001, FBT002
 ) -> Generator[None, None, None]:
     """Temporarily set console handler log level for user-facing output.
@@ -495,7 +596,6 @@ def temporary_console_level(
     Args:
         level: Log level to set
             ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
-        logger_name: Logger namespace to modify (default: "my_unicorn")
         simple_format: Use SimpleConsoleFormatter to show only messages,
             without timestamp/module/level prefix (default: True)
 
@@ -536,17 +636,9 @@ def temporary_console_level(
     # Create simple formatter if needed
     simple_formatter = SimpleConsoleFormatter() if simple_format else None
 
-    # Find all console handlers in the logger namespace
-    # This includes both root and child loggers
-    for name, logger_instance in logging.Logger.manager.loggerDict.items():
-        # Only check loggers in our namespace
-        if not isinstance(logger_instance, logging.Logger):
-            continue
-        if not (name == logger_name or name.startswith(f"{logger_name}.")):
-            continue
-
-        # Find console handlers on this logger
-        for handler in logger_instance.handlers:
+    # Find console handlers in the QueueListener
+    if _state.queue_listener is not None:
+        for handler in _state.queue_listener.handlers:
             if isinstance(handler, logging.StreamHandler) and not isinstance(
                 handler, RotatingFileHandler
             ):
@@ -622,20 +714,23 @@ def get_logger(
 def clear_logger_state() -> None:
     """Clear global logger state for testing purposes.
 
-    Removes all handlers, closes file handles, and clears the logger registry.
-    This ensures a clean slate for test isolation.
+    Stops QueueListener, removes all handlers, closes file handles,
+    and resets all state flags. This ensures a clean slate for test
+    isolation.
 
     Thread Safety:
-        Uses _logger_lock to safely clear state in multi-threaded environments.
+        Uses _state.lock to safely clear state in multi-threaded
+        environments.
 
     Warning:
-        This function is intended for testing only. Do not call in production
-        code as it will disrupt all active logging.
+        This function is intended for testing only. Do not call in
+        production code as it will disrupt all active logging.
 
     Side Effects:
+        - Stops QueueListener thread
         - Closes all file handlers (flushes pending logs)
-        - Removes all handlers from tracked loggers
-        - Clears _logger_instances registry
+        - Removes all handlers from my_unicorn loggers
+        - Resets root_initialized and config_applied flags
         - Removes test loggers from logging.Logger.manager.loggerDict
 
     Example:
@@ -645,25 +740,33 @@ def clear_logger_state() -> None:
         >>> # Next test starts with fresh logger state
 
     Note:
-        Only clears loggers in the "my-unicorn" and "test-" namespaces
+        Only clears loggers in the "my_unicorn" and "test-" namespaces
         to avoid interfering with other libraries.
 
     """
     with _state.lock:
-        # Close and remove handlers from tracked loggers
-        for logger_name in list(_state.instances.keys()):
-            logger_instance = _state.instances[logger_name]
-            for handler in logger_instance.handlers[:]:
-                handler.close()
-                logger_instance.removeHandler(handler)
+        # Flush all pending logs before stopping
+        if _state.queue_listener is not None:
+            flush_all_handlers()
 
-        # Clear registry
-        _state.instances.clear()
+        # Stop QueueListener
+        if _state.queue_listener is not None:
+            _state.queue_listener.stop()
+            _state.queue_listener = None
+
+        # Clear queue
+        _state.log_queue = None
+
+        # Reset state flags
         _state.root_initialized = False
+        _state.config_applied = False
 
         # Clean up logging module's logger dict
         for logger_name in list(logging.Logger.manager.loggerDict.keys()):
-            if logger_name.startswith("test-") or logger_name == "my-unicorn":
+            if (
+                logger_name.startswith(("test-", "my_unicorn"))
+                or logger_name == "my_unicorn"
+            ):
                 log_instance = logging.getLogger(logger_name)
                 for handler in log_instance.handlers[:]:
                     handler.close()

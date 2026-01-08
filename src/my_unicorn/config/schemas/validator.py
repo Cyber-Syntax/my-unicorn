@@ -11,8 +11,9 @@ from typing import Any
 import orjson
 from jsonschema import Draft7Validator, ValidationError
 from jsonschema.exceptions import best_match
+from my_unicorn.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Schema file paths
 SCHEMA_DIR = Path(__file__).parent

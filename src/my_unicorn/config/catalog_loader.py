@@ -12,8 +12,9 @@ import orjson
 from my_unicorn.config.paths import Paths
 from my_unicorn.config.schemas.validator import ConfigValidator
 from my_unicorn.domain.types import CatalogEntryV2
+from my_unicorn.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CatalogLoader:

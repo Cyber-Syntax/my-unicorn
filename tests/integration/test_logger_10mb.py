@@ -10,8 +10,16 @@ from pathlib import Path
 
 import pytest
 
-from my_unicorn.domain.constants import LOG_BACKUP_COUNT, LOG_ROTATION_THRESHOLD_BYTES
-from my_unicorn.logger import clear_logger_state, setup_logging
+from my_unicorn.domain.constants import (
+    LOG_BACKUP_COUNT,
+    LOG_ROTATION_THRESHOLD_BYTES,
+)
+from my_unicorn.logger import (
+    _state,
+    clear_logger_state,
+    flush_all_handlers,
+    setup_logging,
+)
 
 # Constants for test thresholds
 SMALL_LOG_SIZE_THRESHOLD = 1000  # bytes
@@ -22,7 +30,7 @@ MEDIUM_LOG_SIZE_THRESHOLD = 10000  # bytes (10KB)
 
 
 @pytest.fixture
-def logger_name():
+def logger_name() -> str:
     """Provide unique logger name for each test."""
     return f"test-10mb-{int(time.time() * 1000000)}"
 
@@ -56,7 +64,7 @@ def create_10mb_log_file(log_file: Path) -> None:
             f.write(entry)
 
 
-def test_10mb_log_rotation(tmp_path, logger_name):
+def test_10mb_log_rotation(tmp_path: Path, logger_name: str) -> None:
     """Test rotation with realistic 10MB log file."""
     log_file = tmp_path / "my-unicorn.log"
 
@@ -66,11 +74,10 @@ def test_10mb_log_rotation(tmp_path, logger_name):
     # Verify file is at least 10MB
     file_size = log_file.stat().st_size
     assert file_size >= LOG_ROTATION_THRESHOLD_BYTES
-    print(f"Created log file: {file_size / (1024 * 1024):.2f} MB")
 
     # Setup file logging - rotation happens automatically if file is large
     clear_logger_state()
-    logger_instance = setup_logging(
+    _ = setup_logging(
         name=logger_name,
         file_level="DEBUG",
         log_file=log_file,
@@ -80,7 +87,8 @@ def test_10mb_log_rotation(tmp_path, logger_name):
     # Original file should exist as new file
     assert log_file.exists()
 
-    # Should have exactly one backup (RotatingFileHandler creates .log.1 format)
+    # Should have exactly one backup (RotatingFileHandler creates .log.1
+    # format)
     backups = list(tmp_path.glob("my-unicorn.log.*"))
     assert len(backups) == 1
 
@@ -88,22 +96,22 @@ def test_10mb_log_rotation(tmp_path, logger_name):
     backup = backups[0]
     backup_size = backup.stat().st_size
     assert backup_size >= LOG_ROTATION_THRESHOLD_BYTES
-    print(f"Backup file created: {backup_size / (1024 * 1024):.2f} MB")
 
     # New log file should be small/empty
     new_size = log_file.stat().st_size
     assert new_size < SMALL_LOG_SIZE_THRESHOLD
-    print(f"New log file: {new_size} bytes")
 
 
-def test_multiple_10mb_rotations(tmp_path, logger_name):
+def test_multiple_10mb_rotations(tmp_path: Path, logger_name: str) -> None:
     """Test multiple rotations with 10MB files."""
     log_file = tmp_path / "my-unicorn.log"
 
-    # Setup logger once
+    # Setup logger once - use "my_unicorn" as root name
     clear_logger_state()
+    # Use "my_unicorn.test" to ensure proper hierarchy
+    test_logger_name = f"my_unicorn.{logger_name}"
     logger_instance = setup_logging(
-        name=logger_name,
+        name=test_logger_name,
         file_level="DEBUG",
         log_file=log_file,
         enable_file_logging=True,
@@ -116,14 +124,24 @@ def test_multiple_10mb_rotations(tmp_path, logger_name):
         entry_count = (LOG_ROTATION_THRESHOLD_BYTES // 140) + 100  # Add buffer
         for i in range(entry_count):
             logger_instance.info(
-                "Cycle %s: Entry %s with some padding text to reach rotation size",
+                "Cycle %s: Entry %s with some padding text to reach "
+                "rotation size",
                 cycle,
                 i,
             )
 
-        # Flush to ensure rotation check
-        for handler in logger_instance.handlers:
+        # Flush QueueListener handlers
+        if _state.queue_listener:
+            for handler in _state.queue_listener.handlers:
+                handler.flush()
+        # Give queue processing thread time to work
+        time.sleep(1.0)
+
+    # Final flush
+    if _state.queue_listener:
+        for handler in _state.queue_listener.handlers:
             handler.flush()
+    time.sleep(0.5)
 
     # Should have 3 backups (one per cycle)
     # RotatingFileHandler creates backups with .1, .2, .3 suffixes
@@ -135,17 +153,19 @@ def test_multiple_10mb_rotations(tmp_path, logger_name):
     for backup in backups[:EXPECTED_ROTATION_CYCLES]:
         size = backup.stat().st_size
         assert size >= LOG_ROTATION_THRESHOLD_BYTES * 0.99  # 99% of threshold
-        print(f"Backup {backup.name}: {size / (1024 * 1024):.2f} MB")
 
 
-def test_backup_limit_with_10mb_files(tmp_path, logger_name):
+def test_backup_limit_with_10mb_files(
+    tmp_path: Path, logger_name: str
+) -> None:
     """Test backup limit enforcement with large files."""
     log_file = tmp_path / "my-unicorn.log"
 
-    # Setup logger once
+    # Setup logger once - use proper hierarchy
     clear_logger_state()
+    test_logger_name = f"my_unicorn.{logger_name}"
     logger_instance = setup_logging(
-        name=logger_name,
+        name=test_logger_name,
         file_level="DEBUG",
         log_file=log_file,
         enable_file_logging=True,
@@ -165,30 +185,32 @@ def test_backup_limit_with_10mb_files(tmp_path, logger_name):
                 i,
             )
 
-        # Flush to ensure rotation
-        for handler in logger_instance.handlers:
-            handler.flush()
+        # Flush QueueListener handlers to ensure rotation
+        if _state.queue_listener:
+            for handler in _state.queue_listener.handlers:
+                handler.flush()
 
-        # Small delay to ensure different timestamps
-        time.sleep(0.01)
+        # Longer delay to ensure queue processing and rotation
+        time.sleep(1.0)
+
+    # Final wait for all logs to be written
+    time.sleep(0.5)
 
     # Should have exactly LOG_BACKUP_COUNT backups
     # RotatingFileHandler creates backups with .1, .2, .3, .4, .5 suffixes
     backups = list(tmp_path.glob("my-unicorn.log.*"))
     assert len(backups) == LOG_BACKUP_COUNT
 
-    # Calculate total backup size (within 1% tolerance for RotatingFileHandler behavior)
+    # Calculate total backup size (within 1% tolerance for RotatingFileHandler
+    # behavior)
     total_backup_size = sum(b.stat().st_size for b in backups)
     expected_min_size = LOG_BACKUP_COUNT * LOG_ROTATION_THRESHOLD_BYTES * 0.99
     assert total_backup_size >= expected_min_size
 
-    print(
-        f"Total backup size: {total_backup_size / (1024 * 1024):.2f} MB "
-        f"({len(backups)} files)"
-    )
 
-
-def test_logging_performance_after_rotation(tmp_path, logger_name):
+def test_logging_performance_after_rotation(
+    tmp_path: Path, logger_name: str
+) -> None:
     """Test that logging performance is good after rotation."""
     log_file = tmp_path / "my-unicorn.log"
 
@@ -196,8 +218,9 @@ def test_logging_performance_after_rotation(tmp_path, logger_name):
     create_10mb_log_file(log_file)
 
     clear_logger_state()
+    test_logger_name = f"my_unicorn.{logger_name}"
     logger_instance = setup_logging(
-        name=logger_name,
+        name=test_logger_name,
         file_level="DEBUG",
         log_file=log_file,
         enable_file_logging=True,
@@ -210,15 +233,13 @@ def test_logging_performance_after_rotation(tmp_path, logger_name):
     for i in range(num_entries):
         logger_instance.info("Performance test entry %s", i)
 
-    # Flush to ensure all writes complete
-    for handler in logger_instance.handlers:
-        handler.flush()
+    # Flush QueueListener handlers to ensure all writes complete
+    if _state.queue_listener:
+        for handler in _state.queue_listener.handlers:
+            handler.flush()
 
     elapsed = time.time() - start_time
     avg_time_ms = (elapsed / num_entries) * 1000
-
-    print(f"Logged {num_entries} entries in {elapsed:.3f}s")
-    print(f"Average time per entry: {avg_time_ms:.3f}ms")
 
     # Performance should be reasonable (< 5ms per entry)
     assert avg_time_ms < MAX_LOG_ENTRY_TIME_MS, (
@@ -226,7 +247,7 @@ def test_logging_performance_after_rotation(tmp_path, logger_name):
     )
 
 
-def test_full_application_flow_with_10mb(tmp_path):
+def test_full_application_flow_with_10mb(tmp_path: Path) -> None:
     """Test complete application flow with 10MB log rotation."""
     log_file = tmp_path / "my-unicorn.log"
 
@@ -236,7 +257,7 @@ def test_full_application_flow_with_10mb(tmp_path):
     # Application startup - rotation happens automatically
     clear_logger_state()
     logger = setup_logging(
-        name="my-unicorn",
+        name="my_unicorn",
         file_level="DEBUG",
         log_file=log_file,
         enable_file_logging=True,
@@ -253,9 +274,8 @@ def test_full_application_flow_with_10mb(tmp_path):
     logger.warning("Rate limit approaching")
     logger.info("Installation complete")
 
-    # Flush logs
-    for handler in logger.handlers:
-        handler.flush()
+    # Ensure all logs are processed from queue and written to file
+    flush_all_handlers()
 
     # New log should contain recent entries
     log_content = log_file.read_text()
@@ -267,7 +287,7 @@ def test_full_application_flow_with_10mb(tmp_path):
     assert new_size < MEDIUM_LOG_SIZE_THRESHOLD
 
 
-def test_rotation_preserves_encoding(tmp_path, logger_name):
+def test_rotation_preserves_encoding(tmp_path: Path, logger_name: str) -> None:
     """Test that UTF-8 encoding is preserved during rotation."""
     log_file = tmp_path / "my-unicorn.log"
 
@@ -291,8 +311,9 @@ def test_rotation_preserves_encoding(tmp_path, logger_name):
 
     # Trigger rotation (happens automatically when file is large)
     clear_logger_state()
+    test_logger_name = f"my_unicorn.{logger_name}"
     _ = setup_logging(
-        name=logger_name,
+        name=test_logger_name,
         file_level="DEBUG",
         log_file=log_file,
         enable_file_logging=True,
@@ -314,7 +335,7 @@ def test_rotation_preserves_encoding(tmp_path, logger_name):
     assert "🚀" in backup_content
 
 
-def test_concurrent_logger_instances_with_rotation(tmp_path):
+def test_concurrent_logger_instances_with_rotation(tmp_path: Path) -> None:
     """Test multiple logger instances with rotation."""
     log_file = tmp_path / "my-unicorn.log"
 
@@ -324,26 +345,25 @@ def test_concurrent_logger_instances_with_rotation(tmp_path):
     clear_logger_state()
 
     # Setup parent logger with file handler (rotation happens automatically)
-    parent_logger = setup_logging(
-        name="my-unicorn",  # Parent logger
+    _ = setup_logging(
+        name="my_unicorn",  # Parent logger
         file_level="DEBUG",
         log_file=log_file,
         enable_file_logging=True,
     )
 
     # Get child loggers (they inherit parent's handlers via propagation)
-    logger1 = logging.getLogger("my-unicorn.service1")
-    logger2 = logging.getLogger("my-unicorn.service2")
-    logger3 = logging.getLogger("my-unicorn.service3")
+    logger1 = logging.getLogger("my_unicorn.service1")
+    logger2 = logging.getLogger("my_unicorn.service2")
+    logger3 = logging.getLogger("my_unicorn.service3")
 
     # Write from multiple loggers (they all propagate to parent's file handler)
     logger1.debug("Debug from service1")
     logger2.info("Info from service2")
     logger3.warning("Warning from service3")
 
-    # Flush parent handlers
-    for handler in parent_logger.handlers:
-        handler.flush()
+    # Flush to ensure all logs are written to disk
+    flush_all_handlers()
 
     # Verify all messages are in the log
     log_content = log_file.read_text()
