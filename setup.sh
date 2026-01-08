@@ -285,6 +285,26 @@ install_autocomplete() {
     exit 1
   fi
 
+  # Always copy fresh autocomplete files from source
+  echo "📁 Updating autocomplete files..."
+  local src_dir
+  src_dir="$(script_dir)"
+  mkdir -p "$INSTALL_DIR"
+
+  # Copy autocomplete folder and scripts
+  for item in autocomplete scripts; do
+    local src_path="$src_dir/$item"
+    local dst_path="$INSTALL_DIR/$item"
+    if [ -e "$src_path" ]; then
+      if [ -d "$src_path" ]; then
+        rm -rf "$dst_path"
+        cp -r "$src_path" "$dst_path"
+      else
+        cp "$src_path" "$dst_path"
+      fi
+    fi
+  done
+
   if setup_autocomplete; then
     echo "✅ Autocomplete installation complete!"
     echo ""
