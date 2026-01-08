@@ -10,7 +10,7 @@ _my_unicorn_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     
     # Available commands
-    commands="install update upgrade catalog remove backup cache auth config"
+    commands="install update upgrade catalog migrate remove backup token auth config cache"
     
     # Global options
     local global_opts="--help --version"
@@ -26,6 +26,7 @@ _my_unicorn_completion() {
     local cache_clear_opts="--all --help"
     local auth_opts="--save-token --remove-token --status --help"
     local config_opts="--show --reset --help"
+    local token_opts="--save --remove --help"
     
     # If we're completing the first argument (command)
     if [[ ${COMP_CWORD} -eq 1 ]]; then
@@ -75,6 +76,9 @@ _my_unicorn_completion() {
                     ;;
             esac
             ;;
+        migrate)
+            mapfile -t COMPREPLY < <(compgen -W "--force --help" -- "${cur}")
+            ;;
         remove)
             if [[ ${cur} == -* ]]; then
                 mapfile -t COMPREPLY < <(compgen -W "${remove_opts}" -- "${cur}")
@@ -116,6 +120,9 @@ _my_unicorn_completion() {
             ;;
         config)
             mapfile -t COMPREPLY < <(compgen -W "${config_opts}" -- "${cur}")
+            ;;
+        token)
+            mapfile -t COMPREPLY < <(compgen -W "${token_opts}" -- "${cur}")
             ;;
         *)
             COMPREPLY=()

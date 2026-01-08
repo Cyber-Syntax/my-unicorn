@@ -102,18 +102,20 @@ class UpdateManager:
     def __init__(
         self,
         config_manager: ConfigManager | None = None,
+        auth_manager: GitHubAuthManager | None = None,
         progress_service: Any = None,
     ) -> None:
         """Initialize update manager.
 
         Args:
             config_manager: Configuration manager instance
+            auth_manager: GitHub authentication manager instance
             progress_service: Optional progress service for tracking updates
 
         """
         self.config_manager = config_manager or ConfigManager()
         self.global_config = self.config_manager.load_global_config()
-        self.auth_manager = GitHubAuthManager()
+        self.auth_manager = auth_manager or GitHubAuthManager.create_default()
 
         # Initialize storage service with install directory
         storage_dir = self.global_config["directory"]["storage"]

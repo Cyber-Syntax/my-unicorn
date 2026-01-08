@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 import aiohttp
 
 from my_unicorn.config import config_manager
-from my_unicorn.infrastructure.auth import auth_manager
+from my_unicorn.infrastructure.auth import GitHubAuthManager
 from my_unicorn.infrastructure.github import Asset
 from my_unicorn.logger import get_logger
 from my_unicorn.ui.progress import ProgressDisplay, ProgressType
@@ -37,16 +37,20 @@ class DownloadService:
         self,
         session: aiohttp.ClientSession,
         progress_service: ProgressDisplay | None = None,
+        auth_manager: GitHubAuthManager | None = None,
     ) -> None:
         """Initialize download service with HTTP session.
 
         Args:
             session: aiohttp session for downloads
             progress_service: Optional progress service for tracking downloads
+            auth_manager: Optional GitHub authentication manager
+                         (creates default if not provided)
 
         """
         self.session = session
         self.progress_service = progress_service
+        self.auth_manager = auth_manager or GitHubAuthManager.create_default()
 
     async def download_file(
         self,
@@ -290,7 +294,7 @@ class DownloadService:
     ) -> T:
         """Make HTTP request with retry logic."""
         retry_attempts, timeout = self._get_network_config()
-        headers = auth_manager.apply_auth({})
+        headers = self.auth_manager.apply_auth({})
 
         for attempt in range(1, retry_attempts + 1):
             try:

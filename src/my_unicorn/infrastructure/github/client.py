@@ -10,7 +10,7 @@ from typing import Any
 import aiohttp
 
 from my_unicorn.config import config_manager
-from my_unicorn.infrastructure.auth import GitHubAuthManager, auth_manager
+from my_unicorn.infrastructure.auth import GitHubAuthManager
 from my_unicorn.logger import get_logger
 from my_unicorn.ui.progress import ProgressDisplay
 
@@ -99,7 +99,7 @@ class ReleaseAPIClient:
             API response data or None if not found
 
         """
-        headers = auth_manager.apply_auth({})
+        headers = self.auth_manager.apply_auth({})
 
         # If rate-limit is low, wait before making the request
         try:

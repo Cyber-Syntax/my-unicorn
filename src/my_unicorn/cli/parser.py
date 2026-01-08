@@ -70,9 +70,12 @@ Examples:
   %(prog)s catalog --available  # Browse available appimages
   %(prog)s catalog --info joplin  # Get detailed app information
 
-  # Auth Token Management (use keyring library, only gnome-keyring tested)
-  %(prog)s auth --save-token
-  %(prog)s auth --remove-token
+  # Token Management (use keyring library, only gnome-keyring tested)
+  %(prog)s token --save
+  %(prog)s token --remove
+
+  # Auth Status
+  %(prog)s auth
   %(prog)s auth --status
             """,
         )
@@ -118,6 +121,7 @@ Examples:
         self._add_remove_command(subparsers)
         self._add_backup_command(subparsers)
         self._add_cache_command(subparsers)
+        self._add_token_command(subparsers)
         self._add_auth_command(subparsers)
         self._add_config_command(subparsers)
 
@@ -454,6 +458,31 @@ Examples:
             help="Show detailed backup information",
         )
 
+    def _add_token_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
+        """Add token command parser.
+
+        Args:
+            subparsers: The subparsers object to add the token command
+                to.
+
+        """
+        token_parser = subparsers.add_parser(
+            "token", help="Manage GitHub authentication token"
+        )
+        token_group = token_parser.add_mutually_exclusive_group(required=True)
+        token_group.add_argument(
+            "--save",
+            action="store_true",
+            help="Save GitHub authentication token",
+        )
+        token_group.add_argument(
+            "--remove",
+            action="store_true",
+            help="Remove GitHub authentication token",
+        )
+
     def _add_auth_command(
         self, subparsers: argparse._SubParsersAction
     ) -> None:
@@ -465,21 +494,12 @@ Examples:
 
         """
         auth_parser = subparsers.add_parser(
-            "auth", help="Manage GitHub authentication"
+            "auth", help="Show GitHub authentication status"
         )
-        auth_group = auth_parser.add_mutually_exclusive_group(required=True)
-        auth_group.add_argument(
-            "--save-token",
+        auth_parser.add_argument(
+            "--status",
             action="store_true",
-            help="Save GitHub authentication token",
-        )
-        auth_group.add_argument(
-            "--remove-token",
-            action="store_true",
-            help="Remove GitHub authentication token",
-        )
-        auth_group.add_argument(
-            "--status", action="store_true", help="Show authentication status"
+            help="Show authentication status (default action)",
         )
 
     def _add_config_command(

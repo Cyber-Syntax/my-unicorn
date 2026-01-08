@@ -17,11 +17,12 @@ from my_unicorn.cli.commands.config import ConfigHandler
 from my_unicorn.cli.commands.install import InstallCommandHandler
 from my_unicorn.cli.commands.migrate import MigrateHandler
 from my_unicorn.cli.commands.remove import RemoveHandler
+from my_unicorn.cli.commands.token import TokenHandler
 from my_unicorn.cli.commands.update import UpdateHandler
 from my_unicorn.cli.commands.upgrade import UpgradeHandler
 from my_unicorn.cli.parser import CLIParser
 from my_unicorn.config import ConfigManager
-from my_unicorn.infrastructure.auth import auth_manager
+from my_unicorn.infrastructure.auth import GitHubAuthManager
 from my_unicorn.logger import get_logger, update_logger_from_config
 from my_unicorn.workflows.update import UpdateManager
 
@@ -43,8 +44,13 @@ class CLIRunner:
         # Update logger with config-based log levels
         update_logger_from_config()
 
-        self.auth_manager = auth_manager
-        self.update_manager = UpdateManager(self.config_manager)
+        # Create auth manager with default keyring storage
+        self.auth_manager = GitHubAuthManager.create_default()
+
+        # Create update manager with injected dependencies
+        self.update_manager = UpdateManager(
+            self.config_manager, self.auth_manager
+        )
 
         # Initialize command handlers
         self._init_command_handlers()
@@ -78,6 +84,9 @@ class CLIRunner:
                 self.config_manager, self.auth_manager, self.update_manager
             ),
             "cache": CacheHandler(
+                self.config_manager, self.auth_manager, self.update_manager
+            ),
+            "token": TokenHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
             "auth": AuthHandler(

@@ -1,83 +1,23 @@
 """GitHub authentication and rate limiting management.
 
-Utilities for storing, retrieving, and applying GitHub authentication
-tokens, and for tracking rate-limit information to avoid exceeding API
-limits. This module provides a SecretService-backed keyring setup and a
-`GitHubAuthManager` class that stores token metadata and rate-limit
-status.
+Utilities for managing GitHub authentication and tracking rate-limit
+information to avoid exceeding API limits. This module provides a
+`GitHubAuthManager` class for applying authentication headers and managing
+rate-limit status. Token storage is handled separately via the token_store
+property which uses keyring-based storage.
 """
 
-import contextlib
-import getpass
 import re
 import time
 
-import keyring
-from keyring.backends import SecretService
+from my_unicorn.logger import get_logger
 
-from ..logger import get_logger
+from .token import KeyringTokenStore
 
 logger = get_logger(__name__)
 
-# Track keyring initialization to avoid redundant setup
-_keyring_initialized: bool = False
-
 # GitHub token security constraints
 MAX_TOKEN_LENGTH: int = 255  # Maximum allowed token length per GitHub spec
-
-
-class KeyringError(Exception):
-    """Base exception for keyring-related errors."""
-
-
-class KeyringUnavailableError(KeyringError):
-    """Raised when keyring is unavailable (e.g., headless environment)."""
-
-
-class KeyringAccessError(KeyringError):
-    """Raised when keyring access fails (e.g., permission denied)."""
-
-
-def setup_keyring() -> None:
-    """Set SecretService as the preferred keyring backend if available.
-
-    Raises:
-        KeyringUnavailableError: If keyring is unavailable (e.g., headless
-            environment, no DBUS).
-        KeyringAccessError: If keyring setup fails for other reasons.
-
-    """
-    global _keyring_initialized  # noqa: PLW0603
-
-    if _keyring_initialized:
-        return
-
-    _keyring_initialized = True  # Mark as attempted (prevent retries)
-
-    try:
-        keyring.set_keyring(SecretService.Keyring())
-        logger.debug("SecretService backend set successfully")
-    except ImportError:
-        # SecretService not available - expected in some environments
-        logger.debug("SecretService backend not available (import failed)")
-        raise KeyringUnavailableError(  # noqa: TRY003
-            "SecretService backend not available"
-        ) from None
-    except Exception as e:
-        # Expected in headless environments (DBUS unavailable)
-        if "DBUS" in str(e) or "DBus" in str(e):
-            logger.debug("Keyring unavailable in headless environment: %s", e)
-            raise KeyringUnavailableError(  # noqa: TRY003
-                "Keyring unavailable in headless environment"
-            ) from e
-        logger.warning("Keyring setup failed: %s", e)
-        raise KeyringAccessError("Keyring setup failed") from e  # noqa: TRY003
-
-
-# Initialize the keyring backend (suppress exceptions at module load)
-# Expected in some environments - authentication will fall back
-with contextlib.suppress(KeyringError):
-    setup_keyring()
 
 
 def validate_github_token(token: str | None) -> bool:
@@ -174,18 +114,26 @@ def _scrub_token(token: str) -> None:
 
 
 class GitHubAuthManager:
-    """Manage GitHub authentication tokens and rate limiting.
+    """Manage GitHub authentication and rate limiting.
 
-    Provides helper methods to store and retrieve tokens, update rate-limit
-    information from API responses, and apply authentication to outgoing
-    requests.
+    Provides methods to apply authentication to requests and track rate-limit
+    information from API responses. Token storage is handled via the exposed
+    token_store property.
     """
 
-    GITHUB_KEY_NAME: str = "my-unicorn-github-token"
     RATE_LIMIT_THRESHOLD: int = 10  # Minimum remaining requests before waiting
 
-    def __init__(self) -> None:
-        """Initialize the auth manager with rate limit tracking."""
+    def __init__(self, token_store: KeyringTokenStore | None = None) -> None:
+        """Initialize the auth manager with keyring token storage.
+
+        Args:
+            token_store: Optional token storage instance. If None, creates
+                a default KeyringTokenStore instance.
+
+        """
+        self.token_store = (
+            token_store if token_store is not None else KeyringTokenStore()
+        )
         self._rate_limit_reset: int | None = None
         self._remaining_requests: int | None = None
         self._last_check_time: float = 0
@@ -193,210 +141,25 @@ class GitHubAuthManager:
         # (not shared across instances)
         self._user_notified: bool = False
 
-    @staticmethod
-    def _prompt_for_token() -> tuple[str, str]:
-        """Prompt user for token input and confirmation.
+    @classmethod
+    def create_default(cls) -> "GitHubAuthManager":
+        """Create auth manager with default keyring-based token storage.
 
         Returns:
-            tuple[str, str]: Token and confirmation token.
-
-        Raises:
-            ValueError: If input is empty or aborted.
-            EOFError: If input is aborted.
-            KeyboardInterrupt: If input is interrupted.
+            GitHubAuthManager: Instance using KeyringTokenStore.
 
         """
-        token: str = getpass.getpass(
-            prompt="Enter your GitHub token (input hidden): "
-        )
-        if token is None:
-            logger.error("No input received for GitHub token")
-            msg = "Token cannot be empty"
-            raise ValueError(msg)
+        return cls()
 
-        token = token.strip()
-        if not token:
-            logger.error("Token input is empty")
-            msg = "Token cannot be empty"
-            raise ValueError(msg)
-
-        # Security: Validate maximum token length to prevent memory exhaustion
-        if len(token) > MAX_TOKEN_LENGTH:
-            logger.error("Token exceeds maximum allowed length")
-            _scrub_token(token)
-            msg = (
-                f"Token exceeds maximum allowed length "
-                f"({MAX_TOKEN_LENGTH} characters)"
-            )
-            raise ValueError(msg)
-
-        # Confirm token input
-        confirm_token: str = getpass.getpass(
-            prompt="Confirm your GitHub token: "
-        )
-        if confirm_token is None:
-            logger.error("No input received for GitHub token confirmation")
-            msg = "Token confirmation does not match"
-            raise ValueError(msg)
-
-        confirm_token = confirm_token.strip()
-        return token, confirm_token
-
-    @staticmethod
-    def _validate_token_confirmation(token: str, confirm_token: str) -> None:
-        """Validate token confirmation matches original token.
-
-        Args:
-            token: Original token.
-            confirm_token: Confirmation token.
-
-        Raises:
-            ValueError: If tokens don't match or validation fails.
-
-        """
-        if token != confirm_token:
-            logger.error("Token confirmation mismatch")
-            # Security: Scrub tokens from memory on failure
-            _scrub_token(token)
-            _scrub_token(confirm_token)
-            msg = "Token confirmation does not match"
-            raise ValueError(msg)
-
-        # Validate token format before saving
-        if not validate_github_token(token):
-            logger.error("Token validation failed")
-            # Security: Scrub token from memory on validation failure
-            _scrub_token(token)
-            _scrub_token(confirm_token)
-            msg = (
-                "Invalid GitHub token format. "
-                "Must be a valid GitHub token (classic or fine-grained PAT)."
-            )
-            raise ValueError(msg)
-
-    @staticmethod
-    def _handle_keyring_error(
-        e: Exception, token: str, confirm_token: str
-    ) -> None:
-        """Handle keyring errors with sanitized error messages.
-
-        Args:
-            e: The exception that occurred.
-            token: The token to scrub.
-            confirm_token: The confirmation token to scrub.
-
-        """
-        # Security: Scrub tokens from memory on any exception
-        _scrub_token(token)
-        _scrub_token(confirm_token)
-
-        # Provide helpful message for keyring errors without exposing
-        # system details
-        error_msg = str(e)
-        if "DBUS" in error_msg or "DBus" in error_msg:
-            logger.error("Keyring unavailable in headless environment")
-            logger.info("❌ Keyring not available in headless environment")
-            logger.info("💡 Future: Environment variable support coming soon")
-            logger.info(
-                "   (MY_UNICORN_GITHUB_TOKEN will be supported in a "
-                "future release)"
-            )
-        else:
-            # Security: Log error without exposing sensitive details
-            logger.error("Failed to save token to keyring")
-
-    @staticmethod
-    def save_token() -> None:
-        """Prompt for a GitHub token and save it securely to the keyring.
-
-        Prompts the user to enter and confirm a token, validates the token's
-        format, and stores it in the configured keyring backend.
-
-        Raises:
-            ValueError: If the input is empty, the confirmation does not match,
-                or the token format is invalid.
-            Exception: Re-raises underlying keyring errors or other issues.
-
-        """
-        token = ""
-        confirm_token = ""
-        try:
-            # Prompt for token and confirmation
-            token, confirm_token = GitHubAuthManager._prompt_for_token()
-
-            # Validate confirmation matches and token is valid
-            GitHubAuthManager._validate_token_confirmation(
-                token, confirm_token
-            )
-
-            # Save to keyring
-            keyring.set_password(
-                GitHubAuthManager.GITHUB_KEY_NAME, "token", token
-            )
-            logger.info("GitHub token saved successfully.")
-
-            # Security: Scrub tokens from memory after successful save
-            _scrub_token(token)
-            _scrub_token(confirm_token)
-
-        except (EOFError, KeyboardInterrupt) as e:
-            logger.exception("Token input aborted by user")
-            # Security: Scrub tokens from memory on abort
-            _scrub_token(token)
-            _scrub_token(confirm_token)
-            msg = "Token input aborted by user"
-            raise ValueError(msg) from e
-        except ValueError:
-            # Re-raise ValueError exceptions (already have token scrubbing)
-            raise
-        except Exception as e:
-            # Handle keyring errors with sanitized messages
-            GitHubAuthManager._handle_keyring_error(e, token, confirm_token)
-            raise
-
-    @staticmethod
-    def remove_token() -> None:
-        """Remove the stored GitHub token from the system keyring.
-
-        Raises:
-            Exception: If removal from the keyring fails for any reason.
-
-        """
-        try:
-            keyring.delete_password(GitHubAuthManager.GITHUB_KEY_NAME, "token")
-            logger.info("Token removed successfully")
-        except Exception:
-            # Security: Sanitize error message to prevent information
-            # disclosure
-            logger.exception("Failed to remove token from keyring")
-            raise
-
-    @staticmethod
-    def get_token() -> str | None:
-        """Retrieve the stored GitHub token from the keyring.
+    def get_token(self) -> str | None:
+        """Retrieve the stored GitHub token from the token store.
 
         Returns:
             str | None: The token if available, otherwise None if no token
-                is stored or the keyring is unavailable.
+                is stored or the storage is unavailable.
 
         """
-        try:
-            token = keyring.get_password(
-                GitHubAuthManager.GITHUB_KEY_NAME, "token"
-            )
-        except Exception:  # noqa: BLE001
-            # Keyring unavailable is expected in headless environments
-            # Security: Don't log exception details
-            logger.debug("Keyring access failed")
-            return None
-        else:
-            if token:
-                logger.debug(
-                    "GitHub token retrieved from keyring (value hidden)"
-                )
-                return token
-            logger.debug("No token stored in keyring")
-            return None
+        return self.token_store.get()
 
     def apply_auth(self, headers: dict[str, str]) -> dict[str, str]:
         """Apply GitHub authentication to the given request headers.
@@ -413,7 +176,7 @@ class GitHubAuthManager:
                 is available, otherwise the original headers.
 
         """
-        token: str | None = GitHubAuthManager.get_token()
+        token: str | None = self.get_token()
 
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -423,7 +186,7 @@ class GitHubAuthManager:
             self._user_notified = True
             logger.info(
                 "No GitHub token configured. API rate limits apply "
-                "(60 requests/hour). Use 'my-unicorn auth --save-token' "
+                "(60 requests/hour). Use 'my-unicorn token --save' "
                 "to increase the limit to 5000 requests/hour."
             )
 
@@ -531,7 +294,3 @@ class GitHubAuthManager:
         if token is None:
             return False
         return validate_github_token(token)
-
-
-# Global instance for easy access
-auth_manager = GitHubAuthManager()

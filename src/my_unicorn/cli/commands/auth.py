@@ -1,16 +1,14 @@
 """Auth command handler for my-unicorn CLI.
 
-This module handles GitHub authentication management, including token saving,
-removal, and status checking with rate limit information.
+This module handles GitHub authentication status checking with rate limit
+information.
 """
 
-import sys
 from argparse import Namespace
 from datetime import UTC, datetime
 
 import aiohttp
 
-from my_unicorn.infrastructure.auth import GitHubAuthManager
 from my_unicorn.logger import get_logger, temporary_console_level
 
 from .base import BaseCommandHandler
@@ -27,34 +25,16 @@ WARN_CRITICAL = 10
 class AuthHandler(BaseCommandHandler):
     """Handler for auth command operations."""
 
-    async def execute(self, args: Namespace) -> None:
-        """Execute the auth command."""
-        if args.save_token:
-            logger.info("Saving GitHub token...")
-            await self._save_token()
-        elif args.remove_token:
-            logger.info("Removing GitHub token...")
-            await self._remove_token()
-        elif args.status:
-            logger.debug("Checking GitHub authentication status...")
-            await self._show_status()
+    async def execute(self, args: Namespace) -> None:  # noqa: ARG002
+        """Execute the auth command.
 
-    async def _save_token(self) -> None:
-        """Save GitHub authentication token."""
-        try:
-            GitHubAuthManager.save_token()
-            logger.info("GitHub token saved successfully.")
-        except ValueError:
-            logger.exception("Failed to save token")
-            sys.exit(1)
+        Args:
+            args: Parsed command-line arguments (unused, status is default).
 
-    async def _remove_token(self) -> None:
-        """Remove GitHub authentication token."""
-        try:
-            GitHubAuthManager.remove_token()
-            logger.info("GitHub token removed from keyring.")
-        except (ValueError, OSError):
-            logger.exception("Error removing token")
+        """
+        # --status is now the only (and default) action
+        logger.debug("Checking GitHub authentication status...")
+        await self._show_status()
 
     async def _show_status(self) -> None:
         """Show authentication status and rate limit information.
@@ -73,9 +53,7 @@ class AuthHandler(BaseCommandHandler):
             else:
                 logger.info("No GitHub token configured.")
                 logger.info("❌ No GitHub token configured")
-                logger.info(
-                    "Use 'my-unicorn auth --save-token' to set a token"
-                )
+                logger.info("Use 'my-unicorn token --save' to set a token")
                 logger.debug(
                     "No token configured. "
                     "Fetching public GitHub rate limit info."

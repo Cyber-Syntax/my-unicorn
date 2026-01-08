@@ -8,7 +8,7 @@ import os
 
 import aiohttp
 
-from my_unicorn.infrastructure.auth import auth_manager
+from my_unicorn.infrastructure.auth import GitHubAuthManager
 from my_unicorn.infrastructure.cache import get_cache_manager
 from my_unicorn.infrastructure.github.client import ReleaseAPIClient
 from my_unicorn.infrastructure.github.models import Release
@@ -26,6 +26,7 @@ class ReleaseFetcher:
         owner: str,
         repo: str,
         session: aiohttp.ClientSession,
+        auth_manager: GitHubAuthManager | None = None,
         shared_api_task_id: str | None = None,
         use_cache: bool = True,
         progress_service: ProgressDisplay | None = None,
@@ -36,6 +37,8 @@ class ReleaseFetcher:
             owner: Repository owner
             repo: Repository name
             session: aiohttp session for making requests
+            auth_manager: Optional GitHub authentication manager
+                         (creates default if not provided)
             shared_api_task_id: Optional shared API progress task ID
             use_cache: Whether to use persistent caching
             progress_service: Optional progress service for tracking
@@ -45,16 +48,18 @@ class ReleaseFetcher:
         self.repo = repo
         self.use_cache = use_cache
         self.cache_manager = get_cache_manager() if use_cache else None
+        self.auth_manager = auth_manager or GitHubAuthManager.create_default()
         self.api_client = ReleaseAPIClient(
             owner,
             repo,
             session,
-            auth_manager,
+            self.auth_manager,
             shared_api_task_id,
             progress_service,
         )
         self.progress_service = progress_service
         self.shared_api_task_id = shared_api_task_id
+        self.session = session
 
     async def _get_from_cache(
         self, cache_type: str = "stable"
@@ -336,16 +341,20 @@ class GitHubClient:
     def __init__(
         self,
         session: aiohttp.ClientSession,
+        auth_manager: GitHubAuthManager | None = None,
         progress_service: ProgressDisplay | None = None,
     ) -> None:
         """Initialize GitHub client.
 
         Args:
             session: aiohttp session for making requests
+            auth_manager: Optional GitHub authentication manager
+                         (creates default if not provided)
             progress_service: Optional progress service for tracking
 
         """
         self.session = session
+        self.auth_manager = auth_manager or GitHubAuthManager.create_default()
         self.progress_service = progress_service
         self.shared_api_task_id: str | None = None
 
@@ -373,7 +382,11 @@ class GitHubClient:
         """
         try:
             fetcher = ReleaseFetcher(
-                owner, repo, self.session, self.shared_api_task_id
+                owner,
+                repo,
+                self.session,
+                self.auth_manager,
+                self.shared_api_task_id,
             )
             return await fetcher.fetch_latest_release_or_prerelease(
                 prefer_prerelease=False
@@ -403,7 +416,11 @@ class GitHubClient:
         """
         try:
             fetcher = ReleaseFetcher(
-                owner, repo, self.session, self.shared_api_task_id
+                owner,
+                repo,
+                self.session,
+                self.auth_manager,
+                self.shared_api_task_id,
             )
             return await fetcher.fetch_specific_release(tag)
         except Exception:

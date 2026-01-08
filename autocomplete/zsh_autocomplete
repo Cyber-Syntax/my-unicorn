@@ -13,11 +13,13 @@ _my_unicorn() {
         'update:Update installed AppImages'
         'upgrade:Upgrade my-unicorn itself'
         'catalog:Browse AppImage catalog'
+        'migrate:Migrate configuration to latest version'
         'remove:Remove installed AppImages'
         'backup:Manage AppImage backups and restore'
-        'cache:Manage release data cache for better performance'
+        'token:Manage GitHub authentication token'
         'auth:Manage GitHub authentication'
         'config:Manage configuration'
+        'cache:Manage release data cache for better performance'
     )
 
     _arguments -C \
@@ -65,6 +67,11 @@ _my_unicorn() {
                         '(--installed --available --info)--info[Show detailed information about a specific app]:app name:' \
                         '--help[Show help information]' \
                         '1:app app:_files'
+                    ;;
+                migrate)
+                    _arguments \
+                        '(--force)--force[Force migration even if already up-to-date]' \
+                        '--help[Show help information]'
                     ;;
                 remove)
                     _arguments \
@@ -116,6 +123,12 @@ _my_unicorn() {
                         '(--show --reset)--reset[Reset configuration to defaults]' \
                         '--help[Show help information]' \
                         '1:app app:_files'
+                    ;;
+                token)
+                    _arguments \
+                        '(--save --remove)--save[Save GitHub authentication token]' \
+                        '(--save --remove)--remove[Remove GitHub authentication token]' \
+                        '--help[Show help information]'
                     ;;
             esac
             ;;
