@@ -1,6 +1,5 @@
 """Additional coverage tests for AuthHandler command."""
 
-from argparse import Namespace
 from unittest.mock import MagicMock, patch
 
 import aiohttp
@@ -25,56 +24,6 @@ class TestAuthHandlerErrorPaths:
             update_manager=update_manager,
         )
         return handler
-
-    @patch("my_unicorn.cli.commands.auth.GitHubAuthManager.save_token")
-    @patch("my_unicorn.cli.commands.auth.sys.exit")
-    async def test_save_token_value_error(
-        self, mock_exit, mock_save_token, auth_handler, caplog
-    ):
-        """Test saving token handles ValueError."""
-        mock_save_token.side_effect = ValueError("Invalid token format")
-        args = Namespace(save_token=True, remove_token=False, status=False)
-
-        await auth_handler.execute(args)
-
-        mock_save_token.assert_called_once()
-        mock_exit.assert_called_once_with(1)
-        assert any(
-            "Failed to save token" in record.message
-            for record in caplog.records
-        )
-
-    @patch("my_unicorn.cli.commands.auth.GitHubAuthManager.remove_token")
-    async def test_remove_token_value_error(
-        self, mock_remove_token, auth_handler, caplog
-    ):
-        """Test removing token handles ValueError."""
-        mock_remove_token.side_effect = ValueError("Token not found")
-        args = Namespace(save_token=False, remove_token=True, status=False)
-
-        await auth_handler.execute(args)
-
-        mock_remove_token.assert_called_once()
-        assert any(
-            "Error removing token" in record.message
-            for record in caplog.records
-        )
-
-    @patch("my_unicorn.cli.commands.auth.GitHubAuthManager.remove_token")
-    async def test_remove_token_os_error(
-        self, mock_remove_token, auth_handler, caplog
-    ):
-        """Test removing token handles OSError."""
-        mock_remove_token.side_effect = OSError("Keyring error")
-        args = Namespace(save_token=False, remove_token=True, status=False)
-
-        await auth_handler.execute(args)
-
-        mock_remove_token.assert_called_once()
-        assert any(
-            "Error removing token" in record.message
-            for record in caplog.records
-        )
 
     async def test_fetch_fresh_rate_limit_client_error(
         self, auth_handler, caplog
@@ -172,7 +121,9 @@ class TestAuthHandlerErrorPaths:
             "reset": 1700000000,
         }
 
-    @patch("my_unicorn.cli.commands.auth.AuthHandler._display_rate_limit_warnings")
+    @patch(
+        "my_unicorn.cli.commands.auth.AuthHandler._display_rate_limit_warnings"
+    )
     @patch(
         "my_unicorn.cli.commands.auth.AuthHandler._display_additional_rate_limit_details"
     )

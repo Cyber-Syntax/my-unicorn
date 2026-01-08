@@ -28,12 +28,7 @@ def mock_session():
 
 def test_get_current_version_success(mock_config_manager, mock_session):
     """Test SelfUpdater.get_current_version returns version string."""
-    with (
-        patch("my_unicorn.workflows.upgrade.get_version") as mock_get_version,
-        patch("my_unicorn.infrastructure.github.client.auth_manager") as mock_auth_manager,
-    ):
-        # Ensure auth_manager is properly mocked as a regular Mock, not AsyncMock
-        mock_auth_manager.update_rate_limit_info = MagicMock()
+    with patch("my_unicorn.workflows.upgrade.get_version") as mock_get_version:
         mock_get_version.return_value = "1.2.3"
         updater = SelfUpdater(mock_config_manager, mock_session)
         version = updater.get_current_version()
@@ -44,14 +39,10 @@ def test_get_current_version_package_not_found(
     mock_config_manager, mock_session
 ):
     """Test SelfUpdater.get_current_version raises PackageNotFoundError."""
-    with (
-        patch(
-            "my_unicorn.workflows.upgrade.get_version", side_effect=PackageNotFoundError
-        ),
-        patch("my_unicorn.infrastructure.github.client.auth_manager") as mock_auth_manager,
+    with patch(
+        "my_unicorn.workflows.upgrade.get_version",
+        side_effect=PackageNotFoundError,
     ):
-        # Ensure auth_manager is properly mocked as a regular Mock, not AsyncMock
-        mock_auth_manager.update_rate_limit_info = MagicMock()
         updater = SelfUpdater(mock_config_manager, mock_session)
         with pytest.raises(PackageNotFoundError):
             updater.get_current_version()
@@ -357,7 +348,9 @@ async def test_check_for_self_update_true_false(mock_config_manager):
     """Test check_for_self_update returns True/False."""
     from my_unicorn.workflows.upgrade import check_for_self_update
 
-    with patch("my_unicorn.workflows.upgrade.get_self_updater") as mock_get_updater:
+    with patch(
+        "my_unicorn.workflows.upgrade.get_self_updater"
+    ) as mock_get_updater:
         updater = MagicMock()
         updater.check_for_update = AsyncMock(return_value=True)
         updater.session.close = AsyncMock()
@@ -375,7 +368,9 @@ async def test_perform_self_update_runs_update(mock_config_manager):
     """Test perform_self_update returns True/False."""
     from my_unicorn.workflows.upgrade import perform_self_update
 
-    with patch("my_unicorn.workflows.upgrade.get_self_updater") as mock_get_updater:
+    with patch(
+        "my_unicorn.workflows.upgrade.get_self_updater"
+    ) as mock_get_updater:
         updater = MagicMock()
         updater.check_for_update = AsyncMock(return_value=True)
         updater.perform_update = AsyncMock(return_value=True)

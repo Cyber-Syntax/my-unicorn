@@ -1,97 +1,91 @@
 """Tests for GitHubAuthManager: token management and rate limit logic."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from my_unicorn.infrastructure import auth as auth_module
 from my_unicorn.infrastructure.auth import (
     GitHubAuthManager,
+    validate_github_token,
+)
+from my_unicorn.infrastructure.token import (
     KeyringAccessError,
     KeyringUnavailableError,
     setup_keyring,
-    validate_github_token,
 )
 
 
+class MockTokenStore:
+    """Mock token store for testing."""
+
+    def __init__(self, initial_token: str | None = None) -> None:
+        """Initialize mock token store.
+
+        Args:
+            initial_token: Initial token value for testing.
+
+        """
+        self._token = initial_token
+        self.get_called = False
+        self.set_called = False
+        self.delete_called = False
+
+    def get(self) -> str | None:
+        """Get stored token."""
+        self.get_called = True
+        return self._token
+
+    def set(self, token: str) -> None:
+        """Set token."""
+        self.set_called = True
+        self._token = token
+
+    def delete(self) -> None:
+        """Delete token."""
+        self.delete_called = True
+        self._token = None
+
+
 @pytest.fixture
-def auth_manager():
-    """Fixture for GitHubAuthManager instance."""
-    return GitHubAuthManager()
+def mock_token_store():
+    """Fixture for mock token store."""
+    return MockTokenStore()
 
 
-def test_save_token_valid(monkeypatch, auth_manager):
-    """Test save_token saves a valid token."""
-    valid_token = "a" * 40  # Valid legacy format token
-    monkeypatch.setattr("getpass.getpass", lambda prompt: valid_token)
-    keyring_set = MagicMock()
-    monkeypatch.setattr("keyring.set_password", keyring_set)
-    auth_manager.save_token()
-    keyring_set.assert_called_with(
-        auth_manager.GITHUB_KEY_NAME, "token", valid_token
-    )
+@pytest.fixture
+def auth_manager(mock_token_store):
+    """Fixture for GitHubAuthManager instance with mock token store."""
+    return GitHubAuthManager(mock_token_store)
 
 
-def test_save_token_empty(monkeypatch, auth_manager):
-    """Test save_token raises ValueError for empty token."""
-    monkeypatch.setattr("getpass.getpass", lambda prompt: "   ")
-    with pytest.raises(ValueError):
-        auth_manager.save_token()
-
-
-def test_save_token_invalid_format(monkeypatch, auth_manager):
-    """Test save_token raises ValueError for invalid token format."""
-    monkeypatch.setattr(
-        "getpass.getpass", lambda prompt: "invalid_token_format"
-    )
-    with pytest.raises(ValueError, match="Invalid GitHub token format"):
-        auth_manager.save_token()
-
-
-def test_remove_token_success(monkeypatch, auth_manager):
-    """Test remove_token removes token successfully."""
-    keyring_delete = MagicMock()
-    monkeypatch.setattr("keyring.delete_password", keyring_delete)
-    auth_manager.remove_token()
-    keyring_delete.assert_called_with(auth_manager.GITHUB_KEY_NAME, "token")
-
-
-def test_remove_token_failure(monkeypatch, auth_manager):
-    """Test remove_token handles general Exception when deleting token."""
-
-    class DummyError(Exception):
-        """Dummy exception for simulating keyring delete failure."""
-
-    monkeypatch.setattr(
-        "keyring.delete_password", MagicMock(side_effect=DummyError)
-    )
-    with pytest.raises(DummyError):
-        auth_manager.remove_token()
-
-
-def test_get_token(monkeypatch, auth_manager):
-    """Test get_token returns token from keyring."""
-    monkeypatch.setattr("keyring.get_password", lambda k, u: "abc123")
+def test_get_token(mock_token_store):
+    """Test get_token returns token from store."""
+    mock_token_store._token = "abc123"
+    auth_manager = GitHubAuthManager(mock_token_store)
     assert auth_manager.get_token() == "abc123"
+    assert mock_token_store.get_called
 
 
-def test_get_token_none(monkeypatch, auth_manager):
+def test_get_token_none(mock_token_store):
     """Test get_token returns None if not found."""
-    monkeypatch.setattr("keyring.get_password", lambda k, u: None)
+    mock_token_store._token = None
+    auth_manager = GitHubAuthManager(mock_token_store)
     assert auth_manager.get_token() is None
 
 
-def test_apply_auth_adds_auth_header(monkeypatch, auth_manager):
+def test_apply_auth_adds_auth_header(mock_token_store):
     """Test apply_auth adds Authorization header if token exists."""
-    monkeypatch.setattr("keyring.get_password", lambda k, u: "abc123")
+    mock_token_store._token = "abc123"
+    auth_manager = GitHubAuthManager(mock_token_store)
     headers = {}
     result = auth_manager.apply_auth(headers)
     assert result["Authorization"] == "Bearer abc123"
 
 
-def test_apply_auth_without_token(monkeypatch, auth_manager):
+def test_apply_auth_without_token(mock_token_store):
     """Test apply_auth does not add header if token missing."""
-    monkeypatch.setattr("keyring.get_password", lambda k, u: None)
+    mock_token_store._token = None
+    auth_manager = GitHubAuthManager(mock_token_store)
     headers = {}
     result = auth_manager.apply_auth(headers)
     assert "Authorization" not in result
@@ -153,17 +147,19 @@ def test_get_wait_time_default(auth_manager):
     assert wait == 60
 
 
-def test_is_authenticated_true(monkeypatch, auth_manager):
+def test_is_authenticated_true(mock_token_store):
     """Test is_authenticated returns True if token exists."""
-    monkeypatch.setattr("keyring.get_password", lambda k, u: "abc123")
+    mock_token_store._token = "abc123"
+    auth_manager = GitHubAuthManager(mock_token_store)
     assert auth_manager.is_authenticated() is True
 
 
-def test_is_authenticated_false(monkeypatch, auth_manager):
+def test_is_authenticated_false(mock_token_store):
     """Test is_authenticated returns False if token missing or empty."""
-    monkeypatch.setattr("keyring.get_password", lambda k, u: "")
+    mock_token_store._token = ""
+    auth_manager = GitHubAuthManager(mock_token_store)
     assert auth_manager.is_authenticated() is False
-    monkeypatch.setattr("keyring.get_password", lambda k, u: None)
+    mock_token_store._token = None
     assert auth_manager.is_authenticated() is False
 
 
@@ -254,22 +250,24 @@ class TestValidateGitHubToken:
         assert validate_github_token(over_max_token) is False
 
 
-def test_is_token_valid_method(monkeypatch, auth_manager):
+def test_is_token_valid_method(mock_token_store):
     """Test is_token_valid method validates stored token format."""
+    auth_manager = GitHubAuthManager(mock_token_store)
+
     # Test with valid legacy token
-    monkeypatch.setattr("keyring.get_password", lambda k, u: "a" * 40)
+    mock_token_store._token = "a" * 40
     assert auth_manager.is_token_valid() is True
 
     # Test with valid new format token
-    monkeypatch.setattr("keyring.get_password", lambda k, u: "ghp_" + "A" * 40)
+    mock_token_store._token = "ghp_" + "A" * 40
     assert auth_manager.is_token_valid() is True
 
     # Test with invalid token
-    monkeypatch.setattr("keyring.get_password", lambda k, u: "invalid_token")
+    mock_token_store._token = "invalid_token"
     assert auth_manager.is_token_valid() is False
 
     # Test with no token
-    monkeypatch.setattr("keyring.get_password", lambda k, u: None)
+    mock_token_store._token = None
     assert auth_manager.is_token_valid() is False
 
 
@@ -279,8 +277,11 @@ def test_setup_keyring_unavailable_dbus(monkeypatch):
     When DBUS is unavailable (headless environment), setup_keyring should
     raise KeyringUnavailableError and log at DEBUG level.
     """
+    # Import token module for testing
+    from my_unicorn.infrastructure import token as token_module
+
     # Reset the global state
-    auth_module._keyring_initialized = False
+    token_module._keyring_initialized = False
 
     def mock_set_keyring(backend):
         raise Exception("DBUS_SESSION_BUS_ADDRESS is unset")
@@ -288,7 +289,7 @@ def test_setup_keyring_unavailable_dbus(monkeypatch):
     monkeypatch.setattr("keyring.set_keyring", mock_set_keyring)
 
     # Should raise KeyringUnavailableError and log at DEBUG
-    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
+    with patch("my_unicorn.infrastructure.token.logger") as mock_logger:
         with pytest.raises(KeyringUnavailableError):
             setup_keyring()
         # Verify DEBUG log, not ERROR or WARNING for DBUS errors
@@ -303,8 +304,10 @@ def test_setup_keyring_access_error(monkeypatch):
     When keyring setup fails for reasons other than unavailability
     (e.g., permission issues), should raise KeyringAccessError.
     """
+    from my_unicorn.infrastructure import token as token_module
+
     # Reset the global state
-    auth_module._keyring_initialized = False
+    token_module._keyring_initialized = False
 
     def mock_set_keyring(backend):
         raise Exception("Permission denied accessing keyring")
@@ -312,82 +315,75 @@ def test_setup_keyring_access_error(monkeypatch):
     monkeypatch.setattr("keyring.set_keyring", mock_set_keyring)
 
     # Should raise KeyringAccessError and log at WARNING
-    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
+    with patch("my_unicorn.infrastructure.token.logger") as mock_logger:
         with pytest.raises(KeyringAccessError):
             setup_keyring()
         # Verify WARNING log for non-DBUS errors
         assert mock_logger.warning.call_count > 0
 
 
-def test_get_token_keyring_unavailable(monkeypatch, auth_manager):
-    """Test get_token returns None when keyring unavailable.
+def test_get_token_keyring_unavailable():
+    """Test get_token returns None when token store unavailable.
 
-    When keyring is unavailable (DBUS error), get_token should return None
-    and log at DEBUG level without raising an exception.
+    When token store is unavailable, get_token should return None
+    without raising an exception.
     """
 
-    def mock_get_password(key, username):
-        raise Exception("DBUS_SESSION_BUS_ADDRESS is unset")
+    class UnavailableTokenStore:
+        """Token store that simulates unavailability."""
 
-    monkeypatch.setattr("keyring.get_password", mock_get_password)
+        def get(self) -> str | None:
+            # Simulate keyring unavailable
+            return None
 
-    # Should return None, not raise
-    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
-        token = auth_manager.get_token()
-        assert token is None
-        # Verify DEBUG log, not ERROR
-        debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
-        assert any("Keyring access failed" in call for call in debug_calls)
-        assert mock_logger.error.call_count == 0
+        def set(self, token: str) -> None:
+            pass
 
+        def delete(self) -> None:
+            pass
 
-def test_get_token_no_token_stored(monkeypatch, auth_manager):
-    """Test get_token returns None when no token stored.
-
-    When keyring returns None (no token stored), get_token should return
-    None and log at DEBUG level.
-    """
-    monkeypatch.setattr("keyring.get_password", lambda k, u: None)
-
-    # Should return None and log DEBUG
-    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
-        token = auth_manager.get_token()
-        assert token is None
-        # Verify DEBUG log about no token stored
-        debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
-        assert any("No token stored" in call for call in debug_calls)
-        assert mock_logger.error.call_count == 0
+    auth_manager = GitHubAuthManager(UnavailableTokenStore())
+    token = auth_manager.get_token()
+    assert token is None
 
 
-def test_get_token_other_exception(monkeypatch, auth_manager):
-    """Test get_token handles non-DBUS exceptions gracefully.
-
-    When keyring access fails for other reasons, get_token should return
-    None and log at DEBUG level.
-    """
-
-    def mock_get_password(key, username):
-        raise Exception("Some other error")
-
-    monkeypatch.setattr("keyring.get_password", mock_get_password)
-
-    # Should return None, not raise
-    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
-        token = auth_manager.get_token()
-        assert token is None
-        # Verify DEBUG log about keyring access failure
-        debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
-        assert any("Keyring access failed" in call for call in debug_calls)
-        assert mock_logger.error.call_count == 0
+def test_get_token_no_token_stored(mock_token_store):
+    """Test get_token returns None when no token stored."""
+    mock_token_store._token = None
+    auth_manager = GitHubAuthManager(mock_token_store)
+    token = auth_manager.get_token()
+    assert token is None
 
 
-def test_apply_auth_no_token(monkeypatch, auth_manager):
+def test_get_token_other_exception():
+    """Test get_token handles token store exceptions gracefully."""
+
+    class FailingTokenStore:
+        """Token store that fails on get."""
+
+        def get(self) -> str | None:
+            raise Exception("Some other error")
+
+        def set(self, token: str) -> None:
+            pass
+
+        def delete(self) -> None:
+            pass
+
+    auth_manager = GitHubAuthManager(FailingTokenStore())
+    # Should raise exception (not catch it)
+    with pytest.raises(Exception):
+        auth_manager.get_token()
+
+
+def test_apply_auth_no_token(mock_token_store):
     """Test apply_auth works without token.
 
     When no token is available, apply_auth should return headers unchanged
     (no Authorization header added) and notify user once.
     """
-    monkeypatch.setattr("keyring.get_password", lambda k, u: None)
+    mock_token_store._token = None
+    auth_manager = GitHubAuthManager(mock_token_store)
 
     # Reset the notification flag (instance variable)
     auth_manager._user_notified = False
@@ -403,13 +399,14 @@ def test_apply_auth_no_token(monkeypatch, auth_manager):
     assert auth_manager._user_notified is True
 
 
-def test_apply_auth_with_token(monkeypatch, auth_manager):
+def test_apply_auth_with_token(mock_token_store):
     """Test apply_auth adds Authorization header when token present.
 
     When a token is available, apply_auth should add the Authorization
     header with Bearer token and not notify user.
     """
-    monkeypatch.setattr("keyring.get_password", lambda k, u: "ghp_test123")
+    mock_token_store._token = "ghp_test123"
+    auth_manager = GitHubAuthManager(mock_token_store)
 
     # Reset the notification flag
     auth_manager._user_notified = False
@@ -427,16 +424,16 @@ def test_apply_auth_with_token(monkeypatch, auth_manager):
         assert auth_manager._user_notified is False
 
 
-def test_apply_auth_notifies_once(monkeypatch):
+def test_apply_auth_notifies_once():
     """Test user notification appears only once per session.
 
     When no token is available, apply_auth should notify the user about
     rate limits only once, not on subsequent calls.
     """
-    monkeypatch.setattr("keyring.get_password", lambda k, u: None)
+    mock_store = MockTokenStore(None)
 
     # Create a new manager instance (starts with _user_notified = False)
-    auth_manager = GitHubAuthManager()
+    auth_manager = GitHubAuthManager(mock_store)
 
     with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
         # First call - should notify
@@ -451,43 +448,16 @@ def test_apply_auth_notifies_once(monkeypatch):
         assert info_calls_second == 1  # Same count (no new notification)
 
 
-def test_save_token_dbus_unavailable(monkeypatch, auth_manager):
-    """Test save_token provides helpful message for DBUS errors."""
-    valid_token = "ghp_" + "A" * 40
-    monkeypatch.setattr("getpass.getpass", lambda prompt: valid_token)
-
-    class DBusError(Exception):
-        """DBUS-related exception for testing."""
-
-    def mock_set_password(key, username, password):
-        raise DBusError("DBUS_SESSION_BUS_ADDRESS is unset")
-
-    monkeypatch.setattr("keyring.set_password", mock_set_password)
-
-    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
-        with pytest.raises(DBusError):
-            auth_manager.save_token()
-
-        # Check that helpful message was logged
-        info_calls = [str(call) for call in mock_logger.info.call_args_list]
-        assert any(
-            "Keyring not available in headless environment" in call
-            for call in info_calls
-        )
-        assert any(
-            "Future: Environment variable support coming soon" in call
-            for call in info_calls
-        )
-
-
 def test_setup_keyring_import_error(monkeypatch):
     """Test setup_keyring raises KeyringUnavailableError for ImportError.
 
     When SecretService is not available (ImportError), setup_keyring should
     raise KeyringUnavailableError and log at DEBUG level.
     """
+    from my_unicorn.infrastructure import token as token_module
+
     # Reset the global state
-    auth_module._keyring_initialized = False
+    token_module._keyring_initialized = False
 
     def mock_set_keyring(backend):
         raise ImportError("SecretService not available")
@@ -495,9 +465,11 @@ def test_setup_keyring_import_error(monkeypatch):
     monkeypatch.setattr("keyring.set_keyring", mock_set_keyring)
 
     # Should raise KeyringUnavailableError and log at DEBUG
-    with patch("my_unicorn.infrastructure.auth.logger") as mock_logger:
+    with patch("my_unicorn.infrastructure.token.logger") as mock_logger:
         with pytest.raises(KeyringUnavailableError):
             setup_keyring()
         # Verify DEBUG log for ImportError
-        assert mock_logger.debug.call_count > 0
+        debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
+        assert any("not available" in call for call in debug_calls)
+        assert mock_logger.error.call_count == 0
         assert mock_logger.error.call_count == 0
