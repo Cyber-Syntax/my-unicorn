@@ -19,7 +19,7 @@ import aiohttp
 from packaging import version
 
 from my_unicorn.config import ConfigManager, GlobalConfig
-from my_unicorn.infrastructure.github_client import ReleaseFetcher
+from my_unicorn.infrastructure.github import ReleaseFetcher
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
