@@ -153,7 +153,9 @@ class TestUpdateManager:
     def test_init_default_config_manager(self) -> None:
         """Test UpdateManager initialization with default config manager."""
         with (
-            patch("my_unicorn.workflows.update.ConfigManager") as mock_config_cls,
+            patch(
+                "my_unicorn.workflows.update.ConfigManager"
+            ) as mock_config_cls,
             patch("my_unicorn.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.workflows.update.FileOperations"),
             patch("my_unicorn.workflows.update.BackupService"),
@@ -209,7 +211,9 @@ class TestUpdateManager:
             }
             mock_config.load_catalog_entry.return_value = None
 
-            with patch("my_unicorn.workflows.update.ReleaseFetcher") as mock_fetcher_cls:
+            with patch(
+                "my_unicorn.workflows.update.ReleaseFetcher"
+            ) as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
                 mock_fetcher.fetch_latest_release.return_value = {
@@ -273,7 +277,9 @@ class TestUpdateManager:
         ):
             update_manager = UpdateManager(mock_config_manager)
 
-            with patch("my_unicorn.workflows.update.ReleaseFetcher") as mock_fetcher_cls:
+            with patch(
+                "my_unicorn.workflows.update.ReleaseFetcher"
+            ) as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
                 # Mock both possible method calls
@@ -335,7 +341,9 @@ class TestUpdateManager:
         ):
             update_manager = UpdateManager(mock_config_manager)
 
-            with patch("my_unicorn.workflows.update.ReleaseFetcher") as mock_fetcher_cls:
+            with patch(
+                "my_unicorn.workflows.update.ReleaseFetcher"
+            ) as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
                 # Create proper mock request info and history
@@ -377,12 +385,16 @@ class TestUpdateManager:
         ):
             update_manager = UpdateManager(mock_config_manager)
 
-            with patch("my_unicorn.workflows.update.ReleaseFetcher") as mock_fetcher_cls:
+            with patch(
+                "my_unicorn.workflows.update.ReleaseFetcher"
+            ) as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
                 mock_fetcher.fetch_latest_release.side_effect = error
 
-                with patch("my_unicorn.workflows.update.logger") as mock_logger:
+                with patch(
+                    "my_unicorn.workflows.update.logger"
+                ) as mock_logger:
                     result = await update_manager.check_single_update(
                         "test-app", mock_session
                     )
@@ -697,16 +709,17 @@ class TestUpdateManager:
             patch("my_unicorn.workflows.update.FileOperations"),
             patch("my_unicorn.workflows.update.BackupService"),
             patch(
-                "my_unicorn.ui.progress.get_progress_service"
-            ) as mock_get_progress,
-            patch("my_unicorn.workflows.update.DownloadService") as mock_download_cls,
-            patch("my_unicorn.workflows.update.VerificationService") as mock_verify_cls,
+                "my_unicorn.workflows.update.DownloadService"
+            ) as mock_download_cls,
+            patch(
+                "my_unicorn.workflows.update.VerificationService"
+            ) as mock_verify_cls,
         ):
-            # Mock get_progress_service to return a mock progress service
             mock_progress = MagicMock()
-            mock_get_progress.return_value = mock_progress
 
-            update_manager = UpdateManager(mock_config_manager)
+            update_manager = UpdateManager(
+                mock_config_manager, progress_service=mock_progress
+            )
 
             mock_download = MagicMock()
             mock_download_cls.return_value = mock_download

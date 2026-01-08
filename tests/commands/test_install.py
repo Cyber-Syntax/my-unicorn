@@ -71,7 +71,6 @@ async def test_install_handler_with_targets(
         patch(
             "my_unicorn.cli.commands.install.InstallApplicationService"
         ) as mock_service_class,
-        patch("my_unicorn.cli.commands.install.get_progress_service"),
         patch("my_unicorn.cli.commands.install.print_install_summary"),
     ):
         # Setup async context manager for session

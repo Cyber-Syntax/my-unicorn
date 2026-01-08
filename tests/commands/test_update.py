@@ -2,7 +2,7 @@
 
 from argparse import Namespace
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -80,7 +80,7 @@ async def test_update_handler_check_only_mode(
         # Verify service was created with correct dependencies
         mock_service_class.assert_called_once_with(
             config_manager=mock_config_manager,
-            update_manager=mock_update_manager,
+            update_manager=ANY,  # UpdateManager created in execute()
             progress_service=mock_progress,
         )
 
@@ -132,7 +132,7 @@ async def test_update_handler_perform_updates(
         # Verify service was created
         mock_service_class.assert_called_once_with(
             config_manager=mock_config_manager,
-            update_manager=mock_update_manager,
+            update_manager=ANY,  # UpdateManager created in execute()
             progress_service=mock_progress,
         )
 

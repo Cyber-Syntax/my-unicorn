@@ -6,7 +6,7 @@ verification failures, icon extraction errors, and other progress bar issues.
 
 import asyncio
 import io
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -17,9 +17,6 @@ from my_unicorn.ui.progress import (
     ProgressType,
     TaskInfo,
     TaskState,
-    get_progress_service,
-    progress_session,
-    set_progress_service,
 )
 
 
@@ -805,51 +802,6 @@ class TestProgressDisplay:
         progress_diff = 50.0
         speed = progress_diff / time_diff if time_diff > 0 else 0.0
         assert speed == 50.0  # 50 MB in 1 second
-
-
-class TestModuleFunctions:
-    """Test module-level functions."""
-
-    def test_get_set_progress_service(self) -> None:
-        """Test getting and setting global progress service."""
-        # Store original service
-        original_service = get_progress_service()
-
-        # Set a service
-        mock_service = Mock()
-        set_progress_service(mock_service)
-
-        # Should retrieve the set service
-        retrieved_service = get_progress_service()
-        assert retrieved_service == mock_service
-
-        # Clean up
-        set_progress_service(original_service)
-
-    @pytest.mark.asyncio
-    async def test_progress_session_context_manager(self) -> None:
-        """Test progress_session context manager."""
-        original_service = get_progress_service()
-
-        # progress_session creates its own service
-        # Test that it works without error
-        async with progress_session():
-            service = get_progress_service()
-            assert service is not None
-            assert service.is_active()
-
-        # Clean up
-        set_progress_service(original_service)
-
-    @pytest.mark.asyncio
-    async def test_progress_session_no_service(self) -> None:
-        """Test progress_session when no service is set."""
-        set_progress_service(None)
-
-        # Should create a new service
-        async with progress_session():
-            service = get_progress_service()
-            assert service is not None
 
 
 class TestErrorScenarios:
@@ -2053,11 +2005,11 @@ class TestProgressCoverageExtras:
         """Force ID cache eviction and ensure _calculate_speed returns 0 when no current speed."""
         pd = ProgressDisplay()
         # Temporarily shrink the cache limit to trigger eviction
-        import my_unicorn.ui.progress as prog_mod
+        from my_unicorn.ui import progress_types
 
-        old_limit = getattr(prog_mod, "ID_CACHE_LIMIT", None)
+        old_limit = getattr(progress_types, "ID_CACHE_LIMIT", None)
         try:
-            prog_mod.ID_CACHE_LIMIT = 2
+            progress_types.ID_CACHE_LIMIT = 2
             # generate more ids than the small limit
             pd._generate_namespaced_id(ProgressType.DOWNLOAD, "a")
             pd._generate_namespaced_id(ProgressType.DOWNLOAD, "b")
@@ -2065,7 +2017,7 @@ class TestProgressCoverageExtras:
             assert len(pd._id_cache) <= 2
         finally:
             if old_limit is not None:
-                prog_mod.ID_CACHE_LIMIT = old_limit
+                progress_types.ID_CACHE_LIMIT = old_limit
 
         # _calculate_speed returns 0.0 when avg_speed==0 and no previous speed
         ti = TaskInfo(

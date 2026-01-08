@@ -27,30 +27,13 @@ def patch_logger():
         yield mock_logger
 
 
-@pytest_asyncio.fixture
-def patch_progress_service():
-    """Patch progress service to avoid real progress bars."""
-    with patch(
-        "my_unicorn.infrastructure.download.get_progress_service"
-    ) as mock_progress_service:
-        mock_service = MagicMock()
-        mock_service.add_task = AsyncMock(return_value="task-id")
-        mock_service.update_task = AsyncMock()
-        mock_service.update_task_total = AsyncMock()
-        mock_service.finish_task = AsyncMock()
-        mock_progress_service.return_value = mock_service
-        yield mock_service
-
-
 async def async_chunk_gen(chunks: list[bytes]):
     for chunk in chunks:
         yield chunk
 
 
 @pytest.mark.asyncio
-async def test_download_file_success(
-    tmp_file, mock_session, patch_logger, patch_progress_service
-):
+async def test_download_file_success(tmp_file, mock_session, patch_logger):
     """Test DownloadService.download_file downloads file successfully."""
     content = b"hello world"
     mock_response = AsyncMock()
@@ -73,9 +56,7 @@ async def test_download_file_success(
 
 
 @pytest.mark.asyncio
-async def test_download_file_error(
-    tmp_file, mock_session, patch_logger, patch_progress_service
-):
+async def test_download_file_error(tmp_file, mock_session, patch_logger):
     """Test DownloadService.download_file handles error during download."""
     content = b"data"
     mock_response = AsyncMock()
@@ -98,9 +79,7 @@ async def test_download_file_error(
 
 
 @pytest.mark.asyncio
-async def test_download_appimage_success(
-    tmp_file, mock_session, patch_logger, patch_progress_service
-):
+async def test_download_appimage_success(tmp_file, mock_session, patch_logger):
     """Test DownloadService.download_appimage downloads AppImage successfully."""
     asset = Asset(
         name="test.AppImage",
