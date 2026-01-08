@@ -163,10 +163,9 @@ class UpdateManager:
             session: aiohttp session for downloads
 
         """
-        from my_unicorn.ui.progress import get_progress_service
-
-        progress_service = get_progress_service()
-        download_service = DownloadService(session, progress_service)
+        download_service = DownloadService(
+            session, self._progress_service_param
+        )
         # Get progress service from download service if available
         progress_service = getattr(download_service, "progress_service", None)
         self.verification_service = VerificationService(
@@ -570,10 +569,9 @@ class UpdateManager:
                     logger.debug("Backup created: %s", backup_path)
 
             # Download AppImage
-            from my_unicorn.ui.progress import get_progress_service
-
-            progress_service = get_progress_service()
-            download_service = DownloadService(session, progress_service)
+            download_service = DownloadService(
+                session, self._progress_service_param
+            )
             self._initialize_services(session)
             downloaded_path = await download_service.download_appimage(
                 appimage_asset, download_path
@@ -642,11 +640,7 @@ class UpdateManager:
             True if processing was successful
 
         """
-        from my_unicorn.ui.progress import get_progress_service
-
-        progress_service = (
-            self._progress_service_param or get_progress_service()
-        )
+        progress_service = self._progress_service_param
         progress_enabled = (
             progress_service is not None and progress_service.is_active()
         )
@@ -872,9 +866,7 @@ class UpdateManager:
         if not self._shared_api_task_id:
             return
 
-        from my_unicorn.ui.progress import get_progress_service
-
-        progress_service = get_progress_service()
+        progress_service = self._progress_service_param
         if not progress_service or not progress_service.is_active():
             return
 

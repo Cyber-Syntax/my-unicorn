@@ -1,6 +1,7 @@
 """Install command coordinator.
 
-Thin coordinator that validates input and delegates to InstallApplicationService.
+Thin coordinator that validates input and delegates to
+InstallApplicationService.
 """
 
 from argparse import Namespace
@@ -10,11 +11,7 @@ from my_unicorn.infrastructure.github import GitHubClient
 from my_unicorn.infrastructure.http_session import create_http_session
 from my_unicorn.logger import get_logger
 from my_unicorn.ui.display_install import print_install_summary
-from my_unicorn.ui.progress import (
-    ProgressDisplay,
-    get_progress_service,
-    set_progress_service,
-)
+from my_unicorn.ui.progress import ProgressDisplay
 from my_unicorn.workflows.services.install_service import (
     InstallApplicationService,
     InstallOptions,
@@ -56,15 +53,15 @@ class InstallCommandHandler(BaseCommandHandler):
 
         # Execute via service
         async with create_http_session(self.global_config) as session:
-            if not get_progress_service():
-                set_progress_service(ProgressDisplay())
+            progress_service = ProgressDisplay()
 
             service = InstallApplicationService(
                 session=session,
-                github_client=GitHubClient(session),
+                github_client=GitHubClient(session, progress_service),
                 catalog_manager=CatalogManagerAdapter(self.config_manager),
                 config_manager=self.config_manager,
                 install_dir=install_dir,
+                progress_service=progress_service,
             )
             results = await service.install(targets, options)
 

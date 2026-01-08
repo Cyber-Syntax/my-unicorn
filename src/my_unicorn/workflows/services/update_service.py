@@ -11,11 +11,7 @@ Clean Architecture. It orchestrates the complete update workflow including:
 
 from my_unicorn.config import ConfigManager
 from my_unicorn.logger import get_logger
-from my_unicorn.ui.progress import (
-    ProgressDisplay,
-    get_progress_service,
-    github_api_progress_task,
-)
+from my_unicorn.ui.progress import ProgressDisplay, github_api_progress_task
 from my_unicorn.workflows.update import UpdateInfo, UpdateManager
 
 logger = get_logger(__name__)
@@ -47,7 +43,7 @@ class UpdateApplicationService:
         """
         self.config_manager = config_manager
         self.update_manager = update_manager
-        self.progress = progress_service or get_progress_service()
+        self.progress = progress_service
 
     def _validate_app_names(
         self, app_names: list[str] | None

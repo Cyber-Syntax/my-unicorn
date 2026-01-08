@@ -17,11 +17,7 @@ from my_unicorn.config import config_manager
 from my_unicorn.infrastructure.auth import auth_manager
 from my_unicorn.infrastructure.github import Asset
 from my_unicorn.logger import get_logger
-from my_unicorn.ui.progress import (
-    ProgressDisplay,
-    ProgressType,
-    get_progress_service,
-)
+from my_unicorn.ui.progress import ProgressDisplay, ProgressType
 
 T = TypeVar("T")
 
@@ -50,7 +46,7 @@ class DownloadService:
 
         """
         self.session = session
-        self.progress_service = progress_service or get_progress_service()
+        self.progress_service = progress_service
 
     async def download_file(
         self,

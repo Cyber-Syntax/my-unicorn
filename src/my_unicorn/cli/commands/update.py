@@ -1,6 +1,7 @@
 """Update command coordinator.
 
-Thin coordinator that validates input and delegates to UpdateApplicationService.
+Thin coordinator that validates input and delegates to
+UpdateApplicationService.
 """
 
 from argparse import Namespace
@@ -11,6 +12,7 @@ from my_unicorn.ui.progress import progress_session
 from my_unicorn.workflows.services.update_service import (
     UpdateApplicationService,
 )
+from my_unicorn.workflows.update import UpdateManager
 
 from .base import BaseCommandHandler
 
@@ -24,9 +26,15 @@ class UpdateHandler(BaseCommandHandler):
         """Execute update command."""
         try:
             async with progress_session() as progress:
+                # Create UpdateManager with progress service
+                update_manager = UpdateManager(
+                    config_manager=self.config_manager,
+                    progress_service=progress,
+                )
+
                 service = UpdateApplicationService(
                     config_manager=self.config_manager,
-                    update_manager=self.update_manager,
+                    update_manager=update_manager,
                     progress_service=progress,
                 )
 

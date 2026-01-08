@@ -86,10 +86,7 @@ class InstallHandler:
             Configured InstallHandler instance
 
         """
-        from my_unicorn.ui.progress import get_progress_service
-
-        progress = progress_service or get_progress_service()
-        download_service = DownloadService(session, progress)
+        download_service = DownloadService(session, progress_service)
         storage_service = FileOperations(install_dir)
 
         return cls(

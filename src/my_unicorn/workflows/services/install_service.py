@@ -17,7 +17,6 @@ from my_unicorn.infrastructure.github import GitHubClient
 from my_unicorn.logger import get_logger, temporary_console_level
 from my_unicorn.ui.progress import (
     ProgressDisplay,
-    get_progress_service,
     github_api_progress_task,
     operation_progress_session,
 )
@@ -78,7 +77,7 @@ class InstallApplicationService:
         self.catalog = catalog_manager
         self.config = config_manager
         self.install_dir = install_dir
-        self.progress = progress_service or get_progress_service()
+        self.progress = progress_service
 
         # Initialized on demand
         self._download_service: DownloadService | None = None

@@ -13,7 +13,7 @@ from my_unicorn.infrastructure.cache import get_cache_manager
 from my_unicorn.infrastructure.github.client import ReleaseAPIClient
 from my_unicorn.infrastructure.github.models import Release
 from my_unicorn.logger import get_logger
-from my_unicorn.ui.progress import get_progress_service
+from my_unicorn.ui.progress import ProgressDisplay
 
 logger = get_logger(__name__)
 
@@ -28,6 +28,7 @@ class ReleaseFetcher:
         session: aiohttp.ClientSession,
         shared_api_task_id: str | None = None,
         use_cache: bool = True,
+        progress_service: ProgressDisplay | None = None,
     ) -> None:
         """Initialize the release fetcher.
 
@@ -37,6 +38,7 @@ class ReleaseFetcher:
             session: aiohttp session for making requests
             shared_api_task_id: Optional shared API progress task ID
             use_cache: Whether to use persistent caching
+            progress_service: Optional progress service for tracking
 
         """
         self.owner = owner
@@ -44,9 +46,14 @@ class ReleaseFetcher:
         self.use_cache = use_cache
         self.cache_manager = get_cache_manager() if use_cache else None
         self.api_client = ReleaseAPIClient(
-            owner, repo, session, auth_manager, shared_api_task_id
+            owner,
+            repo,
+            session,
+            auth_manager,
+            shared_api_task_id,
+            progress_service,
         )
-        self.progress_service = get_progress_service()
+        self.progress_service = progress_service
         self.shared_api_task_id = shared_api_task_id
 
     async def _get_from_cache(
@@ -210,7 +217,11 @@ class ReleaseFetcher:
         if release:
             return release
 
-        if self.shared_api_task_id and self.progress_service.is_active():
+        if (
+            self.shared_api_task_id
+            and self.progress_service
+            and self.progress_service.is_active()
+        ):
             await self.api_client._update_shared_progress(
                 f"No releases found for {self.owner}/{self.repo}"
             )
@@ -322,15 +333,20 @@ class ReleaseFetcher:
 class GitHubClient:
     """High-level GitHub client for release operations."""
 
-    def __init__(self, session: aiohttp.ClientSession) -> None:
+    def __init__(
+        self,
+        session: aiohttp.ClientSession,
+        progress_service: ProgressDisplay | None = None,
+    ) -> None:
         """Initialize GitHub client.
 
         Args:
             session: aiohttp session for making requests
+            progress_service: Optional progress service for tracking
 
         """
         self.session = session
-        self.progress_service = get_progress_service()
+        self.progress_service = progress_service
         self.shared_api_task_id: str | None = None
 
     def set_shared_api_task(self, task_id: str | None) -> None:

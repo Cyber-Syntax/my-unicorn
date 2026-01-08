@@ -12,7 +12,7 @@ import aiohttp
 from my_unicorn.config import config_manager
 from my_unicorn.infrastructure.auth import GitHubAuthManager, auth_manager
 from my_unicorn.logger import get_logger
-from my_unicorn.ui.progress import get_progress_service
+from my_unicorn.ui.progress import ProgressDisplay
 
 logger = get_logger(__name__)
 
@@ -30,6 +30,7 @@ class ReleaseAPIClient:
         session: aiohttp.ClientSession,
         auth_manager: GitHubAuthManager,
         shared_api_task_id: str | None = None,
+        progress_service: ProgressDisplay | None = None,
     ) -> None:
         """Initialize the API client.
 
@@ -39,6 +40,7 @@ class ReleaseAPIClient:
             session: aiohttp session for making requests
             auth_manager: GitHub authentication manager
             shared_api_task_id: Optional shared API progress task ID
+            progress_service: Optional progress service for tracking
 
         """
         self.owner = owner
@@ -46,7 +48,7 @@ class ReleaseAPIClient:
         self.session = session
         self.auth_manager = auth_manager
         self.shared_api_task_id = shared_api_task_id
-        self.progress_service = get_progress_service()
+        self.progress_service = progress_service
 
     async def _update_shared_progress(self, description: str) -> None:
         """Update shared API progress task.
@@ -57,6 +59,7 @@ class ReleaseAPIClient:
         """
         if (
             not self.shared_api_task_id
+            or not self.progress_service
             or not self.progress_service.is_active()
         ):
             return
@@ -112,6 +115,7 @@ class ReleaseAPIClient:
                 )
                 if (
                     self.shared_api_task_id
+                    and self.progress_service
                     and self.progress_service.is_active()
                 ):
                     # Update shared progress with a short message
@@ -157,6 +161,7 @@ class ReleaseAPIClient:
 
                     if (
                         self.shared_api_task_id
+                        and self.progress_service
                         and self.progress_service.is_active()
                     ):
                         await self._update_shared_progress(description)
