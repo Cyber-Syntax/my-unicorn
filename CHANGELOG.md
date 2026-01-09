@@ -5,16 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0-alpha] - 2026-01-09
 
 ### Breaking Changes
 
+- **Config Module Refactor**: Removed backward compatibility classes from config module
+    - `DirectoryManager` class removed - use `Paths` class instead
+    - `CatalogManager` alias removed - use `CatalogLoader` directly
+    - Import paths remain the same: `from my_unicorn.config import Paths, CatalogLoader`
+    - All functionality preserved through `Paths` class static methods
 - **Config Format Migration**: Application configuration format changed from v1.0.0 to v2.0.0
     - Manual migration required via `my-unicorn migrate` command before use
     - Automatic backups created during migration (.json.backup files)
     - Config v2 uses hybrid structure: catalog apps store only state + catalog_ref, URL apps store full config in overrides
 - **Global Config**: Global configuration version updated to 1.0.2
-- **Command Rename**: `list` command deprecated in favor of `catalog` command (backward compatible alias maintained)
+- **Command Rename**: `list` command deprecated in favor of `catalog` command (removed entirely)
 
 ### Added
 
@@ -27,7 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Catalog Command**: Enhanced `catalog` command with app descriptions
     - `catalog --available` shows apps with descriptions
     - `catalog --info <app-name>` displays detailed app information
-    - Backward compatible `list` alias maintained
 - **Migration Infrastructure**: Complete v1→v2 migration system
     - Dedicated `migration/` package with modular structure
     - Automatic backup creation before migration
@@ -42,8 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Setup.sh Update**: Remove editable mode on legacy installation from setup.sh
 - **Upgrade Process Update**: Use 'uv tool upgrade' command and enhance test coverage
-- **Documentation Enhancement**: Enhance readme and update todo.md
-- **CI Workflow Enhancement**: add enhanced changelog extraction script, add comprehensive test for the ci and its scripts
+- **Documentation Enhancement**: Enhanced readme, updated todo.md, and added comprehensive config documentation
 - **Config Structure**: New hybrid v2 configuration format
     - Catalog apps: Minimal config (state + catalog_ref pointing to catalog filename)
     - URL apps: Full config stored in overrides section
@@ -55,13 +58,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Icon State**: Improved icon state tracking
     - Method field indicates extraction vs download
     - Accurate migration from v1 extraction boolean
+- **Icon Handling**: Refactored to extract icons from AppImage only (no external download)
+    - Removed download method from icon handling
+    - Catalog JSON files updated to remove download_url entries
+    - New extract_icon_from_appimage() function in file_ops.py
 - **Migration Organization**: Refactored migration code into dedicated package
     - `migration/base.py` - Common utilities
     - `migration/app_config.py` - App config migration
+    - `migration/catalog_config.py` - Catalog config migration
     - `migration/global_config.py` - Global config migration
     - Eliminated code duplication
-- **Renamed Command**: Renamed deprecated `list` command with `catalog`.
-    - Use new `catalog` command instead of `list` (there is no alias for `list` command anymore)
+- **Command Refactoring**: Renamed deprecated `list` command to `catalog` with enhanced features
+    - Use new `catalog` command instead of `list`
+- **Logging Improvements**: Replaced print statements with logger for CLI output
+    - Introduced SimpleConsoleFormatter for clean console messages
+    - Improved logging consistency and error reporting
 
 ### Fixed
 
@@ -78,24 +89,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Catalog Reference**: Fixed catalog apps incorrectly migrated as URL apps
     - catalog_ref now maps to catalog filename (app_name), not repo name
     - No overrides added to catalog apps during migration
-- Wrong name in catalog for Beekeeper Studio app, changed name from beekeper-studio to beekeeper-studio.
+- **Beekeeper Studio Naming**: Fixed wrong catalog filename from beekeper-studio to beekeeper-studio
+- **Icon Method Mapping**: Fixed deprecated download method mapping during migration
+- **Backup Migration**: Removed automatic migration, now fully folder-based structure
+- **Install Verification Source**: Fixed verification source field to use lowercase
 
 ### Removed
 
 - **Legacy Config Support**: Removed support for v1 configuration format
     - Post-migration, only v2 configs accepted
     - Simplifies codebase and maintenance
-
-    - Alias maintained for backward compatibility
-    - Encourages use of new command with enhanced features
+- **List Command Alias**: Completely removed `list` command
+    - Use new `catalog` command instead
+    - No backward compatible alias maintained
 - **Old Migration Code**: Removed legacy migration code from main modules
     - All migration logic now in dedicated `migration/` package
     - Cleaner separation of concerns
-- **icon download logic**: Removed icon download logic because we extract icon from appimage now.
+- **Icon Download Logic**: Completely removed icon download functionality
+    - Now extracts icons directly from AppImage files
+    - Removed download_url entries from all catalog configurations
 - **Backup Migration**: Removed automatic migration from old flat backup format to folder-based structure
     - Users with old backups (*.backup.AppImage) should manually reorganize them if needed
     - New installations and users who already migrated are unaffected
     - Backup system now exclusively uses folder-based structure with metadata.json
+- **Show Progress Parameter**: Removed show_progress parameter from download methods
+    - Progress always enabled for install/update operations
+    - Download progress conditionally shown based on file size
+- **Deprecated Classes**: Removed old icon handler classes and unused tool scripts
+- **Deprecated Progress Methods**: Removed deprecated task creation methods from progress service
 
 ### Migration Guide
 
@@ -667,7 +688,6 @@ Please change your current configuration files to the new format. The new format
 - refactor: improve better error handling on verify.py
 - chore: add copilot instructions
 
-[2.0.0]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.2-alpha...v2.0.0
 [1.12.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.1-alpha...v1.12.2-alpha
 [1.12.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.0-alpha...v1.12.1-alpha
 [1.12.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.11.1-alpha...v1.12.0-alpha

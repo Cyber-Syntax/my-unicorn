@@ -25,6 +25,9 @@
     - [ ] services tests
     - [ ] schemas tests
     - [ ] maybe TDT style tests later if possible
+    - [ ] fix: integration test couldn't skipeable test
+        - [ ] integration logger test is slow because of logger rotation, need to fix that
+
 - [ ] config --show is showing global config, better to name it --show-global-config for more clarity
 - [ ] add this to docs later
 
