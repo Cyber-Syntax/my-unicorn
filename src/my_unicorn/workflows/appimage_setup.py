@@ -8,7 +8,10 @@ from pathlib import Path
 from typing import Any
 
 from my_unicorn.infrastructure.desktop_entry import DesktopEntry
-from my_unicorn.infrastructure.file_ops import FileOperations, extract_icon_from_appimage
+from my_unicorn.infrastructure.file_ops import (
+    FileOperations,
+    extract_icon_from_appimage,
+)
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)

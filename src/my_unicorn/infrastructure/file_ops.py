@@ -7,7 +7,10 @@ storage-related tasks.
 
 from pathlib import Path
 
-from my_unicorn.infrastructure.icon import AppImageIconExtractor, IconExtractionError
+from my_unicorn.infrastructure.icon import (
+    AppImageIconExtractor,
+    IconExtractionError,
+)
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)

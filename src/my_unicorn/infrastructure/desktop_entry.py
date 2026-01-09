@@ -16,11 +16,8 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from my_unicorn.logger import get_logger
-from my_unicorn.utils.utils import create_desktop_entry_name, sanitize_filename
-
-from ..config import ConfigManager
-from ..domain.constants import (
+from my_unicorn.config import ConfigManager
+from my_unicorn.domain.constants import (
     DESKTOP_BROWSER_CATEGORIES,
     DESKTOP_BROWSER_EXEC_PARAM,
     DESKTOP_BROWSER_KEYWORDS,
@@ -34,6 +31,8 @@ from ..domain.constants import (
     DESKTOP_SYSTEM_APPLICATION_DIRS,
     DESKTOP_USER_APPLICATIONS_SUBPATH,
 )
+from my_unicorn.logger import get_logger
+from my_unicorn.utils.utils import create_desktop_entry_name, sanitize_filename
 
 logger = get_logger(__name__)
 

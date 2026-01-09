@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 from typing import ClassVar
 
-from ..logger import get_logger
+from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -30,11 +30,10 @@ def human_mib(bytes_value: float) -> str:
     if mib < 1.0:
         kib = bytes_value / KIB
         return f"{kib:.1f} KiB"
-    elif mib < KIB:
+    if mib < KIB:
         return f"{mib:.1f} MiB"
-    else:
-        gib = mib / KIB
-        return f"{gib:.2f} GiB"
+    gib = mib / KIB
+    return f"{gib:.2f} GiB"
 
 
 def human_speed_bps(bytes_per_sec: float) -> str:
@@ -53,9 +52,8 @@ def human_speed_bps(bytes_per_sec: float) -> str:
     mb_per_sec = bytes_per_sec / MIB
     if mb_per_sec >= 1.0:
         return f"{mb_per_sec:.1f} MB/s"
-    else:
-        kb_per_sec = bytes_per_sec / KIB
-        return f"{kb_per_sec:.0f} KB/s"
+    kb_per_sec = bytes_per_sec / KIB
+    return f"{kb_per_sec:.0f} KB/s"
 
 
 def format_eta(seconds: float) -> str:
@@ -77,10 +75,9 @@ def format_eta(seconds: float) -> str:
 
     if hours > 0:
         return f"{hours}h {minutes}m"
-    elif minutes > 0:
+    if minutes > 0:
         return f"{minutes}m {secs}s"
-    else:
-        return f"{secs}s"
+    return f"{secs}s"
 
 
 def render_bar(completed: float, total: float, width: int = 30) -> str:
