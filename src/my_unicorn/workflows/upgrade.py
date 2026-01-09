@@ -7,10 +7,8 @@ the latest release from GitHub and using uv's direct installation feature.
 Currently using prereleases until stable releases are available.
 """
 
-import asyncio
 import os
 import subprocess
-import sys
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as get_version
 from typing import Any
@@ -23,69 +21,6 @@ from my_unicorn.infrastructure.github import ReleaseFetcher
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
-
-
-class SimpleProgress:
-    """Simple progress indicator using rotating slash characters."""
-
-    def __init__(self) -> None:
-        """Initialize the simple progress indicator."""
-        self.indicators = ["/", "-", "\\", "|"]
-        self.current = 0
-        self.active_tasks: dict[str, str] = {}
-
-    def start_task(self, name: str, description: str) -> str:
-        """Start a new progress task.
-
-        Args:
-            name: Task name/identifier
-            description: Task description to display
-
-        Returns:
-            Task ID for updating the task
-
-        """
-        task_id = f"task_{len(self.active_tasks)}"
-        self.active_tasks[task_id] = description
-        logger.info("⚡ %s", description)
-        return task_id
-
-    def update_task(
-        self, task_id: str, description: str | None = None
-    ) -> None:
-        """Update a task's progress indicator.
-
-        Args:
-            task_id: Task identifier
-            description: Optional new description
-
-        """
-        if task_id in self.active_tasks:
-            if description:
-                self.active_tasks[task_id] = description
-            indicator = self.indicators[self.current % len(self.indicators)]
-            logger.info("%s %s", indicator, self.active_tasks[task_id])
-            self.current += 1
-
-    def finish_task(
-        self,
-        task_id: str,
-        success: bool = True,
-        description: str | None = None,
-    ) -> None:
-        """Finish a task.
-
-        Args:
-            task_id: Task identifier
-            success: Whether the task completed successfully
-            description: Optional final description
-
-        """
-        if task_id in self.active_tasks:
-            status = "✅" if success else "❌"
-            desc = description or self.active_tasks[task_id]
-            logger.info("\r%s %s", status, desc)
-            del self.active_tasks[task_id]
 
 
 GITHUB_OWNER = "Cyber-Syntax"
@@ -105,24 +40,22 @@ def normalize_version_string(version_str: str) -> str:
 
     """
     # Remove 'v' prefix if present
-    clean_version = version_str.lstrip("v")
+    clean = version_str.lstrip("v")
 
-    # Convert GitHub-style version tags to Python version format
-    replacements = {
-        "-alpha": "a0",
-        "-alpha.": "a",
-        "-beta": "b0",
-        "-beta.": "b",
-        "-rc": "rc0",
-        "-rc.": "rc",
-    }
-
-    for old, new in replacements.items():
-        if old in clean_version:
-            clean_version = clean_version.replace(old, new)
-            break
-
-    return clean_version
+    # Try parsing first - if it works, use as-is
+    try:
+        version.parse(clean)
+        return clean
+    except Exception:
+        # Fallback: minimal normalization only if needed
+        return (
+            clean.replace("-alpha.", "a")
+            .replace("-alpha", "a0")
+            .replace("-beta.", "b")
+            .replace("-beta", "b0")
+            .replace("-rc.", "rc")
+            .replace("-rc", "rc0")
+        )
 
 
 class SelfUpdater:
@@ -132,54 +65,23 @@ class SelfUpdater:
         self,
         config_manager: ConfigManager,
         session: aiohttp.ClientSession,
-        simple_progress: bool = True,
     ) -> None:
         """Initialize the self-updater.
 
         Args:
             config_manager: Configuration manager instance
             session: aiohttp client session for API requests
-            simple_progress: Whether to use simple progress indicators
 
         """
         self.config_manager: ConfigManager = config_manager
         self.global_config: GlobalConfig = config_manager.load_global_config()
         self.session: aiohttp.ClientSession = session
-        self.progress = SimpleProgress() if simple_progress else None
         self.github_fetcher: ReleaseFetcher = ReleaseFetcher(
             owner=GITHUB_OWNER,
             repo=GITHUB_REPO,
             session=session,
         )
         self._uv_available: bool = self._check_uv_available()
-
-    @classmethod
-    def create_default(
-        cls,
-        session: aiohttp.ClientSession,
-        config_manager: ConfigManager | None = None,
-        simple_progress: bool = True,
-    ) -> "SelfUpdater":
-        """Create SelfUpdater with default dependencies.
-
-        Factory method for simplified instantiation with sensible defaults.
-
-        Args:
-            session: aiohttp client session for API requests
-            config_manager: Optional configuration manager (creates new if None)
-            simple_progress: Whether to use simple progress indicators
-
-        Returns:
-            Configured SelfUpdater instance
-
-        """
-        config_mgr = config_manager or ConfigManager()
-
-        return cls(
-            config_manager=config_mgr,
-            session=session,
-            simple_progress=simple_progress,
-        )
 
     def _check_uv_available(self) -> bool:
         """Check if UV is available in the system.
@@ -194,12 +96,13 @@ class SelfUpdater:
                 check=False,
                 capture_output=True,
                 text=True,
-                timeout=5,
+                timeout=2,
             )
-            available = result.returncode == 0
-            if available:
+            if result.returncode == 0:
                 logger.debug("UV is available: %s", result.stdout.strip())
-            return available
+                return True
+            logger.debug("UV command failed: %s", result.stderr.strip())
+            return False
         except (FileNotFoundError, subprocess.TimeoutExpired):
             logger.debug("UV is not available in PATH")
             return False
@@ -224,23 +127,6 @@ class SelfUpdater:
         except PackageNotFoundError:
             logger.error("Package 'my-unicorn' not found")
             raise
-
-    def get_formatted_version(self) -> str:
-        """Get formatted version for better readability.
-
-        Returns:
-            Formatted version string
-
-        """
-        try:
-            version_str = self.get_current_version()
-            # Handle version with git info
-            if "+" in version_str:
-                numbered_version, git_version = version_str.split("+", 1)
-                return f"{numbered_version} (git: {git_version})"
-            return version_str
-        except PackageNotFoundError:
-            return "Package not found"
 
     async def get_latest_release(
         self, refresh_cache: bool = False
@@ -291,12 +177,16 @@ class SelfUpdater:
                     "GitHub Rate limit exceeded. Please try again later."
                 )
             else:
-                logger.exception("GitHub API error")
-                logger.info("GitHub API error: %s - %s", e.status, e.message)
+                logger.exception(
+                    "GitHub API error: %s - %s", e.status, e.message
+                )
+                logger.info("GitHub API error. Please check your connection.")
             return None
-        except Exception as e:
+        except Exception:
             logger.exception("Unexpected error fetching release")
-            logger.info("Error connecting to GitHub: %s", e)
+            logger.info(
+                "Error connecting to GitHub. Please check your connection."
+            )
             return None
 
     async def check_for_update(self, refresh_cache: bool = False) -> bool:
@@ -362,9 +252,9 @@ class SelfUpdater:
             logger.debug("No update needed: current > latest (dev version?)")
             return False
 
-        except (PackageNotFoundError, Exception) as e:
-            logger.error("Error checking version: %s", e)
-            logger.info("Error: %s", e)
+        except (PackageNotFoundError, Exception):
+            logger.exception("Error checking version")
+            logger.info("Error checking version. Please try again.")
             return False
 
     async def perform_update(self) -> bool:
@@ -378,7 +268,8 @@ class SelfUpdater:
           CLI tools
 
         Returns:
-            True if update was successful, False otherwise
+            False if upgrade could not be started.
+            Does not return on success (process replaced by execvp).
 
         """
         logger.debug("Starting upgrade to my-unicorn...")
@@ -394,19 +285,11 @@ class SelfUpdater:
             return False
 
         try:
-            # Show progress message
-            if self.progress:
-                task_id = self.progress.start_task(
-                    "upgrade", "Upgrading my-unicorn..."
-                )
-                self.progress.finish_task(
-                    task_id,
-                    success=True,
-                    description="Starting upgrade with uv...",
-                )
-
-            logger.info("Executing: uv tool upgrade my-unicorn")
             logger.info("⚡ Upgrading my-unicorn...")
+            logger.info("Executing: uv tool upgrade my-unicorn")
+
+            # Close session before replacing process
+            await self.session.close()
 
             # Use os.execvp to replace current process with uv upgrade
             # This ensures the upgrade completes properly and is the
@@ -423,21 +306,19 @@ class SelfUpdater:
             return False
 
         except Exception as e:
-            logger.exception("Update failed: %s", e)
+            logger.exception("Update failed")
             logger.info("❌ Update failed: %s", e)
             return False
 
 
 async def get_self_updater(
     config_manager: ConfigManager | None = None,
-    simple_progress: bool = True,
 ) -> SelfUpdater:
     """Get a SelfUpdater instance with proper session management.
 
     Args:
         config_manager: Optional config manager, will create one if not
             provided
-        simple_progress: Whether to use simple progress indicators
 
     Returns:
         Configured SelfUpdater instance
@@ -465,7 +346,7 @@ async def get_self_updater(
     )
     session = aiohttp.ClientSession(timeout=timeout)
 
-    return SelfUpdater(config_manager, session, simple_progress)
+    return SelfUpdater(config_manager, session)
 
 
 async def check_for_self_update(refresh_cache: bool = False) -> bool:
@@ -503,47 +384,3 @@ async def perform_self_update(refresh_cache: bool = False) -> bool:
         return False
     finally:
         await updater.session.close()
-
-
-def display_current_version() -> None:
-    """Display the current version synchronously (for CLI compatibility)."""
-    try:
-        version_str = get_version("my-unicorn")
-        # Handle None return in Python 3.13+ for uninstalled packages
-        if version_str is None:
-            logger.info("Version information not available")
-            return
-        # Handle version with git info
-        if "+" in version_str:
-            numbered_version, git_version = version_str.split("+", 1)
-            formatted_version = f"{numbered_version} (git: {git_version})"
-        else:
-            formatted_version = version_str
-        logger.info("my-unicorn version: %s", formatted_version)
-    except PackageNotFoundError:
-        logger.info("my-unicorn version: Package not found")
-    except Exception as e:
-        logger.exception("Failed to display version: %s", e)
-        logger.info("Error: %s", e)
-
-
-# Legacy compatibility functions for CLI usage
-async def main_check() -> None:
-    """Check for updates (CLI compatibility)."""
-    _ = await check_for_self_update()
-
-
-async def main_update() -> None:
-    """Perform updates (CLI compatibility)."""
-    if await check_for_self_update():
-        _ = await perform_self_update()
-
-
-if __name__ == "__main__":
-    # Simple CLI for testing
-    if len(sys.argv) > 1 and sys.argv[1] == "--check":
-        asyncio.run(main_check())
-    elif len(sys.argv) > 1 and sys.argv[1] == "--update":
-        asyncio.run(main_update())
-    else:
-        display_current_version()

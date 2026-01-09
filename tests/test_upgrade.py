@@ -48,15 +48,6 @@ def test_get_current_version_package_not_found(
             updater.get_current_version()
 
 
-def test_get_formatted_version_git_info(mock_config_manager, mock_session):
-    """Test get_formatted_version returns formatted version with git info."""
-    with patch("my_unicorn.workflows.upgrade.get_version") as mock_get_version:
-        mock_get_version.return_value = "1.2.3+abcdef"
-        updater = SelfUpdater(mock_config_manager, mock_session)
-        formatted = updater.get_formatted_version()
-        assert formatted == "1.2.3 (git: abcdef)"
-
-
 @pytest.mark.asyncio
 async def test_get_latest_release_success(mock_config_manager, mock_session):
     """Test get_latest_release returns release dict."""
@@ -309,6 +300,9 @@ async def test_check_for_update_up_to_date(
 @pytest.mark.asyncio
 async def test_perform_update_success(mock_config_manager, mock_session):
     """Test perform_update uses os.execvp with correct UV command."""
+    # Make session.close() async-compatible
+    mock_session.close = AsyncMock()
+
     updater = SelfUpdater(mock_config_manager, mock_session)
 
     # Mock os.execvp to capture the command without actually executing it
@@ -321,6 +315,9 @@ async def test_perform_update_success(mock_config_manager, mock_session):
             await updater.perform_update()
         except SystemExit:
             pass  # Expected when execvp is mocked
+
+        # Verify session was closed before execvp
+        mock_session.close.assert_called_once()
 
         # Verify os.execvp was called with correct arguments
         mock_execvp.assert_called_once_with(
@@ -382,21 +379,6 @@ async def test_perform_self_update_runs_update(mock_config_manager):
         updater.session.close = AsyncMock()
         result = await perform_self_update()
         assert result is False
-
-
-def test_display_current_version_prints(monkeypatch, caplog):
-    """Test display_current_version logs version."""
-    monkeypatch.setattr(
-        "my_unicorn.workflows.upgrade.get_version", lambda pkg: "1.2.3+abcdef"
-    )
-    from my_unicorn.workflows.upgrade import display_current_version
-
-    display_current_version()
-    # Check logger output instead of capsys
-    assert any(
-        "my-unicorn version: 1.2.3 (git: abcdef)" in record.message
-        for record in caplog.records
-    )
 
 
 # ============================================================================
@@ -542,6 +524,7 @@ async def test_perform_update_uses_uv_direct_install():
     }
 
     mock_session = MagicMock()
+    mock_session.close = AsyncMock()
     updater = SelfUpdater(mock_config, mock_session)
 
     # Mock os.execvp to capture the command
@@ -552,6 +535,9 @@ async def test_perform_update_uses_uv_direct_install():
             await updater.perform_update()
         except SystemExit:
             pass  # Expected
+
+        # Verify session was closed
+        mock_session.close.assert_called_once()
 
         # Verify the correct UV command is used
         mock_execvp.assert_called_once()
@@ -591,6 +577,7 @@ async def test_perform_update_no_git_operations():
     }
 
     mock_session = MagicMock()
+    mock_session.close = AsyncMock()
     updater = SelfUpdater(mock_config, mock_session)
 
     # Track if any git or file operations are attempted
@@ -605,13 +592,7 @@ async def test_perform_update_no_git_operations():
         nonlocal shutil_called
         shutil_called = True
 
-    with (
-        patch(
-            "my_unicorn.workflows.upgrade.asyncio.create_subprocess_exec",
-            side_effect=track_git,
-        ),
-        patch("my_unicorn.workflows.upgrade.os.execvp") as mock_execvp,
-    ):
+    with patch("my_unicorn.workflows.upgrade.os.execvp") as mock_execvp:
         mock_execvp.side_effect = SystemExit(0)
 
         try:
@@ -621,6 +602,9 @@ async def test_perform_update_no_git_operations():
 
         # CRITICAL: Verify no git operations
         assert not git_called, "New implementation should NOT use git clone"
+
+        # Verify session was closed
+        mock_session.close.assert_called_once()
 
         # Verify os.execvp was called (the new method)
         mock_execvp.assert_called_once()

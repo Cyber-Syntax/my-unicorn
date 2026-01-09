@@ -32,7 +32,7 @@ class TestUVDetection:
         session = MagicMock()
 
         # Create updater instance
-        updater = SelfUpdater(config_manager, session, simple_progress=False)
+        updater = SelfUpdater(config_manager, session)
 
         # Verify UV was detected
         assert updater._uv_available is True
@@ -41,7 +41,7 @@ class TestUVDetection:
             check=False,
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=2,
         )
 
     @patch("my_unicorn.workflows.upgrade.subprocess.run")
@@ -58,7 +58,7 @@ class TestUVDetection:
         session = MagicMock()
 
         # Create updater instance
-        updater = SelfUpdater(config_manager, session, simple_progress=False)
+        updater = SelfUpdater(config_manager, session)
 
         # Verify UV was not detected
         assert updater._uv_available is False
@@ -77,7 +77,7 @@ class TestUVDetection:
         session = MagicMock()
 
         # Create updater instance
-        updater = SelfUpdater(config_manager, session, simple_progress=False)
+        updater = SelfUpdater(config_manager, session)
 
         # Verify UV was not detected
         assert updater._uv_available is False
@@ -99,7 +99,7 @@ class TestUVDetection:
         session = MagicMock()
 
         # Create updater instance
-        updater = SelfUpdater(config_manager, session, simple_progress=False)
+        updater = SelfUpdater(config_manager, session)
 
         # Verify UV was not detected
         assert updater._uv_available is False
@@ -127,7 +127,8 @@ class TestUVIntegration:
         # Create updater instance
         with caplog.at_level("DEBUG"):
             updater = SelfUpdater(
-                config_manager, session, simple_progress=False
+                config_manager,
+                session,
             )
 
         # Verify UV status is logged
@@ -152,7 +153,8 @@ class TestUVIntegration:
         # Create updater instance
         with caplog.at_level("DEBUG"):
             updater = SelfUpdater(
-                config_manager, session, simple_progress=False
+                config_manager,
+                session,
             )
 
         # Verify UV status is logged
@@ -191,4 +193,3 @@ class TestUVSetupScript:
 
         assert "python3 -m venv" in content
         assert "python3 -m pip install" in content
-

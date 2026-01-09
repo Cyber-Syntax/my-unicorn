@@ -14,7 +14,7 @@ not copied to a package_dir like the old setup.sh method.
 """
 
 import contextlib
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -77,6 +77,7 @@ async def test_upgrade_version_progression(temp_install_dirs):
         }
 
         session = MagicMock()
+        session.close = AsyncMock()
         updater = SelfUpdater(config_manager, session)
 
         # Run the upgrade
@@ -112,6 +113,7 @@ async def test_upgrade_clones_to_correct_directory(temp_install_dirs):
         }
 
         session = MagicMock()
+        session.close = AsyncMock()
         updater = SelfUpdater(config_manager, session)
 
         # Run the upgrade
@@ -147,6 +149,7 @@ async def test_upgrade_copies_files_correctly(temp_install_dirs):
         }
 
         session = MagicMock()
+        session.close = AsyncMock()
         updater = SelfUpdater(config_manager, session)
 
         # Run the upgrade
@@ -182,6 +185,7 @@ async def test_installer_finds_required_files(temp_install_dirs):
         }
 
         session = MagicMock()
+        session.close = AsyncMock()
         updater = SelfUpdater(config_manager, session)
 
         # Run the upgrade
