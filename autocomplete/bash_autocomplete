@@ -21,10 +21,10 @@ _my_unicorn_completion() {
     local upgrade_opts="--check-only --help"
     local catalog_opts="--installed --available --info --help"
     local remove_opts="--keep-config --help"
-    local backup_opts="--restore-last --restore-version --list-backups --cleanup --info --migrate --help"
+    local backup_opts="--restore-last --restore-version --list-backups --cleanup --info --help"
     local cache_opts="clear stats --help"
     local cache_clear_opts="--all --help"
-    local auth_opts="--save-token --remove-token --status --help"
+    local auth_opts="--status --help"
     local config_opts="--show --reset --help"
     local token_opts="--save --remove --help"
     
