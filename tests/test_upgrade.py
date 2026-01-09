@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from my_unicorn.cli.upgrade import PackageNotFoundError, SelfUpdater
 from my_unicorn.infrastructure.github import Release
-from my_unicorn.workflows.upgrade import PackageNotFoundError, SelfUpdater
 
 
 @pytest.fixture
@@ -28,7 +28,7 @@ def mock_session():
 
 def test_get_current_version_success(mock_config_manager, mock_session):
     """Test SelfUpdater.get_current_version returns version string."""
-    with patch("my_unicorn.workflows.upgrade.get_version") as mock_get_version:
+    with patch("my_unicorn.cli.upgrade.get_version") as mock_get_version:
         mock_get_version.return_value = "1.2.3"
         updater = SelfUpdater(mock_config_manager, mock_session)
         version = updater.get_current_version()
@@ -40,7 +40,7 @@ def test_get_current_version_package_not_found(
 ):
     """Test SelfUpdater.get_current_version raises PackageNotFoundError."""
     with patch(
-        "my_unicorn.workflows.upgrade.get_version",
+        "my_unicorn.cli.upgrade.get_version",
         side_effect=PackageNotFoundError,
     ):
         updater = SelfUpdater(mock_config_manager, mock_session)
@@ -266,7 +266,7 @@ async def test_check_for_update_newer_version(
             "fetch_latest_release_or_prerelease",
             new=AsyncMock(return_value=release_data),
         ),
-        patch("my_unicorn.workflows.upgrade.get_version") as mock_get_version,
+        patch("my_unicorn.cli.upgrade.get_version") as mock_get_version,
     ):
         mock_get_version.return_value = "1.0.0"
         result = await updater.check_for_update()
@@ -290,7 +290,7 @@ async def test_check_for_update_up_to_date(
             "fetch_latest_release_or_prerelease",
             new=AsyncMock(return_value=release_data),
         ),
-        patch("my_unicorn.workflows.upgrade.get_version") as mock_get_version,
+        patch("my_unicorn.cli.upgrade.get_version") as mock_get_version,
     ):
         mock_get_version.return_value = "1.0.0"
         result = await updater.check_for_update()
@@ -306,7 +306,7 @@ async def test_perform_update_success(mock_config_manager, mock_session):
     updater = SelfUpdater(mock_config_manager, mock_session)
 
     # Mock os.execvp to capture the command without actually executing it
-    with patch("my_unicorn.workflows.upgrade.os.execvp") as mock_execvp:
+    with patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp:
         # os.execvp doesn't return on success, so we simulate by raising
         # an exception to prevent actual execution
         mock_execvp.side_effect = SystemExit(0)
@@ -334,7 +334,7 @@ async def test_perform_update_success(mock_config_manager, mock_session):
 @pytest.mark.asyncio
 async def test_get_self_updater_returns_instance(mock_config_manager):
     """Test get_self_updater returns SelfUpdater instance."""
-    from my_unicorn.workflows.upgrade import get_self_updater
+    from my_unicorn.cli.upgrade import get_self_updater
 
     updater = await get_self_updater(mock_config_manager)
     assert isinstance(updater, SelfUpdater)
@@ -343,11 +343,9 @@ async def test_get_self_updater_returns_instance(mock_config_manager):
 @pytest.mark.asyncio
 async def test_check_for_self_update_true_false(mock_config_manager):
     """Test check_for_self_update returns True/False."""
-    from my_unicorn.workflows.upgrade import check_for_self_update
+    from my_unicorn.cli.upgrade import check_for_self_update
 
-    with patch(
-        "my_unicorn.workflows.upgrade.get_self_updater"
-    ) as mock_get_updater:
+    with patch("my_unicorn.cli.upgrade.get_self_updater") as mock_get_updater:
         updater = MagicMock()
         updater.check_for_update = AsyncMock(return_value=True)
         updater.session.close = AsyncMock()
@@ -363,11 +361,9 @@ async def test_check_for_self_update_true_false(mock_config_manager):
 @pytest.mark.asyncio
 async def test_perform_self_update_runs_update(mock_config_manager):
     """Test perform_self_update returns True/False."""
-    from my_unicorn.workflows.upgrade import perform_self_update
+    from my_unicorn.cli.upgrade import perform_self_update
 
-    with patch(
-        "my_unicorn.workflows.upgrade.get_self_updater"
-    ) as mock_get_updater:
+    with patch("my_unicorn.cli.upgrade.get_self_updater") as mock_get_updater:
         updater = MagicMock()
         updater.check_for_update = AsyncMock(return_value=True)
         updater.perform_update = AsyncMock(return_value=True)
@@ -528,7 +524,7 @@ async def test_perform_update_uses_uv_direct_install():
     updater = SelfUpdater(mock_config, mock_session)
 
     # Mock os.execvp to capture the command
-    with patch("my_unicorn.workflows.upgrade.os.execvp") as mock_execvp:
+    with patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp:
         mock_execvp.side_effect = SystemExit(0)
 
         try:
@@ -592,7 +588,7 @@ async def test_perform_update_no_git_operations():
         nonlocal shutil_called
         shutil_called = True
 
-    with patch("my_unicorn.workflows.upgrade.os.execvp") as mock_execvp:
+    with patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp:
         mock_execvp.side_effect = SystemExit(0)
 
         try:

@@ -118,12 +118,7 @@ class SelfUpdater:
 
         """
         try:
-            version_str = get_version("my-unicorn")
-            # Handle None return in Python 3.13+ for uninstalled packages
-            if version_str is None:
-                logger.error("Package 'my-unicorn' not found")
-                raise PackageNotFoundError("my-unicorn")
-            return version_str
+            return get_version("my-unicorn")
         except PackageNotFoundError:
             logger.error("Package 'my-unicorn' not found")
             raise

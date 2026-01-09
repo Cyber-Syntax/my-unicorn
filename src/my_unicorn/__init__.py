@@ -1,6 +1,6 @@
 """Top-level package for my-unicorn.
 
-Author: 2023 - 2025 Cyber-Syntax
+Author: 2023 - 2026 Cyber-Syntax
 License: GPL-3.0
 """
 

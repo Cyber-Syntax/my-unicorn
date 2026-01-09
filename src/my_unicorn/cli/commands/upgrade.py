@@ -5,11 +5,8 @@ Thin coordinator for upgrading my-unicorn itself.
 
 from argparse import Namespace
 
+from my_unicorn.cli.upgrade import check_for_self_update, perform_self_update
 from my_unicorn.logger import get_logger
-from my_unicorn.workflows.upgrade import (
-    check_for_self_update,
-    perform_self_update,
-)
 
 from .base import BaseCommandHandler
 
