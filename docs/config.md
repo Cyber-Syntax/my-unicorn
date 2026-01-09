@@ -257,8 +257,7 @@ The `verification` object in state tracks all verification attempts:
   "methods": [
     {
       "type": "skip",
-      "status": "skipped",
-      "message": "No verification methods available (dev did not provide checksums)"
+      "status": "skipped"
     }
   ]
 }
@@ -313,7 +312,7 @@ Config validation failed at '/state/verification/methods/0/type':
 'invalid_type' is not one of ['digest', 'checksum_file', 'skip']
 ```
 
-For complete examples, see [docs/example_app_state_configs/](example_app_state_configs/).
+For complete examples, see [docs/example_app_state_configs/](data/example_app_state_configs).
 
 #### Backup metadata.json implementation
 

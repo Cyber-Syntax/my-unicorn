@@ -1,4 +1,4 @@
-# CLI User Experience Examples
+# UI Documentation
 
 ## Installation with Warnings Example
 

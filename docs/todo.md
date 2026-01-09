@@ -2,41 +2,74 @@
 
 ## review
 
-- Network retry logic
-- Logger rotation logic
-- API rate limiting
-- Build with uv
-- test new github action for release
-- test new v2 config formats
+- [ ] Big reviews
+    - [ ] Network retry logic
+    - [x] Logger rotation logic
+    - [ ] Logger rotation on production
+    - [ ] Logger rotation on virtual machine
+    - [ ] API rate limiting
+
+- [ ] Test new features
+    - [ ] github action for releases
+    - [ ] `my-unicorn upgrade` command now use uv package manager.
+    - [x] Test `migrate` command
+    - [ ] Test `migrate` command on virtual machine.
 
 ## in-progress
 
-- [ ] P3: Catalog and app state config structure refactor
-    - [x] Move owner, repo to github section
-    - [x] Better structure
-    - [x] Migration logic automatically on old config detected(decided to make a seperate command)
-        - [x] Make a new plan for more simple migration logic
-        - [x] via script?
-        - [x] via code on startup? Current one `class AppConfigV2(TypedDict):` used like this. Seems like violate DRY prenciple.
-    - [x] Update docs
-    - [x] add description to catalogs
-    - [x] show description on list --available command
+- [ ] writing every test from scratch for better understanding of tests and make sure they work as expected
+    - [ ] cli tests
+    - [ ] commands tests
+    - [ ] integration tests
+    - [ ] migration tests
+    - [ ] services tests
+    - [ ] schemas tests
+    - [ ] maybe TDT style tests later if possible
+- [ ] config --show is showing global config, better to name it --show-global-config for more clarity
+- [ ] add this to docs later
 
-- [ ] beekeper-studio.png is wrong, extract manually and find the correct icon
-- [ ] add remove --all command
-- [ ] Add option in global config for [auth]
-- [ ] What about threading usage on logging? Example: <https://github.com/Roulbac/uv-func/blob/main/src/uv_func/logging.py>
-- [ ] P1: deprecate my-unicorn package and repo directories after migration to uv package manager:
-    repo = /home/developer/.local/share/my-unicorn-repo
-    package = /home/developer/.local/share/my-unicorn
+1. The “stop rule” (very important)
 
-- [ ] P1: remove icon download logic because we extract icon from appimage now.
-- [ ] P1: Clear all the examples, plan...
+If you feel the need to introduce a new pattern, stop and ask:
+“Can this just be a function or a service?”
+
+90% of the time, the answer is yes.
+
+- [ ] move workflow folder modules to utils folder for better structure
+
+- [ ] we use logger.info so much, maybe we can disable logger.info on progress.py but keep logger info default on other modules for better user experience?
+    - [ ] progress.py logger.info disable by default
+    - [ ] other modules keep logger.info default
+
+- [ ] Cleanup unused code lines
+    - [ ] update.py unused progress task id lines
+    - [ ] install.py and update.py module lines so much, better to move some of the functions to utils module. For example, creating_desktop_entry, parse_github_url etc.
+
+- [ ] Correct comman design pattern with receiver and invoker, commands need to be thin and execute receivers only, learn from examples/patterns/Command/ folder
+- [ ] Make a better todo.md structure with priorities, labels etc.
+    - [ ] clean this todo list, make priority to BUGS first.
+    - [ ] handle todos, in-progress better which we conflict all of them, keep in-progress to what you working on etc.
+    - [ ] move big tasks to issues if you need
+    - [ ] get some issues to here with their #code like this
+    - [ ] make a template for yourself to keep same template all of your other projects
+
+- [ ] P2: #BUG: Cycle, circular import detected in import chain for cache.py
+- [ ] P1: deprecate my-unicorn package and repo directories (migrated to uv)
+    - [ ] Remove venv-wrapper
+    - [ ] Remove legacy cli tool install from setup.sh
+- [ ] use space-separated to follow KISS principle?
+
+```bash
+  # Install from catalog (comma-separated or space-separated)
+  my-unicorn install appflowy,joplin,obsidian
+  my-unicorn install appflowy joplin obsidian
+```
+
 - [ ] P1: add INFO level logs for verification instead of DEBUG
+- [ ] add remove --all command
 - [ ] P2: add lock for one instance only to prevent multiple instance run at the same time
     - [ ] 16G error log, because of 2 instance running at the same time.
 
-- [ ] P2: #BUG: Cycle, circular import detected in import chain for cache.py
 - [ ] P3: Never use the real user config logs, app location on pytest unittests which current is use them!
 
 - [ ] P4: Remove code smells: <https://refactoring.guru/refactoring/smells>
@@ -44,30 +77,22 @@
     - [ ] config
     - [x] handle FIXME, TODO for duplicate functions
 
-- [ ] just simply use github release sections, not bother to write fetching from api
-
-```bash
-my-unicorn install super-productivity
-Fetching from API: # this line is not needed at all.
-GitHub Releases      0/1 Fetching... # add here to fetchin from api basically.
-#it isn't long  text
-Fetching from API:
-GitHub Releases      1/1 Retrieved
-```
-
 ## todo
 
-- [ ] use space-sperated to follow KISS principle?
+- [ ] add token command and use it as token storage etc. keep auth command for authentication only.
+- [ ] performance improvements on api : <https://github.com/xbeat/Machine-Learning/blob/main/9%20Strategies%20to%20Boost%20API%20Performance.md>
+    - [ ] APIGateway would be useful when we impemented gitlab support
+    - [ ] GraphQL-like query system for REST APIs
+- [ ] Add command to migrate from URL installs to Catalog installs
+Example; `my-unicorn migrate --app appflowy` or `my-unicorn migrate --all`
+but we use migrate command to migrate old config to new config structure
+so we need to use flags like `--from-url-to-catalog` or something like that.
 
-```bash
-  # Install from catalog (comma-separated or space-separated)
-  my-unicorn install appflowy,joplin,obsidian
-  my-unicorn install appflowy joplin obsidian
-  ```
+- [ ] Add option in global config for [auth]
+- [ ] What about threading usage on logging? Example: <https://github.com/Roulbac/uv-func/blob/main/src/uv_func/logging.py>
 
+- [ ] make wiki page
 - [ ] sphinx for docs?
-- [ ] Make a better todo.md structure with priorities, labels etc.
-- [ ] clean this todo list, make priority to BUGS first.
 - [ ] P1: png need priority one because kde not show .svg on its bar when pinned
 - [ ] P4: remove legacy upgrade command
 - [ ] P3: #BUG: when there is one fail(keepassxc fails on checksum because external
@@ -85,7 +110,7 @@ GitHub Releases      1/1 Retrieved
 - [ ] is it better to use functional programming?
 - [ ] dev(test): manual test script need network exception error handling
 - [ ] mv neovim to usr bin to use appimage neovim
-    mv /tmp/nvim.appimage /usr/local/bin/nvim
+      mv /tmp/nvim.appimage /usr/local/bin/nvim
 
 ## backlog
 
@@ -124,13 +149,12 @@ Confirm your GitHub token:
       <https://clig.dev/>
       <https://www.amazon.com/UNIX-Programming-Addison-Wesley-Professional-Computng/dp/0131429019>
 
-  My advice as a user of CLI:
-
+    My advice as a user of CLI:
     - no emojis please, ever
-    Many people are more visually oriented, and are greatly aided by images and color.
-    A standard `NO_EMOJIS` environment variable could perhaps be used to help both camps, just like `NO_COLOR` is available today.
+      Many people are more visually oriented, and are greatly aided by images and color.
+      A standard `NO_EMOJIS` environment variable could perhaps be used to help both camps, just like `NO_COLOR` is available today.
     - if you want to make it look nice, use ANSI escape codes for color rather than emojis.
-    even then, don't use color alone to convey meaning because it will most likely get destroyed by whatever you're piping it to.
+      even then, don't use color alone to convey meaning because it will most likely get destroyed by whatever you're piping it to.
     - No, please don't use escape codes in your output. Use the library that is designed for this purpose: terminfo.
     - please take the time to write detailed man pages, not just a "--help" screen
     - implement "did you mean?" for typos (git style) and potentially dangerous commands
@@ -138,8 +162,25 @@ Confirm your GitHub token:
     - if you are displaying tabular data, present an ncurses interface
     - (extremely important) shell completion for bash and zsh
 
+- [ ] Allow users to specify target architecture (ARM, x86_64, etc.)
+- [ ] Switch to stable releases only when we publish stable versions (currently using prereleases in upgrade module)
+
 ## done
 
+- [x] token save, remove not work on zsh completion?
+- [x] remove unused autocomplete flags from auth for save remove token and backup --migrate flag
+- [x] P1: remove icon download logic because we extract icon from appimage now.
+- [x] beekeper-studio.png is wrong, extract manually and find the correct icon
+- [x] P3: Catalog and app state config structure refactor
+    - [x] Move owner, repo to github section
+    - [x] Better structure
+    - [x] Migration logic automatically on old config detected(decided to make a seperate command)
+        - [x] Make a new plan for more simple migration logic
+        - [x] via script?
+        - [x] via code on startup? Current one `class AppConfigV2(TypedDict):` used like this. Seems like violate DRY prenciple.
+    - [x] Update docs
+    - [x] add description to catalogs
+    - [x] show description on list --available command
 - [x] add verification passed or not to verification section on app-specific config
 - [x] dev(improve): rename list.py to catalog.py and all it's commands list to catalog
 - [x] fix the autocomplete zshrc local bin exporting
@@ -148,7 +189,7 @@ Confirm your GitHub token:
 - [x] remove writing commits to release desc
     - [x] removed commits
     - [x] make it work with keepachangelog template which that template not use v0.1.0 `v` prefix on its heading
-        so our github action bash script need to add itself when creating tags because conventional tags need v in front of them.
+          so our github action bash script need to add itself when creating tags because conventional tags need v in front of them.
 - [x] #BUG: Rotation error on logs... - Currently, implemented to custom rotation logic more simple and efficient
       and also increased 1MB log to 10MB to increase the log size. Manual and pytest
       succesfully passed.
@@ -171,7 +212,7 @@ Confirm your GitHub token:
 - [x] #BUG: digest not became true on catalog installs if its use checksum_file with digest verify both
 - [x] make sure skip not skip verification if there is verification option
     - [x] freetube test verify digest even it is skip: true on the catalog,
-        and I still keep it skip purposely
+          and I still keep it skip purposely
     - [x] obsidian test
 - [x] Clean up code
     - [x] general
@@ -194,30 +235,3 @@ Confirm your GitHub token:
 - [x] test.bash -> update test not available because we remove before catalog install or url install
       so we need a better logic to handle this case
 - [x] BUG: two time installed print on new version
-
-## Future Enhancements (Good-to-have)
-
-### Asset detection, filtering, and prioritization
-
-1. **Configurable Architecture Support**
-
-   - Allow users to specify target architecture (ARM, x86_64, etc.)
-   - Useful for edge cases like Raspberry Pi users
-
-2. **Smart Checksum Prioritization**
-
-   - Prefer SHA512 > SHA256 > MD5 when multiple checksums available
-   - Documented in filtering methods
-
-3. **Cache Statistics Enhancement**
-
-   - Add metrics for filtered vs. total assets
-   - Show cache size savings in stats output
-
-4. **Pattern Configuration**
-   - Move platform patterns to configuration file
-   - Allow advanced users to customize filtering rules
-
-## Future Improvements
-
-- [ ] Switch to stable releases only when we publish stable versions (currently using prereleases in upgrade module)

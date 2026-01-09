@@ -123,13 +123,13 @@ my-unicorn migrate
 
 ```bash
 # Save GitHub token
-my-unicorn auth --save-token
+my-unicorn token --save
 
 # Check auth status
 my-unicorn auth --status
 
 # Remove token
-my-unicorn auth --remove-token
+my-unicorn token --remove
 ```
 
 ### Backup

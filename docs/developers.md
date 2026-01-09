@@ -22,52 +22,55 @@ Architecture:
 
 Project Structure:
 
-- `my_unicorn/` - Main application directory (e.g. src)
-    - `catalog/` - AppImage catalog data (owner, repo, verification logic etc.)
-        - `appflowy.json` - AppFlowy catalog config
-        - `zen-browser.json` - Zen Browser catalog config
-    - `cli/` - CLI interface (parser, runner)
-    - `commands/` - Command handlers
-        - `auth.py` - Auth command handler
-        - `backup.py` - Backup command handler
-        - `base.py` - Base command handler
-        - `cache.py` - Cache command handler
-        - `catalog.py` - Catalog command handler (renamed from list.py)
-        - `config.py` - Config command handler
-        - `install.py` - Install command handler
-        - `migrate.py` - Migration command handler (v1→v2 config migration)
-        - `remove.py` - Remove command handler
-        - `update.py` - Update command handler
-        - `upgrade.py` - Upgrade command handler
-    - `migration/` - Config migration modules
-        - `base.py` - Common migration utilities
-        - `app_config.py` - App config v1→v2 migration
-        - `global_config.py` - Global config migration
-    - `schemas/` - JSON schemas for config validation
-    - `utils/` - Utility functions
-    - `verification/` - Checksum verification logic
-    - auth.py: Authentication handler module for github token management
-    - backup.py: Backup configuration module
-    - cache.py: Cache management module
-    - config.py: Configuration management module
-    - config_migration.py: Configuration migration module
-    - constants.py: Constants module
-    - desktop_entry.py: Desktop entry creation module
-    - download.py: Download module that downloads AppImage, checksum files
-    - exceptions.py: Exception handling module
-    - file_ops.py: File operations module
-    - github_client.py: GitHub API client module for requests
-    - icon.py: Icon management module
-    - install.py: Installation module
-    - logger.py: Logging module
-    - main.py: Main entry point for the application
-    - progress.py: Progress bar module using ASCII backend
-    - update.py: Update module that updates AppImages
-    - upgrade.py: Upgrade module that upgrades my-unicorn
-- `scripts/`: Scripts for various tasks
-- `tests/`: Test files written in Python using pytest
-- setup.sh: Setup script for installation my-unicorn
-- run.py: my-unicorn development entry point
+- `src/my_unicorn/` - Main package source code
+    - `catalog/` - Application catalog JSON files
+    - `cli/` - CLI argument parsing and command runners
+        - `commands/` - Individual command handlers (install, update, remove, list, etc.)
+        - `parser.py` - Argument parser setup
+        - `runner.py` - Command execution orchestration
+    - `config/` - Configuration management
+        - `global.py` - Global INI configuration
+        - `app.py` - Per-app JSON configuration
+        - `catalog.py` - Application catalog loader
+        - `migration/` - Configuration migration logic
+        - `schemas/` - JSON schema validation
+    - `domain/` - Domain models and business logic
+        - `asset.py` - AppImage asset handling
+        - `release.py` - Release information
+        - `verification/` - Hash verification logic
+        - `constants.py` - Application constants (versions, paths, defaults)
+        - `types.py` - Type definitions and dataclasses
+    - `infrastructure/` - External integrations and I/O
+        - `github/` - GitHub API client
+        - `cache.py` - Release cache management
+        - `download.py` - File download logic
+        - `desktop_entry.py` - Desktop file generation
+        - `icon.py` - Icon extraction and management
+        - `file_ops.py` - File system operations
+        - `auth.py` - Authentication handling
+        - `token.py` - Token storage and retrieval
+    - `ui/` - User interface and display
+        - `progress.py` - Progress bar management
+        - `display.py` - Output formatting and rendering
+        - `formatters.py` - Text formatters
+    - `utils/` - Utility functions and helpers
+    - `workflows/` - Business workflows (use cases)
+        - `install.py` - Install workflow
+        - `update.py` - Update workflow
+        - `remove.py` - Remove workflow
+        - `services/` - Workflow helper services
+    - `exceptions.py` - Custom exception classes
+    - `logger.py` - Logging setup and configuration
+    - `main.py` - Application entry point
+- `tests/` - Comprehensive test suite (Same structure as src/my_unicorn/)
+    - `cli/` - CLI tests
+    - `commands/` - Command handler tests
+    - `integration/` - Integration tests
+    - `migration/` - Migration tests
+    - `services/` - Service tests
+    - `schemas/` - Schema validation tests
+- `docs/` - Documentation and design decisions
+- `scripts/` - Helper scripts for development
 
 ## API
 
@@ -129,4 +132,4 @@ Project Structure:
 >
 > This example of latest release but beta is similar to this one. Only changes beta provide all the assets and we use the asset 0 for latest version informations, latest release provide directly to that asset 0.
 
-[raw_api_returned_data.json](/docs/raw_api_returned_data.json)
+[raw_api_returned_data.json](/docs/data/raw_api_returned_data.json)
