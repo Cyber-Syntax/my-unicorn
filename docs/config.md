@@ -105,7 +105,7 @@ Catalog entries define metadata for supported applications. These are maintained
   },
   "icon": {
     "method": "extraction",  // "extraction" or "download"
-    "name": "appflowy.svg",
+    "name": "appflowy.png",
     // For download method:
     "url": ""  // URL to icon file
   }
