@@ -1,6 +1,7 @@
 """Tests for ConfigManager: global config, app config, catalog, and directory logic."""
 
 import configparser
+from pathlib import Path
 from typing import cast
 
 import orjson
@@ -18,7 +19,7 @@ from my_unicorn.domain.constants import GLOBAL_CONFIG_VERSION
 
 
 @pytest.fixture
-def config_dir(tmp_path):
+def config_dir(tmp_path: Path) -> Path:
     """Provide a temporary config directory for ConfigManager."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -57,25 +58,25 @@ def config_dir(tmp_path):
 
 
 @pytest.fixture
-def config_manager(config_dir, tmp_path):
+def config_manager(config_dir: Path, tmp_path: Path) -> ConfigManager:
     """ConfigManager instance using temporary config_dir and catalog_dir."""
     # Use the temporary catalog directory for tests
     catalog_dir = tmp_path / "catalog"
     return ConfigManager(config_dir, catalog_dir)
 
 
-def test_load_and_save_global_config(config_manager):
+def test_load_and_save_global_config(config_manager: ConfigManager) -> None:
     """Test loading and saving global config."""
     config = config_manager.load_global_config()
     assert isinstance(config, dict)
-    TEST_MAX_BACKUP = 7
-    config["max_backup"] = TEST_MAX_BACKUP
+    test_max_backup = 7
+    config["max_backup"] = test_max_backup
     config_manager.save_global_config(config)
     loaded = config_manager.load_global_config()
-    assert loaded["max_backup"] == TEST_MAX_BACKUP
+    assert loaded["max_backup"] == test_max_backup
 
 
-def test_load_app_config_and_migration(config_manager):
+def test_load_app_config_and_migration(config_manager: ConfigManager) -> None:
     """Test saving and loading app config with v2.0.0 format."""
     app_name = "testapp"
     app_config = {
@@ -108,7 +109,7 @@ def test_load_app_config_and_migration(config_manager):
     assert loaded["state"]["verification"]["passed"] is True
 
 
-def test_remove_app_config(config_manager):
+def test_remove_app_config(config_manager: ConfigManager) -> None:
     """Test removing app config file."""
     app_name = "toremove"
     app_config = {
@@ -141,7 +142,7 @@ def test_remove_app_config(config_manager):
     assert config_manager.remove_app_config(app_name) is False
 
 
-def test_list_installed_apps(config_manager):
+def test_list_installed_apps(config_manager: ConfigManager) -> None:
     """Test listing installed apps."""
     app_names = ["app1", "app2"]
     for name in app_names:
@@ -157,7 +158,9 @@ def test_list_installed_apps(config_manager):
                     "name_template": "",
                     "characteristic_suffix": [],
                     "installed_date": "2024-01-01T12:00:00",
-                    "digest": "sha256:abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
+                    "digest": (
+                        "sha256:abc123def456abc123def456abc123def456abc123def456abc123def456abcd"
+                    ),
                 },
                 "owner": "owner",
                 "repo": "repo",
@@ -175,13 +178,13 @@ def test_list_installed_apps(config_manager):
     assert set(installed) == set(app_names)
 
 
-def test_list_catalog_apps(config_manager):
+def test_list_catalog_apps(config_manager: ConfigManager) -> None:
     """Test listing catalog apps."""
     catalog_apps = config_manager.list_catalog_apps()
     assert "dummyapp" in catalog_apps
 
 
-def test_load_catalog_entry(config_manager):
+def test_load_catalog_entry(config_manager: ConfigManager) -> None:
     """Test loading catalog entry."""
     entry = config_manager.load_catalog_entry("dummyapp")
     assert entry is not None
@@ -189,7 +192,9 @@ def test_load_catalog_entry(config_manager):
     assert entry["source"]["repo"] == "dummyrepo"
 
 
-def test_ensure_directories_from_config(config_manager, tmp_path):
+def test_ensure_directories_from_config(
+    config_manager: ConfigManager, tmp_path: Path
+) -> None:
     """Test ensure_directories_from_config creates directories."""
     dirs = {
         "repo": tmp_path / "repo",
@@ -216,7 +221,9 @@ def test_ensure_directories_from_config(config_manager, tmp_path):
         assert d.exists()
 
 
-def test_directory_creation_without_comments(config_manager, tmp_path):
+def test_directory_creation_without_comments(
+    config_manager: ConfigManager, tmp_path: Path
+) -> None:
     """Test that directories are created without inline comments in names.
 
     This test prevents regression of the bug where directories were created
@@ -283,7 +290,7 @@ def test_directory_creation_without_comments(config_manager, tmp_path):
                 )
 
 
-def test_comment_stripping_configparser(config_manager):
+def test_comment_stripping_configparser(config_manager: ConfigManager) -> None:
     """Test that CommentAwareConfigParser correctly strips inline comments."""
     # Create a config file with inline comments
     config_content = """[DEFAULT]
@@ -315,7 +322,7 @@ tmp = /test/tmp  # Temporary files directory
 # Tests for refactored specialized manager classes
 
 
-def test_global_config_manager(config_dir):
+def test_global_config_manager(config_dir: Path) -> None:
     """Test GlobalConfigManager functionality."""
     global_manager = GlobalConfigManager(config_dir)
 
@@ -326,20 +333,18 @@ def test_global_config_manager(config_dir):
     assert "max_concurrent_downloads" in config
 
     # Test saving and loading
-    TEST_MAX_DOWNLOADS = 8
-    config["max_concurrent_downloads"] = TEST_MAX_DOWNLOADS
+    test_max_downloads = 8
+    config["max_concurrent_downloads"] = test_max_downloads
     global_manager.save_global_config(config)
     loaded = global_manager.load_global_config()
-    assert loaded["max_concurrent_downloads"] == TEST_MAX_DOWNLOADS
+    assert loaded["max_concurrent_downloads"] == test_max_downloads
 
     # Test get default global config
     default = global_manager.get_default_global_config()
     assert isinstance(default, dict)
 
     # Test convert to global config (with compatible input type)
-    from configparser import ConfigParser
-
-    raw_config = ConfigParser()
+    raw_config = configparser.ConfigParser()
     raw_config.add_section("settings")
     raw_config.set("settings", "max_backup", "3")
     converted = global_manager._convert_to_global_config(raw_config)
@@ -347,7 +352,7 @@ def test_global_config_manager(config_dir):
     assert "network" in converted
 
 
-def test_app_config_manager(config_dir):
+def test_app_config_manager(config_dir: Path) -> None:
     """Test AppConfigManager functionality."""
     apps_dir = config_dir / "apps"
     apps_dir.mkdir(parents=True, exist_ok=True)
@@ -355,13 +360,13 @@ def test_app_config_manager(config_dir):
 
     # Test saving and loading app config
     app_name = "testapp"
-    TEST_VERSION = "2.0.0"
+    test_version = "2.0.0"
     app_config = {
         "config_version": "2.0.0",
         "source": "catalog",
         "catalog_ref": "testapp",
         "state": {
-            "version": TEST_VERSION,
+            "version": test_version,
             "installed_date": "2024-01-01T12:00:00",
             "installed_path": "",
             "verification": {
@@ -390,7 +395,7 @@ def test_app_config_manager(config_dir):
     assert loaded is not None
     # V2.0.0 format with state
     assert loaded["config_version"] == "2.0.0"
-    assert loaded["state"]["version"] == TEST_VERSION
+    assert loaded["state"]["version"] == test_version
 
     # Test listing apps
     installed = app_manager.list_installed_apps()
@@ -409,7 +414,7 @@ def test_app_config_manager(config_dir):
     assert nonexistent is None
 
 
-def test_catalog_manager(config_dir):
+def test_catalog_manager(config_dir: Path) -> None:
     """Test CatalogLoader functionality."""
     # Create catalog directory with test data
     catalog_dir = config_dir / "catalog"
@@ -460,7 +465,7 @@ def test_catalog_manager(config_dir):
     assert nonexistent is None
 
 
-def test_config_manager_facade_integration(config_dir):
+def test_config_manager_facade_integration(config_dir: Path) -> None:
     """Test that ConfigManager facade properly integrates all managers."""
     catalog_dir = config_dir / "catalog"
     catalog_dir.mkdir()
@@ -501,15 +506,15 @@ def test_config_manager_facade_integration(config_dir):
     config_manager = ConfigManager(config_dir, catalog_dir)
 
     # Test that all manager functionality is accessible through facade
-    TEST_CONCURRENT_DOWNLOADS = 6
+    test_concurrent_downloads = 6
 
     # Global config operations
     global_config = config_manager.load_global_config()
-    global_config["max_concurrent_downloads"] = TEST_CONCURRENT_DOWNLOADS
+    global_config["max_concurrent_downloads"] = test_concurrent_downloads
     config_manager.save_global_config(global_config)
     loaded_global = config_manager.load_global_config()
     assert (
-        loaded_global["max_concurrent_downloads"] == TEST_CONCURRENT_DOWNLOADS
+        loaded_global["max_concurrent_downloads"] == test_concurrent_downloads
     )
 
     # App config operations
@@ -578,7 +583,7 @@ def test_config_manager_facade_integration(config_dir):
     assert isinstance(converted_config, dict)
 
 
-def test_version_comparison(config_dir):
+def test_version_comparison(config_dir: Path) -> None:
     """Test semantic version comparison functionality."""
     manager = GlobalConfigManager(config_dir)
 
@@ -606,7 +611,7 @@ def test_version_comparison(config_dir):
     assert manager.migration._compare_versions("1.0.0", "invalid") == 1
 
 
-def test_needs_migration(config_dir):
+def test_needs_migration(config_dir: Path) -> None:
     """Test migration necessity detection."""
     manager = GlobalConfigManager(config_dir)
 
@@ -624,7 +629,7 @@ def test_needs_migration(config_dir):
     assert manager.migration._needs_migration("invalid") is True
 
 
-def test_config_backup_creation(config_dir):
+def test_config_backup_creation(config_dir: Path) -> None:
     """Test configuration backup functionality."""
     manager = GlobalConfigManager(config_dir)
 
@@ -642,7 +647,7 @@ def test_config_backup_creation(config_dir):
     assert "config_version = 1.0.0" in backup_path.read_text()
 
 
-def test_merge_missing_fields(config_dir):
+def test_merge_missing_fields(config_dir: Path) -> None:
     """Test missing configuration field detection and merging."""
     manager = GlobalConfigManager(config_dir)
     user_config = configparser.ConfigParser()
@@ -687,7 +692,7 @@ config_version = 1.0.0
     assert fields_added is False
 
 
-def test_validate_merged_config(config_dir):
+def test_validate_merged_config(config_dir: Path) -> None:
     """Test configuration validation after merging."""
     manager = GlobalConfigManager(config_dir)
 
@@ -721,7 +726,7 @@ config_version = 1.0.1
     assert manager.migration._validate_merged_config(minimal_config) is False
 
 
-def test_configuration_migration_integration(config_dir):
+def test_configuration_migration_integration(config_dir: Path) -> None:
     """Test complete configuration migration workflow."""
     manager = GlobalConfigManager(config_dir)
 
@@ -748,7 +753,9 @@ storage = /custom/storage
 
     # Verify missing fields were added
     assert "console_log_level" in config
-    assert config["console_log_level"] == "WARNING"  # Default value
+    assert (
+        config["console_log_level"] == "INFO"
+    )  # Default value (changed from WARNING)
     assert config["network"]["timeout_seconds"] == 10  # Default value
 
     # Verify custom directory setting preserved but missing ones added
@@ -760,7 +767,7 @@ storage = /custom/storage
     assert len(backup_files) > 0
 
 
-def test_migration_failure_rollback(config_dir):
+def test_migration_failure_rollback(config_dir: Path) -> None:
     """Test migration rollback on validation failure."""
     manager = GlobalConfigManager(config_dir)
 
@@ -769,7 +776,7 @@ def test_migration_failure_rollback(config_dir):
 
     original_validate = manager.migration._validate_merged_config
 
-    def mock_validate_failure(config):
+    def mock_validate_failure(config: configparser.ConfigParser) -> bool:
         # Always return False to simulate validation failure
         return False
 
@@ -793,7 +800,7 @@ config_version = 1.0.0
     manager.migration._validate_merged_config = original_validate
 
 
-def test_migration_with_new_config_file(config_dir):
+def test_migration_with_new_config_file(config_dir: Path) -> None:
     """Test behavior with non-existent configuration file."""
     manager = GlobalConfigManager(config_dir)
 
@@ -805,7 +812,7 @@ def test_migration_with_new_config_file(config_dir):
     assert manager.settings_file.exists()
 
 
-def test_migration_no_changes_needed(config_dir):
+def test_migration_no_changes_needed(config_dir: Path) -> None:
     """Test migration when configuration is already up to date."""
     manager = GlobalConfigManager(config_dir)
 
@@ -847,7 +854,7 @@ def test_migration_no_changes_needed(config_dir):
     # that loading didn't create additional unnecessary backups
 
 
-def test_config_file_with_comments(config_dir, tmp_path):
+def test_config_file_with_comments(config_dir: Path, tmp_path: Path) -> None:
     """Test that configuration files are saved with user-friendly comments."""
     catalog_dir = tmp_path / "catalog"
     catalog_dir.mkdir(exist_ok=True)
@@ -884,7 +891,9 @@ def test_config_file_with_comments(config_dir, tmp_path):
     assert loaded_config == config
 
 
-def test_comment_stripping_functionality(config_dir, tmp_path):
+def test_comment_stripping_functionality(
+    config_dir: Path, tmp_path: Path
+) -> None:
     """Test that inline comments are properly stripped when loading config."""
     catalog_dir = tmp_path / "catalog"
     catalog_dir.mkdir(exist_ok=True)
@@ -943,14 +952,14 @@ def _parse_ini_file_lines(content: str) -> tuple[list, list, list]:
 
 def _verify_comment_lines(lines_with_comments: list) -> None:
     """Verify lines with comments have proper formatting."""
-    MIN_COMMENT_LINES = 1
+    min_comment_lines = 1
 
     for line_num, line in lines_with_comments:
         # Should have exactly one comment (config_version)
         assert "config_version" in line, (
             f"Only config_version should have inline comment, found: {line}"
         )
-        assert line.count("  #") == MIN_COMMENT_LINES, (
+        assert line.count("  #") == min_comment_lines, (
             f"Line {line_num} should have exactly one comment marker: {line!r}"
         )
         assert "DO NOT MODIFY" in line, (
@@ -965,7 +974,7 @@ def _verify_comment_lines(lines_with_comments: list) -> None:
 
 def _verify_clean_lines(lines_without_comments: list) -> None:
     """Verify lines without comments have no trailing spaces."""
-    EXPECTED_KEY_VALUE_PARTS = 2
+    expected_key_value_parts = 2
 
     for line_num, line in lines_without_comments:
         # Should not end with any spaces
@@ -978,7 +987,7 @@ def _verify_clean_lines(lines_without_comments: list) -> None:
 
         # Should have proper format: "key = value" (no trailing whitespace)
         parts = line.split(" = ")
-        assert len(parts) == EXPECTED_KEY_VALUE_PARTS, (
+        assert len(parts) == expected_key_value_parts, (
             f"Line {line_num} should have 'key = value' format: {line!r}"
         )
         _, value = parts  # Only use value, ignore key
@@ -987,14 +996,16 @@ def _verify_clean_lines(lines_without_comments: list) -> None:
         )
 
 
-def test_ini_file_inline_spacing_format(config_dir, tmp_path):
+def test_ini_file_inline_spacing_format(
+    config_dir: Path, tmp_path: Path
+) -> None:
     """Test INI files have proper spacing without trailing spaces.
 
     This prevents regression of the trailing whitespace issue where all lines
     had unnecessary trailing spaces even when they had no inline comments.
     """
-    MIN_COMMENT_LINES = 1
-    MIN_CLEAN_LINES = 5
+    min_comment_lines = 1
+    min_clean_lines = 5
 
     catalog_dir = tmp_path / "catalog"
     catalog_dir.mkdir(exist_ok=True)
@@ -1012,10 +1023,10 @@ def test_ini_file_inline_spacing_format(config_dir, tmp_path):
     )
 
     # Verify we have the expected structure
-    assert len(lines_with_comments) >= MIN_COMMENT_LINES, (
+    assert len(lines_with_comments) >= min_comment_lines, (
         "Should have at least config_version with comment"
     )
-    assert len(lines_without_comments) >= MIN_CLEAN_LINES, (
+    assert len(lines_without_comments) >= min_clean_lines, (
         "Should have multiple lines without comments"
     )
 

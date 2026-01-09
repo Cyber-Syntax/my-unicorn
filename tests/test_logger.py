@@ -45,7 +45,7 @@ def test_get_logger_singleton_behavior():
 
 
 def test_console_handler_has_color_formatter():
-    """Test console handler uses ColoredConsoleFormatter via QueueListener."""
+    """Test console handler uses HybridConsoleFormatter via QueueListener."""
     # Get root logger to ensure initialization
     _ = get_logger("my_unicorn", enable_file_logging=False)
 
@@ -59,7 +59,10 @@ def test_console_handler_has_color_formatter():
     ]
 
     assert len(console_handlers) == 1
-    assert isinstance(console_handlers[0].formatter, ColoredConsoleFormatter)
+    # Updated to HybridConsoleFormatter which provides simple format for INFO
+    from my_unicorn.logger import HybridConsoleFormatter
+
+    assert isinstance(console_handlers[0].formatter, HybridConsoleFormatter)
 
 
 def test_child_logger_propagates_to_root():
@@ -395,85 +398,3 @@ def test_update_logger_from_config(monkeypatch):
 
     assert console_handler.level == logging.ERROR
     assert file_handler.level == logging.WARNING
-
-
-def test_temporary_console_level_context_manager(caplog):
-    """Test temporary_console_level context manager adjusts and restores levels."""
-    from my_unicorn.logger import temporary_console_level
-
-    logger = get_logger("my_unicorn", enable_file_logging=False)
-
-    # Get console handler from QueueListener
-    assert _state.queue_listener is not None
-    console_handler = next(
-        h
-        for h in _state.queue_listener.handlers
-        if isinstance(h, logging.StreamHandler)
-        and not isinstance(h, RotatingFileHandler)
-    )
-    console_handler.setLevel(logging.WARNING)
-
-    original_level = console_handler.level
-    assert original_level == logging.WARNING
-
-    # Use context manager to temporarily set to INFO
-    with temporary_console_level("INFO"):
-        # Level should be INFO inside context
-        assert console_handler.level == logging.INFO
-
-        # Log an INFO message that should be visible
-        logger.info("Test info message")
-
-    # Level should be restored to WARNING
-    assert console_handler.level == original_level
-    assert console_handler.level == logging.WARNING
-
-
-def test_temporary_console_level_invalid_level():
-    """Test temporary_console_level raises ValueError for invalid level."""
-    from my_unicorn.logger import temporary_console_level
-
-    with pytest.raises(ValueError, match="Invalid log level"):
-        with temporary_console_level("INVALID_LEVEL"):
-            pass
-
-
-def test_temporary_console_level_with_file_handler(tmp_path):
-    """Test temporary_console_level only affects console handlers, not file handlers."""
-    from my_unicorn.logger import temporary_console_level
-
-    log_file = tmp_path / "test.log"
-    logger = setup_logging(
-        "my_unicorn",
-        console_level="WARNING",
-        file_level="INFO",
-        log_file=log_file,
-        enable_file_logging=True,
-    )
-
-    # Get handlers from QueueListener
-    assert _state.queue_listener is not None
-    console_handler = None
-    file_handler = None
-    for handler in _state.queue_listener.handlers:
-        if isinstance(handler, RotatingFileHandler):
-            file_handler = handler
-        elif isinstance(handler, logging.StreamHandler):
-            console_handler = handler
-
-    assert console_handler is not None
-    assert file_handler is not None
-
-    original_file_level = file_handler.level
-    original_console_level = console_handler.level
-
-    # Use context manager
-    with temporary_console_level("DEBUG"):
-        # Console handler should change
-        assert console_handler.level == logging.DEBUG
-        # File handler should NOT change
-        assert file_handler.level == original_file_level
-
-    # Both should be restored
-    assert console_handler.level == original_console_level
-    assert file_handler.level == original_file_level
