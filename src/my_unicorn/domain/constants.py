@@ -44,7 +44,7 @@ DEFAULT_LOG_LEVEL: Final[str] = "INFO"
 # Defaults used by the global config manager
 DEFAULT_MAX_CONCURRENT_DOWNLOADS: Final[int] = 5
 DEFAULT_MAX_BACKUP: Final[int] = 1
-DEFAULT_CONSOLE_LOG_LEVEL: Final[str] = "WARNING"
+DEFAULT_CONSOLE_LOG_LEVEL: Final[str] = "INFO"
 
 # Date/time formats used in config headers and saved timestamps
 ISO_DATETIME_FORMAT: Final[str] = "%Y-%m-%d %H:%M:%S"

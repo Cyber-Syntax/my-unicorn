@@ -15,9 +15,11 @@ Key features:
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from collections import OrderedDict, defaultdict
 from contextlib import asynccontextmanager, suppress
+from logging.handlers import RotatingFileHandler
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -34,7 +36,12 @@ logger = get_logger(__name__)
 
 
 class ProgressDisplay:
-    """Progress display UI component using ASCII backend."""
+    """Progress display UI component using ASCII backend.
+
+    During active progress sessions, logger.info() is automatically
+    suppressed to prevent interference with progress bar rendering.
+    Warning/error logs are always shown.
+    """
 
     def __init__(
         self,
@@ -79,6 +86,9 @@ class ProgressDisplay:
         # Background rendering task
         self._render_task: asyncio.Task | None = None
         self._stop_rendering: asyncio.Event = asyncio.Event()
+
+        # Logger suppression state
+        self._original_console_levels: dict[logging.Handler, int] = {}
 
     def _generate_namespaced_id(
         self, progress_type: ProgressType, name: str
@@ -203,8 +213,36 @@ class ProgressDisplay:
             except Exception as e:
                 logger.debug("Error in render loop: %s", e)
 
+    def _suppress_console_logger(self) -> None:
+        """Suppress logger.info during progress session.
+
+        Temporarily raises console handler level to WARNING to prevent
+        logger.info() from interfering with progress bar rendering.
+        Stores original levels for later restoration.
+        """
+        from my_unicorn.logger import _state
+
+        if _state.queue_listener is not None:
+            for handler in _state.queue_listener.handlers:
+                if isinstance(
+                    handler, logging.StreamHandler
+                ) and not isinstance(handler, RotatingFileHandler):
+                    # Store original level
+                    self._original_console_levels[handler] = handler.level
+                    # Suppress INFO level during progress
+                    handler.setLevel(logging.WARNING)
+
+    def _restore_console_logger(self) -> None:
+        """Restore console logger to original levels after progress session."""
+        for handler, original_level in self._original_console_levels.items():
+            handler.setLevel(original_level)
+        self._original_console_levels.clear()
+
     async def start_session(self, total_operations: int = 0) -> None:
         """Start a progress display session.
+
+        Automatically suppresses logger.info() to prevent interference
+        with progress bar rendering.
 
         Args:
             total_operations: Total number of operations (currently unused)
@@ -217,6 +255,9 @@ class ProgressDisplay:
         self._active = True
         self._stop_rendering.clear()
 
+        # Suppress logger.info during progress
+        self._suppress_console_logger()
+
         # Start background rendering loop
         self._render_task = asyncio.create_task(self._render_loop())
 
@@ -226,7 +267,11 @@ class ProgressDisplay:
         )
 
     async def stop_session(self) -> None:
-        """Stop the progress display session."""
+        """Stop the progress display session.
+
+        Automatically restores logger.info() output after progress
+        session ends.
+        """
         if not self._active:
             return
 
@@ -242,6 +287,9 @@ class ProgressDisplay:
 
         # Final cleanup render
         await self._backend.cleanup()
+
+        # Restore logger.info after progress
+        self._restore_console_logger()
 
         # Clear cached state
         self._clear_id_cache()

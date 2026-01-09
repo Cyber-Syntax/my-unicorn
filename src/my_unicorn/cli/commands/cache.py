@@ -8,7 +8,7 @@ import sys
 from argparse import Namespace
 
 from my_unicorn.infrastructure.cache import get_cache_manager
-from my_unicorn.logger import get_logger, temporary_console_level
+from my_unicorn.logger import get_logger
 
 from .base import BaseCommandHandler
 
@@ -37,21 +37,20 @@ class CacheHandler(BaseCommandHandler):
             SystemExit: On unknown action or error.
 
         """
-        with temporary_console_level("INFO"):
-            try:
-                if args.cache_action == "clear":
-                    await self._handle_clear(args)
-                elif args.cache_action == "stats":
-                    await self._handle_stats(args)
-                else:
-                    logger.error("Unknown cache action: %s", args.cache_action)
-                    sys.exit(1)
-            except KeyboardInterrupt:
-                logger.info("Cache operation interrupted by user")
-                sys.exit(130)
-            except Exception as e:
-                logger.error("Cache operation failed: %s", e)
+        try:
+            if args.cache_action == "clear":
+                await self._handle_clear(args)
+            elif args.cache_action == "stats":
+                await self._handle_stats(args)
+            else:
+                logger.error("Unknown cache action: %s", args.cache_action)
                 sys.exit(1)
+        except KeyboardInterrupt:
+            logger.info("Cache operation interrupted by user")
+            sys.exit(130)
+        except Exception as e:
+            logger.error("Cache operation failed: %s", e)
+            sys.exit(1)
 
     async def _handle_clear(self, args: Namespace) -> None:
         """Clear cache entries based on arguments.

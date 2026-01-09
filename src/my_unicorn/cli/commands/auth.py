@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 
 import aiohttp
 
-from my_unicorn.logger import get_logger, temporary_console_level
+from my_unicorn.logger import get_logger
 
 from .base import BaseCommandHandler
 
@@ -43,27 +43,25 @@ class AuthHandler(BaseCommandHandler):
         when no personal access token is configured. The API will return the
         public (unauthenticated) rate limits in that case.
         """
-        with temporary_console_level("INFO"):
-            configured = self.auth_manager.is_authenticated()
-            if configured:
-                logger.info("✅ GitHub token is configured")
-                logger.debug(
-                    "GitHub token is configured. Fetching rate limit info..."
-                )
-            else:
-                logger.info("No GitHub token configured.")
-                logger.info("❌ No GitHub token configured")
-                logger.info("Use 'my-unicorn token --save' to set a token")
-                logger.debug(
-                    "No token configured. "
-                    "Fetching public GitHub rate limit info."
-                )
+        configured = self.auth_manager.is_authenticated()
+        if configured:
+            logger.info("✅ GitHub token is configured")
+            logger.info(
+                "GitHub token is configured. Fetching Github rate limit info..."
+            )
+        else:
+            logger.info("No GitHub token configured.")
+            logger.info("❌ No GitHub token configured")
+            logger.info("Use 'my-unicorn token --save' to set a token")
+            logger.info(
+                "No token configured. Fetching Github rate limit info."
+            )
 
-            # Get fresh rate limit information (works with or without token)
-            rate_limit_data = await self._fetch_fresh_rate_limit()
+        # Get fresh rate limit information (works with or without token)
+        rate_limit_data = await self._fetch_fresh_rate_limit()
 
-            # Show rate limit information
-            await self._display_rate_limit_info(rate_limit_data)
+        # Show rate limit information
+        await self._display_rate_limit_info(rate_limit_data)
 
     async def _fetch_fresh_rate_limit(self) -> dict[str, object] | None:
         """Fetch fresh rate limit information from GitHub API.

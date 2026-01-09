@@ -6,7 +6,7 @@ displaying current configuration and resetting to default values.
 
 from argparse import Namespace
 
-from my_unicorn.logger import get_logger, temporary_console_level
+from my_unicorn.logger import get_logger
 
 from .base import BaseCommandHandler
 
@@ -18,11 +18,10 @@ class ConfigHandler(BaseCommandHandler):
 
     async def execute(self, args: Namespace) -> None:
         """Execute the config command."""
-        with temporary_console_level("INFO"):
-            if args.show:
-                await self._show_config()
-            elif args.reset:
-                await self._reset_config()
+        if args.show:
+            await self._show_config()
+        elif args.reset:
+            await self._reset_config()
 
     async def _show_config(self) -> None:
         """Display current configuration."""

@@ -26,7 +26,7 @@ from my_unicorn.domain.constants import (
     BACKUP_METADATA_TMP_SUFFIX,
     BACKUP_TEMP_SUFFIX,
 )
-from my_unicorn.logger import get_logger, temporary_console_level
+from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -633,22 +633,19 @@ class BackupService:
                 app_name,
                 config_version,
             )
-            with temporary_console_level("INFO"):
-                logger.info("")
-                logger.info("⚠️  Old Configuration Format Detected")
-                logger.info("")
-                logger.info(
-                    "The app '%s' uses config version %s (current: %s).",
-                    app_name,
-                    config_version,
-                    APP_CONFIG_VERSION,
-                )
-                logger.info(
-                    "Please run the migration command to upgrade to v2:"
-                )
-                logger.info("")
-                logger.info("  my-unicorn migrate")
-                logger.info("")
+            logger.info("")
+            logger.info("⚠️  Old Configuration Format Detected")
+            logger.info("")
+            logger.info(
+                "The app '%s' uses config version %s (current: %s).",
+                app_name,
+                config_version,
+                APP_CONFIG_VERSION,
+            )
+            logger.info("Please run the migration command to upgrade to v2:")
+            logger.info("")
+            logger.info("  my-unicorn migrate")
+            logger.info("")
             return None
 
         # v2 config structure: extract necessary fields from state and overrides

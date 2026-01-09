@@ -321,7 +321,9 @@ class GlobalConfigManager:
             max_backup=int(get_scalar_config("max_backup", 1)),
             log_level=str(get_scalar_config("log_level", "INFO")),
             console_log_level=str(
-                get_scalar_config("console_log_level", "WARNING")
+                get_scalar_config(
+                    "console_log_level", DEFAULT_CONSOLE_LOG_LEVEL
+                )
             ),
             network=network_config,
             directory=DirectoryConfig(

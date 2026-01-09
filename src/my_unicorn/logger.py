@@ -30,11 +30,6 @@ Usage:
         >>> from my_unicorn.logger import update_logger_from_config
         >>> update_logger_from_config()
 
-    Temporarily adjust console output level for user-facing commands:
-        >>> from my_unicorn.logger import temporary_console_level
-        >>> with temporary_console_level("INFO"):
-        ...     logger.info("This message will be visible to users")
-
 Environment Variables:
     LOG_LEVEL: Override console log level for testing
         Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL
@@ -71,8 +66,6 @@ import queue
 import sys
 import threading
 import time
-from collections.abc import Generator
-from contextlib import contextmanager
 from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 from pathlib import Path
 
@@ -207,7 +200,10 @@ def _load_log_settings() -> tuple[str, str, Path]:
 
 
 def _create_console_handler(console_level: str) -> logging.StreamHandler:
-    """Create and configure console handler with colored output.
+    """Create and configure console handler with hybrid formatting.
+
+    Uses HybridConsoleFormatter which shows simple format (message only)
+    for INFO level and structured format with colors for WARNING and above.
 
     Args:
         console_level: Log level for console (e.g., "DEBUG", "INFO", "WARNING")
@@ -218,7 +214,7 @@ def _create_console_handler(console_level: str) -> logging.StreamHandler:
     """
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(
-        ColoredConsoleFormatter(
+        HybridConsoleFormatter(
             LOG_CONSOLE_FORMAT,
             datefmt=LOG_CONSOLE_DATE_FORMAT,
         )
@@ -475,8 +471,8 @@ class SimpleConsoleFormatter(logging.Formatter):
     that use logger.info() as a replacement for print().
 
     Usage:
-        Typically used automatically by temporary_console_level() when
-        simple_format=True (the default). Not normally instantiated directly.
+        Used by HybridConsoleFormatter for INFO level messages to show only
+        the message content. Not normally instantiated directly.
 
     Example Output:
         Standard formatter: "21:30:08 - my_unicorn.update - INFO - Message"
@@ -499,6 +495,61 @@ class SimpleConsoleFormatter(logging.Formatter):
 
         """
         return record.getMessage()
+
+
+class HybridConsoleFormatter(logging.Formatter):
+    """Console formatter with simple format for INFO, structured for others.
+
+    This formatter provides clean output for user-facing INFO messages while
+    maintaining detailed context for warnings and errors. INFO level messages
+    show only the message content, while WARNING and above show timestamp,
+    module, level, and message with color coding.
+
+    Format Selection:
+        - INFO: Simple format (message only)
+        - WARNING/ERROR/CRITICAL: Structured format with colors and metadata
+        - DEBUG: Structured format with colors and metadata
+
+    Example Output:
+        INFO:     "🚀 Starting installation"
+        WARNING:  "12:30:45 - my_unicorn - WARNING - Cache outdated"
+        ERROR:    "12:30:45 - my_unicorn - ERROR - Connection failed"
+
+    Thread Safety:
+        Safe for multi-threaded use as each format() call works on
+        a separate log record instance.
+
+    """
+
+    def __init__(
+        self,
+        fmt: str | None = None,
+        datefmt: str | None = None,
+    ) -> None:
+        """Initialize hybrid formatter with structured format template.
+
+        Args:
+            fmt: Format string for structured messages (WARNING and above)
+            datefmt: Date format string for timestamps
+
+        """
+        super().__init__(fmt, datefmt)
+        self._simple_formatter = SimpleConsoleFormatter()
+        self._colored_formatter = ColoredConsoleFormatter(fmt, datefmt)
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record using simple or structured format by level.
+
+        Args:
+            record: The log record to format
+
+        Returns:
+            Formatted message (simple for INFO, structured for others)
+
+        """
+        if record.levelno == logging.INFO:
+            return self._simple_formatter.format(record)
+        return self._colored_formatter.format(record)
 
 
 def setup_logging(
@@ -579,93 +630,6 @@ def setup_logging(
     # Return the requested logger (let logging.getLogger handle it)
     # Python's logging automatically handles parent-child relationships
     return logging.getLogger(name)
-
-
-@contextmanager
-def temporary_console_level(
-    level: str = "INFO",
-    simple_format: bool = True,  # noqa: FBT001, FBT002
-) -> Generator[None, None, None]:
-    """Temporarily set console handler log level for user-facing output.
-
-    This context manager is designed for commands that need to display
-    information to users even when console_log_level is set to WARNING.
-    It temporarily adjusts console handler levels and optionally switches
-    to a simplified format, then restores them.
-
-    Args:
-        level: Log level to set
-            ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
-        simple_format: Use SimpleConsoleFormatter to show only messages,
-            without timestamp/module/level prefix (default: True)
-
-    Example:
-        >>> from my_unicorn.logger import (
-        ...     get_logger,
-        ...     temporary_console_level,
-        ... )
-        >>> logger = get_logger(__name__)
-        >>>
-        >>> # Simple format (default) - only shows message
-        >>> with temporary_console_level("INFO"):
-        ...     logger.info("Clean output without metadata")
-        >>>
-        >>> # Full format - shows timestamp, module, level
-        >>> with temporary_console_level("INFO", simple_format=False):
-        ...     logger.info("Output with full metadata")
-
-    Thread Safety:
-        Not thread-safe. Avoid using in concurrent contexts.
-
-    Raises:
-        ValueError: If level is not a valid logging level name
-
-    Yields:
-        None
-
-    """
-    # Validate level
-    if not hasattr(logging, level):
-        msg = f"Invalid log level: {level}"
-        raise ValueError(msg)
-
-    console_handlers = []
-    original_levels = []
-    original_formatters = []
-
-    # Create simple formatter if needed
-    simple_formatter = SimpleConsoleFormatter() if simple_format else None
-
-    # Find console handlers in the QueueListener
-    if _state.queue_listener is not None:
-        for handler in _state.queue_listener.handlers:
-            if isinstance(handler, logging.StreamHandler) and not isinstance(
-                handler, RotatingFileHandler
-            ):
-                console_handlers.append(handler)
-                original_levels.append(handler.level)
-                original_formatters.append(handler.formatter)
-
-                # Set new level
-                handler.setLevel(getattr(logging, level))
-
-                # Set simple formatter if requested
-                if simple_formatter is not None:
-                    handler.setFormatter(simple_formatter)
-
-    try:
-        yield
-    finally:
-        # Restore original levels and formatters
-        for handler, orig_level, orig_formatter in zip(
-            console_handlers,
-            original_levels,
-            original_formatters,
-            strict=False,
-        ):
-            handler.setLevel(orig_level)
-            if orig_formatter is not None:
-                handler.setFormatter(orig_formatter)
 
 
 def get_logger(

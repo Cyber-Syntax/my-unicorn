@@ -22,10 +22,10 @@ async def async_main() -> None:
     asynchronously.
     """
     runner = CLIRunner()
-    logger.info("CLI started")
+    logger.debug("CLI started")
     try:
         await runner.run()
-        logger.info("CLI completed successfully")
+        logger.debug("CLI completed successfully")
     except Exception:
         logger.exception("CLI encountered an error")
         raise

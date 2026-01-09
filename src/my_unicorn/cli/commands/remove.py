@@ -5,7 +5,7 @@ Thin coordinator for removing installed AppImages.
 
 from argparse import Namespace
 
-from my_unicorn.logger import get_logger, temporary_console_level
+from my_unicorn.logger import get_logger
 from my_unicorn.workflows.remove import RemoveService
 
 from .base import BaseCommandHandler
@@ -18,11 +18,10 @@ class RemoveHandler(BaseCommandHandler):
 
     async def execute(self, args: Namespace) -> None:
         """Execute the remove command."""
-        with temporary_console_level("INFO"):
-            service = RemoveService(self.config_manager, self.global_config)
-            for app_name in args.apps:
-                result = await service.remove_app(app_name, args.keep_config)
-                self._display_result(result, app_name)
+        service = RemoveService(self.config_manager, self.global_config)
+        for app_name in args.apps:
+            result = await service.remove_app(app_name, args.keep_config)
+            self._display_result(result, app_name)
 
     def _display_result(self, result: dict, app_name: str) -> None:
         """Display removal operation results."""

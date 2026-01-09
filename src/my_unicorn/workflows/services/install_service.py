@@ -14,7 +14,7 @@ from my_unicorn.config import ConfigManager
 from my_unicorn.infrastructure.download import DownloadService
 from my_unicorn.infrastructure.file_ops import FileOperations
 from my_unicorn.infrastructure.github import GitHubClient
-from my_unicorn.logger import get_logger, temporary_console_level
+from my_unicorn.logger import get_logger
 from my_unicorn.ui.progress import (
     ProgressDisplay,
     github_api_progress_task,
@@ -222,10 +222,9 @@ class InstallApplicationService:
             already_installed: List of app names already installed
 
         """
-        with temporary_console_level("INFO"):
-            logger.info(
-                "INFO: Skipping %s already installed app(s):",
-                len(already_installed),
-            )
-            for app_name in already_installed:
-                logger.info("   • %s", app_name)
+        logger.info(
+            "INFO: Skipping %s already installed app(s):",
+            len(already_installed),
+        )
+        for app_name in already_installed:
+            logger.info("   • %s", app_name)

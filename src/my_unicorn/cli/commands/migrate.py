@@ -15,7 +15,7 @@ from my_unicorn.domain.constants import (
     APP_CONFIG_VERSION,
     CATALOG_CONFIG_VERSION,
 )
-from my_unicorn.logger import get_logger, temporary_console_level
+from my_unicorn.logger import get_logger
 
 from .base import BaseCommandHandler
 
@@ -36,55 +36,50 @@ class MigrateHandler(BaseCommandHandler):
             args: Parsed command-line arguments
 
         """
-        with temporary_console_level("INFO"):
-            # Handle dry-run mode
-            if getattr(args, "dry_run", False):
-                await self._dry_run_migration()
-                return
+        # Handle dry-run mode
+        if getattr(args, "dry_run", False):
+            await self._dry_run_migration()
+            return
 
-            # Check which apps need migration
-            apps_to_migrate = get_apps_needing_migration(
-                self.config_manager.apps_dir
-            )
+        # Check which apps need migration
+        apps_to_migrate = get_apps_needing_migration(
+            self.config_manager.apps_dir
+        )
 
-            if not apps_to_migrate:
-                logger.info("ℹ️  All app configs are already up to date")
-            else:
-                logger.info(
-                    "🔄 Found %s app(s) to migrate to v%s...",
-                    len(apps_to_migrate),
-                    APP_CONFIG_VERSION,
-                )
-
-            # Step 1: Migrate app configs
-            app_results = await self._migrate_app_configs()
-
-            # Step 2: Migrate catalog configs
-            catalog_results = await self._migrate_catalog_configs()
-
-            # Step 3: Report results
-            total_migrated = (
-                app_results["migrated"] + catalog_results["migrated"]
-            )
-            total_errors = app_results["errors"] + catalog_results["errors"]
-
-            if total_errors > 0:
-                logger.info("")
-                logger.info(
-                    "⚠️  Migration completed with %s errors", total_errors
-                )
-                return
-
-            if total_migrated == 0:
-                logger.info("")
-                logger.info("ℹ️  All configs already up to date")
-                return
-
-            logger.info("")
+        if not apps_to_migrate:
+            logger.info("ℹ️  All app configs are already up to date")
+        else:
             logger.info(
-                "✅ Migration complete! Migrated %s configs", total_migrated
+                "🔄 Found %s app(s) to migrate to v%s...",
+                len(apps_to_migrate),
+                APP_CONFIG_VERSION,
             )
-            logger.info("Run 'my-unicorn list' to verify.")
+
+        # Step 1: Migrate app configs
+        app_results = await self._migrate_app_configs()
+
+        # Step 2: Migrate catalog configs
+        catalog_results = await self._migrate_catalog_configs()
+
+        # Step 3: Report results
+        total_migrated = app_results["migrated"] + catalog_results["migrated"]
+        total_errors = app_results["errors"] + catalog_results["errors"]
+
+        if total_errors > 0:
+            logger.info("")
+            logger.info("⚠️  Migration completed with %s errors", total_errors)
+            return
+
+        if total_migrated == 0:
+            logger.info("")
+            logger.info("ℹ️  All configs already up to date")
+            return
+
+        logger.info("")
+        logger.info(
+            "✅ Migration complete! Migrated %s configs", total_migrated
+        )
+        logger.info("Run 'my-unicorn list' to verify.")
 
     async def _dry_run_migration(self) -> None:
         """Show what would be migrated without making changes."""
