@@ -75,7 +75,8 @@ managed = true
 required-environments = ["sys_platform == 'linux'"]
 
 [tool.setuptools.package-data]
-my_unicorn = ["catalog/*.json", "schemas/*.json"]
+#NOTE: include all JSON files in the specified directories for inclusion in the package
+my_unicorn = ["catalog/*.json", "config/schemas/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
