@@ -49,8 +49,8 @@ class ConfigHandler(BaseCommandHandler):
     async def _reset_config(self) -> None:
         """Reset configuration to default values."""
         # Reset to defaults by removing the settings file and loading fresh config
-        if self.config_manager.directory_manager.settings_file.exists():
-            self.config_manager.directory_manager.settings_file.unlink()
+        if self.config_manager.settings_file.exists():
+            self.config_manager.settings_file.unlink()
 
         # Load fresh config (which will create defaults)
         self.config_manager.load_global_config()

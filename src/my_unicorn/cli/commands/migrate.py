@@ -4,6 +4,7 @@ Provides manual migration interface for users upgrading configuration files.
 Creates backups before migration for safety.
 """
 
+import asyncio
 from argparse import Namespace
 
 from my_unicorn.config.migration import base
@@ -36,9 +37,14 @@ class MigrateHandler(BaseCommandHandler):
 
         """
         with temporary_console_level("INFO"):
+            # Handle dry-run mode
+            if getattr(args, "dry_run", False):
+                await self._dry_run_migration()
+                return
+
             # Check which apps need migration
             apps_to_migrate = get_apps_needing_migration(
-                self.config_manager.directory_manager.apps_dir
+                self.config_manager.apps_dir
             )
 
             if not apps_to_migrate:
@@ -79,6 +85,76 @@ class MigrateHandler(BaseCommandHandler):
                 "✅ Migration complete! Migrated %s configs", total_migrated
             )
             logger.info("Run 'my-unicorn list' to verify.")
+
+    async def _dry_run_migration(self) -> None:
+        """Show what would be migrated without making changes."""
+        # Check apps needing migration
+        apps_to_migrate = get_apps_needing_migration(
+            self.config_manager.apps_dir
+        )
+
+        # Check catalogs needing migration
+        catalogs_to_migrate = []
+        catalog_dir = self.config_manager.catalog_dir
+        if catalog_dir.exists():
+            for catalog_file in catalog_dir.glob("*.json"):
+                try:
+                    catalog = base.load_json_file(catalog_file)
+                    current_version = catalog.get("config_version", "1.0.0")
+                    if base.needs_migration(
+                        current_version, CATALOG_CONFIG_VERSION
+                    ):
+                        catalogs_to_migrate.append(
+                            (catalog_file.stem, current_version)
+                        )
+                except Exception as e:
+                    logger.error("Error reading %s: %s", catalog_file, e)
+
+        # Display results
+        logger.info("")
+        logger.info("🔍 Dry-run mode - showing what would be migrated:")
+        logger.info("")
+
+        if apps_to_migrate:
+            logger.info("Apps to migrate:")
+            for app_name, current_version in apps_to_migrate:
+                logger.info(
+                    "  • %s: v%s → v%s",
+                    app_name,
+                    current_version,
+                    APP_CONFIG_VERSION,
+                )
+        else:
+            logger.info("Apps: All up to date ✓")
+
+        logger.info("")
+
+        if catalogs_to_migrate:
+            logger.info("Catalogs to migrate:")
+            for catalog_name, current_version in catalogs_to_migrate:
+                logger.info(
+                    "  • %s: v%s → v%s",
+                    catalog_name,
+                    current_version,
+                    CATALOG_CONFIG_VERSION,
+                )
+        else:
+            logger.info("Catalogs: All up to date ✓")
+
+        logger.info("")
+        total_items = len(apps_to_migrate) + len(catalogs_to_migrate)
+        if total_items > 0:
+            logger.info(
+                "Total items to migrate: %s",
+                total_items,
+            )
+            logger.info("")
+            logger.info("Run without --dry-run to perform the migration")
+        else:
+            logger.info("ℹ️  No migration needed")
+
+        # Allow time for queue to drain
+        await asyncio.sleep(0.1)
 
     async def _migrate_app_configs(self) -> dict:
         """Migrate all app configs using AppConfigMigrator.
@@ -127,7 +203,7 @@ class MigrateHandler(BaseCommandHandler):
 
         """
         try:
-            catalog_dir = self.config_manager.directory_manager.catalog_dir
+            catalog_dir = self.config_manager.catalog_dir
             catalog_files = list(catalog_dir.glob("*.json"))
 
             if not catalog_files:

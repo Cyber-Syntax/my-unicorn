@@ -75,8 +75,70 @@ class Paths:
         return cls.CACHE_DIR / f"{cache_key}.json"
 
     @classmethod
+    def expand_path(cls, path_str: str) -> Path:
+        """Expand and resolve path with ~ and relative path support.
+
+        Args:
+            path_str: Path string to expand (e.g., "~/my-path" or "./relative")
+
+        Returns:
+            Expanded and resolved Path object
+
+        Example:
+            >>> Paths.expand_path("~/Documents")
+            Path('/home/user/Documents')
+        """
+        return Path(path_str).expanduser().resolve(strict=False)
+
+    @classmethod
+    def validate_catalog_directory(cls) -> None:
+        """Validate bundled catalog directory exists and contains apps.
+
+        Raises:
+            FileNotFoundError: If catalog directory or catalog files don't
+                exist
+            NotADirectoryError: If catalog path is not a directory
+
+        Note:
+            The catalog directory is bundled with the package and should
+            always exist in a proper installation. Missing catalog indicates
+            a packaging or installation issue.
+        """
+        if not cls.CATALOG_DIR.exists():
+            msg = (
+                f"Bundled catalog directory not found: {cls.CATALOG_DIR}\n"
+                "This indicates a packaging or installation issue."
+            )
+            raise FileNotFoundError(msg)
+
+        if not cls.CATALOG_DIR.is_dir():
+            msg = f"Catalog path is not a directory: {cls.CATALOG_DIR}"
+            raise NotADirectoryError(msg)
+
+        # Check if catalog has any JSON files
+        catalog_files = list(cls.CATALOG_DIR.glob("*.json"))
+        if not catalog_files:
+            msg = (
+                f"No catalog entries found in: {cls.CATALOG_DIR}\n"
+                "Expected to find *.json files with app catalog entries."
+            )
+            raise FileNotFoundError(msg)
+
+    @classmethod
     def ensure_directories(cls) -> None:
-        """Create necessary directories if they don't exist."""
+        """Create necessary user directories if they don't exist.
+
+        Creates all required directories for application operation:
+        - CONFIG_DIR: Main configuration directory
+        - CACHE_DIR: Release cache storage
+        - APPS_DIR: Application state files
+        - LOGS_DIR: Application logs
+        - BACKUPS_DIR: Configuration backups
+
+        Note:
+            CATALOG_DIR is not created as it's bundled with the package.
+            Uses mkdir with parents=True to create intermediate directories.
+        """
         for directory in [
             cls.CONFIG_DIR,
             cls.CACHE_DIR,

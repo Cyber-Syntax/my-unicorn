@@ -52,9 +52,7 @@ class AppConfigMigrator:
 
         """
         # Load config file directly (bypass version validation)
-        app_file = (
-            self.config_manager.directory_manager.apps_dir / f"{app_name}.json"
-        )
+        app_file = self.config_manager.apps_dir / f"{app_name}.json"
         config = base.load_json_file(app_file)
 
         current_version = config.get("config_version", "1.0.0")
@@ -68,7 +66,7 @@ class AppConfigMigrator:
             }
 
         # Create backup before migration
-        backup_dir = self.config_manager.directory_manager.apps_dir / "backups"
+        backup_dir = self.config_manager.apps_dir / "backups"
         base.create_backup(app_file, backup_dir)
 
         # Migrate based on version
@@ -220,17 +218,24 @@ class AppConfigMigrator:
         # Priority 3: Catalog says skip but no actual verification in v1
         # For catalog apps, check if catalog method is skip
         elif source == "catalog":
-            catalog_entry = (
-                self.config_manager.catalog_manager.load_catalog_entry(
+            try:
+                catalog_entry = self.config_manager.catalog_loader.load(
                     app_name
                 )
-            )
-            if catalog_entry:
-                catalog_verification = catalog_entry.get("verification", {})
-                method = catalog_verification.get("method", "digest")
+                if catalog_entry:
+                    catalog_verification = catalog_entry.get(
+                        "verification", {}
+                    )
+                    method = catalog_verification.get("method", "digest")
 
-                if method == "skip":
-                    methods.append({"type": "skip", "status": "skipped"})
+                    if method == "skip":
+                        methods.append({"type": "skip", "status": "skipped"})
+            except FileNotFoundError:
+                # Catalog entry not found - app might have been installed
+                # via URL or catalog entry removed
+                logger.debug(
+                    "Catalog entry not found for %s during migration", app_name
+                )
 
         # Ensure at least one method exists (required by v2 schema)
         if not methods:

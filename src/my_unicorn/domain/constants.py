@@ -30,10 +30,10 @@ CATALOG_CONFIG_VERSION: Final[str] = "2.0.0"
 CONFIG_FILE_NAME: Final[str] = "settings.conf"
 
 # Default config directory name under the user's home directory
-CONFIG_DIR_NAME: Final[str] = ".config"
+DEFAULT_CONFIG_SUBDIR: Final[str] = ".config"
 
 # Application-specific subdirectory under the config directory
-DEFAULT_CONFIG_SUBDIR: Final[str] = "my-unicorn"
+CONFIG_DIR_NAME: Final[str] = "my-unicorn"
 
 # Default apps dir name under config
 DEFAULT_APPS_DIR_NAME: Final[str] = "apps"

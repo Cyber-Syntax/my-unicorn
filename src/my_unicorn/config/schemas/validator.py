@@ -4,13 +4,13 @@ This module provides validation utilities for catalog and app state
 configuration files using JSON Schema.
 """
 
-import logging
 from pathlib import Path
 from typing import Any
 
 import orjson
 from jsonschema import Draft7Validator, ValidationError
 from jsonschema.exceptions import best_match
+
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
@@ -62,9 +62,7 @@ class ConfigValidator:
 
     def __init__(self) -> None:
         """Initialize validator with loaded schemas."""
-        # Load all schema versions
-        self._catalog_v1_schema = self._load_schema(CATALOG_V1_SCHEMA_PATH)
-        self._catalog_v2_schema = self._load_schema(CATALOG_V2_SCHEMA_PATH)
+        # Load app state and cache schemas only (catalogs are bundled and trusted)
         self._app_state_v1_schema = self._load_schema(APP_STATE_V1_SCHEMA_PATH)
         self._app_state_v2_schema = self._load_schema(APP_STATE_V2_SCHEMA_PATH)
         self._cache_release_schema = self._load_schema(
@@ -72,8 +70,6 @@ class ConfigValidator:
         )
 
         # Create validators
-        self._catalog_v1_validator = Draft7Validator(self._catalog_v1_schema)
-        self._catalog_v2_validator = Draft7Validator(self._catalog_v2_schema)
         self._app_state_v1_validator = Draft7Validator(
             self._app_state_v1_schema
         )
@@ -157,26 +153,6 @@ class ConfigValidator:
         return f"{message} (at '{path}')"
 
     @staticmethod
-    def _detect_catalog_version(config: dict[str, Any]) -> str:
-        """Detect catalog configuration version.
-
-        Args:
-            config: Catalog configuration dictionary
-
-        Returns:
-            Version string ("1.0.0" or "2.0.0")
-
-        """
-        # v2 has config_version field, v1 does not
-        config_version = config.get("config_version")
-        if config_version == "2.0.0":
-            return "2.0.0"
-        # v1 has owner/repo at top level, v2 has them nested under source
-        if "owner" in config and "repo" in config:
-            return "1.0.0"
-        return "2.0.0"  # Default to v2 for new configs
-
-    @staticmethod
     def _detect_app_state_version(config: dict[str, Any]) -> str:
         """Detect app state configuration version.
 
@@ -190,59 +166,6 @@ class ConfigValidator:
         config_version = config.get("config_version", "")
         return (
             config_version if config_version in ("1.0.0", "2.0.0") else "1.0.0"
-        )
-
-    def validate_catalog(
-        self, config: dict[str, Any], catalog_name: str | None = None
-    ) -> None:
-        """Validate catalog configuration against schema.
-
-        Args:
-            config: Catalog configuration dictionary
-            catalog_name: Optional catalog name for better error messages
-
-        Raises:
-            SchemaValidationError: If validation fails
-
-        """
-        # Detect version and select appropriate validator
-        version = self._detect_catalog_version(config)
-        validator = (
-            self._catalog_v1_validator
-            if version == "1.0.0"
-            else self._catalog_v2_validator
-        )
-
-        errors = list(validator.iter_errors(config))
-        if errors:
-            # Get the most relevant error
-            best_error = best_match(errors)
-            error_msg = self._format_validation_error(best_error, "catalog")
-
-            # Add catalog name to error if provided
-            if catalog_name:
-                error_msg = f"Invalid catalog '{catalog_name}': {error_msg}"
-
-            # Add migration hint for v1 configs
-            if version == "1.0.0":
-                error_msg += (
-                    "\nThis is a v1 catalog format. "
-                    "Consider migrating to v2 format for better validation."
-                )
-
-            path = (
-                ".".join(str(p) for p in best_error.absolute_path)
-                if best_error.absolute_path
-                else None
-            )
-            raise SchemaValidationError(
-                error_msg, path=path, schema_type="catalog"
-            )
-
-        logger.debug(
-            "Catalog validation passed (v%s): %s",
-            version,
-            catalog_name or "unknown",
         )
 
     def validate_app_state(
@@ -348,22 +271,6 @@ def get_validator() -> ConfigValidator:
     if _validator is None:
         _validator = ConfigValidator()
     return _validator
-
-
-def validate_catalog(
-    config: dict[str, Any], catalog_name: str | None = None
-) -> None:
-    """Validate catalog configuration (convenience function).
-
-    Args:
-        config: Catalog configuration dictionary
-        catalog_name: Optional catalog name for better error messages
-
-    Raises:
-        SchemaValidationError: If validation fails
-
-    """
-    get_validator().validate_catalog(config, catalog_name)
 
 
 def validate_app_state(

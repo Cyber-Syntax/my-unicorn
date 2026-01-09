@@ -4,8 +4,8 @@ This module handles loading and validating catalog entries from the bundled
 catalog directory, ensuring they conform to the v2 catalog schema.
 """
 
-import logging
 from pathlib import Path
+from typing import cast
 
 import orjson
 
@@ -53,10 +53,7 @@ class CatalogLoader:
         with path.open("rb") as f:
             data = orjson.loads(f.read())
 
-        # Validate against schema
-        self.validator.validate_catalog(data, catalog_name=app_name)
-
-        return data  # type: ignore[return-value]
+        return cast("CatalogEntryV2", data)
 
     def load_all(self) -> dict[str, CatalogEntryV2]:
         """Load all catalog entries.
@@ -115,3 +112,26 @@ class CatalogLoader:
                 invalid_apps.append(app_name)
 
         return valid_apps, invalid_apps
+
+    # Backward compatibility methods for old CatalogManager API
+    def load_catalog_entry(self, app_name: str) -> CatalogEntryV2 | None:
+        """Load catalog entry for an app (backward compatible).
+
+        Args:
+            app_name: Application name
+
+        Returns:
+            Catalog entry or None if not found
+        """
+        try:
+            return self.load(app_name)
+        except FileNotFoundError:
+            return None
+
+    def list_catalog_apps(self) -> list[str]:
+        """Get list of available apps in bundled catalog (backward compatible).
+
+        Returns:
+            List of available application names
+        """
+        return self.list_apps()

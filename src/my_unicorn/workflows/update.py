@@ -356,7 +356,7 @@ class UpdateManager:
 
     def _warn_about_migration(self) -> None:
         """Check and warn about apps needing migration."""
-        apps_dir = self.config_manager.directory_manager.apps_dir
+        apps_dir = self.config_manager.apps_dir
         apps_needing_migration = get_apps_needing_migration(apps_dir)
 
         if not apps_needing_migration:

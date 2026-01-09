@@ -1,15 +1,16 @@
 """JSON Schema validation package for My Unicorn.
 
 This package provides JSON Schema validation for:
-- Catalog configuration files (catalog/*.json)
 - App state configuration files (apps/*.json)
 - Release cache entries (cache/releases/*.json)
 
+Note: Catalog validation has been removed as catalogs are bundled and trusted.
+Developers ensure catalog correctness before release.
+
 Usage:
-    from my_unicorn.config.schemas import validate_catalog, validate_app_state, validate_cache_release, SchemaValidationError
+    from my_unicorn.config.schemas import validate_app_state, validate_cache_release, SchemaValidationError
 
     try:
-        validate_catalog(catalog_config, "obsidian")
         validate_app_state(app_config, "obsidian")
         validate_cache_release(cache_entry, "obsidianmd_obsidian-releases")
     except SchemaValidationError as e:
@@ -22,7 +23,6 @@ from my_unicorn.config.schemas.validator import (
     get_validator,
     validate_app_state,
     validate_cache_release,
-    validate_catalog,
 )
 
 __all__ = [
@@ -31,5 +31,4 @@ __all__ = [
     "get_validator",
     "validate_app_state",
     "validate_cache_release",
-    "validate_catalog",
 ]

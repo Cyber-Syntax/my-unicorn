@@ -116,7 +116,7 @@ class CatalogMigrator:
             dict: {"migrated": int, "errors": int}
 
         """
-        catalog_dir = self.config_manager.directory_manager.catalog_dir
+        catalog_dir = self.config_manager.catalog_dir
         catalog_files = list(catalog_dir.glob("*.json"))
 
         if not catalog_files:

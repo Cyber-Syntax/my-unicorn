@@ -14,7 +14,6 @@ import configparser
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 # Import from centralized constants module
 from my_unicorn.domain.constants import (
@@ -36,23 +35,22 @@ from my_unicorn.domain.constants import (
 )
 from my_unicorn.logger import get_logger
 
-if TYPE_CHECKING:
-    from my_unicorn.config import DirectoryManager
-
 logger = get_logger(__name__)
 
 
 class ConfigMigration:
     """Single class to handle config migration with deferred logging."""
 
-    def __init__(self, directory_manager: "DirectoryManager") -> None:
+    def __init__(self, config_dir: Path, settings_file: Path) -> None:
         """Initialize migration handler.
 
         Args:
-            directory_manager: Directory manager for path operations
+            config_dir: Configuration directory path
+            settings_file: Settings file path
 
         """
-        self.directory_manager = directory_manager
+        self.config_dir = config_dir
+        self.settings_file = settings_file
         # (level, message, args)
         self._messages: list[tuple[str, str, tuple]] = []
 
@@ -213,7 +211,7 @@ class ConfigMigration:
             # We need to import here to avoid circular imports
             from my_unicorn.config import GlobalConfigManager
 
-            temp_manager = GlobalConfigManager(self.directory_manager)
+            temp_manager = GlobalConfigManager(self.config_dir)
             migrated_config = temp_manager._convert_to_global_config(
                 user_config
             )
@@ -240,18 +238,18 @@ class ConfigMigration:
             OSError: If backup creation fails
 
         """
-        if not self.directory_manager.settings_file.exists():
+        if not self.settings_file.exists():
             # No config to backup
-            return self.directory_manager.settings_file
+            return self.settings_file
 
         # Prepare backup filename with timestamp
         timestamp = datetime.now().strftime(CONFIG_BACKUP_TIMESTAMP_FORMAT)
-        backup_path: Path = self.directory_manager.settings_file.with_suffix(
+        backup_path: Path = self.settings_file.with_suffix(
             CONFIG_BACKUP_SUFFIX_TEMPLATE.format(timestamp=timestamp)
         )
 
         try:
-            shutil.copy2(self.directory_manager.settings_file, backup_path)
+            shutil.copy2(self.settings_file, backup_path)
             self._collect_message(
                 "INFO", "Created configuration backup at %s", backup_path
             )
@@ -264,18 +262,15 @@ class ConfigMigration:
         try:
             # Find most recent backup
             backup_files = list(
-                self.directory_manager.settings_file.parent.glob(
-                    f"{self.directory_manager.settings_file.name}.*"
-                    f"{CONFIG_BACKUP_EXTENSION}"
+                self.settings_file.parent.glob(
+                    f"{self.settings_file.name}.*{CONFIG_BACKUP_EXTENSION}"
                 )
             )
             if backup_files:
                 latest_backup = max(
                     backup_files, key=lambda p: p.stat().st_mtime
                 )
-                shutil.copy2(
-                    latest_backup, self.directory_manager.settings_file
-                )
+                shutil.copy2(latest_backup, self.settings_file)
                 self._collect_message(
                     "INFO",
                     "Restored configuration from backup: %s",
