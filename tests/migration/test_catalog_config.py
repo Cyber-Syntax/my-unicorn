@@ -7,13 +7,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from my_unicorn.config import ConfigManager
-from my_unicorn.domain.constants import CATALOG_CONFIG_VERSION
 from my_unicorn.config.migration.catalog_config import (
     CatalogMigrator,
     _get_icon_config,
     _get_verification_method,
     migrate_catalog_v1_to_v2,
 )
+from my_unicorn.domain.constants import CATALOG_CONFIG_VERSION
 
 
 class TestCatalogMigrationFunctions:
@@ -159,8 +159,7 @@ class TestCatalogMigrator:
         catalog_dir.mkdir()
 
         manager = MagicMock(spec=ConfigManager)
-        manager.directory_manager = MagicMock()
-        manager.directory_manager.catalog_dir = catalog_dir
+        manager.catalog_dir = catalog_dir
 
         return manager
 
@@ -185,7 +184,7 @@ class TestCatalogMigrator:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Test migrate_all with successful migrations."""
-        catalog_dir = config_manager.directory_manager.catalog_dir
+        catalog_dir = config_manager.catalog_dir
         catalog_file = catalog_dir / "testapp.json"
 
         # Create a v1 catalog file
@@ -208,7 +207,7 @@ class TestCatalogMigrator:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Test migrate_all with migration errors."""
-        catalog_dir = config_manager.directory_manager.catalog_dir
+        catalog_dir = config_manager.catalog_dir
         catalog_file = catalog_dir / "testapp.json"
 
         catalog_file.write_text('{"config_version": "1.0.0"}')
@@ -228,7 +227,7 @@ class TestCatalogMigrator:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Test _migrate_catalog_file with successful migration."""
-        catalog_dir = config_manager.directory_manager.catalog_dir
+        catalog_dir = config_manager.catalog_dir
         catalog_file = catalog_dir / "testapp.json"
 
         catalog_file.write_text(
@@ -253,7 +252,7 @@ class TestCatalogMigrator:
         self, migrator: CatalogMigrator, config_manager: ConfigManager
     ) -> None:
         """Test _migrate_catalog_file when already at target version."""
-        catalog_dir = config_manager.directory_manager.catalog_dir
+        catalog_dir = config_manager.catalog_dir
         catalog_file = catalog_dir / "testapp.json"
 
         catalog_file.write_text(
@@ -268,7 +267,7 @@ class TestCatalogMigrator:
         self, migrator: CatalogMigrator, config_manager: ConfigManager
     ) -> None:
         """Test _migrate_catalog_file with unsupported old version."""
-        catalog_dir = config_manager.directory_manager.catalog_dir
+        catalog_dir = config_manager.catalog_dir
         catalog_file = catalog_dir / "testapp.json"
 
         # Version 0.9.0 is older and needs migration but not supported

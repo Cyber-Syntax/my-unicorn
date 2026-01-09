@@ -9,10 +9,9 @@ import pytest
 from my_unicorn.config import (
     AppConfig,
     AppConfigManager,
-    CatalogManager,
+    CatalogLoader,
     CommentAwareConfigParser,
     ConfigManager,
-    DirectoryManager,
     GlobalConfigManager,
 )
 from my_unicorn.domain.constants import GLOBAL_CONFIG_VERSION
@@ -316,33 +315,9 @@ tmp = /test/tmp  # Temporary files directory
 # Tests for refactored specialized manager classes
 
 
-def test_directory_manager(config_dir):
-    """Test DirectoryManager functionality."""
-    dir_manager = DirectoryManager(config_dir)
-
-    # Test properties
-    assert dir_manager.config_dir == config_dir
-    assert dir_manager.apps_dir == config_dir / "apps"
-    assert dir_manager.settings_file == config_dir / "settings.conf"
-
-    # Test ensure_user_directories
-    dir_manager.ensure_user_directories()
-    assert dir_manager.apps_dir.exists()
-
-    # Test simple directory creation (this method just ensures directories exist)
-    test_dirs = [
-        config_dir / "test_repo",
-        config_dir / "test_package",
-    ]
-    for d in test_dirs:
-        d.mkdir(parents=True, exist_ok=True)
-        assert d.exists()
-
-
 def test_global_config_manager(config_dir):
     """Test GlobalConfigManager functionality."""
-    dir_manager = DirectoryManager(config_dir)
-    global_manager = GlobalConfigManager(dir_manager)
+    global_manager = GlobalConfigManager(config_dir)
 
     # Test loading default config
     config = global_manager.load_global_config()
@@ -374,9 +349,9 @@ def test_global_config_manager(config_dir):
 
 def test_app_config_manager(config_dir):
     """Test AppConfigManager functionality."""
-    dir_manager = DirectoryManager(config_dir)
-    dir_manager.ensure_user_directories()
-    app_manager = AppConfigManager(dir_manager)
+    apps_dir = config_dir / "apps"
+    apps_dir.mkdir(parents=True, exist_ok=True)
+    app_manager = AppConfigManager(apps_dir)
 
     # Test saving and loading app config
     app_name = "testapp"
@@ -435,7 +410,7 @@ def test_app_config_manager(config_dir):
 
 
 def test_catalog_manager(config_dir):
-    """Test CatalogManager functionality."""
+    """Test CatalogLoader functionality."""
     # Create catalog directory with test data
     catalog_dir = config_dir / "catalog"
     catalog_dir.mkdir()
@@ -467,22 +442,21 @@ def test_catalog_manager(config_dir):
     test_catalog_file = catalog_dir / "testapp.json"
     test_catalog_file.write_bytes(orjson.dumps(test_app_data))
 
-    # Create DirectoryManager with catalog_dir
-    dir_manager = DirectoryManager(config_dir, catalog_dir)
-    catalog_manager = CatalogManager(dir_manager)
+    # Create CatalogLoader with catalog_dir
+    catalog_loader = CatalogLoader(catalog_dir)
 
     # Test listing catalog apps
-    catalog_apps = catalog_manager.list_catalog_apps()
+    catalog_apps = catalog_loader.list_catalog_apps()
     assert "testapp" in catalog_apps
 
     # Test loading catalog entry
-    entry = catalog_manager.load_catalog_entry("testapp")
+    entry = catalog_loader.load_catalog_entry("testapp")
     assert entry is not None
     assert entry["source"]["owner"] == "testowner"
     assert entry["source"]["repo"] == "testapp"
 
     # Test non-existent catalog entry
-    nonexistent = catalog_manager.load_catalog_entry("nonexistent")
+    nonexistent = catalog_loader.load_catalog_entry("nonexistent")
     assert nonexistent is None
 
 
@@ -586,7 +560,7 @@ def test_config_manager_facade_integration(config_dir):
 
     # Directory operations
     assert config_manager.apps_dir.exists()
-    assert config_manager.directory_manager.settings_file.exists()
+    assert config_manager.global_config_manager.settings_file.exists()
 
     # Test direct access to manager classes
     default_config = (
@@ -606,7 +580,7 @@ def test_config_manager_facade_integration(config_dir):
 
 def test_version_comparison(config_dir):
     """Test semantic version comparison functionality."""
-    manager = GlobalConfigManager(DirectoryManager(config_dir))
+    manager = GlobalConfigManager(config_dir)
 
     # Test equal versions
     assert manager.migration._compare_versions("1.0.0", "1.0.0") == 0
@@ -634,7 +608,7 @@ def test_version_comparison(config_dir):
 
 def test_needs_migration(config_dir):
     """Test migration necessity detection."""
-    manager = GlobalConfigManager(DirectoryManager(config_dir))
+    manager = GlobalConfigManager(config_dir)
 
     # Current version is older than default
     assert manager.migration._needs_migration("1.0.0") is True
@@ -652,15 +626,15 @@ def test_needs_migration(config_dir):
 
 def test_config_backup_creation(config_dir):
     """Test configuration backup functionality."""
-    manager = GlobalConfigManager(DirectoryManager(config_dir))
+    manager = GlobalConfigManager(config_dir)
 
     # Test with no existing config file
     backup_path = manager.migration._create_config_backup()
-    assert backup_path == manager.directory_manager.settings_file
+    assert backup_path == manager.settings_file
 
     # Create a config file and test backup
     config_content = "[DEFAULT]\nconfig_version = 1.0.0\n"
-    manager.directory_manager.settings_file.write_text(config_content)
+    manager.settings_file.write_text(config_content)
 
     backup_path = manager.migration._create_config_backup()
     assert backup_path.exists()
@@ -670,7 +644,7 @@ def test_config_backup_creation(config_dir):
 
 def test_merge_missing_fields(config_dir):
     """Test missing configuration field detection and merging."""
-    manager = GlobalConfigManager(DirectoryManager(config_dir))
+    manager = GlobalConfigManager(config_dir)
     user_config = configparser.ConfigParser()
 
     # Start with minimal config using proper ConfigParser syntax
@@ -715,7 +689,7 @@ config_version = 1.0.0
 
 def test_validate_merged_config(config_dir):
     """Test configuration validation after merging."""
-    manager = GlobalConfigManager(DirectoryManager(config_dir))
+    manager = GlobalConfigManager(config_dir)
 
     # Create valid complete configuration
     defaults = manager.get_default_global_config()
@@ -749,7 +723,7 @@ config_version = 1.0.1
 
 def test_configuration_migration_integration(config_dir):
     """Test complete configuration migration workflow."""
-    manager = GlobalConfigManager(DirectoryManager(config_dir))
+    manager = GlobalConfigManager(config_dir)
 
     # Create old configuration file missing some fields
     old_config_content = """[DEFAULT]
@@ -762,7 +736,7 @@ retry_attempts = 5
 [directory]
 storage = /custom/storage
 """
-    manager.directory_manager.settings_file.write_text(old_config_content)
+    manager.settings_file.write_text(old_config_content)
 
     # Load configuration (should trigger migration)
     config = manager.load_global_config()
@@ -788,7 +762,7 @@ storage = /custom/storage
 
 def test_migration_failure_rollback(config_dir):
     """Test migration rollback on validation failure."""
-    manager = GlobalConfigManager(DirectoryManager(config_dir))
+    manager = GlobalConfigManager(config_dir)
 
     # Create configuration that will fail validation after migration
     # This is hard to trigger naturally, so we'll test the rollback mechanism
@@ -804,7 +778,7 @@ def test_migration_failure_rollback(config_dir):
     old_config_content = """[DEFAULT]
 config_version = 1.0.0
 """
-    manager.directory_manager.settings_file.write_text(old_config_content)
+    manager.settings_file.write_text(old_config_content)
 
     # Create a user config that should trigger migration
     user_config = configparser.ConfigParser()
@@ -821,19 +795,19 @@ config_version = 1.0.0
 
 def test_migration_with_new_config_file(config_dir):
     """Test behavior with non-existent configuration file."""
-    manager = GlobalConfigManager(DirectoryManager(config_dir))
+    manager = GlobalConfigManager(config_dir)
 
     # Load configuration with no existing file
     config = manager.load_global_config()
 
     # Should create default configuration
     assert config["config_version"] == "1.0.2"
-    assert manager.directory_manager.settings_file.exists()
+    assert manager.settings_file.exists()
 
 
 def test_migration_no_changes_needed(config_dir):
     """Test migration when configuration is already up to date."""
-    manager = GlobalConfigManager(DirectoryManager(config_dir))
+    manager = GlobalConfigManager(config_dir)
 
     # Create current configuration file with all required fields
     complete_config_content = """[DEFAULT]
@@ -860,7 +834,7 @@ def test_migration_no_changes_needed(config_dir):
     tmp = /tmp/tmp
     """
 
-    manager.directory_manager.settings_file.write_text(complete_config_content)
+    manager.settings_file.write_text(complete_config_content)
 
     # Load configuration (should not require migration)
     config = manager.load_global_config()

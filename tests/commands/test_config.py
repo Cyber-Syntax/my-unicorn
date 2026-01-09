@@ -24,16 +24,12 @@ def mock_config_manager():
             called["converted"] = self.converted
             return self.converted
 
-    class DummyDirectoryManager:
+    class DummyConfigManager:
         def __init__(self):
             from pathlib import Path
 
-            self.settings_file = Path("/tmp/dummy_settings.conf")
-
-    class DummyConfigManager:
-        def __init__(self):
             self.global_config_manager = DummyGlobalConfigManager()
-            self.directory_manager = DummyDirectoryManager()
+            self.settings_file = Path("/tmp/dummy_settings.conf")
             called["saved"] = False
 
         def load_global_config(self):

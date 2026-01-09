@@ -7,9 +7,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from my_unicorn.config import DirectoryManager
-from my_unicorn.domain.constants import GLOBAL_CONFIG_VERSION
 from my_unicorn.config.migration.global_config import ConfigMigration
+from my_unicorn.domain.constants import GLOBAL_CONFIG_VERSION
 
 
 @pytest.fixture
@@ -20,17 +19,12 @@ def temp_dir():
 
 
 @pytest.fixture
-def directory_manager(temp_dir):
-    """Create a DirectoryManager for testing."""
+def migration(temp_dir):
+    """Create a ConfigMigration instance for testing."""
     config_dir = temp_dir / "config"
     config_dir.mkdir()
-    return DirectoryManager(config_dir=config_dir)
-
-
-@pytest.fixture
-def migration(directory_manager):
-    """Create a ConfigMigration instance for testing."""
-    return ConfigMigration(directory_manager)
+    settings_file = config_dir / "settings.conf"
+    return ConfigMigration(config_dir, settings_file)
 
 
 @pytest.fixture
@@ -48,9 +42,12 @@ def sample_defaults():
 class TestConfigMigration:
     """Test cases for ConfigMigration class."""
 
-    def test_init(self, migration, directory_manager):
+    def test_init(self, migration, temp_dir):
         """Test ConfigMigration initialization."""
-        assert migration.directory_manager == directory_manager
+        config_dir = temp_dir / "config"
+        settings_file = config_dir / "settings.conf"
+        assert migration.config_dir == config_dir
+        assert migration.settings_file == settings_file
         assert migration._messages == []
 
     def test_collect_message(self, migration):
@@ -217,7 +214,7 @@ class TestConfigMigration:
         result = migration._create_config_backup()
 
         # Should return the settings file path even if it doesn't exist
-        assert result == migration.directory_manager.settings_file
+        assert result == migration.settings_file
 
     def test_restore_backup_no_backups(self, migration):
         """Test backup restoration when no backups exist."""

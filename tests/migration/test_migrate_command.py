@@ -29,9 +29,8 @@ def config_manager(temp_dir):
     catalog_dir.mkdir()
 
     manager = MagicMock(spec=ConfigManager)
-    manager.directory_manager = MagicMock()
-    manager.directory_manager.apps_dir = apps_dir
-    manager.directory_manager.catalog_dir = catalog_dir
+    manager.apps_dir = apps_dir
+    manager.catalog_dir = catalog_dir
     manager.app_config_manager = MagicMock()
 
     return manager
@@ -61,7 +60,7 @@ class TestMigrateHandler:
         ) as mock_get_apps:
             mock_get_apps.return_value = []
 
-            args = Namespace()
+            args = Namespace(dry_run=False)
             await handler.execute(args)
 
             # Should report all configs up to date
@@ -100,7 +99,7 @@ class TestMigrateHandler:
                         "errors": 0,
                     }
 
-                    args = Namespace()
+                    args = Namespace(dry_run=False)
                     await handler.execute(args)
 
                     # Should report found apps to migrate
@@ -136,7 +135,7 @@ class TestMigrateHandler:
                         "errors": 0,
                     }
 
-                    args = Namespace()
+                    args = Namespace(dry_run=False)
                     await handler.execute(args)
 
                     # Should report errors
@@ -172,7 +171,7 @@ class TestMigrateHandler:
                         "errors": 0,
                     }
 
-                    args = Namespace()
+                    args = Namespace(dry_run=False)
                     await handler.execute(args)
 
                     # Should report all up to date
@@ -283,7 +282,7 @@ class TestMigrateHandler:
         self, handler, config_manager, caplog
     ):
         """Test _migrate_catalog_configs with successful migration."""
-        catalog_dir = config_manager.directory_manager.catalog_dir
+        catalog_dir = config_manager.catalog_dir
         catalog_file = catalog_dir / "testapp.json"
 
         # Create a v1 catalog file
@@ -323,7 +322,7 @@ class TestMigrateHandler:
         self, handler, config_manager, caplog
     ):
         """Test _migrate_catalog_configs when catalog already at target version."""
-        catalog_dir = config_manager.directory_manager.catalog_dir
+        catalog_dir = config_manager.catalog_dir
         catalog_file = catalog_dir / "testapp.json"
 
         # Create a v2 catalog file
@@ -349,7 +348,7 @@ class TestMigrateHandler:
         self, handler, config_manager, caplog
     ):
         """Test _migrate_catalog_configs when migration fails."""
-        catalog_dir = config_manager.directory_manager.catalog_dir
+        catalog_dir = config_manager.catalog_dir
         catalog_file = catalog_dir / "testapp.json"
 
         # Create a catalog file
@@ -371,9 +370,97 @@ class TestMigrateHandler:
     ):
         """Test _migrate_catalog_configs handles general exceptions."""
         # Simulate directory access error
-        config_manager.directory_manager.catalog_dir = None
+        config_manager.catalog_dir = None
 
         result = await handler._migrate_catalog_configs()
 
         assert result == {"migrated": 0, "errors": 1}
         assert "failed" in caplog.text.lower()
+
+    @pytest.mark.asyncio
+    async def test_execute_dry_run_mode(self, handler, config_manager, caplog):
+        """Test execute with --dry-run flag shows what would be migrated."""
+        # Setup: Create apps and catalogs that need migration
+        apps_dir = config_manager.apps_dir
+        catalog_dir = config_manager.catalog_dir
+
+        # Create an app config needing migration
+        app_file = apps_dir / "testapp.json"
+        app_file.write_text('{"config_version": "1.0.0", "name": "testapp"}')
+
+        # Create a catalog needing migration
+        catalog_file = catalog_dir / "testcatalog.json"
+        catalog_file.write_text('{"config_version": "1.0.0", "repo": "test"}')
+
+        with patch(
+            "my_unicorn.cli.commands.migrate.get_apps_needing_migration"
+        ) as mock_get_apps:
+            mock_get_apps.return_value = [("testapp", "1.0.0")]
+
+            with (
+                patch.object(
+                    handler, "_migrate_app_configs", new_callable=AsyncMock
+                ) as mock_app_migrate,
+                patch.object(
+                    handler,
+                    "_migrate_catalog_configs",
+                    new_callable=AsyncMock,
+                ) as mock_catalog_migrate,
+            ):
+                args = Namespace(dry_run=True)
+                await handler.execute(args)
+
+                # Verify migration functions were NOT called
+                mock_app_migrate.assert_not_called()
+                mock_catalog_migrate.assert_not_called()
+
+                # Verify dry-run output
+                assert "Dry-run mode" in caplog.text
+                assert "showing what would be migrated" in caplog.text
+                assert "Run without --dry-run" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_execute_dry_run_nothing_to_migrate(
+        self, handler, config_manager, caplog
+    ):
+        """Test execute with --dry-run when nothing needs migration."""
+        # Setup: No apps or catalogs needing migration
+        with patch(
+            "my_unicorn.cli.commands.migrate.get_apps_needing_migration"
+        ) as mock_get_apps:
+            mock_get_apps.return_value = []
+
+            args = Namespace(dry_run=True)
+            await handler.execute(args)
+
+            # Verify dry-run output
+            assert "Dry-run mode" in caplog.text
+            assert "No migration needed" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_dry_run_migration_shows_apps_and_catalogs(
+        self, handler, config_manager, caplog
+    ):
+        """Test _dry_run_migration displays both apps and catalogs."""
+        # Setup: Create configs needing migration
+        apps_dir = config_manager.apps_dir
+        catalog_dir = config_manager.catalog_dir
+
+        app_file = apps_dir / "testapp.json"
+        app_file.write_text('{"config_version": "1.0.0"}')
+
+        catalog_file = catalog_dir / "testcatalog.json"
+        catalog_file.write_text('{"config_version": "1.0.0"}')
+
+        with patch(
+            "my_unicorn.cli.commands.migrate.get_apps_needing_migration"
+        ) as mock_get_apps:
+            mock_get_apps.return_value = [("testapp", "1.0.0")]
+
+            await handler._dry_run_migration()
+
+            # Verify output includes both apps and catalogs
+            assert "Apps to migrate" in caplog.text
+            assert "testapp" in caplog.text
+            assert "Catalogs to migrate" in caplog.text
+            assert "testcatalog" in caplog.text
