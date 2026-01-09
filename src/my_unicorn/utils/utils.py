@@ -164,7 +164,9 @@ SPECIFIC_CHECKSUM_EXTENSIONS = [
 ]
 
 
-def is_checksum_file(filename: str, require_appimage_base: bool = False) -> bool:
+def is_checksum_file(
+    filename: str, require_appimage_base: bool = False
+) -> bool:
     """Check if filename is a checksum file.
 
     Args:

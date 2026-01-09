@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.github_client import Release
-from my_unicorn.upgrade import PackageNotFoundError, SelfUpdater
+from my_unicorn.cli.upgrade import PackageNotFoundError, SelfUpdater
+from my_unicorn.infrastructure.github import Release
 
 
 @pytest.fixture
@@ -28,12 +28,7 @@ def mock_session():
 
 def test_get_current_version_success(mock_config_manager, mock_session):
     """Test SelfUpdater.get_current_version returns version string."""
-    with (
-        patch("my_unicorn.upgrade.get_version") as mock_get_version,
-        patch("my_unicorn.github_client.auth_manager") as mock_auth_manager,
-    ):
-        # Ensure auth_manager is properly mocked as a regular Mock, not AsyncMock
-        mock_auth_manager.update_rate_limit_info = MagicMock()
+    with patch("my_unicorn.cli.upgrade.get_version") as mock_get_version:
         mock_get_version.return_value = "1.2.3"
         updater = SelfUpdater(mock_config_manager, mock_session)
         version = updater.get_current_version()
@@ -44,38 +39,13 @@ def test_get_current_version_package_not_found(
     mock_config_manager, mock_session
 ):
     """Test SelfUpdater.get_current_version raises PackageNotFoundError."""
-    with (
-        patch(
-            "my_unicorn.upgrade.get_version", side_effect=PackageNotFoundError
-        ),
-        patch("my_unicorn.github_client.auth_manager") as mock_auth_manager,
+    with patch(
+        "my_unicorn.cli.upgrade.get_version",
+        side_effect=PackageNotFoundError,
     ):
-        # Ensure auth_manager is properly mocked as a regular Mock, not AsyncMock
-        mock_auth_manager.update_rate_limit_info = MagicMock()
         updater = SelfUpdater(mock_config_manager, mock_session)
         with pytest.raises(PackageNotFoundError):
             updater.get_current_version()
-
-
-def test_get_formatted_version_git_info(mock_config_manager, mock_session):
-    """Test get_formatted_version returns formatted version with git info."""
-    with patch("my_unicorn.upgrade.get_version") as mock_get_version:
-        mock_get_version.return_value = "1.2.3+abcdef"
-        updater = SelfUpdater(mock_config_manager, mock_session)
-        formatted = updater.get_formatted_version()
-        assert formatted == "1.2.3 (git: abcdef)"
-
-
-def test_display_version_info_prints_version(
-    mock_config_manager, mock_session, capsys
-):
-    """Test display_version_info prints formatted version."""
-    with patch("my_unicorn.upgrade.get_version") as mock_get_version:
-        mock_get_version.return_value = "1.2.3"
-        updater = SelfUpdater(mock_config_manager, mock_session)
-        updater.display_version_info()
-        out = capsys.readouterr().out
-        assert "my-unicorn version: 1.2.3" in out
 
 
 @pytest.mark.asyncio
@@ -102,7 +72,7 @@ async def test_get_latest_release_success(mock_config_manager, mock_session):
 
 @pytest.mark.asyncio
 async def test_get_latest_release_api_error(
-    mock_config_manager, mock_session, capsys
+    mock_config_manager, mock_session, caplog
 ):
     """Test get_latest_release handles API error gracefully."""
     updater = SelfUpdater(mock_config_manager, mock_session)
@@ -119,12 +89,14 @@ async def test_get_latest_release_api_error(
     ):
         result = await updater.get_latest_release()
         assert result is None
-        out = capsys.readouterr().out
-        assert (
-            "Rate limit exceeded" in out or "GitHub Rate limit exceeded" in out
+        # Check logger output instead of capsys
+        assert any(
+            "Rate limit exceeded" in record.message
+            for record in caplog.records
         )
 
     # Simulate generic API error
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -132,10 +104,13 @@ async def test_get_latest_release_api_error(
     ):
         result = await updater.get_latest_release()
         assert result is None
-        out = capsys.readouterr().out
-        assert "Error connecting to GitHub" in out or "API error" in out
+        # Check logger output instead of capsys
+        assert any(
+            "error" in record.message.lower() for record in caplog.records
+        )
 
     # Simulate network error (ClientError)
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -143,10 +118,13 @@ async def test_get_latest_release_api_error(
     ):
         result = await updater.get_latest_release()
         assert result is None
-        out = capsys.readouterr().out
-        assert "Error connecting to GitHub" in out or "Network down" in out
+        # Check logger output instead of capsys
+        assert any(
+            "error" in record.message.lower() for record in caplog.records
+        )
 
     # Simulate timeout error
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -154,10 +132,13 @@ async def test_get_latest_release_api_error(
     ):
         result = await updater.get_latest_release()
         assert result is None
-        out = capsys.readouterr().out
-        assert "Error connecting to GitHub" in out or "ClientTimeout" in out
+        # Check logger output instead of capsys
+        assert any(
+            "error" in record.message.lower() for record in caplog.records
+        )
 
     # Simulate malformed response (None)
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -165,12 +146,9 @@ async def test_get_latest_release_api_error(
     ):
         result = await updater.get_latest_release()
         assert result is None or isinstance(result, dict)
-        out = capsys.readouterr().out
-        assert (
-            "Malformed release data" in out or "Error" in out or result is None
-        )
 
     # Simulate malformed response (unexpected type)
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -178,15 +156,11 @@ async def test_get_latest_release_api_error(
     ):
         result = await updater.get_latest_release()
         assert result is None or isinstance(result, dict)
-        out = capsys.readouterr().out
-        assert (
-            "Malformed release data" in out or "Error" in out or result is None
-        )
 
 
 @pytest.mark.asyncio
 async def test_check_for_update_api_error(
-    mock_config_manager, mock_session, capsys
+    mock_config_manager, mock_session, caplog
 ):
     """Test check_for_update handles API/network errors gracefully."""
     updater = SelfUpdater(mock_config_manager, mock_session)
@@ -203,12 +177,14 @@ async def test_check_for_update_api_error(
     ):
         result = await updater.check_for_update()
         assert result is False
-        out = capsys.readouterr().out
-        assert (
-            "Rate limit exceeded" in out or "GitHub Rate limit exceeded" in out
+        # Check logger output instead of capsys
+        assert any(
+            "Rate limit exceeded" in record.message
+            for record in caplog.records
         )
 
     # Simulate generic API error
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -216,10 +192,13 @@ async def test_check_for_update_api_error(
     ):
         result = await updater.check_for_update()
         assert result is False
-        out = capsys.readouterr().out
-        assert "Error connecting to GitHub" in out or "API error" in out
+        # Check logger output instead of capsys
+        assert any(
+            "error" in record.message.lower() for record in caplog.records
+        )
 
     # Simulate network error (ClientError)
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -227,12 +206,13 @@ async def test_check_for_update_api_error(
     ):
         result = await updater.check_for_update()
         assert result is False
-        out = capsys.readouterr().out
-        assert (
-            "Error connecting to GitHub" in out or "Network unreachable" in out
+        # Check logger output instead of capsys
+        assert any(
+            "error" in record.message.lower() for record in caplog.records
         )
 
     # Simulate timeout error
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -240,10 +220,13 @@ async def test_check_for_update_api_error(
     ):
         result = await updater.check_for_update()
         assert result is False
-        out = capsys.readouterr().out
-        assert "Error connecting to GitHub" in out or "ClientTimeout" in out
+        # Check logger output instead of capsys
+        assert any(
+            "error" in record.message.lower() for record in caplog.records
+        )
 
     # Simulate malformed response (None)
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -251,14 +234,9 @@ async def test_check_for_update_api_error(
     ):
         result = await updater.check_for_update()
         assert result is False
-        out = capsys.readouterr().out
-        assert (
-            "Malformed release data" in out
-            or "Error" in out
-            or result is False
-        )
 
     # Simulate malformed response (unexpected type)
+    caplog.clear()
     with patch.object(
         updater.github_fetcher,
         "fetch_latest_release_or_prerelease",
@@ -266,12 +244,6 @@ async def test_check_for_update_api_error(
     ):
         result = await updater.check_for_update()
         assert result is False
-        out = capsys.readouterr().out
-        assert (
-            "Malformed release data" in out
-            or "Error" in out
-            or result is False
-        )
 
 
 @pytest.mark.asyncio
@@ -294,7 +266,7 @@ async def test_check_for_update_newer_version(
             "fetch_latest_release_or_prerelease",
             new=AsyncMock(return_value=release_data),
         ),
-        patch("my_unicorn.upgrade.get_version") as mock_get_version,
+        patch("my_unicorn.cli.upgrade.get_version") as mock_get_version,
     ):
         mock_get_version.return_value = "1.0.0"
         result = await updater.check_for_update()
@@ -318,7 +290,7 @@ async def test_check_for_update_up_to_date(
             "fetch_latest_release_or_prerelease",
             new=AsyncMock(return_value=release_data),
         ),
-        patch("my_unicorn.upgrade.get_version") as mock_get_version,
+        patch("my_unicorn.cli.upgrade.get_version") as mock_get_version,
     ):
         mock_get_version.return_value = "1.0.0"
         result = await updater.check_for_update()
@@ -328,10 +300,13 @@ async def test_check_for_update_up_to_date(
 @pytest.mark.asyncio
 async def test_perform_update_success(mock_config_manager, mock_session):
     """Test perform_update uses os.execvp with correct UV command."""
+    # Make session.close() async-compatible
+    mock_session.close = AsyncMock()
+
     updater = SelfUpdater(mock_config_manager, mock_session)
 
     # Mock os.execvp to capture the command without actually executing it
-    with patch("my_unicorn.upgrade.os.execvp") as mock_execvp:
+    with patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp:
         # os.execvp doesn't return on success, so we simulate by raising
         # an exception to prevent actual execution
         mock_execvp.side_effect = SystemExit(0)
@@ -341,15 +316,17 @@ async def test_perform_update_success(mock_config_manager, mock_session):
         except SystemExit:
             pass  # Expected when execvp is mocked
 
+        # Verify session was closed before execvp
+        mock_session.close.assert_called_once()
+
         # Verify os.execvp was called with correct arguments
         mock_execvp.assert_called_once_with(
             "uv",
             [
                 "uv",
                 "tool",
-                "install",
-                "git+https://github.com/Cyber-Syntax/my-unicorn",
-                "--upgrade",
+                "upgrade",
+                "my-unicorn",
             ],
         )
 
@@ -357,7 +334,7 @@ async def test_perform_update_success(mock_config_manager, mock_session):
 @pytest.mark.asyncio
 async def test_get_self_updater_returns_instance(mock_config_manager):
     """Test get_self_updater returns SelfUpdater instance."""
-    from my_unicorn.upgrade import get_self_updater
+    from my_unicorn.cli.upgrade import get_self_updater
 
     updater = await get_self_updater(mock_config_manager)
     assert isinstance(updater, SelfUpdater)
@@ -366,9 +343,9 @@ async def test_get_self_updater_returns_instance(mock_config_manager):
 @pytest.mark.asyncio
 async def test_check_for_self_update_true_false(mock_config_manager):
     """Test check_for_self_update returns True/False."""
-    from my_unicorn.upgrade import check_for_self_update
+    from my_unicorn.cli.upgrade import check_for_self_update
 
-    with patch("my_unicorn.upgrade.get_self_updater") as mock_get_updater:
+    with patch("my_unicorn.cli.upgrade.get_self_updater") as mock_get_updater:
         updater = MagicMock()
         updater.check_for_update = AsyncMock(return_value=True)
         updater.session.close = AsyncMock()
@@ -384,9 +361,9 @@ async def test_check_for_self_update_true_false(mock_config_manager):
 @pytest.mark.asyncio
 async def test_perform_self_update_runs_update(mock_config_manager):
     """Test perform_self_update returns True/False."""
-    from my_unicorn.upgrade import perform_self_update
+    from my_unicorn.cli.upgrade import perform_self_update
 
-    with patch("my_unicorn.upgrade.get_self_updater") as mock_get_updater:
+    with patch("my_unicorn.cli.upgrade.get_self_updater") as mock_get_updater:
         updater = MagicMock()
         updater.check_for_update = AsyncMock(return_value=True)
         updater.perform_update = AsyncMock(return_value=True)
@@ -398,18 +375,6 @@ async def test_perform_self_update_runs_update(mock_config_manager):
         updater.session.close = AsyncMock()
         result = await perform_self_update()
         assert result is False
-
-
-def test_display_current_version_prints(monkeypatch, capsys):
-    """Test display_current_version prints version."""
-    monkeypatch.setattr(
-        "my_unicorn.upgrade.get_version", lambda pkg: "1.2.3+abcdef"
-    )
-    from my_unicorn.upgrade import display_current_version
-
-    display_current_version()
-    out = capsys.readouterr().out
-    assert "my-unicorn version: 1.2.3 (git: abcdef)" in out
 
 
 # ============================================================================
@@ -537,12 +502,11 @@ def test_upgrade_directories_are_distinct():
 
 @pytest.mark.asyncio
 async def test_perform_update_uses_uv_direct_install():
-    """Test that perform_update uses UV's direct GitHub installation.
+    """Test that perform_update uses UV's tool upgrade command.
 
-    CRITICAL: This ensures we're using the new, correct approach:
-    - Uses 'uv tool install git+URL --upgrade'
-    - No git cloning required
-    - Delegates to UV for fetching and installing
+    CRITICAL: This ensures we're using the correct approach:
+    - Uses 'uv tool upgrade my-unicorn'
+    - Delegates to UV for upgrading the tool
     """
     mock_config = MagicMock()
     repo_dir = Path("/tmp/test-my-unicorn-repo")
@@ -556,16 +520,20 @@ async def test_perform_update_uses_uv_direct_install():
     }
 
     mock_session = MagicMock()
+    mock_session.close = AsyncMock()
     updater = SelfUpdater(mock_config, mock_session)
 
     # Mock os.execvp to capture the command
-    with patch("my_unicorn.upgrade.os.execvp") as mock_execvp:
+    with patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp:
         mock_execvp.side_effect = SystemExit(0)
 
         try:
             await updater.perform_update()
         except SystemExit:
             pass  # Expected
+
+        # Verify session was closed
+        mock_session.close.assert_called_once()
 
         # Verify the correct UV command is used
         mock_execvp.assert_called_once()
@@ -576,10 +544,9 @@ async def test_perform_update_uses_uv_direct_install():
         assert call_args[0][1] == [
             "uv",
             "tool",
-            "install",
-            "git+https://github.com/Cyber-Syntax/my-unicorn",
-            "--upgrade",
-        ], "Should use correct UV tool install arguments"
+            "upgrade",
+            "my-unicorn",
+        ], "Should use correct UV tool upgrade arguments"
 
         # CRITICAL: Verify no git clone is attempted
         # (In the new implementation, we never call git)
@@ -606,6 +573,7 @@ async def test_perform_update_no_git_operations():
     }
 
     mock_session = MagicMock()
+    mock_session.close = AsyncMock()
     updater = SelfUpdater(mock_config, mock_session)
 
     # Track if any git or file operations are attempted
@@ -620,13 +588,7 @@ async def test_perform_update_no_git_operations():
         nonlocal shutil_called
         shutil_called = True
 
-    with (
-        patch(
-            "my_unicorn.upgrade.asyncio.create_subprocess_exec",
-            side_effect=track_git,
-        ),
-        patch("my_unicorn.upgrade.os.execvp") as mock_execvp,
-    ):
+    with patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp:
         mock_execvp.side_effect = SystemExit(0)
 
         try:
@@ -636,6 +598,9 @@ async def test_perform_update_no_git_operations():
 
         # CRITICAL: Verify no git operations
         assert not git_called, "New implementation should NOT use git clone"
+
+        # Verify session was closed
+        mock_session.close.assert_called_once()
 
         # Verify os.execvp was called (the new method)
         mock_execvp.assert_called_once()

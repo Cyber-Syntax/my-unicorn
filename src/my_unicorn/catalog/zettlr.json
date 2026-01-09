@@ -1,27 +1,35 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "Zettlr",
+    "display_name": "Zettlr",
+    "description": "Open-source note-taking application that works with Markdown files."
+  },
+  "source": {
+    "type": "github",
     "owner": "Zettlr",
     "repo": "Zettlr",
-    "appimage": {
-        "rename": "zettlr",
-        "name_template": "{rename}-{latest_version}-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": [
-            "x86_64",
-            "amd64"
-        ]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": false,
-        "skip": false,
-        "checksum_file": "SHA256SUMS.txt",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "https://raw.githubusercontent.com/Zettlr/Zettlr/master/resources/icons/png/256x256.png",
-        "name": "zettlr.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "{rename}-{latest_version}-{characteristic_suffix}.AppImage",
+      "target_name": "zettlr",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "checksum_file",
+    "checksum_file": {
+      "filename": "SHA256SUMS.txt",
+      "algorithm": "sha256"
+    }
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "zettlr.png"
+  }
 }

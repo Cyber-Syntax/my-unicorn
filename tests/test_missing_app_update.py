@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.update import UpdateInfo, UpdateManager
+from my_unicorn.workflows.update import UpdateInfo, UpdateManager
 
 
 class TestMissingAppImageUpdate:
@@ -77,7 +77,7 @@ class TestMissingAppImageUpdate:
         mock_config_manager.load_app_config.return_value = mock_app_config
 
         # Create mock Release object with no assets
-        from my_unicorn.github_client import Release
+        from my_unicorn.infrastructure.github import Release
 
         mock_release = Release(
             owner="AppFlowy-IO",
@@ -97,22 +97,18 @@ class TestMissingAppImageUpdate:
         )
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
-            patch("my_unicorn.update.logger"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
+            patch("my_unicorn.workflows.update.logger"),
             patch.object(
                 UpdateManager,
                 "check_single_update",
                 return_value=update_info,
             ),
-            patch.object(
-                UpdateManager,
-                "_get_github_info",
-                return_value=("AppFlowy-IO", "AppFlowy", None, False),
-            ),
-            patch.object(
-                UpdateManager, "_find_appimage_asset", return_value=None
+            patch(
+                "my_unicorn.workflows.update.select_best_appimage_asset",
+                return_value=None,
             ),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -138,9 +134,9 @@ class TestMissingAppImageUpdate:
         are complete, others are still building.
         """
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
             patch.object(
                 UpdateManager, "update_single_app", new=AsyncMock()
             ) as mock_update_single,

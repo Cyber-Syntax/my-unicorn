@@ -1,26 +1,31 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "joplin",
+    "display_name": "joplin",
+    "description": "Open source note taking and to-do app with sync capabilities"
+  },
+  "source": {
+    "type": "github",
     "owner": "laurent22",
     "repo": "joplin",
-    "appimage": {
-        "rename": "joplin",
-        "name_template": "{rename}-{latest_version}.AppImage",
-        "characteristic_suffix": [
-            ""
-        ]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "https://raw.githubusercontent.com/laurent22/joplin/dev/Assets/LinuxIcons/256x256.png",
-        "name": "joplin.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "{rename}-{latest_version}.AppImage",
+      "target_name": "joplin",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "joplin.png"
+  }
 }

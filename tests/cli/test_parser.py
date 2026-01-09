@@ -106,23 +106,32 @@ def test_remove_with_keep_config(cli_parser):
         assert args.keep_config
 
 
-def test_auth_save_token(cli_parser):
-    with patch("sys.argv", ["my-unicorn", "auth", "--save-token"]):
+def test_token_save(cli_parser):
+    with patch("sys.argv", ["my-unicorn", "token", "--save"]):
         args = cli_parser.parse_args()
-        assert args.command == "auth"
-        assert args.save_token
+        assert args.command == "token"
+        assert args.save
 
 
-def test_auth_remove_token(cli_parser):
-    with patch("sys.argv", ["my-unicorn", "auth", "--remove-token"]):
+def test_token_remove(cli_parser):
+    with patch("sys.argv", ["my-unicorn", "token", "--remove"]):
         args = cli_parser.parse_args()
-        assert args.remove_token
+        assert args.remove
 
 
 def test_auth_status(cli_parser):
+    """Test auth command with --status flag."""
     with patch("sys.argv", ["my-unicorn", "auth", "--status"]):
         args = cli_parser.parse_args()
+        assert args.command == "auth"
         assert args.status
+
+
+def test_auth_default(cli_parser):
+    """Test auth command without flag (status is default)."""
+    with patch("sys.argv", ["my-unicorn", "auth"]):
+        args = cli_parser.parse_args()
+        assert args.command == "auth"
 
 
 def test_config_show(cli_parser):

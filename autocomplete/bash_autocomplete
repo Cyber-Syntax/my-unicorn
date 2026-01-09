@@ -10,7 +10,7 @@ _my_unicorn_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     
     # Available commands
-    commands="install update upgrade list remove backup cache auth config"
+    commands="install update upgrade catalog migrate remove backup token auth config cache"
     
     # Global options
     local global_opts="--help --version"
@@ -19,13 +19,14 @@ _my_unicorn_completion() {
     local install_opts="--concurrency --no-icon --no-verify --no-desktop --verbose --help"
     local update_opts="--check-only --refresh-cache --verbose --help"
     local upgrade_opts="--check-only --help"
-    local list_opts="--available --help"
+    local catalog_opts="--installed --available --info --help"
     local remove_opts="--keep-config --help"
-    local backup_opts="--restore-last --restore-version --list-backups --cleanup --info --migrate --help"
+    local backup_opts="--restore-last --restore-version --list-backups --cleanup --info --help"
     local cache_opts="clear stats --help"
     local cache_clear_opts="--all --help"
-    local auth_opts="--save-token --remove-token --status --help"
+    local auth_opts="--status --help"
     local config_opts="--show --reset --help"
+    local token_opts="--save --remove --help"
     
     # If we're completing the first argument (command)
     if [[ ${COMP_CWORD} -eq 1 ]]; then
@@ -64,8 +65,19 @@ _my_unicorn_completion() {
         upgrade)
             mapfile -t COMPREPLY < <(compgen -W "${upgrade_opts}" -- "${cur}")
             ;;
-        list)
-            mapfile -t COMPREPLY < <(compgen -W "${list_opts}" -- "${cur}")
+        catalog)
+            case "${prev}" in
+                --info)
+                    # App name expected for --info
+                    COMPREPLY=()
+                    ;;
+                *)
+                    mapfile -t COMPREPLY < <(compgen -W "${catalog_opts}" -- "${cur}")
+                    ;;
+            esac
+            ;;
+        migrate)
+            mapfile -t COMPREPLY < <(compgen -W "--force --help" -- "${cur}")
             ;;
         remove)
             if [[ ${cur} == -* ]]; then
@@ -108,6 +120,9 @@ _my_unicorn_completion() {
             ;;
         config)
             mapfile -t COMPREPLY < <(compgen -W "${config_opts}" -- "${cur}")
+            ;;
+        token)
+            mapfile -t COMPREPLY < <(compgen -W "${token_opts}" -- "${cur}")
             ;;
         *)
             COMPREPLY=()

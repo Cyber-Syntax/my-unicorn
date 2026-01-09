@@ -1,0 +1,62 @@
+{
+  "config_version": "2.0.0",
+  "source": "url",
+  "catalog_ref": null,
+  "state": {
+    "version": "2.7.11",
+    "installed_date": "2025-12-07T09:55:09.966991",
+    "installed_path": "/home/developer/Applications/keepassxc.AppImage",
+    "verification": {
+      "passed": true,
+      "methods": [
+        {
+          "type": "digest",
+          "status": "passed",
+          "algorithm": "sha256",
+          "expected": "31fc1f7944480c1739aa7f4b4c397b036ba48438ceb946de12a3a5c89e8d5423",
+          "computed": "31fc1f7944480c1739aa7f4b4c397b036ba48438ceb946de12a3a5c89e8d5423",
+          "source": "github_api"
+        }
+      ]
+    },
+    "icon": {
+      "installed": true,
+      "method": "extraction",
+      "path": "/home/developer/Applications/icons/keepassxc.png"
+    }
+  },
+  "overrides": {
+    "metadata": {
+      "name": "keepassxc",
+      "display_name": "keepassxc",
+      "description": ""
+    },
+    "source": {
+      "type": "github",
+      "owner": "keepassxreboot",
+      "repo": "keepassxc",
+      "prerelease": false
+    },
+    "appimage": {
+      "naming": {
+        "template": "",
+        "target_name": "keepassxc",
+        "architectures": [
+          "amd64",
+          "x86_64"
+        ]
+      }
+    },
+    "verification": {
+      "method": "checksum_file",
+      "checksum_file": {
+        "filename": "KeePassXC-{version}-x86_64.AppImage.DIGEST",
+        "algorithm": "sha256"
+      }
+    },
+    "icon": {
+      "method": "extraction",
+      "filename": "keepassxc.png"
+    }
+  }
+}

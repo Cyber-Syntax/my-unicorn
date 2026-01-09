@@ -1,24 +1,35 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "Legcord",
+    "display_name": "Legcord",
+    "description": "Custom Discord client with privacy and customization features"
+  },
+  "source": {
+    "type": "github",
     "owner": "Legcord",
     "repo": "Legcord",
-    "appimage": {
-        "rename": "legcord",
-        "name_template": "",
-        "characteristic_suffix": []
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": false,
-        "skip": false,
-        "checksum_file": "latest-linux.yml",
-        "checksum_hash_type": "sha512"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "",
-        "name": "legcord.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "",
+      "target_name": "legcord",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "checksum_file",
+    "checksum_file": {
+      "filename": "latest-linux.yml",
+      "algorithm": "sha512"
+    }
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "legcord.png"
+  }
 }

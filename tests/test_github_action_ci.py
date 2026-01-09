@@ -48,13 +48,10 @@ def _extract_notes_from_changelog(changelog_path: Path, version: str) -> str:
                 break
         if capturing:
             notes.append(line.rstrip())
-    result = "\n".join(notes).strip()
-    return result
+    return "\n".join(notes).strip()
 
 
-def test_github_action_test_script_generates_expected_markdown(
-    tmp_path: Path,
-) -> None:
+def test_github_action_test_script_generates_expected_markdown() -> None:
     """Run the release workflow test script and validate output.
 
     This test executes the local script that mimics the GitHub Action and

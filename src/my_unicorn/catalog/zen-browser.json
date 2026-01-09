@@ -1,27 +1,31 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "desktop",
+    "display_name": "desktop",
+    "description": "Privacy-focused Firefox-based web browser"
+  },
+  "source": {
+    "type": "github",
     "owner": "zen-browser",
     "repo": "desktop",
-    "appimage": {
-        "rename": "zen-browser",
-        "name_template": "zen-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": [
-            "x86_64",
-            "amd64"
-        ]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "https://raw.githubusercontent.com/zen-browser/desktop/dev/docs/assets/zen-black.svg",
-        "name": "zen-browser.svg"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "zen-{characteristic_suffix}.AppImage",
+      "target_name": "zen-browser",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "zen-browser.png"
+  }
 }

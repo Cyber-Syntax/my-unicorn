@@ -1,12 +1,14 @@
-import pytest
 from argparse import Namespace
 from types import SimpleNamespace
 
-from my_unicorn.commands.base import BaseCommandHandler
+import pytest
+
+from my_unicorn.cli.commands.base import BaseCommandHandler
 
 
 class DummyHandler(BaseCommandHandler):
     """Concrete subclass for testing BaseCommandHandler."""
+
     async def execute(self, args: Namespace) -> None:
         self.executed_args = args
 

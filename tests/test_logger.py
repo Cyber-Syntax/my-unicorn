@@ -1,148 +1,37 @@
-"""Tests for the logger module."""
+"""Tests for the async-safe logger module with QueueHandler architecture."""
 
 import logging
-import logging.handlers
-import threading
+from logging.handlers import QueueHandler, RotatingFileHandler
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-import my_unicorn.logger as logger_module
+from my_unicorn.domain.constants import (
+    LOG_BACKUP_COUNT,
+    LOG_ROTATION_THRESHOLD_BYTES,
+)
 from my_unicorn.logger import (
-    ColoredFormatter,
-    MyUnicornLogger,
+    ColoredConsoleFormatter,
+    _state,
     clear_logger_state,
     get_logger,
+    setup_logging,
 )
 
 
-@pytest.fixture
-def logger_name():
-    """Return test logger name."""
-    return "test-logger"
-
-
-@pytest.fixture
-def logger_instance(logger_name):
-    """Create a fresh logger instance for testing."""
-    # Clear any existing state first
+@pytest.fixture(autouse=True)
+def cleanup_loggers():
+    """Clear logger state before and after each test."""
     clear_logger_state()
-    # Always create a fresh logger for isolation
-    return MyUnicornLogger(logger_name)
-
-
-def test_debug_info_warning_error_critical_methods(logger_instance):
-    """Test debug/info/warning/error/critical log methods call underlying logger."""
-    with (
-        patch.object(
-            logger_instance.logger, "isEnabledFor", return_value=True
-        ),
-        patch.object(logger_instance.logger, "debug") as mock_debug,
-        patch.object(logger_instance.logger, "info") as mock_info,
-        patch.object(logger_instance.logger, "warning") as mock_warning,
-        patch.object(logger_instance.logger, "error") as mock_error,
-        patch.object(logger_instance.logger, "critical") as mock_critical,
-    ):
-        logger_instance.debug("debug message %s", 1)
-        logger_instance.info("info message %s", 2)
-        logger_instance.warning("warning message %s", 3)
-        logger_instance.error("error message %s", 4)
-        logger_instance.critical("critical message %s", 5)
-
-        mock_debug.assert_called_once_with("debug message %s", 1)
-        mock_info.assert_called_once_with("info message %s", 2)
-        mock_warning.assert_called_once_with("warning message %s", 3)
-        mock_error.assert_called_once_with(
-            "error message %s", 4, exc_info=False
-        )
-        mock_critical.assert_called_once_with("critical message %s", 5)
-
-
-def test_exception_method_logs_exception(logger_instance):
-    """Test exception method calls logger.exception."""
-    with (
-        patch.object(
-            logger_instance.logger, "isEnabledFor", return_value=True
-        ),
-        patch.object(logger_instance.logger, "exception") as mock_exception,
-    ):
-        logger_instance.exception("exception occurred %s", "foo")
-        mock_exception.assert_called_once_with("exception occurred %s", "foo")
-
-
-def test_progress_context_defers_and_flushes_messages(logger_instance):
-    """Test progress_context defers INFO/WARNING and flushes after context."""
-    with (
-        patch.object(
-            logger_instance.logger, "isEnabledFor", return_value=True
-        ),
-        patch.object(logger_instance.logger, "info") as mock_info,
-        patch.object(logger_instance.logger, "warning") as mock_warning,
-    ):
-        # INFO/WARNING inside context are deferred
-        with logger_instance.progress_context():
-            logger_instance.info("deferred info")
-            logger_instance.warning("deferred warning")
-            assert not mock_info.called
-            assert not mock_warning.called
-        # After context, deferred messages are flushed
-        assert mock_info.call_count == 1
-        assert mock_warning.call_count == 1
-        mock_info.assert_called_with("deferred info")
-        mock_warning.assert_called_with("deferred warning")
-
-
-def test_set_and_restore_console_level(logger_instance):
-    """Test set_console_level."""
-    # Console handler is set up in MyUnicornLogger
-    logger_instance = MyUnicornLogger("unique-console-test")
-    if logger_instance._console_handler is None:
-        logger_instance._setup_console_handler()
-    handler = logger_instance._console_handler
-    assert handler.level == logging.WARNING
-    logger_instance.set_console_level("DEBUG")
-    assert handler.level == logging.DEBUG
-    # Test setting back to WARNING
-    logger_instance.set_console_level("WARNING")
-    assert handler.level == logging.WARNING
-
-
-def test_set_console_level_temporarily_and_restore():
-    """Console level should return to original level after temporary change."""
+    yield
     clear_logger_state()
-    temp_logger = MyUnicornLogger("temporary-console-test")
-    handler = temp_logger._console_handler
-    assert handler is not None
-    original_level = handler.level
-
-    temp_logger.set_console_level_temporarily("DEBUG")
-    assert handler.level == logging.DEBUG
-
-    temp_logger.restore_console_level()
-    assert handler.level == original_level
-
-    # Second restore call should be a no-op
-    temp_logger.restore_console_level()
 
 
-def test_setup_file_logging_creates_file_handler(tmp_path, logger_name):
-    """Test setup_file_logging adds file handler and sets level."""
-    log_file = tmp_path / "my-unicorn.log"
-    logger_instance = MyUnicornLogger(logger_name)
-    logger_instance.setup_file_logging(log_file, level="DEBUG")
-    # Should have a file handler with correct level (using FileHandler)
-    file_handlers = [
-        h
-        for h in logger_instance.logger.handlers
-        if isinstance(h, logging.FileHandler)
-    ]
-    assert file_handlers
-    assert file_handlers[0].level == logging.DEBUG
-    # Log file should exist after logging
-    logger_instance.debug("test file log")
-    logger_instance.logger.handlers[1].flush()
-    assert log_file.exists()
+def test_get_logger_returns_standard_logger():
+    """Test that get_logger returns a standard Python logger."""
+    logger = get_logger("test-logger", enable_file_logging=False)
+    assert isinstance(logger, logging.Logger)
+    assert logger.name == "test-logger"
 
 
 def test_get_logger_singleton_behavior():
@@ -150,12 +39,83 @@ def test_get_logger_singleton_behavior():
     logger1 = get_logger("singleton-test", enable_file_logging=False)
     logger2 = get_logger("singleton-test", enable_file_logging=False)
     assert logger1 is logger2
+
     logger3 = get_logger("another-test", enable_file_logging=False)
     assert logger1 is not logger3
 
 
-def test_colored_formatter_colors_output():
-    """Test ColoredFormatter adds color codes for known levels."""
+def test_console_handler_has_color_formatter():
+    """Test console handler uses HybridConsoleFormatter via QueueListener."""
+    # Get root logger to ensure initialization
+    _ = get_logger("my_unicorn", enable_file_logging=False)
+
+    # Console handler should be in QueueListener
+    assert _state.queue_listener is not None
+    console_handlers = [
+        h
+        for h in _state.queue_listener.handlers
+        if isinstance(h, logging.StreamHandler)
+        and not isinstance(h, RotatingFileHandler)
+    ]
+
+    assert len(console_handlers) == 1
+    # Updated to HybridConsoleFormatter which provides simple format for INFO
+    from my_unicorn.logger import HybridConsoleFormatter
+
+    assert isinstance(console_handlers[0].formatter, HybridConsoleFormatter)
+
+
+def test_child_logger_propagates_to_root():
+    """Test child loggers propagate to root logger with QueueHandler."""
+    # Get root logger
+    root = get_logger("my_unicorn", enable_file_logging=False)
+
+    # Get child logger
+    child = get_logger("my_unicorn.test_child", enable_file_logging=False)
+
+    # Root should have QueueHandler
+    root_queue_handlers = [
+        h for h in root.handlers if isinstance(h, QueueHandler)
+    ]
+    assert len(root_queue_handlers) == 1
+
+    # Child should have no handlers (propagates to root)
+    assert len(child.handlers) == 0
+
+    # Child should propagate
+    assert child.propagate is True
+
+
+def test_file_handler_uses_rotating_file_handler(tmp_path):
+    """Test file logging uses RotatingFileHandler via QueueListener."""
+    log_file = tmp_path / "test.log"
+    logger = setup_logging(
+        name="my_unicorn",  # Use root logger
+        log_file=log_file,
+        enable_file_logging=True,
+    )
+
+    # Root logger should have QueueHandler
+    queue_handlers = [
+        h for h in logger.handlers if isinstance(h, QueueHandler)
+    ]
+    assert len(queue_handlers) == 1
+
+    # File handler should be in QueueListener
+    assert _state.queue_listener is not None
+    file_handlers = [
+        h
+        for h in _state.queue_listener.handlers
+        if isinstance(h, RotatingFileHandler)
+    ]
+
+    assert len(file_handlers) == 1
+    assert isinstance(file_handlers[0], RotatingFileHandler)
+    assert isinstance(file_handlers[0].formatter, logging.Formatter)
+
+
+def test_colored_formatter_adds_ansi_colors():
+    """Test ColoredConsoleFormatter adds ANSI color codes."""
     record = logging.LogRecord(
         name="test",
         level=logging.INFO,
@@ -165,290 +125,276 @@ def test_colored_formatter_colors_output():
         args=(),
         exc_info=None,
     )
-    formatter = ColoredFormatter("%(levelname)s %(message)s")
+    formatter = ColoredConsoleFormatter("%(levelname)s %(message)s")
     formatted = formatter.format(record)
+
     # Should contain ANSI color code for green (INFO)
     assert "\033[32mINFO\033[0m" in formatted
 
 
-def test_level_checking_optimization_debug_disabled(logger_instance):
-    """Test that debug method doesn't call logger when DEBUG level is disabled."""
-    with (
-        patch.object(
-            logger_instance.logger, "isEnabledFor", return_value=False
-        ),
-        patch.object(logger_instance.logger, "debug") as mock_debug,
-    ):
-        logger_instance.debug("debug message")
-        mock_debug.assert_not_called()
-
-
-def test_level_checking_optimization_info_disabled(logger_instance):
-    """Test that info method doesn't call logger when INFO level is disabled."""
-    with (
-        patch.object(
-            logger_instance.logger, "isEnabledFor", return_value=False
-        ),
-        patch.object(logger_instance.logger, "info") as mock_info,
-    ):
-        logger_instance.info("info message")
-        mock_info.assert_not_called()
-
-
-def test_level_checking_optimization_warning_disabled(logger_instance):
-    """Test that warning method doesn't call logger when WARNING level is disabled."""
-    with (
-        patch.object(
-            logger_instance.logger, "isEnabledFor", return_value=False
-        ),
-        patch.object(logger_instance.logger, "warning") as mock_warning,
-    ):
-        logger_instance.warning("warning message")
-        mock_warning.assert_not_called()
-
-
-def test_level_checking_optimization_error_disabled(logger_instance):
-    """Test that error method doesn't call logger when ERROR level is disabled."""
-    with (
-        patch.object(
-            logger_instance.logger, "isEnabledFor", return_value=False
-        ),
-        patch.object(logger_instance.logger, "error") as mock_error,
-    ):
-        logger_instance.error("error message")
-        mock_error.assert_not_called()
-
-
-def test_level_checking_optimization_critical_disabled(logger_instance):
-    """Test that critical method doesn't call logger when CRITICAL level is disabled."""
-    with (
-        patch.object(
-            logger_instance.logger, "isEnabledFor", return_value=False
-        ),
-        patch.object(logger_instance.logger, "critical") as mock_critical,
-    ):
-        logger_instance.critical("critical message")
-        mock_critical.assert_not_called()
-
-
-def test_level_checking_optimization_exception_disabled(logger_instance):
-    """Test that exception method doesn't call logger when ERROR level is disabled."""
-    with (
-        patch.object(
-            logger_instance.logger, "isEnabledFor", return_value=False
-        ),
-        patch.object(logger_instance.logger, "exception") as mock_exception,
-    ):
-        logger_instance.exception("exception message")
-        mock_exception.assert_not_called()
-
-
-def test_thread_local_progress_context_isolation():
-    """Test that progress context is isolated per thread."""
-    results = []
-
-    def thread_worker(thread_id: int) -> None:
-        logger = get_logger(f"thread-{thread_id}", enable_file_logging=False)
-        with (
-            patch.object(logger.logger, "isEnabledFor", return_value=True),
-            patch.object(logger.logger, "info") as mock_info,
-        ):
-            with logger.progress_context():
-                logger.info("deferred message from thread %s", thread_id)
-                # Messages should be deferred, not called immediately
-                results.append(("deferred", thread_id, mock_info.call_count))
-            # After context, messages should be flushed
-            results.append(("flushed", thread_id, mock_info.call_count))
-
-    # Run multiple threads
-    threads = []
-    for i in range(3):
-        thread = threading.Thread(target=thread_worker, args=(i,))
-        threads.append(thread)
-        thread.start()
-
-    for thread in threads:
-        thread.join()
-
-    # Each thread should have deferred (0 calls) then flushed (1 call)
-    deferred_counts = [r[2] for r in results if r[0] == "deferred"]
-    flushed_counts = [r[2] for r in results if r[0] == "flushed"]
-
-    assert all(count == 0 for count in deferred_counts), (
-        "Messages should be deferred"
-    )
-    assert all(count == 1 for count in flushed_counts), (
-        "Messages should be flushed after context"
+def test_logger_level_filtering_console_vs_file(tmp_path):
+    """Test console and file handlers have independent level filtering."""
+    log_file = tmp_path / "level-test.log"
+    logger = setup_logging(
+        name="my_unicorn",  # Use root logger
+        console_level="WARNING",
+        file_level="DEBUG",
+        log_file=log_file,
+        enable_file_logging=True,
     )
 
+    # Root logger should have QueueHandler
+    assert any(isinstance(h, QueueHandler) for h in logger.handlers)
 
-def test_set_level_updates_file_handler(logger_instance, tmp_path):
-    """Test that set_level updates file handler level."""
-    log_file = tmp_path / "test.log"
-    logger_instance.setup_file_logging(log_file, level="INFO")
-
-    # Initial file handler level should be INFO
-    assert logger_instance._file_handler.level == logging.INFO
-
-    # Change level to DEBUG
-    logger_instance.set_level("DEBUG")
-    assert logger_instance._file_handler.level == logging.DEBUG
-
-    # Change level to ERROR
-    logger_instance.set_level("ERROR")
-    assert logger_instance._file_handler.level == logging.ERROR
-
-
-def test_error_method_exc_info_parameter(logger_instance):
-    """Test that error method respects exc_info parameter."""
-    with (
-        patch.object(
-            logger_instance.logger, "isEnabledFor", return_value=True
-        ),
-        patch.object(logger_instance.logger, "error") as mock_error,
-    ):
-        # Test default behavior (no exception info)
-        logger_instance.error("error without exc_info")
-        mock_error.assert_called_with("error without exc_info", exc_info=False)
-
-        mock_error.reset_mock()
-
-        # Test explicit exc_info=True
-        logger_instance.error("error with exc_info", exc_info=True)
-        mock_error.assert_called_with("error with exc_info", exc_info=True)
-
-        mock_error.reset_mock()
-
-        # Test explicit exc_info=False
-        logger_instance.error("error explicit false", exc_info=False)
-        mock_error.assert_called_with("error explicit false", exc_info=False)
-
-
-def test_get_logger_applies_config_level(monkeypatch, tmp_path):
-    """Configured log levels should be applied separately to console and file handlers."""
-    clear_logger_state()
-
-    expected_log_path = tmp_path / "my-unicorn.log"
-
-    def fake_load_settings() -> tuple[str, str, Path]:
-        return "ERROR", "DEBUG", expected_log_path
-
-    monkeypatch.setattr(
-        logger_module,
-        "_load_log_settings",
-        fake_load_settings,
+    # Find handlers in QueueListener
+    assert _state.queue_listener is not None
+    console_handler = next(
+        h
+        for h in _state.queue_listener.handlers
+        if isinstance(h, logging.StreamHandler)
+        and not isinstance(h, RotatingFileHandler)
+    )
+    file_handler = next(
+        h
+        for h in _state.queue_listener.handlers
+        if isinstance(h, RotatingFileHandler)
     )
 
-    configured_logger = logger_module.get_logger("config-level-test")
-
-    # Console handler should respect configured console level
-    console_handler = configured_logger._console_handler
-    assert console_handler is not None
-    assert console_handler.level == logging.ERROR
-
-    # File handler should be created with configured file level and path
-    file_handler = configured_logger._file_handler
-    assert file_handler is not None
+    assert console_handler.level == logging.WARNING
     assert file_handler.level == logging.DEBUG
-    assert Path(file_handler.baseFilename) == expected_log_path
-
-    clear_logger_state()
 
 
-# ===== ROTATING HANDLER SHARED INSTANCE TESTS =====
-# These tests prevent the log rotation issues we encountered by ensuring
-# multiple loggers share the same RotatingFileHandler instance
+def test_file_rotation_configuration(tmp_path):
+    """Test RotatingFileHandler is configured correctly via QueueListener."""
+    log_file = tmp_path / "rotate-test.log"
+    logger = setup_logging(
+        name="my_unicorn",  # Use root logger
+        log_file=log_file,
+        enable_file_logging=True,
+    )
 
-
-def test_file_handler_actually_added_to_logger(tmp_path):
-    """Critical: Ensure file handlers are actually added to logger instances.
-
-    This test prevents the bug where handlers were created but not
-    added to the logger, resulting in no file logging.
-    """
-    clear_logger_state()
-    log_file = tmp_path / "handler_added_test.log"
-
-    logger_instance = get_logger("handler_test", enable_file_logging=False)
-
-    # Before setup, no file handlers should exist
-    file_handlers_before = [
+    # Get file handler from QueueListener
+    assert _state.queue_listener is not None
+    file_handler = next(
         h
-        for h in logger_instance.logger.handlers
-        if isinstance(h, logging.FileHandler)
-    ]
-    assert len(file_handlers_before) == 0
+        for h in _state.queue_listener.handlers
+        if isinstance(h, RotatingFileHandler)
+    )
 
-    # Set up file logging
-    logger_instance.setup_file_logging(log_file, "INFO")
+    # Verify rotation is configured
+    assert file_handler.maxBytes == LOG_ROTATION_THRESHOLD_BYTES
+    assert file_handler.backupCount == LOG_BACKUP_COUNT
 
-    # After setup, exactly one file handler should be added
-    file_handlers_after = [
-        h
-        for h in logger_instance.logger.handlers
-        if isinstance(h, logging.FileHandler)
-    ]
-    assert len(file_handlers_after) == 1
-    assert file_handlers_after[0] is logger_instance._file_handler
 
+def test_logging_actually_writes_to_file(tmp_path):
+    """Test that logging writes messages to file via QueueListener."""
+    log_file = tmp_path / "write-test.log"
+    logger = setup_logging(
+        name="my_unicorn",  # Use root logger
+        file_level="DEBUG",
+        log_file=log_file,
+        enable_file_logging=True,
+    )
+
+    test_message = "Test log message 12345"
+    logger.debug(test_message)
+
+    # Flush QueueListener handlers
+    if _state.queue_listener is not None:
+        for handler in _state.queue_listener.handlers:
+            handler.flush()
+
+    # Read file and verify message was written
+    assert log_file.exists()
+    content = log_file.read_text()
+    assert test_message in content
+
+
+def test_clear_logger_state_removes_handlers():
+    """Test clear_logger_state properly cleans up QueueListener."""
+    log_file = Path("/tmp/clear-test.log")
+    logger = setup_logging(
+        name="my_unicorn",  # Use root logger
+        log_file=log_file,
+        enable_file_logging=True,
+    )
+
+    # Verify QueueHandler exists on root logger
+    assert any(isinstance(h, QueueHandler) for h in logger.handlers)
+    # Verify QueueListener is running
+    assert _state.queue_listener is not None
+
+    # Clear state
     clear_logger_state()
 
+    # QueueListener should be stopped
+    assert _state.queue_listener is None
+    assert _state.log_queue is None
+    assert _state.root_initialized is False
 
-def test_file_logging_actually_writes_to_file(tmp_path):
-    """Test that file logging actually works and writes messages to file."""
-    clear_logger_state()
-    log_file = tmp_path / "actual_write_test.log"
+    # Getting a new logger should start fresh
+    new_logger = get_logger("my_unicorn", enable_file_logging=False)
 
-    # Create multiple loggers
-    logger1 = get_logger("my_unicorn.test1", enable_file_logging=False)
-    logger2 = get_logger("my_unicorn.test2", enable_file_logging=False)
-
-    # Set up file logging
-    logger1.setup_file_logging(log_file, "DEBUG")
-    logger2.setup_file_logging(log_file, "DEBUG")
-
-    # Log some messages
-    logger1.info("Test message from logger1")
-    logger2.warning("Test warning from logger2")
-    logger1.error("Test error from logger1")
-
-    # Force flush to ensure messages are written
-    if logger1._file_handler:
-        logger1._file_handler.flush()
-
-    # File should exist and contain our messages
-    assert log_file.exists(), "Log file should be created"
-
-    content = log_file.read_text(encoding="utf-8")
-    assert "Test message from logger1" in content
-    assert "Test warning from logger2" in content
-    assert "Test error from logger1" in content
-
-    # Messages should be in chronological order (not scattered)
-    lines = content.strip().split("\n")
-    assert len(lines) >= 3, "Should have at least 3 log lines"
-
-    clear_logger_state()
+    # New root logger should have QueueHandler
+    queue_count = sum(
+        1 for h in new_logger.handlers if isinstance(h, QueueHandler)
+    )
+    assert queue_count == 1
 
 
-def test_no_duplicate_handlers_on_multiple_setup_calls(tmp_path):
-    """Test that calling setup_file_logging multiple times doesn't create duplicates."""
-    clear_logger_state()
-    log_file = tmp_path / "no_duplicate_test.log"
+def test_no_progress_context_method():
+    """Test that new logger does NOT have progress_context() method."""
+    logger = get_logger("no-progress-test", enable_file_logging=False)
 
-    logger_instance = get_logger("duplicate_test", enable_file_logging=False)
+    # Standard logger doesn't have progress_context method
+    assert not hasattr(logger, "progress_context")
 
-    # Call setup multiple times
-    logger_instance.setup_file_logging(log_file, "INFO")
-    logger_instance.setup_file_logging(log_file, "DEBUG")
-    logger_instance.setup_file_logging(log_file, "WARNING")
 
-    # Should have exactly one FileHandler
+def test_loads_config_from_settings():
+    """Test that logger loads configuration from config_manager."""
+    # This test verifies _load_log_settings() is called
+    # Actual config loading is tested implicitly by get_logger()
+
+    # Get root logger
+    logger = get_logger("my_unicorn", enable_file_logging=False)
+
+    # Root logger level should be DEBUG (captures all)
+    assert logger.level == logging.DEBUG
+
+    # If config loading works, logger should be created successfully
+    assert logger.name == "my_unicorn"
+
+
+def test_no_file_logging_when_disabled():
+    """Test that file logging is not setup when enable_file_logging=False."""
+    logger = get_logger("no-file-test", enable_file_logging=False)
+
+    # Should only have console handler
     file_handlers = [
-        h
-        for h in logger_instance.logger.handlers
-        if isinstance(h, logging.FileHandler)
+        h for h in logger.handlers if isinstance(h, RotatingFileHandler)
     ]
-    assert len(file_handlers) == 1, "Should have exactly one FileHandler"
+    assert len(file_handlers) == 0
 
+
+def test_multiple_loggers_are_independent(tmp_path):
+    """Test that multiple loggers share same QueueListener in new architecture."""
+    # In new architecture, all loggers share the root logger's QueueListener
+    # This test verifies that child loggers still work correctly
+
+    # Get root logger
+    root = get_logger("my_unicorn", enable_file_logging=True)
+
+    # Get child loggers
+    logger1 = get_logger("my_unicorn.module1")
+    logger2 = get_logger("my_unicorn.module2")
+
+    # Verify hierarchy
+    assert logger1.name == "my_unicorn.module1"
+    assert logger2.name == "my_unicorn.module2"
+
+    # Child loggers should propagate
+    assert logger1.propagate is True
+    assert logger2.propagate is True
+
+    # Root has QueueHandler, children have no handlers (propagate)
+    assert len(root.handlers) > 0
+    assert len(logger1.handlers) == 0
+    assert len(logger2.handlers) == 0
+
+
+def test_structured_file_formatter_uses_correct_format():
+    """Test logging.Formatter uses configured format string for file output."""
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    record = logging.LogRecord(
+        name="test",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=10,
+        msg="structured message",
+        args=(),
+        exc_info=None,
+    )
+
+    formatted = formatter.format(record)
+    assert "test" in formatted
+    assert "INFO" in formatted
+    assert "structured message" in formatted
+
+
+def test_logger_propagate_behavior():
+    """Test logger propagation behavior in new architecture."""
+    # Root logger doesn't propagate
+    root_logger = get_logger("my_unicorn", enable_file_logging=False)
+    assert root_logger.propagate is False
+
+    # Child loggers DO propagate to root
+    child_logger = get_logger("my_unicorn.child", enable_file_logging=False)
+    assert child_logger.propagate is True
+
+
+def test_existing_handlers_are_cleared_on_setup():
+    """Test that setup_logging clears existing handlers."""
+    logger_name = "handler-clear-test"
+
+    # First setup
+    logger1 = setup_logging(
+        name=logger_name,
+        enable_file_logging=False,
+    )
+    initial_handler_count = len(logger1.handlers)
+
+    # Clear and setup again (should not double handlers)
     clear_logger_state()
+    logger2 = setup_logging(
+        name=logger_name,
+        enable_file_logging=False,
+    )
+
+    # Should have same number of handlers (not doubled)
+    assert len(logger2.handlers) == initial_handler_count
+
+
+def test_update_logger_from_config(monkeypatch):
+    """Test that update_logger_from_config updates handler levels."""
+    from unittest.mock import MagicMock
+
+    from my_unicorn.logger import update_logger_from_config
+
+    # Setup root logger first
+    _ = get_logger("my_unicorn", enable_file_logging=True)
+
+    # Create a mock config_manager that returns DEBUG levels
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_global_config.return_value = {
+        "console_log_level": "ERROR",
+        "log_level": "WARNING",
+    }
+
+    # Monkey patch the config_manager import
+    import my_unicorn.config as config_module
+
+    monkeypatch.setattr(config_module, "config_manager", mock_config_manager)
+
+    # Update from config
+    update_logger_from_config()
+
+    # Verify handlers in QueueListener were updated
+    assert _state.queue_listener is not None
+    console_handler = next(
+        h
+        for h in _state.queue_listener.handlers
+        if isinstance(h, logging.StreamHandler)
+        and not isinstance(h, RotatingFileHandler)
+    )
+    file_handler = next(
+        h
+        for h in _state.queue_listener.handlers
+        if isinstance(h, RotatingFileHandler)
+    )
+
+    assert console_handler.level == logging.ERROR
+    assert file_handler.level == logging.WARNING

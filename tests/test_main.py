@@ -23,7 +23,7 @@ def test_main_normal_run():
 
 
 def test_main_keyboard_interrupt(monkeypatch):
-    """Test main() handles KeyboardInterrupt and prints cancel message."""
+    """Test main() handles KeyboardInterrupt and logs cancel message."""
     called = {}
 
     def fake_run(coro):
@@ -40,15 +40,15 @@ def test_main_keyboard_interrupt(monkeypatch):
 
     monkeypatch.setattr(sys, "exit", fake_exit)
 
-    with patch("builtins.print") as mock_print:
+    with patch("my_unicorn.main.logger") as mock_logger:
         with pytest.raises(SystemExit):
             main.main()
-        mock_print.assert_any_call("\n⏹️  Operation cancelled by user")
+        mock_logger.info.assert_called_with("CLI cancelled by user")
         assert called["exit"] == 1
 
 
 def test_main_exception(monkeypatch):
-    """Test main() handles Exception and prints error message."""
+    """Test main() handles Exception and logs error message."""
     called = {}
 
     def fake_run(coro):
@@ -65,8 +65,8 @@ def test_main_exception(monkeypatch):
 
     monkeypatch.setattr(sys, "exit", fake_exit)
 
-    with patch("builtins.print") as mock_print:
+    with patch("my_unicorn.main.logger") as mock_logger:
         with pytest.raises(SystemExit):
             main.main()
-        mock_print.assert_any_call("❌ Unexpected error: fail")
+        mock_logger.exception.assert_called_with("❌ Unexpected error")
         assert called["exit"] == 1

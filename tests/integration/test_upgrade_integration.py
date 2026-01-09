@@ -13,14 +13,12 @@ Note: With uv tool install, files are installed in an isolated environment,
 not copied to a package_dir like the old setup.sh method.
 """
 
-import re
-import shutil
-from pathlib import Path
+import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.upgrade import SelfUpdater
+from my_unicorn.cli.upgrade import SelfUpdater
 
 
 @pytest.fixture
@@ -54,157 +52,20 @@ def temp_install_dirs(tmp_path):
     }
 
 
-async def mock_git_clone_with_version(
-    _source_dir: Path | None, dest_dir: Path, target_version: str
-) -> None:
-    """Simulate git clone by copying from actual project with version override.
-
-    Args:
-        _source_dir: Source directory (unused, we use project root)
-        dest_dir: Destination directory for cloned repo
-        target_version: Version to simulate in the cloned code
-
-    """
-    # Get the actual project root
-    project_root = Path(__file__).parent.parent.parent
-
-    # Copy the entire project (simulating git clone)
-    # Note: dest_dir might already exist (created by upgrade.py)
-    # so we use dirs_exist_ok=True
-    shutil.copytree(
-        project_root,
-        dest_dir,
-        ignore=shutil.ignore_patterns(
-            ".git", ".venv", "__pycache__", "*.pyc", ".pytest_cache"
-        ),
-        dirs_exist_ok=True,
-    )
-
-    # Modify pyproject.toml to reflect the target version
-    # This simulates checking out a specific release tag
-    pyproject_path = dest_dir / "pyproject.toml"
-    if pyproject_path.exists():
-        content = pyproject_path.read_text()
-        # Update version in pyproject.toml
-        content = re.sub(
-            r'version = "[^"]+"', f'version = "{target_version}"', content
-        )
-        pyproject_path.write_text(content)
-
-
-@pytest.fixture
-def mock_git_subprocess():
-    """Mock asyncio.create_subprocess_exec for git clone and uv tool install.
-
-    Returns:
-        callable: Async function that mocks subprocess execution
-
-    """
-
-    async def _mock_subprocess(*args, **kwargs):
-        """Mock subprocess that simulates git clone and uv tool install.
-
-        Args:
-            *args: Command arguments
-            **kwargs: Additional keyword arguments
-
-        Returns:
-            AsyncMock: Mocked process with success exit code
-
-        """
-        # Extract the destination directory from git clone command
-        # Command format: ['git', 'clone', url, dest_dir]
-        if len(args) > 0 and args[0] == "git" and "clone" in args:
-            dest_dir = Path(args[-1])  # Last argument is destination
-
-            # Get target version from kwargs (passed from test)
-            target_version = kwargs.pop("_target_version", "1.9.2")
-
-            await mock_git_clone_with_version(None, dest_dir, target_version)
-
-            # Return a mock process with successful exit code
-            mock_process = AsyncMock()
-            mock_process.returncode = 0
-            mock_process.stdout = AsyncMock()
-            mock_process.stdout.readline = AsyncMock(return_value=b"")
-            mock_process.wait = AsyncMock(return_value=0)
-            return mock_process
-
-        # For uv tool install --reinstall calls, simulate installation
-        # Command format: ['uv', 'tool', 'install', '--reinstall', repo_dir]
-        if (
-            len(args) > 0
-            and args[0] == "uv"
-            and "tool" in args
-            and "install" in args
-        ):
-            # uv tool install creates an isolated environment
-            # We don't need to simulate file copying since uv
-            # handles it internally. Just return success to indicate
-            # the tool was installed
-
-            mock_process = AsyncMock()
-            mock_process.returncode = 0
-            mock_process.stdout = AsyncMock()
-            mock_process.stdout.readline = AsyncMock(return_value=b"")
-            mock_process.wait = AsyncMock(return_value=0)
-            mock_process.pid = 12345
-            return mock_process
-
-        # For other subprocess calls, return success
-        mock_process = AsyncMock()
-        mock_process.returncode = 0
-        mock_process.stdout = AsyncMock()
-        mock_process.stdout.readline = AsyncMock(return_value=b"")
-        mock_process.wait = AsyncMock(return_value=0)
-        mock_process.pid = 12345
-        return mock_process
-
-    return _mock_subprocess
-
-
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "current_version,new_version",
-    [
-        ("1.9.1", "1.9.2"),  # Test immediate next version
-        ("1.9.2", "2.0.0"),  # Test major version upgrade
-        ("2.0.0", "2.1.0"),  # Test future minor upgrade
-    ],
-)
-async def test_upgrade_version_progression(
-    temp_install_dirs, mock_git_subprocess, current_version, new_version
-):
-    """Verify upgrade works for version progression paths.
+async def test_upgrade_version_progression(temp_install_dirs):
+    """Verify upgrade executes uv tool upgrade command.
 
-    This test ensures that:
-    1. Users on v1.9.1 can upgrade to v1.9.2
-    2. Users on v1.9.2 can upgrade to v2.0.0
-    3. The fix continues to work for future versions
+    This test ensures that the upgrade process calls the correct uv command.
 
     Args:
         temp_install_dirs: Temporary directory fixture
-        mock_git_subprocess: Mock subprocess fixture
-        current_version: Current installed version
-        new_version: Version to upgrade to
 
     """
     with (
-        patch(
-            "asyncio.create_subprocess_exec", side_effect=mock_git_subprocess
-        ),
-        patch("my_unicorn.upgrade.get_version") as mock_get_version,
-        patch.object(SelfUpdater, "get_latest_release") as mock_get_release,
+        patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp,
     ):
-        # Mock current installed version
-        mock_get_version.return_value = current_version
-
-        # Mock latest release version
-        mock_get_release.return_value = {
-            "tag_name": f"v{new_version}",
-            "version": new_version,
-            "prerelease": False,
-        }
+        mock_execvp.side_effect = SystemExit(0)
 
         # Create updater instance
         config_manager = MagicMock()
@@ -216,56 +77,32 @@ async def test_upgrade_version_progression(
         }
 
         session = MagicMock()
+        session.close = AsyncMock()
         updater = SelfUpdater(config_manager, session)
 
         # Run the upgrade
-        result = await updater.perform_update()
+        with contextlib.suppress(SystemExit):
+            await updater.perform_update()
 
-        # CRITICAL ASSERTIONS: Verify upgrade process
-
-        # 1. Verify upgrade succeeded
-        assert result is True, (
-            f"Upgrade from {current_version} to {new_version} should succeed"
-        )
-
-        # 2. Verify repo directory was cloned (then cleaned up)
-        # With uv tool install, files are installed in isolated environment
-        # We just verify the upgrade process completed successfully
-        repo_dir = temp_install_dirs["repo"]
-        assert not repo_dir.exists(), (
-            "repo_dir should be cleaned up after successful upgrade"
+        # Verify os.execvp was called with correct arguments
+        mock_execvp.assert_called_once_with(
+            "uv",
+            ["uv", "tool", "upgrade", "my-unicorn"],
         )
 
 
 @pytest.mark.asyncio
-async def test_upgrade_clones_to_correct_directory(
-    temp_install_dirs, mock_git_subprocess
-):
-    """Verify upgrade uses uv tool install from cloned repo.
-
-    This is the core test: clone repo, run uv tool install, cleanup.
+async def test_upgrade_clones_to_correct_directory(temp_install_dirs):
+    """Verify upgrade executes uv tool upgrade command.
 
     Args:
         temp_install_dirs: Temporary directory fixture
-        mock_git_subprocess: Mock subprocess fixture
 
     """
     with (
-        patch(
-            "asyncio.create_subprocess_exec", side_effect=mock_git_subprocess
-        ),
-        patch("my_unicorn.upgrade.get_version") as mock_get_version,
-        patch.object(SelfUpdater, "get_latest_release") as mock_get_release,
+        patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp,
     ):
-        # Mock current version
-        mock_get_version.return_value = "1.9.1"
-
-        # Mock latest release
-        mock_get_release.return_value = {
-            "tag_name": "v1.9.2",
-            "version": "1.9.2",
-            "prerelease": False,
-        }
+        mock_execvp.side_effect = SystemExit(0)
 
         config_manager = MagicMock()
         config_manager.load_global_config.return_value = {
@@ -276,45 +113,32 @@ async def test_upgrade_clones_to_correct_directory(
         }
 
         session = MagicMock()
+        session.close = AsyncMock()
         updater = SelfUpdater(config_manager, session)
 
-        # Run perform_update()
-        result = await updater.perform_update()
+        # Run the upgrade
+        with contextlib.suppress(SystemExit):
+            await updater.perform_update()
 
-        # Assert upgrade succeeded
-        assert result is True, "Upgrade should succeed"
-
-        # After successful upgrade, repo_dir is cleaned up
-        repo_dir = temp_install_dirs["repo"]
-        assert not repo_dir.exists(), (
-            "repo_dir should be cleaned up after upgrade"
+        # Verify os.execvp was called with correct arguments
+        mock_execvp.assert_called_once_with(
+            "uv",
+            ["uv", "tool", "upgrade", "my-unicorn"],
         )
 
 
 @pytest.mark.asyncio
-async def test_upgrade_copies_files_correctly(
-    temp_install_dirs, mock_git_subprocess
-):
-    """Verify upgrade process clones repo correctly.
+async def test_upgrade_copies_files_correctly(temp_install_dirs):
+    """Verify upgrade executes uv tool upgrade command.
 
     Args:
         temp_install_dirs: Temporary directory fixture
-        mock_git_subprocess: Mock subprocess fixture
 
     """
     with (
-        patch(
-            "asyncio.create_subprocess_exec", side_effect=mock_git_subprocess
-        ),
-        patch("my_unicorn.upgrade.get_version") as mock_get_version,
-        patch.object(SelfUpdater, "get_latest_release") as mock_get_release,
+        patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp,
     ):
-        mock_get_version.return_value = "1.9.1"
-        mock_get_release.return_value = {
-            "tag_name": "v1.9.2",
-            "version": "1.9.2",
-            "prerelease": False,
-        }
+        mock_execvp.side_effect = SystemExit(0)
 
         config_manager = MagicMock()
         config_manager.load_global_config.return_value = {
@@ -325,45 +149,32 @@ async def test_upgrade_copies_files_correctly(
         }
 
         session = MagicMock()
+        session.close = AsyncMock()
         updater = SelfUpdater(config_manager, session)
 
-        # Run perform_update()
-        result = await updater.perform_update()
+        # Run the upgrade
+        with contextlib.suppress(SystemExit):
+            await updater.perform_update()
 
-        # Verify upgrade succeeded
-        assert result is True, "Upgrade should succeed"
-
-        # Verify repo was cleaned up after installation
-        repo_dir = temp_install_dirs["repo"]
-        assert not repo_dir.exists(), (
-            "repo_dir should be cleaned up after upgrade"
+        # Verify os.execvp was called with correct arguments
+        mock_execvp.assert_called_once_with(
+            "uv",
+            ["uv", "tool", "upgrade", "my-unicorn"],
         )
 
 
 @pytest.mark.asyncio
-async def test_installer_finds_required_files(
-    temp_install_dirs, mock_git_subprocess
-):
-    """Verify uv tool install process works during upgrade.
+async def test_installer_finds_required_files(temp_install_dirs):
+    """Verify upgrade executes uv tool upgrade command.
 
     Args:
         temp_install_dirs: Temporary directory fixture
-        mock_git_subprocess: Mock subprocess fixture
 
     """
     with (
-        patch(
-            "asyncio.create_subprocess_exec", side_effect=mock_git_subprocess
-        ),
-        patch("my_unicorn.upgrade.get_version") as mock_get_version,
-        patch.object(SelfUpdater, "get_latest_release") as mock_get_release,
+        patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp,
     ):
-        mock_get_version.return_value = "1.9.1"
-        mock_get_release.return_value = {
-            "tag_name": "v1.9.2",
-            "version": "1.9.2",
-            "prerelease": False,
-        }
+        mock_execvp.side_effect = SystemExit(0)
 
         config_manager = MagicMock()
         config_manager.load_global_config.return_value = {
@@ -374,16 +185,15 @@ async def test_installer_finds_required_files(
         }
 
         session = MagicMock()
+        session.close = AsyncMock()
         updater = SelfUpdater(config_manager, session)
 
-        # Run perform_update()
-        result = await updater.perform_update()
+        # Run the upgrade
+        with contextlib.suppress(SystemExit):
+            await updater.perform_update()
 
-        # Verify upgrade succeeded
-        assert result is True, "Upgrade should succeed"
-
-        # Verify repo was cleaned up
-        repo_dir = temp_install_dirs["repo"]
-        assert not repo_dir.exists(), (
-            "repo_dir should be cleaned up after upgrade"
+        # Verify os.execvp was called with correct arguments
+        mock_execvp.assert_called_once_with(
+            "uv",
+            ["uv", "tool", "upgrade", "my-unicorn"],
         )

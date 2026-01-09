@@ -8,15 +8,16 @@
 #
 # Auto-detects container vs normal machine:
 #  - In container: uses installed 'my-unicorn' command
-#  - On normal machine: uses 'python3 run.py' for development
+#  - On normal machine: uses 'uv run my-unicorn' for development
 #
 # # Update specific apps to test update functionality
 # appflowy: Catalog + digest
 # qownnotes: Catalog + digest
 # legcord: Catalog + checksum_file via latest-linux.yml
 # keepassxc: URL + checksum_file via x.AppImage.DIGEST
+# neovim: URL + digest
 # freetube: Catalog/URL + always beta app + digest test. 
-# tagspaces: Catalog + Digest and checksum_file via SHA256SUMS.txt
+# flameshot: Catalog + digest
 # logseq: Catalog + checksum_file via SHA256SUMS.txt
 # standard-notes: Catalog + checksum_file via SHA256SUMS.txt 
 #                + special naming logic  which repo name is desktop
@@ -88,10 +89,10 @@ run_cli() {
       return $?
     fi
     # fallback to repository script if installed binary not present
-    python3 "$APP_ROOT/run.py" "${args[@]}"
+    uv run my-unicorn "${args[@]}"
     return $?
   else
-    python3 "$APP_ROOT/run.py" "${args[@]}"
+    uv run my-unicorn "${args[@]}"
     return $?
   fi
 }
@@ -158,7 +159,7 @@ set_version() {
   fi
 
   info "Setting $app version to $version (for update test)"
-  jq --arg v "$version" '.appimage.version = $v' "$config_file" >"$config_file.tmp" &&
+  jq --arg v "$version" '.state.version = $v' "$config_file" >"$config_file.tmp" &&
     mv "$config_file.tmp" "$config_file"
 }
 
@@ -200,27 +201,26 @@ test_update() {
 # ======== Comprehensive Test Suites ========
 
 test_quick() {
-  info "=== Running Quick Tests (appflowy) ==="
+  info "=== Running Quick Tests (qownnotes) ==="
 
-  # Step 1: Remove appflowy for clean state
-  info "Step 1/5: Removing appflowy for clean URL install test"
-  remove_apps appflowy
-
+  # Step 1: Remove qownnotes for clean state
+  info "Step 1/5: Removing qownnotes for clean URL install test"
+  remove_apps qownnotes
   # Step 2: Test URL install
-  info "Step 2/5: Testing appflowy URL install"
-  run_cli install https://github.com/AppFlowy-IO/AppFlowy
+  info "Step 2/5: Testing qownnotes URL install"
+  run_cli install https://github.com/pbek/QOwnNotes
 
-  # Step 3: Remove appflowy for clean catalog test
-  info "Step 3/5: Removing appflowy for clean catalog install test"
-  remove_apps appflowy
+  # Step 3: Remove qownnotes for clean catalog test
+  info "Step 3/5: Removing qownnotes for clean catalog install test"
+  remove_apps qownnotes
 
   # Step 4: Test catalog install (keep installed for update test)
-  info "Step 4/5: Testing appflowy catalog install"
-  test_catalog_install appflowy
+  info "Step 4/5: Testing qownnotes catalog install"
+  test_catalog_install qownnotes
 
-  # Step 5: Test update (appflowy is already installed from catalog)
-  info "Step 5/5: Testing appflowy update"
-  test_update appflowy
+  # Step 5: Test update (qownnotes is already installed from catalog)
+  info "Step 5/5: Testing qownnotes update"
+  test_update qownnotes
 
   info "=== Quick tests completed successfully ==="
 }
@@ -228,27 +228,27 @@ test_quick() {
 test_all() {
   info "=== Running All Comprehensive Tests ==="
 
-  # Test multiple URL installs: nuclear + keepassxc
-  info "--- Testing URL installs (nuclear + keepassxc) ---"
+  # Test multiple URL installs: neovim + keepassxc
+  info "--- Testing URL installs (neovim + keepassxc) ---"
 
   info "Step 1/2: Removing apps for clean URL install test"
-  remove_apps nuclear keepassxc
+  remove_apps neovim keepassxc
 
   info "Step 2/2: Testing concurrent URL installs"
-  run_cli install https://github.com/nukeop/nuclear https://github.com/keepassxreboot/keepassxc
+  run_cli install https://github.com/neovim/neovim https://github.com/keepassxreboot/keepassxc
 
   # Test multiple catalog installs
-  info "--- Testing catalog installs (legcord + tagspaces + (already installed appflowy)) ---"
+  info "--- Testing catalog installs (legcord + flameshot + (already installed appflowy)) ---"
 
   info "Step 1/2: Removing apps for clean catalog install test"
-  remove_apps legcord tagspaces
+  remove_apps legcord flameshot
 
   info "Step 2/2: Testing multiple catalog install"
-  test_catalog_install legcord tagspaces appflowy standard-notes
+  test_catalog_install legcord flameshot appflowy standard-notes
 
   # Test updates for multiple apps
   info "--- Testing updates for multiple apps ---"
-  test_update legcord tagspaces keepassxc appflowy standard-notes
+  test_update legcord flameshot keepassxc appflowy standard-notes
 
   info "=== All comprehensive tests completed ==="
 }
@@ -277,9 +277,9 @@ TEST FLOW:
 
     All Tests:
         1. appflowy: remove -> URL install -> remove -> catalog install -> update
-        2. URL installs: remove (nuclear, keepassxc) -> concurrent URL install
-        3. Catalog installs: remove (legcord, tagspaces) -> catalog install
-        4. Updates: test updates for legcord, tagspaces, keepassxc
+        2. URL installs: remove (neovim, keepassxc) -> concurrent URL install
+        3. Catalog installs: remove (legcord, flameshot) -> catalog install
+        4. Updates: test updates for legcord, flameshot, keepassxc
 
 EXAMPLES:
     $0 --quick                       # Run quick tests (appflowy only)
@@ -288,7 +288,7 @@ EXAMPLES:
 NOTES:
     - Auto-detects container vs normal machine
     - In containers: uses 'my-unicorn' command if available
-    - On normal machines: uses 'python3 run.py' for development
+    - On normal machines: uses 'uv run my-unicorn' for development
     - Logs are written to: $LOG_FILE
     - Set DEBUG=true environment variable for detailed logging
     - Tests run from: $APP_ROOT

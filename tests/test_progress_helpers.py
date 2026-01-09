@@ -1,6 +1,6 @@
 import io
 
-from my_unicorn.progress import (
+from my_unicorn.ui.progress import (
     AsciiProgressBackend,
     ProgressConfig,
     ProgressType,

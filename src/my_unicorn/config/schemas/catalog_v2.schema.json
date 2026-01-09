@@ -1,0 +1,202 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/Cyber-Syntax/my-unicorn/schemas/catalog_v2.schema.json",
+    "title": "My Unicorn Catalog Entry Schema v2.0.0",
+    "description": "Schema for catalog entry JSON files that define AppImage metadata",
+    "type": "object",
+    "required": [
+        "config_version",
+        "metadata",
+        "source",
+        "appimage",
+        "verification",
+        "icon"
+    ],
+    "additionalProperties": false,
+    "properties": {
+        "config_version": {
+            "type": "string",
+            "const": "2.0.0",
+            "description": "Configuration format version"
+        },
+        "metadata": {
+            "type": "object",
+            "required": [
+                "name",
+                "display_name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Internal name (should match filename without .json)"
+                },
+                "display_name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Human-readable display name"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Optional description of the application"
+                }
+            }
+        },
+        "source": {
+            "type": "object",
+            "required": [
+                "type",
+                "owner",
+                "repo",
+                "prerelease"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "github"
+                    ],
+                    "description": "Source type (currently only github supported)"
+                },
+                "owner": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "GitHub repository owner"
+                },
+                "repo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "GitHub repository name"
+                },
+                "prerelease": {
+                    "type": "boolean",
+                    "description": "Whether to include prerelease versions"
+                }
+            }
+        },
+        "appimage": {
+            "type": "object",
+            "required": [
+                "naming"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "naming": {
+                    "type": "object",
+                    "required": [
+                        "target_name",
+                        "architectures"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "template": {
+                            "type": "string",
+                            "description": "Template for matching AppImage filenames (e.g., '{repo}-{version}.AppImage')"
+                        },
+                        "target_name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Target filename for the installed AppImage (without .AppImage extension)"
+                        },
+                        "architectures": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "amd64",
+                                    "x86_64",
+                                    "arm64",
+                                    "aarch64",
+                                    "i386",
+                                    "i686"
+                                ]
+                            },
+                            "description": "Supported CPU architectures"
+                        }
+                    }
+                }
+            }
+        },
+        "verification": {
+            "type": "object",
+            "required": [
+                "method"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "method": {
+                    "type": "string",
+                    "enum": [
+                        "digest",
+                        "checksum_file",
+                        "skip"
+                    ],
+                    "description": "Verification method to use"
+                },
+                "checksum_file": {
+                    "type": "object",
+                    "required": [
+                        "filename",
+                        "algorithm"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "filename": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Checksum file name pattern (may include {version} placeholder)"
+                        },
+                        "algorithm": {
+                            "type": "string",
+                            "enum": [
+                                "sha256",
+                                "sha512",
+                                "sha1",
+                                "md5"
+                            ],
+                            "description": "Hash algorithm used in checksum file"
+                        }
+                    },
+                    "description": "Required when method is 'checksum_file'"
+                }
+            },
+            "if": {
+                "properties": {
+                    "method": {
+                        "const": "checksum_file"
+                    }
+                }
+            },
+            "then": {
+                "required": [
+                    "checksum_file"
+                ]
+            }
+        },
+        "icon": {
+            "type": "object",
+            "required": [
+                "method",
+                "filename"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "method": {
+                    "type": "string",
+                    "enum": [
+                        "extraction"
+                    ],
+                    "description": "How to obtain the icon (extraction from AppImage only)"
+                },
+                "filename": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Icon filename (e.g., 'obsidian.png')"
+                }
+            }
+        }
+    }
+}

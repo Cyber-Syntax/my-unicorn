@@ -1,24 +1,31 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "AppFlowy",
+    "display_name": "AppFlowy",
+    "description": "Open source Notion alternative with offline-first approach"
+  },
+  "source": {
+    "type": "github",
     "owner": "AppFlowy-IO",
     "repo": "AppFlowy",
-    "appimage": {
-        "rename": "appflowy",
-        "name_template": "{rename}-{latest_version}-linux-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": ["x86_64", "amd64"]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-       "extraction": true,
-        "url": "",
-        "name": "appflowy.svg"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "{rename}-{latest_version}-linux-{characteristic_suffix}.AppImage",
+      "target_name": "appflowy",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "appflowy.png"
+  }
 }

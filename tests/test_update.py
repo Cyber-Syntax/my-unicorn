@@ -7,8 +7,8 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import aiohttp
 import pytest
 
-from my_unicorn.github_client import Release
-from my_unicorn.update import UpdateInfo, UpdateManager
+from my_unicorn.infrastructure.github import Release
+from my_unicorn.workflows.update import UpdateInfo, UpdateManager
 
 # Test constants
 EXPECTED_APP_COUNT = 2
@@ -129,9 +129,9 @@ class TestUpdateManager:
     def update_manager(self, mock_config_manager: MagicMock) -> UpdateManager:
         """Create UpdateManager instance with mocked dependencies."""
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
         ):
             manager = UpdateManager(mock_config_manager)
             return manager
@@ -141,9 +141,9 @@ class TestUpdateManager:
     ) -> None:
         """Test UpdateManager initialization with provided config manager."""
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
         ):
             manager = UpdateManager(mock_config_manager)
 
@@ -153,10 +153,12 @@ class TestUpdateManager:
     def test_init_default_config_manager(self) -> None:
         """Test UpdateManager initialization with default config manager."""
         with (
-            patch("my_unicorn.update.ConfigManager") as mock_config_cls,
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch(
+                "my_unicorn.workflows.update.ConfigManager"
+            ) as mock_config_cls,
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
         ):
             mock_config_instance = MagicMock()
             mock_config_cls.return_value = mock_config_instance
@@ -209,7 +211,9 @@ class TestUpdateManager:
             }
             mock_config.load_catalog_entry.return_value = None
 
-            with patch("my_unicorn.update.ReleaseFetcher") as mock_fetcher_cls:
+            with patch(
+                "my_unicorn.workflows.update.ReleaseFetcher"
+            ) as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
                 mock_fetcher.fetch_latest_release.return_value = {
@@ -244,6 +248,19 @@ class TestUpdateManager:
             "github": {"use_github_api": True, "use_prerelease": False}
         }
 
+        # Mock app_config_manager.get_effective_config to return effective config
+        mock_app_config_manager = MagicMock()
+        mock_app_config_manager.get_effective_config.return_value = {
+            "config_version": "2.0.0",
+            "source": {
+                "owner": "test-owner",
+                "repo": "test-repo",
+                "prerelease": False,
+            },
+            "state": {"version": "1.0.0"},
+        }
+        mock_config_manager.app_config_manager = mock_app_config_manager
+
         mock_release_data = Release(
             owner="test-owner",
             repo="test-repo",
@@ -254,13 +271,15 @@ class TestUpdateManager:
         )
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
-            with patch("my_unicorn.update.ReleaseFetcher") as mock_fetcher_cls:
+            with patch(
+                "my_unicorn.workflows.update.ReleaseFetcher"
+            ) as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
                 # Mock both possible method calls
@@ -292,10 +311,10 @@ class TestUpdateManager:
         mock_config_manager.load_app_config.return_value = None
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
-            patch("my_unicorn.update.logger"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
+            patch("my_unicorn.workflows.update.logger"),
         ):
             update_manager = UpdateManager(mock_config_manager)
             result = await update_manager.check_single_update(
@@ -316,13 +335,15 @@ class TestUpdateManager:
         mock_config_manager.load_catalog_entry.return_value = None
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
-            with patch("my_unicorn.update.ReleaseFetcher") as mock_fetcher_cls:
+            with patch(
+                "my_unicorn.workflows.update.ReleaseFetcher"
+            ) as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
                 # Create proper mock request info and history
@@ -333,7 +354,7 @@ class TestUpdateManager:
                 )
                 mock_fetcher.fetch_latest_release.side_effect = error
 
-                with patch("my_unicorn.update.logger"):
+                with patch("my_unicorn.workflows.update.logger"):
                     result = await update_manager.check_single_update(
                         "test-app", mock_session
                     )
@@ -358,41 +379,45 @@ class TestUpdateManager:
         )
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
-            with patch("my_unicorn.update.ReleaseFetcher") as mock_fetcher_cls:
+            with patch(
+                "my_unicorn.workflows.update.ReleaseFetcher"
+            ) as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
                 mock_fetcher.fetch_latest_release.side_effect = error
 
-                with patch("my_unicorn.update.logger") as mock_logger:
+                with patch(
+                    "my_unicorn.workflows.update.logger"
+                ) as mock_logger:
                     result = await update_manager.check_single_update(
                         "test-app", mock_session
                     )
 
                     assert result is None
                     # Verify specific auth error handling
-                    mock_logger.error.assert_called()
+                    mock_logger.exception.assert_called()
 
     @pytest.mark.asyncio
-    async def test_check_updates_with_show_progress(
+    async def test_check_updates_shows_progress_message(
         self,
         mock_config_manager: MagicMock,
     ) -> None:
-        """Test check_updates with show_progress parameter."""
+        """Test check_updates always shows progress message."""
         mock_config_manager.list_installed_apps.return_value = ["app1", "app2"]
 
         update_info1 = UpdateInfo("app1", "1.0.0", "1.1.0", True)
         update_info2 = UpdateInfo("app2", "2.0.0", "2.0.0", False)
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -400,16 +425,16 @@ class TestUpdateManager:
                 patch.object(
                     update_manager, "check_single_update", new=AsyncMock()
                 ) as mock_check,
-                patch("builtins.print") as mock_print,
+                patch("my_unicorn.workflows.update.logger") as mock_logger,
             ):
                 mock_check.side_effect = [update_info1, update_info2]
 
-                result = await update_manager.check_updates(show_progress=True)
+                result = await update_manager.check_updates()
 
                 assert len(result) == EXPECTED_APP_COUNT
-                # Verify progress message was printed
-                mock_print.assert_called_once_with(
-                    "🔄 Checking 2 app(s) for updates..."
+                # Verify progress message was logged
+                mock_logger.info.assert_called_once_with(
+                    "🔄 Checking %d app(s) for updates...", 2
                 )
 
     @pytest.mark.asyncio
@@ -422,9 +447,9 @@ class TestUpdateManager:
         update_info = UpdateInfo("app1", "1.0.0", "1.1.0", True)
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -448,10 +473,10 @@ class TestUpdateManager:
         mock_config_manager.list_installed_apps.return_value = []
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
-            patch("my_unicorn.update.logger"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
+            patch("my_unicorn.workflows.update.logger"),
         ):
             update_manager = UpdateManager(mock_config_manager)
             result = await update_manager.check_updates()
@@ -471,9 +496,9 @@ class TestUpdateManager:
         update_info2 = UpdateInfo("app2", "2.0.0", "2.0.0", False)
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -503,9 +528,9 @@ class TestUpdateManager:
         update_info1 = UpdateInfo("app1", "1.0.0", "1.1.0", True)
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -519,7 +544,7 @@ class TestUpdateManager:
                     Exception("API error"),
                 ]
 
-                with patch("my_unicorn.update.logger"):
+                with patch("my_unicorn.workflows.update.logger"):
                     result = await update_manager.check_updates()
 
                     # Only successful checks should be returned
@@ -527,38 +552,38 @@ class TestUpdateManager:
                     assert result[0] == update_info1
 
     @pytest.mark.asyncio
-    async def test_check_updates_with_show_progress_no_apps(
+    async def test_check_updates_no_apps(
         self,
         mock_config_manager: MagicMock,
     ) -> None:
-        """Test check updates with progress when no apps installed."""
+        """Test check updates when no apps installed."""
         mock_config_manager.list_installed_apps.return_value = []
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
-            patch("my_unicorn.update.logger"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
+            patch("my_unicorn.workflows.update.logger"),
             patch("builtins.print"),
         ):
             update_manager = UpdateManager(mock_config_manager)
-            result = await update_manager.check_updates(show_progress=True)
+            result = await update_manager.check_updates()
 
             assert result == []
 
     @pytest.mark.asyncio
-    async def test_check_updates_with_show_progress_enabled(
+    async def test_check_updates_shows_message(
         self,
         mock_config_manager: MagicMock,
     ) -> None:
-        """Test check updates with progress message enabled."""
+        """Test check updates shows progress message."""
         mock_config_manager.list_installed_apps.return_value = ["app1"]
         update_info = UpdateInfo("app1", "1.0.0", "1.1.0", True)
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -566,17 +591,17 @@ class TestUpdateManager:
                 patch.object(
                     update_manager, "check_single_update", new=AsyncMock()
                 ) as mock_check,
-                patch("builtins.print") as mock_print,
+                patch("my_unicorn.workflows.update.logger") as mock_logger,
             ):
                 mock_check.return_value = update_info
 
-                result = await update_manager.check_updates(show_progress=True)
+                result = await update_manager.check_updates()
 
                 assert len(result) == 1
                 assert result[0] == update_info
-                # Verify progress message was printed
-                mock_print.assert_called_once_with(
-                    "🔄 Checking 1 app(s) for updates..."
+                # Verify progress message was logged
+                mock_logger.info.assert_called_once_with(
+                    "🔄 Checking %d app(s) for updates...", 1
                 )
 
     @pytest.mark.asyncio
@@ -589,10 +614,10 @@ class TestUpdateManager:
         mock_config_manager.load_app_config.return_value = None
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
-            patch("my_unicorn.update.logger"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
+            patch("my_unicorn.workflows.update.logger"),
         ):
             update_manager = UpdateManager(mock_config_manager)
             success, error_reason = await update_manager.update_single_app(
@@ -616,9 +641,9 @@ class TestUpdateManager:
         update_info = UpdateInfo("test-app", "1.0.0", "1.0.0", False)
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -627,7 +652,7 @@ class TestUpdateManager:
             ) as mock_check:
                 mock_check.return_value = update_info
 
-                with patch("my_unicorn.update.logger"):
+                with patch("my_unicorn.workflows.update.logger"):
                     (
                         success,
                         error_reason,
@@ -648,9 +673,9 @@ class TestUpdateManager:
         app_names = ["app1", "app2", "app3"]
 
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -680,45 +705,46 @@ class TestUpdateManager:
     ) -> None:
         """Test services initialization with HTTP session."""
         with (
-            patch("my_unicorn.update.GitHubAuthManager"),
-            patch("my_unicorn.update.FileOperations"),
-            patch("my_unicorn.update.BackupService"),
+            patch("my_unicorn.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.workflows.update.FileOperations"),
+            patch("my_unicorn.workflows.update.BackupService"),
             patch(
-                "my_unicorn.progress.get_progress_service"
-            ) as mock_get_progress,
-            patch("my_unicorn.update.DownloadService") as mock_download_cls,
-            patch("my_unicorn.update.IconHandler") as mock_icon_cls,
-            patch("my_unicorn.update.VerificationService") as mock_verify_cls,
+                "my_unicorn.workflows.update.DownloadService"
+            ) as mock_download_cls,
+            patch(
+                "my_unicorn.workflows.update.VerificationService"
+            ) as mock_verify_cls,
         ):
-            # Mock get_progress_service to return a mock progress service
             mock_progress = MagicMock()
-            mock_get_progress.return_value = mock_progress
 
-            update_manager = UpdateManager(mock_config_manager)
+            update_manager = UpdateManager(
+                mock_config_manager, progress_service=mock_progress
+            )
 
             mock_download = MagicMock()
             mock_download_cls.return_value = mock_download
             mock_download.progress_service = MagicMock()
 
-            mock_icon = MagicMock()
             mock_verify = MagicMock()
-            mock_icon_cls.return_value = mock_icon
             mock_verify_cls.return_value = mock_verify
 
-            # Call the private method through a public interface
+            # Initialize services
             update_manager._initialize_services(mock_session)
 
+            # Verify DownloadService was initialized
+            mock_download_cls.assert_called_once()
+
+            # Verify VerificationService was initialized
+            mock_verify_cls.assert_called_once()
+            assert update_manager.verification_service is not None
+
             # Verify services were created with correct parameters
-            mock_get_progress.assert_called_once()
             mock_download_cls.assert_called_once_with(
                 mock_session, mock_progress
-            )
-            mock_icon_cls.assert_called_once_with(
-                mock_download, mock_download.progress_service
             )
             mock_verify_cls.assert_called_once_with(
                 mock_download, mock_download.progress_service
             )
 
-            assert update_manager.icon_service == mock_icon
+            # Verify that verification service was set
             assert update_manager.verification_service == mock_verify

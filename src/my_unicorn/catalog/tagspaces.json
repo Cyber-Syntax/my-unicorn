@@ -1,28 +1,35 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "tagspaces",
+    "display_name": "tagspaces",
+    "description": "Offline file organizer and manager with tagging support"
+  },
+  "source": {
+    "type": "github",
     "owner": "tagspaces",
     "repo": "tagspaces",
-    "appimage": {
-        "rename": "tagspaces",
-        "name_template": "{repo}-{latest_version}-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": [
-            "linux-x86_64",
-            "x86_64",
-            "amd64"
-        ]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": false,
-        "skip": false,
-        "checksum_file": "SHA256SUMS.txt",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "https://raw.githubusercontent.com/tagspaces/tagspaces/master/assets/icon.png",
-        "name": "tagspaces.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "{repo}-{latest_version}-{characteristic_suffix}.AppImage",
+      "target_name": "tagspaces",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "checksum_file",
+    "checksum_file": {
+      "filename": "SHA256SUMS.txt",
+      "algorithm": "sha256"
+    }
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "tagspaces.png"
+  }
 }

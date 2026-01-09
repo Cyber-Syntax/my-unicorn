@@ -66,12 +66,16 @@ Examples:
   %(prog)s upgrade
 
   # Other commands
-  %(prog)s list                # Show installed appimages
-  %(prog)s list --available    # Available appimages via catalog installation
+  %(prog)s catalog              # Show installed appimages
+  %(prog)s catalog --available  # Browse available appimages
+  %(prog)s catalog --info joplin  # Get detailed app information
 
-  # Auth Token Management (use keyring library, only gnome-keyring tested)
-  %(prog)s auth --save-token
-  %(prog)s auth --remove-token
+  # Token Management (use keyring library, only gnome-keyring tested)
+  %(prog)s token --save
+  %(prog)s token --remove
+
+  # Auth Status
+  %(prog)s auth
   %(prog)s auth --status
             """,
         )
@@ -111,14 +115,19 @@ Examples:
         self._add_install_command(subparsers)
         self._add_update_command(subparsers)
         self._add_upgrade_command(subparsers)
-        self._add_list_command(subparsers)
+        self._add_catalog_command(subparsers)
+        self._add_list_command(subparsers)  # Deprecated alias for catalog
+        self._add_migrate_command(subparsers)
         self._add_remove_command(subparsers)
         self._add_backup_command(subparsers)
         self._add_cache_command(subparsers)
+        self._add_token_command(subparsers)
         self._add_auth_command(subparsers)
         self._add_config_command(subparsers)
 
-    def _add_install_command(self, subparsers) -> None:
+    def _add_install_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add install command parser.
 
         Args:
@@ -180,7 +189,9 @@ Examples:
             help="Show detailed logging during installation",
         )
 
-    def _add_update_command(self, subparsers) -> None:
+    def _add_update_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add update command parser.
 
         Args:
@@ -227,7 +238,9 @@ Examples:
             help="Show detailed logging during update",
         )
 
-    def _add_upgrade_command(self, subparsers) -> None:
+    def _add_upgrade_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add upgrade command parser.
 
         Args:
@@ -258,8 +271,43 @@ Examples:
             "(useful for automated scripts)",
         )
 
-    def _add_list_command(self, subparsers) -> None:
-        """Add list command parser.
+    def _add_catalog_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
+        """Add catalog command parser.
+
+        Args:
+            subparsers: The subparsers object to add the catalog command
+                to.
+
+        """
+        catalog_parser = subparsers.add_parser(
+            "catalog",
+            help="Browse AppImage catalog",
+            description="Browse available AppImages and show installed apps",
+        )
+        # Create mutually exclusive group for subcommands
+        catalog_group = catalog_parser.add_mutually_exclusive_group()
+        catalog_group.add_argument(
+            "--installed",
+            action="store_true",
+            help="Show installed AppImages (default)",
+        )
+        catalog_group.add_argument(
+            "--available",
+            action="store_true",
+            help="Show available applications from catalog with descriptions",
+        )
+        catalog_group.add_argument(
+            "--info",
+            metavar="APP",
+            help="Show detailed information about a specific app",
+        )
+
+    def _add_list_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
+        """Add list command parser (deprecated alias for catalog).
 
         Args:
             subparsers: The subparsers object to add the list command
@@ -267,7 +315,8 @@ Examples:
 
         """
         list_parser = subparsers.add_parser(
-            "list", help="List installed AppImages"
+            "list",
+            help="(Deprecated: use 'catalog') List installed AppImages",
         )
         list_parser.add_argument(
             "--available",
@@ -275,7 +324,35 @@ Examples:
             help="Show available applications from catalog",
         )
 
-    def _add_remove_command(self, subparsers) -> None:
+    def _add_migrate_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
+        """Add migrate command parser.
+
+        Args:
+            subparsers: The subparsers object to add the migrate command
+                to.
+
+        """
+        migrate_parser = subparsers.add_parser(
+            "migrate",
+            help="Migrate configs to latest version",
+            description="Upgrade app and catalog configs to v2 format",
+        )
+        migrate_parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Show what would be migrated without making changes",
+        )
+        migrate_parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Force migration even if versions match",
+        )
+
+    def _add_remove_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add remove command parser.
 
         Args:
@@ -302,7 +379,9 @@ Examples:
             help="Keep configuration files",
         )
 
-    def _add_backup_command(self, subparsers) -> None:
+    def _add_backup_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add backup command parser.
 
         Args:
@@ -335,9 +414,6 @@ Examples:
   # Cleanup old backups
   %(prog)s --cleanup
   %(prog)s appflowy --cleanup
-
-  # Migrate old backup format
-  %(prog)s --migrate
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
@@ -382,13 +458,34 @@ Examples:
             help="Show detailed backup information",
         )
 
-        action_group.add_argument(
-            "--migrate",
+    def _add_token_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
+        """Add token command parser.
+
+        Args:
+            subparsers: The subparsers object to add the token command
+                to.
+
+        """
+        token_parser = subparsers.add_parser(
+            "token", help="Manage GitHub authentication token"
+        )
+        token_group = token_parser.add_mutually_exclusive_group(required=True)
+        token_group.add_argument(
+            "--save",
             action="store_true",
-            help="Migrate old backup files to new folder-based format",
+            help="Save GitHub authentication token",
+        )
+        token_group.add_argument(
+            "--remove",
+            action="store_true",
+            help="Remove GitHub authentication token",
         )
 
-    def _add_auth_command(self, subparsers) -> None:
+    def _add_auth_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add auth command parser.
 
         Args:
@@ -397,24 +494,17 @@ Examples:
 
         """
         auth_parser = subparsers.add_parser(
-            "auth", help="Manage GitHub authentication"
+            "auth", help="Show GitHub authentication status"
         )
-        auth_group = auth_parser.add_mutually_exclusive_group(required=True)
-        auth_group.add_argument(
-            "--save-token",
+        auth_parser.add_argument(
+            "--status",
             action="store_true",
-            help="Save GitHub authentication token",
-        )
-        auth_group.add_argument(
-            "--remove-token",
-            action="store_true",
-            help="Remove GitHub authentication token",
-        )
-        auth_group.add_argument(
-            "--status", action="store_true", help="Show authentication status"
+            help="Show authentication status (default action)",
         )
 
-    def _add_config_command(self, subparsers) -> None:
+    def _add_config_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add config command parser.
 
         Args:
@@ -437,7 +527,9 @@ Examples:
             help="Reset configuration to defaults",
         )
 
-    def _add_cache_command(self, subparsers) -> None:
+    def _add_cache_command(
+        self, subparsers: argparse._SubParsersAction
+    ) -> None:
         """Add cache command parser.
 
         Args:

@@ -5,6 +5,154 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-alpha] - 2026-01-09
+
+### Breaking Changes
+
+- **Config Module Refactor**: Removed backward compatibility classes from config module
+    - `DirectoryManager` class removed - use `Paths` class instead
+    - `CatalogManager` alias removed - use `CatalogLoader` directly
+    - Import paths remain the same: `from my_unicorn.config import Paths, CatalogLoader`
+    - All functionality preserved through `Paths` class static methods
+- **Config Format Migration**: Application configuration format changed from v1.0.0 to v2.0.0
+    - Manual migration required via `my-unicorn migrate` command before use
+    - Automatic backups created during migration (.json.backup files)
+    - Config v2 uses hybrid structure: catalog apps store only state + catalog_ref, URL apps store full config in overrides
+- **Global Config**: Global configuration version updated to 1.0.2
+- **Command Rename**: `list` command deprecated in favor of `catalog` command (removed entirely)
+
+### Added
+
+- **JSON Schema Validation**: Comprehensive validation for catalog and app state configurations
+    - Auto-detection of v1 vs v2 config formats
+    - Runtime validation at load/save operations
+    - Clear error messages with JSON path references
+    - IDE support via .schema.json files
+- **App Descriptions**: Added descriptions for all 27 catalog applications
+- **Catalog Command**: Enhanced `catalog` command with app descriptions
+    - `catalog --available` shows apps with descriptions
+    - `catalog --info <app-name>` displays detailed app information
+- **Migration Infrastructure**: Complete v1→v2 migration system
+    - Dedicated `migration/` package with modular structure
+    - Automatic backup creation before migration
+    - Support for both catalog and URL-installed apps
+    - Post-migration validation with schema checking
+- **Verification Warnings**: Installation proceeds with warnings when no verification methods available
+    - Clear security warnings for users
+    - Progress display shows ⚠ symbol for unverified installs
+    - Detailed logging for debugging
+
+### Changed
+
+- **Setup.sh Update**: Remove editable mode on legacy installation from setup.sh
+- **Upgrade Process Update**: Use 'uv tool upgrade' command and enhance test coverage
+- **Documentation Enhancement**: Enhanced readme, updated todo.md, and added comprehensive config documentation
+- **Config Structure**: New hybrid v2 configuration format
+    - Catalog apps: Minimal config (state + catalog_ref pointing to catalog filename)
+    - URL apps: Full config stored in overrides section
+    - Improved separation of concerns and reduced duplication
+- **Verification State**: Enhanced verification tracking in app state
+    - Multiple verification methods tracked per installation
+    - Detailed status for each method (type, algorithm, hashes, source)
+    - Properly saves `passed: false` when no verification occurs
+- **Icon State**: Improved icon state tracking
+    - Method field indicates extraction vs download
+    - Accurate migration from v1 extraction boolean
+- **Icon Handling**: Refactored to extract icons from AppImage only (no external download)
+    - Removed download method from icon handling
+    - Catalog JSON files updated to remove download_url entries
+    - New extract_icon_from_appimage() function in file_ops.py
+- **Migration Organization**: Refactored migration code into dedicated package
+    - `migration/base.py` - Common utilities
+    - `migration/app_config.py` - App config migration
+    - `migration/catalog_config.py` - Catalog config migration
+    - `migration/global_config.py` - Global config migration
+    - Eliminated code duplication
+- **Command Refactoring**: Renamed deprecated `list` command to `catalog` with enhanced features
+    - Use new `catalog` command instead of `list`
+- **Logging Improvements**: Replaced print statements with logger for CLI output
+    - Introduced SimpleConsoleFormatter for clean console messages
+    - Improved logging consistency and error reporting
+
+### Fixed
+
+- **Icon Migration**: Fixed v1→v2 migration incorrectly setting icon.method to "download"
+    - Now correctly checks source field first, then falls back to extraction boolean
+    - Affects apps like tagspaces, super-productivity with extraction+URL
+- **Catalog App Verification**: Fixed checksum_file verification not preserved during migration
+    - Migration now consults catalog for correct verification method
+    - Apps like standard-notes properly migrated
+- **URL Install Config**: Fixed URL-installed apps creating empty overrides in source fields
+    - Now properly populates source section in overrides
+- **Migration Command**: Fixed migrate command failing on v1 configs
+    - Now reads raw JSON directly instead of using load_app_config validation
+- **Catalog Reference**: Fixed catalog apps incorrectly migrated as URL apps
+    - catalog_ref now maps to catalog filename (app_name), not repo name
+    - No overrides added to catalog apps during migration
+- **Beekeeper Studio Naming**: Fixed wrong catalog filename from beekeper-studio to beekeeper-studio
+- **Icon Method Mapping**: Fixed deprecated download method mapping during migration
+- **Backup Migration**: Removed automatic migration, now fully folder-based structure
+- **Install Verification Source**: Fixed verification source field to use lowercase
+
+### Removed
+
+- **Legacy Config Support**: Removed support for v1 configuration format
+    - Post-migration, only v2 configs accepted
+    - Simplifies codebase and maintenance
+- **List Command Alias**: Completely removed `list` command
+    - Use new `catalog` command instead
+    - No backward compatible alias maintained
+- **Old Migration Code**: Removed legacy migration code from main modules
+    - All migration logic now in dedicated `migration/` package
+    - Cleaner separation of concerns
+- **Icon Download Logic**: Completely removed icon download functionality
+    - Now extracts icons directly from AppImage files
+    - Removed download_url entries from all catalog configurations
+- **Backup Migration**: Removed automatic migration from old flat backup format to folder-based structure
+    - Users with old backups (*.backup.AppImage) should manually reorganize them if needed
+    - New installations and users who already migrated are unaffected
+    - Backup system now exclusively uses folder-based structure with metadata.json
+- **Show Progress Parameter**: Removed show_progress parameter from download methods
+    - Progress always enabled for install/update operations
+    - Download progress conditionally shown based on file size
+- **Deprecated Classes**: Removed old icon handler classes and unused tool scripts
+- **Deprecated Progress Methods**: Removed deprecated task creation methods from progress service
+
+### Migration Guide
+
+#### Migrating from v1.x to v2.0.0
+
+1. **beekeeper-studio name**:
+    - (Recommended) If you use beekeeper-studio, remove the app before migration to v2.0.0 and reinstall after migration to avoid issues.
+    - You can manually rename your config and desktop files for Beekeeper Studio if you migrated before reinstalling:
+      1. Rename `~/.config/my-unicorn/apps/beekeper-studio.json` to `beekeeper-studio.json`.
+      2. Rename `~/.local/share/applications/beekeper-studio.desktop` to `beekeeper-studio.desktop`.
+      3. Update `catalog_ref` field in the config file to `beekeeper-studio`.
+
+2. **Run migration command**:
+
+   ```bash
+   my-unicorn migrate
+   ```
+
+3. **Migration process**:
+   - Automatically detects v1 configs in `~/.config/my-unicorn/apps/`
+   - Creates `.json.backup` files before migration
+   - Converts to v2 format with appropriate structure
+   - Validates migrated configs against JSON schema
+
+4. **After migration**:
+   - Review migrated configs in `~/.config/my-unicorn/apps/`
+   - Backups available in `~/.config/my-unicorn/apps/backups/`
+   - Use `catalog` command instead of `list` (alias still works)
+
+5. **Config structure changes**:
+   - Catalog apps: Only state + catalog_ref stored (metadata from catalog)
+   - URL apps: Full config in overrides section
+   - See docs/config.md for detailed v2 format documentation
+
+For detailed migration information, see [docs/config.md](docs/config.md).
+
 ## [1.12.2-alpha]
 
 ### Fixed
@@ -42,7 +190,7 @@ To migrate to the new uv-based installation, please follow these steps:
 - Remove `~/.local/share/my-unicorn/` directory if it exists.
 - Remove `~/.local/share/my-unicorn-repo/` directory if it exists.
 
-2. Install via setup.sh script:
+1. Install via setup.sh script:
 
 ```bash
 ./setup.sh uv-install

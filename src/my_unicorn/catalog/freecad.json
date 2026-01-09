@@ -1,24 +1,31 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "FreeCAD",
+    "display_name": "FreeCAD",
+    "description": "Parametric 3D CAD modeler"
+  },
+  "source": {
+    "type": "github",
     "owner": "FreeCAD",
     "repo": "FreeCAD",
-    "appimage": {
-        "rename": "freecad",
-        "name_template": "",
-        "characteristic_suffix": []
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "",
-        "name": "freecad.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "",
+      "target_name": "freecad",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "freecad.png"
+  }
 }

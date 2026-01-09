@@ -1,24 +1,31 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "endless-sky",
+    "display_name": "endless-sky",
+    "description": "2D space trading and combat game"
+  },
+  "source": {
+    "type": "github",
     "owner": "endless-sky",
     "repo": "endless-sky",
-    "appimage": {
-        "rename": "endless-sky",
-        "name_template": "{repo}-{characteristic_suffix}.AppImage",
-        "characteristic_suffix": ["x86_64.AppImage"]
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": true,
-        "skip": false,
-        "checksum_file": "",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "",
-        "name": "endless-sky.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "{repo}-{characteristic_suffix}.AppImage",
+      "target_name": "endless-sky",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "digest"
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "endless-sky.png"
+  }
 }

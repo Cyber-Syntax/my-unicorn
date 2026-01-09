@@ -7,9 +7,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from my_unicorn.config import DirectoryManager
-from my_unicorn.config_migration import ConfigMigration
-from my_unicorn.constants import CONFIG_VERSION
+from my_unicorn.config.migration.global_config import ConfigMigration
+from my_unicorn.domain.constants import GLOBAL_CONFIG_VERSION
 
 
 @pytest.fixture
@@ -20,24 +19,19 @@ def temp_dir():
 
 
 @pytest.fixture
-def directory_manager(temp_dir):
-    """Create a DirectoryManager for testing."""
+def migration(temp_dir):
+    """Create a ConfigMigration instance for testing."""
     config_dir = temp_dir / "config"
     config_dir.mkdir()
-    return DirectoryManager(config_dir=config_dir)
-
-
-@pytest.fixture
-def migration(directory_manager):
-    """Create a ConfigMigration instance for testing."""
-    return ConfigMigration(directory_manager)
+    settings_file = config_dir / "settings.conf"
+    return ConfigMigration(config_dir, settings_file)
 
 
 @pytest.fixture
 def sample_defaults():
     """Sample default configuration for testing."""
     return {
-        "config_version": CONFIG_VERSION,
+        "config_version": GLOBAL_CONFIG_VERSION,
         "log_level": "INFO",
         "console_log_level": "WARNING",
         "network": {"retry_attempts": "3", "timeout_seconds": "10"},
@@ -48,9 +42,12 @@ def sample_defaults():
 class TestConfigMigration:
     """Test cases for ConfigMigration class."""
 
-    def test_init(self, migration, directory_manager):
+    def test_init(self, migration, temp_dir):
         """Test ConfigMigration initialization."""
-        assert migration.directory_manager == directory_manager
+        config_dir = temp_dir / "config"
+        settings_file = config_dir / "settings.conf"
+        assert migration.config_dir == config_dir
+        assert migration.settings_file == settings_file
         assert migration._messages == []
 
     def test_collect_message(self, migration):
@@ -63,13 +60,14 @@ class TestConfigMigration:
         assert message == "Test message %s"
         assert args == ("arg1",)
 
-    def test_collect_message_critical_prints(self, migration, capsys):
-        """Test that critical messages are printed to console."""
+    def test_collect_message_critical_prints(self, migration, caplog):
+        """Test that critical messages are logged to console."""
         migration._collect_message("ERROR", "Critical error: %s", "problem")
 
-        captured = capsys.readouterr()
-        assert (
-            "Config Migration ERROR: Critical error: problem" in captured.out
+        # Check that the message was logged (now uses logger.info instead of print)
+        assert any(
+            "Config Migration ERROR: Critical error: problem" in record.message
+            for record in caplog.records
         )
 
     def test_needs_migration_true(self, migration):
@@ -79,7 +77,7 @@ class TestConfigMigration:
 
     def test_needs_migration_false(self, migration):
         """Test migration is not needed for current or newer versions."""
-        assert migration._needs_migration(CONFIG_VERSION) is False
+        assert migration._needs_migration(GLOBAL_CONFIG_VERSION) is False
         assert migration._needs_migration("1.1.0") is False
 
     def test_compare_versions(self, migration):
@@ -91,7 +89,7 @@ class TestConfigMigration:
     def test_migrate_if_needed_no_migration(self, migration, sample_defaults):
         """Test migration when no migration is needed."""
         config = configparser.ConfigParser()
-        config["DEFAULT"] = {"config_version": CONFIG_VERSION}
+        config["DEFAULT"] = {"config_version": GLOBAL_CONFIG_VERSION}
 
         result = migration.migrate_if_needed(config, sample_defaults)
 
@@ -135,7 +133,7 @@ class TestConfigMigration:
         """Test that no changes are made when all fields exist."""
         config = configparser.ConfigParser()
         config["DEFAULT"] = {
-            "config_version": CONFIG_VERSION,
+            "config_version": GLOBAL_CONFIG_VERSION,
             "log_level": "INFO",
             "console_log_level": "WARNING",
         }
@@ -154,7 +152,7 @@ class TestConfigMigration:
         """Test validation of a valid configuration."""
         config = configparser.ConfigParser()
         config["DEFAULT"] = {
-            "config_version": CONFIG_VERSION,
+            "config_version": GLOBAL_CONFIG_VERSION,
             "log_level": "INFO",
             "console_log_level": "WARNING",
         }
@@ -172,7 +170,7 @@ class TestConfigMigration:
     def test_validate_merged_config_invalid(self, migration):
         """Test validation of an invalid configuration."""
         config = configparser.ConfigParser()
-        config["DEFAULT"] = {"config_version": CONFIG_VERSION}
+        config["DEFAULT"] = {"config_version": GLOBAL_CONFIG_VERSION}
         # Missing required sections and fields
 
         result = migration._validate_merged_config(config)
@@ -216,7 +214,7 @@ class TestConfigMigration:
         result = migration._create_config_backup()
 
         # Should return the settings file path even if it doesn't exist
-        assert result == migration.directory_manager.settings_file
+        assert result == migration.settings_file
 
     def test_restore_backup_no_backups(self, migration):
         """Test backup restoration when no backups exist."""

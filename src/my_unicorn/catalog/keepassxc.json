@@ -1,24 +1,35 @@
 {
+  "config_version": "2.0.0",
+  "metadata": {
+    "name": "keepassxc",
+    "display_name": "keepassxc",
+    "description": "Cross-platform password manager"
+  },
+  "source": {
+    "type": "github",
     "owner": "keepassxreboot",
     "repo": "keepassxc",
-    "appimage": {
-        "rename": "keepassxc",
-        "name_template": "",
-        "characteristic_suffix": []
-    },
-    "github": {
-        "repo": true,
-        "prerelease": false
-    },
-    "verification": {
-        "digest": false,
-        "skip": false,
-        "checksum_file": "KeePassXC-{version}-x86_64.AppImage.DIGEST",
-        "checksum_hash_type": "sha256"
-    },
-    "icon": {
-        "extraction": true,
-        "url": "",
-        "name": "keepassxc.png"
+    "prerelease": false
+  },
+  "appimage": {
+    "naming": {
+      "template": "",
+      "target_name": "keepassxc",
+      "architectures": [
+        "amd64",
+        "x86_64"
+      ]
     }
+  },
+  "verification": {
+    "method": "checksum_file",
+    "checksum_file": {
+      "filename": "KeePassXC-{version}-x86_64.AppImage.DIGEST",
+      "algorithm": "sha256"
+    }
+  },
+  "icon": {
+    "method": "extraction",
+    "filename": "keepassxc.png"
+  }
 }

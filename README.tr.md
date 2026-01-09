@@ -1,120 +1,182 @@
-English Description: [README.md](README.md)
+# **My Unicorn 🦄 - Linux için AppImage Yöneticisi**
 
 > [!CAUTION]
-> Bu proje sınırlı testlerden dolayı şu anlık **alpha aşamasındadır**.
 >
-> **Önemli:** Script’i güncellerken **Releases** bölümündeki talimatları takip edin.
->
-> **Desteklenen İşletim Sistemleri:** Şu anlık sadece Linux destekleniyor.
+> - Bu proje sınırlı testlerden dolayı şu anlık **alpha aşamasındadır** ancak işlevseldir. Karşılaştığınız sorunları lütfen bildirin.
+> - **Önemli:** Script'i güncellerken potansiyel sorunlardan kaçınmak için **Releases bölümündeki** talimatları takip edin.
+> - **Desteklenen OS:** Şu anlık sadece Linux destekleniyor ve test ediliyor.
 
-## **🦄 my-unicorn Hakkında**
+İngilizce: [README.md](README.md)
+
+## 📋 Genel Bakış
 
 > [!NOTE]
-> Manuel AppImage güncelleme sürecinden yılmıştım, süreci otomatikleştirmek için bu projeyi oluşturdum.
 >
-> Detaylı bilgi: [wiki.md](docs/wiki.md)
+> My Unicorn, Linux'ta AppImage'ları yönetmek için bir komut satırı aracıdır. Kullanıcıların GitHub depolarından AppImage'ları kolayca yüklemesine, güncellemesine ve yönetmesine olanak tanır. AppImage'ları işleme sürecini basitleştirmek için tasarlanmıştır ve kullanıcıların uygulamalarını güncel tutmasını daha uygun hale getirir.
+>
+> - Detaylı bilgi: [wiki.md](docs/wiki.md)
 
 - **Desteklenen Uygulamalar:**
-    - Super-Productivity, Siyuan, Joplin, Standard-notes, Logseq, QOwnNotes, Tagspaces, Zen-Browser, weektodo, Zettlr
-    - Doğrulaması olmayan uygulamalar (yazılımcıları hash sağlamıyor):
-        - FreeTube
-            - Bağlantılı sorun: <https://github.com/FreeTubeApp/FreeTube/issues/4720>)
-        - AppFlowy
-        - Obsidian
-    - Daha fazlası [apps](src/my_unicorn/apps) klasöründe bulunabilir.
-- **Desteklenen Hash Türleri:**
+    - Super-Productivity, Siyuan, Joplin, Standard-notes, Logseq, QOwnNotes, Tagspaces, Zen-Browser, Zettlr, HeroicGamesLauncher, KDiskMark, AppFlowy, Obsidian, FreeTube
+    - Doğrulaması olmayan uygulamalar (geliştirici hash sağlamıyor):
+        - WeekToDo
+    - Daha fazlası [catalog](src/my_unicorn/catalog) klasöründe bulunabilir.
+- **Desteklenen hash türleri:**
     - sha256, sha512
 
-# 💡 Yükleme/Kurulum
+## 🚀 Hızlı Başlangıç Örneği
+
+```bash
+my-unicorn install qownnotes
+Fetching from API:
+GitHub Releases      1/1 Retrieved
+
+Downloading:
+QOwnNotes-x86_64   41.5 MiB  10.8 MB/s 00:00 [==============================]   100% ✓
+
+Installing:
+(1/2) Verifying qownnotes ✓
+(2/2) Installing qownnotes ✓
+
+
+📦 Installation Summary:
+--------------------------------------------------
+qownnotes                 ✅ 25.12.7
+
+🎉 Successfully installed 1 app(s)
+```
+
+## 💡 Yükleme
+
+## Seçenek 1: uv kullanarak yükleme (Önerilen)
 
 > [!TIP]
-> Installer script, gerekli bağımlılıkları yüklemek için Venv kullanır.
+>
+> Bu yöntem üretim kullanımı için önerilir. my-unicorn'u izole edilmiş bir CLI aracı olarak yükler.
+
+### Ön Koşullar
+
+Henüz yüklemediyseniz `uv`'yi yükleyin:
+
+```bash
+# Fedora
+sudo dnf install uv
+
+# Arch Linux
+sudo pacman -S uv
+
+# Evrensel yükleyici (Linux, macOS)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### Üretim Yüklemesi
+
+#### Yöntem 1: setup.sh kullanarak (önerilen)**
+
+> [!NOTE]
+>
+> Bu yöntem bash/zsh kabukları için otomatik tamamlama ayarlar.
+
+```bash
+cd ~/Downloads
+git clone https://github.com/Cyber-Syntax/my-unicorn.git
+cd my-unicorn
+./setup.sh uv-install
+```
+
+#### Yöntem 2: Doğrudan uv komutu
+
+> [!NOTE]
+>
+> Bu yöntem otomatik tamamlama ayarlamaz. Gerekirse manuel olarak ayarlayın.
+
+```bash
+uv tool install git+https://github.com/Cyber-Syntax/my-unicorn
+```
+
+### Güncelleme
+
+my-unicorn'u en son sürüme güncellemek için çalıştırın:
+
+```bash
+my-unicorn upgrade
+```
+
+### Geliştirme Yüklemesi (katkıda bulunanlar için)
+
+**setup.sh kullanarak:**
+
+```bash
+cd ~/Downloads/my-unicorn
+./setup.sh uv-editable
+```
+
+**Doğrudan uv komutu:**
+
+```bash
+cd ~/Downloads/my-unicorn
+uv tool install --editable .
+```
+
+Kaynak kodundaki değişiklikler yeniden yüklemeye gerek olmadan hemen yansıtılır.
+
+## Seçenek 2: Geleneksel Yükleme (Eski)
+
+> [!TIP]
+>
+> Yükleyici script, gerekli bağımlılıkları yüklemek için venv kullanır.
 
 1. Bir terminal açın ve bu depoyu klonlayın (git'in yüklü olduğundan emin olun):
 
-   ```bash
-   cd ~/Downloads/
-   git clone https://github.com/Cyber-Syntax/my-unicorn.git
-   ```
+    ```bash
+    cd ~/Downloads &
+    git clone https://github.com/Cyber-Syntax/my-unicorn.git
+    ```
 
-2. Paket olarak oluşturun:
+2. `uv`'yi yükleyin (ÖNERİLEN):
+
+    > `uv`, bağımlılıkları venv'e yüklemek için kullanılır, pip'ten daha verimlidir.
 
     ```bash
+    # fedora
+    sudo dnf install uv
+    # arch
+    sudo pacman -S uv
+    # veya `uv` astral resmi bağımsız yükleyici
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
+
+3. Paket olarak oluşturun:
+
+    ```bash
+    # Proje dizinine gidin
     cd my-unicorn &
-    sh setup.sh install
+    # Yükleyiciyi çalıştırın (mevcut ise UV'yi otomatik kullanır)
+    ./setup.sh install
     ```
 
-## Paketi kaldır
-
-> [!TIP]
-> Eğer paketi küresel olarak yüklediyseniz, aşağıdaki komutu kullanarak kaldırabilirsiniz:
+4. my-unicorn'u kullanmaya başlayın:
 
     ```bash
-    pip uninstall my-unicorn
+    my-unicorn --help # komut seçeneklerini görmek için
     ```
 
-# Nasıl Kullanılır?
-
-## Paket olarak kullanım
-
-```bash
-my-unicorn --help # to see the command options
-```
-
-```bash
-usage: my-unicorn [-h] {download,install,update,token,migrate} ...
-
-my-unicorn: AppImage management tool
-
-positional arguments:
-  {download,install,update,token,migrate}
-                        Available commands
-    download            Download AppImage from URL
-    install             Install app from catalog
-    update              Update AppImages
-    token               GitHub token management
-    migrate             Migrate configuration files
-
-options:
-  -h, --help            show this help message and exit
-
-Examples:
-my-unicorn # Interactive mode (default)
-my-unicorn download https://github.com/johannesjo/super-productivity # Download AppImage from URL
-my-unicorn install joplin # Install AppImage from catalog
-my-unicorn update --all # Update all AppImages
-my-unicorn update --select joplin,super-productivity # Select AppImages to update
-my-unicorn token --save # Save GitHub token to keyring
-my-unicorn token --remove # Remove GitHub token
-my-unicorn token --check # Check GitHub API rate limits
-my-unicorn migrate --clean # Migrate configuration files
-my-unicorn migrate --force # Migrate configuration without confirmation
-```
-
-## Desteklenmeyen uygulamalar için (URL ile kurulum)
+## Uyumsuz uygulamalar için (URL ile yükleme)
 
 > [!IMPORTANT]
-> Eğer desteklenmeyen bir uygulamayı kurmak istiyorsanız, uygulama hakkında bazı bilgilere sahip olmanız gerekecektir.
+>
+> Uyumsuz bir uygulamayı yüklemek istiyorsanız, uygulama hakkında bazı bilgilere sahip olmanız gerekecektir.
 
-- **GitHub URL:** Uygulamanın GitHub depo adresi (örn. `https://github.com/johannesjo/super-productivity`).
-- Hash türü ve Hash dosya adı otamatik olarak tespit edilir. Eğer uygulamanın uyumluluğu yoksa veya hata oluşursa aşağıdaki bilgileri sağlamanız gerekecek:
+- **GitHub URL:** Uygulamanın depo URL'si (örn. `https://github.com/johannesjo/super-productivity`).
+- Hash türü ve Hash dosya adı otomatik olarak tespit edilir. Uygulama uyumluluğu mevcut değilse veya hata oluşursa aşağıdaki bilgileri sağlamanız gerekecektir:
     - **Hash türü:** Hash türünü belirtin (örn. super-productivity için sha512).
-    - **Hash doğrulama sorunları:** Eğer hash doğrulama başarısız olursa, hash'i manuel olarak JSON dosyasına ekleyebilirsiniz:
-        - En son hash bilgisini GitHub sürüm sayfasında bulabilirsiniz (örn. [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
-        - Örnekler için [apps](src/my_unicorn/apps) klasörüne bakabilirsiniz.
+    - **Hash doğrulama sorunları:** Hash doğrulaması başarısız olursa, hash'i manuel olarak JSON dosyasına ekleyebilirsiniz:
+        - En son hash bilgisini GitHub sürüm sayfasında arayın (örn. [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
+        - Örnekler için [catalog](src/my_unicorn/catalog) klasörüne bakın.
 
-# **🙏 Bu Projeye Destek Olun**
+## **🙏 Bu Projeye Destek Olun**
 
-- **GitHub üzerinde yıldız ⭐** vererek desteğinizi gösterebilirsiniz, böylece kodlama yolculuğumda motive olmamı sağlar!
-- **Test:** Eğer betiği test eder ve karşılaştığınız herhangi bir sorun hakkında geri bildirim sağlayabilirseniz harika olur.
-- **💖 Projeyi Destekle:** Çalışmalarımı desteklemek ve projeler yapmaya devam etmemi sağlamak istersen, bana sponsor olmayı düşünebilirsin:
+- **GitHub'da yıldız ⭐** vererek desteğinizi gösterebilir ve kodlama yolculuğumda motive olmamı sağlayabilirsiniz!
+- **Test:** Script'i test eder ve karşılaştığınız sorunlar hakkında geri bildirim sağlarsanız harika olur.
+- **💖 Beni Sponsorla:** Çalışmalarımı desteklemek ve öğrenmeye ve projeler yapmaya devam etmemi sağlamak istersen, beni sponsor olmayı düşün:
     - [![Sponsor Ol](https://img.shields.io/badge/Sponsor-💖-brightgreen)](https://github.com/sponsors/Cyber-Syntax)
-
-## **🤝 Katkı Sağlama**
-
-- Bu proje benim için öncelikle bir öğrenme kaynağıdır, ancak geri bildirim veya önerilerden memnuniyet duyarım! Tüm katkıları entegre etmeyi veya sürekli olarak katılım sağlamayı vaat edemem, ancak proje hedeflerine uygun iyileştirmelere ve fikirlere açığım.
-- Yine de, daha ayrıntılı bir açıklama için lütfen [CONTRIBUTING.tr.md](.github/CONTRIBUTING.tr.md) dosyasına göz atın.
-
-# **📝 Lisans**
-
-Bu script, [GPL 3.0 Lisansı](https://www.gnu.org/licenses/gpl-3.0.en.html) altında lisanslanmıştır. Lisansın bir kopyasını [LICENSE](https://github.com/Cyber-Syntax/my-unicorn/blob/main/LICENSE) dosyasından veya [www.gnu.org](https://www.gnu.org/licenses/gpl-3.0.en.html) adresinden bulabilirsiniz.

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from my_unicorn.commands.config import ConfigHandler
+from my_unicorn.cli.commands.config import ConfigHandler
 
 
 @pytest.fixture
@@ -24,16 +24,12 @@ def mock_config_manager():
             called["converted"] = self.converted
             return self.converted
 
-    class DummyDirectoryManager:
+    class DummyConfigManager:
         def __init__(self):
             from pathlib import Path
 
-            self.settings_file = Path("/tmp/dummy_settings.conf")
-
-    class DummyConfigManager:
-        def __init__(self):
             self.global_config_manager = DummyGlobalConfigManager()
-            self.directory_manager = DummyDirectoryManager()
+            self.settings_file = Path("/tmp/dummy_settings.conf")
             called["saved"] = False
 
         def load_global_config(self):
@@ -66,25 +62,25 @@ def handler(mock_config_manager):
 
 
 @pytest.mark.asyncio
-async def test_execute_show(monkeypatch, handler, capsys):
+async def test_execute_show(monkeypatch, handler, mocker):
     h, _ = handler
+    mock_logger = mocker.patch("my_unicorn.cli.commands.config.logger")
     args = Namespace(show=True, reset=False)
 
     await h.execute(args)
 
-    captured = capsys.readouterr()
-    assert "📋 Current Configuration:" in captured.out
-    assert "Config Version: 1.0" in captured.out
-    assert "Max Downloads: 5" in captured.out
-
-    assert "Log Level: INFO" in captured.out
-    assert "/tmp/storage" in captured.out
-    assert "/tmp/download" in captured.out
+    mock_logger.info.assert_any_call("📋 Current Configuration:")
+    mock_logger.info.assert_any_call("  Config Version: %s", "1.0")
+    mock_logger.info.assert_any_call("  Max Downloads: %s", 5)
+    mock_logger.info.assert_any_call("  Log Level: %s", "INFO")
+    mock_logger.info.assert_any_call("  Storage Dir: %s", "/tmp/storage")
+    mock_logger.info.assert_any_call("  Download Dir: %s", "/tmp/download")
 
 
 @pytest.mark.asyncio
-async def test_execute_reset(monkeypatch, handler, capsys):
+async def test_execute_reset(monkeypatch, handler, mocker):
     h, called = handler
+    mock_logger = mocker.patch("my_unicorn.cli.commands.config.logger")
     args = Namespace(show=False, reset=True)
 
     # Mock file operations using monkeypatch
@@ -100,18 +96,17 @@ async def test_execute_reset(monkeypatch, handler, capsys):
 
     await h.execute(args)
 
-    captured = capsys.readouterr()
-    assert "✅ Configuration reset to defaults" in captured.out
+    mock_logger.info.assert_any_call("✅ Configuration reset to defaults")
     assert called["file_deleted"] is True
 
 
 @pytest.mark.asyncio
-async def test_execute_no_flags(handler, capsys):
+async def test_execute_no_flags(handler, mocker):
     h, called = handler
+    mock_logger = mocker.patch("my_unicorn.cli.commands.config.logger")
     args = Namespace(show=False, reset=False)
 
-    # Should not raise or print anything
+    # Should not raise or log anything
     await h.execute(args)
-    captured = capsys.readouterr()
-    assert captured.out == ""
+    mock_logger.info.assert_not_called()
     assert "saved" not in called or called["saved"] is False

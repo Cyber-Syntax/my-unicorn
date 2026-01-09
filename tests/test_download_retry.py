@@ -14,8 +14,8 @@ from unittest.mock import AsyncMock, Mock
 import aiohttp
 import pytest
 
-from my_unicorn.download import DownloadService
-from my_unicorn.progress import ProgressType
+from my_unicorn.infrastructure.download import DownloadService
+from my_unicorn.ui.progress import ProgressType
 
 # Test constants
 DEFAULT_RETRY_ATTEMPTS = 3
@@ -50,7 +50,7 @@ def mock_config(monkeypatch):
         return mock_config_data
 
     monkeypatch.setattr(
-        "my_unicorn.download.config_manager.load_global_config",
+        "my_unicorn.infrastructure.download.config_manager.load_global_config",
         mock_load_global_config,
     )
     return mock_config_data
@@ -99,7 +99,7 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download
-        await download_service.download_file(url, dest, show_progress=False)
+        await download_service.download_file(url, dest)
 
         # Verify file was created
         assert dest.exists()
@@ -151,7 +151,7 @@ class TestDownloadRetryLogic:
         ]
 
         # Execute download (should retry and succeed)
-        await download_service.download_file(url, dest, show_progress=False)
+        await download_service.download_file(url, dest)
 
         # Verify session.get was called twice (1 failure + 1 success)
         call_count_expected = 2
@@ -183,10 +183,10 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail after retries)
-        with pytest.raises(aiohttp.ClientError):
-            await download_service.download_file(
-                url, dest, show_progress=False
-            )
+        from my_unicorn.infrastructure.download import DownloadError
+
+        with pytest.raises(DownloadError):
+            await download_service.download_file(url, dest)
 
         # Verify partial file was cleaned up
         assert not dest.exists()
@@ -213,10 +213,10 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail after all retries)
-        with pytest.raises(aiohttp.ClientError):
-            await download_service.download_file(
-                url, dest, show_progress=False
-            )
+        from my_unicorn.infrastructure.download import DownloadError
+
+        with pytest.raises(DownloadError):
+            await download_service.download_file(url, dest)
 
         # Verify session.get was called 3 times (default retry_attempts=3)
         assert mock_session.get.call_count == DEFAULT_RETRY_ATTEMPTS
@@ -254,10 +254,10 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail after retries)
-        with pytest.raises(aiohttp.ClientError):
-            await download_service.download_file(
-                url, dest, show_progress=False
-            )
+        from my_unicorn.infrastructure.download import DownloadError
+
+        with pytest.raises(DownloadError):
+            await download_service.download_file(url, dest)
 
         # Verify exponential backoff: 2^1=2, 2^2=4
         # (no sleep after final attempt)
@@ -285,10 +285,10 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail after retries)
-        with pytest.raises(TimeoutError):
-            await download_service.download_file(
-                url, dest, show_progress=False
-            )
+        from my_unicorn.infrastructure.download import DownloadError
+
+        with pytest.raises(DownloadError):
+            await download_service.download_file(url, dest)
 
         # Verify retry attempts were made
         assert mock_session.get.call_count == DEFAULT_RETRY_ATTEMPTS
@@ -310,10 +310,10 @@ class TestDownloadRetryLogic:
         )
 
         # Execute download (should fail after retries)
-        with pytest.raises(aiohttp.ClientError):
-            await download_service.download_file(
-                url, dest, show_progress=False
-            )
+        from my_unicorn.infrastructure.download import DownloadError
+
+        with pytest.raises(DownloadError):
+            await download_service.download_file(url, dest)
 
         # Verify retry attempts were made
         assert mock_session.get.call_count == DEFAULT_RETRY_ATTEMPTS
@@ -339,10 +339,10 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail after retries)
-        with pytest.raises(aiohttp.ClientError):
-            await download_service.download_file(
-                url, dest, show_progress=False
-            )
+        from my_unicorn.infrastructure.download import DownloadError
+
+        with pytest.raises(DownloadError):
+            await download_service.download_file(url, dest)
 
         # Verify retry attempts were made
         assert mock_session.get.call_count == DEFAULT_RETRY_ATTEMPTS
@@ -394,17 +394,12 @@ class TestDownloadRetryLogic:
 
         # Execute download with progress
         await download_service.download_file(
-            url, dest, show_progress=True, progress_type=ProgressType.DOWNLOAD
+            url, dest, progress_type=ProgressType.DOWNLOAD
         )
 
-        # Verify progress task was created twice (once per attempt)
-        expected_task_calls = 2
-        assert mock_progress_service.add_task.call_count == expected_task_calls
-
-        # Verify progress task was finished twice
-        assert (
-            mock_progress_service.finish_task.call_count == expected_task_calls
-        )
+        # File is too small (< 1MB), so no progress task is created
+        # Progress is only shown for files > 1MB
+        assert mock_progress_service.add_task.call_count == 0
 
         # Verify final file exists and is correct
         assert dest.exists()
@@ -434,10 +429,10 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail immediately)
-        with pytest.raises(ValueError):
-            await download_service.download_file(
-                url, dest, show_progress=False
-            )
+        from my_unicorn.infrastructure.download import DownloadError
+
+        with pytest.raises(DownloadError):
+            await download_service.download_file(url, dest)
 
         # Verify only one attempt was made
         # (no retries for non-retryable errors)
@@ -476,10 +471,10 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail)
-        with pytest.raises(aiohttp.ClientError):
-            await download_service.download_file(
-                url, dest, show_progress=False
-            )
+        from my_unicorn.infrastructure.download import DownloadError
+
+        with pytest.raises(DownloadError):
+            await download_service.download_file(url, dest)
 
         # Verify retry attempts were still made despite cleanup issues
         assert mock_session.get.call_count == DEFAULT_RETRY_ATTEMPTS

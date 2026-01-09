@@ -12,12 +12,14 @@ _my_unicorn() {
         'install:Install AppImages from catalog or URLs'
         'update:Update installed AppImages'
         'upgrade:Upgrade my-unicorn itself'
-        'list:List installed AppImages'
+        'catalog:Browse AppImage catalog'
+        'migrate:Migrate configuration to latest version'
         'remove:Remove installed AppImages'
         'backup:Manage AppImage backups and restore'
-        'cache:Manage release data cache for better performance'
+        'token:Manage GitHub authentication token'
         'auth:Manage GitHub authentication'
         'config:Manage configuration'
+        'cache:Manage release data cache for better performance'
     )
 
     _arguments -C \
@@ -58,11 +60,18 @@ _my_unicorn() {
                         '--help[Show help information]' \
                         '1:app app:_files'
                     ;;
-                list)
+                catalog)
                     _arguments \
-                        '(--available)--available[Show available applications from catalog]' \
+                        '(--installed --available --info)--installed[Show installed AppImages (default)]' \
+                        '(--installed --available --info)--available[Show available applications from catalog with descriptions]' \
+                        '(--installed --available --info)--info[Show detailed information about a specific app]:app name:' \
                         '--help[Show help information]' \
                         '1:app app:_files'
+                    ;;
+                migrate)
+                    _arguments \
+                        '(--force)--force[Force migration even if already up-to-date]' \
+                        '--help[Show help information]'
                     ;;
                 remove)
                     _arguments \
@@ -72,12 +81,11 @@ _my_unicorn() {
                     ;;
                 backup)
                     _arguments \
-                        '(--restore-last --restore-version --list-backups --cleanup --info --migrate)--restore-last[Restore the latest backup version]' \
-                        '(--restore-last --restore-version --list-backups --cleanup --info --migrate)--restore-version[Restore a specific version]:version:' \
-                        '(--restore-last --restore-version --list-backups --cleanup --info --migrate)--list-backups[List available backups for the specified app]' \
-                        '(--restore-last --restore-version --list-backups --cleanup --info --migrate)--cleanup[Clean up old backups according to max_backup setting]' \
-                        '(--restore-last --restore-version --list-backups --cleanup --info --migrate)--info[Show detailed backup information]' \
-                        '(--restore-last --restore-version --list-backups --cleanup --info --migrate)--migrate[Migrate old backup files to new folder-based format]' \
+                        '(--restore-last --restore-version --list-backups --cleanup --info)--restore-last[Restore the latest backup version]' \
+                        '(--restore-last --restore-version --list-backups --cleanup --info)--restore-version[Restore a specific version]:version:' \
+                        '(--restore-last --restore-version --list-backups --cleanup --info)--list-backups[List available backups for the specified app]' \
+                        '(--restore-last --restore-version --list-backups --cleanup --info)--cleanup[Clean up old backups according to max_backup setting]' \
+                        '(--restore-last --restore-version --list-backups --cleanup --info)--info[Show detailed backup information]' \
                         '--help[Show help information]' \
                         '1:app app:_files'
                     ;;
@@ -102,9 +110,7 @@ _my_unicorn() {
                     ;;
                 auth)
                     _arguments \
-                        '(--save-token --remove-token --status)--save-token[Save GitHub authentication token]' \
-                        '(--save-token --remove-token --status)--remove-token[Remove GitHub authentication token]' \
-                        '(--save-token --remove-token --status)--status[Show authentication status]' \
+                        '(--status)--status[Show authentication status]' \
                         '--help[Show help information]' \
                         '1:app app:_files'
                     ;;
@@ -112,6 +118,13 @@ _my_unicorn() {
                     _arguments \
                         '(--show --reset)--show[Show current configuration]' \
                         '(--show --reset)--reset[Reset configuration to defaults]' \
+                        '--help[Show help information]' \
+                        '1:app app:_files'
+                    ;;
+                token)
+                    _arguments \
+                        '(--save --remove)--save[Save GitHub authentication token]' \
+                        '(--save --remove)--remove[Remove GitHub authentication token]' \
                         '--help[Show help information]' \
                         '1:app app:_files'
                     ;;

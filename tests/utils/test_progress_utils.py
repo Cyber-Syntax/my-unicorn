@@ -77,7 +77,6 @@ Tests cover all utility functions for ASCII rendering and data formatting
 including edge cases and boundary conditions.
 """
 
-
 from my_unicorn.utils.progress_utils import (
     GIB,
     KIB,

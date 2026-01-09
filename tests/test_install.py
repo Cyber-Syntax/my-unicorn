@@ -5,9 +5,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from my_unicorn.file_ops import FileOperations
-from my_unicorn.github_client import Asset, Release
-from my_unicorn.install import InstallHandler
+from my_unicorn.infrastructure.github import Asset, Release
+from my_unicorn.workflows.install import InstallHandler
 
 
 class TestInstallHandler:
@@ -31,6 +30,15 @@ class TestInstallHandler:
         config_manager = Mock()
         config_manager.save_app_config = Mock(
             return_value=Path("/config/test.json")
+        )
+        config_manager.load_global_config = Mock(
+            return_value={
+                "directory": {
+                    "icon": "/tmp/icons",
+                    "install": "/tmp/install",
+                    "desktop": "/tmp/desktop",
+                },
+            }
         )
 
         github_client = Mock()
@@ -68,22 +76,12 @@ class TestInstallHandler:
             }
         )
 
-        icon_service = Mock()
-        icon_service.acquire_icon = AsyncMock(
-            return_value=Mock(
-                icon_path=Path("/icons/test.png"),
-                source="extracted",
-                config={},
-            )
-        )
-
         return {
             "download_service": download_service,
             "storage_service": storage_service,
             "config_manager": config_manager,
             "github_client": github_client,
             "catalog_manager": catalog_manager,
-            "icon_service": icon_service,
         }
 
     @pytest.fixture
@@ -97,7 +95,7 @@ class TestInstallHandler:
     ):
         """Test successful installation from catalog."""
         with patch(
-            "my_unicorn.install.VerificationService"
+            "my_unicorn.workflows.install.VerificationService"
         ) as mock_verification:
             from dataclasses import dataclass
 
@@ -106,16 +104,20 @@ class TestInstallHandler:
                 passed: bool
                 methods: dict
                 updated_config: dict
+                warning: str | None = None
 
             mock_verification.return_value.verify_file = AsyncMock(
                 return_value=MockVerificationResult(
                     passed=True,
                     methods={"sha256": "abc123"},
                     updated_config={},
+                    warning=None,
                 )
             )
 
-            with patch("my_unicorn.install.DesktopEntry") as mock_desktop:
+            with patch(
+                "my_unicorn.workflows.appimage_setup.DesktopEntry"
+            ) as mock_desktop:
                 mock_desktop.return_value.create = Mock(
                     return_value=Path("/desktop/test.desktop")
                 )
@@ -145,7 +147,7 @@ class TestInstallHandler:
     ):
         """Test installing multiple apps concurrently."""
         with patch(
-            "my_unicorn.install.VerificationService"
+            "my_unicorn.workflows.install.VerificationService"
         ) as mock_verification:
             from dataclasses import dataclass
 
@@ -154,16 +156,20 @@ class TestInstallHandler:
                 passed: bool
                 methods: dict
                 updated_config: dict
+                warning: str | None = None
 
             mock_verification.return_value.verify_file = AsyncMock(
                 return_value=MockVerificationResult(
                     passed=True,
                     methods={"sha256": "abc123"},
                     updated_config={},
+                    warning=None,
                 )
             )
 
-            with patch("my_unicorn.install.DesktopEntry") as mock_desktop:
+            with patch(
+                "my_unicorn.workflows.appimage_setup.DesktopEntry"
+            ) as mock_desktop:
                 mock_desktop.return_value.create_desktop_file = Mock(
                     return_value=Path("/desktop/test.desktop")
                 )
@@ -183,7 +189,7 @@ class TestInstallHandler:
     ):
         """Test successful installation from URL."""
         with patch(
-            "my_unicorn.install.VerificationService"
+            "my_unicorn.workflows.install.VerificationService"
         ) as mock_verification:
             from dataclasses import dataclass
 
@@ -192,16 +198,20 @@ class TestInstallHandler:
                 passed: bool
                 methods: dict
                 updated_config: dict
+                warning: str | None = None
 
             mock_verification.return_value.verify_file = AsyncMock(
                 return_value=MockVerificationResult(
                     passed=True,
                     methods={"sha256": "abc123"},
                     updated_config={},
+                    warning=None,
                 )
             )
 
-            with patch("my_unicorn.install.DesktopEntry") as mock_desktop:
+            with patch(
+                "my_unicorn.workflows.appimage_setup.DesktopEntry"
+            ) as mock_desktop:
                 mock_desktop.return_value.create_desktop_file = Mock(
                     return_value=Path("/desktop/test.desktop")
                 )
@@ -229,7 +239,7 @@ class TestInstallHandler:
                 )
 
                 with patch(
-                    "my_unicorn.install.VerificationService"
+                    "my_unicorn.workflows.install.VerificationService"
                 ) as mock_verification:
                     mock_verification.return_value.verify_file = AsyncMock(
                         return_value=Mock(
@@ -311,81 +321,3 @@ class TestInstallHandler:
         )
         assert catalog_needing == ["app1"]
         assert already == []
-
-
-def make_handler_with_storage(install_dir: Path) -> InstallHandler:
-    """Create an InstallHandler using real FileOperations."""
-    storage = FileOperations(install_dir)
-    # Use Mock objects for required services to satisfy type hints
-    download_service = Mock()
-    config_manager = Mock()
-    github_client = Mock()
-    catalog_manager = Mock()
-    icon_service = Mock()
-
-    handler = InstallHandler(
-        download_service=download_service,
-        storage_service=storage,
-        config_manager=config_manager,
-        github_client=github_client,
-        catalog_manager=catalog_manager,
-        icon_service=icon_service,
-    )
-    return handler
-
-
-def test_install_and_rename_adds_appimage_extension(tmp_path: Path):
-    """_install_and_rename should ensure resulting file ends with .AppImage."""
-    install_dir = tmp_path / "install"
-    install_dir.mkdir()
-
-    handler = make_handler_with_storage(install_dir)
-
-    # Simulate a downloaded AppImage asset
-    downloaded = tmp_path / "downloaded-temp.AppImage"
-    downloaded.write_text("content", encoding="utf-8")
-
-    app_config = {"appimage": {"rename": "mycoolapp"}}
-
-    result_path = handler._install_and_rename(
-        downloaded, "mycoolapp", app_config
-    )
-
-    # File should have .AppImage with correct casing
-    assert result_path.name == "mycoolapp.AppImage"
-    assert result_path.exists()
-    assert result_path.read_text(encoding="utf-8") == "content"
-
-
-def test_install_and_rename_normalizes_existing_extensions(tmp_path: Path):
-    """Normalize provided extensions to canonical form.
-
-    Ensure rename values with any casing or extension normalize to
-    '.AppImage'.
-    """
-    install_dir = tmp_path / "install2"
-    install_dir.mkdir()
-
-    handler = make_handler_with_storage(install_dir)
-
-    downloaded = tmp_path / "some-download.AppImage"
-    downloaded.write_text("x", encoding="utf-8")
-
-    # Provided rename has a lowercase extension
-    app_config_lower = {"appimage": {"rename": "NeatApp.appimage"}}
-    result_lower = handler._install_and_rename(
-        downloaded, "NeatApp", app_config_lower
-    )
-    assert result_lower.name == "NeatApp.AppImage"
-    assert result_lower.exists()
-
-    # Now try with an uppercase extension already present
-    # Create another downloaded file to avoid reuse
-    downloaded2 = tmp_path / "some-download-2.AppImage"
-    downloaded2.write_text("y", encoding="utf-8")
-    app_config_upper = {"appimage": {"rename": "NeatApp.AppImage"}}
-    result_upper = handler._install_and_rename(
-        downloaded2, "NeatApp", app_config_upper
-    )
-    assert result_upper.name == "NeatApp.AppImage"
-    assert result_upper.exists()

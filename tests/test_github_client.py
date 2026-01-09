@@ -7,7 +7,7 @@ import aiohttp
 import pytest
 import pytest_asyncio
 
-from my_unicorn.github_client import (
+from my_unicorn.infrastructure.github import (
     Asset,
     AssetSelector,
     ChecksumFileInfo,
@@ -44,7 +44,7 @@ def mock_config(monkeypatch):
         return mock_config_data
 
     monkeypatch.setattr(
-        "my_unicorn.github_client.config_manager.load_global_config",
+        "my_unicorn.config.config_manager.load_global_config",
         mock_load_global_config,
     )
     return mock_config_data
@@ -568,19 +568,6 @@ async def test_fetch_latest_release_malformed_response(mock_session):
     # Should raise AttributeError when trying to call .get() on non-dict
     with pytest.raises(AttributeError):
         await fetcher.fetch_latest_release()
-
-
-def test_build_icon_url_and_extract_icon_filename():
-    """Test build_icon_url and extract_icon_filename."""
-    icon_url = ReleaseFetcher.build_icon_url(
-        "Cyber-Syntax", "my-unicorn", "icon.png"
-    )
-    assert (
-        icon_url
-        == "https://raw.githubusercontent.com/Cyber-Syntax/my-unicorn/main/icon.png"
-    )
-    filename = ReleaseFetcher.extract_icon_filename(icon_url, "my-unicorn")
-    assert filename == "my-unicorn.png"
 
 
 @pytest.mark.asyncio

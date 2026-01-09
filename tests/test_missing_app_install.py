@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from my_unicorn.github_client import Asset, Release
-from my_unicorn.install import InstallHandler
+from my_unicorn.infrastructure.github import Asset, Release
+from my_unicorn.workflows.install import InstallHandler
 
 
 class TestMissingAppImageInstall:
@@ -185,22 +185,73 @@ class TestMissingAppImageInstall:
         def get_app_config_side_effect(app_name: str) -> dict:
             configs = {
                 "app1": {
-                    "name": "app1",
-                    "owner": "owner1",
-                    "repo": "repo1",
-                    "appimage": {"rename": "app1"},
+                    "config_version": "2.0.0",
+                    "metadata": {
+                        "name": "app1",
+                        "display_name": "App1",
+                        "description": "",
+                    },
+                    "source": {
+                        "type": "github",
+                        "owner": "owner1",
+                        "repo": "repo1",
+                        "prerelease": False,
+                    },
+                    "appimage": {
+                        "naming": {
+                            "template": "",
+                            "target_name": "",
+                            "architectures": [],
+                        }
+                    },
+                    "verification": {"method": "skip"},
+                    "icon": {"method": "extraction", "filename": ""},
                 },
                 "app2": {
-                    "name": "app2",
-                    "owner": "owner2",
-                    "repo": "repo2",
-                    "appimage": {"rename": "app2"},
+                    "config_version": "2.0.0",
+                    "metadata": {
+                        "name": "app2",
+                        "display_name": "App2",
+                        "description": "",
+                    },
+                    "source": {
+                        "type": "github",
+                        "owner": "owner2",
+                        "repo": "repo2",
+                        "prerelease": False,
+                    },
+                    "appimage": {
+                        "naming": {
+                            "template": "",
+                            "target_name": "",
+                            "architectures": [],
+                        }
+                    },
+                    "verification": {"method": "skip"},
+                    "icon": {"method": "extraction", "filename": ""},
                 },
                 "app3": {
-                    "name": "app3",
-                    "owner": "owner3",
-                    "repo": "repo3",
-                    "appimage": {"rename": "app3"},
+                    "config_version": "2.0.0",
+                    "metadata": {
+                        "name": "app3",
+                        "display_name": "App3",
+                        "description": "",
+                    },
+                    "source": {
+                        "type": "github",
+                        "owner": "owner3",
+                        "repo": "repo3",
+                        "prerelease": False,
+                    },
+                    "appimage": {
+                        "naming": {
+                            "template": "",
+                            "target_name": "",
+                            "architectures": [],
+                        }
+                    },
+                    "verification": {"method": "skip"},
+                    "icon": {"method": "extraction", "filename": ""},
                 },
             }
             return configs.get(app_name)
@@ -228,7 +279,7 @@ class TestMissingAppImageInstall:
                     ],
                     original_tag_name="v1.0.0",
                 )
-            elif repo == "repo2":
+            if repo == "repo2":
                 # No assets yet - still building
                 return Release(
                     owner=owner,
@@ -238,23 +289,23 @@ class TestMissingAppImageInstall:
                     assets=[],
                     original_tag_name="v2.0.0",
                 )
-            else:  # repo3
-                # Has non-AppImage assets only
-                return Release(
-                    owner=owner,
-                    repo=repo,
-                    version="v3.0.0",
-                    prerelease=False,
-                    assets=[
-                        Asset(
-                            name="checksums.txt",
-                            size=1024,
-                            browser_download_url="https://example.com/checksums.txt",
-                            digest=None,
-                        )
-                    ],
-                    original_tag_name="v3.0.0",
-                )
+            # repo3
+            # Has non-AppImage assets only
+            return Release(
+                owner=owner,
+                repo=repo,
+                version="v3.0.0",
+                prerelease=False,
+                assets=[
+                    Asset(
+                        name="checksums.txt",
+                        size=1024,
+                        browser_download_url="https://example.com/checksums.txt",
+                        digest=None,
+                    )
+                ],
+                original_tag_name="v3.0.0",
+            )
 
         with (
             patch.object(

@@ -1,4 +1,4 @@
-from my_unicorn.utils.install_display import print_install_summary
+from my_unicorn.ui.display_install import print_install_summary
 
 
 def test_print_installation_summary_all_already_installed(capsys):

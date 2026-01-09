@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from my_unicorn.desktop_entry import (
+from my_unicorn.infrastructure.desktop_entry import (
     DesktopEntry,
     create_desktop_entry_for_app,
     remove_desktop_entry_for_app,

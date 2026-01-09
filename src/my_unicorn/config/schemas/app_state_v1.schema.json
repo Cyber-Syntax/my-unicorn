@@ -1,0 +1,190 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/Cyber-Syntax/my-unicorn/schemas/app_state_v1.schema.json",
+    "title": "My Unicorn App State Configuration v1",
+    "description": "JSON Schema for v1 app state configuration files (~/.config/my-unicorn/apps/*.json)",
+    "type": "object",
+    "required": [
+        "config_version",
+        "source",
+        "owner",
+        "repo",
+        "appimage",
+        "github",
+        "verification",
+        "icon"
+    ],
+    "properties": {
+        "config_version": {
+            "type": "string",
+            "const": "1.0.0",
+            "description": "Configuration version (must be 1.0.0 for v1 format)"
+        },
+        "source": {
+            "type": "string",
+            "enum": [
+                "catalog",
+                "url"
+            ],
+            "description": "Source of the app installation (catalog or URL)"
+        },
+        "owner": {
+            "type": "string",
+            "description": "GitHub repository owner/organization",
+            "minLength": 1
+        },
+        "repo": {
+            "type": "string",
+            "description": "GitHub repository name",
+            "minLength": 1
+        },
+        "installed_path": {
+            "type": "string",
+            "description": "Path where AppImage is installed"
+        },
+        "appimage": {
+            "type": "object",
+            "required": [
+                "version",
+                "name",
+                "rename",
+                "name_template",
+                "characteristic_suffix",
+                "installed_date",
+                "digest"
+            ],
+            "properties": {
+                "version": {
+                    "type": "string",
+                    "description": "Installed version",
+                    "minLength": 1
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Actual AppImage filename",
+                    "minLength": 1
+                },
+                "rename": {
+                    "type": "string",
+                    "description": "Target name for the AppImage",
+                    "minLength": 1
+                },
+                "name_template": {
+                    "type": "string",
+                    "description": "Template for AppImage filename"
+                },
+                "characteristic_suffix": {
+                    "type": "array",
+                    "description": "Architecture or variant suffixes",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "installed_date": {
+                    "type": "string",
+                    "description": "ISO 8601 formatted installation date",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}"
+                },
+                "digest": {
+                    "type": "string",
+                    "description": "Hash digest of installed AppImage (format: algorithm:hash)",
+                    "pattern": "^(sha256|sha512):[a-f0-9]{64,128}$"
+                }
+            },
+            "additionalProperties": false
+        },
+        "github": {
+            "type": "object",
+            "required": [
+                "repo",
+                "prerelease"
+            ],
+            "properties": {
+                "repo": {
+                    "type": "boolean",
+                    "description": "Whether this is a GitHub repository release"
+                },
+                "prerelease": {
+                    "type": "boolean",
+                    "description": "Whether to include pre-release versions"
+                }
+            },
+            "additionalProperties": false
+        },
+        "verification": {
+            "type": "object",
+            "required": [
+                "digest",
+                "skip",
+                "checksum_file",
+                "checksum_hash_type"
+            ],
+            "properties": {
+                "digest": {
+                    "type": "boolean",
+                    "description": "Whether to verify using GitHub API provided digest"
+                },
+                "skip": {
+                    "type": "boolean",
+                    "description": "Whether to skip verification entirely"
+                },
+                "checksum_file": {
+                    "type": "string",
+                    "description": "Filename of checksum file (empty string if not used)"
+                },
+                "checksum_hash_type": {
+                    "type": "string",
+                    "enum": [
+                        "sha256",
+                        "sha512"
+                    ],
+                    "description": "Hash algorithm for checksum verification"
+                }
+            },
+            "additionalProperties": false
+        },
+        "icon": {
+            "type": "object",
+            "required": [
+                "name",
+                "installed"
+            ],
+            "properties": {
+                "extraction": {
+                    "type": "boolean",
+                    "description": "Whether icon was extracted from AppImage"
+                },
+                "url": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "URL icon was downloaded from (null if extracted)"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Filename for the icon",
+                    "minLength": 1
+                },
+                "source": {
+                    "type": "string",
+                    "enum": [
+                        "extraction",
+                        "download"
+                    ],
+                    "description": "Source of the icon"
+                },
+                "installed": {
+                    "type": "boolean",
+                    "description": "Whether icon is installed"
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Path to installed icon file"
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false
+}
