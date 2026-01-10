@@ -5,121 +5,100 @@ command verb and the `UpgradeHandler` import.
 """
 
 from argparse import Namespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from my_unicorn.infrastructure.auth import GitHubAuthManager
 from my_unicorn.cli.commands.upgrade import UpgradeHandler
-from my_unicorn.config import ConfigManager
-from my_unicorn.workflows.update import UpdateManager
 
 
 @pytest.mark.asyncio
-async def test_execute_check_only_update_available(mocker) -> None:
-    config_manager = ConfigManager()
-    auth_manager = GitHubAuthManager()
-    update_manager = UpdateManager(config_manager)
-    handler = UpgradeHandler(config_manager, auth_manager, update_manager)
-    mocker.patch(
-        "my_unicorn.cli.commands.upgrade.check_for_self_update",
-        new=AsyncMock(return_value=True),
-    )
-    mock_logger = mocker.patch("my_unicorn.cli.commands.upgrade.logger")
-    args = Namespace(check_only=True)
-    await handler.execute(args)
-    mock_logger.info.assert_any_call("🔍 Checking for my-unicorn upgrade...")
-    mock_logger.info.assert_any_call("")
-    mock_logger.info.assert_any_call(
-        "Run 'my-unicorn upgrade' to install the upgrade."
-    )
+async def test_execute_perform_update_success() -> None:
+    """Upgrade runs when a newer version is available."""
+    handler = UpgradeHandler()
+    with (
+        patch(
+            "my_unicorn.cli.commands.upgrade.perform_self_update"
+        ) as mock_perform,
+        patch(
+            "my_unicorn.cli.commands.upgrade.should_perform_self_update",
+            AsyncMock(return_value=(True, "2.0.1")),
+        ) as mock_check,
+    ):
+        mock_perform.return_value = True
+        args = Namespace(check=False)
+        await handler.execute(args)
+        mock_check.assert_called_once()
+        mock_perform.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_execute_check_only_no_update(mocker) -> None:
-    config_manager = ConfigManager()
-    auth_manager = GitHubAuthManager()
-    update_manager = UpdateManager(config_manager)
-    handler = UpgradeHandler(config_manager, auth_manager, update_manager)
-    mocker.patch(
-        "my_unicorn.cli.commands.upgrade.check_for_self_update",
-        new=AsyncMock(return_value=False),
-    )
-    mock_logger = mocker.patch("my_unicorn.cli.commands.upgrade.logger")
-    args = Namespace(check_only=True)
-    await handler.execute(args)
-    mock_logger.info.assert_any_call("✅ my-unicorn is up to date")
+async def test_execute_perform_update_failure() -> None:
+    """Upgrade flow logs failure when exec does not start."""
+    handler = UpgradeHandler()
+    with (
+        patch(
+            "my_unicorn.cli.commands.upgrade.perform_self_update"
+        ) as mock_perform,
+        patch(
+            "my_unicorn.cli.commands.upgrade.should_perform_self_update",
+            AsyncMock(return_value=(True, "2.0.1")),
+        ) as mock_check,
+        patch("my_unicorn.cli.commands.upgrade.logger") as mock_logger,
+    ):
+        mock_perform.return_value = False
+        args = Namespace(check=False)
+        await handler.execute(args)
+        mock_check.assert_called_once()
+        mock_perform.assert_called_once()
+        # Check that the failure message was logged
+        mock_logger.info.assert_any_call(
+            "❌ Upgrade failed. Please try again or update manually."
+        )
 
 
 @pytest.mark.asyncio
-async def test_execute_perform_update_success(mocker) -> None:
-    config_manager = ConfigManager()
-    auth_manager = GitHubAuthManager()
-    update_manager = UpdateManager(config_manager)
-    handler = UpgradeHandler(config_manager, auth_manager, update_manager)
-
-    async def fake_check_for_self_update(refresh_cache: bool = False):
-        return True
-
-    async def fake_perform_self_update(refresh_cache: bool = False):
-        return True
-
-    mocker.patch(
-        "my_unicorn.cli.commands.upgrade.check_for_self_update",
-        side_effect=fake_check_for_self_update,
-    )
-    mocker.patch(
-        "my_unicorn.cli.commands.upgrade.perform_self_update",
-        side_effect=fake_perform_self_update,
-    )
-    mock_logger = mocker.patch("my_unicorn.cli.commands.upgrade.logger")
-    args = Namespace(check_only=False)
-    await handler.execute(args)
-    mock_logger.info.assert_any_call("")
-    mock_logger.info.assert_any_call("🚀 Starting upgrade...")
-    mock_logger.info.assert_any_call("✅ Upgrade completed successfully!")
+async def test_execute_skips_when_latest() -> None:
+    """Upgrade is skipped when already on the latest release."""
+    handler = UpgradeHandler()
+    with (
+        patch(
+            "my_unicorn.cli.commands.upgrade.should_perform_self_update",
+            AsyncMock(return_value=(False, "2.0.0")),
+        ) as mock_check,
+        patch(
+            "my_unicorn.cli.commands.upgrade.perform_self_update"
+        ) as mock_perform,
+        patch("my_unicorn.cli.commands.upgrade.logger") as mock_logger,
+    ):
+        args = Namespace(check=False)
+        await handler.execute(args)
+        mock_check.assert_called_once()
+        mock_perform.assert_not_called()
+        mock_logger.info.assert_any_call(
+            "✨ You are already running the latest my-unicorn (%s).",
+            "2.0.0",
+        )
 
 
 @pytest.mark.asyncio
-async def test_execute_perform_update_no_update(mocker) -> None:
-    config_manager = ConfigManager()
-    auth_manager = GitHubAuthManager()
-    update_manager = UpdateManager(config_manager)
-    handler = UpgradeHandler(config_manager, auth_manager, update_manager)
-    mocker.patch(
-        "my_unicorn.cli.commands.upgrade.check_for_self_update",
-        new=AsyncMock(return_value=False),
-    )
-    mock_logger = mocker.patch("my_unicorn.cli.commands.upgrade.logger")
-    args = Namespace(check_only=False)
-    await handler.execute(args)
-    mock_logger.info.assert_any_call("✅ my-unicorn is already up to date")
-
-
-@pytest.mark.asyncio
-async def test_execute_perform_update_failure(mocker) -> None:
-    config_manager = ConfigManager()
-    auth_manager = GitHubAuthManager()
-    update_manager = UpdateManager(config_manager)
-    handler = UpgradeHandler(config_manager, auth_manager, update_manager)
-
-    async def fake_check_for_self_update(refresh_cache: bool = False):
-        return True
-
-    async def fake_perform_self_update(refresh_cache: bool = False):
-        return False
-
-    mocker.patch(
-        "my_unicorn.cli.commands.upgrade.check_for_self_update",
-        side_effect=fake_check_for_self_update,
-    )
-    mocker.patch(
-        "my_unicorn.cli.commands.upgrade.perform_self_update",
-        side_effect=fake_perform_self_update,
-    )
-    mock_logger = mocker.patch("my_unicorn.cli.commands.upgrade.logger")
-    args = Namespace(check_only=False)
-    await handler.execute(args)
-    mock_logger.info.assert_any_call(
-        "❌ Upgrade failed. Please try again or update manually."
-    )
+async def test_execute_check_version() -> None:
+    """Check version displays current and latest versions."""
+    handler = UpgradeHandler()
+    with (
+        patch(
+            "my_unicorn.cli.commands.upgrade.should_perform_self_update",
+            AsyncMock(return_value=(True, "2.0.1")),
+        ) as mock_check,
+        patch("my_unicorn.cli.commands.upgrade.logger") as mock_logger,
+        patch("my_unicorn.cli.commands.upgrade.__version__", "2.0.0"),
+    ):
+        args = Namespace(check=True)
+        await handler.execute(args)
+        mock_check.assert_called_once()
+        mock_logger.info.assert_any_call(
+            "Current: %s, Latest: %s",
+            "2.0.0",
+            "2.0.1",
+        )
+        mock_logger.info.assert_any_call("✅ A newer version is available!")

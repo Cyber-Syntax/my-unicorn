@@ -14,15 +14,16 @@ not copied to a package_dir like the old setup.sh method.
 """
 
 import contextlib
-from unittest.mock import AsyncMock, MagicMock, patch
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from my_unicorn.cli.upgrade import SelfUpdater
+from my_unicorn.cli.upgrade import perform_self_update
 
 
 @pytest.fixture
-def temp_install_dirs(tmp_path):
+def temp_install_dirs(tmp_path: Path) -> dict[str, Path]:
     """Create temporary directory structure for testing.
 
     Args:
@@ -52,9 +53,12 @@ def temp_install_dirs(tmp_path):
     }
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
-async def test_upgrade_version_progression(temp_install_dirs):
-    """Verify upgrade executes uv tool upgrade command.
+async def test_upgrade_version_progression(
+    temp_install_dirs: dict[str, Path],
+) -> None:
+    """Verify upgrade executes uv tool install --upgrade command.
 
     This test ensures that the upgrade process calls the correct uv command.
 
@@ -64,36 +68,33 @@ async def test_upgrade_version_progression(temp_install_dirs):
     """
     with (
         patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp,
+        patch("my_unicorn.cli.upgrade.shutil.which", return_value="uv"),
     ):
         mock_execvp.side_effect = SystemExit(0)
 
-        # Create updater instance
-        config_manager = MagicMock()
-        config_manager.load_global_config.return_value = {
-            "directory": {
-                "repo": temp_install_dirs["repo"],
-                "package": temp_install_dirs["package"],
-            }
-        }
-
-        session = MagicMock()
-        session.close = AsyncMock()
-        updater = SelfUpdater(config_manager, session)
-
         # Run the upgrade
         with contextlib.suppress(SystemExit):
-            await updater.perform_update()
+            perform_self_update()
 
         # Verify os.execvp was called with correct arguments
         mock_execvp.assert_called_once_with(
             "uv",
-            ["uv", "tool", "upgrade", "my-unicorn"],
+            [
+                "uv",
+                "tool",
+                "install",
+                "--upgrade",
+                "git+https://github.com/Cyber-Syntax/my-unicorn",
+            ],
         )
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
-async def test_upgrade_clones_to_correct_directory(temp_install_dirs):
-    """Verify upgrade executes uv tool upgrade command.
+async def test_upgrade_clones_to_correct_directory(
+    temp_install_dirs: dict[str, Path],
+) -> None:
+    """Verify upgrade executes uv tool install --upgrade command.
 
     Args:
         temp_install_dirs: Temporary directory fixture
@@ -101,35 +102,33 @@ async def test_upgrade_clones_to_correct_directory(temp_install_dirs):
     """
     with (
         patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp,
+        patch("my_unicorn.cli.upgrade.shutil.which", return_value="uv"),
     ):
         mock_execvp.side_effect = SystemExit(0)
 
-        config_manager = MagicMock()
-        config_manager.load_global_config.return_value = {
-            "directory": {
-                "repo": temp_install_dirs["repo"],
-                "package": temp_install_dirs["package"],
-            }
-        }
-
-        session = MagicMock()
-        session.close = AsyncMock()
-        updater = SelfUpdater(config_manager, session)
-
         # Run the upgrade
         with contextlib.suppress(SystemExit):
-            await updater.perform_update()
+            perform_self_update()
 
         # Verify os.execvp was called with correct arguments
         mock_execvp.assert_called_once_with(
             "uv",
-            ["uv", "tool", "upgrade", "my-unicorn"],
+            [
+                "uv",
+                "tool",
+                "install",
+                "--upgrade",
+                "git+https://github.com/Cyber-Syntax/my-unicorn",
+            ],
         )
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
-async def test_upgrade_copies_files_correctly(temp_install_dirs):
-    """Verify upgrade executes uv tool upgrade command.
+async def test_upgrade_copies_files_correctly(
+    temp_install_dirs: dict[str, Path],
+) -> None:
+    """Verify upgrade executes uv tool install --upgrade command.
 
     Args:
         temp_install_dirs: Temporary directory fixture
@@ -137,35 +136,33 @@ async def test_upgrade_copies_files_correctly(temp_install_dirs):
     """
     with (
         patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp,
+        patch("my_unicorn.cli.upgrade.shutil.which", return_value="uv"),
     ):
         mock_execvp.side_effect = SystemExit(0)
 
-        config_manager = MagicMock()
-        config_manager.load_global_config.return_value = {
-            "directory": {
-                "repo": temp_install_dirs["repo"],
-                "package": temp_install_dirs["package"],
-            }
-        }
-
-        session = MagicMock()
-        session.close = AsyncMock()
-        updater = SelfUpdater(config_manager, session)
-
         # Run the upgrade
         with contextlib.suppress(SystemExit):
-            await updater.perform_update()
+            perform_self_update()
 
         # Verify os.execvp was called with correct arguments
         mock_execvp.assert_called_once_with(
             "uv",
-            ["uv", "tool", "upgrade", "my-unicorn"],
+            [
+                "uv",
+                "tool",
+                "install",
+                "--upgrade",
+                "git+https://github.com/Cyber-Syntax/my-unicorn",
+            ],
         )
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
-async def test_installer_finds_required_files(temp_install_dirs):
-    """Verify upgrade executes uv tool upgrade command.
+async def test_installer_finds_required_files(
+    temp_install_dirs: dict[str, Path],
+) -> None:
+    """Verify upgrade executes uv tool install --upgrade command.
 
     Args:
         temp_install_dirs: Temporary directory fixture
@@ -173,27 +170,22 @@ async def test_installer_finds_required_files(temp_install_dirs):
     """
     with (
         patch("my_unicorn.cli.upgrade.os.execvp") as mock_execvp,
+        patch("my_unicorn.cli.upgrade.shutil.which", return_value="uv"),
     ):
         mock_execvp.side_effect = SystemExit(0)
 
-        config_manager = MagicMock()
-        config_manager.load_global_config.return_value = {
-            "directory": {
-                "repo": temp_install_dirs["repo"],
-                "package": temp_install_dirs["package"],
-            }
-        }
-
-        session = MagicMock()
-        session.close = AsyncMock()
-        updater = SelfUpdater(config_manager, session)
-
         # Run the upgrade
         with contextlib.suppress(SystemExit):
-            await updater.perform_update()
+            perform_self_update()
 
         # Verify os.execvp was called with correct arguments
         mock_execvp.assert_called_once_with(
             "uv",
-            ["uv", "tool", "upgrade", "my-unicorn"],
+            [
+                "uv",
+                "tool",
+                "install",
+                "--upgrade",
+                "git+https://github.com/Cyber-Syntax/my-unicorn",
+            ],
         )

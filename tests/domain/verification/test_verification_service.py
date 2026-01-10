@@ -3,12 +3,12 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from my_unicorn.domain.verification.service import (
     VerificationConfig,
     VerificationResult,
     VerificationService,
 )
-
 from my_unicorn.infrastructure.github import Asset, ChecksumFileInfo
 
 # Test data constants
