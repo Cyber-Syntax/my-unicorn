@@ -39,10 +39,74 @@ LEGCORD_EXPECTED_HEX = "24d9980531bd96a5edfd55e67acdf6a6eddb9f3fd868a3337e31552f
 LEGCORD_BASE64_HASH = "JNmYBTG9lqXt/VXmes32pu3bnz/YaKMzfjFVL+0J+S8MSWl7nLmHolmUNLFAubpy1JWTUwEdlPW8UhRNxNiQuw=="
 
 
+from my_unicorn.domain.verification.verifier import (
+    BYTES_PER_UNIT,
+    format_bytes,
+)
+
+
+class TestConstants:
+    """Test verification formatting module constants."""
+
+    def test_bytes_per_unit(self) -> None:
+        """Test bytes per unit constant."""
+        assert BYTES_PER_UNIT == 1024.0
+
+
+class TestFormatBytes:
+    """Test format_bytes function."""
+
+    def test_bytes(self) -> None:
+        """Test formatting bytes."""
+        assert format_bytes(512) == "512.0 B"
+
+    def test_kilobytes(self) -> None:
+        """Test formatting kilobytes."""
+        result = format_bytes(1536)
+        assert "KB" in result
+
+    def test_megabytes(self) -> None:
+        """Test formatting megabytes."""
+        result = format_bytes(5 * 1024 * 1024)
+        assert "MB" in result
+
+    def test_gigabytes(self) -> None:
+        """Test formatting gigabytes."""
+        result = format_bytes(3 * 1024 * 1024 * 1024)
+        assert "GB" in result
+
+    def test_terabytes(self) -> None:
+        """Test formatting terabytes."""
+        result = format_bytes(2 * 1024 * 1024 * 1024 * 1024)
+        assert "TB" in result
+
+    def test_petabytes(self) -> None:
+        """Test formatting petabytes."""
+        result = format_bytes(1024 * 1024 * 1024 * 1024 * 1024)
+        assert "PB" in result
+
+    def test_zero_bytes(self) -> None:
+        """Test zero bytes."""
+        assert format_bytes(0) == "0.0 B"
+
+    def test_fractional_size(self) -> None:
+        """Test fractional size."""
+        result = format_bytes(1536.5)
+        assert "1.5 KB" in result
+
+    def test_format_bytes_very_large(self) -> None:
+        """Test formatting very large byte values."""
+        huge_size = 10 * 1024**5
+        result = format_bytes(huge_size)
+        assert "PB" in result
+
+
 @pytest.fixture
 def patch_logger():
     """Patch get_logger to avoid real logging output."""
-    with patch("my_unicorn.domain.verification.verifier.get_logger") as mock_logger:
+    with patch(
+        "my_unicorn.domain.verification.verifier.get_logger"
+    ) as mock_logger:
         yield mock_logger
 
 

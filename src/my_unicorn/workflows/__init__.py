@@ -10,7 +10,6 @@ This module provides the main workflow orchestrators:
 Each workflow provides a `create_default()` factory method for simplified instantiation.
 """
 
-from my_unicorn.cli.upgrade import SelfUpdater
 from my_unicorn.workflows.backup import BackupService
 from my_unicorn.workflows.install import InstallHandler
 from my_unicorn.workflows.remove import RemoveService
@@ -20,6 +19,5 @@ __all__ = [
     "BackupService",
     "InstallHandler",
     "RemoveService",
-    "SelfUpdater",
     "UpdateManager",
 ]

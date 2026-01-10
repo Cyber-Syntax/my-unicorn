@@ -61,8 +61,7 @@ Examples:
   %(prog)s update appflowy joplin
   %(prog)s update
 
-      # my-unicorn upgrade and check
-  %(prog)s upgrade --check-only
+      # my-unicorn upgrade
   %(prog)s upgrade
 
   # Other commands
@@ -253,22 +252,15 @@ Examples:
             help="Upgrade my-unicorn cli",
             epilog="""
 Examples:
-  %(prog)s --check-only                 # Check for upgrades only
-  %(prog)s --check-only --refresh-cache # Check for upgrades bypassing cache
-  %(prog)s                              # Upgrade if available
+  %(prog)s  # Upgrade my-unicorn using uv tool install
+  %(prog)s --check  # Check for available updates without upgrading
             """,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
         upgrade_parser.add_argument(
-            "--check-only",
+            "--check",
             action="store_true",
-            help="Only check for upgrades without installing",
-        )
-        upgrade_parser.add_argument(
-            "--refresh-cache",
-            action="store_true",
-            help="Bypass cache and fetch fresh data from GitHub API "
-            "(useful for automated scripts)",
+            help="Check for available updates without performing the upgrade",
         )
 
     def _add_catalog_command(

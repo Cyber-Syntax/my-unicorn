@@ -4,7 +4,9 @@ Pure business logic for selecting appropriate releases based on
 version specifications and requirements.
 """
 
-from my_unicorn.domain.types import Release, Version
+from packaging.version import InvalidVersion, Version
+
+from my_unicorn.domain.types import Release
 
 
 def _parse_version_safe(tag_name: str) -> Version:
@@ -17,10 +19,10 @@ def _parse_version_safe(tag_name: str) -> Version:
         Version object (or minimal Version for invalid input)
     """
     try:
-        return Version.parse(tag_name)
-    except ValueError:
+        return Version(tag_name.lstrip("v"))
+    except InvalidVersion:
         # Return minimal version for unparseable tags
-        return Version(major=0, minor=0, patch=0, prerelease=tag_name)
+        return Version("0.0.0")
 
 
 def select_latest_release(
@@ -97,9 +99,9 @@ def is_newer_version(current: str, candidate: str) -> bool:
         True if candidate is newer than current
     """
     try:
-        current_ver = Version.parse(current)
-        candidate_ver = Version.parse(candidate)
-    except ValueError:
+        current_ver = Version(current.lstrip("v"))
+        candidate_ver = Version(candidate.lstrip("v"))
+    except InvalidVersion:
         # If parsing fails, do string comparison as fallback
         return candidate > current
     else:

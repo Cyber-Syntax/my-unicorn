@@ -94,6 +94,17 @@ uv tool install git+https://github.com/Cyber-Syntax/my-unicorn
 
 ### Updating
 
+> [!NOTE]
+>
+> For UV installations, an additional script `my-unicorn-update` is available in your PATH (e.g., `~/.local/bin/my-unicorn-update`) for updating AppImages. This script is automatically set up during UV installation and can be used in status bars like polybar.
+>
+> Example usage:
+>
+> ```bash
+> my-unicorn-update --check  # Check for AppImage updates
+> my-unicorn-update --help   # Show help for update script
+> ```
+
 To update my-unicorn to the latest version, run:
 
 ```bash

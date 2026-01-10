@@ -68,9 +68,7 @@ class CLIRunner:
             "update": UpdateHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),
-            "upgrade": UpgradeHandler(
-                self.config_manager, self.auth_manager, self.update_manager
-            ),
+            "upgrade": UpgradeHandler(),
             "catalog": CatalogHandler(
                 self.config_manager, self.auth_manager, self.update_manager
             ),

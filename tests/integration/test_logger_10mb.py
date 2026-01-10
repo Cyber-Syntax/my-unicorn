@@ -30,6 +30,7 @@ MAX_LOG_ENTRY_TIME_MS = 5.0  # milliseconds
 MEDIUM_LOG_SIZE_THRESHOLD = 10000  # bytes (10KB)
 
 
+@pytest.mark.slow
 def wait_until(
     predicate: Callable[[], bool],
     timeout: float = 5.0,
@@ -79,6 +80,7 @@ def backup_index(path: Path) -> int:
     return int(path.suffix.lstrip("."))
 
 
+@pytest.mark.slow
 def write_until_rotation(
     logger: logging.Logger,
     approx_entry_size: int = 60,
@@ -94,6 +96,7 @@ def write_until_rotation(
         logger.info("Entry %s padding", i)
 
 
+@pytest.mark.slow
 def create_10mb_log_file(log_file: Path) -> None:
     """Create a realistic 10MB log file.
 
@@ -161,6 +164,7 @@ def test_10mb_log_rotation(tmp_path: Path, logger_name: str) -> None:
     assert new_size < SMALL_LOG_SIZE_THRESHOLD
 
 
+@pytest.mark.slow
 def test_multiple_10mb_rotations(tmp_path: Path, logger_name: str) -> None:
     """Test multiple rotations with 10MB files."""
     log_file = tmp_path / "my-unicorn.log"
@@ -207,6 +211,7 @@ def test_multiple_10mb_rotations(tmp_path: Path, logger_name: str) -> None:
         assert size >= LOG_ROTATION_THRESHOLD_BYTES * 0.99  # 99% of threshold
 
 
+@pytest.mark.slow
 def test_backup_limit_with_10mb_files(
     tmp_path: Path, logger_name: str
 ) -> None:
@@ -262,6 +267,7 @@ def test_backup_limit_with_10mb_files(
     assert total_backup_size >= expected_min_size
 
 
+@pytest.mark.slow
 def test_logging_performance_after_rotation(
     tmp_path: Path, logger_name: str
 ) -> None:
@@ -301,6 +307,7 @@ def test_logging_performance_after_rotation(
     )
 
 
+@pytest.mark.slow
 def test_full_application_flow_with_10mb(tmp_path: Path) -> None:
     """Test complete application flow with 10MB log rotation."""
     log_file = tmp_path / "my-unicorn.log"
@@ -340,6 +347,7 @@ def test_full_application_flow_with_10mb(tmp_path: Path) -> None:
     assert new_size < MEDIUM_LOG_SIZE_THRESHOLD
 
 
+@pytest.mark.slow
 def test_rotation_preserves_encoding(tmp_path: Path, logger_name: str) -> None:
     """Test that UTF-8 encoding is preserved during rotation."""
     log_file = tmp_path / "my-unicorn.log"
@@ -394,6 +402,7 @@ def test_rotation_preserves_encoding(tmp_path: Path, logger_name: str) -> None:
     assert "🦄" in new_content
 
 
+@pytest.mark.slow
 def test_concurrent_logger_instances_with_rotation(tmp_path: Path) -> None:
     """Test multiple logger instances with rotation."""
     log_file = tmp_path / "my-unicorn.log"

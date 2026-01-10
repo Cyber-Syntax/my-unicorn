@@ -10,6 +10,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, TypedDict
 
+from my_unicorn.utils.asset_validation import (
+    is_appimage_file,
+    is_checksum_file,
+)
+
 
 class Platform(Enum):
     """Supported platforms."""
@@ -57,24 +62,19 @@ class Asset:
 
     @property
     def is_appimage(self) -> bool:
-        """Check if asset is an AppImage."""
-        name_lower = self.name.lower()
-        return name_lower.endswith(".appimage") or ".appimage." in name_lower
+        """Check if asset is an AppImage.
+
+        Delegates to shared utility function for consistency across codebase.
+        """
+        return is_appimage_file(self.name)
 
     @property
     def is_checksum_file(self) -> bool:
-        """Check if asset is a checksum file."""
-        name_lower = self.name.lower()
-        return any(
-            ext in name_lower
-            for ext in [
-                ".sha256",
-                ".sha512",
-                "sha256sum",
-                "sha512sum",
-                "checksums",
-            ]
-        )
+        """Check if asset is a checksum file.
+
+        Delegates to shared utility function for consistency across codebase.
+        """
+        return is_checksum_file(self.name)
 
 
 @dataclass(frozen=True)
@@ -92,113 +92,6 @@ class Release:
         """Extract version from tag name."""
         # Remove 'v' prefix if present
         return self.tag_name.lstrip("v")
-
-
-@dataclass(frozen=True)
-class Version:
-    """Semantic version with comparison support."""
-
-    major: int
-    minor: int
-    patch: int
-    prerelease: str = ""
-
-    @classmethod
-    def parse(cls, version_string: str) -> "Version":
-        """Parse version string into Version object.
-
-        Args:
-            version_string: Version string (e.g., "1.2.3", "v1.2.3-beta")
-
-        Returns:
-            Version object
-
-        Raises:
-            ValueError: If version string is invalid
-        """
-        # Remove 'v' prefix
-        clean = version_string.lstrip("v")
-
-        # Split prerelease
-        if "-" in clean:
-            version_part, prerelease = clean.split("-", 1)
-        else:
-            version_part = clean
-            prerelease = ""
-
-        # Parse version parts
-        version_parts_count = 3
-        try:
-            parts = version_part.split(".")
-            if len(parts) != version_parts_count:
-                msg = f"Invalid version format: {version_string}"
-                raise ValueError(msg)
-
-            major, minor, patch = map(int, parts)
-            return cls(
-                major=major, minor=minor, patch=patch, prerelease=prerelease
-            )
-
-        except (ValueError, AttributeError) as e:
-            msg = f"Invalid version format: {version_string}"
-            raise ValueError(msg) from e
-
-    def __str__(self) -> str:
-        """String representation."""
-        version = f"{self.major}.{self.minor}.{self.patch}"
-        if self.prerelease:
-            version += f"-{self.prerelease}"
-        return version
-
-    def __lt__(self, other: "Version") -> bool:
-        """Less than comparison."""
-        if not isinstance(other, Version):
-            return NotImplemented
-
-        # Compare version numbers
-        self_tuple = (self.major, self.minor, self.patch)
-        other_tuple = (other.major, other.minor, other.patch)
-
-        if self_tuple != other_tuple:
-            return self_tuple < other_tuple
-
-        # If versions equal, check prerelease
-        # Stable (no prerelease) > prerelease
-        if not self.prerelease and other.prerelease:
-            return False
-        if self.prerelease and not other.prerelease:
-            return True
-
-        # Both have prerelease, compare alphabetically
-        return self.prerelease < other.prerelease
-
-    def __le__(self, other: "Version") -> bool:
-        """Less than or equal comparison."""
-        return self == other or self < other
-
-    def __gt__(self, other: "Version") -> bool:
-        """Greater than comparison."""
-        return not self <= other
-
-    def __ge__(self, other: "Version") -> bool:
-        """Greater than or equal comparison."""
-        return not self < other
-
-    def __eq__(self, other: object) -> bool:
-        """Equality comparison."""
-        if not isinstance(other, Version):
-            return NotImplemented
-
-        return (
-            self.major == other.major
-            and self.minor == other.minor
-            and self.patch == other.patch
-            and self.prerelease == other.prerelease
-        )
-
-    def __hash__(self) -> int:
-        """Hash method for use in sets and dicts."""
-        return hash((self.major, self.minor, self.patch, self.prerelease))
 
 
 @dataclass(frozen=True)

@@ -206,7 +206,6 @@ class TestSetupAppimageIcon:
         assert result["name"] == "custom_icon.png"
 
 
-@pytest.mark.asyncio
 class TestCreateDesktopEntry:
     """Tests for create_desktop_entry function."""
 

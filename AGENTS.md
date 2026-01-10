@@ -13,16 +13,19 @@
 
 ## Testing Instructions
 
-Critical: Run tests after any change to ensure nothing breaks.
+Critical: Run tests after any change on cli code to ensure nothing breaks.
 
 - Run the full suite (≈995 tests): `uv run pytest`
 - Focused runs:
     - File: `uv run pytest tests/test_backup.py`
-    - Marker filtering: `uv run pytest -m "not slow and not integration"`
+    - Marker filtering: `uv run pytest -m "not slow"` (skips slow tests, keeps fast integration tests)
+    - Full marker filtering: `uv run pytest -m "not slow and not integration"` (skips all integration tests)
     - Single test: `uv run pytest tests/test_backup.py::test_restore_doesnt_delete_restore_target`
 - Coverage examples:
     - `uv run pytest --cov=my_unicorn`
     - `uv run pytest --cov=my_unicorn.commands.migrate tests/migration/test_migrate_command.py`
+
+Note: The `slow` marker is applied to performance-heavy tests (e.g., 10MB log file rotation). Integration tests in `tests/integration/` are marked with `integration` but may not be slow—use `-m "not slow"` for quick runs that include fast integration tests. Skip integration tests entirely if changes don't affect config, upgrade, or cross-component interactions.
 
 ## Code Style Guidelines
 

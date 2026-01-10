@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-01-10
+
+### Added
+
+- Implemented copy_update_script function to copy the update script to a shared location.
+- Integrated the script copying into installation and update processes for UV tool.
+- Added warnings for missing autocomplete helper and update script.
+
+### Changed
+
+- Change upgrade command options from `--check-only` to `--check`.
+- Update bash and zsh autocomplete scripts to reflect new option.
+- Modify update script to remove automatic upgrade handling.
+- Enhance upgrade command to check for updates without installing.
+- Refactor version comparison logic to improve accuracy.
+- Moved asset validation functions to utils/asset_validation.py for better modularity.
+- Consolidated version extraction logic into infrastructure/github/version_utils.py.
+- Updated domain types to use shared utility functions for file type checks.
+- Removed redundant utility functions from utils.py to streamline the codebase.
+- Clarified testing instructions to specify CLI code changes.
+- Added note about the `my-unicorn-update` script for UV installations.
+- Updated installation commands to reflect the correct repository.
+
 ## [2.0.0-alpha] - 2026-01-09
 
 ### Breaking Changes
@@ -688,6 +711,7 @@ Please change your current configuration files to the new format. The new format
 - refactor: improve better error handling on verify.py
 - chore: add copilot instructions
 
+[2.0.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.1-alpha...v2.0.0-alpha
 [1.12.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.1-alpha...v1.12.2-alpha
 [1.12.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.0-alpha...v1.12.1-alpha
 [1.12.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.11.1-alpha...v1.12.0-alpha
