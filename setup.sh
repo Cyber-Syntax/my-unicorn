@@ -135,6 +135,8 @@ install_with_uv_tool() {
     echo "⚠️  Warning: Autocomplete helper not found at $autocomplete_helper"
   fi
 
+  copy_update_script
+
   echo "✅ Installation complete using uv tool."
   echo "Run 'my-unicorn --help' to get started."
 }
@@ -164,6 +166,8 @@ update_with_uv_tool() {
     echo "⚠️  Warning: Autocomplete helper not found at $autocomplete_helper"
   fi
 
+  copy_update_script
+
   echo "✅ Update complete using uv tool."
 }
 
@@ -191,6 +195,8 @@ install_with_uv_editable() {
   else
     echo "⚠️  Warning: Autocomplete helper not found at $autocomplete_helper"
   fi
+
+  copy_update_script
 
   echo "✅ Editable installation complete using uv tool."
   echo "Changes to source code will be reflected immediately."
@@ -248,6 +254,22 @@ setup_autocomplete() {
   else
     echo "❌ Autocomplete helper script not found or not executable"
     return 1
+  fi
+}
+
+# Copy update script to shared location for UV installs
+copy_update_script() {
+  local src_dir
+  src_dir="$(script_dir)"
+  local src_path="$src_dir/scripts/update.bash"
+  local dst_path="$HOME/.local/bin/my-unicorn-update"
+  if [ -f "$src_path" ]; then
+    mkdir -p "$HOME/.local/bin"
+    cp "$src_path" "$dst_path"
+    chmod +x "$dst_path"
+    echo "✅ Update script copied to $dst_path"
+  else
+    echo "⚠️  Warning: Update script not found at $src_path, skipping copy."
   fi
 }
 
