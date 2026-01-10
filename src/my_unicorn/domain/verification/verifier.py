@@ -17,7 +17,6 @@ from my_unicorn.domain.constants import (
     HashType,
 )
 from my_unicorn.logger import get_logger
-from my_unicorn.utils import format_bytes
 
 if TYPE_CHECKING:
     from my_unicorn.infrastructure.download import DownloadService
@@ -34,6 +33,26 @@ except ImportError:
 
 
 logger = get_logger(__name__)
+
+
+BYTES_PER_UNIT = 1024.0
+
+
+def format_bytes(size: float) -> str:
+    """Format byte size in human readable format (e.g., '1.5 MB').
+
+    Args:
+        size: Size in bytes
+
+    Returns:
+        Human-readable size string with appropriate unit
+
+    """
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
+        if size < BYTES_PER_UNIT:
+            return f"{size:.1f} {unit}"
+        size /= BYTES_PER_UNIT
+    return f"{size:.1f} PB"
 
 
 class Verifier:

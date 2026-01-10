@@ -10,6 +10,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, TypedDict
 
+from my_unicorn.utils.asset_validation import (
+    is_appimage_file,
+    is_checksum_file,
+)
+
 
 class Platform(Enum):
     """Supported platforms."""
@@ -57,24 +62,19 @@ class Asset:
 
     @property
     def is_appimage(self) -> bool:
-        """Check if asset is an AppImage."""
-        name_lower = self.name.lower()
-        return name_lower.endswith(".appimage") or ".appimage." in name_lower
+        """Check if asset is an AppImage.
+
+        Delegates to shared utility function for consistency across codebase.
+        """
+        return is_appimage_file(self.name)
 
     @property
     def is_checksum_file(self) -> bool:
-        """Check if asset is a checksum file."""
-        name_lower = self.name.lower()
-        return any(
-            ext in name_lower
-            for ext in [
-                ".sha256",
-                ".sha512",
-                "sha256sum",
-                "sha512sum",
-                "checksums",
-            ]
-        )
+        """Check if asset is a checksum file.
+
+        Delegates to shared utility function for consistency across codebase.
+        """
+        return is_checksum_file(self.name)
 
 
 @dataclass(frozen=True)

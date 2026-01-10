@@ -9,10 +9,12 @@ import re
 from dataclasses import dataclass, replace
 from typing import Any
 
-from my_unicorn.logger import get_logger
-from my_unicorn.utils import (
-    SPECIFIC_CHECKSUM_EXTENSIONS,
+from my_unicorn.infrastructure.github.version_utils import (
     extract_and_validate_version,
+)
+from my_unicorn.logger import get_logger
+from my_unicorn.utils.asset_validation import (
+    SPECIFIC_CHECKSUM_EXTENSIONS,
     get_checksum_file_format_type,
     is_appimage_file,
     is_checksum_file,
