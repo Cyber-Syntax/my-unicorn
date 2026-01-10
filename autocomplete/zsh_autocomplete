@@ -56,7 +56,7 @@ _my_unicorn() {
                     ;;
                 upgrade)
                     _arguments \
-                        '(--check-only)--check-only[Only check for upgrades without installing]' \
+                        '(--check)--check[Only check for upgrades without installing]' \
                         '--help[Show help information]' \
                         '1:app app:_files'
                     ;;

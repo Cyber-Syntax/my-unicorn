@@ -18,7 +18,7 @@ _my_unicorn_completion() {
     # Command-specific options
     local install_opts="--concurrency --no-icon --no-verify --no-desktop --verbose --help"
     local update_opts="--check-only --refresh-cache --verbose --help"
-    local upgrade_opts="--check-only --help"
+    local upgrade_opts="--check --help"
     local catalog_opts="--installed --available --info --help"
     local remove_opts="--keep-config --help"
     local backup_opts="--restore-last --restore-version --list-backups --cleanup --info --help"

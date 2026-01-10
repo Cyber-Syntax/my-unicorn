@@ -5,9 +5,15 @@
 # You need to install the apps first to use this script.
 #
 # Author: Cyber-Syntax
-# License: same as my-unicorn project
+# License: GPL-3.0
 
 set -euo pipefail
+
+polybar_mode=false
+if [[ "${1:-}" == "--polybar" ]]; then
+  polybar_mode=true
+  shift
+fi
 
 UNICORN=~/.local/bin/my-unicorn
 
@@ -17,9 +23,9 @@ if [ ! -x "$UNICORN" ]; then
   exit 127
 fi
 
-# my-unicorn new version check command
+# my-unicorn new version check command (removed - use 'my-unicorn upgrade' manually)
 check_upgrade() {
-  if ! output="$("$UNICORN" upgrade --check-only --refresh-cache 2>&1)"; then
+  if ! output="$("$UNICORN" upgrade --check --refresh-cache 2>&1)"; then
     echo "Error: Failed to check for updates. Possible network issue."
     echo "$output"
     return 1
@@ -45,7 +51,7 @@ notify_cli_upgrade() {
   fi
 }
 
-# Show CLI upgrade status to user and send notification if an upgrade exists
+# Show CLI upgrade status to user and send notification if an upgrade exists (removed)
 show_cli_upgrade() {
   local output
   if ! output=$(check_upgrade); then
@@ -75,10 +81,7 @@ show_cli_upgrade() {
   fi
 }
 
-# Perform CLI upgrade (run the CLI's upgrade command). This may prompt
-# interactively depending on the user's my-unicorn settings; callers that
-# want fully automated behavior should ensure batch mode is enabled in
-# ~/.config/my-unicorn/settings.conf or provide appropriate CLI flags.
+# Perform CLI upgrade (removed - use 'my-unicorn upgrade' manually)
 upgrade_cli() {
   echo "Upgrading my-unicorn CLI..."
   if ! "$UNICORN" upgrade; then
@@ -122,10 +125,14 @@ show_updates() {
   fi
 
   local count
-  count=$(echo "$output" | grep -c '📦 Update available' || true)
+  count=$(echo "$output" | grep -cE '→|([0-9]+\.[0-9]+\.[0-9]+).*([0-9]+\.[0-9]+\.[0-9]+)' || true)
 
   if [ "$count" -eq 0 ]; then
-    echo "Up-to-date"
+    if [ "$polybar_mode" = true ]; then
+      echo ""
+    else
+      echo "Up-to-date"
+    fi
   else
     echo "AppImage Updates: $count"
   fi
@@ -140,10 +147,10 @@ determine_outdated_apps() {
 
   local outdated_apps=()
   while IFS= read -r line; do
-    if [[ $line == *"📦 Update available"* ]]; then
-      # Extract the app name from the line (first field)
+    if echo "$line" | grep -qE '→|([0-9]+\.[0-9]+\.[0-9]+).*([0-9]+\.[0-9]+\.[0-9]+)'; then
+      # Extract the app name from the part before the colon, trimming spaces
       local app_name
-      app_name=$(echo "$line" | awk '{print $1}')
+      app_name=$(echo "$line" | awk -F: '{print $1}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
       outdated_apps+=("$app_name")
     fi
   done <<<"$output"
@@ -201,15 +208,16 @@ help() {
   echo "Usage: $0 [OPTION] [APP_NAMES...]"
   echo ""
   echo "Options:"
+  echo "  --polybar         Enable polybar mode (simplified output for status bars)"
   echo "  --check           Display status of updates (default)"
   echo "  --update-all      Update all of your downloaded AppImages (concurrent)"
   echo "  --update-outdated Update only outdated AppImages (concurrent)"
-  echo "  --check-cli       Check for my-unicorn CLI updates"
-  echo "  --upgrade-cli     Run the my-unicorn CLI upgrade command (may be interactive)"
   echo "  --help, -h        Display this help message"
   echo ""
   echo "Examples:"
   echo "  $0                           # Check for updates"
+  echo "  $0 --polybar                 # Check for updates in polybar mode"
+  echo "  $0 --polybar --check         # Same as above"
   echo "  $0 --update-all              # Update all apps"
   echo "  $0 --update-outdated         # Update only outdated apps concurrently"
 }

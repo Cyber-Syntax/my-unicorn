@@ -1,381 +1,305 @@
-#!/usr/bin/python3
 """my-unicorn cli upgrade module.
 
-This module handles updating the my-unicorn package itself by fetching
-the latest release from GitHub and using uv's direct installation feature.
+This module handles updating the my-unicorn package itself by using uv's
+tool install with upgrade from the official GitHub repository.
 
-Currently using prereleases until stable releases are available.
+Key Design Decisions:
+
+1. **Cache Disabled for Version Checks**: The upgrade command intentionally
+   disables caching for release fetches (use_cache=False, ignore_cache=True).
+   This ensures users always check against the latest available version.
+   Rationale:
+   - CLI tools must use the latest version for security and reliability
+   - Users expect fresh results when checking for updates
+   - Cache TTL (24 hours default) could hide critical updates
+
+2. **GitHub API Rate Limiting**: Rate limiting is acceptable for this use case.
+   - Without token: 60 requests/hour (sufficient for manual checks)
+   - With token (via keyring): 5000 requests/hour
+   - Users run upgrades infrequently, so rate limits are not a concern
+
+3. **Prerelease-Only Handling**: Currently fetches latest prerelease. When
+   my-unicorn publishes stable releases, change fetch_latest_prerelease()
+   to fetch_latest_release() in _fetch_latest_prerelease_version().
+   See NOTE below for details.
 """
 
+import asyncio
 import os
-import subprocess
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as get_version
-from typing import Any
+import re
+import shutil
 
 import aiohttp
-from packaging import version
+from packaging.version import InvalidVersion, Version
 
-from my_unicorn.config import ConfigManager, GlobalConfig
-from my_unicorn.infrastructure.github import ReleaseFetcher
+from my_unicorn import __version__
+from my_unicorn.infrastructure.github.release_fetcher import ReleaseFetcher
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
 
-
 GITHUB_OWNER = "Cyber-Syntax"
 GITHUB_REPO = "my-unicorn"
 GITHUB_URL = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}"
-HTTP_FORBIDDEN = 403
 
 
-def normalize_version_string(version_str: str) -> str:
-    """Normalize a version string to Python's version format.
+def _detect_dev_installation() -> bool:
+    """Detect if current installation is a development version.
 
-    Args:
-        version_str: Version string (e.g., "v0.11.1-alpha", "0.11.1a0")
-
-    Returns:
-        Normalized version string
-
-    """
-    # Remove 'v' prefix if present
-    clean = version_str.lstrip("v")
-
-    # Try parsing first - if it works, use as-is
-    try:
-        version.parse(clean)
-        return clean
-    except Exception:
-        # Fallback: minimal normalization only if needed
-        return (
-            clean.replace("-alpha.", "a")
-            .replace("-alpha", "a0")
-            .replace("-beta.", "b")
-            .replace("-beta", "b0")
-            .replace("-rc.", "rc")
-            .replace("-rc", "rc0")
-        )
-
-
-class SelfUpdater:
-    """Handles self-updating of the my-unicorn package."""
-
-    def __init__(
-        self,
-        config_manager: ConfigManager,
-        session: aiohttp.ClientSession,
-    ) -> None:
-        """Initialize the self-updater.
-
-        Args:
-            config_manager: Configuration manager instance
-            session: aiohttp client session for API requests
-
-        """
-        self.config_manager: ConfigManager = config_manager
-        self.global_config: GlobalConfig = config_manager.load_global_config()
-        self.session: aiohttp.ClientSession = session
-        self.github_fetcher: ReleaseFetcher = ReleaseFetcher(
-            owner=GITHUB_OWNER,
-            repo=GITHUB_REPO,
-            session=session,
-        )
-        self._uv_available: bool = self._check_uv_available()
-
-    def _check_uv_available(self) -> bool:
-        """Check if UV is available in the system.
-
-        Returns:
-            True if UV is installed and available, False otherwise
-
-        """
-        try:
-            result = subprocess.run(
-                ["uv", "--version"],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=2,
-            )
-            if result.returncode == 0:
-                logger.debug("UV is available: %s", result.stdout.strip())
-                return True
-            logger.debug("UV command failed: %s", result.stderr.strip())
-            return False
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            logger.debug("UV is not available in PATH")
-            return False
-
-    def get_current_version(self) -> str:
-        """Get the current installed version of my-unicorn.
-
-        Returns:
-            The current version string
-
-        Raises:
-            PackageNotFoundError: If the package is not found
-
-        """
-        try:
-            return get_version("my-unicorn")
-        except PackageNotFoundError:
-            logger.error("Package 'my-unicorn' not found")
-            raise
-
-    async def get_latest_release(
-        self, refresh_cache: bool = False
-    ) -> dict[str, Any] | None:
-        """Get the latest release information from GitHub API.
-
-        Args:
-            refresh_cache: Whether to bypass cache and fetch fresh data
-
-        Returns:
-            Release information or None if failed
-
-        """
-        try:
-            logger.info("Fetching latest release from GitHub...")
-            # Using prerelease until stable versions are published
-            release_data = (
-                await self.github_fetcher.fetch_latest_release_or_prerelease(
-                    prefer_prerelease=True, ignore_cache=refresh_cache
-                )
-            )
-
-            logger.info(
-                "Found latest release: %s",
-                release_data.version,
-            )
-
-            # Convert to format compatible with old code
-            return {
-                "tag_name": f"v{release_data.version}",
-                "version": release_data.version,
-                "prerelease": release_data.prerelease,
-                "assets": [
-                    {
-                        "name": asset.name,
-                        "size": asset.size,
-                        "browser_download_url": asset.browser_download_url,
-                        "digest": asset.digest or "",
-                    }
-                    for asset in release_data.assets
-                ],
-            }
-
-        except aiohttp.ClientResponseError as e:
-            if e.status == HTTP_FORBIDDEN:
-                logger.exception("GitHub API rate limit exceeded")
-                logger.info(
-                    "GitHub Rate limit exceeded. Please try again later."
-                )
-            else:
-                logger.exception(
-                    "GitHub API error: %s - %s", e.status, e.message
-                )
-                logger.info("GitHub API error. Please check your connection.")
-            return None
-        except Exception:
-            logger.exception("Unexpected error fetching release")
-            logger.info(
-                "Error connecting to GitHub. Please check your connection."
-            )
-            return None
-
-    async def check_for_update(self, refresh_cache: bool = False) -> bool:
-        """Check if a new release is available from the GitHub repo.
-
-        Args:
-            refresh_cache: Whether to bypass cache and fetch fresh data
-
-        Returns:
-            True if update is available, False otherwise
-
-        """
-        logger.info("Checking for updates...")
-
-        # Get latest release info
-        latest_release = await self.get_latest_release(refresh_cache)
-        if not latest_release:
-            return False
-
-        latest_version_tag = latest_release.get("tag_name")
-        if not isinstance(latest_version_tag, str):
-            latest_version_tag = None
-        if not latest_version_tag:
-            logger.error("Malformed release data - no tag_name found")
-            logger.info(
-                "Malformed release data! Reinstall manually or open an issue on GitHub for help!"
-            )
-            return False
-
-        # Get current version
-        try:
-            current_version_str = self.get_current_version()
-            logger.debug("Current version string: %s", current_version_str)
-            logger.debug(
-                "Latest version tag from GitHub: %s", latest_version_tag
-            )
-
-            # Normalize both versions for proper comparison
-            current_normalized = normalize_version_string(
-                current_version_str.split("+")[0]  # Remove git info
-            )
-            latest_normalized = normalize_version_string(latest_version_tag)
-
-            logger.debug("Normalized current: %s", current_normalized)
-            logger.debug("Normalized latest: %s", latest_normalized)
-
-            # Use packaging library for proper version comparison
-            current_version_obj = version.parse(current_normalized)
-            latest_version_obj = version.parse(latest_normalized)
-
-            logger.debug("Version comparison objects:")
-            logger.debug("  Current: %s", current_version_obj)
-            logger.debug("  Latest: %s", latest_version_obj)
-
-            if latest_version_obj > current_version_obj:
-                logger.debug("Update available: latest > current")
-                return True
-
-            if latest_version_obj == current_version_obj:
-                logger.debug("No update needed: versions are equal")
-                return False
-
-            logger.debug("No update needed: current > latest (dev version?)")
-            return False
-
-        except (PackageNotFoundError, Exception):
-            logger.exception("Error checking version")
-            logger.info("Error checking version. Please try again.")
-            return False
-
-    async def perform_update(self) -> bool:
-        """Update using UV's direct GitHub installation.
-
-        This uses uv's modern tool installation from GitHub which:
-        - Fetches the latest version directly from GitHub
-        - Resolves and installs dependencies automatically
-        - No need for local repository cloning
-        - Follows best practices used by ruff, uv, and other modern
-          CLI tools
-
-        Returns:
-            False if upgrade could not be started.
-            Does not return on success (process replaced by execvp).
-
-        """
-        logger.debug("Starting upgrade to my-unicorn...")
-        logger.debug("UV available: %s", self._uv_available)
-
-        # Check UV availability first
-        if not self._uv_available:
-            logger.error("UV is required for upgrading my-unicorn")
-            logger.info("❌ UV is required for upgrading my-unicorn")
-            logger.info(
-                "Install UV first: curl -LsSf https://astral.sh/uv/install.sh | sh"
-            )
-            return False
-
-        try:
-            logger.info("⚡ Upgrading my-unicorn...")
-            logger.info("Executing: uv tool upgrade my-unicorn")
-
-            # Close session before replacing process
-            await self.session.close()
-
-            # Use os.execvp to replace current process with uv upgrade
-            # This ensures the upgrade completes properly and is the
-            # recommended approach for self-upgrading CLI tools
-            os.execvp(
-                "uv",
-                ["uv", "tool", "upgrade", "my-unicorn"],
-            )
-
-            # Note: Code after execvp won't execute if successful
-            # If we reach here, execvp failed
-            logger.error("Failed to execute uv upgrade")
-            logger.info("❌ Failed to execute upgrade command")
-            return False
-
-        except Exception as e:
-            logger.exception("Update failed")
-            logger.info("❌ Update failed: %s", e)
-            return False
-
-
-async def get_self_updater(
-    config_manager: ConfigManager | None = None,
-) -> SelfUpdater:
-    """Get a SelfUpdater instance with proper session management.
-
-    Args:
-        config_manager: Optional config manager, will create one if not
-            provided
+    Checks if my-unicorn is installed as a local file path (dev) or from
+    a git repository (production). Development installations use file:// URIs,
+    while production installations use git+https:// URIs.
 
     Returns:
-        Configured SelfUpdater instance
-
+        True if development installation detected, False otherwise.
     """
-    if config_manager is None:
-        from my_unicorn.config import config_manager as default_config_manager
-
-        config_manager = default_config_manager
-
-    # Use a timeout for GitHub API requests driven by configuration
     try:
-        global_conf = config_manager.load_global_config()
-        network_cfg = global_conf.get("network", {})
-        timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
-    except Exception:
-        # Fall back to a sensible default if config lookup fails
-        timeout_seconds = 10
-
-    # Map configured base seconds to aiohttp timeouts (keeps previous defaults)
-    timeout = aiohttp.ClientTimeout(
-        total=timeout_seconds * 3,
-        sock_read=timeout_seconds * 2,
-        sock_connect=timeout_seconds,
-    )
-    session = aiohttp.ClientSession(timeout=timeout)
-
-    return SelfUpdater(config_manager, session)
-
-
-async def check_for_self_update(refresh_cache: bool = False) -> bool:
-    """Check for self-updates.
-
-    Args:
-        refresh_cache: Whether to bypass cache and fetch fresh data
-
-    Returns:
-        True if update is available, False otherwise
-
-    """
-    updater = await get_self_updater()
-    try:
-        return await updater.check_for_update(refresh_cache)
-    finally:
-        await updater.session.close()
-
-
-async def perform_self_update(refresh_cache: bool = False) -> bool:
-    """Perform self-update.
-
-    Args:
-        refresh_cache: Whether to bypass cache and fetch fresh data
-
-    Returns:
-        True if update was successful, False otherwise
-
-    """
-    updater = await get_self_updater()
-    try:
-        # First check if update is available
-        if await updater.check_for_update(refresh_cache):
-            return await updater.perform_update()
+        return asyncio.run(_run_uv_tool_list())
+    except OSError as e:
+        logger.debug("Could not detect installation type: %s", e)
         return False
-    finally:
-        await updater.session.close()
+
+
+async def _run_uv_tool_list() -> bool:
+    """Run 'uv tool list --show-version-specifiers' and detect install type.
+
+    Returns:
+        True if my-unicorn is a dev installation (file://),
+        False if production.
+    """
+    try:
+        process = await asyncio.create_subprocess_exec(
+            "uv",
+            "tool",
+            "list",
+            "--show-version-specifiers",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await process.communicate()
+        output = stdout.decode("utf-8", errors="ignore")
+
+        for line in output.splitlines():
+            if "my-unicorn" in line:
+                return "file://" in line
+        return False  # noqa: TRY300
+    except OSError as e:
+        logger.debug("Error running uv tool list: %s", e)
+        return False
+
+
+_PRERELEASE_MAP = {
+    "alpha": "a",
+    "beta": "b",
+    "rc": "rc",
+}
+
+_PRERELEASE_RE = re.compile(
+    r"""
+    ^
+    (?P<base>\d+\.\d+\.\d+)
+    (?:-
+        (?P<label>alpha|beta|rc)
+        (?P<num>\d*)?
+    )?
+    $
+    """,
+    re.VERBOSE,
+)
+
+
+def normalize_version(v: str) -> str:
+    """Normalize semver-like versions to PEP 440."""
+    v = v.lstrip("v")
+
+    match = _PRERELEASE_RE.match(v)
+    if not match:
+        return v
+
+    base = match.group("base")
+    label = match.group("label")
+    num = match.group("num") or "0"
+
+    if not label:
+        return base
+
+    pep_label = _PRERELEASE_MAP[label]
+    return f"{base}{pep_label}{num}"
+
+
+def perform_self_update() -> bool:
+    """Update my-unicorn using uv tool install --upgrade from git.
+
+    This ensures a reliable update from the official repository,
+    regardless of how it was originally installed. Uses os.execvp to replace
+    the current process, ensuring the upgrade completes properly.
+
+    Returns:
+        False if upgrade could not be started.
+        Does not return on success (process replaced by execvp).
+
+    Note:
+        Users must restart their terminal after a successful upgrade to
+        refresh the command cache and use the updated version.
+
+    """
+    logger.debug("Starting upgrade to my-unicorn...")
+    logger.debug(
+        "Executing: uv tool install --upgrade git+%s",
+        GITHUB_URL,
+    )
+
+    uv_executable = shutil.which("uv") or "uv"
+
+    try:
+        # Use os.execvp to replace current process with uv install
+        # This ensures the upgrade completes properly
+        os.execvp(  # noqa: S606
+            uv_executable,
+            [
+                uv_executable,
+                "tool",
+                "install",
+                "--upgrade",
+                f"git+{GITHUB_URL}",
+            ],
+        )
+    except Exception as e:
+        logger.exception("Update failed")
+        logger.info("❌ Update failed: %s", e)
+        return False
+
+    logger.error("Failed to execute uv upgrade")
+    logger.info("❌ Failed to execute upgrade command")
+    return False
+
+
+def _is_candidate_newer(current_version: str, candidate_version: str) -> bool:
+    """Return True if candidate version is newer than current.
+
+    Parsing failures on the current version are treated as requiring an
+    upgrade when the candidate parses successfully.
+    """
+    try:
+        current = Version(normalize_version(current_version))
+    except InvalidVersion:
+        try:
+            Version(normalize_version(candidate_version))
+        except InvalidVersion:
+            return candidate_version > current_version
+        return True
+
+    try:
+        candidate = Version(normalize_version(candidate_version))
+    except InvalidVersion:
+        return False
+
+    return candidate > current
+
+
+# NOTE: Prerelease handling - update this when stable releases are published.
+# Currently my-unicorn only publishes prerelease versions. When transitioning
+# to stable releases, replace fetch_latest_prerelease() with
+# fetch_latest_release() to prioritize stable versions over prereleases.
+# This is a YAGNI decision - we'll implement stable release logic when it's
+# actually needed.
+async def _fetch_latest_prerelease_version() -> str | None:
+    """Fetch the latest prerelease version from GitHub releases.
+
+    Intentionally disables caching to always get fresh version data.
+    Cache is disabled because:
+    - Users need accurate version information for security and reliability
+    - Upgrade decisions must be based on current available versions
+    - Manual commands users run infrequently don't stress GitHub API limits
+    """
+
+    async with aiohttp.ClientSession() as session:
+        # Cache is intentionally disabled here to ensure users always check
+        # against the latest available version. This is safe because:
+        # 1. GitHub API allows 60 requests/hour without auth token
+        # 2. Users run upgrade checks infrequently
+        # 3. Accuracy of version information is critical for CLI security
+        fetcher = ReleaseFetcher(
+            GITHUB_OWNER,
+            GITHUB_REPO,
+            session,
+            use_cache=False,
+        )
+        try:
+            release = await fetcher.fetch_latest_prerelease(ignore_cache=True)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Unable to fetch latest release for %s/%s: %s",
+                GITHUB_OWNER,
+                GITHUB_REPO,
+                exc,
+            )
+            return None
+
+    return release.version or release.original_tag_name
+
+
+async def should_perform_self_update(
+    current_version: str,
+) -> tuple[bool, str | None]:
+    """Determine if a newer release is available.
+
+    Checks if installation is dev-based first. If dev installation is detected,
+    always upgrade to production (git repo version). Otherwise, fetches the
+    latest version from GitHub API (cache disabled) to ensure accurate
+    upgrade decisions.
+
+    Returns:
+        A tuple of (should_upgrade, latest_version) where:
+        - should_upgrade: True if upgrade needed (dev install or newer version)
+        - latest_version: The latest version string, or None if unavailable
+    """
+    is_dev_install = await _run_uv_tool_list()
+
+    if is_dev_install:
+        logger.info("🔧 Development installation detected")
+        latest_version = await _fetch_latest_prerelease_version()
+        return True, latest_version
+
+    latest_version = await _fetch_latest_prerelease_version()
+
+    if not latest_version:
+        logger.warning(
+            "Could not determine latest my-unicorn version; proceeding "
+            "with upgrade.",
+        )
+        return True, None
+
+    if not latest_version.strip():
+        return True, None
+
+    if not _is_candidate_newer(current_version, latest_version):
+        return False, latest_version
+
+    return True, latest_version
+
+
+async def check_for_self_update() -> bool:
+    """Check if a newer my-unicorn release is available.
+
+    Always queries GitHub API for fresh version data (cache disabled).
+
+    Returns:
+        True if a newer version is available, False otherwise.
+    """
+
+    should_upgrade, _ = await should_perform_self_update(__version__)
+    return should_upgrade
+
+
+async def perform_self_update_async() -> bool:
+    """Async wrapper for perform_self_update.
+
+    Allows perform_self_update() to be called from async contexts.
+
+    Returns:
+        False if update could not be started.
+        Does not return on success (process replaced by execvp).
+
+    """
+    return perform_self_update()
