@@ -102,7 +102,7 @@ markers = [
 [tool.ruff]
 line-length = 79
 indent-width = 4
-include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
+include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py", "tests/**/*.py"]
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.

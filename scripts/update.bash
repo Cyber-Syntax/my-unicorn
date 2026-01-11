@@ -43,12 +43,6 @@ notify_cli_upgrade() {
   # window managers can consume it (for example via a log-watcher or
   # a startup hook). Keep a simple format that is easy to grep.
   printf 'MY-UNICORN-NOTIFY: %s\n%s\n' "$title" "$body"
-
-  # Also try to trigger a Qtile widget refresh if present. This is
-  # left as-is for users using Qtile who want an immediate widget update.
-  if command -v qtile >/dev/null 2>&1; then
-    qtile cmd-obj -o widget my-unicorn -f force_update >/dev/null 2>&1 || true
-  fi
 }
 
 # Show CLI upgrade status to user and send notification if an upgrade exists (removed)
@@ -107,12 +101,6 @@ update_all() {
   if ! "$UNICORN" update; then
     echo "Error: Update failed. Check your network connection or logs."
     return 1
-  fi
-
-  if command -v qtile >/dev/null 2>&1; then
-    if ! qtile cmd-obj -o widget my-unicorn -f force_update; then
-      echo "Warning: Qtile widget update failed"
-    fi
   fi
 }
 
@@ -194,11 +182,7 @@ update_outdated() {
     return 1
   fi
 
-  if command -v qtile >/dev/null 2>&1; then
-    if ! qtile cmd-obj -o widget my-unicorn -f force_update; then
-      echo "Warning: Qtile widget update failed"
-    fi
-  fi
+
 
   echo "✓ All outdated apps updated successfully"
 }

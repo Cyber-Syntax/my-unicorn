@@ -123,7 +123,7 @@ install_with_uv_tool() {
   fi
 
   cd "$src_dir"
-  uv tool install git+https://github.com/Cyber-Syntax/my-unicorn
+  uv tool install git+https://github.com/Cyber-Syntax/my-unicorn --force
   check_local_bin_in_path
   
   # For uv tool installs, run autocomplete setup from source directory
