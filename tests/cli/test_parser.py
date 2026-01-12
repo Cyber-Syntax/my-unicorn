@@ -72,15 +72,15 @@ def test_self_update_command(cli_parser):
         assert args.command == "upgrade"
 
 
-def test_list_installed(cli_parser):
-    with patch("sys.argv", ["my-unicorn", "list"]):
+def test_catalog_installed(cli_parser):
+    with patch("sys.argv", ["my-unicorn", "catalog"]):
         args = cli_parser.parse_args()
-        assert args.command == "list"
+        assert args.command == "catalog"
         assert not args.available
 
 
-def test_list_available(cli_parser):
-    with patch("sys.argv", ["my-unicorn", "list", "--available"]):
+def test_catalog_available(cli_parser):
+    with patch("sys.argv", ["my-unicorn", "catalog", "--available"]):
         args = cli_parser.parse_args()
         assert args.available
 

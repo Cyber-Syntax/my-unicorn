@@ -422,9 +422,8 @@ class InstallHandler:
 
         if unknown_targets:
             unknown_list = ", ".join(unknown_targets)
-            raise InstallationError(
-                f"Unknown applications or invalid URLs: {unknown_list}. Use 'my-unicorn list' to see available apps."
-            )
+            msg = f"Unknown applications or invalid URLs: {unknown_list}. Use 'my-unicorn catalog --available' to see available apps."
+            raise InstallationError(msg)
 
         return url_targets, catalog_targets
 

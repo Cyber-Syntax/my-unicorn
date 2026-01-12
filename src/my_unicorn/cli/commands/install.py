@@ -35,7 +35,7 @@ class InstallCommandHandler(BaseCommandHandler):
         if not targets:
             logger.error("❌ No targets specified.")
             logger.info(
-                "💡 Use 'my-unicorn list' to see available catalog apps."
+                "💡 Use 'my-unicorn catalog' to see available catalog apps."
             )
             return
 

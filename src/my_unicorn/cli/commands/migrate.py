@@ -79,7 +79,7 @@ class MigrateHandler(BaseCommandHandler):
         logger.info(
             "✅ Migration complete! Migrated %s configs", total_migrated
         )
-        logger.info("Run 'my-unicorn list' to verify.")
+        logger.info("Run 'my-unicorn catalog' to verify.")
 
     async def _dry_run_migration(self) -> None:
         """Show what would be migrated without making changes."""

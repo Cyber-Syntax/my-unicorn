@@ -47,7 +47,7 @@ async def test_install_handler_no_targets(
 
         mock_logger.error.assert_called_once_with("❌ No targets specified.")
         mock_logger.info.assert_called_once_with(
-            "💡 Use 'my-unicorn list' to see available catalog apps."
+            "💡 Use 'my-unicorn catalog' to see available catalog apps."
         )
 
 
