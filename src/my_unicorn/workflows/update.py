@@ -10,13 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import aiohttp
-
-try:
-    from packaging.version import InvalidVersion, Version
-except ImportError:
-    Version = None  # type: ignore
-    InvalidVersion = None  # type: ignore
-
+from packaging.version import InvalidVersion, Version
 
 from my_unicorn.config import ConfigManager
 from my_unicorn.config.migration.helpers import get_apps_needing_migration
@@ -130,7 +124,7 @@ class UpdateManager:
         self._progress_service_param = progress_service
 
         # Initialize shared services - will be set when session is available
-        self.verification_service = None
+        self.verification_service: VerificationService | None = None
 
         # Shared API progress task ID for consolidated API progress tracking
         self._shared_api_task_id: str | None = None
@@ -196,10 +190,11 @@ class UpdateManager:
             try:
                 current_version = Version(current_clean)
                 latest_version = Version(latest_clean)
-                return latest_version > current_version
             except InvalidVersion:
                 # Fall through to legacy comparison if parsing fails
                 pass
+            else:
+                return latest_version > current_version
 
         # Legacy comparison for backward compatibility
         try:
@@ -210,12 +205,11 @@ class UpdateManager:
             max_len = max(len(current_parts), len(latest_parts))
             current_parts.extend([0] * (max_len - len(current_parts)))
             latest_parts.extend([0] * (max_len - len(latest_parts)))
-
-            return latest_parts > current_parts
-
         except ValueError:
             # Fallback to string comparison
             return latest_clean > current_clean
+        else:
+            return latest_parts > current_parts
 
     async def check_single_update(
         self,

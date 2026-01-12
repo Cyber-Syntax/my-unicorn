@@ -7,12 +7,12 @@ import orjson
 import pytest
 
 from my_unicorn.config.migration.base import (
-    compare_versions,
     create_backup,
     load_json_file,
     needs_migration,
     save_json_file,
 )
+from my_unicorn.domain.version import compare_versions
 
 
 class TestVersionComparison:

@@ -16,6 +16,7 @@ from my_unicorn.config import (
     GlobalConfigManager,
 )
 from my_unicorn.domain.constants import GLOBAL_CONFIG_VERSION
+from my_unicorn.domain.version import compare_versions
 
 
 @pytest.fixture
@@ -588,27 +589,27 @@ def test_version_comparison(config_dir: Path) -> None:
     manager = GlobalConfigManager(config_dir)
 
     # Test equal versions
-    assert manager.migration._compare_versions("1.0.0", "1.0.0") == 0
-    assert manager.migration._compare_versions("1.0.1", "1.0.1") == 0
+    assert compare_versions("1.0.0", "1.0.0") == 0
+    assert compare_versions("1.0.1", "1.0.1") == 0
 
     # Test version1 < version2
-    assert manager.migration._compare_versions("1.0.0", "1.0.1") == -1
-    assert manager.migration._compare_versions("1.0.1", "1.1.0") == -1
-    assert manager.migration._compare_versions("1.1.0", "2.0.0") == -1
+    assert compare_versions("1.0.0", "1.0.1") == -1
+    assert compare_versions("1.0.1", "1.1.0") == -1
+    assert compare_versions("1.1.0", "2.0.0") == -1
 
     # Test version1 > version2
-    assert manager.migration._compare_versions("1.0.1", "1.0.0") == 1
-    assert manager.migration._compare_versions("1.1.0", "1.0.1") == 1
-    assert manager.migration._compare_versions("2.0.0", "1.1.0") == 1
+    assert compare_versions("1.0.1", "1.0.0") == 1
+    assert compare_versions("1.1.0", "1.0.1") == 1
+    assert compare_versions("2.0.0", "1.1.0") == 1
 
     # Test different length versions
-    assert manager.migration._compare_versions("1.0", "1.0.0") == 0
-    assert manager.migration._compare_versions("1.0.0.1", "1.0.0") == 1
-    assert manager.migration._compare_versions("1.0", "1.0.1") == -1
+    assert compare_versions("1.0", "1.0.0") == 0
+    assert compare_versions("1.0.0.1", "1.0.0") == 1
+    assert compare_versions("1.0", "1.0.1") == -1
 
     # Test invalid versions (fallback to 0.0.0)
-    assert manager.migration._compare_versions("invalid", "1.0.0") == -1
-    assert manager.migration._compare_versions("1.0.0", "invalid") == 1
+    assert compare_versions("invalid", "1.0.0") == -1
+    assert compare_versions("1.0.0", "invalid") == 1
 
 
 def test_needs_migration(config_dir: Path) -> None:

@@ -9,7 +9,7 @@ import pytest
 
 from my_unicorn.config.migration.global_config import ConfigMigration
 from my_unicorn.domain.constants import GLOBAL_CONFIG_VERSION
-
+from my_unicorn.domain.version import compare_versions
 
 @pytest.fixture
 def temp_dir():
@@ -82,9 +82,9 @@ class TestConfigMigration:
 
     def test_compare_versions(self, migration):
         """Test version comparison logic."""
-        assert migration._compare_versions("1.0.0", "1.0.1") == -1
-        assert migration._compare_versions("1.0.1", "1.0.0") == 1
-        assert migration._compare_versions("1.0.1", "1.0.1") == 0
+        assert compare_versions("1.0.0", "1.0.1") == -1
+        assert compare_versions("1.0.1", "1.0.0") == 1
+        assert compare_versions("1.0.1", "1.0.1") == 0
 
     def test_migrate_if_needed_no_migration(self, migration, sample_defaults):
         """Test migration when no migration is needed."""
