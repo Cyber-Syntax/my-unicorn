@@ -258,6 +258,98 @@ class BackupMetadata:
         return sha256_hash.hexdigest()
 
 
+# Helper functions for backup operations
+
+
+def _validate_backup_exists(
+    backup_path: Path, version: str, app_name: str
+) -> None:
+    """Validate that backup file exists.
+
+    Args:
+        backup_path: Path to backup file
+        version: Version string
+        app_name: Application name
+
+    Raises:
+        FileNotFoundError: If backup file doesn't exist
+    """
+    if not backup_path.exists():
+        msg = f"Backup file not found: {backup_path}"
+        logger.error(msg)
+        raise FileNotFoundError(msg)
+
+
+def _validate_backup_integrity(
+    metadata: "BackupMetadata", version: str, backup_path: Path, app_name: str
+) -> None:
+    """Validate backup file integrity using checksum.
+
+    Args:
+        metadata: BackupMetadata instance
+        version: Version string
+        backup_path: Path to backup file
+        app_name: Application name
+
+    Raises:
+        ValueError: If integrity check fails
+    """
+    if not metadata.verify_backup_integrity(version, backup_path):
+        msg = f"Backup integrity check failed for {app_name} v{version}"
+        logger.error(msg)
+        raise ValueError(msg)
+
+
+def _group_backups_by_version(backups: list[Path]) -> dict[str, list[Path]]:
+    """Group backup files by version number.
+
+    Args:
+        backups: List of backup file paths
+
+    Returns:
+        Dictionary mapping version strings to lists of backup paths
+    """
+    version_groups: dict[str, list[Path]] = {}
+    for backup in backups:
+        # Extract version from backup filename (format: app-version.AppImage)
+        parts = backup.stem.split("-")
+        if len(parts) >= 2:
+            version = parts[-1]
+            version_groups.setdefault(version, []).append(backup)
+    return version_groups
+
+
+def _delete_old_backups(
+    versions_to_remove: list[str],
+    metadata: "BackupMetadata",
+    app_backup_dir: Path,
+) -> None:
+    """Delete old backup files and update metadata.
+
+    Args:
+        versions_to_remove: List of version strings to remove
+        metadata: BackupMetadata instance
+        app_backup_dir: Backup directory for the app
+    """
+    for version in versions_to_remove:
+        version_info = metadata.get_version_info(version)
+        if version_info:
+            backup_path = app_backup_dir / version_info["filename"]
+            if backup_path.exists():
+                try:
+                    backup_path.unlink()
+                    metadata.remove_version(version)
+                    logger.info(
+                        "Removed old backup: %s (v%s)",
+                        backup_path,
+                        version,
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Failed to remove backup %s: %s", backup_path, e
+                    )
+
+
 class BackupService:
     """Enhanced service for creating and managing AppImage backups with versioning."""
 
@@ -608,15 +700,13 @@ class BackupService:
         backup_filename = version_info["filename"]
         backup_path = app_backup_dir / backup_filename
 
-        if not backup_path.exists():
-            logger.error("Backup file not found: %s", backup_path)
-            return None
-
-        # Verify backup integrity
-        if not metadata.verify_backup_integrity(version, backup_path):
-            logger.error(
-                "Backup integrity check failed for %s v%s", app_name, version
+        # Validate backup exists and integrity
+        try:
+            _validate_backup_exists(backup_path, version, app_name)
+            _validate_backup_integrity(
+                metadata, version, backup_path, app_name
             )
+        except (FileNotFoundError, ValueError):
             return None
 
         # Get app config to determine proper filename and current version
@@ -779,19 +869,12 @@ class BackupService:
 
         """
         max_backups = self.global_config["max_backup"]
+        metadata = BackupMetadata(app_backup_dir)
 
         if max_backups == 0:
             # Delete all backups
-            metadata = BackupMetadata(app_backup_dir)
             versions = metadata.list_versions()
-            for version in versions:
-                version_info = metadata.get_version_info(version)
-                if version_info:
-                    backup_path = app_backup_dir / version_info["filename"]
-                    if backup_path.exists():
-                        backup_path.unlink()
-                        logger.info("Removed backup: %s", backup_path)
-                    metadata.remove_version(version)
+            _delete_old_backups(versions, metadata, app_backup_dir)
 
             # Remove metadata file and directory if empty
             if metadata.metadata_file.exists():
@@ -801,28 +884,9 @@ class BackupService:
             return
 
         # Keep only the most recent max_backups versions
-        metadata = BackupMetadata(app_backup_dir)
         versions = metadata.list_versions()  # Already sorted newest to oldest
-
         versions_to_remove = versions[max_backups:]
-
-        for version in versions_to_remove:
-            version_info = metadata.get_version_info(version)
-            if version_info:
-                backup_path = app_backup_dir / version_info["filename"]
-                if backup_path.exists():
-                    try:
-                        backup_path.unlink()
-                        metadata.remove_version(version)
-                        logger.info(
-                            "Removed old backup: %s (v%s)",
-                            backup_path,
-                            version,
-                        )
-                    except Exception as e:
-                        logger.error(
-                            "Failed to remove backup %s: %s", backup_path, e
-                        )
+        _delete_old_backups(versions_to_remove, metadata, app_backup_dir)
 
     def list_apps_with_backups(self) -> list[str]:
         """List all apps that have backups.

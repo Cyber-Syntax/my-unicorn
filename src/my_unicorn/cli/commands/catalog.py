@@ -19,6 +19,72 @@ MAX_VERSION_DISPLAY_LENGTH = 16
 DESCRIPTION_COLUMN_START = 26  # App name column width + spacing
 
 
+# TODO: make a core module for this command and move the core logic there
+def _build_repository_display(source: dict[str, Any]) -> tuple[str, str]:
+    """Build repository display information.
+
+    Args:
+        source: Source configuration dictionary
+
+    Returns:
+        Tuple of (repo_display, repo_url)
+    """
+    if source.get("type") == "github":
+        repo_owner = source.get("owner", "")
+        repo_name = source.get("repo", "")
+        repo_url = f"https://github.com/{repo_owner}/{repo_name}"
+        repo_display = f"{repo_owner}/{repo_name}"
+    else:
+        repo_url = "N/A"
+        repo_display = "N/A"
+    return repo_display, repo_url
+
+
+def _build_verification_display(verification: dict[str, Any]) -> str:
+    """Build verification method display string.
+
+    Args:
+        verification: Verification configuration dictionary
+
+    Returns:
+        Human-readable verification method description
+    """
+    verify_method = verification.get("method", "None")
+    if verify_method == "digest":
+        return "SHA256 digest (embedded in GitHub release)"
+    if verify_method == "checksum_file":
+        checksum_file_data = verification.get("checksum_file", {})
+        if isinstance(checksum_file_data, dict):
+            checksum_file = checksum_file_data.get("name", "Unknown")
+            algorithm = str(
+                checksum_file_data.get("algorithm", "SHA256")
+            ).upper()
+        else:
+            checksum_file = "Unknown"
+            algorithm = "SHA256"
+        return f"{algorithm} checksum ({checksum_file})"
+    if verify_method == "skip":
+        return "No verification (developer provides no checksums)"
+    return "None"
+
+
+def _build_icon_display(icon: dict[str, Any] | Any) -> str:
+    """Build icon method display string.
+
+    Args:
+        icon: Icon configuration dictionary or value
+
+    Returns:
+        Human-readable icon method description
+    """
+    icon_method = (
+        icon.get("method", "None") if isinstance(icon, dict) else "None"
+    )
+    if icon_method == "extraction":
+        return "Embedded (extracted from AppImage)"
+    return "None"
+
+
 class CatalogHandler(BaseCommandHandler):
     """Handler for catalog command operations."""
 
@@ -114,46 +180,10 @@ class CatalogHandler(BaseCommandHandler):
         display_name = metadata.get("display_name", app_name)
         description = metadata.get("description", "No description available")
 
-        # Build repository information
-        if source.get("type") == "github":
-            repo_owner = source.get("owner", "")
-            repo_name = source.get("repo", "")
-            repo_url = f"https://github.com/{repo_owner}/{repo_name}"
-            repo_display = f"{repo_owner}/{repo_name}"
-        else:
-            repo_url = "N/A"
-            repo_display = "N/A"
-
-        # Build verification information
-        verify_method = verification.get("method", "None")
-        if verify_method == "digest":
-            verify_display = "SHA256 digest (embedded in GitHub release)"
-        elif verify_method == "checksum_file":
-            checksum_file_data = verification.get("checksum_file", {})
-            if isinstance(checksum_file_data, dict):
-                checksum_file = checksum_file_data.get("name", "Unknown")
-                algorithm = str(
-                    checksum_file_data.get("algorithm", "SHA256")
-                ).upper()
-            else:
-                checksum_file = "Unknown"
-                algorithm = "SHA256"
-            verify_display = f"{algorithm} checksum ({checksum_file})"
-        elif verify_method == "skip":
-            verify_display = (
-                "No verification (developer provides no checksums)"
-            )
-        else:
-            verify_display = "None"
-
-        # Build icon information
-        icon_method = (
-            icon.get("method", "None") if isinstance(icon, dict) else "None"
-        )
-        if icon_method == "extraction":
-            icon_display = "Embedded (extracted from AppImage)"
-        else:
-            icon_display = "None"
+        # Build display information using helpers
+        repo_display, repo_url = _build_repository_display(source)
+        verify_display = _build_verification_display(verification)
+        icon_display = _build_icon_display(icon)
 
         # Display information
         logger.info("📦 %s", display_name)

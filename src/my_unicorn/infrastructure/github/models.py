@@ -4,7 +4,6 @@ This module contains data classes representing GitHub releases and assets.
 Note: These should eventually move to domain/ layer in Phase 2 refactoring.
 """
 
-import os
 import re
 from dataclasses import dataclass, replace
 from typing import Any
@@ -541,21 +540,3 @@ class AssetSelector:
                 logger.debug("Filtering out asset: %s", filename)
 
         return filtered
-
-
-def extract_icon_filename(icon_path: str, app_name: str) -> str:
-    """Extract or generate icon filename from path.
-
-    Args:
-        icon_path: Path to the icon file
-        app_name: Name of the application
-
-    Returns:
-        Appropriate filename for the icon
-
-    """
-    filename = os.path.basename(icon_path)
-    if "." in filename:
-        extension = os.path.splitext(filename)[1]
-        return f"{app_name}{extension}"
-    return f"{app_name}.png"

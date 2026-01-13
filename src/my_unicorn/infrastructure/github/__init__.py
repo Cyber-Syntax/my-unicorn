@@ -6,7 +6,6 @@ from my_unicorn.infrastructure.github.models import (
     AssetSelector,
     ChecksumFileInfo,
     Release,
-    extract_icon_filename,
 )
 from my_unicorn.infrastructure.github.operations import (
     extract_github_config,
@@ -26,6 +25,5 @@ __all__ = [
     "ReleaseAPIClient",
     "ReleaseFetcher",
     "extract_github_config",
-    "extract_icon_filename",
     "parse_github_url",
 ]

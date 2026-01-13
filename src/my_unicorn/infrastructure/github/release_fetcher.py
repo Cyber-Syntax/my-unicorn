@@ -4,8 +4,6 @@ This module orchestrates release fetching operations, managing cache
 interactions and coordinating with the low-level HTTP client.
 """
 
-import os
-
 import aiohttp
 
 from my_unicorn.infrastructure.auth import GitHubAuthManager
@@ -425,21 +423,3 @@ class GitHubClient:
             return await fetcher.fetch_specific_release(tag)
         except Exception:
             return None
-
-
-def extract_icon_filename(icon_path: str, app_name: str) -> str:
-    """Extract or generate icon filename from path.
-
-    Args:
-        icon_path: Path to the icon file
-        app_name: Name of the application
-
-    Returns:
-        Appropriate filename for the icon
-
-    """
-    filename = os.path.basename(icon_path)
-    if "." in filename:
-        extension = os.path.splitext(filename)[1]
-        return f"{app_name}{extension}"
-    return f"{app_name}.png"
