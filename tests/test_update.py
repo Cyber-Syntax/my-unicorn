@@ -209,7 +209,7 @@ class TestUpdateManager:
                 "owner": "test",
                 "repo": "test",
             }
-            mock_config.load_catalog_entry.return_value = None
+            mock_config.load_catalog.return_value = None
 
             with patch(
                 "my_unicorn.workflows.update.ReleaseFetcher"
@@ -244,7 +244,7 @@ class TestUpdateManager:
         """Test successful single app update check."""
         # Mock dependencies via the mock_config_manager
         mock_config_manager.load_app_config.return_value = mock_app_config
-        mock_config_manager.load_catalog_entry.return_value = {
+        mock_config_manager.load_catalog.return_value = {
             "github": {"use_github_api": True, "use_prerelease": False}
         }
 
@@ -332,7 +332,7 @@ class TestUpdateManager:
     ) -> None:
         """Test single app update check when API call fails."""
         mock_config_manager.load_app_config.return_value = mock_app_config
-        mock_config_manager.load_catalog_entry.return_value = None
+        mock_config_manager.load_catalog.return_value = None
 
         with (
             patch("my_unicorn.workflows.update.GitHubAuthManager"),

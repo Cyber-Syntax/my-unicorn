@@ -187,7 +187,7 @@ def test_list_catalog_apps(config_manager: ConfigManager) -> None:
 
 def test_load_catalog_entry(config_manager: ConfigManager) -> None:
     """Test loading catalog entry."""
-    entry = config_manager.load_catalog_entry("dummyapp")
+    entry = config_manager.load_catalog("dummyapp")
     assert entry is not None
     assert entry["source"]["owner"] == "dummy"
     assert entry["source"]["repo"] == "dummyrepo"
@@ -452,18 +452,18 @@ def test_catalog_manager(config_dir: Path) -> None:
     catalog_loader = CatalogLoader(catalog_dir)
 
     # Test listing catalog apps
-    catalog_apps = catalog_loader.list_catalog_apps()
+    catalog_apps = catalog_loader.list_apps()
     assert "testapp" in catalog_apps
 
     # Test loading catalog entry
-    entry = catalog_loader.load_catalog_entry("testapp")
+    entry = catalog_loader.load("testapp")
     assert entry is not None
     assert entry["source"]["owner"] == "testowner"
     assert entry["source"]["repo"] == "testapp"
 
     # Test non-existent catalog entry
-    nonexistent = catalog_loader.load_catalog_entry("nonexistent")
-    assert nonexistent is None
+    with pytest.raises(FileNotFoundError):
+        catalog_loader.load("nonexistent")
 
 
 def test_config_manager_facade_integration(config_dir: Path) -> None:
@@ -560,7 +560,7 @@ def test_config_manager_facade_integration(config_dir: Path) -> None:
     catalog_apps = config_manager.list_catalog_apps()
     assert "integration_test" in catalog_apps
 
-    catalog_entry = config_manager.load_catalog_entry("integration_test")
+    catalog_entry = config_manager.load_catalog("integration_test")
     assert catalog_entry is not None
     assert catalog_entry["source"]["repo"] == "test"
 

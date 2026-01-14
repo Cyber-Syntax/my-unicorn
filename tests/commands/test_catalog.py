@@ -1,15 +1,17 @@
 """Tests for the catalog command handler."""
 
 from argparse import Namespace
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from pytest_mock import MockerFixture
 
 from my_unicorn.cli.commands.catalog import CatalogHandler
 
 
 @pytest.fixture
-def mock_config_manager():
+def mock_config_manager() -> MagicMock:
     """Fixture to mock the configuration manager."""
     config_manager = MagicMock()
     config_manager.list_catalog_apps.return_value = ["app1", "app2", "app3"]
@@ -18,7 +20,7 @@ def mock_config_manager():
         "installed_app2",
     ]
 
-    def load_catalog(app):
+    def load_catalog(app: str) -> dict[str, Any]:
         return {
             "metadata": {
                 "display_name": app,
@@ -29,19 +31,21 @@ def mock_config_manager():
             "icon": {"method": "extraction"},
         }
 
-    def load_config(app):
+    def load_config(app: str) -> None:
         if app.startswith("installed"):
-            raise ValueError(
-                f"Config for '{app}' is version 1.0.0, expected 2.0.0. Run 'my-unicorn migrate' to upgrade."
+            message = (
+                f"Config for '{app}' is version 1.0.0, expected 2.0.0. "
+                "Run 'my-unicorn migrate' to upgrade."
             )
+            raise ValueError(message)
 
-    config_manager.load_catalog_entry.side_effect = load_catalog
+    config_manager.load_catalog.side_effect = load_catalog
     config_manager.load_app_config.side_effect = load_config
     return config_manager
 
 
 @pytest.fixture
-def catalog_handler(mock_config_manager):
+def catalog_handler(mock_config_manager: MagicMock) -> CatalogHandler:
     """Fixture to create a CatalogHandler instance with mocked dependencies."""
     return CatalogHandler(
         config_manager=mock_config_manager,
@@ -51,9 +55,13 @@ def catalog_handler(mock_config_manager):
 
 
 @pytest.mark.asyncio
-async def test_catalog_available_apps(catalog_handler, mocker):
+async def test_catalog_available_apps(
+    catalog_handler: CatalogHandler, mocker: MockerFixture
+) -> None:
     """Test CatalogHandler._list_available_apps."""
-    mock_logger = mocker.patch("my_unicorn.cli.commands.catalog.logger")
+    mock_logger = mocker.patch(
+        "my_unicorn.workflows.services.catalog_service.logger"
+    )
     args = Namespace(available=True, installed=False, info=None)
 
     await catalog_handler.execute(args)
@@ -70,9 +78,13 @@ async def test_catalog_available_apps(catalog_handler, mocker):
 
 
 @pytest.mark.asyncio
-async def test_catalog_installed_apps(catalog_handler, mocker):
+async def test_catalog_installed_apps(
+    catalog_handler: CatalogHandler, mocker: MockerFixture
+) -> None:
     """Test CatalogHandler._list_installed_apps."""
-    mock_logger = mocker.patch("my_unicorn.cli.commands.catalog.logger")
+    mock_logger = mocker.patch(
+        "my_unicorn.workflows.services.catalog_service.logger"
+    )
     args = Namespace(available=False, installed=True, info=None)
 
     await catalog_handler.execute(args)
@@ -86,9 +98,13 @@ async def test_catalog_installed_apps(catalog_handler, mocker):
 
 
 @pytest.mark.asyncio
-async def test_catalog_info(catalog_handler, mocker):
+async def test_catalog_info(
+    catalog_handler: CatalogHandler, mocker: MockerFixture
+) -> None:
     """Test CatalogHandler._show_app_info."""
-    mock_logger = mocker.patch("my_unicorn.cli.commands.catalog.logger")
+    mock_logger = mocker.patch(
+        "my_unicorn.workflows.services.catalog_service.logger"
+    )
     args = Namespace(available=False, installed=False, info="app1")
 
     await catalog_handler.execute(args)
