@@ -55,6 +55,25 @@ class CLIRunner:
         # Initialize command handlers
         self._init_command_handlers()
 
+    def _create_handler(self, handler_class: type) -> object:
+        """Create command handler with standard dependencies.
+
+        Args:
+            handler_class: The handler class to instantiate.
+
+        Returns:
+            Instantiated handler with injected dependencies.
+        """
+        # UpgradeHandler doesn't need dependencies
+        if handler_class is UpgradeHandler:
+            return handler_class()
+
+        return handler_class(
+            self.config_manager,
+            self.auth_manager,
+            self.update_manager,
+        )
+
     def _init_command_handlers(self) -> None:
         """Initialize all command handlers with shared dependencies.
 
@@ -62,37 +81,17 @@ class CLIRunner:
         command.
         """
         self.command_handlers = {
-            "install": InstallCommandHandler(
-                self.config_manager, self.auth_manager, self.update_manager
-            ),
-            "update": UpdateHandler(
-                self.config_manager, self.auth_manager, self.update_manager
-            ),
-            "upgrade": UpgradeHandler(),
-            "catalog": CatalogHandler(
-                self.config_manager, self.auth_manager, self.update_manager
-            ),
-            "migrate": MigrateHandler(
-                self.config_manager, self.auth_manager, self.update_manager
-            ),
-            "remove": RemoveHandler(
-                self.config_manager, self.auth_manager, self.update_manager
-            ),
-            "backup": BackupHandler(
-                self.config_manager, self.auth_manager, self.update_manager
-            ),
-            "cache": CacheHandler(
-                self.config_manager, self.auth_manager, self.update_manager
-            ),
-            "token": TokenHandler(
-                self.config_manager, self.auth_manager, self.update_manager
-            ),
-            "auth": AuthHandler(
-                self.config_manager, self.auth_manager, self.update_manager
-            ),
-            "config": ConfigHandler(
-                self.config_manager, self.auth_manager, self.update_manager
-            ),
+            "install": self._create_handler(InstallCommandHandler),
+            "update": self._create_handler(UpdateHandler),
+            "upgrade": self._create_handler(UpgradeHandler),
+            "catalog": self._create_handler(CatalogHandler),
+            "migrate": self._create_handler(MigrateHandler),
+            "remove": self._create_handler(RemoveHandler),
+            "backup": self._create_handler(BackupHandler),
+            "cache": self._create_handler(CacheHandler),
+            "token": self._create_handler(TokenHandler),
+            "auth": self._create_handler(AuthHandler),
+            "config": self._create_handler(ConfigHandler),
         }
 
     async def run(self) -> None:

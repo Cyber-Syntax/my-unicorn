@@ -469,11 +469,16 @@ class UpdateManager:
 
         # Load catalog entry if referenced
         catalog_ref = effective_config.get("catalog_ref")
-        catalog_entry = (
-            self.config_manager.load_catalog_entry(catalog_ref)
-            if catalog_ref
-            else None
-        )
+        catalog_entry = None
+        if catalog_ref:
+            try:
+                catalog_entry = self.config_manager.load_catalog(catalog_ref)
+            except (FileNotFoundError, ValueError):
+                msg = (
+                    f"App '{app_name}' references catalog '{catalog_ref}', "
+                    f"but catalog entry is missing or invalid. Please reinstall."
+                )
+                raise ValueError(msg)
 
         # Find AppImage asset from cached release data
         appimage_asset = select_best_appimage_asset(

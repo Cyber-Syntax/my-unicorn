@@ -1,3 +1,11 @@
+"""Version comparison and normalization utilities.
+
+Provides utilities for comparing semantic versions and normalizing semver-style
+version strings to PEP 440 format for proper Python version comparison.
+"""
+
+import re
+
 from packaging.version import InvalidVersion, Version
 
 
@@ -40,3 +48,66 @@ def compare_versions(version1: str, version2: str) -> int:
         if v1_parts > v2_parts:
             return 1
         return 0
+
+
+# Map semver prerelease labels to PEP 440 equivalents
+_PRERELEASE_MAP = {
+    "alpha": "a",
+    "beta": "b",
+    "rc": "rc",
+}
+
+# Regex pattern for detecting semver-style prerelease versions
+_PRERELEASE_RE = re.compile(
+    r"""
+    ^
+    (?P<base>\d+\.\d+\.\d+)
+    (?:-
+        (?P<label>alpha|beta|rc)
+        (?P<num>\d*)?
+    )?
+    $
+    """,
+    re.VERBOSE,
+)
+
+
+def normalize_version(v: str) -> str:
+    """Normalize semver-like versions to PEP 440.
+
+    Converts semantic versioning style prerelease versions to PEP 440 format
+    for proper Python version comparison using packaging.version.
+
+    Examples:
+        >>> normalize_version("1.0.0-alpha")
+        '1.0.0a0'
+        >>> normalize_version("2.0.0-beta1")
+        '2.0.0b1'
+        >>> normalize_version("3.0.0-rc2")
+        '3.0.0rc2'
+        >>> normalize_version("v1.2.3")
+        '1.2.3'
+        >>> normalize_version("1.2.3")
+        '1.2.3'
+
+    Args:
+        v: Version string in semver or PEP 440 format
+
+    Returns:
+        Normalized version string in PEP 440 format
+    """
+    v = v.lstrip("v")
+
+    match = _PRERELEASE_RE.match(v)
+    if not match:
+        return v
+
+    base = match.group("base")
+    label = match.group("label")
+    num = match.group("num") or "0"
+
+    if not label:
+        return base
+
+    pep_label = _PRERELEASE_MAP[label]
+    return f"{base}{pep_label}{num}"

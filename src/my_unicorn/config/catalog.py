@@ -10,7 +10,6 @@ from typing import cast
 import orjson
 
 from my_unicorn.config.paths import Paths
-from my_unicorn.config.schemas.validator import ConfigValidator
 from my_unicorn.domain.types import CatalogEntryV2
 from my_unicorn.logger import get_logger
 
@@ -28,7 +27,6 @@ class CatalogLoader:
                         Defaults to bundled catalog.
         """
         self.catalog_dir = catalog_dir or Paths.CATALOG_DIR
-        self.validator = ConfigValidator()
 
     def load(self, app_name: str) -> CatalogEntryV2:
         """Load catalog entry for app.
@@ -55,13 +53,16 @@ class CatalogLoader:
 
         return cast("CatalogEntryV2", data)
 
-    def load_all(self) -> dict[str, CatalogEntryV2]:
+    def load_all(self) -> tuple[dict[str, CatalogEntryV2], list[str]]:
         """Load all catalog entries.
 
         Returns:
-            Dictionary mapping app names to catalog entries
+            Tuple of (catalog_entries, failed_apps) where:
+            - catalog_entries: Dictionary mapping app names to catalog entries
+            - failed_apps: List of app names that failed to load
         """
         catalog_entries = {}
+        failed_apps = []
 
         for path in self.catalog_dir.glob("*.json"):
             app_name = path.stem
@@ -72,8 +73,9 @@ class CatalogLoader:
                 logger.warning(
                     "Skipping invalid catalog entry %s: %s", app_name, e
                 )
+                failed_apps.append(app_name)
 
-        return catalog_entries
+        return catalog_entries, failed_apps
 
     def exists(self, app_name: str) -> bool:
         """Check if catalog entry exists.
@@ -112,26 +114,3 @@ class CatalogLoader:
                 invalid_apps.append(app_name)
 
         return valid_apps, invalid_apps
-
-    # Backward compatibility methods for old CatalogManager API
-    def load_catalog_entry(self, app_name: str) -> CatalogEntryV2 | None:
-        """Load catalog entry for an app (backward compatible).
-
-        Args:
-            app_name: Application name
-
-        Returns:
-            Catalog entry or None if not found
-        """
-        try:
-            return self.load(app_name)
-        except FileNotFoundError:
-            return None
-
-    def list_catalog_apps(self) -> list[str]:
-        """Get list of available apps in bundled catalog (backward compatible).
-
-        Returns:
-            List of available application names
-        """
-        return self.list_apps()
