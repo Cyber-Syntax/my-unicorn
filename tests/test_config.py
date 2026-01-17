@@ -15,8 +15,8 @@ from my_unicorn.config import (
     ConfigManager,
     GlobalConfigManager,
 )
-from my_unicorn.domain.constants import GLOBAL_CONFIG_VERSION
-from my_unicorn.domain.version import compare_versions
+from my_unicorn.config.migration.helpers import compare_versions
+from my_unicorn.constants import GLOBAL_CONFIG_VERSION
 
 
 @pytest.fixture

@@ -4,7 +4,7 @@ This module provides common utility functions used across the application.
 
 Functions have been reorganized into specific modules following the DRY principle:
 - Asset validation utilities moved to utils.asset_validation (shared across layers)
-- Verification formatting moved to domain.verification.formatting (domain layer)
+- Verification formatting moved to core.verification.formatting (domain layer)
 - Version extraction moved to infrastructure.github.version_utils (GitHub layer)
 - Desktop entry utilities moved to infrastructure.desktop_entry (desktop integration)
 

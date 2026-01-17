@@ -60,7 +60,7 @@ async def test_catalog_available_apps(
 ) -> None:
     """Test CatalogHandler._list_available_apps."""
     mock_logger = mocker.patch(
-        "my_unicorn.workflows.services.catalog_service.logger"
+        "my_unicorn.core.workflows.services.catalog_service.logger"
     )
     args = Namespace(available=True, installed=False, info=None)
 
@@ -83,7 +83,7 @@ async def test_catalog_installed_apps(
 ) -> None:
     """Test CatalogHandler._list_installed_apps."""
     mock_logger = mocker.patch(
-        "my_unicorn.workflows.services.catalog_service.logger"
+        "my_unicorn.core.workflows.services.catalog_service.logger"
     )
     args = Namespace(available=False, installed=True, info=None)
 
@@ -103,7 +103,7 @@ async def test_catalog_info(
 ) -> None:
     """Test CatalogHandler._show_app_info."""
     mock_logger = mocker.patch(
-        "my_unicorn.workflows.services.catalog_service.logger"
+        "my_unicorn.core.workflows.services.catalog_service.logger"
     )
     args = Namespace(available=False, installed=False, info="app1")
 

@@ -12,7 +12,7 @@ from my_unicorn.config.migration.base import (
     needs_migration,
     save_json_file,
 )
-from my_unicorn.domain.version import compare_versions
+from my_unicorn.config.migration.helpers import compare_versions
 
 
 class TestVersionComparison:

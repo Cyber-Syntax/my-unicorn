@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.domain.types import AppConfig, GlobalConfig
-from my_unicorn.workflows.remove import RemoveService
+from my_unicorn.core.workflows.remove import RemoveService
+from my_unicorn.types import AppConfig, GlobalConfig
 
 
 @pytest.fixture
@@ -49,10 +49,10 @@ async def test_remove_app_success(mock_config_manager, global_config):
         patch("pathlib.Path.exists", autospec=True, return_value=True),
         patch("pathlib.Path.unlink", autospec=True) as unlink_mock,
         patch(
-            "my_unicorn.infrastructure.cache.get_cache_manager",
+            "my_unicorn.core.cache.get_cache_manager",
         ) as mock_get_cache,
         patch(
-            "my_unicorn.infrastructure.desktop_entry.remove_desktop_entry_for_app",
+            "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
         ),
     ):
         mock_cache_manager = MagicMock()
@@ -89,9 +89,7 @@ async def test_remove_app_icon_removed_when_present(
             side_effect=exists_side_effect,
         ),
         patch("pathlib.Path.unlink", autospec=True) as unlink_mock,
-        patch(
-            "my_unicorn.infrastructure.desktop_entry.remove_desktop_entry_for_app"
-        ),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
     ):
         result = await service.remove_app("test_app", keep_config=True)
 
@@ -125,9 +123,7 @@ async def test_remove_app_icon_skipped_when_missing(
             side_effect=exists_side_effect,
         ),
         patch("pathlib.Path.unlink", autospec=True) as unlink_mock,
-        patch(
-            "my_unicorn.infrastructure.desktop_entry.remove_desktop_entry_for_app"
-        ),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
     ):
         result = await service.remove_app("test_app", keep_config=True)
 
@@ -172,13 +168,11 @@ async def test_remove_app_cache_and_backup_clear(global_config):
         ),
         patch("pathlib.Path.unlink", autospec=True),
         patch(
-            "my_unicorn.infrastructure.cache.get_cache_manager",
+            "my_unicorn.core.cache.get_cache_manager",
             return_value=mock_cache_manager,
         ),
         patch("shutil.rmtree") as rmtree_mock,
-        patch(
-            "my_unicorn.infrastructure.desktop_entry.remove_desktop_entry_for_app"
-        ),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
     ):
         result = await service.remove_app("test_app", keep_config=False)
 
@@ -249,7 +243,7 @@ async def test_clear_cache_calls_api_when_owner_repo_present(global_config):
     mock_cache_manager.clear_cache = AsyncMock()
 
     with patch(
-        "my_unicorn.infrastructure.cache.get_cache_manager",
+        "my_unicorn.core.cache.get_cache_manager",
         return_value=mock_cache_manager,
     ):
         app_config = cast(
@@ -324,13 +318,13 @@ def test_remove_desktop_entry(mock_config_manager, global_config):
     service = RemoveService(mock_config_manager, global_config)
 
     with patch(
-        "my_unicorn.infrastructure.desktop_entry.remove_desktop_entry_for_app",
+        "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
         return_value=True,
     ):
         assert service._remove_desktop_entry("test_app") is True
 
     with patch(
-        "my_unicorn.infrastructure.desktop_entry.remove_desktop_entry_for_app",
+        "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
         return_value=False,
     ):
         assert service._remove_desktop_entry("test_app") is False

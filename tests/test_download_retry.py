@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, Mock
 import aiohttp
 import pytest
 
-from my_unicorn.infrastructure.download import DownloadService
+from my_unicorn.core.download import DownloadService
 from my_unicorn.ui.progress import ProgressType
 
 # Test constants
@@ -50,7 +50,7 @@ def mock_config(monkeypatch):
         return mock_config_data
 
     monkeypatch.setattr(
-        "my_unicorn.infrastructure.download.config_manager.load_global_config",
+        "my_unicorn.core.download.config_manager.load_global_config",
         mock_load_global_config,
     )
     return mock_config_data
@@ -183,7 +183,7 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail after retries)
-        from my_unicorn.infrastructure.download import DownloadError
+        from my_unicorn.core.download import DownloadError
 
         with pytest.raises(DownloadError):
             await download_service.download_file(url, dest)
@@ -213,7 +213,7 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail after all retries)
-        from my_unicorn.infrastructure.download import DownloadError
+        from my_unicorn.core.download import DownloadError
 
         with pytest.raises(DownloadError):
             await download_service.download_file(url, dest)
@@ -254,7 +254,7 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail after retries)
-        from my_unicorn.infrastructure.download import DownloadError
+        from my_unicorn.core.download import DownloadError
 
         with pytest.raises(DownloadError):
             await download_service.download_file(url, dest)
@@ -285,7 +285,7 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail after retries)
-        from my_unicorn.infrastructure.download import DownloadError
+        from my_unicorn.core.download import DownloadError
 
         with pytest.raises(DownloadError):
             await download_service.download_file(url, dest)
@@ -310,7 +310,7 @@ class TestDownloadRetryLogic:
         )
 
         # Execute download (should fail after retries)
-        from my_unicorn.infrastructure.download import DownloadError
+        from my_unicorn.core.download import DownloadError
 
         with pytest.raises(DownloadError):
             await download_service.download_file(url, dest)
@@ -339,7 +339,7 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail after retries)
-        from my_unicorn.infrastructure.download import DownloadError
+        from my_unicorn.core.download import DownloadError
 
         with pytest.raises(DownloadError):
             await download_service.download_file(url, dest)
@@ -429,7 +429,7 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail immediately)
-        from my_unicorn.infrastructure.download import DownloadError
+        from my_unicorn.core.download import DownloadError
 
         with pytest.raises(DownloadError):
             await download_service.download_file(url, dest)
@@ -471,7 +471,7 @@ class TestDownloadRetryLogic:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         # Execute download (should fail)
-        from my_unicorn.infrastructure.download import DownloadError
+        from my_unicorn.core.download import DownloadError
 
         with pytest.raises(DownloadError):
             await download_service.download_file(url, dest)

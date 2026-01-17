@@ -8,9 +8,9 @@ from abc import ABC, abstractmethod
 from argparse import Namespace
 
 from my_unicorn.config import ConfigManager
-from my_unicorn.infrastructure.auth import GitHubAuthManager
+from my_unicorn.core.auth import GitHubAuthManager
+from my_unicorn.core.workflows.update import UpdateManager
 from my_unicorn.logger import get_logger
-from my_unicorn.workflows.update import UpdateManager
 
 logger = get_logger(__name__)
 

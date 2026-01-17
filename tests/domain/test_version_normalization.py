@@ -2,7 +2,7 @@
 
 import pytest
 
-from my_unicorn.domain.version import normalize_version
+from my_unicorn.cli.upgrade import normalize_version
 
 
 class TestNormalizeVersion:

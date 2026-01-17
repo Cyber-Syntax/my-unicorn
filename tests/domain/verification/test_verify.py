@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from my_unicorn.domain.verification import VerificationConfig, Verifier
+from my_unicorn.core.verification import VerificationConfig, Verifier
 
 
 def test_verify_digest_success(tmp_path: Path) -> None:

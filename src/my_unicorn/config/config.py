@@ -19,7 +19,7 @@ from pathlib import Path
 from my_unicorn.config.app import AppConfigManager
 from my_unicorn.config.catalog import CatalogLoader
 from my_unicorn.config.paths import Paths
-from my_unicorn.domain.types import AppConfig, CatalogEntryV2, GlobalConfig
+from my_unicorn.types import AppConfig, CatalogEntryV2, GlobalConfig
 
 logger = logging.getLogger(__name__)
 

@@ -15,8 +15,10 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
+from my_unicorn.config.migration.helpers import compare_versions
+
 # Import from centralized constants module
-from my_unicorn.domain.constants import (
+from my_unicorn.constants import (
     CONFIG_BACKUP_EXTENSION,
     CONFIG_BACKUP_SUFFIX_TEMPLATE,
     CONFIG_BACKUP_TIMESTAMP_FORMAT,
@@ -33,7 +35,6 @@ from my_unicorn.domain.constants import (
     SECTION_DIRECTORY,
     SECTION_NETWORK,
 )
-from my_unicorn.domain.version import compare_versions
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)

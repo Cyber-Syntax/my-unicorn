@@ -11,7 +11,7 @@ from typing import Any
 
 import orjson
 
-from my_unicorn.domain.version import compare_versions
+from my_unicorn.config.migration.helpers import compare_versions
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)

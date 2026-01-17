@@ -6,13 +6,13 @@ UpdateApplicationService.
 
 from argparse import Namespace
 
+from my_unicorn.core.workflows.services.update_service import (
+    UpdateApplicationService,
+)
+from my_unicorn.core.workflows.update import UpdateManager
 from my_unicorn.logger import get_logger
 from my_unicorn.ui.display_update import display_update_error
 from my_unicorn.ui.progress import progress_session
-from my_unicorn.workflows.services.update_service import (
-    UpdateApplicationService,
-)
-from my_unicorn.workflows.update import UpdateManager
 
 from .base import BaseCommandHandler
 

@@ -22,9 +22,9 @@ from my_unicorn.cli.commands.update import UpdateHandler
 from my_unicorn.cli.commands.upgrade import UpgradeHandler
 from my_unicorn.cli.parser import CLIParser
 from my_unicorn.config import ConfigManager
-from my_unicorn.infrastructure.auth import GitHubAuthManager
+from my_unicorn.core.auth import GitHubAuthManager
+from my_unicorn.core.workflows.update import UpdateManager
 from my_unicorn.logger import get_logger, update_logger_from_config
-from my_unicorn.workflows.update import UpdateManager
 
 logger = get_logger(__name__)
 

@@ -6,7 +6,7 @@ import pytest
 
 from my_unicorn.cli.commands.install import CatalogManagerAdapter
 from my_unicorn.config import config_manager
-from my_unicorn.workflows.install import InstallHandler
+from my_unicorn.core.workflows.install import InstallHandler
 
 
 @pytest.mark.asyncio

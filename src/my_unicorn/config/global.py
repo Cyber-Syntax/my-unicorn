@@ -10,7 +10,7 @@ from my_unicorn.config.parser import (
     _strip_inline_comment,
 )
 from my_unicorn.config.paths import Paths
-from my_unicorn.domain.constants import (
+from my_unicorn.constants import (
     DEFAULT_CONSOLE_LOG_LEVEL,
     DEFAULT_LOG_LEVEL,
     DEFAULT_MAX_BACKUP,
@@ -26,11 +26,7 @@ from my_unicorn.domain.constants import (
     SECTION_DIRECTORY,
     SECTION_NETWORK,
 )
-from my_unicorn.domain.types import (
-    DirectoryConfig,
-    GlobalConfig,
-    NetworkConfig,
-)
+from my_unicorn.types import DirectoryConfig, GlobalConfig, NetworkConfig
 
 logger = logging.getLogger(__name__)
 

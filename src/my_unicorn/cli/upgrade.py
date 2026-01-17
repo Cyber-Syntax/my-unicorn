@@ -8,14 +8,14 @@ See docs/upgrade.md for detailed design rationale.
 
 import asyncio
 import os
+import re
 import shutil
 
 import aiohttp
 from packaging.version import InvalidVersion, Version
 
 from my_unicorn import __version__
-from my_unicorn.domain.version import normalize_version
-from my_unicorn.infrastructure.github.release_fetcher import ReleaseFetcher
+from my_unicorn.core.github.release_fetcher import ReleaseFetcher
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
@@ -23,6 +23,68 @@ logger = get_logger(__name__)
 GITHUB_OWNER = "Cyber-Syntax"
 GITHUB_REPO = "my-unicorn"
 GITHUB_URL = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}"
+
+# Map semver prerelease labels to PEP 440 equivalents
+_PRERELEASE_MAP = {
+    "alpha": "a",
+    "beta": "b",
+    "rc": "rc",
+}
+
+# Regex pattern for detecting semver-style prerelease versions
+_PRERELEASE_RE = re.compile(
+    r"""
+    ^
+    (?P<base>\d+\.\d+\.\d+)
+    (?:-
+        (?P<label>alpha|beta|rc)
+        (?P<num>\d*)?
+    )?
+    $
+    """,
+    re.VERBOSE,
+)
+
+
+def normalize_version(v: str) -> str:
+    """Normalize semver-like versions to PEP 440.
+
+    Converts semantic versioning style prerelease versions to PEP 440 format
+    for proper Python version comparison using packaging.version.
+
+    Examples:
+        >>> normalize_version("1.0.0-alpha")
+        '1.0.0a0'
+        >>> normalize_version("2.0.0-beta1")
+        '2.0.0b1'
+        >>> normalize_version("3.0.0-rc2")
+        '3.0.0rc2'
+        >>> normalize_version("v1.2.3")
+        '1.2.3'
+        >>> normalize_version("1.2.3")
+        '1.2.3'
+
+    Args:
+        v: Version string in semver or PEP 440 format
+
+    Returns:
+        Normalized version string in PEP 440 format
+    """
+    v = v.lstrip("v")
+
+    match = _PRERELEASE_RE.match(v)
+    if not match:
+        return v
+
+    base = match.group("base")
+    label = match.group("label")
+    num = match.group("num") or "0"
+
+    if not label:
+        return base
+
+    pep_label = _PRERELEASE_MAP[label]
+    return f"{base}{pep_label}{num}"
 
 
 def _detect_dev_installation() -> bool:

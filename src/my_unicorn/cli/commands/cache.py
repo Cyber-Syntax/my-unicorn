@@ -7,7 +7,7 @@ and displaying cache statistics.
 import sys
 from argparse import Namespace
 
-from my_unicorn.infrastructure.cache import get_cache_manager
+from my_unicorn.core.cache import get_cache_manager
 from my_unicorn.logger import get_logger
 
 from .base import BaseCommandHandler

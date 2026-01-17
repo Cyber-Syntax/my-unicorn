@@ -7,7 +7,7 @@ import aiohttp
 import pytest
 import pytest_asyncio
 
-from my_unicorn.infrastructure.github import (
+from my_unicorn.core.github import (
     Asset,
     AssetSelector,
     ChecksumFileInfo,

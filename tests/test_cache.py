@@ -11,8 +11,12 @@ from unittest.mock import MagicMock, patch
 import orjson
 import pytest
 
-from my_unicorn.infrastructure.cache import CacheEntry, ReleaseCacheManager, get_cache_manager
 from my_unicorn.config import ConfigManager
+from my_unicorn.core.cache import (
+    CacheEntry,
+    ReleaseCacheManager,
+    get_cache_manager,
+)
 
 
 class TestReleaseCacheManager:
@@ -73,7 +77,7 @@ class TestReleaseCacheManager:
 
     def test_init_without_config_manager(self):
         """Test initialization without explicit config manager."""
-        with patch("my_unicorn.infrastructure.cache.ConfigManager") as mock_config_class:
+        with patch("my_unicorn.core.cache.ConfigManager") as mock_config_class:
             mock_config = MagicMock()
             mock_config.load_global_config.return_value = {
                 "directory": {"cache": Path("/tmp")}
@@ -495,13 +499,13 @@ class TestReleaseCacheManager:
     def test_get_cache_manager_singleton(self):
         """Test the module-level cache manager getter."""
         # Test that it creates a new instance when none exists
-        with patch("my_unicorn.infrastructure.cache._cache_manager", None):
+        with patch("my_unicorn.core.cache._cache_manager", None):
             manager = get_cache_manager(ttl_hours=48)
             assert isinstance(manager, ReleaseCacheManager)
             assert manager.ttl_hours == 48
 
     def test_get_cache_manager_existing_instance(self):
         """Test get_cache_manager returns existing instance when available."""
-        with patch("my_unicorn.infrastructure.cache._cache_manager") as mock_manager:
+        with patch("my_unicorn.core.cache._cache_manager") as mock_manager:
             result = get_cache_manager()
             assert result == mock_manager

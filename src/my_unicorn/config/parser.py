@@ -8,7 +8,7 @@ import configparser
 from datetime import UTC, datetime
 from typing import Any
 
-from my_unicorn.domain.constants import (
+from my_unicorn.constants import (
     GLOBAL_CONFIG_VERSION,
     ISO_DATETIME_FORMAT,
     KEY_CONFIG_VERSION,

@@ -13,7 +13,7 @@ from my_unicorn.config.migration.catalog_config import (
     _get_verification_method,
     migrate_catalog_v1_to_v2,
 )
-from my_unicorn.domain.constants import CATALOG_CONFIG_VERSION
+from my_unicorn.constants import CATALOG_CONFIG_VERSION
 
 
 class TestCatalogMigrationFunctions:

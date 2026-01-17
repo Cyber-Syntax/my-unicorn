@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from my_unicorn.domain.verification.checksum_parser import (
+from my_unicorn.core.verification.checksum_parser import (
     convert_base64_to_hex,
     detect_hash_type_from_checksum_filename,
     find_checksum_entry,
@@ -99,7 +99,7 @@ def test_find_checksum_entry_yaml_not_found() -> None:
     assert entry is None
 
 
-@patch("my_unicorn.domain.verification.checksum_parser._YAML_AVAILABLE", False)
+@patch("my_unicorn.core.verification.checksum_parser._YAML_AVAILABLE", False)
 def test_find_checksum_entry_yaml_not_available() -> None:
     entry = find_checksum_entry(
         LEGCORD_YAML_CONTENT,

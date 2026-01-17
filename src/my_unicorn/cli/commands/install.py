@@ -7,15 +7,15 @@ InstallApplicationService.
 from argparse import Namespace
 from pathlib import Path
 
-from my_unicorn.infrastructure.github import GitHubClient
-from my_unicorn.infrastructure.http_session import create_http_session
-from my_unicorn.logger import get_logger
-from my_unicorn.ui.display_install import print_install_summary
-from my_unicorn.ui.progress import ProgressDisplay
-from my_unicorn.workflows.services.install_service import (
+from my_unicorn.core.github import GitHubClient
+from my_unicorn.core.http_session import create_http_session
+from my_unicorn.core.workflows.services.install_service import (
     InstallApplicationService,
     InstallOptions,
 )
+from my_unicorn.logger import get_logger
+from my_unicorn.ui.display_install import print_install_summary
+from my_unicorn.ui.progress import ProgressDisplay
 
 from .base import BaseCommandHandler
 from .catalog_adapter import CatalogManagerAdapter

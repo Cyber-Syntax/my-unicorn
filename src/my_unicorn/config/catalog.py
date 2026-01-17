@@ -10,8 +10,8 @@ from typing import cast
 import orjson
 
 from my_unicorn.config.paths import Paths
-from my_unicorn.domain.types import CatalogEntryV2
 from my_unicorn.logger import get_logger
+from my_unicorn.types import CatalogEntryV2
 
 logger = get_logger(__name__)
 

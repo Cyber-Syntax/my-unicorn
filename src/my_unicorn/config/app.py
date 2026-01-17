@@ -12,8 +12,8 @@ from my_unicorn.config.schemas.validator import (
     SchemaValidationError,
     validate_app_state,
 )
-from my_unicorn.domain.constants import APP_CONFIG_VERSION
-from my_unicorn.domain.types import AppConfig
+from my_unicorn.constants import APP_CONFIG_VERSION
+from my_unicorn.types import AppConfig
 
 logger = logging.getLogger(__name__)
 

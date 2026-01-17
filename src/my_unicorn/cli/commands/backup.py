@@ -6,8 +6,8 @@ Thin coordinator that delegates to BackupService and displays results.
 from argparse import Namespace
 from pathlib import Path
 
+from my_unicorn.core.workflows.backup import BackupService
 from my_unicorn.logger import get_logger
-from my_unicorn.workflows.backup import BackupService
 
 from .base import BaseCommandHandler
 

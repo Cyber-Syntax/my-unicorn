@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.workflows.services.install_service import (
+from my_unicorn.core.workflows.services.install_service import (
     InstallApplicationService,
     InstallOptions,
 )
@@ -158,13 +158,13 @@ class TestInstallApplicationService:
         """Test successful installation workflow."""
         # Mock separate_targets_impl
         with patch(
-            "my_unicorn.workflows.install.InstallHandler.separate_targets_impl"
+            "my_unicorn.core.workflows.install.InstallHandler.separate_targets_impl"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1"])
 
             # Mock check_apps_needing_work_impl
             with patch(
-                "my_unicorn.workflows.install.InstallHandler.check_apps_needing_work_impl"
+                "my_unicorn.core.workflows.install.InstallHandler.check_apps_needing_work_impl"
             ) as mock_check:
                 mock_check.return_value = ([], ["app1"], [])
 
@@ -193,13 +193,13 @@ class TestInstallApplicationService:
         """Test installation when app is already installed."""
         # Mock separate_targets_impl
         with patch(
-            "my_unicorn.workflows.install.InstallHandler.separate_targets_impl"
+            "my_unicorn.core.workflows.install.InstallHandler.separate_targets_impl"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1"])
 
             # Mock check_apps_needing_work_impl - app already installed
             with patch(
-                "my_unicorn.workflows.install.InstallHandler.check_apps_needing_work_impl"
+                "my_unicorn.core.workflows.install.InstallHandler.check_apps_needing_work_impl"
             ) as mock_check:
                 mock_check.return_value = ([], [], ["app1"])
 
@@ -216,13 +216,13 @@ class TestInstallApplicationService:
         """Test installation with mix of already installed and new apps."""
         # Mock separate_targets_impl
         with patch(
-            "my_unicorn.workflows.install.InstallHandler.separate_targets_impl"
+            "my_unicorn.core.workflows.install.InstallHandler.separate_targets_impl"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1", "app2"])
 
             # Mock check_apps_needing_work_impl
             with patch(
-                "my_unicorn.workflows.install.InstallHandler.check_apps_needing_work_impl"
+                "my_unicorn.core.workflows.install.InstallHandler.check_apps_needing_work_impl"
             ) as mock_check:
                 # app1 needs work, app2 already installed
                 mock_check.return_value = ([], ["app1"], ["app2"])
@@ -259,7 +259,7 @@ class TestInstallApplicationService:
         """Test installation with URL targets."""
         # Mock separate_targets_impl
         with patch(
-            "my_unicorn.workflows.install.InstallHandler.separate_targets_impl"
+            "my_unicorn.core.workflows.install.InstallHandler.separate_targets_impl"
         ) as mock_separate:
             mock_separate.return_value = (
                 [
@@ -270,7 +270,7 @@ class TestInstallApplicationService:
 
             # Mock check_apps_needing_work_impl
             with patch(
-                "my_unicorn.workflows.install.InstallHandler.check_apps_needing_work_impl"
+                "my_unicorn.core.workflows.install.InstallHandler.check_apps_needing_work_impl"
             ) as mock_check:
                 mock_check.return_value = (
                     [
@@ -310,13 +310,13 @@ class TestInstallApplicationService:
         """Test that progress session is properly managed."""
         # Mock separate_targets_impl
         with patch(
-            "my_unicorn.workflows.install.InstallHandler.separate_targets_impl"
+            "my_unicorn.core.workflows.install.InstallHandler.separate_targets_impl"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1"])
 
             # Mock check_apps_needing_work_impl
             with patch(
-                "my_unicorn.workflows.install.InstallHandler.check_apps_needing_work_impl"
+                "my_unicorn.core.workflows.install.InstallHandler.check_apps_needing_work_impl"
             ) as mock_check:
                 mock_check.return_value = ([], ["app1"], [])
 
@@ -346,13 +346,13 @@ class TestInstallApplicationService:
         """Test that shared API task is set on GitHub client."""
         # Mock separate_targets_impl
         with patch(
-            "my_unicorn.workflows.install.InstallHandler.separate_targets_impl"
+            "my_unicorn.core.workflows.install.InstallHandler.separate_targets_impl"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1"])
 
             # Mock check_apps_needing_work_impl
             with patch(
-                "my_unicorn.workflows.install.InstallHandler.check_apps_needing_work_impl"
+                "my_unicorn.core.workflows.install.InstallHandler.check_apps_needing_work_impl"
             ) as mock_check:
                 mock_check.return_value = ([], ["app1"], [])
 

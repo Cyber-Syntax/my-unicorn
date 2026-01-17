@@ -11,10 +11,7 @@ from my_unicorn.config.migration import base
 from my_unicorn.config.migration.app_config import AppConfigMigrator
 from my_unicorn.config.migration.catalog_config import migrate_catalog_v1_to_v2
 from my_unicorn.config.migration.helpers import get_apps_needing_migration
-from my_unicorn.domain.constants import (
-    APP_CONFIG_VERSION,
-    CATALOG_CONFIG_VERSION,
-)
+from my_unicorn.constants import APP_CONFIG_VERSION, CATALOG_CONFIG_VERSION
 from my_unicorn.logger import get_logger
 
 from .base import BaseCommandHandler

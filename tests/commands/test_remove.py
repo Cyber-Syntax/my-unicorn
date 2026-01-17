@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from my_unicorn.cli.commands.remove import RemoveHandler
-from my_unicorn.infrastructure.desktop_entry import ConfigManager
+from my_unicorn.core.desktop_entry import ConfigManager
 
 
 @pytest.fixture
@@ -226,7 +226,7 @@ async def test_remove_app_with_desktop_entry_error(
         ) as mock_exists,
         patch("pathlib.Path.unlink", autospec=True) as mock_unlink,
         patch(
-            "my_unicorn.infrastructure.desktop_entry.remove_desktop_entry_for_app",
+            "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
             side_effect=Exception("Desktop entry error"),
         ) as mock_remove_desktop_entry,
         patch(

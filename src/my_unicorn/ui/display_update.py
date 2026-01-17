@@ -12,7 +12,7 @@ Note:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from my_unicorn.workflows.update import UpdateInfo
+    from my_unicorn.core.workflows.update import UpdateInfo
 
 from my_unicorn.logger import get_logger
 
