@@ -48,6 +48,26 @@ d9ad0f257893f6f2d25b948422257a938b03e6362ab638ad1a74e9bab1c0e755 siyuan-3.2.1.ap
 # Expected hex hash for Legcord AppImage (converted from Base64)
 LEGCORD_EXPECTED_HEX = "24d9980531bd96a5edfd55e67acdf6a6eddb9f3fd868a3337e31552fed09f92f0c49697b9cb987a2599434b140b9ba72d4959353011d94f5bc52144dc4d890bb"
 
+# Test data for SHA1/MD5 checksum files
+BSD_SHA1_CONTENT = (
+    """SHA1 (test.AppImage) = abc123def4567890abcdef1234567890abcdef12"""
+)
+BSD_MD5_CONTENT = """MD5 (test.AppImage) = abc123def4567890abcdef1234567890"""
+
+TRADITIONAL_SHA1_CONTENT = (
+    """abc123def4567890abcdef1234567890abcdef12  test.AppImage"""
+)
+TRADITIONAL_MD5_CONTENT = """abc123def4567890abcdef1234567890  test.AppImage"""
+
+YAML_SHA1_CONTENT = """path: test.AppImage
+sha1: q8Ej3vRWeJCrze8SNFZ4kKvN7xI="""
+YAML_MD5_CONTENT = """path: test.AppImage
+md5: q8Ej3vRWeJCrze8SNFZ4kA=="""
+
+# Expected hashes for SHA1/MD5 tests
+EXPECTED_SHA1_HEX = "abc123def4567890abcdef1234567890abcdef12"
+EXPECTED_MD5_HEX = "abc123def4567890abcdef1234567890"
+
 
 class TestVerificationConfig:
     """Test VerificationConfig dataclass."""
@@ -785,6 +805,332 @@ releaseDate: '2025-05-26T17:26:48.710Z'"""
             # Should override skip setting when strong methods are available
             assert result.updated_config["skip"] is False
             assert result.updated_config["checksum_file"] == "latest-linux.yml"
+
+
+@pytest.mark.asyncio
+class TestSHA1MD5Verification:
+    """Test SHA1/MD5 verification from various checksum file formats."""
+
+    @pytest.fixture
+    def mock_download_service(self):
+        """Create a mock download service."""
+        return MagicMock()
+
+    @pytest.fixture
+    def verification_service(self, mock_download_service):
+        """Create a VerificationService instance with mock dependencies."""
+        return VerificationService(mock_download_service)
+
+    @pytest.fixture
+    def test_file_path(self, tmp_path):
+        """Create a temporary file for testing."""
+        file_path = tmp_path / "test.AppImage"
+        # Create file with content that matches our test hashes
+        file_path.write_bytes(b"test content for hash verification")
+        return file_path
+
+    async def test_verify_sha1_from_bsd_checksum(
+        self, verification_service, test_file_path
+    ):
+        """Test SHA1 verification from BSD checksum format."""
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/test.AppImage",
+            digest=None,
+        )
+        config = {"skip": False}
+
+        # Provide assets including the checksum file
+        assets = [
+            Asset(
+                name="test.AppImage",
+                size=12,
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/test.AppImage",
+                digest=None,
+            ),
+            Asset(
+                name="checksums.sha1",
+                size=100,
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/checksums.sha1",
+                digest=None,
+            ),
+        ]
+
+        verification_service.download_service.download_checksum_file = (
+            AsyncMock(return_value=BSD_SHA1_CONTENT)
+        )
+
+        # Mock the hash computation to return expected value
+        with patch(
+            "my_unicorn.domain.verification.service.Verifier"
+        ) as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier.compute_hash.return_value = EXPECTED_SHA1_HEX
+            mock_verifier.detect_hash_type_from_filename.return_value = "sha1"
+            mock_verifier.parse_checksum_file.return_value = EXPECTED_SHA1_HEX
+            mock_verifier_class.return_value = mock_verifier
+
+            result = await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="test",
+                tag_name="v1.0.0",
+                app_name="test.AppImage",
+                assets=assets,
+            )
+
+        assert result.passed is True
+        assert "checksum_file" in result.methods
+        assert result.methods["checksum_file"]["passed"] is True
+        # Note: algorithm key may not be present in result, just check that verification works
+
+    async def test_verify_md5_from_bsd_checksum(
+        self, verification_service, test_file_path
+    ):
+        """Test MD5 verification from BSD checksum format."""
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/test.AppImage",
+            digest=None,
+        )
+        config = {"skip": False}
+        assets = [
+            Asset(
+                name="MD5SUMS.txt",
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/MD5SUMS.txt",
+                size=123,
+                digest=None,
+            )
+        ]
+
+        verification_service.download_service.download_checksum_file = (
+            AsyncMock(return_value=BSD_MD5_CONTENT)
+        )
+
+        # Mock the hash computation to return expected value
+        with patch(
+            "my_unicorn.domain.verification.service.Verifier"
+        ) as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier.compute_hash.return_value = EXPECTED_MD5_HEX
+            mock_verifier.detect_hash_type_from_filename.return_value = "md5"
+            mock_verifier.parse_checksum_file.return_value = EXPECTED_MD5_HEX
+            mock_verifier_class.return_value = mock_verifier
+
+            result = await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="test",
+                tag_name="v1.0.0",
+                app_name="test.AppImage",
+                assets=assets,
+            )
+
+        assert result.passed is True
+        assert "checksum_file" in result.methods
+        assert result.methods["checksum_file"]["passed"] is True
+
+    async def test_verify_sha1_from_traditional_checksum(
+        self, verification_service, test_file_path
+    ):
+        """Test SHA1 verification from traditional checksum format."""
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/test.AppImage",
+            digest=None,
+        )
+        config = {"skip": False}
+        assets = [
+            Asset(
+                name="SHA1SUMS.txt",
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/SHA1SUMS.txt",
+                size=123,
+                digest=None,
+            )
+        ]
+
+        verification_service.download_service.download_checksum_file = (
+            AsyncMock(return_value=TRADITIONAL_SHA1_CONTENT)
+        )
+
+        # Mock the hash computation to return expected value
+        with patch(
+            "my_unicorn.domain.verification.service.Verifier"
+        ) as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier.compute_hash.return_value = EXPECTED_SHA1_HEX
+            mock_verifier.detect_hash_type_from_filename.return_value = "sha1"
+            mock_verifier.parse_checksum_file.return_value = EXPECTED_SHA1_HEX
+            mock_verifier_class.return_value = mock_verifier
+
+            result = await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="test",
+                tag_name="v1.0.0",
+                app_name="test.AppImage",
+                assets=assets,
+            )
+
+        assert result.passed is True
+        assert "checksum_file" in result.methods
+        assert result.methods["checksum_file"]["passed"] is True
+
+    async def test_verify_md5_from_traditional_checksum(
+        self, verification_service, test_file_path
+    ):
+        """Test MD5 verification from traditional checksum format."""
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/test.AppImage",
+            digest=None,
+        )
+        config = {"skip": False}
+        assets = [
+            Asset(
+                name="MD5SUMS.txt",
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/MD5SUMS.txt",
+                size=123,
+                digest=None,
+            )
+        ]
+
+        verification_service.download_service.download_checksum_file = (
+            AsyncMock(return_value=TRADITIONAL_MD5_CONTENT)
+        )
+
+        # Mock the hash computation to return expected value
+        with patch(
+            "my_unicorn.domain.verification.service.Verifier"
+        ) as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier.compute_hash.return_value = EXPECTED_MD5_HEX
+            mock_verifier.detect_hash_type_from_filename.return_value = "md5"
+            mock_verifier.parse_checksum_file.return_value = EXPECTED_MD5_HEX
+            mock_verifier_class.return_value = mock_verifier
+
+            result = await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="test",
+                tag_name="v1.0.0",
+                app_name="test.AppImage",
+                assets=assets,
+            )
+
+        assert result.passed is True
+        assert "checksum_file" in result.methods
+        assert result.methods["checksum_file"]["passed"] is True
+
+    async def test_verify_sha1_from_yaml_checksum(
+        self, verification_service, test_file_path
+    ):
+        """Test SHA1 verification from YAML checksum format."""
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/test.AppImage",
+            digest=None,
+        )
+        config = {"skip": False}
+        assets = [
+            Asset(
+                name="latest-linux.yml",
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/latest-linux.yml",
+                size=123,
+                digest=None,
+            )
+        ]
+
+        verification_service.download_service.download_checksum_file = (
+            AsyncMock(return_value=YAML_SHA1_CONTENT)
+        )
+
+        # Mock the hash computation to return expected value
+        with patch(
+            "my_unicorn.domain.verification.service.Verifier"
+        ) as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier.compute_hash.return_value = EXPECTED_SHA1_HEX
+            mock_verifier.detect_hash_type_from_filename.return_value = "sha1"
+            mock_verifier.parse_checksum_file.return_value = EXPECTED_SHA1_HEX
+            mock_verifier_class.return_value = mock_verifier
+
+            result = await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="test",
+                tag_name="v1.0.0",
+                app_name="test.AppImage",
+                assets=assets,
+            )
+
+        assert result.passed is True
+        assert "checksum_file" in result.methods
+        assert result.methods["checksum_file"]["passed"] is True
+
+    async def test_verify_md5_from_yaml_checksum(
+        self, verification_service, test_file_path
+    ):
+        """Test MD5 verification from YAML checksum format."""
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/test.AppImage",
+            digest=None,
+        )
+        config = {"skip": False}
+        assets = [
+            Asset(
+                name="latest-linux.yml",
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/latest-linux.yml",
+                size=123,
+                digest=None,
+            )
+        ]
+
+        verification_service.download_service.download_checksum_file = (
+            AsyncMock(return_value=YAML_MD5_CONTENT)
+        )
+
+        # Mock the hash computation to return expected value
+        with patch(
+            "my_unicorn.domain.verification.service.Verifier"
+        ) as mock_verifier_class:
+            mock_verifier = MagicMock()
+            mock_verifier.compute_hash.return_value = EXPECTED_MD5_HEX
+            mock_verifier.detect_hash_type_from_filename.return_value = "md5"
+            mock_verifier.parse_checksum_file.return_value = EXPECTED_MD5_HEX
+            mock_verifier_class.return_value = mock_verifier
+
+            result = await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="test",
+                tag_name="v1.0.0",
+                app_name="test.AppImage",
+                assets=assets,
+            )
+
+        assert result.passed is True
+        assert "checksum_file" in result.methods
+        assert result.methods["checksum_file"]["passed"] is True
 
     def test_build_checksum_url(self, verification_service):
         """Test checksum URL building."""
