@@ -265,8 +265,11 @@ SUPPORTED_HASH_ALGORITHMS: Final[tuple[str, ...]] = (
     "md5",
 )
 
+# Type alias for supported hash types used across verification modules
+HashType = Literal["sha1", "sha256", "sha512", "md5"]
+
 # Default hash algorithm when none is specified/detected
-DEFAULT_HASH_TYPE: Final[str] = "sha256"
+DEFAULT_HASH_TYPE: Final[HashType] = "sha256"
 
 # Default hash to prefer for YAML checksum files
 YAML_DEFAULT_HASH: Final[str] = "sha512"
@@ -278,6 +281,3 @@ HASH_PREFERENCE_ORDER: Final[tuple[str, ...]] = (
     "sha1",
     "md5",
 )
-
-# Type alias for supported hash types used across verification modules
-HashType = Literal["sha1", "sha256", "sha512", "md5"]
