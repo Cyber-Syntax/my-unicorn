@@ -807,7 +807,6 @@ releaseDate: '2025-05-26T17:26:48.710Z'"""
             assert result.updated_config["checksum_file"] == "latest-linux.yml"
 
 
-@pytest.mark.asyncio
 class TestSHA1MD5Verification:
     """Test SHA1/MD5 verification from various checksum file formats."""
 

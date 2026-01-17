@@ -1,4 +1,20 @@
-from my_unicorn.ui.display_install import print_install_summary
+from my_unicorn.ui.display_install import (
+    display_no_targets_error,
+    print_install_summary,
+)
+
+
+def test_display_no_targets_error(capsys):
+    """Test display_no_targets_error shows error and help message."""
+    from unittest.mock import patch
+
+    with patch("my_unicorn.ui.display_install.logger") as mock_logger:
+        display_no_targets_error()
+
+        mock_logger.error.assert_called_once_with("❌ No targets specified.")
+        mock_logger.info.assert_called_once_with(
+            "💡 Use 'my-unicorn catalog' to see available catalog apps."
+        )
 
 
 def test_print_install_summary_all_already_installed(capsys):

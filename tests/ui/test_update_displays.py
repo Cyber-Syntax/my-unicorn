@@ -1,6 +1,7 @@
 """Tests for display_update utility module."""
 
 from dataclasses import dataclass
+from unittest.mock import MagicMock, patch
 
 
 @dataclass
@@ -336,3 +337,218 @@ class TestDisplayMessageFunctions:
 
         captured = capsys.readouterr()
         assert "⚠️  Low disk space" in captured.out
+
+
+class TestDisplayCheckResults:
+    """Tests for display_check_results function."""
+
+    def test_display_check_results_with_updates(self):
+        """Test display_check_results with available updates."""
+        from my_unicorn.ui.display_update import display_check_results
+
+        results = {
+            "available_updates": [
+                {
+                    "app_name": "app1",
+                    "current_version": "1.0.0",
+                    "latest_version": "2.0.0",
+                },
+                {
+                    "app_name": "app2",
+                    "current_version": "1.5.0",
+                    "latest_version": "2.5.0",
+                },
+            ]
+        }
+
+        with patch("my_unicorn.ui.display_update.logger") as mock_logger:
+            display_check_results(results)
+
+            assert mock_logger.info.call_count >= 3
+            mock_logger.info.assert_any_call("Updates available:")
+            mock_logger.info.assert_any_call(
+                "  %s: %s → %s", "app1", "1.0.0", "2.0.0"
+            )
+
+    def test_display_check_results_no_updates(self):
+        """Test display_check_results with no updates."""
+        from my_unicorn.ui.display_update import display_check_results
+
+        results = {"available_updates": []}
+
+        with patch("my_unicorn.ui.display_update.logger") as mock_logger:
+            display_check_results(results)
+
+            mock_logger.info.assert_called_once_with(
+                "✅ All apps are up to date"
+            )
+
+
+class TestDisplayUpdateResults:
+    """Tests for display_update_results function."""
+
+    def test_display_update_results_with_infos(self, capsys):
+        """Test display_update_results with update_infos."""
+        from my_unicorn.ui.display_update import display_update_results
+
+        update_infos = [
+            MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
+        ]
+        results = {
+            "updated": ["app1"],
+            "failed": [],
+            "up_to_date": [],
+            "update_infos": update_infos,
+        }
+
+        display_update_results(results)
+
+        captured = capsys.readouterr()
+        assert "📦 Update Summary:" in captured.out
+        assert "app1" in captured.out
+        assert "✅" in captured.out
+        assert "1.0.0 → 2.0.0" in captured.out
+        assert "Successfully updated 1 app(s)" in captured.out
+
+    def test_display_update_results_with_failures(self, capsys):
+        """Test display_update_results with failed updates."""
+        from my_unicorn.ui.display_update import display_update_results
+
+        update_infos = [
+            MockUpdateInfo(
+                "app1",
+                "1.0.0",
+                "2.0.0",
+                has_update=True,
+                error_reason="Network timeout",
+            ),
+        ]
+        results = {
+            "updated": [],
+            "failed": ["app1"],
+            "up_to_date": [],
+            "update_infos": update_infos,
+        }
+
+        display_update_results(results)
+
+        captured = capsys.readouterr()
+        assert "app1" in captured.out
+        assert "❌ Update failed" in captured.out
+        assert "Network timeout" in captured.out
+        assert "1 app(s) failed to update" in captured.out
+
+    def test_display_update_results_with_up_to_date(self, capsys):
+        """Test display_update_results with up-to-date apps."""
+        from my_unicorn.ui.display_update import display_update_results
+
+        update_infos = [
+            MockUpdateInfo("app1", "2.0.0", "2.0.0", has_update=False),
+        ]
+        results = {
+            "updated": [],
+            "failed": [],
+            "up_to_date": ["app1"],
+            "update_infos": update_infos,
+        }
+
+        display_update_results(results)
+
+        captured = capsys.readouterr()
+        assert "app1" in captured.out
+        assert "Already up to date" in captured.out
+        assert "2.0.0" in captured.out
+
+    def test_display_update_results_fallback_without_infos(self):
+        """Test display_update_results fallback when no update_infos."""
+        from my_unicorn.ui.display_update import display_update_results
+
+        results = {
+            "updated": ["app1"],
+            "failed": ["app2"],
+            "up_to_date": ["app3"],
+            "update_infos": [],
+        }
+
+        with patch("my_unicorn.ui.display_update.logger") as mock_logger:
+            display_update_results(results)
+
+            mock_logger.info.assert_any_call(
+                "✅ Successfully updated: %s", "app1"
+            )
+            mock_logger.error.assert_any_call(
+                "❌ Failed to update: %s", "app2"
+            )
+            mock_logger.info.assert_any_call("Already up to date: %s", "app3")
+
+    def test_display_update_results_mixed(self, capsys):
+        """Test display_update_results with mixed results."""
+        from my_unicorn.ui.display_update import display_update_results
+
+        update_infos = [
+            MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
+            MockUpdateInfo("app2", "1.5.0", "2.5.0", has_update=True),
+            MockUpdateInfo("app3", "3.0.0", "3.0.0", has_update=False),
+        ]
+        results = {
+            "updated": ["app1"],
+            "failed": ["app2"],
+            "up_to_date": ["app3"],
+            "update_infos": update_infos,
+        }
+
+        display_update_results(results)
+
+        captured = capsys.readouterr()
+        assert "app1" in captured.out and "✅" in captured.out
+        assert "app2" in captured.out and "❌" in captured.out
+        assert "app3" in captured.out and "Already up to date" in captured.out
+
+
+class TestDisplayInvalidApps:
+    """Tests for display_invalid_apps function."""
+
+    def test_display_invalid_apps_with_suggestions(self):
+        """Test display_invalid_apps with installed apps for suggestions."""
+        from my_unicorn.ui.display_update import display_invalid_apps
+
+        mock_config_manager = MagicMock()
+        mock_config_manager.list_installed_apps.return_value = [
+            "firefox",
+            "chrome",
+        ]
+
+        with patch("my_unicorn.ui.display_update.logger") as mock_logger:
+            display_invalid_apps(["unknown"], mock_config_manager)
+
+            mock_logger.warning.assert_called_once_with(
+                "⚠️  Apps not found: %s", "unknown"
+            )
+            mock_logger.info.assert_called_once_with(
+                "   Installed apps: %s", "firefox, chrome"
+            )
+
+    def test_display_invalid_apps_no_installed(self):
+        """Test display_invalid_apps with no installed apps."""
+        from my_unicorn.ui.display_update import display_invalid_apps
+
+        mock_config_manager = MagicMock()
+        mock_config_manager.list_installed_apps.return_value = []
+
+        with patch("my_unicorn.ui.display_update.logger") as mock_logger:
+            display_invalid_apps(["unknown"], mock_config_manager)
+
+            mock_logger.warning.assert_called_once()
+            assert mock_logger.info.call_count == 0
+
+    def test_display_invalid_apps_empty_list(self):
+        """Test display_invalid_apps with empty list."""
+        from my_unicorn.ui.display_update import display_invalid_apps
+
+        mock_config_manager = MagicMock()
+
+        with patch("my_unicorn.ui.display_update.logger") as mock_logger:
+            display_invalid_apps([], mock_config_manager)
+
+            mock_logger.warning.assert_not_called()
+            mock_logger.info.assert_not_called()

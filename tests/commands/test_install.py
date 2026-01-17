@@ -42,13 +42,12 @@ async def test_install_handler_no_targets(
     """Test InstallCommandHandler with no targets."""
     args = Namespace(targets=[])
 
-    with patch("my_unicorn.cli.commands.install.logger") as mock_logger:
+    with patch(
+        "my_unicorn.cli.commands.install.display_no_targets_error"
+    ) as mock_display:
         await install_handler.execute(args)
 
-        mock_logger.error.assert_called_once_with("❌ No targets specified.")
-        mock_logger.info.assert_called_once_with(
-            "💡 Use 'my-unicorn catalog' to see available catalog apps."
-        )
+        mock_display.assert_called_once()
 
 
 @pytest.mark.asyncio
