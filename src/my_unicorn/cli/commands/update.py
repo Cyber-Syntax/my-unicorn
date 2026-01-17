@@ -11,10 +11,16 @@ from my_unicorn.core.workflows.services.update_service import (
 )
 from my_unicorn.core.workflows.update import UpdateManager
 from my_unicorn.logger import get_logger
-from my_unicorn.ui.display_update import display_update_error
+from my_unicorn.ui.display_update import (
+    display_check_results,
+    display_invalid_apps,
+    display_update_error,
+    display_update_results,
+)
 from my_unicorn.ui.progress import progress_session
 
 from .base import BaseCommandHandler
+from .helpers import parse_targets
 
 logger = get_logger(__name__)
 
@@ -38,71 +44,27 @@ class UpdateHandler(BaseCommandHandler):
                     progress_service=progress,
                 )
 
-                app_names = self._parse_targets(args) if args.apps else None
+                app_names = parse_targets(args.apps) if args.apps else None
                 refresh = getattr(args, "refresh_cache", False)
 
                 if getattr(args, "check_only", False):
                     results = await service.check_for_updates(
                         app_names=app_names, refresh_cache=refresh
                     )
-                    self._display_check_results(results)
                 else:
                     results = await service.perform_updates(
                         app_names=app_names, refresh_cache=refresh, force=False
                     )
-                    self._display_update_results(results)
 
-                self._log_invalid_apps(results.get("invalid_apps", []))
+            # Display results after progress session ends
+            if getattr(args, "check_only", False):
+                display_check_results(results)
+            else:
+                display_update_results(results)
+
+            display_invalid_apps(
+                results.get("invalid_apps", []), self.config_manager
+            )
         except Exception as e:
             display_update_error(f"Update operation failed: {e}")
             logger.exception("Update operation failed")
-
-    def _parse_targets(self, args: Namespace) -> list[str]:
-        """Parse app names from arguments."""
-        return (
-            self._expand_comma_separated_targets(args.apps)
-            if args.apps
-            else []
-        )
-
-    def _parse_app_names(self, args: Namespace) -> list[str]:
-        """Alias for _parse_targets for backward compatibility."""
-        return self._parse_targets(args)
-
-    def _display_check_results(self, results: dict) -> None:
-        """Display check results."""
-        if results["available_updates"]:
-            logger.info("Updates available:")
-            for info in results["available_updates"]:
-                logger.info(
-                    "  %s: %s → %s",
-                    info["app_name"],
-                    info["current_version"],
-                    info["latest_version"],
-                )
-            logger.info("\nRun 'my-unicorn update' to install updates")
-        else:
-            logger.info("✅ All apps are up to date")
-
-    def _display_update_results(self, results: dict) -> None:
-        """Display update results."""
-        if results["updated"]:
-            logger.info(
-                "✅ Successfully updated: %s", ", ".join(results["updated"])
-            )
-        if results["failed"]:
-            logger.error(
-                "❌ Failed to update: %s", ", ".join(results["failed"])
-            )
-        if results["up_to_date"]:
-            logger.info(
-                "Already up to date: %s", ", ".join(results["up_to_date"])
-            )
-
-    def _log_invalid_apps(self, invalid_apps: list[str]) -> None:
-        """Log invalid app names."""
-        if invalid_apps:
-            logger.warning("⚠️  Apps not found: %s", ", ".join(invalid_apps))
-            installed = self.config_manager.list_installed_apps()
-            if installed:
-                logger.info("   Installed apps: %s", ", ".join(installed))
