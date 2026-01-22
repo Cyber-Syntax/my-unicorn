@@ -63,6 +63,7 @@ dev = [
   "pytest-asyncio",
   "aioresponses",
   "requests",
+  "mypy>=1.19.1",
 ]
 lint = ["ruff"]
 
