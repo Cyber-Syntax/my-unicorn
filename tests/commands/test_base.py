@@ -56,19 +56,3 @@ def test_ensure_directories(handler):
     h._ensure_directories()
     assert called["ensured"] is True
     assert "dirs" in called["config"]
-
-
-@pytest.mark.parametrize(
-    "targets, expected",
-    [
-        (["one", "two"], ["one", "two"]),
-        (["one,two"], ["one", "two"]),
-        (["one, two", "three"], ["one", "two", "three"]),
-        (["one", "One", "ONE"], ["one"]),
-        (["a,b,c", "c, d", "E"], ["a", "b", "c", "d", "E"]),
-    ],
-)
-def test_expand_comma_separated_targets(handler, targets, expected):
-    h, _ = handler
-    result = h._expand_comma_separated_targets(targets)
-    assert result == expected

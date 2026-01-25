@@ -15,8 +15,10 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
+from my_unicorn.config.migration.helpers import compare_versions
+
 # Import from centralized constants module
-from my_unicorn.domain.constants import (
+from my_unicorn.constants import (
     CONFIG_BACKUP_EXTENSION,
     CONFIG_BACKUP_SUFFIX_TEMPLATE,
     CONFIG_BACKUP_TIMESTAMP_FORMAT,
@@ -111,44 +113,7 @@ class ConfigMigration:
             True if migration is needed
 
         """
-        return (
-            self._compare_versions(current_version, GLOBAL_CONFIG_VERSION) < 0
-        )
-
-    def _compare_versions(self, version1: str, version2: str) -> int:
-        """Compare two semantic version strings.
-
-        Args:
-            version1: First version string (e.g., "1.0.0")
-            version2: Second version string (e.g., "1.0.1")
-
-        Returns:
-            -1 if version1 < version2, 0 if equal, 1 if version1 > version2
-
-        """
-
-        def parse_version(version: str) -> list[int]:
-            """Parse version string into list of integers."""
-            try:
-                return [int(x) for x in version.split(".")]
-            except ValueError:
-                # Fallback for invalid versions
-                return [0, 0, 0]
-
-        v1_parts = parse_version(version1)
-        v2_parts = parse_version(version2)
-
-        # Pad shorter version with zeros
-        max_len = max(len(v1_parts), len(v2_parts))
-        v1_parts.extend([0] * (max_len - len(v1_parts)))
-        v2_parts.extend([0] * (max_len - len(v2_parts)))
-
-        for v1, v2 in zip(v1_parts, v2_parts, strict=True):
-            if v1 < v2:
-                return -1
-            if v1 > v2:
-                return 1
-        return 0
+        return compare_versions(current_version, GLOBAL_CONFIG_VERSION) < 0
 
     def _migrate_configuration(
         self,

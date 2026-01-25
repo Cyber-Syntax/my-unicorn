@@ -20,7 +20,7 @@ from my_unicorn.config.parser import (
     ConfigCommentManager,
 )
 from my_unicorn.config.paths import Paths
-from my_unicorn.domain.types import AppConfig, GlobalConfig
+from my_unicorn.types import AppConfig, GlobalConfig
 
 _global_module = importlib.import_module("my_unicorn.config.global")
 GlobalConfigManager = _global_module.GlobalConfigManager

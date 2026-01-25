@@ -15,7 +15,7 @@ v2 Format (hybrid structure):
 from typing import TYPE_CHECKING, Any
 
 from my_unicorn.config.migration import base
-from my_unicorn.domain.constants import APP_CONFIG_VERSION
+from my_unicorn.constants import APP_CONFIG_VERSION
 
 if TYPE_CHECKING:
     from my_unicorn.config import ConfigManager

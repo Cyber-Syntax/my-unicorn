@@ -3,7 +3,7 @@
 Tests cover filename sanitization and desktop entry name generation.
 """
 
-from my_unicorn.infrastructure.desktop_entry import (
+from my_unicorn.core.desktop_entry import (
     create_desktop_entry_name,
     sanitize_filename,
 )

@@ -6,7 +6,7 @@ making it easy to reference and override paths consistently.
 
 from pathlib import Path
 
-from my_unicorn.domain.constants import (
+from my_unicorn.constants import (
     CONFIG_DIR_NAME,
     CONFIG_FILE_NAME,
     DEFAULT_APPS_DIR_NAME,

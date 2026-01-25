@@ -5,22 +5,22 @@ InstallApplicationService.
 """
 
 from argparse import Namespace
-from pathlib import Path
 
-from my_unicorn.infrastructure.github import GitHubClient
-from my_unicorn.infrastructure.http_session import create_http_session
-from my_unicorn.logger import get_logger
-from my_unicorn.ui.display_install import print_install_summary
-from my_unicorn.ui.progress import ProgressDisplay
-from my_unicorn.workflows.services.install_service import (
+from my_unicorn.core.github import GitHubClient
+from my_unicorn.core.http_session import create_http_session
+from my_unicorn.core.workflows.services.install_service import (
     InstallApplicationService,
     InstallOptions,
 )
+from my_unicorn.ui.display_install import (
+    display_no_targets_error,
+    print_install_summary,
+)
+from my_unicorn.ui.progress import ProgressDisplay
 
 from .base import BaseCommandHandler
 from .catalog_adapter import CatalogManagerAdapter
-
-logger = get_logger(__name__)
+from .helpers import ensure_app_directories, get_install_paths, parse_targets
 
 
 class InstallCommandHandler(BaseCommandHandler):
@@ -29,20 +29,14 @@ class InstallCommandHandler(BaseCommandHandler):
     async def execute(self, args: Namespace) -> None:
         """Execute install command."""
         # Parse and validate
-        targets = self._expand_comma_separated_targets(
-            getattr(args, "targets", [])
-        )
+        targets = parse_targets(getattr(args, "targets", None))
         if not targets:
-            logger.error("❌ No targets specified.")
-            logger.info(
-                "💡 Use 'my-unicorn list' to see available catalog apps."
-            )
+            display_no_targets_error()
             return
 
         # Setup
-        self._ensure_directories()
-        install_dir = Path(self.global_config["directory"]["storage"])
-        download_dir = Path(self.global_config["directory"]["download"])
+        ensure_app_directories(self.config_manager, self.global_config)
+        install_dir, download_dir = get_install_paths(self.global_config)
 
         # Create options
         options = InstallOptions(
@@ -57,7 +51,9 @@ class InstallCommandHandler(BaseCommandHandler):
 
             service = InstallApplicationService(
                 session=session,
-                github_client=GitHubClient(session, progress_service),
+                github_client=GitHubClient(
+                    session, progress_service=progress_service
+                ),
                 catalog_manager=CatalogManagerAdapter(self.config_manager),
                 config_manager=self.config_manager,
                 install_dir=install_dir,

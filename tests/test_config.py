@@ -15,7 +15,8 @@ from my_unicorn.config import (
     ConfigManager,
     GlobalConfigManager,
 )
-from my_unicorn.domain.constants import GLOBAL_CONFIG_VERSION
+from my_unicorn.config.migration.helpers import compare_versions
+from my_unicorn.constants import GLOBAL_CONFIG_VERSION
 
 
 @pytest.fixture
@@ -186,7 +187,7 @@ def test_list_catalog_apps(config_manager: ConfigManager) -> None:
 
 def test_load_catalog_entry(config_manager: ConfigManager) -> None:
     """Test loading catalog entry."""
-    entry = config_manager.load_catalog_entry("dummyapp")
+    entry = config_manager.load_catalog("dummyapp")
     assert entry is not None
     assert entry["source"]["owner"] == "dummy"
     assert entry["source"]["repo"] == "dummyrepo"
@@ -451,18 +452,18 @@ def test_catalog_manager(config_dir: Path) -> None:
     catalog_loader = CatalogLoader(catalog_dir)
 
     # Test listing catalog apps
-    catalog_apps = catalog_loader.list_catalog_apps()
+    catalog_apps = catalog_loader.list_apps()
     assert "testapp" in catalog_apps
 
     # Test loading catalog entry
-    entry = catalog_loader.load_catalog_entry("testapp")
+    entry = catalog_loader.load("testapp")
     assert entry is not None
     assert entry["source"]["owner"] == "testowner"
     assert entry["source"]["repo"] == "testapp"
 
     # Test non-existent catalog entry
-    nonexistent = catalog_loader.load_catalog_entry("nonexistent")
-    assert nonexistent is None
+    with pytest.raises(FileNotFoundError):
+        catalog_loader.load("nonexistent")
 
 
 def test_config_manager_facade_integration(config_dir: Path) -> None:
@@ -559,7 +560,7 @@ def test_config_manager_facade_integration(config_dir: Path) -> None:
     catalog_apps = config_manager.list_catalog_apps()
     assert "integration_test" in catalog_apps
 
-    catalog_entry = config_manager.load_catalog_entry("integration_test")
+    catalog_entry = config_manager.load_catalog("integration_test")
     assert catalog_entry is not None
     assert catalog_entry["source"]["repo"] == "test"
 
@@ -588,27 +589,27 @@ def test_version_comparison(config_dir: Path) -> None:
     manager = GlobalConfigManager(config_dir)
 
     # Test equal versions
-    assert manager.migration._compare_versions("1.0.0", "1.0.0") == 0
-    assert manager.migration._compare_versions("1.0.1", "1.0.1") == 0
+    assert compare_versions("1.0.0", "1.0.0") == 0
+    assert compare_versions("1.0.1", "1.0.1") == 0
 
     # Test version1 < version2
-    assert manager.migration._compare_versions("1.0.0", "1.0.1") == -1
-    assert manager.migration._compare_versions("1.0.1", "1.1.0") == -1
-    assert manager.migration._compare_versions("1.1.0", "2.0.0") == -1
+    assert compare_versions("1.0.0", "1.0.1") == -1
+    assert compare_versions("1.0.1", "1.1.0") == -1
+    assert compare_versions("1.1.0", "2.0.0") == -1
 
     # Test version1 > version2
-    assert manager.migration._compare_versions("1.0.1", "1.0.0") == 1
-    assert manager.migration._compare_versions("1.1.0", "1.0.1") == 1
-    assert manager.migration._compare_versions("2.0.0", "1.1.0") == 1
+    assert compare_versions("1.0.1", "1.0.0") == 1
+    assert compare_versions("1.1.0", "1.0.1") == 1
+    assert compare_versions("2.0.0", "1.1.0") == 1
 
     # Test different length versions
-    assert manager.migration._compare_versions("1.0", "1.0.0") == 0
-    assert manager.migration._compare_versions("1.0.0.1", "1.0.0") == 1
-    assert manager.migration._compare_versions("1.0", "1.0.1") == -1
+    assert compare_versions("1.0", "1.0.0") == 0
+    assert compare_versions("1.0.0.1", "1.0.0") == 1
+    assert compare_versions("1.0", "1.0.1") == -1
 
     # Test invalid versions (fallback to 0.0.0)
-    assert manager.migration._compare_versions("invalid", "1.0.0") == -1
-    assert manager.migration._compare_versions("1.0.0", "invalid") == 1
+    assert compare_versions("invalid", "1.0.0") == -1
+    assert compare_versions("1.0.0", "invalid") == 1
 
 
 def test_needs_migration(config_dir: Path) -> None:

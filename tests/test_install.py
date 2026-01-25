@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from my_unicorn.infrastructure.github import Asset, Release
-from my_unicorn.workflows.install import InstallHandler
+from my_unicorn.core.github import Asset, Release
+from my_unicorn.core.workflows.install import InstallHandler
 
 
 class TestInstallHandler:
@@ -95,7 +95,7 @@ class TestInstallHandler:
     ):
         """Test successful installation from catalog."""
         with patch(
-            "my_unicorn.workflows.install.VerificationService"
+            "my_unicorn.core.workflows.install.VerificationService"
         ) as mock_verification:
             from dataclasses import dataclass
 
@@ -116,7 +116,7 @@ class TestInstallHandler:
             )
 
             with patch(
-                "my_unicorn.workflows.appimage_setup.DesktopEntry"
+                "my_unicorn.core.workflows.appimage_setup.DesktopEntry"
             ) as mock_desktop:
                 mock_desktop.return_value.create = Mock(
                     return_value=Path("/desktop/test.desktop")
@@ -147,7 +147,7 @@ class TestInstallHandler:
     ):
         """Test installing multiple apps concurrently."""
         with patch(
-            "my_unicorn.workflows.install.VerificationService"
+            "my_unicorn.core.workflows.install.VerificationService"
         ) as mock_verification:
             from dataclasses import dataclass
 
@@ -168,7 +168,7 @@ class TestInstallHandler:
             )
 
             with patch(
-                "my_unicorn.workflows.appimage_setup.DesktopEntry"
+                "my_unicorn.core.workflows.appimage_setup.DesktopEntry"
             ) as mock_desktop:
                 mock_desktop.return_value.create_desktop_file = Mock(
                     return_value=Path("/desktop/test.desktop")
@@ -189,7 +189,7 @@ class TestInstallHandler:
     ):
         """Test successful installation from URL."""
         with patch(
-            "my_unicorn.workflows.install.VerificationService"
+            "my_unicorn.core.workflows.install.VerificationService"
         ) as mock_verification:
             from dataclasses import dataclass
 
@@ -210,7 +210,7 @@ class TestInstallHandler:
             )
 
             with patch(
-                "my_unicorn.workflows.appimage_setup.DesktopEntry"
+                "my_unicorn.core.workflows.appimage_setup.DesktopEntry"
             ) as mock_desktop:
                 mock_desktop.return_value.create_desktop_file = Mock(
                     return_value=Path("/desktop/test.desktop")
@@ -239,7 +239,7 @@ class TestInstallHandler:
                 )
 
                 with patch(
-                    "my_unicorn.workflows.install.VerificationService"
+                    "my_unicorn.core.workflows.install.VerificationService"
                 ) as mock_verification:
                     mock_verification.return_value.verify_file = AsyncMock(
                         return_value=Mock(

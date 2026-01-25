@@ -12,8 +12,8 @@ from my_unicorn.config.schemas.validator import (
     SchemaValidationError,
     validate_app_state,
 )
-from my_unicorn.domain.constants import APP_CONFIG_VERSION
-from my_unicorn.domain.types import AppConfig
+from my_unicorn.constants import APP_CONFIG_VERSION
+from my_unicorn.types import AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -172,9 +172,12 @@ class AppConfigManager:
         # Step 1: Load catalog as base (if referenced)
         catalog_ref = app_config.get("catalog_ref")
         if catalog_ref and self.catalog_manager:
-            catalog = self.catalog_manager.load_catalog_entry(catalog_ref)
-            if catalog:
+            try:
+                catalog = self.catalog_manager.load(catalog_ref)
                 effective = self._deep_copy(catalog)
+            except (FileNotFoundError, ValueError):
+                # Catalog not found or invalid, skip catalog defaults
+                pass
 
         # Step 2: Merge overrides (for URL installs or user customizations)
         overrides = app_config.get("overrides", {})

@@ -4,10 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from my_unicorn.infrastructure.icon import (
-    AppImageIconExtractor,
-    IconExtractionError,
-)
+from my_unicorn.core.icon import AppImageIconExtractor, IconExtractionError
 
 
 class TestAppImageIconExtractor:

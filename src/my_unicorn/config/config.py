@@ -19,7 +19,7 @@ from pathlib import Path
 from my_unicorn.config.app import AppConfigManager
 from my_unicorn.config.catalog import CatalogLoader
 from my_unicorn.config.paths import Paths
-from my_unicorn.domain.types import AppConfig, CatalogEntryV2, GlobalConfig
+from my_unicorn.types import AppConfig, CatalogEntryV2, GlobalConfig
 
 logger = logging.getLogger(__name__)
 
@@ -137,13 +137,35 @@ class ConfigManager:
         return self.app_config_manager.remove_app_config(app_name)
 
     # Catalog loader delegates
-    def load_catalog_entry(self, app_name: str) -> CatalogEntryV2 | None:
-        """Load catalog entry for an app from bundled catalog."""
-        return self.catalog_loader.load_catalog_entry(app_name)
+    def load_catalog(self, app_name: str) -> CatalogEntryV2:
+        """Load catalog entry for an app from bundled catalog.
+
+        Args:
+            app_name: Application name
+
+        Returns:
+            Catalog entry
+
+        Raises:
+            FileNotFoundError: If catalog entry doesn't exist
+            ValueError: If catalog entry is invalid
+        """
+        return self.catalog_loader.load(app_name)
 
     def list_catalog_apps(self) -> list[str]:
         """Get list of available apps in bundled catalog."""
-        return self.catalog_loader.list_catalog_apps()
+        return self.catalog_loader.list_apps()
+
+    def catalog_exists(self, app_name: str) -> bool:
+        """Check if catalog entry exists for an app.
+
+        Args:
+            app_name: Application name
+
+        Returns:
+            True if catalog exists, False otherwise
+        """
+        return self.catalog_loader.exists(app_name)
 
 
 # Global instance for easy access

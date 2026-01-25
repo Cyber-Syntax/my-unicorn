@@ -11,6 +11,10 @@ and progress display systems.
 
 from typing import Any
 
+from my_unicorn.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 def _categorize_results(results: list[dict[str, Any]]) -> dict[str, list]:
     """Categorize installation results by status."""
@@ -102,3 +106,9 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
         _print_result_line(result)
 
     _print_statistics(categories)
+
+
+def display_no_targets_error() -> None:
+    """Display error when no installation targets are specified."""
+    logger.error("❌ No targets specified.")
+    logger.info("💡 Use 'my-unicorn catalog' to see available catalog apps.")

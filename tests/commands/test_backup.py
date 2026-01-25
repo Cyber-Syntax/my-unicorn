@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from my_unicorn.cli.commands.backup import BackupHandler
-from my_unicorn.workflows.backup import BackupService
+from my_unicorn.core.workflows.backup import BackupService
 
 
 @pytest.fixture
@@ -215,7 +215,7 @@ class TestBackupHandler:
         backup_file.write_text("backup content")
 
         # Use BackupMetadata to create proper checksums
-        from my_unicorn.workflows.backup import BackupMetadata
+        from my_unicorn.core.workflows.backup import BackupMetadata
 
         metadata_manager = BackupMetadata(app_backup_dir)
         metadata_manager.add_version(
@@ -266,7 +266,7 @@ class TestBackupHandler:
         backup_file.write_text("specific version content")
 
         # Use BackupMetadata to create proper checksums
-        from my_unicorn.workflows.backup import BackupMetadata
+        from my_unicorn.core.workflows.backup import BackupMetadata
 
         metadata_manager = BackupMetadata(app_backup_dir)
         metadata_manager.add_version(
@@ -302,7 +302,7 @@ class TestBackupHandler:
         app_backup_dir.mkdir(parents=True)
 
         # Create multiple backup versions using BackupMetadata for proper checksums
-        from my_unicorn.workflows.backup import BackupMetadata
+        from my_unicorn.core.workflows.backup import BackupMetadata
 
         versions = ["1.2.1", "1.2.2", "1.2.3"]
         metadata_manager = BackupMetadata(app_backup_dir)
@@ -373,7 +373,7 @@ class TestBackupHandler:
         app_backup_dir.mkdir(parents=True)
 
         # Create backups using BackupMetadata for proper structure
-        from my_unicorn.workflows.backup import BackupMetadata
+        from my_unicorn.core.workflows.backup import BackupMetadata
 
         versions = ["1.0.0", "1.1.0", "1.2.0"]
         metadata_manager = BackupMetadata(app_backup_dir)
@@ -445,7 +445,7 @@ class TestBackupHandler:
         app_backup_dir.mkdir(parents=True)
 
         # Create multiple backup versions using BackupMetadata
-        from my_unicorn.workflows.backup import BackupMetadata
+        from my_unicorn.core.workflows.backup import BackupMetadata
 
         versions = ["1.0.0", "1.1.0", "1.2.0", "1.3.0"]
         metadata_manager = BackupMetadata(app_backup_dir)
@@ -485,7 +485,7 @@ class TestBackupHandler:
 
         # Create backup directories for multiple apps
         apps = ["appflowy", "obsidian"]
-        from my_unicorn.workflows.backup import BackupMetadata
+        from my_unicorn.core.workflows.backup import BackupMetadata
 
         for app_name in apps:
             app_backup_dir = backup_dir / app_name
@@ -531,7 +531,7 @@ class TestBackupHandler:
         app_backup_dir.mkdir(parents=True)
 
         # Create backups using BackupMetadata
-        from my_unicorn.workflows.backup import BackupMetadata
+        from my_unicorn.core.workflows.backup import BackupMetadata
 
         versions = ["1.0.0", "1.1.0"]
         metadata_manager = BackupMetadata(app_backup_dir)
@@ -663,7 +663,7 @@ class TestBackupHandler:
         backup_file.write_text("old version content")
 
         # Use BackupMetadata to create proper checksums
-        from my_unicorn.workflows.backup import BackupMetadata
+        from my_unicorn.core.workflows.backup import BackupMetadata
 
         metadata_manager = BackupMetadata(app_backup_dir)
         metadata_manager.add_version(
@@ -771,7 +771,7 @@ class TestBackupHandler:
         app_backup_dir = backup_dir / app_name
         app_backup_dir.mkdir(parents=True)
 
-        from my_unicorn.workflows.backup import BackupMetadata
+        from my_unicorn.core.workflows.backup import BackupMetadata
 
         backup_file = app_backup_dir / f"{app_name}-1.2.3.AppImage"
         backup_file.write_text("test content")

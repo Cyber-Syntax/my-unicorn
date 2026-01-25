@@ -35,6 +35,7 @@ from .progress_types import ProgressConfig, ProgressType, TaskConfig, TaskInfo
 logger = get_logger(__name__)
 
 
+#TODO: maybe better to move this to progress.py ?
 class ProgressDisplay:
     """Progress display UI component using ASCII backend.
 

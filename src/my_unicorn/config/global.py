@@ -10,7 +10,7 @@ from my_unicorn.config.parser import (
     _strip_inline_comment,
 )
 from my_unicorn.config.paths import Paths
-from my_unicorn.domain.constants import (
+from my_unicorn.constants import (
     DEFAULT_CONSOLE_LOG_LEVEL,
     DEFAULT_LOG_LEVEL,
     DEFAULT_MAX_BACKUP,
@@ -26,16 +26,106 @@ from my_unicorn.domain.constants import (
     SECTION_DIRECTORY,
     SECTION_NETWORK,
 )
-from my_unicorn.domain.types import (
-    DirectoryConfig,
-    GlobalConfig,
-    NetworkConfig,
-)
+from my_unicorn.types import DirectoryConfig, GlobalConfig, NetworkConfig
 
 logger = logging.getLogger(__name__)
 
 # Type alias for raw INI config dictionary
 RawConfigDict = dict[str, str | dict[str, str]]
+
+
+def _convert_configparser_to_dict(
+    config: configparser.ConfigParser,
+) -> RawConfigDict:
+    """Convert ConfigParser to dictionary without DEFAULT bleeding.
+
+    Args:
+        config: ConfigParser instance
+
+    Returns:
+        Dictionary with sections and their key-value pairs
+    """
+    config_dict: RawConfigDict = {}
+
+    # Extract sections without DEFAULT values bleeding in
+    # Use items() with raw=True to get section-specific values only
+    for section_name in config.sections():
+        section_dict = {
+            key: value
+            for key, value in config.items(section_name, raw=True)
+            if not config.has_option(SECTION_DEFAULT, key)
+        }
+        config_dict[section_name] = section_dict
+
+    # Add DEFAULT section items separately
+    for key, raw_value in config.defaults().items():
+        config_dict[key] = raw_value
+
+    return config_dict
+
+
+def _extract_directory_config(
+    config_dict: RawConfigDict, config_dir: Path
+) -> dict[str, Path]:
+    """Extract and expand directory paths from config.
+
+    Args:
+        config_dict: Raw configuration dictionary
+        config_dir: Configuration directory path for defaults
+
+    Returns:
+        Dictionary of directory keys to expanded paths
+    """
+
+    def strip_comments(value: str | Path) -> str | Path:
+        """Strip inline comments from config values."""
+        if isinstance(value, str):
+            return _strip_inline_comment(value)
+        return value
+
+    directory_config: dict[str, Path] = {}
+    directory_dict = config_dict.get(SECTION_DIRECTORY, {})
+    if isinstance(directory_dict, dict):
+        # Only process known directory keys to avoid config values
+        known_dir_keys = set(DIRECTORY_KEYS)
+        for key, value in directory_dict.items():
+            if key in known_dir_keys:
+                cleaned_path = strip_comments(value)
+                directory_config[key] = Paths.expand_path(cleaned_path)
+
+    return directory_config
+
+
+def _extract_network_config(config_dict: RawConfigDict) -> NetworkConfig:
+    """Extract network configuration from config dict.
+
+    Args:
+        config_dict: Raw configuration dictionary
+
+    Returns:
+        NetworkConfig instance
+    """
+
+    def strip_comments(value: str | Path) -> str | Path:
+        """Strip inline comments from config values."""
+        if isinstance(value, str):
+            return _strip_inline_comment(value)
+        return value
+
+    network_dict = config_dict.get(SECTION_NETWORK, {})
+
+    return NetworkConfig(
+        retry_attempts=int(
+            strip_comments(network_dict.get("retry_attempts", 3))
+        )
+        if isinstance(network_dict, dict)
+        else 3,
+        timeout_seconds=int(
+            strip_comments(network_dict.get("timeout_seconds", 10))
+        )
+        if isinstance(network_dict, dict)
+        else 10,
+    )
 
 
 class GlobalConfigManager:
@@ -247,22 +337,9 @@ class GlobalConfigManager:
             Typed global configuration
 
         """
+        # Convert ConfigParser to dict if needed
         if isinstance(config, configparser.ConfigParser):
-            config_dict: RawConfigDict = {}
-
-            # Extract sections without DEFAULT values bleeding in
-            # Use items() with raw=True to get section-specific values only
-            for section_name in config.sections():
-                section_dict = {
-                    key: value
-                    for key, value in config.items(section_name, raw=True)
-                    if not config.has_option(SECTION_DEFAULT, key)
-                }
-                config_dict[section_name] = section_dict
-
-            # Add DEFAULT section items separately
-            for key, raw_value in config.defaults().items():
-                config_dict[key] = raw_value
+            config_dict = _convert_configparser_to_dict(config)
         else:
             config_dict = config
 
@@ -284,32 +361,11 @@ class GlobalConfigManager:
             cleaned_value = strip_comments(value)
             return cleaned_value if cleaned_value is not None else default
 
-        # Convert directory paths (only from explicit directory section)
-        directory_config: dict[str, Path] = {}
-        directory_dict = config_dict.get(SECTION_DIRECTORY, {})
-        if isinstance(directory_dict, dict):
-            # Only process known directory keys to avoid config values
-            known_dir_keys = set(DIRECTORY_KEYS)
-            for key, value in directory_dict.items():
-                if key in known_dir_keys:
-                    cleaned_path = strip_comments(value)
-                    directory_config[key] = Paths.expand_path(cleaned_path)
-
-        # Get network config
-        network_dict = config_dict.get(SECTION_NETWORK, {})
-
-        network_config = NetworkConfig(
-            retry_attempts=int(
-                strip_comments(network_dict.get("retry_attempts", 3))
-            )
-            if isinstance(network_dict, dict)
-            else 3,
-            timeout_seconds=int(
-                strip_comments(network_dict.get("timeout_seconds", 10))
-            )
-            if isinstance(network_dict, dict)
-            else 10,
+        # Extract directory and network configs using helpers
+        directory_config = _extract_directory_config(
+            config_dict, self.config_dir
         )
+        network_config = _extract_network_config(config_dict)
 
         return GlobalConfig(
             config_version=str(

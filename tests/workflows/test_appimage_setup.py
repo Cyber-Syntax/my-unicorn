@@ -11,7 +11,7 @@ class TestRenameAppimage:
 
     def test_rename_appimage_from_catalog(self):
         """Test rename_appimage using catalog entry."""
-        from my_unicorn.workflows.appimage_setup import rename_appimage
+        from my_unicorn.core.workflows.appimage_setup import rename_appimage
 
         appimage_path = Path("/tmp/test.AppImage")
         catalog_entry = {"appimage": {"rename": "MyApp"}}
@@ -37,7 +37,7 @@ class TestRenameAppimage:
 
     def test_rename_appimage_from_app_config(self):
         """Test rename_appimage using app config."""
-        from my_unicorn.workflows.appimage_setup import rename_appimage
+        from my_unicorn.core.workflows.appimage_setup import rename_appimage
 
         appimage_path = Path("/tmp/test.AppImage")
         app_config = {"appimage": {"rename": "ConfigApp"}}
@@ -62,7 +62,7 @@ class TestRenameAppimage:
 
     def test_rename_appimage_fallback_to_app_name(self):
         """Test rename_appimage fallback to app_name when no rename config."""
-        from my_unicorn.workflows.appimage_setup import rename_appimage
+        from my_unicorn.core.workflows.appimage_setup import rename_appimage
 
         appimage_path = Path("/tmp/test.AppImage")
         storage_service = MagicMock()
@@ -86,7 +86,7 @@ class TestRenameAppimage:
 
     def test_rename_appimage_catalog_priority(self):
         """Test that catalog entry takes priority over app config."""
-        from my_unicorn.workflows.appimage_setup import rename_appimage
+        from my_unicorn.core.workflows.appimage_setup import rename_appimage
 
         appimage_path = Path("/tmp/test.AppImage")
         catalog_entry = {"appimage": {"rename": "CatalogName"}}
@@ -115,10 +115,14 @@ class TestRenameAppimage:
 class TestSetupAppimageIcon:
     """Tests for setup_appimage_icon function."""
 
-    @patch("my_unicorn.workflows.appimage_setup.extract_icon_from_appimage")
+    @patch(
+        "my_unicorn.core.workflows.appimage_setup.extract_icon_from_appimage"
+    )
     async def test_setup_appimage_icon_success(self, mock_extract):
         """Test setup_appimage_icon with successful extraction."""
-        from my_unicorn.workflows.appimage_setup import setup_appimage_icon
+        from my_unicorn.core.workflows.appimage_setup import (
+            setup_appimage_icon,
+        )
 
         mock_extract.return_value = "/path/to/icon.png"
         appimage_path = Path("/tmp/test.AppImage")
@@ -138,10 +142,14 @@ class TestSetupAppimageIcon:
         assert result["installed"] is True
         mock_extract.assert_called_once()
 
-    @patch("my_unicorn.workflows.appimage_setup.extract_icon_from_appimage")
+    @patch(
+        "my_unicorn.core.workflows.appimage_setup.extract_icon_from_appimage"
+    )
     async def test_setup_appimage_icon_disabled(self, mock_extract):
         """Test setup_appimage_icon when extraction is disabled."""
-        from my_unicorn.workflows.appimage_setup import setup_appimage_icon
+        from my_unicorn.core.workflows.appimage_setup import (
+            setup_appimage_icon,
+        )
 
         appimage_path = Path("/tmp/test.AppImage")
         icon_dir = Path("/tmp/icons")
@@ -163,10 +171,14 @@ class TestSetupAppimageIcon:
         assert result["name"] == "custom.png"
         mock_extract.assert_not_called()
 
-    @patch("my_unicorn.workflows.appimage_setup.extract_icon_from_appimage")
+    @patch(
+        "my_unicorn.core.workflows.appimage_setup.extract_icon_from_appimage"
+    )
     async def test_setup_appimage_icon_extraction_error(self, mock_extract):
         """Test setup_appimage_icon when extraction fails."""
-        from my_unicorn.workflows.appimage_setup import setup_appimage_icon
+        from my_unicorn.core.workflows.appimage_setup import (
+            setup_appimage_icon,
+        )
 
         mock_extract.side_effect = OSError("Extraction failed")
         appimage_path = Path("/tmp/test.AppImage")
@@ -184,10 +196,14 @@ class TestSetupAppimageIcon:
         assert "error" in result
         assert result["error"] == "Extraction error"
 
-    @patch("my_unicorn.workflows.appimage_setup.extract_icon_from_appimage")
+    @patch(
+        "my_unicorn.core.workflows.appimage_setup.extract_icon_from_appimage"
+    )
     async def test_setup_appimage_icon_custom_filename(self, mock_extract):
         """Test setup_appimage_icon with custom filename."""
-        from my_unicorn.workflows.appimage_setup import setup_appimage_icon
+        from my_unicorn.core.workflows.appimage_setup import (
+            setup_appimage_icon,
+        )
 
         mock_extract.return_value = "/path/to/custom.png"
         appimage_path = Path("/tmp/test.AppImage")
@@ -209,10 +225,12 @@ class TestSetupAppimageIcon:
 class TestCreateDesktopEntry:
     """Tests for create_desktop_entry function."""
 
-    @patch("my_unicorn.workflows.appimage_setup.DesktopEntry")
+    @patch("my_unicorn.core.workflows.appimage_setup.DesktopEntry")
     def test_create_desktop_entry_success(self, mock_desktop_entry_class):
         """Test create_desktop_entry with successful creation."""
-        from my_unicorn.workflows.appimage_setup import create_desktop_entry
+        from my_unicorn.core.workflows.appimage_setup import (
+            create_desktop_entry,
+        )
 
         mock_desktop = MagicMock()
         mock_desktop.create_desktop_file = MagicMock(
@@ -235,10 +253,12 @@ class TestCreateDesktopEntry:
         assert result["desktop_path"] == "/tmp/testapp.desktop"
         mock_desktop.create_desktop_file.assert_called_once()
 
-    @patch("my_unicorn.workflows.appimage_setup.DesktopEntry")
+    @patch("my_unicorn.core.workflows.appimage_setup.DesktopEntry")
     def test_create_desktop_entry_no_icon(self, mock_desktop_entry_class):
         """Test create_desktop_entry without icon."""
-        from my_unicorn.workflows.appimage_setup import create_desktop_entry
+        from my_unicorn.core.workflows.appimage_setup import (
+            create_desktop_entry,
+        )
 
         mock_desktop = MagicMock()
         mock_desktop.create_desktop_file = MagicMock(
@@ -261,10 +281,12 @@ class TestCreateDesktopEntry:
         # Should still create desktop entry even without icon
         mock_desktop.create_desktop_file.assert_called_once()
 
-    @patch("my_unicorn.workflows.appimage_setup.DesktopEntry")
+    @patch("my_unicorn.core.workflows.appimage_setup.DesktopEntry")
     def test_create_desktop_entry_error(self, mock_desktop_entry_class):
         """Test create_desktop_entry with error."""
-        from my_unicorn.workflows.appimage_setup import create_desktop_entry
+        from my_unicorn.core.workflows.appimage_setup import (
+            create_desktop_entry,
+        )
 
         mock_desktop = MagicMock()
         mock_desktop.create_desktop_file = MagicMock(

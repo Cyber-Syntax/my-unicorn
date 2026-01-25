@@ -4,7 +4,7 @@ This test module verifies the cache filtering improvements implemented
 according to CACHE_FILTERING_IMPROVEMENT_PLAN.md.
 """
 
-from my_unicorn.infrastructure.github import Asset, AssetSelector
+from my_unicorn.core.github import Asset, AssetSelector
 
 
 class TestAssetSelectorPlatformCompatibility:

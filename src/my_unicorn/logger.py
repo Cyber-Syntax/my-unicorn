@@ -69,7 +69,7 @@ import time
 from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 from pathlib import Path
 
-from my_unicorn.domain.constants import (
+from my_unicorn.constants import (
     DEFAULT_LOG_LEVEL,
     LOG_BACKUP_COUNT,
     LOG_COLORS,

@@ -171,10 +171,9 @@ async def test_update_handler_exception_handling(
         )
 
 
-def test_parse_app_names_handles_comma_separated(
-    update_handler: UpdateHandler,
-) -> None:
-    """Test _parse_app_names expands comma-separated app names."""
-    args = Namespace(apps=["foo,bar", "baz"])
-    expanded = update_handler._parse_app_names(args)  # noqa: SLF001
+def test_parse_targets_handles_comma_separated() -> None:
+    """Test parse_targets expands comma-separated app names."""
+    from my_unicorn.cli.commands.helpers import parse_targets
+
+    expanded = parse_targets(["foo,bar", "baz"])
     assert expanded == ["foo", "bar", "baz"]

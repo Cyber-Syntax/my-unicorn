@@ -1,16 +1,16 @@
 from argparse import Namespace
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from my_unicorn.cli.commands.remove import RemoveHandler
-from my_unicorn.infrastructure.desktop_entry import ConfigManager
+from my_unicorn.core.desktop_entry import ConfigManager
 
 
 @pytest.fixture
 def mock_config_manager():
-    """Fixture to mock the configuration manager."""
+    """Fixture to mock the configuration manager with v2 config format."""
     config_manager = MagicMock()
     config_manager.load_global_config.return_value = {
         "directory": {
@@ -18,13 +18,56 @@ def mock_config_manager():
             "icon": Path("/mock/icons"),
         }
     }
-    config_manager.load_app_config.side_effect = (
-        lambda app_name: {
-            "appimage": {"name": f"{app_name}.AppImage", "rename": app_name},
-            "icon": {"name": f"{app_name}.png", "installed": True},
+
+    def load_app_config_side_effect(app_name):
+        if app_name == "missing_app":
+            return None
+        # v2 format
+        return {
+            "config_version": "2.0.0",
+            "source": "catalog",
+            "catalog_ref": app_name,
+            "state": {
+                "version": "1.0.0",
+                "installed_date": "2024-01-01T00:00:00",
+                "installed_path": f"/mock/storage/{app_name}.AppImage",
+                "verification": {"passed": True, "methods": []},
+                "icon": {
+                    "installed": True,
+                    "method": "extraction",
+                    "path": f"/mock/icons/{app_name}.png",
+                },
+            },
         }
-        if app_name != "missing_app"
-        else None
+
+    def get_effective_config_side_effect(app_name):
+        if app_name == "missing_app":
+            raise ValueError(f"No config found for {app_name}")
+        return {
+            "config_version": "2.0.0",
+            "metadata": {"name": app_name, "display_name": app_name.title()},
+            "source": {
+                "type": "github",
+                "owner": "test-owner",
+                "repo": "test-repo",
+                "prerelease": False,
+            },
+            "state": {
+                "version": "1.0.0",
+                "installed_date": "2024-01-01T00:00:00",
+                "installed_path": f"/mock/storage/{app_name}.AppImage",
+                "verification": {"passed": True, "methods": []},
+                "icon": {
+                    "installed": True,
+                    "method": "extraction",
+                    "path": f"/mock/icons/{app_name}.png",
+                },
+            },
+        }
+
+    config_manager.load_app_config.side_effect = load_app_config_side_effect
+    config_manager.app_config_manager.get_effective_config.side_effect = (
+        get_effective_config_side_effect
     )
     config_manager.remove_app_config = MagicMock()
     return config_manager
@@ -58,52 +101,31 @@ async def test_remove_single_app_success(
     remove_handler, mock_config_manager, global_config
 ):
     """Test successful removal of a single app."""
-    storage_dir = global_config["directory"]["storage"]
-    icon_dir = global_config["directory"]["icon"]
+    icon_path = Path("/mock/icons/test_app.png")
+    appimage_path = Path("/mock/storage/test_app.AppImage")
 
-    # Mock file existence and unlink behavior
-    appimage_path = storage_dir / "test_app.AppImage"
-    clean_appimage_path = storage_dir / "test_app.appimage"
-    icon_path = icon_dir / "test_app.png"
+    mock_cache_manager = MagicMock()
+    mock_cache_manager.clear_cache = AsyncMock()
 
     with (
         patch(
             "pathlib.Path.exists", autospec=True, return_value=True
         ) as mock_exists,
         patch("pathlib.Path.unlink", autospec=True) as mock_unlink,
-        patch("my_unicorn.cli.commands.remove.logger") as mock_logger,
+        patch(
+            "my_unicorn.core.cache.get_cache_manager",
+            return_value=mock_cache_manager,
+        ),
     ):
-        mock_appimage_unlink = mock_unlink
-        mock_clean_appimage_unlink = mock_unlink
-        mock_icon_unlink = mock_unlink
-        print(
-            f"Debugging paths: {appimage_path}, {clean_appimage_path}, {icon_path}"
-        )
         args = Namespace(apps=["test_app"], keep_config=False)
         await remove_handler.execute(args)
 
-        # Verify unlink calls
-        expected_calls = [
-            ((appimage_path,),),
-            ((clean_appimage_path,),),
-            ((icon_path,),),
-            # Desktop entry file is also unlinked, but path is dynamic.
-        ]
-        # Check that the expected files were unlinked
-        mock_unlink.assert_any_call(appimage_path)
-        mock_unlink.assert_any_call(clean_appimage_path)
-        mock_unlink.assert_any_call(icon_path)
-        # There should be 4 calls: AppImage, clean AppImage, desktop entry, icon
-        assert mock_unlink.call_count == 4
+        # Verify files were unlinked (appimage, desktop, icon)
+        assert mock_unlink.call_count == 3
 
         # Verify config removal
         mock_config_manager.remove_app_config.assert_called_once_with(
             "test_app"
-        )
-        # Verify that messages were printed for successful removals
-        mock_logger.info.assert_any_call("✅ Removed icon: %s", str(icon_path))
-        mock_logger.info.assert_any_call(
-            "✅ %s config for %s", "Removed", "test_app"
         )
 
 
@@ -112,13 +134,8 @@ async def test_remove_single_app_keep_config(
     remove_handler, mock_config_manager, global_config
 ):
     """Test removal of a single app while keeping its config."""
-    storage_dir = global_config["directory"]["storage"]
-    icon_dir = global_config["directory"]["icon"]
-
-    # Mock file existence and unlink behavior
-    appimage_path = storage_dir / "test_app.AppImage"
-    clean_appimage_path = storage_dir / "test_app.appimage"
-    icon_path = icon_dir / "test_app.png"
+    mock_cache_manager = MagicMock()
+    mock_cache_manager.clear_cache = AsyncMock()
 
     with (
         patch(
@@ -126,28 +143,18 @@ async def test_remove_single_app_keep_config(
         ) as mock_exists,
         patch("pathlib.Path.unlink", autospec=True) as mock_unlink,
         patch(
-            "my_unicorn.config.ConfigManager",
-            return_value=ConfigManager(),
-        ) as MockConfigManager,
-        patch("my_unicorn.cli.commands.remove.logger") as mock_logger,
+            "my_unicorn.core.cache.get_cache_manager",
+            return_value=mock_cache_manager,
+        ),
     ):
         args = Namespace(apps=["test_app"], keep_config=True)
         await remove_handler.execute(args)
 
-        # Verify unlink calls
-        mock_unlink.assert_any_call(appimage_path)
-        mock_unlink.assert_any_call(clean_appimage_path)
-        mock_unlink.assert_any_call(icon_path)
-        # There should be 4 calls: AppImage, clean AppImage, desktop entry, icon
-        assert mock_unlink.call_count == 4
+        # Verify files were unlinked (appimage, desktop, icon)
+        assert mock_unlink.call_count == 3
 
         # Verify config is not removed
         mock_config_manager.remove_app_config.assert_not_called()
-        # Verify printed messages for successful removals
-        mock_logger.info.assert_any_call("✅ Removed icon: %s", str(icon_path))
-        mock_logger.info.assert_any_call(
-            "✅ %s config for %s", "Kept", "test_app"
-        )
 
 
 @pytest.mark.asyncio
@@ -158,15 +165,17 @@ async def test_remove_icon_always_attempted(
     storage_dir = global_config["directory"]["storage"]
     icon_dir = global_config["directory"]["icon"]
 
-    appimage_path = storage_dir / "test_app.AppImage"
-    clean_appimage_path = storage_dir / "test_app.appimage"
     icon_path = icon_dir / "test_app.png"
 
-    # Remove 'installed' flag from icon config to simulate missing flag
+    # Override with v2 config that has icon in state
     mock_config_manager.load_app_config.side_effect = (
         lambda app_name: {
-            "appimage": {"name": f"{app_name}.AppImage", "rename": app_name},
-            "icon": {"name": f"{app_name}.png"},  # no 'installed'
+            "state": {
+                "icon": {"path": f"/mock/icons/{app_name}.png"},
+            },
+            "effective_config": {
+                "source": {"owner": "test-owner", "repo": "test-repo"},
+            },
         }
         if app_name != "missing_app"
         else None
@@ -181,7 +190,10 @@ async def test_remove_icon_always_attempted(
             "my_unicorn.config.ConfigManager",
             return_value=ConfigManager(),
         ),
-        patch("my_unicorn.cli.commands.remove.logger") as mock_logger,
+        patch(
+            "my_unicorn.core.cache.get_cache_manager",
+            return_value=AsyncMock(),
+        ) as mock_get_cache,
     ):
         args = Namespace(apps=["test_app"], keep_config=False)
         await remove_handler.execute(args)
@@ -191,20 +203,15 @@ async def test_remove_icon_always_attempted(
 
 
 @pytest.mark.asyncio
-async def test_remove_missing_app(remove_handler, mock_config_manager):
-    """Test removal of a missing app."""
+async def test_remove_missing_app(remove_handler, mock_config_manager, caplog):
+    """Test removal of a missing app logs error without raising."""
     args = Namespace(apps=["missing_app"], keep_config=False)
 
-    with patch("my_unicorn.cli.commands.remove.logger") as mock_logger:
-        await remove_handler.execute(args)
+    await remove_handler.execute(args)
 
-        # Verify error message (actual format is "❌ %s", msg where msg="App 'missing_app' not found")
-        mock_logger.info.assert_any_call(
-            "❌ %s", "App 'missing_app' not found"
-        )
-
-        # Verify config is not removed
-        mock_config_manager.remove_app_config.assert_not_called()
+    # Should log error message instead of raising
+    assert "App 'missing_app' not found" in caplog.text
+    assert "ERROR" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -215,9 +222,8 @@ async def test_remove_app_with_desktop_entry_error(
     storage_dir = global_config["directory"]["storage"]
     icon_dir = global_config["directory"]["icon"]
 
-    # Mock file existence and unlink behavior
+    # Mock file existence and unlink behavior - using single path for v2
     appimage_path = storage_dir / "test_app.AppImage"
-    clean_appimage_path = storage_dir / "test_app.appimage"
     icon_path = icon_dir / "test_app.png"
 
     with (
@@ -226,27 +232,26 @@ async def test_remove_app_with_desktop_entry_error(
         ) as mock_exists,
         patch("pathlib.Path.unlink", autospec=True) as mock_unlink,
         patch(
-            "my_unicorn.infrastructure.desktop_entry.remove_desktop_entry_for_app",
+            "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
             side_effect=Exception("Desktop entry error"),
         ) as mock_remove_desktop_entry,
         patch(
             "my_unicorn.config.ConfigManager",
             return_value=ConfigManager(),
         ) as MockConfigManager,
-        patch("my_unicorn.cli.commands.remove.logger") as mock_logger,
+        patch(
+            "my_unicorn.core.cache.get_cache_manager",
+            return_value=AsyncMock(),
+        ) as mock_get_cache,
     ):
-        print(
-            f"Debugging paths: appimage_path={appimage_path}, clean_appimage_path={clean_appimage_path}, icon_path={icon_path}"
-        )
         args = Namespace(apps=["test_app"], keep_config=False)
         await remove_handler.execute(args)
 
-        # Verify unlink calls
+        # V2 removes only AppImage and icon (2 files total) when desktop entry fails
+        # Note: clean_appimage_path is removed in v1, but v2 only has state.installed_path
+        assert mock_unlink.call_count == 2
         mock_unlink.assert_any_call(appimage_path)
-        mock_unlink.assert_any_call(clean_appimage_path)
         mock_unlink.assert_any_call(icon_path)
-        # There should be 3 calls: AppImage, clean AppImage, icon (desktop entry fails)
-        assert mock_unlink.call_count == 3
 
         # Verify desktop entry removal error is logged
         mock_remove_desktop_entry.assert_called_once_with(

@@ -1,27 +1,9 @@
 """my-unicorn cli upgrade module.
 
-This module handles updating the my-unicorn package itself by using uv's
-tool install with upgrade from the official GitHub repository.
+Handles self-updating the my-unicorn package using uv's tool management.
+Disables caching for version checks to ensure latest version detection.
 
-Key Design Decisions:
-
-1. **Cache Disabled for Version Checks**: The upgrade command intentionally
-   disables caching for release fetches (use_cache=False, ignore_cache=True).
-   This ensures users always check against the latest available version.
-   Rationale:
-   - CLI tools must use the latest version for security and reliability
-   - Users expect fresh results when checking for updates
-   - Cache TTL (24 hours default) could hide critical updates
-
-2. **GitHub API Rate Limiting**: Rate limiting is acceptable for this use case.
-   - Without token: 60 requests/hour (sufficient for manual checks)
-   - With token (via keyring): 5000 requests/hour
-   - Users run upgrades infrequently, so rate limits are not a concern
-
-3. **Prerelease-Only Handling**: Currently fetches latest prerelease. When
-   my-unicorn publishes stable releases, change fetch_latest_prerelease()
-   to fetch_latest_release() in _fetch_latest_prerelease_version().
-   See NOTE below for details.
+See docs/upgrade.md for detailed design rationale.
 """
 
 import asyncio
@@ -33,7 +15,7 @@ import aiohttp
 from packaging.version import InvalidVersion, Version
 
 from my_unicorn import __version__
-from my_unicorn.infrastructure.github.release_fetcher import ReleaseFetcher
+from my_unicorn.core.github.release_fetcher import ReleaseFetcher
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
@@ -41,6 +23,68 @@ logger = get_logger(__name__)
 GITHUB_OWNER = "Cyber-Syntax"
 GITHUB_REPO = "my-unicorn"
 GITHUB_URL = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}"
+
+# Map semver prerelease labels to PEP 440 equivalents
+_PRERELEASE_MAP = {
+    "alpha": "a",
+    "beta": "b",
+    "rc": "rc",
+}
+
+# Regex pattern for detecting semver-style prerelease versions
+_PRERELEASE_RE = re.compile(
+    r"""
+    ^
+    (?P<base>\d+\.\d+\.\d+)
+    (?:-
+        (?P<label>alpha|beta|rc)
+        (?P<num>\d*)?
+    )?
+    $
+    """,
+    re.VERBOSE,
+)
+
+
+def normalize_version(v: str) -> str:
+    """Normalize semver-like versions to PEP 440.
+
+    Converts semantic versioning style prerelease versions to PEP 440 format
+    for proper Python version comparison using packaging.version.
+
+    Examples:
+        >>> normalize_version("1.0.0-alpha")
+        '1.0.0a0'
+        >>> normalize_version("2.0.0-beta1")
+        '2.0.0b1'
+        >>> normalize_version("3.0.0-rc2")
+        '3.0.0rc2'
+        >>> normalize_version("v1.2.3")
+        '1.2.3'
+        >>> normalize_version("1.2.3")
+        '1.2.3'
+
+    Args:
+        v: Version string in semver or PEP 440 format
+
+    Returns:
+        Normalized version string in PEP 440 format
+    """
+    v = v.lstrip("v")
+
+    match = _PRERELEASE_RE.match(v)
+    if not match:
+        return v
+
+    base = match.group("base")
+    label = match.group("label")
+    num = match.group("num") or "0"
+
+    if not label:
+        return base
+
+    pep_label = _PRERELEASE_MAP[label]
+    return f"{base}{pep_label}{num}"
 
 
 def _detect_dev_installation() -> bool:
@@ -88,45 +132,6 @@ async def _run_uv_tool_list() -> bool:
         return False
 
 
-_PRERELEASE_MAP = {
-    "alpha": "a",
-    "beta": "b",
-    "rc": "rc",
-}
-
-_PRERELEASE_RE = re.compile(
-    r"""
-    ^
-    (?P<base>\d+\.\d+\.\d+)
-    (?:-
-        (?P<label>alpha|beta|rc)
-        (?P<num>\d*)?
-    )?
-    $
-    """,
-    re.VERBOSE,
-)
-
-
-def normalize_version(v: str) -> str:
-    """Normalize semver-like versions to PEP 440."""
-    v = v.lstrip("v")
-
-    match = _PRERELEASE_RE.match(v)
-    if not match:
-        return v
-
-    base = match.group("base")
-    label = match.group("label")
-    num = match.group("num") or "0"
-
-    if not label:
-        return base
-
-    pep_label = _PRERELEASE_MAP[label]
-    return f"{base}{pep_label}{num}"
-
-
 def perform_self_update() -> bool:
     """Update my-unicorn using uv tool install --upgrade from git.
 
@@ -164,7 +169,7 @@ def perform_self_update() -> bool:
                 f"git+{GITHUB_URL}",
             ],
         )
-    except Exception as e:
+    except (OSError, FileNotFoundError) as e:
         logger.exception("Update failed")
         logger.info("❌ Update failed: %s", e)
         return False
@@ -197,28 +202,11 @@ def _is_candidate_newer(current_version: str, candidate_version: str) -> bool:
     return candidate > current
 
 
-# NOTE: Prerelease handling - update this when stable releases are published.
-# Currently my-unicorn only publishes prerelease versions. When transitioning
-# to stable releases, replace fetch_latest_prerelease() with
-# fetch_latest_release() to prioritize stable versions over prereleases.
-# This is a YAGNI decision - we'll implement stable release logic when it's
-# actually needed.
+# TODO: Update to fetch_latest_release() when stable releases are published
 async def _fetch_latest_prerelease_version() -> str | None:
-    """Fetch the latest prerelease version from GitHub releases.
-
-    Intentionally disables caching to always get fresh version data.
-    Cache is disabled because:
-    - Users need accurate version information for security and reliability
-    - Upgrade decisions must be based on current available versions
-    - Manual commands users run infrequently don't stress GitHub API limits
-    """
+    """Fetch the latest prerelease version from GitHub (cache disabled)."""
 
     async with aiohttp.ClientSession() as session:
-        # Cache is intentionally disabled here to ensure users always check
-        # against the latest available version. This is safe because:
-        # 1. GitHub API allows 60 requests/hour without auth token
-        # 2. Users run upgrade checks infrequently
-        # 3. Accuracy of version information is critical for CLI security
         fetcher = ReleaseFetcher(
             GITHUB_OWNER,
             GITHUB_REPO,
@@ -227,7 +215,7 @@ async def _fetch_latest_prerelease_version() -> str | None:
         )
         try:
             release = await fetcher.fetch_latest_prerelease(ignore_cache=True)
-        except Exception as exc:  # noqa: BLE001
+        except (aiohttp.ClientError, TimeoutError) as exc:
             logger.warning(
                 "Unable to fetch latest release for %s/%s: %s",
                 GITHUB_OWNER,
@@ -244,10 +232,9 @@ async def should_perform_self_update(
 ) -> tuple[bool, str | None]:
     """Determine if a newer release is available.
 
-    Checks if installation is dev-based first. If dev installation is detected,
-    always upgrade to production (git repo version). Otherwise, fetches the
-    latest version from GitHub API (cache disabled) to ensure accurate
-    upgrade decisions.
+    Checks for dev installation first. Dev installations always upgrade to
+    production. Otherwise, fetches latest version from GitHub API (cache
+    disabled) to ensure accurate upgrade decisions.
 
     Returns:
         A tuple of (should_upgrade, latest_version) where:
@@ -280,9 +267,7 @@ async def should_perform_self_update(
 
 
 async def check_for_self_update() -> bool:
-    """Check if a newer my-unicorn release is available.
-
-    Always queries GitHub API for fresh version data (cache disabled).
+    """Check if a newer my-unicorn release is available (cache disabled).
 
     Returns:
         True if a newer version is available, False otherwise.

@@ -29,9 +29,12 @@ class CatalogManagerAdapter:
         """
         apps = {}
         for app_name in self.config_manager.list_catalog_apps():
-            config = self.config_manager.load_catalog_entry(app_name)
-            if config:
+            try:
+                config = self.config_manager.load_catalog(app_name)
                 apps[app_name] = config
+            except (FileNotFoundError, ValueError):
+                # Skip invalid entries
+                continue
         return apps
 
     def get_app_config(self, app_name: str) -> dict[str, Any] | None:
@@ -44,7 +47,10 @@ class CatalogManagerAdapter:
             App configuration or None if not found
 
         """
-        return self.config_manager.load_catalog_entry(app_name)
+        try:
+            return self.config_manager.load_catalog(app_name)
+        except (FileNotFoundError, ValueError):
+            return None
 
     def get_installed_app_config(self, app_name: str) -> dict[str, Any] | None:
         """Get installed app configuration.

@@ -12,7 +12,8 @@ Note:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from my_unicorn.workflows.update import UpdateInfo
+    from my_unicorn.config import ConfigManager
+    from my_unicorn.core.workflows.update import UpdateInfo
 
 from my_unicorn.logger import get_logger
 
@@ -22,9 +23,9 @@ logger = get_logger(__name__)
 def display_update_summary(
     updated_apps: list[str],
     failed_apps: list[str],
-    up_to_date_apps: list[str],
+    up_to_date_apps: list[str],  # noqa: ARG001
     update_infos: list["UpdateInfo"],
-    check_only: bool = False,
+    check_only: bool = False,  # noqa: FBT001, FBT002
 ) -> None:
     """Display a comprehensive summary of update results.
 
@@ -193,7 +194,7 @@ def _format_update_version_info(info: "UpdateInfo") -> str:
         version_str = info.current_version
 
     # Truncate long version strings
-    if len(version_str) > 40:
+    if len(version_str) > 40:  # noqa: PLR2004
         return version_str[:37] + "..."
     return version_str
 
@@ -256,3 +257,108 @@ def display_update_warning(message: str) -> None:
 
     """
     print(f"⚠️  {message}")
+
+
+def display_check_results(results: dict) -> None:
+    """Display check-only results from update service.
+
+    Args:
+        results: Results dictionary with 'available_updates' key
+
+    """
+    if results["available_updates"]:
+        logger.info("Updates available:")
+        for info in results["available_updates"]:
+            logger.info(
+                "  %s: %s → %s",
+                info["app_name"],
+                info["current_version"],
+                info["latest_version"],
+            )
+        logger.info("\nRun 'my-unicorn update' to install updates")
+    else:
+        logger.info("✅ All apps are up to date")
+
+
+def display_update_results(results: dict) -> None:  # noqa: C901, PLR0912
+    """Display update operation results from update service.
+
+    Args:
+        results: Results dictionary with 'updated', 'failed', 'up_to_date',
+            and 'update_infos' keys
+
+    """
+    updated = results.get("updated", [])
+    failed = results.get("failed", [])
+    up_to_date = results.get("up_to_date", [])
+    update_infos = results.get("update_infos", [])
+
+    # If we have detailed info, use formatted summary
+    if update_infos:
+        print("\n📦 Update Summary:")
+        print("-" * 50)
+
+        # Show updated apps with version info
+        for app_name in updated:
+            app_info = _find_update_info(app_name, update_infos)
+            if app_info:
+                version_info = (
+                    f"{app_info.current_version} → {app_info.latest_version}"
+                )
+                print(f"{app_name:<25} ✅ {version_info}")
+            else:
+                print(f"{app_name:<25} ✅ Updated")
+
+        # Show failed apps with error info
+        for app_name in failed:
+            app_info = _find_update_info(app_name, update_infos)
+            print(f"{app_name:<25} ❌ Update failed")
+            if app_info and app_info.error_reason:
+                print(f"{'':25}    → {app_info.error_reason}")
+
+        # Show up-to-date apps
+        for app_name in up_to_date:
+            app_info = _find_update_info(app_name, update_infos)
+            if app_info:
+                version = app_info.current_version
+                print(
+                    f"{app_name:<25} ℹ️  Already up to date ({version})"  # noqa: RUF001
+                )
+            else:
+                print(f"{app_name:<25} ℹ️  Already up to date")  # noqa: RUF001
+
+        # Show summary stats
+        print()
+        if updated:
+            print(f"🎉 Successfully updated {len(updated)} app(s)")
+        if failed:
+            print(f"❌ {len(failed)} app(s) failed to update")
+        if up_to_date:
+            print(
+                f"ℹ️  {len(up_to_date)} app(s) already up to date"  # noqa: RUF001
+            )
+    else:
+        # Fallback to simple logger output
+        if updated:
+            logger.info("✅ Successfully updated: %s", ", ".join(updated))
+        if failed:
+            logger.error("❌ Failed to update: %s", ", ".join(failed))
+        if up_to_date:
+            logger.info("Already up to date: %s", ", ".join(up_to_date))
+
+
+def display_invalid_apps(
+    invalid_apps: list[str], config_manager: "ConfigManager"
+) -> None:
+    """Display warning about invalid app names.
+
+    Args:
+        invalid_apps: List of app names not found
+        config_manager: ConfigManager instance for listing installed apps
+
+    """
+    if invalid_apps:
+        logger.warning("⚠️  Apps not found: %s", ", ".join(invalid_apps))
+        installed = config_manager.list_installed_apps()
+        if installed:
+            logger.info("   Installed apps: %s", ", ".join(installed))

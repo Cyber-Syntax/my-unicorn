@@ -4,12 +4,12 @@ Thin coordinator that delegates to BackupService and displays results.
 """
 
 from argparse import Namespace
-from pathlib import Path
 
+from my_unicorn.core.workflows.backup import BackupService
 from my_unicorn.logger import get_logger
-from my_unicorn.workflows.backup import BackupService
 
 from .base import BaseCommandHandler
+from .helpers import ensure_app_directories, get_install_paths
 
 logger = get_logger(__name__)
 
@@ -22,7 +22,7 @@ class BackupHandler(BaseCommandHandler):
         if not self._validate_arguments(args):
             return
 
-        self._ensure_directories()
+        ensure_app_directories(self.config_manager, self.global_config)
         service = BackupService(self.config_manager, self.global_config)
 
         # Route to appropriate handler
@@ -70,9 +70,9 @@ class BackupHandler(BaseCommandHandler):
             return
 
         logger.info("🔄 Restoring latest backup for %s...", app_name)
-        dest = Path(self.global_config["directory"]["storage"])
+        storage_dir, _ = get_install_paths(self.global_config)
 
-        if path := service.restore_latest_backup(app_name, dest):
+        if path := service.restore_latest_backup(app_name, storage_dir):
             config = self.config_manager.load_app_config(app_name)
             version = (
                 config.get("state", {}).get("version", "unknown")
@@ -95,9 +95,11 @@ class BackupHandler(BaseCommandHandler):
             return
 
         logger.info("🔄 Restoring %s version %s...", app_name, version)
-        dest = Path(self.global_config["directory"]["storage"])
+        storage_dir, _ = get_install_paths(self.global_config)
 
-        if path := service.restore_specific_version(app_name, version, dest):
+        if path := service.restore_specific_version(
+            app_name, version, storage_dir
+        ):
             logger.info("✅ Successfully restored %s v%s", app_name, version)
             logger.info("Restored to: %s", path)
         else:
@@ -112,7 +114,7 @@ class BackupHandler(BaseCommandHandler):
 
         logger.info("Creating backup for %s...", app_name)
         config = self.config_manager.load_app_config(app_name)
-        storage = Path(self.global_config["directory"]["storage"])
+        storage_dir, _ = get_install_paths(self.global_config)
 
         # Get AppImage path
         catalog_ref = config.get("catalog_ref", app_name)
@@ -121,7 +123,7 @@ class BackupHandler(BaseCommandHandler):
             .get("appimage", {})
             .get("rename", catalog_ref)
         )
-        appimage_path = storage / f"{app_rename}.AppImage"
+        appimage_path = storage_dir / f"{app_rename}.AppImage"
 
         if not appimage_path.exists():
             logger.error("❌ AppImage file not found: %s", appimage_path)
