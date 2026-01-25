@@ -219,13 +219,13 @@ class ReleaseCacheManager:
                 cache_file = self._get_cache_file_path(owner, repo)
                 if cache_file.exists():
                     cache_file.unlink()
-                    logger.info("Cleared cache for %s/%s", owner, repo)
+                    logger.debug("Cleared cache for %s/%s", owner, repo)
             else:
                 # Clear all cache
                 cache_files = list(self.cache_dir.glob("*.json"))
                 for cache_file in cache_files:
                     cache_file.unlink()
-                logger.info("Cleared %d cache entries", len(cache_files))
+                logger.debug("Cleared %d cache entries", len(cache_files))
 
         except Exception as e:
             logger.error("Failed to clear cache: %s", e)
@@ -324,6 +324,7 @@ def get_cache_manager(ttl_hours: int = 24) -> ReleaseCacheManager:
         ReleaseCacheManager instance
 
     """
+    global _cache_manager
     if _cache_manager is None:
-        return ReleaseCacheManager(ttl_hours=ttl_hours)
+        _cache_manager = ReleaseCacheManager(ttl_hours=ttl_hours)
     return _cache_manager

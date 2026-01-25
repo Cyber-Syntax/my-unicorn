@@ -1,8 +1,8 @@
 """Tests for display_remove module."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from my_unicorn.ui.display_remove import display_removal_result
+from my_unicorn.core.remove import display_removal_result
 
 
 class TestDisplayRemovalResult:
@@ -11,19 +11,17 @@ class TestDisplayRemovalResult:
     def test_display_removal_result_failure(self) -> None:
         """Test display when removal fails."""
         result = {"success": False, "error": "App not found"}
-        config_manager = MagicMock()
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(result, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(result, "test_app")
 
             mock_logger.info.assert_called_once_with("❌ %s", "App not found")
 
     def test_display_removal_result_empty_result(self) -> None:
         """Test display with empty/None result."""
-        config_manager = MagicMock()
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(None, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(None, "test_app")
 
             mock_logger.info.assert_called_once_with(
                 "❌ Failed to remove %s", "test_app"
@@ -35,10 +33,9 @@ class TestDisplayRemovalResult:
             "success": True,
             "removed_files": ["test_app.AppImage"],
         }
-        config_manager = MagicMock()
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(result, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(result, "test_app")
 
             mock_logger.info.assert_any_call(
                 "✅ Removed AppImage(s): %s", "test_app.AppImage"
@@ -50,10 +47,9 @@ class TestDisplayRemovalResult:
             "success": True,
             "removed_files": ["test_app.AppImage", "test_app.appimage"],
         }
-        config_manager = MagicMock()
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(result, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(result, "test_app")
 
             mock_logger.info.assert_any_call(
                 "✅ Removed AppImage(s): %s",
@@ -65,31 +61,28 @@ class TestDisplayRemovalResult:
         result = {
             "success": True,
             "cache_cleared": True,
-        }
-        config_manager = MagicMock()
-        config_manager.load_app_config.return_value = {
-            "owner": "test-owner",
-            "repo": "test-repo",
+            "cache_owner": "test-owner",
+            "cache_repo": "test-repo",
         }
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(result, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(result, "test_app")
 
             mock_logger.info.assert_any_call(
                 "✅ Removed cache for %s/%s", "test-owner", "test-repo"
             )
 
     def test_display_removal_result_cache_no_owner_repo(self) -> None:
-        """Test display when cache cleared but no owner/repo in config."""
+        """Test display when cache cleared but no owner/repo available."""
         result = {
             "success": True,
             "cache_cleared": True,
+            "cache_owner": None,
+            "cache_repo": None,
         }
-        config_manager = MagicMock()
-        config_manager.load_app_config.return_value = {}
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(result, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(result, "test_app")
 
             # Should not log cache removal without owner/repo
             calls = [call[0][0] for call in mock_logger.info.call_args_list]
@@ -102,10 +95,9 @@ class TestDisplayRemovalResult:
             "backup_path": "/path/to/backups",
             "backup_removed": True,
         }
-        config_manager = MagicMock()
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(result, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(result, "test_app")
 
             mock_logger.info.assert_any_call(
                 "✅ Removed all backups and metadata for %s", "test_app"
@@ -118,10 +110,9 @@ class TestDisplayRemovalResult:
             "backup_path": "/path/to/backups",
             "backup_removed": False,
         }
-        config_manager = MagicMock()
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(result, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(result, "test_app")
 
             mock_logger.info.assert_any_call(
                 "⚠️  No backups found at: %s", "/path/to/backups"
@@ -133,10 +124,9 @@ class TestDisplayRemovalResult:
             "success": True,
             "desktop_entry_removed": True,
         }
-        config_manager = MagicMock()
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(result, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(result, "test_app")
 
             mock_logger.info.assert_any_call(
                 "✅ Removed desktop entry for %s", "test_app"
@@ -149,10 +139,9 @@ class TestDisplayRemovalResult:
             "icon_path": "/path/to/icon.png",
             "icon_removed": True,
         }
-        config_manager = MagicMock()
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(result, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(result, "test_app")
 
             mock_logger.info.assert_any_call(
                 "✅ Removed icon: %s", "/path/to/icon.png"
@@ -165,10 +154,9 @@ class TestDisplayRemovalResult:
             "icon_path": "/path/to/icon.png",
             "icon_removed": False,
         }
-        config_manager = MagicMock()
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(result, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(result, "test_app")
 
             mock_logger.info.assert_any_call(
                 "⚠️  Icon not found at: %s", "/path/to/icon.png"
@@ -180,10 +168,9 @@ class TestDisplayRemovalResult:
             "success": True,
             "config_removed": True,
         }
-        config_manager = MagicMock()
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(result, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(result, "test_app")
 
             mock_logger.info.assert_any_call(
                 "✅ %s config for %s", "Removed", "test_app"
@@ -195,10 +182,9 @@ class TestDisplayRemovalResult:
             "success": True,
             "config_removed": False,
         }
-        config_manager = MagicMock()
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(result, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(result, "test_app")
 
             mock_logger.info.assert_any_call(
                 "✅ %s config for %s", "Kept", "test_app"
@@ -210,6 +196,8 @@ class TestDisplayRemovalResult:
             "success": True,
             "removed_files": ["test_app.AppImage"],
             "cache_cleared": True,
+            "cache_owner": "owner",
+            "cache_repo": "repo",
             "backup_path": "/backups",
             "backup_removed": True,
             "desktop_entry_removed": True,
@@ -217,14 +205,9 @@ class TestDisplayRemovalResult:
             "icon_removed": True,
             "config_removed": True,
         }
-        config_manager = MagicMock()
-        config_manager.load_app_config.return_value = {
-            "owner": "owner",
-            "repo": "repo",
-        }
 
-        with patch("my_unicorn.ui.display_remove.logger") as mock_logger:
-            display_removal_result(result, "test_app", config_manager)
+        with patch("my_unicorn.core.remove.logger") as mock_logger:
+            display_removal_result(result, "test_app")
 
             # Verify all success messages are logged
             assert mock_logger.info.call_count >= 6

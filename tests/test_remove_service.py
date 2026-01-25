@@ -12,15 +12,68 @@ from my_unicorn.types import AppConfig, GlobalConfig
 
 @pytest.fixture
 def mock_config_manager():
-    """Return a mock configuration manager for testing."""
+    """Return a mock configuration manager for testing with v2 config format."""
     config_manager = MagicMock()
-    config_manager.load_app_config.side_effect = (
-        lambda app_name: {
-            "appimage": {"name": f"{app_name}.AppImage", "rename": app_name},
-            "icon": {"name": f"{app_name}.png", "installed": True},
+
+    def load_app_config_side_effect(app_name):
+        if app_name == "missing_app":
+            return None
+        # Return v2 format config
+        return {
+            "config_version": "2.0.0",
+            "source": "catalog",
+            "catalog_ref": app_name,
+            "state": {
+                "version": "1.0.0",
+                "installed_date": "2024-01-01T00:00:00",
+                "installed_path": f"/mock/storage/{app_name}.AppImage",
+                "verification": {
+                    "passed": True,
+                    "methods": [],
+                },
+                "icon": {
+                    "installed": True,
+                    "method": "extraction",
+                    "path": f"/mock/icons/{app_name}.png",
+                },
+            },
         }
-        if app_name != "missing_app"
-        else None
+
+    def get_effective_config_side_effect(app_name):
+        if app_name == "missing_app":
+            raise ValueError(f"No config found for {app_name}")
+        # Return effective config with source
+        return {
+            "config_version": "2.0.0",
+            "metadata": {
+                "name": app_name,
+                "display_name": app_name.title(),
+            },
+            "source": {
+                "type": "github",
+                "owner": "test-owner",
+                "repo": "test-repo",
+                "prerelease": False,
+            },
+            "state": {
+                "version": "1.0.0",
+                "installed_date": "2024-01-01T00:00:00",
+                "installed_path": f"/mock/storage/{app_name}.AppImage",
+                "verification": {
+                    "passed": True,
+                    "methods": [],
+                },
+                "icon": {
+                    "installed": True,
+                    "method": "extraction",
+                    "path": f"/mock/icons/{app_name}.png",
+                },
+            },
+        }
+
+    config_manager.load_app_config.side_effect = load_app_config_side_effect
+    config_manager.app_config_manager.get_effective_config.side_effect = (
+        get_effective_config_side_effect
     )
     config_manager.remove_app_config = MagicMock()
     return config_manager
@@ -56,6 +109,7 @@ async def test_remove_app_success(mock_config_manager, global_config):
         ),
     ):
         mock_cache_manager = MagicMock()
+        mock_cache_manager.clear_cache = AsyncMock()
         mock_get_cache.return_value = mock_cache_manager
 
         result = await service.remove_app("test_app", keep_config=False)
@@ -64,7 +118,8 @@ async def test_remove_app_success(mock_config_manager, global_config):
         assert result["config_removed"] is True
         assert result["icon_removed"] is True
         assert isinstance(result["backup_removed"], bool)
-        MIN_UNLINKS = 3
+        # Should have called unlink for appimage and icon
+        MIN_UNLINKS = 2
         assert unlink_mock.call_count >= MIN_UNLINKS
 
 
@@ -139,13 +194,44 @@ async def test_remove_app_icon_skipped_when_missing(
 @pytest.mark.asyncio
 async def test_remove_app_cache_and_backup_clear(global_config):
     """Cache should be cleared and backups removed when owner/repo is present."""
-    # Build a custom config manager with owner/repo and appimage/icon info
+    # Build a custom config manager with v2 format config
     custom_config_manager = MagicMock()
     custom_config_manager.load_app_config.return_value = {
-        "owner": "test_owner",
-        "repo": "test_repo",
-        "appimage": {"name": "test_app.AppImage", "rename": "test_app"},
-        "icon": {"name": "test_app.png", "installed": True},
+        "config_version": "2.0.0",
+        "source": "catalog",
+        "catalog_ref": "test_app",
+        "state": {
+            "version": "1.0.0",
+            "installed_date": "2024-01-01T00:00:00",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {"passed": True, "methods": []},
+            "icon": {
+                "installed": True,
+                "method": "extraction",
+                "path": "/mock/icons/test_app.png",
+            },
+        },
+    }
+    custom_config_manager.app_config_manager.get_effective_config.return_value = {
+        "config_version": "2.0.0",
+        "metadata": {"name": "test_app", "display_name": "Test App"},
+        "source": {
+            "type": "github",
+            "owner": "test_owner",
+            "repo": "test_repo",
+            "prerelease": False,
+        },
+        "state": {
+            "version": "1.0.0",
+            "installed_date": "2024-01-01T00:00:00",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {"passed": True, "methods": []},
+            "icon": {
+                "installed": True,
+                "method": "extraction",
+                "path": "/mock/icons/test_app.png",
+            },
+        },
     }
     custom_config_manager.remove_app_config = MagicMock()
 
@@ -203,17 +289,23 @@ async def test_remove_appimage_files_removes_files(
     mock_config_manager,
     global_config,
 ):
-    """_remove_appimage_files removes the named and normalized AppImage files."""
+    """_remove_appimage_files removes AppImage file from state.installed_path."""
     service = RemoveService(mock_config_manager, global_config)
 
-    storage_dir = global_config["directory"]["storage"]
+    # v2 config format with installed_path in state
     app_config = cast(
         "AppConfig",
         {
-            "appimage": {
-                "name": "test_app.AppImage",
-                "rename": "test_app",
-            }
+            "config_version": "2.0.0",
+            "source": "catalog",
+            "catalog_ref": "test_app",
+            "state": {
+                "installed_path": "/mock/storage/test_app.AppImage",
+                "version": "1.0.0",
+                "installed_date": "2024-01-01T00:00:00",
+                "verification": {"passed": True, "methods": []},
+                "icon": {"installed": False, "method": "none", "path": ""},
+            },
         },
     )
 
@@ -225,17 +317,16 @@ async def test_remove_appimage_files_removes_files(
         ),
         patch("pathlib.Path.unlink", autospec=True) as unlink_mock,
     ):
-        removed = service._remove_appimage_files(app_config, storage_dir)
+        removed = service._remove_appimage_files(app_config)
 
-        # Both paths should be removed
-        MIN_REMOVED = 2
-        assert len(removed) == MIN_REMOVED
-        assert unlink_mock.call_count >= MIN_REMOVED
+        # One AppImage file should be removed
+        assert len(removed) == 1
+        assert unlink_mock.call_count == 1
 
 
 @pytest.mark.asyncio
 async def test_clear_cache_calls_api_when_owner_repo_present(global_config):
-    """_clear_cache should call the cache manager when owner and repo exist."""
+    """_clear_cache should call the cache manager when owner and repo exist in effective config."""
     mock_config_manager = MagicMock()
     service = RemoveService(mock_config_manager, global_config)
 
@@ -246,23 +337,27 @@ async def test_clear_cache_calls_api_when_owner_repo_present(global_config):
         "my_unicorn.core.cache.get_cache_manager",
         return_value=mock_cache_manager,
     ):
-        app_config = cast(
-            "AppConfig", {"owner": "o", "repo": "r", "appimage": {"name": "x"}}
-        )
-        cleared = await service._clear_cache(app_config)
+        # v2: owner/repo are in effective_config.source dict
+        effective_config = {
+            "source": {"type": "github", "owner": "o", "repo": "r"},
+        }
+        cleared, owner, repo = await service._clear_cache(effective_config)
         assert cleared is True
+        assert owner == "o"
+        assert repo == "r"
         mock_cache_manager.clear_cache.assert_awaited_once_with("o", "r")
 
 
 @pytest.mark.asyncio
 async def test_clear_cache_skips_when_owner_repo_missing(global_config):
-    """_clear_cache should skip when owner or repo are missing."""
+    """_clear_cache should skip when owner or repo are missing from effective config."""
     service = RemoveService(MagicMock(), global_config)
-    app_config = cast(
-        "AppConfig", {"owner": None, "repo": None, "appimage": {"name": "x"}}
-    )
-    cleared = await service._clear_cache(app_config)
+    # Empty or missing source dict
+    effective_config = {"source": {}}
+    cleared, owner, repo = await service._clear_cache(effective_config)
     assert cleared is False
+    assert owner is None
+    assert repo is None
 
 
 def test_remove_backups_removes_and_returns_path(global_config):
@@ -331,13 +426,26 @@ def test_remove_desktop_entry(mock_config_manager, global_config):
 
 
 def test_remove_icon_remove_and_report(mock_config_manager, global_config):
-    """_remove_icon removes icon when present and returns its path."""
+    """_remove_icon removes icon when present in state and returns its path."""
     service = RemoveService(mock_config_manager, global_config)
+    # v2 config: icon path is in state.icon.path
     app_config = cast(
         "AppConfig",
         {
-            "icon": {"name": "test_app.png", "installed": True},
-            "appimage": {"name": "x"},
+            "config_version": "2.0.0",
+            "source": "catalog",
+            "catalog_ref": "test_app",
+            "state": {
+                "version": "1.0.0",
+                "installed_date": "2024-01-01T00:00:00",
+                "installed_path": "/mock/storage/test_app.AppImage",
+                "verification": {"passed": True, "methods": []},
+                "icon": {
+                    "installed": True,
+                    "method": "extraction",
+                    "path": "/mock/icons/test_app.png",
+                },
+            },
         },
     )
 
@@ -355,17 +463,31 @@ def test_remove_icon_remove_and_report(mock_config_manager, global_config):
         removed, path = service._remove_icon(app_config)
         assert removed is True
         assert isinstance(path, str)
+        assert path == "/mock/icons/test_app.png"
         assert unlink_mock.called
 
 
 def test_remove_icon_skipped_when_missing(mock_config_manager, global_config):
-    """_remove_icon should no-op when the icon is missing."""
+    """_remove_icon should return False when icon file doesn't exist."""
     service = RemoveService(mock_config_manager, global_config)
+    # v2 config: icon path in state
     app_config = cast(
         "AppConfig",
         {
-            "icon": {"name": "test_app.png", "installed": True},
-            "appimage": {"name": "x"},
+            "config_version": "2.0.0",
+            "source": "catalog",
+            "catalog_ref": "test_app",
+            "state": {
+                "version": "1.0.0",
+                "installed_date": "2024-01-01T00:00:00",
+                "installed_path": "/mock/storage/test_app.AppImage",
+                "verification": {"passed": True, "methods": []},
+                "icon": {
+                    "installed": True,
+                    "method": "extraction",
+                    "path": "/mock/icons/test_app.png",
+                },
+            },
         },
     )
 
@@ -383,6 +505,7 @@ def test_remove_icon_skipped_when_missing(mock_config_manager, global_config):
         removed, path = service._remove_icon(app_config)
         assert removed is False
         assert isinstance(path, str)
+        assert path == "/mock/icons/test_app.png"
         assert not unlink_mock.called
 
 

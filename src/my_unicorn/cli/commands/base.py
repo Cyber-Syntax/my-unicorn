@@ -56,6 +56,7 @@ class BaseCommandHandler(ABC):
         """Ensure required directories exist based on global config."""
         self.config_manager.ensure_directories_from_config(self.global_config)
 
+    #TODO: remove, unused
     def _expand_comma_separated_targets(self, targets: list[str]) -> list[str]:
         """Expand comma-separated target strings into a flat list.
 
