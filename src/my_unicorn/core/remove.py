@@ -114,6 +114,7 @@ class RemoveService:
         try:
             app_config = self.config_manager.load_app_config(app_name)
             if not app_config:
+                logger.error("❌ App '%s' not found", app_name)
                 return RemovalResult(
                     success=False,
                     app_name=app_name,
