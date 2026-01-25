@@ -90,14 +90,3 @@ async def test_install_handler_with_targets(
         mock_service.install.assert_awaited_once()
         call_args = mock_service.install.call_args
         assert call_args[0][0] == ["app1"]  # targets
-
-
-def test_expand_comma_separated_targets(
-    install_handler: InstallCommandHandler,
-) -> None:
-    """Test _expand_comma_separated_targets method."""
-    targets = ["app1,app2", "app3"]
-    expanded = install_handler._expand_comma_separated_targets(  # noqa: SLF001
-        targets
-    )
-    assert expanded == ["app1", "app2", "app3"]

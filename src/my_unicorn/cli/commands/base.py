@@ -55,34 +55,3 @@ class BaseCommandHandler(ABC):
     def _ensure_directories(self) -> None:
         """Ensure required directories exist based on global config."""
         self.config_manager.ensure_directories_from_config(self.global_config)
-
-    #TODO: remove, unused
-    def _expand_comma_separated_targets(self, targets: list[str]) -> list[str]:
-        """Expand comma-separated target strings into a flat list.
-
-        Args:
-            targets: List of target strings that may contain comma-separated values
-
-        Returns:
-            Flattened list of unique targets with duplicates removed
-
-        """
-        all_targets = []
-        for target in targets:
-            if "," in target:
-                all_targets.extend(
-                    [t.strip() for t in target.split(",") if t.strip()]
-                )
-            else:
-                all_targets.append(target.strip())
-
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_targets = []
-        for target in all_targets:
-            target_lower = target.lower()
-            if target_lower not in seen:
-                seen.add(target_lower)
-                unique_targets.append(target)
-
-        return unique_targets
