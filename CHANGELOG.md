@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0-alpha] - 2026-01-25
+
+### Added
+
+- Added mypy to development dependencies for type checking.
+- Added tests for SHA1 and MD5 verification across multiple checksum file formats.
+- Added unit tests for CLI command helpers and display functions.
+
+### Changed
+
+- Replaced custom version comparison logic with the packaging library.
+- Updated command references from 'list' to 'catalog' for consistency.
+- Updated catalog loading methods in tests for better alignment.
+- Cleaned up catalog and configuration management code.
+- Streamlined verification and checksum parsing logic.
+- Moved infrastructure modules to the core package for better organization.
+- Enhanced command handlers with shared helper functions.
+- Moved remove service to core/remove.py for better modularity.
+- Moved display_remove.py service to remove.py for simplification.
+- Enhanced remove service with dataclass for structured results.
+
+### Fixed
+
+- Fixed remove command by adding v2 config support.
+- Fixed attribute error in install command by adding explicit keyword argument to progress_service.
+
+### Removed
+
+- Removed unused imports and redundant code in various modules.
+- Eliminated deprecated methods and classes related to removal logic.
+
 ## [2.1.0-alpha] - 2026-01-10
 
 ### Added
@@ -711,6 +742,8 @@ Please change your current configuration files to the new format. The new format
 - refactor: improve better error handling on verify.py
 - chore: add copilot instructions
 
+[2.2.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.1.0-alpha...v2.2.0-alpha
+[2.1.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.0.0-alpha...v2.1.0-alpha
 [2.0.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.1-alpha...v2.0.0-alpha
 [1.12.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.1-alpha...v1.12.2-alpha
 [1.12.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.0-alpha...v1.12.1-alpha

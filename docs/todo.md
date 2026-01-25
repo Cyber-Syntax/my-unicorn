@@ -157,6 +157,8 @@ Confirm your GitHub token:
 
 ## done
 
+- [x] fix: remove service can't remove caches!
+- [x] unused comma seperate function on commands/base.py
 - [x] P2: #BUG: Cycle, circular import detected in import chain for cache.py
 - [x] we use logger.info so much, maybe we can disable logger.info on progress.py but keep logger info default on other modules for better user experience?
     - [x] progress.py logger.info disable by default
