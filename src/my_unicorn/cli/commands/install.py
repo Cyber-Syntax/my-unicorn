@@ -51,7 +51,9 @@ class InstallCommandHandler(BaseCommandHandler):
 
             service = InstallApplicationService(
                 session=session,
-                github_client=GitHubClient(session, progress_service),
+                github_client=GitHubClient(
+                    session, progress_service=progress_service
+                ),
                 catalog_manager=CatalogManagerAdapter(self.config_manager),
                 config_manager=self.config_manager,
                 install_dir=install_dir,
