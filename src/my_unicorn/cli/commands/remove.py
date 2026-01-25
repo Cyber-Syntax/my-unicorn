@@ -26,7 +26,5 @@ class RemoveHandler(BaseCommandHandler):
             result = await service.remove_app(app_name, args.keep_config)
             if not result.success:
                 error_msg = result.error or "Unknown error"
-                if "not found" in error_msg.lower():
-                    logger.error("❌ %s", error_msg)
-                else:
+                if "not found" not in error_msg.lower():
                     raise RuntimeError(error_msg)
