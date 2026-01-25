@@ -13,9 +13,15 @@
     - [ ] github action for releases
     - [ ] `my-unicorn upgrade` command now use uv package manager.
     - [x] Test `migrate` command
-    - [ ] Test `migrate` command on virtual machine.
+    - [x] Test `migrate` command on virtual machine.
 
 ## in-progress
+
+- [ ] Improve manual test script
+    - [ ] make sure the api fetch install works (we do that by remove and install on manual test script but seems like remove didn't removed the cache and I couldn't able to detect the api bug correctly, so we need to make manual test to make sure remove did it's job correctly etc.)
+    - [ ] add backup tests to make sure backup command also work as expected on tests etc.
+    - [ ] add new command to manual test script like `--slow` for big apps like joplin.
+    - [ ] add new command to test remove, upgrade, migrate commands.
 
 - [ ] writing every test from scratch for better understanding of tests and make sure they work as expected
     - [ ] cli tests
@@ -25,30 +31,11 @@
     - [ ] services tests
     - [ ] schemas tests
     - [ ] maybe TDT style tests later if possible
-    - [ ] fix: integration test couldn't skipeable test
-        - [ ] integration logger test is slow because of logger rotation, need to fix that
 
 - [ ] config --show is showing global config, better to name it --show-global-config for more clarity
-- [ ] add this to docs later
-
-1. The “stop rule” (very important)
-
-If you feel the need to introduce a new pattern, stop and ask:
-“Can this just be a function or a service?”
-
-90% of the time, the answer is yes.
-
 - [ ] move workflow folder modules to utils folder for better structure
-
-- [ ] we use logger.info so much, maybe we can disable logger.info on progress.py but keep logger info default on other modules for better user experience?
-    - [ ] progress.py logger.info disable by default
-    - [ ] other modules keep logger.info default
-
-- [ ] Cleanup unused code lines
-    - [ ] update.py unused progress task id lines
-    - [ ] install.py and update.py module lines so much, better to move some of the functions to utils module. For example, creating_desktop_entry, parse_github_url etc.
-
 - [ ] Correct comman design pattern with receiver and invoker, commands need to be thin and execute receivers only, learn from examples/patterns/Command/ folder
+
 - [ ] Make a better todo.md structure with priorities, labels etc.
     - [ ] clean this todo list, make priority to BUGS first.
     - [ ] handle todos, in-progress better which we conflict all of them, keep in-progress to what you working on etc.
@@ -56,10 +43,10 @@ If you feel the need to introduce a new pattern, stop and ask:
     - [ ] get some issues to here with their #code like this
     - [ ] make a template for yourself to keep same template all of your other projects
 
-- [ ] P2: #BUG: Cycle, circular import detected in import chain for cache.py
 - [ ] P1: deprecate my-unicorn package and repo directories (migrated to uv)
-    - [ ] Remove venv-wrapper
+    - [ ] Move venv-wrapper.bash to archive to your lin-utils repo
     - [ ] Remove legacy cli tool install from setup.sh
+
 - [ ] use space-separated to follow KISS principle?
 
 ```bash
@@ -170,6 +157,17 @@ Confirm your GitHub token:
 
 ## done
 
+- [x] P2: #BUG: Cycle, circular import detected in import chain for cache.py
+- [x] we use logger.info so much, maybe we can disable logger.info on progress.py but keep logger info default on other modules for better user experience?
+    - [x] progress.py logger.info disable by default
+    - [x] other modules keep logger.info default
+- [x] Cleanup unused code lines
+    - [x] update.py unused progress task id lines
+    - [x] install.py and update.py module lines so much, better to move some of the functions to utils module. For example, creating_desktop_entry, parse_github_url etc.
+- [x] fix: integration test couldn't skipeable test
+    - [x] integration logger test is slow because of logger rotation, need to fix that
+- [x] cleanup folder structure for better structure
+    - [x] move asset and release.py from domain to correct folder
 - [x] token save, remove not work on zsh completion?
 - [x] remove unused autocomplete flags from auth for save remove token and backup --migrate flag
 - [x] P1: remove icon download logic because we extract icon from appimage now.

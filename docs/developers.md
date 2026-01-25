@@ -3,6 +3,13 @@
 > [!NOTE]
 > This document provides an overview of the architecture and key components of the My Unicorn project for developers.
 
+## The Stop Rule for code complexity
+
+If you feel the need to introduce a new pattern, stop and ask:
+“Can this just be a function or a service?”
+
+90% of the time, the answer is yes.
+
 ## Architecture Overview
 
 Architecture:
@@ -25,7 +32,7 @@ Project Structure:
 - `src/my_unicorn/` - Main package source code
     - `catalog/` - Application catalog JSON files
     - `cli/` - CLI argument parsing and command runners
-        - `commands/` - Individual command handlers (install, update, remove, list, etc.)
+        - `commands/` - Individual command handlers (install, update, remove, catalog, etc.)
         - `parser.py` - Argument parser setup
         - `runner.py` - Command execution orchestration
     - `config/` - Configuration management
