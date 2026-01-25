@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.core.workflows.remove import RemoveService
+from my_unicorn.core.remove import RemoveService
 from my_unicorn.types import AppConfig, GlobalConfig
 
 

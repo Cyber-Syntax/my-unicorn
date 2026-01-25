@@ -5,7 +5,7 @@ Thin coordinator for removing installed AppImages.
 
 from argparse import Namespace
 
-from my_unicorn.core.workflows.remove import RemoveService
+from my_unicorn.core.remove import RemoveService
 from my_unicorn.ui.display_remove import display_removal_result
 
 from .base import BaseCommandHandler
