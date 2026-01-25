@@ -1,7 +1,10 @@
+# Specific files
+test_github_release_desc.md
 CHANGELOG_commits.md
 memory-bank/
 backups
 plan
+
 # ignore appimages
 *.AppImage*
 *.appimage
