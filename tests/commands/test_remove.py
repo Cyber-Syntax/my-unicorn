@@ -116,23 +116,17 @@ async def test_remove_single_app_success(
             "my_unicorn.core.cache.get_cache_manager",
             return_value=mock_cache_manager,
         ),
-        patch(
-            "my_unicorn.cli.commands.remove.display_removal_result"
-        ) as mock_display,
     ):
         args = Namespace(apps=["test_app"], keep_config=False)
         await remove_handler.execute(args)
 
         # Verify files were unlinked (appimage, desktop, icon)
         assert mock_unlink.call_count == 3
-        mock_display.assert_called_once()
 
         # Verify config removal
         mock_config_manager.remove_app_config.assert_called_once_with(
             "test_app"
         )
-        # Verify display was called
-        mock_display.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -152,9 +146,6 @@ async def test_remove_single_app_keep_config(
             "my_unicorn.core.cache.get_cache_manager",
             return_value=mock_cache_manager,
         ),
-        patch(
-            "my_unicorn.cli.commands.remove.display_removal_result"
-        ) as mock_display,
     ):
         args = Namespace(apps=["test_app"], keep_config=True)
         await remove_handler.execute(args)
@@ -164,8 +155,6 @@ async def test_remove_single_app_keep_config(
 
         # Verify config is not removed
         mock_config_manager.remove_app_config.assert_not_called()
-        # Verify display was called
-        mock_display.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -205,9 +194,6 @@ async def test_remove_icon_always_attempted(
             "my_unicorn.core.cache.get_cache_manager",
             return_value=AsyncMock(),
         ) as mock_get_cache,
-        patch(
-            "my_unicorn.cli.commands.remove.display_removal_result"
-        ) as mock_display,
     ):
         args = Namespace(apps=["test_app"], keep_config=False)
         await remove_handler.execute(args)
@@ -217,20 +203,15 @@ async def test_remove_icon_always_attempted(
 
 
 @pytest.mark.asyncio
-async def test_remove_missing_app(remove_handler, mock_config_manager):
-    """Test removal of a missing app."""
+async def test_remove_missing_app(remove_handler, mock_config_manager, caplog):
+    """Test removal of a missing app logs error without raising."""
     args = Namespace(apps=["missing_app"], keep_config=False)
 
-    with patch(
-        "my_unicorn.cli.commands.remove.display_removal_result"
-    ) as mock_display:
-        await remove_handler.execute(args)
+    await remove_handler.execute(args)
 
-        # Verify display was called with failure result
-        mock_display.assert_called_once()
-
-        # Verify config is not removed
-        mock_config_manager.remove_app_config.assert_not_called()
+    # Should log error message instead of raising
+    assert "App 'missing_app' not found" in caplog.text
+    assert "ERROR" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -262,9 +243,6 @@ async def test_remove_app_with_desktop_entry_error(
             "my_unicorn.core.cache.get_cache_manager",
             return_value=AsyncMock(),
         ) as mock_get_cache,
-        patch(
-            "my_unicorn.cli.commands.remove.display_removal_result"
-        ) as mock_display,
     ):
         args = Namespace(apps=["test_app"], keep_config=False)
         await remove_handler.execute(args)

@@ -5,7 +5,10 @@ This implementation encapsulates all business logic previously present in
 as invokers and services act as receivers that perform the domain logic.
 """
 
+from __future__ import annotations
+
 import shutil
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +19,34 @@ from my_unicorn.logger import get_logger
 from my_unicorn.types import AppConfig, GlobalConfig
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class RemovalOperation:
+    """Result of a single removal operation."""
+
+    success: bool
+    files: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class RemovalResult:
+    """Result of a removal operation."""
+
+    success: bool
+    app_name: str
+    removed_files: list[str]
+    cache_cleared: bool
+    cache_owner: str | None
+    cache_repo: str | None
+    backup_removed: bool
+    backup_path: str | None
+    desktop_entry_removed: bool
+    icon_removed: bool
+    icon_path: str | None
+    config_removed: bool
+    error: str | None = None
 
 
 class RemoveService:
@@ -52,13 +83,14 @@ class RemoveService:
     def create_default(
         cls,
         config_manager: ConfigManager | None = None,
-    ) -> "RemoveService":
+    ) -> RemoveService:
         """Create RemoveService with default dependencies.
 
         Factory method for simplified instantiation with sensible defaults.
 
         Args:
-            config_manager: Optional configuration manager (creates new if None)
+            config_manager: Optional configuration manager
+                (creates new if None)
 
         Returns:
             Configured RemoveService instance
@@ -74,126 +106,194 @@ class RemoveService:
 
     async def remove_app(
         self, app_name: str, keep_config: bool = False
-    ) -> dict[str, Any]:
+    ) -> RemovalResult:
         """Remove an application and its related files.
 
-        Returns a dictionary containing operation results and helpful flags.
+        Returns a RemovalResult containing operation results and helpful flags.
         """
-        result: dict[str, Any] = {
-            "success": True,
-            "app_name": app_name,
-            "removed_files": [],
-            "cache_cleared": False,
-            "cache_owner": None,  # For display purposes
-            "cache_repo": None,  # For display purposes
-            "backup_removed": False,
-            "backup_path": None,
-            "desktop_entry_removed": False,
-            "icon_removed": False,
-            "icon_path": None,
-            "config_removed": False,
-            "error": None,
-        }
-
         try:
             app_config = self.config_manager.load_app_config(app_name)
             if not app_config:
-                result["success"] = False
-                result["error"] = f"App '{app_name}' not found"
-                return result
+                return RemovalResult(
+                    success=False,
+                    app_name=app_name,
+                    removed_files=[],
+                    cache_cleared=False,
+                    cache_owner=None,
+                    cache_repo=None,
+                    backup_removed=False,
+                    backup_path=None,
+                    desktop_entry_removed=False,
+                    icon_removed=False,
+                    icon_path=None,
+                    config_removed=False,
+                    error=f"App '{app_name}' not found",
+                )
 
-            # Get effective config for owner/repo and other merged settings
             effective_config = (
                 self.config_manager.app_config_manager.get_effective_config(
                     app_name
                 )
             )
 
-            # Remove appimage files
-            result["removed_files"] = self._remove_appimage_files(app_config)
-
-            # Clear cache if owner/repo present
-            cache_cleared, owner, repo = await self._clear_cache(
-                effective_config
-            )
-            result["cache_cleared"] = cache_cleared
-            result["cache_owner"] = owner
-            result["cache_repo"] = repo
-
-            # Remove backup folder if configured
-            result["backup_removed"], result["backup_path"] = (
-                self._remove_backups(app_name)
+            # Execute removal operations
+            appimage_op = self._remove_appimage_files(app_config)
+            cache_op = await self._clear_cache(effective_config)
+            backup_op = self._remove_backups(app_name)
+            desktop_op = self._remove_desktop_entry(app_name)
+            icon_op = self._remove_icon(app_config)
+            config_op = (
+                self._remove_config(app_name)
+                if not keep_config
+                else RemovalOperation(success=True)
             )
 
-            # Remove desktop entry
-            result["desktop_entry_removed"] = self._remove_desktop_entry(
-                app_name
+            # Log results
+            self._log_removal_results(
+                app_name,
+                appimage_op,
+                cache_op,
+                backup_op,
+                desktop_op,
+                icon_op,
+                keep_config,
             )
 
-            # Remove icon
-            icon_removed, icon_path = self._remove_icon(app_config)
-            result["icon_removed"] = icon_removed
-            result["icon_path"] = icon_path
+            # Build result dictionary
+            return self._build_result(
+                app_name,
+                appimage_op,
+                cache_op,
+                backup_op,
+                desktop_op,
+                icon_op,
+                config_op,
+                keep_config,
+            )
 
-            # Remove config unless keeping it
-            if not keep_config:
-                result["config_removed"] = self._remove_config(app_name)
+        except Exception:
+            logger.exception("Failed to remove app %s", app_name)
+            return RemovalResult(
+                success=False,
+                app_name=app_name,
+                removed_files=[],
+                cache_cleared=False,
+                cache_owner=None,
+                cache_repo=None,
+                backup_removed=False,
+                backup_path=None,
+                desktop_entry_removed=False,
+                icon_removed=False,
+                icon_path=None,
+                config_removed=False,
+                error="Removal operation failed",
+            )
 
-            return result
+    def _log_removal_results(
+        self,
+        app_name: str,
+        appimage_op: RemovalOperation,
+        cache_op: RemovalOperation,
+        backup_op: RemovalOperation,
+        desktop_op: RemovalOperation,
+        icon_op: RemovalOperation,
+        keep_config: bool,
+    ) -> None:
+        """Log user-facing results of removal operations."""
+        if appimage_op.files:
+            files_str = ", ".join(appimage_op.files)
+            logger.info("✅ Removed AppImage(s): %s", files_str)
 
-        except Exception as e:
-            logger.error("Failed to remove app %s: %s", app_name, e)
-            result["success"] = False
-            result["error"] = str(e)
-            return result
+        if cache_op.metadata.get("owner") and cache_op.metadata.get("repo"):
+            logger.info(
+                "✅ Removed cache for %s/%s",
+                cache_op.metadata["owner"],
+                cache_op.metadata["repo"],
+            )
 
-    def _remove_appimage_files(self, app_config: AppConfig) -> list[str]:
-        """Remove appimage files recorded in app config from storage dir.
+        if backup_path := backup_op.metadata.get("path"):
+            if backup_op.files:
+                logger.info(
+                    "✅ Removed all backups and metadata for %s",
+                    app_name,
+                )
+            else:
+                logger.info("⚠️  No backups found at: %s", backup_path)
 
-        Returns a list of removed file paths.
-        """
-        removed: list[str] = []
+        if desktop_op.success:
+            logger.info("✅ Removed desktop entry for %s", app_name)
 
-        # v2 config: installed_path is in state
+        if icon_path := icon_op.metadata.get("path"):
+            if icon_op.files:
+                logger.info("✅ Removed icon: %s", icon_path)
+            else:
+                logger.info("⚠️  Icon not found at: %s", icon_path)
+
+        if keep_config:
+            logger.info("✅ Kept config for %s", app_name)
+        else:
+            logger.info("✅ Removed config for %s", app_name)
+
+    def _build_result(
+        self,
+        app_name: str,
+        appimage_op: RemovalOperation,
+        cache_op: RemovalOperation,
+        backup_op: RemovalOperation,
+        desktop_op: RemovalOperation,
+        icon_op: RemovalOperation,
+        config_op: RemovalOperation,
+        keep_config: bool,
+    ) -> RemovalResult:
+        """Build result from removal operations."""
+        return RemovalResult(
+            success=True,
+            app_name=app_name,
+            removed_files=appimage_op.files,
+            cache_cleared=bool(cache_op.metadata),
+            cache_owner=cache_op.metadata.get("owner"),
+            cache_repo=cache_op.metadata.get("repo"),
+            backup_removed=bool(backup_op.files),
+            backup_path=backup_op.metadata.get("path"),
+            desktop_entry_removed=desktop_op.success,
+            icon_removed=bool(icon_op.files),
+            icon_path=icon_op.metadata.get("path"),
+            config_removed=config_op.success if not keep_config else False,
+            error=None,
+        )
+
+    def _remove_appimage_files(
+        self, app_config: AppConfig
+    ) -> RemovalOperation:
+        """Remove appimage files recorded in app config from storage dir."""
         state = app_config.get("state", {})
         installed_path_str = state.get("installed_path")
 
         if not installed_path_str:
             logger.debug("No installed_path in state; skipping file remove")
-            return removed
+            return RemovalOperation(success=True, files=[])
 
         appimage_path = Path(installed_path_str)
 
         try:
             if appimage_path.exists():
                 appimage_path.unlink()
-                removed.append(str(appimage_path))
                 logger.debug("Removed AppImage: %s", appimage_path)
+                return RemovalOperation(
+                    success=True, files=[str(appimage_path)]
+                )
+            logger.debug("No AppImage file found at: %s", appimage_path)
+            return RemovalOperation(success=True, files=[])
         except Exception as unlink_exc:  # pragma: no cover - logging
             logger.warning(
                 "Failed to remove AppImage %s: %s",
                 appimage_path,
                 unlink_exc,
             )
+            return RemovalOperation(success=False, files=[])
 
-        if removed:
-            logger.debug("Removed AppImage(s): %s", removed)
-        else:
-            logger.debug("No AppImage file found at: %s", appimage_path)
-
-        return removed
-
-    async def _clear_cache(
-        self, effective_config: dict
-    ) -> tuple[bool, str | None, str | None]:
-        """Clear cache for app if owner/repo available.
-
-        Args:
-            effective_config: Merged effective configuration with source dict
-
-        Returns:
-            Tuple of (cache_cleared: bool, owner: str|None, repo: str|None)
-        """
+    async def _clear_cache(self, effective_config: dict) -> RemovalOperation:
+        """Clear cache for app if owner/repo available."""
         try:
             source = effective_config.get("source", {})
             owner = source.get("owner")
@@ -203,19 +303,19 @@ class RemoveService:
                 cache_manager = cache_module.get_cache_manager()
                 await cache_manager.clear_cache(owner, repo)
                 logger.debug("Removed cache for %s/%s", owner, repo)
-                return True, owner, repo
+                return RemovalOperation(
+                    success=True,
+                    metadata={"owner": owner, "repo": repo},
+                )
 
             logger.debug("Owner/repo missing in source; skip cache removal")
-            return False, None, None
+            return RemovalOperation(success=True, metadata={})
         except Exception as cache_exc:  # pragma: no cover - logging branch
             logger.warning("Failed to remove cache: %s", cache_exc)
-            return False, None, None
+            return RemovalOperation(success=False, metadata={})
 
-    def _remove_backups(self, app_name: str) -> tuple[bool, str | None]:
-        """Remove backups directory for app and return status and path.
-
-        Returns (removed: bool, path: str|None)
-        """
+    def _remove_backups(self, app_name: str) -> RemovalOperation:
+        """Remove backups directory for app."""
         try:
             backup_base = self.global_config["directory"].get("backup")
             if not backup_base:
@@ -223,30 +323,33 @@ class RemoveService:
                     "No backup_dir configured; skip backup removal for %s",
                     app_name,
                 )
-                return False, None
+                return RemovalOperation(success=True, metadata={})
 
             backup_dir = Path(backup_base) / app_name
-            # Always record backup path for user-facing messages
             backup_path = str(backup_dir)
+
             if backup_dir.exists():
                 shutil.rmtree(backup_dir)
                 logger.debug("Removed backups for %s", app_name)
-                return True, backup_path
+                return RemovalOperation(
+                    success=True,
+                    files=[backup_path],
+                    metadata={"path": backup_path},
+                )
 
-            return False, backup_path
+            return RemovalOperation(
+                success=True, metadata={"path": backup_path}
+            )
         except Exception as backup_exc:  # pragma: no cover - logging
             logger.warning(
                 "Failed to remove backups for %s: %s",
                 app_name,
                 backup_exc,
             )
-            return False, None
+            return RemovalOperation(success=False, metadata={})
 
-    def _remove_desktop_entry(self, app_name: str) -> bool:
-        """Attempt to remove a desktop entry for the app.
-
-        Returns True if removal succeeded, otherwise False.
-        """
+    def _remove_desktop_entry(self, app_name: str) -> RemovalOperation:
+        """Attempt to remove a desktop entry for the app."""
         try:
             removed = desktop_entry_module.remove_desktop_entry_for_app(
                 app_name,
@@ -254,114 +357,51 @@ class RemoveService:
             )
             if removed:
                 logger.debug("Removed desktop entry for %s", app_name)
-            return bool(removed)
+            return RemovalOperation(success=bool(removed))
         except Exception as desk_exc:  # pragma: no cover - logging
             logger.warning(
                 "Failed to remove desktop entry for %s: %s",
                 app_name,
                 desk_exc,
             )
-            return False
+            return RemovalOperation(success=False)
 
-    def _remove_icon(self, app_config: AppConfig) -> tuple[bool, str | None]:
-        """Remove icon file from icon directory if configured.
-
-        Returns (removed: bool, icon_path: str|None).
-        """
+    def _remove_icon(self, app_config: AppConfig) -> RemovalOperation:
+        """Remove icon file from icon directory if configured."""
         try:
-            # v2 config: icon path is in state.icon.path
             state = app_config.get("state", {})
             icon_state = state.get("icon", {})
             icon_path_str = icon_state.get("path")
 
             if not icon_path_str:
                 logger.debug("No icon path in state; skip icon removal")
-                return False, None
+                return RemovalOperation(success=True, metadata={})
 
             icon_path = Path(icon_path_str)
 
             if icon_path.exists():
                 icon_path.unlink()
                 logger.debug("Removed icon: %s", icon_path)
-                return True, icon_path_str
+                return RemovalOperation(
+                    success=True,
+                    files=[icon_path_str],
+                    metadata={"path": icon_path_str},
+                )
 
             logger.debug("Icon file not found: %s", icon_path)
-            return False, icon_path_str
+            return RemovalOperation(
+                success=True, metadata={"path": icon_path_str}
+            )
         except Exception as icon_exc:  # pragma: no cover - logging
             logger.warning("Failed to remove icon: %s", icon_exc)
-            return False, None
+            return RemovalOperation(success=False, metadata={})
 
-    def _remove_config(self, app_name: str) -> bool:
-        """Remove app config file from settings if present.
-
-        Returns True if removed, False otherwise.
-        """
+    def _remove_config(self, app_name: str) -> RemovalOperation:
+        """Remove app config file from settings if present."""
         try:
             removed = self.config_manager.remove_app_config(app_name)
             if removed:
                 logger.debug("Removed config for %s", app_name)
-            return bool(removed)
-        except Exception as cfg_exc:  # pragma: no cover - logging
-            logger.warning(
-                "Failed to remove config for %s: %s",
-                app_name,
-                cfg_exc,
-            )
-            return False
-
-
-def display_removal_result(
-    result: dict,
-    app_name: str,
-) -> None:
-    """Display results of a removal operation.
-
-    Args:
-        result: Result dictionary from RemoveService.remove_app()
-        app_name: Name of the app being removed
-
-    """
-    if not result:
-        logger.info("❌ Failed to remove %s", app_name)
-        return
-
-    if not result.get("success"):
-        logger.info(
-            "❌ %s", result.get("error", f"Failed to remove {app_name}")
-        )
-        return
-
-    # Log removed files
-    if files := result.get("removed_files"):
-        logger.info("✅ Removed AppImage(s): %s", ", ".join(files))
-
-    # Log cache clearance
-    if result.get("cache_cleared"):
-        owner = result.get("cache_owner")
-        repo = result.get("cache_repo")
-        if owner and repo:
-            logger.info("✅ Removed cache for %s/%s", owner, repo)
-
-    # Log backup removal
-    if backup_path := result.get("backup_path"):
-        if result.get("backup_removed"):
-            logger.info("✅ Removed all backups and metadata for %s", app_name)
-        else:
-            logger.info("⚠️  No backups found at: %s", backup_path)
-
-    # Log desktop entry and icon
-    if result.get("desktop_entry_removed"):
-        logger.info("✅ Removed desktop entry for %s", app_name)
-
-    if icon_path := result.get("icon_path"):
-        if result.get("icon_removed"):
-            logger.info("✅ Removed icon: %s", icon_path)
-        else:
-            logger.info("⚠️  Icon not found at: %s", icon_path)
-
-    # Log config status
-    logger.info(
-        "✅ %s config for %s",
-        "Removed" if result.get("config_removed") else "Kept",
-        app_name,
-    )
+            return RemovalOperation(success=bool(removed))
+        except Exception:  # pragma: no cover - logging
+            return RemovalOperation(success=False)

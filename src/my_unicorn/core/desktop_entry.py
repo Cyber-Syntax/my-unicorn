@@ -339,14 +339,14 @@ class DesktopEntry:
                     f.write(new_content)
 
                 # Make file executable
-                os.chmod(desktop_file_path, 0o755)
+                desktop_file_path.chmod(0o755)
 
                 if desktop_file_path.exists():
-                    logger.info(
+                    logger.debug(
                         "🖥️  Updated desktop entry: %s", desktop_file_path.name
                     )
                 else:
-                    logger.info(
+                    logger.debug(
                         "🖥️  Created desktop entry: %s", desktop_file_path.name
                     )
                 return desktop_file_path
