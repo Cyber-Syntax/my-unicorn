@@ -71,7 +71,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ### Üretim Yüklemesi
 
-#### Yöntem 1: setup.sh kullanarak (önerilen)**
+#### Yöntem 1: install.sh kullanarak (önerilen)**
 
 > [!NOTE]
 >
@@ -81,7 +81,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 cd ~/Downloads
 git clone https://github.com/Cyber-Syntax/my-unicorn.git
 cd my-unicorn
-./setup.sh uv-install
+./install.sh -i
 ```
 
 #### Yöntem 2: Doğrudan uv komutu
@@ -104,11 +104,11 @@ my-unicorn upgrade
 
 ### Geliştirme Yüklemesi (katkıda bulunanlar için)
 
-**setup.sh kullanarak:**
+**install.sh kullanarak:**
 
 ```bash
 cd ~/Downloads/my-unicorn
-./setup.sh uv-editable
+./install.sh -e
 ```
 
 **Doğrudan uv komutu:**
@@ -152,7 +152,7 @@ Kaynak kodundaki değişiklikler yeniden yüklemeye gerek olmadan hemen yansıt�
     # Proje dizinine gidin
     cd my-unicorn &
     # Yükleyiciyi çalıştırın (mevcut ise UV'yi otomatik kullanır)
-    ./setup.sh install
+    ./install.sh -i
     ```
 
 4. my-unicorn'u kullanmaya başlayın:

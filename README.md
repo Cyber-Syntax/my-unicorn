@@ -71,7 +71,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ### Production Install
 
-#### Method 1: Using setup.sh (recommended)**
+#### Method 1: Using install.sh (recommended)**
 >
 > [!NOTE]
 > This method also setup autocomplete for bash/zsh shells automatically.
@@ -80,7 +80,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 cd ~/Downloads
 git clone https://github.com/Cyber-Syntax/my-unicorn.git
 cd my-unicorn
-./setup.sh uv-install
+./install.sh -i
 ```
 
 #### Method 2: Direct uv command
@@ -113,11 +113,11 @@ my-unicorn upgrade
 
 ### Development Install (for contributors)
 
-**Using setup.sh:**
+**Using install.sh:**
 
 ```bash
 cd ~/Downloads/my-unicorn
-./setup.sh uv-editable
+./install.sh -e
 ```
 
 **Direct uv command:**
@@ -161,7 +161,7 @@ Changes to the source code will be reflected immediately without reinstalling.
     # Go to the project directory
     cd my-unicorn &
     # Run installer (automatically uses UV if available)
-    ./setup.sh install
+    ./install.sh -i
     ```
 
 4. Start using my-unicorn:

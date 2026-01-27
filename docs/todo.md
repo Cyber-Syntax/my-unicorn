@@ -5,24 +5,71 @@
 - [ ] Big reviews
     - [ ] Network retry logic
     - [x] Logger rotation logic
-    - [ ] Logger rotation on production
     - [ ] Logger rotation on virtual machine
     - [ ] API rate limiting
+    - [ ] Logger rotation on production
 
-- [ ] Test new features
-    - [ ] github action for releases
-    - [ ] `my-unicorn upgrade` command now use uv package manager.
-    - [x] Test `migrate` command
-    - [x] Test `migrate` command on virtual machine.
+```bash
+# log.1 rotated
+2026-01-25 16:03:09 - my_unicorn.main - DEBUG - async_main:28 - CLI completed successfully
+2026-01-25 16:03:09 - my_unicorn.main - DEBUG - async_main:25 - CLI started
+2026-01-25 16:03:09 - my_unicorn.ui.display - DEBUG - start_session:265 - Progress session started with 0 total operations
+2026-01-25 16:03:09 - my_unicorn.core.workflows.update - INFO - check_updates:400 - 🔄 Checking 5 app(s) for updates...
+...
+2026-01-25 16:03:10 - my_unicorn.core.token - DEBUG - get:131 - GitHub token retrieved from keyring (value hidden)
+2026-01-25 16:03:10 - my_unicorn.core.auth - DEBUG - apply_auth:183 - Applied GitHub authentication (token present)
+2026-01-25 16:03:10 - my_unicorn.config.schemas.validator - DEBUG - validate_app_state:218 - App state validation passed (v2.0.0): appflowy
+2026-01-25 16:03:10 - my_unicorn.config.schemas.validator - DEBUG - validate_app_state:218 - App state validation passed (v2.0.0): appflowy
+
+# .log new created (continue with correct module which it is backup to save metadata after the validator)
+# So, this rotation work as expected.
+2026-01-25 16:03:10 - my_unicorn.core.workflows.backup - DEBUG - save:100 - Saved metadata to /home/developer/Applications/backups/appflowy/metadata.json
+2026-01-25 16:03:10 - my_unicorn.core.workflows.backup - DEBUG - add_version:127 - Added version 0.1.0 to metadata
+2026-01-25 16:03:10 - my_unicorn.core.workflows.backup - INFO - create_backup:459 - Backup created: /home/developer/Applications/backups/appflowy/appflowy-0.1.0.AppImage (v0.1.0)
+2026-01-25 16:03:10 - my_unicorn.core.workflows.update - DEBUG - update_single_app:570 - Backup created: /home/developer/Applications/backups/appflowy/appflowy-0.1.0.AppImage
+...
+2026-01-25 16:03:57 - my_unicorn.main - DEBUG - async_main:28 - CLI completed successfully
+```
 
 ## in-progress
 
-- [ ] Improve manual test script
+- [ ] P1-Q1: Improve manual test script #p1 #q1 #important #testing
     - [ ] make sure the api fetch install works (we do that by remove and install on manual test script but seems like remove didn't removed the cache and I couldn't able to detect the api bug correctly, so we need to make manual test to make sure remove did it's job correctly etc.)
     - [ ] add backup tests to make sure backup command also work as expected on tests etc.
     - [ ] add new command to manual test script like `--slow` for big apps like joplin.
     - [ ] add new command to test remove, upgrade, migrate commands.
 
+add a diagnose test after the test done to make sure everything is fine after all tests
+we can do a something like return a report at the end of the tests with diagnose output etc.
+current test summary couldn't detect the failed passed correctly but we can make
+comprehensive report by checking the appimage config, backup metedata, check appimage location, desktop entry
+etc. all of the things to make sure everything is fine after the tests.
+
+we probably need to define one correct example or we can just use the json scheme
+
+- [ ] P1-Q3: Never use the real user config logs, app location on pytest unittests which current is use them! #p1 #important #q3
+- [ ] P1-Q2: deprecate my-unicorn package and repo directories (migrated to uv) #q2 #important #refactor
+    - [ ] Remove legacy cli tool install from install.sh
+
+- [ ] P2-Q4: fix all mypy issues #p2 #important #q4
+- [ ] P3-Q5: move workflow folder modules to utils folder for better structure
+- [ ] P3-Q6: Correct comman design pattern with receiver and invoker, commands need to be thin and execute receivers only, learn from examples/patterns/Command/ folder
+
+- [ ] P4-Q7:Make a better todo.md structure with priorities, labels etc.
+    - [ ] clean this todo list, make priority to BUGS first.
+    - [ ] handle todos, in-progress better which we conflict all of them, keep in-progress to what you working on etc.
+    - [ ] move big tasks to issues if you need
+    - [ ] get some issues to here with their #code like this
+    - [ ] make a template for yourself to keep same template all of your other projects
+- [ ] P1-Q8: add lock for one instance only to prevent multiple instance run at the same time
+    - [x] 16G error log, because of 2 instance running at the same time.(This solved by logger rotation fix but still better to add lock to prevent multiple instance run at the same time)
+
+## todo
+
+- [ ] P4: Remove code smells: <https://refactoring.guru/refactoring/smells>
+    - [ ] contexts
+    - [ ] config
+    - [x] handle FIXME, TODO for duplicate functions
 - [ ] writing every test from scratch for better understanding of tests and make sure they work as expected
     - [ ] cli tests
     - [ ] commands tests
@@ -31,44 +78,8 @@
     - [ ] services tests
     - [ ] schemas tests
     - [ ] maybe TDT style tests later if possible
-
-- [ ] config --show is showing global config, better to name it --show-global-config for more clarity
-- [ ] move workflow folder modules to utils folder for better structure
-- [ ] Correct comman design pattern with receiver and invoker, commands need to be thin and execute receivers only, learn from examples/patterns/Command/ folder
-
-- [ ] Make a better todo.md structure with priorities, labels etc.
-    - [ ] clean this todo list, make priority to BUGS first.
-    - [ ] handle todos, in-progress better which we conflict all of them, keep in-progress to what you working on etc.
-    - [ ] move big tasks to issues if you need
-    - [ ] get some issues to here with their #code like this
-    - [ ] make a template for yourself to keep same template all of your other projects
-
-- [ ] P1: deprecate my-unicorn package and repo directories (migrated to uv)
-    - [ ] Move venv-wrapper.bash to archive to your lin-utils repo
-    - [ ] Remove legacy cli tool install from setup.sh
-
-- [ ] use space-separated to follow KISS principle?
-
-```bash
-  # Install from catalog (comma-separated or space-separated)
-  my-unicorn install appflowy,joplin,obsidian
-  my-unicorn install appflowy joplin obsidian
-```
-
-- [ ] P1: add INFO level logs for verification instead of DEBUG
 - [ ] add remove --all command
-- [ ] P2: add lock for one instance only to prevent multiple instance run at the same time
-    - [ ] 16G error log, because of 2 instance running at the same time.
-
-- [ ] P3: Never use the real user config logs, app location on pytest unittests which current is use them!
-
-- [ ] P4: Remove code smells: <https://refactoring.guru/refactoring/smells>
-    - [ ] contexts
-    - [ ] config
-    - [x] handle FIXME, TODO for duplicate functions
-
-## todo
-
+- [ ] config --show is showing global config, better to name it --show-global-config for more clarity
 - [ ] add token command and use it as token storage etc. keep auth command for authentication only.
 - [ ] performance improvements on api : <https://github.com/xbeat/Machine-Learning/blob/main/9%20Strategies%20to%20Boost%20API%20Performance.md>
     - [ ] APIGateway would be useful when we impemented gitlab support
@@ -157,6 +168,12 @@ Confirm your GitHub token:
 
 ## done
 
+- [x] Test new features
+    - [x] github action for releases
+    - [x] `my-unicorn upgrade` command now use uv package manager.
+    - [x] Test `migrate` command
+    - [x] Test `migrate` command on virtual machine.
+- [x] use orjson for the migrate modules for better performance
 - [x] fix: remove service can't remove caches!
 - [x] unused comma seperate function on commands/base.py
 - [x] P2: #BUG: Cycle, circular import detected in import chain for cache.py

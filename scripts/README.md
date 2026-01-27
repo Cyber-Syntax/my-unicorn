@@ -3,8 +3,7 @@
 Helper scripts for managing the my-unicorn project.
 
 - Updater: `scripts/update.bash` is automate the my-unicorn cli usage with one command. It can be used in window manager widgets, cron jobs, or manually.
-- Installer: `./setup.sh` (top-level) installs the project into your XDG data dir, creates a virtualenv, installs a small wrapper executable, and sets up shell completion.
-- Wrapper: `scripts/venv-wrapper.bash` provides helper functions when sourced; the installer will copy a wrapper executable to `~/.local/bin/my-unicorn` for everyday use.
+- Installer: `./install.sh` is the main installation script for my-unicorn. Default use uv package manager to install my-unicorn. It also copy the update.bash script to `~/.local/bin/my-unicorn-update` for easy access.
 - Autocomplete: `scripts/autocomplete.bash` provides shell completion snippets.
 - Tests:
     - `scripts/test.py` - Python-based manual test suite (recommended) with colored output, better logging, and test result tracking

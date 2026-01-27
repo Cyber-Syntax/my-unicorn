@@ -75,11 +75,11 @@ My Unicorn is a Python 3.12+ CLI tool for managing AppImages on Linux. It instal
 
 ```bash
 # Install in editable mode for development 
-./setup.sh uv-editable
+./install.sh -e
 uv tool install --editable . --force
 
 # Or install from GitHub for production use (both commands do the same)
-./setup.sh uv-install
+./install.sh -i
 uv tool install git+https://github.com/Cyber-Syntax/my-unicorn --force
 ```
 
@@ -162,7 +162,7 @@ ruff format path/to/code/
 ruff format .
 ```
 
-### Ruff Error Fixes
+### Ruff Error Fixes (Only for non-test code)
 
 **S100**: Replace `assert` with `if-raise` blocks:
 
@@ -207,10 +207,9 @@ uv run my-unicorn <command>
 ```bash
 # Install from GitHub (main branch, for production use)
 uv tool install git+https://github.com/Cyber-Syntax/my-unicorn
-./setup.sh uv-install
+./install.sh -i
 
 # Upgrade to latest from GitHub
-./setup.sh uv-upgrade
 my-unicorn upgrade
 uv tool install --upgrade git+https://github.com/Cyber-Syntax/my-unicorn
 ```
