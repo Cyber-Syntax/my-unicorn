@@ -72,19 +72,16 @@ def _display_update_operation_summary(
     # Show individual results
     for app_name in updated_apps:
         app_info = _find_update_info(app_name, update_infos)
-        if app_info:
-            version_info = (
-                f"{app_info.current_version} → {app_info.latest_version}"
-            )
-            print(f"{app_name:<25} ✅ {version_info}")
-        else:
-            print(f"{app_name:<25} ✅ Updated")
+        version_info = (
+            f"{app_info.current_version} → {app_info.latest_version}"
+        )
+        print(f"{app_name:<25} ✅ {version_info}")
 
     for app_name in failed_apps:
         app_info = _find_update_info(app_name, update_infos)
         print(f"{app_name:<25} ❌ Update failed")
         # Display error reason if available
-        if app_info and app_info.error_reason:
+        if app_info.error_reason:
             print(f"{'':>25}    → {app_info.error_reason}")
 
     # Show summary stats
@@ -202,7 +199,7 @@ def _format_update_version_info(info: "UpdateInfo") -> str:
 def _find_update_info(
     app_name: str,
     update_infos: list["UpdateInfo"],
-) -> "UpdateInfo | None":
+) -> "UpdateInfo":
     """Find UpdateInfo for a specific app.
 
     Args:
@@ -210,13 +207,19 @@ def _find_update_info(
         update_infos: List of UpdateInfo objects.
 
     Returns:
-        UpdateInfo for the app, or None if not found.
+        UpdateInfo for the app with default error if not found.
 
     """
     for info in update_infos:
         if info.app_name == app_name:
             return info
-    return None
+    # Return default error UpdateInfo if not found
+    from my_unicorn.core.workflows.update import UpdateInfo
+
+    return UpdateInfo(
+        app_name=app_name,
+        error_reason="Update info not found",
+    )
 
 
 def display_update_progress(message: str) -> None:

@@ -116,11 +116,20 @@ class InstallHandler:
 
         """
         logger.debug("Starting catalog install: app=%s", app_name)
+
+        def _raise_app_not_found() -> None:
+            msg = "App not found in catalog"
+            raise InstallationError(msg)
+
+        def _raise_no_asset() -> None:
+            msg = "No suitable AppImage asset found"
+            raise ValueError(msg)
+
         try:
             # Get app configuration (v2 format from catalog)
             app_config = self.catalog_manager.get_app_config(app_name)
             if not app_config:
-                raise InstallationError("App not found in catalog")
+                _raise_app_not_found()
 
             # Extract source info from v2 config
             source_config = app_config.get("source", {})
@@ -141,12 +150,13 @@ class InstallHandler:
                 installation_source="catalog",
             )
             # Asset is guaranteed non-None (raise_on_not_found=True by default)
-            assert asset is not None
+            if asset is None:
+                _raise_no_asset()
 
             # Install workflow
             return await self._install_workflow(
                 app_name=app_name,
-                asset=asset,
+                asset=asset,  # type: ignore[arg-type]
                 release=release,
                 app_config=app_config,
                 source="catalog",
@@ -200,6 +210,11 @@ class InstallHandler:
 
         """
         logger.debug("Starting URL install: url=%s", github_url)
+
+        def _raise_no_asset() -> None:
+            msg = "No suitable AppImage asset found"
+            raise ValueError(msg)
+
         try:
             # Parse GitHub URL
             url_info = parse_github_url(github_url)
@@ -222,7 +237,8 @@ class InstallHandler:
                 release, installation_source="url"
             )
             # Asset is guaranteed non-None (raise_on_not_found=True by default)
-            assert asset is not None
+            if asset is None:
+                _raise_no_asset()
 
             # Create v2 format app config template for URL installs
             # Note: verification method will auto-detect checksums
@@ -258,7 +274,7 @@ class InstallHandler:
             # Install workflow
             return await self._install_workflow(
                 app_name=app_name,
-                asset=asset,
+                asset=asset,  # type: ignore[arg-type]
                 release=release,
                 app_config=app_config,
                 source="url",
@@ -558,6 +574,11 @@ class InstallHandler:
         # in the exception handler that attempts to finish progress tasks.
         verification_task_id = None
         installation_task_id = None
+
+        def _raise_verification_error(error_msg: str) -> None:
+            msg = f"Verification failed: {error_msg}"
+            raise InstallationError(msg)
+
         try:
             # 1. Download
             download_path = download_dir / asset.name
@@ -602,11 +623,7 @@ class InstallHandler:
                 )
                 if not verify_result["passed"]:
                     error_msg = verify_result.get("error", "Unknown error")
-                    raise InstallationError(
-                        f"Verification failed: {error_msg}"
-                    )
-
-            # 3. Move to install directory and rename
+                    _raise_verification_error(error_msg)
             logger.info("Installing %s", app_name)
             # Move file to install directory first
             moved_path = self.storage_service.move_to_install_dir(
@@ -699,11 +716,16 @@ class InstallHandler:
 
     async def _fetch_release(self, owner: str, repo: str) -> Release:
         """Fetch release data from GitHub."""
+
+        def _raise_no_release() -> None:
+            msg = f"No release found for {owner}/{repo}"
+            raise InstallationError(msg)
+
         try:
             release = await self.github_client.get_latest_release(owner, repo)
             if not release:
-                raise InstallationError(f"No release found for {owner}/{repo}")
-            return release
+                _raise_no_release()
+            return release  # type: ignore[return-value]
         except Exception as error:
             logger.error(
                 "Failed to fetch release for %s/%s: %s", owner, repo, error

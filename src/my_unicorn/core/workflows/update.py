@@ -5,9 +5,10 @@ and managing the update process for installed AppImages.
 """
 
 import asyncio
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp
 from packaging.version import InvalidVersion, Version
@@ -36,9 +37,13 @@ from my_unicorn.core.workflows.shared import (
 )
 from my_unicorn.logger import get_logger
 
+if TYPE_CHECKING:
+    from my_unicorn.types import AppConfig
+
 logger = get_logger(__name__)
 
 
+@dataclass
 class UpdateInfo:
     """Information about an available update.
 
@@ -46,48 +51,41 @@ class UpdateInfo:
     redundant cache file reads during a single update operation.
     """
 
-    def __init__(
-        self,
-        app_name: str,
-        current_version: str,
-        latest_version: str,
-        has_update: bool,
-        release_url: str = "",
-        prerelease: bool = False,
-        original_tag_name: str = "",
-        release_data: Release | None = None,
-        error_reason: str | None = None,
-    ):
-        """Initialize update information.
+    app_name: str
+    current_version: str = "unknown"
+    latest_version: str = "unknown"
+    has_update: bool = False
+    release_url: str = ""
+    prerelease: bool = False
+    original_tag_name: str = ""
+    release_data: Release | None = None
+    error_reason: str | None = None
 
-        Args:
-            app_name: Name of the application
-            current_version: Currently installed version
-            latest_version: Latest available version
-            has_update: Whether an update is available
-            release_url: URL to the release
-            prerelease: Whether the latest version is a prerelease
-            original_tag_name: Original tag name from GitHub (preserves 'v' prefix)
-            release_data: Full release data from GitHub API (in-memory cache)
-            error_reason: Optional error message if update failed
+    def __post_init__(self) -> None:
+        """Post-initialization processing."""
+        # Set default original_tag_name if not provided
+        if not self.original_tag_name and self.latest_version != "unknown":
+            self.original_tag_name = f"v{self.latest_version}"
+
+    @property
+    def is_success(self) -> bool:
+        """Check if update info represents a successful operation.
+
+        Returns:
+            True if no error occurred, False otherwise
 
         """
-        self.app_name = app_name
-        self.current_version = current_version
-        self.latest_version = latest_version
-        self.has_update = has_update
-        self.release_url = release_url
-        self.prerelease = prerelease
-        self.original_tag_name = original_tag_name or f"v{latest_version}"
-        self.release_data = (
-            release_data  # In-memory cache for single operation
-        )
-        self.error_reason = error_reason
+        return self.error_reason is None
 
     def __repr__(self) -> str:
         """String representation of update info."""
+        if self.error_reason:
+            return f"UpdateInfo({self.app_name}: Error - {self.error_reason})"
         status = "Available" if self.has_update else "Up to date"
-        return f"UpdateInfo({self.app_name}: {self.current_version} -> {self.latest_version}, {status})"
+        return (
+            f"UpdateInfo({self.app_name}: {self.current_version} -> "
+            f"{self.latest_version}, {status})"
+        )
 
 
 class UpdateManager:
@@ -216,7 +214,7 @@ class UpdateManager:
         app_name: str,
         session: aiohttp.ClientSession,
         refresh_cache: bool = False,
-    ) -> UpdateInfo | None:
+    ) -> UpdateInfo:
         """Check for updates for a single app.
 
         Args:
@@ -225,14 +223,17 @@ class UpdateManager:
             refresh_cache: If True, bypass cache and fetch fresh data from API
 
         Returns:
-            UpdateInfo object or None if app not found
+            UpdateInfo object with error_reason set if check failed
 
         """
         try:
             app_config = self.config_manager.load_app_config(app_name)
             if not app_config:
                 logger.warning("No config found for app: %s", app_name)
-                return None
+                return UpdateInfo(
+                    app_name=app_name,
+                    error_reason="No config found for app",
+                )
 
             # Get effective config (all configs are v2 after migration)
             effective_config = (
@@ -266,9 +267,7 @@ class UpdateManager:
             # to avoid redundant API calls within the same operation.
             #
             # Fetch latest release
-            fetcher = ReleaseFetcher(
-                owner, repo, session, self._shared_api_task_id
-            )
+            fetcher = ReleaseFetcher(owner, repo, session, self.auth_manager)
             if should_use_prerelease:
                 logger.debug(
                     "Fetching latest prerelease for %s/%s", owner, repo
@@ -323,6 +322,7 @@ class UpdateManager:
         except aiohttp.client_exceptions.ClientResponseError as e:
             # Handle HTTP errors (401, 403, 404, etc.)
             if e.status == 401:
+                error_msg = "Authentication required - please set GitHub token"
                 logger.exception(
                     "Failed to check updates for %s: Unauthorized (401). "
                     "Your GitHub Personal Access Token (PAT) is invalid. "
@@ -330,23 +330,33 @@ class UpdateManager:
                     app_name,
                 )
             else:
+                error_msg = f"HTTP {e.status} error"
                 logger.exception(
                     "Failed to check updates for %s: HTTP %d - %s",
                     app_name,
                     e.status,
                     e.message,
                 )
-            return None
+            return UpdateInfo(
+                app_name=app_name,
+                error_reason=error_msg,
+            )
 
         except ValueError as e:
-            # Handle specific ValueError cases (no releases, parsing errors, etc.)
-            logger.exception("Failed to check updates for %s: %s", app_name, e)
-            return None
+            # Handle specific ValueError cases (no releases, parsing errors)
+            logger.exception("Failed to check updates for %s", app_name)
+            return UpdateInfo(
+                app_name=app_name,
+                error_reason=str(e),
+            )
 
         except Exception as e:
             # Catch-all for unexpected errors
-            logger.exception("Failed to check updates for %s: %s", app_name, e)
-            return None
+            logger.exception("Failed to check updates for %s", app_name)
+            return UpdateInfo(
+                app_name=app_name,
+                error_reason=f"Unexpected error: {e}",
+            )
 
     def _warn_about_migration(self) -> None:
         """Check and warn about apps needing migration."""
@@ -401,25 +411,34 @@ class UpdateManager:
 
         async with aiohttp.ClientSession() as session:
 
-            async def check_single(app_name: str) -> UpdateInfo | None:
+            async def check_single(app_name: str) -> UpdateInfo:
                 try:
                     return await self.check_single_update(
                         app_name, session, refresh_cache=refresh_cache
                     )
                 except Exception as e:
-                    logger.error("Update check failed for %s: %s", app_name, e)
-                    return None
+                    logger.exception("Update check failed for %s", app_name)
+                    return UpdateInfo(
+                        app_name=app_name,
+                        error_reason=f"Exception during check: {e}",
+                    )
 
             tasks = [check_single(app) for app in app_names]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Filter out None results and exceptions
-        update_infos = [
-            result for result in results if isinstance(result, UpdateInfo)
-        ]
-        for result in results:
+        # Handle any unexpected exceptions from gather
+        update_infos: list[UpdateInfo] = []
+        for i, result in enumerate(results):
             if isinstance(result, Exception):
                 logger.error("Update check failed: %s", result)
+                update_infos.append(
+                    UpdateInfo(
+                        app_name=app_names[i],
+                        error_reason=f"Critical error: {result}",
+                    )
+                )
+            elif isinstance(result, UpdateInfo):
+                update_infos.append(result)
 
         return update_infos
 
@@ -451,10 +470,17 @@ class UpdateManager:
         # Use cached update info if provided, otherwise check for updates
         if not update_info:
             update_info = await self.check_single_update(app_name, session)
-            if not update_info:
-                return None, "Failed to check for updates"
 
-        # Check if update is needed
+        # Check if update info indicates an error
+        if not update_info.is_success:
+            logger.error(
+                "Failed to check updates for %s: %s",
+                app_name,
+                update_info.error_reason,
+            )
+            return None, update_info.error_reason or "Failed to check updates"
+
+        # Check if update is needed (skip context only if up to date and not forced)
         if not update_info.has_update and not force:
             logger.info("%s is already up to date", app_name)
             return {"skip": True, "success": True}, None
@@ -481,9 +507,18 @@ class UpdateManager:
                 raise ValueError(msg)
 
         # Find AppImage asset from cached release data
+        if not update_info.release_data:
+            logger.error("No release data available for %s", app_name)
+            return (
+                None,
+                "No release data available",
+            )
+
+        # Convert catalog_entry to dict if needed for select_best_appimage_asset
+        catalog_dict = dict(catalog_entry) if catalog_entry else None
         appimage_asset = select_best_appimage_asset(
             update_info.release_data,
-            catalog_entry=catalog_entry,
+            catalog_entry=catalog_dict,
             installation_source="url",
             raise_on_not_found=False,
         )
@@ -522,20 +557,32 @@ class UpdateManager:
             Tuple of (success status, error reason or None)
 
         """
+
+        def _raise_invalid_update_info() -> None:
+            msg = "update_info from context is guaranteed to be non-None"
+            raise ValueError(msg)
+
+        def _raise_no_release_data() -> None:
+            msg = "release_data must be available"
+            raise ValueError(msg)
+
         try:
             # Prepare update context
             context, error = await self._prepare_update_context(
                 app_name, session, force, update_info
             )
-            if error:
+            if error or context is None:
                 return False, error
             if context.get("skip"):
                 return True, None
 
             # Extract from context
             app_config = context["app_config"]
-            update_info = context["update_info"]
+            update_info = cast("UpdateInfo", context["update_info"])
             appimage_asset = context["appimage_asset"]
+
+            # Type narrowing: update_info from context is guaranteed
+            # to be non-None and successful (checked in _prepare_update_context)
 
             # Setup paths
             storage_dir = Path(self.global_config["directory"]["storage"])
@@ -543,7 +590,6 @@ class UpdateManager:
             download_dir = Path(self.global_config["directory"]["download"])
 
             # Get download path
-            from my_unicorn.core.download import DownloadService
 
             download_service_temp = DownloadService(None)  # type: ignore[arg-type]
             filename = download_service_temp.get_filename_from_url(
@@ -581,6 +627,10 @@ class UpdateManager:
                 return False, "Download failed"
 
             # Verify, install, and configure
+            # release_data is guaranteed to exist at this point
+            # (checked in _prepare_update_context)
+            if update_info.release_data is None:
+                _raise_no_release_data()
             success = await self._process_post_download(
                 app_name=app_name,
                 app_config=app_config,
@@ -589,7 +639,7 @@ class UpdateManager:
                 repo=context["repo"],
                 catalog_entry=context["catalog_entry"],
                 appimage_asset=appimage_asset,
-                release_data=update_info.release_data,
+                release_data=update_info.release_data,  # type: ignore[arg-type]
                 icon_dir=icon_dir,
                 storage_dir=storage_dir,
                 downloaded_path=downloaded_path,
@@ -605,7 +655,7 @@ class UpdateManager:
             return False, "Post-download processing failed"
 
         except Exception as e:
-            logger.error("Failed to update %s: %s", app_name, e)
+            logger.exception("Failed to update %s", app_name)
             return False, f"Update failed: {e}"
 
     async def _process_post_download(
@@ -651,11 +701,25 @@ class UpdateManager:
         # otherwise be undefined.
         verification_task_id = None
         installation_task_id = None
+
+        def _raise_no_progress_service() -> None:
+            msg = "Progress service is required when progress is enabled"
+            raise ValueError(msg)
+
+        def _raise_no_verification_service() -> None:
+            msg = "verification_service must be initialized"
+            raise ValueError(msg)
+
+        def _raise_progress_required() -> None:
+            msg = "Progress service is required"
+            raise ValueError(msg)
+
         try:
             if progress_enabled:
                 # Type narrowing: progress_enabled is only True when
                 # progress_service is not None
-                assert progress_service is not None
+                if progress_service is None:
+                    _raise_no_progress_service()
                 (
                     verification_task_id,
                     installation_task_id,
@@ -664,12 +728,15 @@ class UpdateManager:
                 )
 
             # Verify download if requested
+            # verification_service is initialized in _initialize_services called before this method
+            if self.verification_service is None:
+                _raise_no_verification_service()
             verify_result = await verify_appimage_download(
                 file_path=downloaded_path,
                 asset=appimage_asset,
                 release=release_data,
                 app_name=app_name,
-                verification_service=self.verification_service,
+                verification_service=self.verification_service,  # type: ignore[arg-type]
                 verification_config=app_config.get("verification"),
                 catalog_entry=catalog_entry,
                 owner=owner,
@@ -746,7 +813,8 @@ class UpdateManager:
 
             # Finish installation task
             if installation_task_id and progress_enabled:
-                assert progress_service is not None
+                if progress_service is None:
+                    _raise_progress_required()
                 await progress_service.finish_task(
                     installation_task_id,
                     success=True,
@@ -765,7 +833,8 @@ class UpdateManager:
         except Exception:
             # Mark installation as failed if we have a progress task
             if installation_task_id and progress_enabled:
-                assert progress_service is not None
+                if progress_service is None:
+                    _raise_progress_required()
                 await progress_service.finish_task(
                     installation_task_id,
                     success=False,
@@ -810,7 +879,9 @@ class UpdateManager:
             app_config["state"] = {}
         app_config["state"]["version"] = update_info.latest_version
         app_config["state"]["installed_path"] = str(appimage_path)
-        app_config["state"]["installed_date"] = datetime.now().isoformat()
+        app_config["state"]["installed_date"] = (
+            datetime.now().astimezone().isoformat()
+        )
         # Note: Verification results are stored in state.verification during install
 
         # Update icon configuration in state.icon (v2 format)
@@ -831,7 +902,9 @@ class UpdateManager:
                     app_config["state"]["icon"]["installed"],
                 )
 
-        self.config_manager.save_app_config(app_name, app_config)
+        self.config_manager.save_app_config(
+            app_name, cast("AppConfig", app_config), skip_validation=True
+        )
 
         # Clean up old backups after successful update
         try:
@@ -850,9 +923,9 @@ class UpdateManager:
     ) -> str:
         """Get the hash to store from verification results or asset digest."""
         if verification_results.get("digest", {}).get("passed"):
-            return verification_results["digest"]["hash"]
+            return str(verification_results["digest"]["hash"])
         if verification_results.get("checksum_file", {}).get("passed"):
-            return verification_results["checksum_file"]["hash"]
+            return str(verification_results["checksum_file"]["hash"])
         if appimage_asset.digest:
             return appimage_asset.digest
         return ""

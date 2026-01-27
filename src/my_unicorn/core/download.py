@@ -150,7 +150,9 @@ class DownloadService:
 
         """
         # This method should only be called when progress_service is not None
-        assert self.progress_service is not None, "progress_service required"
+        if self.progress_service is None:
+            msg = "progress_service required"
+            raise ValueError(msg)
 
         # Create progress task with total in bytes
         task_id = await self.progress_service.add_task(
@@ -301,9 +303,7 @@ class DownloadService:
                 async with self.session.get(
                     url, headers=headers, timeout=timeout
                 ) as response:
-                    _maybe = response.raise_for_status()
-                    if asyncio.iscoroutine(_maybe):
-                        await _maybe
+                    response.raise_for_status()
                     return await process_callback(response)
 
             except (aiohttp.ClientError, TimeoutError) as e:

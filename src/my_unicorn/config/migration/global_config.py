@@ -14,6 +14,7 @@ import configparser
 import shutil
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from my_unicorn.config.migration.helpers import compare_versions
 
@@ -56,7 +57,7 @@ class ConfigMigration:
         # (level, message, args)
         self._messages: list[tuple[str, str, tuple]] = []
 
-    def _collect_message(self, level: str, message: str, *args) -> None:
+    def _collect_message(self, level: str, message: str, *args: Any) -> None:
         """Collect migration messages for later logging.
 
         Args:
@@ -207,8 +208,12 @@ class ConfigMigration:
             # No config to backup
             return self.settings_file
 
-        # Prepare backup filename with timestamp
-        timestamp = datetime.now().strftime(CONFIG_BACKUP_TIMESTAMP_FORMAT)
+        # Prepare backup filename with timestamp (use astimezone for local time)
+        timestamp = (
+            datetime.now()
+            .astimezone()
+            .strftime(CONFIG_BACKUP_TIMESTAMP_FORMAT)
+        )
         backup_path: Path = self.settings_file.with_suffix(
             CONFIG_BACKUP_SUFFIX_TEMPLATE.format(timestamp=timestamp)
         )
