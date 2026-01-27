@@ -10,7 +10,7 @@ from argparse import Namespace
 
 import keyring
 
-from my_unicorn.core.auth import (
+from my_unicorn.core.token import (
     MAX_TOKEN_LENGTH,
     _scrub_token,
     validate_github_token,

@@ -4,11 +4,12 @@ from unittest.mock import patch
 
 import pytest
 
-from my_unicorn.core.auth import GitHubAuthManager, validate_github_token
+from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.token import (
     KeyringAccessError,
     KeyringUnavailableError,
     setup_keyring,
+    validate_github_token,
 )
 
 
