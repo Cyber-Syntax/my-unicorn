@@ -332,8 +332,8 @@ class TestDownloadRetryLogic:
         # Mock response with error status
         mock_response = AsyncMock()
         mock_response.status = 500
-        mock_response.raise_for_status.side_effect = aiohttp.ClientError(
-            "500 Server Error"
+        mock_response.raise_for_status = Mock(
+            side_effect=aiohttp.ClientError("500 Server Error")
         )
 
         mock_session.get.return_value.__aenter__.return_value = mock_response

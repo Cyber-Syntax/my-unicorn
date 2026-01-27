@@ -1,9 +1,9 @@
 """Tests for BackupHandler command: comprehensive testing of backup operations."""
 
-import json
 from datetime import datetime
 from unittest.mock import MagicMock
 
+import orjson
 import pytest
 
 from my_unicorn.cli.commands.backup import BackupHandler
@@ -166,7 +166,7 @@ class TestBackupHandler:
         metadata_file = app_backup_dir / "metadata.json"
         assert metadata_file.exists()
 
-        metadata = json.loads(metadata_file.read_text())
+        metadata = orjson.loads(metadata_file.read_bytes())
         assert "1.2.3" in metadata["versions"]
         assert (
             metadata["versions"]["1.2.3"]["filename"]
@@ -580,13 +580,13 @@ class TestBackupHandler:
                 "1.2.3": {
                     "filename": f"{app_name}-1.2.3.AppImage",
                     "sha256": "backup_hash",
-                    "created": datetime.now().isoformat(),
+                    "created": datetime.now().astimezone().isoformat(),
                     "size": len("backup content"),
                 }
             }
         }
         metadata_file = app_backup_dir / "metadata.json"
-        metadata_file.write_text(json.dumps(metadata))
+        metadata_file.write_bytes(orjson.dumps(metadata))
 
         args = MagicMock()
         args.app_name = app_name

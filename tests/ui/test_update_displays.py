@@ -296,7 +296,10 @@ class TestFindUpdateInfo:
 
         info = _find_update_info("nonexistent", update_infos)
 
-        assert info is None
+        # Now returns UpdateInfo with error instead of None
+        assert info is not None
+        assert info.app_name == "nonexistent"
+        assert info.error_reason == "Update info not found"
 
 
 class TestDisplayMessageFunctions:

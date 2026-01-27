@@ -1,10 +1,10 @@
 """Tests for BackupService: enhanced backup creation, cleanup, restore, and migration."""
 
-import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import orjson
 import pytest
 
 from my_unicorn.core.workflows.backup import BackupMetadata, BackupService
@@ -207,7 +207,7 @@ class TestBackupService:
         metadata_file = backup_path.parent / "metadata.json"
         assert metadata_file.exists()
 
-        metadata = json.loads(metadata_file.read_text())
+        metadata = orjson.loads(metadata_file.read_bytes())
         assert "1.2.3" in metadata["versions"]
 
     def test_create_backup_missing_file(self, backup_service):
@@ -316,7 +316,7 @@ class TestBackupService:
             metadata.save(metadata_data)
 
         # Cleanup
-        backup_service._cleanup_old_backups_for_app(app_name, app_backup_dir)
+        backup_service._cleanup_old_backups_for_app(app_backup_dir)
 
         # Should keep only 2 most recent
         remaining_files = list(app_backup_dir.glob("*.AppImage"))
@@ -345,7 +345,7 @@ class TestBackupService:
                 version, f"app1-{version}.AppImage", backup_file
             )
 
-        backup_service._cleanup_old_backups_for_app(app_name, app_backup_dir)
+        backup_service._cleanup_old_backups_for_app(app_backup_dir)
 
         # All should be removed
         assert not list(app_backup_dir.glob("*.AppImage"))

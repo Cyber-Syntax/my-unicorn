@@ -189,9 +189,17 @@ class TestUpdateManager:
                 "2.0.0-alpha",
                 "2.0.0-beta",
                 True,
-            ),  # fallback to string comparison
-            ("invalid", "1.0.0", True),  # fallback to string comparison
-            ("1.0.0", "invalid", False),  # fallback to string comparison
+            ),  # fallback to string comparison: "2.0.0-alpha" < "2.0.0-beta"
+            (
+                "invalid",
+                "1.0.0",
+                False,
+            ),  # fallback to string comparison: "1.0.0" < "invalid"
+            (
+                "1.0.0",
+                "invalid",
+                True,
+            ),  # fallback to string comparison: "1.0.0" < "invalid"
         ],
     )
     def test_compare_versions(
@@ -211,23 +219,44 @@ class TestUpdateManager:
             }
             mock_config.load_catalog.return_value = None
 
+            # Mock app_config_manager.get_effective_config to return effective config
+            mock_app_config_manager = MagicMock()
+            mock_app_config_manager.get_effective_config.return_value = {
+                "config_version": "2.0.0",
+                "source": {
+                    "owner": "test-owner",
+                    "repo": "test-repo",
+                    "prerelease": False,
+                },
+                "state": {"version": current},
+            }
+            mock_config.app_config_manager = mock_app_config_manager
+
+            # Create a proper Release object
+            mock_release_data = Release(
+                owner="test-owner",
+                repo="test-repo",
+                version=latest,
+                prerelease=False,
+                assets=[],
+                original_tag_name=f"v{latest}",
+            )
+
             with patch(
                 "my_unicorn.core.workflows.update.ReleaseFetcher"
             ) as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
-                mock_fetcher.fetch_latest_release.return_value = {
-                    "version": latest,
-                    "prerelease": False,
-                    "original_tag_name": f"v{latest}",
-                }
+                mock_fetcher.fetch_latest_release_or_prerelease.return_value = mock_release_data
 
                 async def run_test() -> None:
                     result = await update_manager.check_single_update(
                         "test-app", AsyncMock(spec=aiohttp.ClientSession)
                     )
-                    if result:
-                        assert result.has_update == expected
+                    assert result.is_success, (
+                        f"Check failed: {result.error_reason}"
+                    )
+                    assert result.has_update == expected
 
                 # Run the async test
                 import asyncio
@@ -321,7 +350,10 @@ class TestUpdateManager:
                 "nonexistent-app", mock_session
             )
 
-            assert result is None
+            assert isinstance(result, UpdateInfo)
+            assert not result.is_success
+            assert result.error_reason is not None
+            assert "No config found" in result.error_reason
 
     @pytest.mark.asyncio
     async def test_check_single_update_api_error(
@@ -333,6 +365,19 @@ class TestUpdateManager:
         """Test single app update check when API call fails."""
         mock_config_manager.load_app_config.return_value = mock_app_config
         mock_config_manager.load_catalog.return_value = None
+
+        # Mock app_config_manager.get_effective_config to return effective config
+        mock_app_config_manager = MagicMock()
+        mock_app_config_manager.get_effective_config.return_value = {
+            "config_version": "2.0.0",
+            "source": {
+                "owner": "test-owner",
+                "repo": "test-repo",
+                "prerelease": False,
+            },
+            "state": {"version": "1.0.0"},
+        }
+        mock_config_manager.app_config_manager = mock_app_config_manager
 
         with (
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
@@ -352,14 +397,19 @@ class TestUpdateManager:
                 error = aiohttp.ClientResponseError(
                     mock_request_info, mock_history, status=404
                 )
-                mock_fetcher.fetch_latest_release.side_effect = error
+                mock_fetcher.fetch_latest_release_or_prerelease.side_effect = (
+                    error
+                )
 
                 with patch("my_unicorn.core.workflows.update.logger"):
                     result = await update_manager.check_single_update(
                         "test-app", mock_session
                     )
 
-                    assert result is None
+                    assert isinstance(result, UpdateInfo)
+                    assert not result.is_success
+                    assert result.error_reason is not None
+                    assert result.app_name == "test-app"
 
     @pytest.mark.asyncio
     async def test_check_single_update_auth_error(
@@ -370,6 +420,19 @@ class TestUpdateManager:
     ) -> None:
         """Test single app update check when GitHub auth fails."""
         mock_config_manager.load_app_config.return_value = mock_app_config
+
+        # Mock app_config_manager.get_effective_config to return effective config
+        mock_app_config_manager = MagicMock()
+        mock_app_config_manager.get_effective_config.return_value = {
+            "config_version": "2.0.0",
+            "source": {
+                "owner": "test-owner",
+                "repo": "test-repo",
+                "prerelease": False,
+            },
+            "state": {"version": "1.0.0"},
+        }
+        mock_config_manager.app_config_manager = mock_app_config_manager
 
         # Create proper mock request info and history
         mock_request_info = MagicMock()
@@ -390,7 +453,9 @@ class TestUpdateManager:
             ) as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
-                mock_fetcher.fetch_latest_release.side_effect = error
+                mock_fetcher.fetch_latest_release_or_prerelease.side_effect = (
+                    error
+                )
 
                 with patch(
                     "my_unicorn.core.workflows.update.logger"
@@ -399,7 +464,10 @@ class TestUpdateManager:
                         "test-app", mock_session
                     )
 
-                    assert result is None
+                    assert isinstance(result, UpdateInfo)
+                    assert not result.is_success
+                    assert result.error_reason is not None
+                    assert "Authentication required" in result.error_reason
                     # Verify specific auth error handling
                     mock_logger.exception.assert_called()
 
@@ -539,19 +607,32 @@ class TestUpdateManager:
             with patch.object(
                 update_manager, "check_single_update", new=AsyncMock()
             ) as mock_check:
-                # app1 succeeds, app2 returns None, app3 raises exception
+                # app1 succeeds, app2 returns error UpdateInfo, app3 raises exception
+                error_info2 = UpdateInfo(
+                    app_name="app2",
+                    error_reason="Failed to fetch",
+                )
+                error_info3 = UpdateInfo(
+                    app_name="app3",
+                    error_reason="Exception during check: API error",
+                )
                 mock_check.side_effect = [
                     update_info1,
-                    None,
-                    Exception("API error"),
+                    error_info2,
+                    error_info3,
                 ]
 
                 with patch("my_unicorn.core.workflows.update.logger"):
                     result = await update_manager.check_updates()
 
-                    # Only successful checks should be returned
-                    assert len(result) == 1
+                    # All results should be returned (including errors)
+                    assert len(result) == 3
                     assert result[0] == update_info1
+                    assert result[1] == error_info2
+                    assert result[2] == error_info3
+                    # Verify error UpdateInfo instances
+                    assert not result[1].is_success
+                    assert not result[2].is_success
 
     @pytest.mark.asyncio
     async def test_check_updates_no_apps(

@@ -4,7 +4,7 @@ This test suite validates handling of releases where AppImages are not yet
 available (still building). Based on real-world AppFlowy 0.10.2 scenario.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -100,13 +100,8 @@ class TestMissingAppImageInstall:
         This is the most common scenario - release is published but
         GitHub Actions is still building the AppImages.
         """
-        with (
-            patch.object(
-                install_handler,
-                "_fetch_release",
-                return_value=mock_release_without_appimage,
-            ),
-        ):
+        mock_fetch = AsyncMock(return_value=mock_release_without_appimage)
+        with patch.object(install_handler, "_fetch_release", mock_fetch):
             result = await install_handler.install_from_catalog(
                 "appflowy",
                 verify_downloads=False,
@@ -133,13 +128,10 @@ class TestMissingAppImageInstall:
         mock_release_with_non_appimage_assets: dict,
     ) -> None:
         """Test install when release has assets but no AppImage files."""
-        with (
-            patch.object(
-                install_handler,
-                "_fetch_release",
-                return_value=mock_release_with_non_appimage_assets,
-            ),
-        ):
+        mock_fetch = AsyncMock(
+            return_value=mock_release_with_non_appimage_assets
+        )
+        with patch.object(install_handler, "_fetch_release", mock_fetch):
             result = await install_handler.install_from_catalog(
                 "appflowy",
                 verify_downloads=False,
@@ -307,21 +299,17 @@ class TestMissingAppImageInstall:
                 original_tag_name="v3.0.0",
             )
 
+        mock_fetch = AsyncMock(side_effect=fetch_release_side_effect)
+        mock_workflow = AsyncMock(
+            return_value={
+                "success": True,
+                "name": "app1",
+                "version": "v1.0.0",
+            }
+        )
         with (
-            patch.object(
-                install_handler,
-                "_fetch_release",
-                side_effect=fetch_release_side_effect,
-            ),
-            patch.object(
-                install_handler,
-                "_install_workflow",
-                return_value={
-                    "success": True,
-                    "name": "app1",
-                    "version": "v1.0.0",
-                },
-            ),
+            patch.object(install_handler, "_fetch_release", mock_fetch),
+            patch.object(install_handler, "_install_workflow", mock_workflow),
         ):
             results = await install_handler.install_multiple(
                 catalog_apps=["app1", "app2", "app3"],
@@ -380,20 +368,17 @@ class TestMissingAppImageInstall:
             catalog_manager=mock_catalog_manager,
         )
 
-        with (
-            patch.object(
-                install_handler,
-                "_fetch_release",
-                return_value=Release(
-                    owner="AppFlowy-IO",
-                    repo="AppFlowy",
-                    version="0.10.2",
-                    prerelease=False,
-                    assets=[],
-                    original_tag_name="0.10.2",
-                ),
-            ),
-        ):
+        mock_fetch = AsyncMock(
+            return_value=Release(
+                owner="AppFlowy-IO",
+                repo="AppFlowy",
+                version="0.10.2",
+                prerelease=False,
+                assets=[],
+                original_tag_name="0.10.2",
+            )
+        )
+        with patch.object(install_handler, "_fetch_release", mock_fetch):
             result = await install_handler.install_from_catalog(
                 "appflowy",
                 verify_downloads=False,

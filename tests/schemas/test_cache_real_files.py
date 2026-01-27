@@ -1,8 +1,8 @@
 """Test cache validation against real cache files."""
 
-import json
 from pathlib import Path
 
+import orjson
 import pytest
 
 from my_unicorn.config.schemas import validate_cache_release
@@ -26,8 +26,7 @@ def test_all_example_cache_files_validate(cache_examples_dir):
 
     # Validate each cache file
     for cache_file in cache_files:
-        with cache_file.open("r") as f:
-            cache_data = json.load(f)
+        cache_data = orjson.loads(cache_file.read_bytes())
 
         # Should not raise SchemaValidationError
         validate_cache_release(cache_data, cache_file.stem)
@@ -47,7 +46,6 @@ def test_specific_cache_files(cache_examples_dir, cache_file):
     if not cache_path.exists():
         pytest.skip(f"Cache file not found: {cache_path}")
 
-    with cache_path.open("r") as f:
-        cache_data = json.load(f)
+    cache_data = orjson.loads(cache_path.read_bytes())
 
     validate_cache_release(cache_data, cache_path.stem)
