@@ -7,7 +7,7 @@ template method pattern with a simpler, more maintainable approach.
 import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
@@ -29,6 +29,9 @@ from my_unicorn.core.workflows.shared import (
 )
 from my_unicorn.exceptions import InstallationError
 from my_unicorn.logger import get_logger
+
+if TYPE_CHECKING:
+    from my_unicorn.types import AppConfig
 
 logger = get_logger(__name__)
 
@@ -783,7 +786,9 @@ class InstallHandler:
 
         # Save configuration
         try:
-            self.config_manager.save_app_config(app_name, config_data)
+            self.config_manager.save_app_config(
+                app_name, cast("AppConfig", config_data), skip_validation=True
+            )
             return {
                 "success": True,
                 "config_path": str(

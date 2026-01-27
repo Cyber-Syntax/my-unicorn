@@ -3,9 +3,8 @@
 This adapter provides a catalog manager interface for the installation system.
 """
 
-from typing import Any
-
 from my_unicorn.config import ConfigManager
+from my_unicorn.types import AppConfig, CatalogEntryV2
 
 
 class CatalogManagerAdapter:
@@ -20,7 +19,7 @@ class CatalogManagerAdapter:
         """
         self.config_manager = config_manager
 
-    def get_available_apps(self) -> dict[str, dict[str, Any]]:
+    def get_available_apps(self) -> dict[str, CatalogEntryV2]:
         """Get available apps from catalog.
 
         Returns:
@@ -37,7 +36,7 @@ class CatalogManagerAdapter:
                 continue
         return apps
 
-    def get_app_config(self, app_name: str) -> dict[str, Any] | None:
+    def get_app_config(self, app_name: str) -> CatalogEntryV2 | None:
         """Get configuration for a specific app.
 
         Args:
@@ -52,7 +51,7 @@ class CatalogManagerAdapter:
         except (FileNotFoundError, ValueError):
             return None
 
-    def get_installed_app_config(self, app_name: str) -> dict[str, Any] | None:
+    def get_installed_app_config(self, app_name: str) -> AppConfig | None:
         """Get installed app configuration.
 
         Args:
@@ -67,15 +66,22 @@ class CatalogManagerAdapter:
         except (FileNotFoundError, KeyError):
             return None
 
-    def save_app_config(self, app_name: str, config: dict[str, Any]) -> None:
+    def save_app_config(
+        self,
+        app_name: str,
+        config: AppConfig,
+        *,
+        skip_validation: bool = False,
+    ) -> None:
         """Save app configuration.
 
         Args:
             app_name: Name of the app
             config: Configuration to save
+            skip_validation: If True, skip schema validation
 
         """
-        self.config_manager.save_app_config(app_name, config)
+        self.config_manager.save_app_config(app_name, config, skip_validation)
 
     def remove_app_config(self, app_name: str) -> bool:
         """Remove app configuration.

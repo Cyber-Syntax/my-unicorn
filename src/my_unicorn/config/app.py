@@ -3,9 +3,12 @@
 import copy
 import logging
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import orjson
+
+if TYPE_CHECKING:
+    from my_unicorn.config.catalog import CatalogLoader
 
 from my_unicorn.config.paths import Paths
 from my_unicorn.config.schemas.validator import (
@@ -24,7 +27,7 @@ class AppConfigManager:
     def __init__(
         self,
         apps_dir: Path | None = None,
-        catalog_manager: "Any | None" = None,  # CatalogLoader/CatalogManager
+        catalog_manager: "CatalogLoader | None" = None,
     ) -> None:
         """Initialize app config manager.
 
@@ -66,7 +69,7 @@ class AppConfigManager:
                     f"expected {APP_CONFIG_VERSION}. "
                     f"Run 'my-unicorn migrate' to upgrade."
                 )
-                raise ValueError(msg)
+                raise ValueError(msg) from None
 
             # Validate against schema
             validate_app_state(config_data, app_name)
@@ -78,16 +81,24 @@ class AppConfigManager:
         except orjson.JSONDecodeError as e:
             msg = f"Invalid JSON in app config for {app_name}: {e}"
             raise ValueError(msg) from e
-        except (Exception, OSError) as e:
+        except OSError as e:
             msg = f"Failed to load app_config for {app_name}: {e}"
             raise ValueError(msg) from e
 
-    def save_app_config(self, app_name: str, config: AppConfig) -> None:
+    def save_app_config(
+        self,
+        app_name: str,
+        config: AppConfig,
+        *,
+        skip_validation: bool = False,
+    ) -> None:
         """Save app-specific configuration.
 
         Args:
             app_name: Name of the application
             config: App configuration to save
+            skip_validation: If True, skip schema validation (use when config
+                was recently loaded and validated)
 
         Raises:
             ValueError: If config cannot be saved
@@ -97,7 +108,8 @@ class AppConfigManager:
 
         try:
             # Validate before saving
-            validate_app_state(cast("dict[str, Any]", config), app_name)
+            if not skip_validation:
+                validate_app_state(cast("dict[str, Any]", config), app_name)
 
             with app_file.open("wb") as f:
                 f.write(
@@ -173,14 +185,15 @@ class AppConfigManager:
         catalog_ref = app_config.get("catalog_ref")
         if catalog_ref and self.catalog_manager:
             try:
-                catalog = self.catalog_manager.load(catalog_ref)
-                effective = self._deep_copy(catalog)
+                catalog_ref_str = cast("str", catalog_ref)
+                catalog = self.catalog_manager.load(catalog_ref_str)
+                effective = self._deep_copy(cast("dict[str, Any]", catalog))
             except (FileNotFoundError, ValueError):
                 # Catalog not found or invalid, skip catalog defaults
                 pass
 
         # Step 2: Merge overrides (for URL installs or user customizations)
-        overrides = app_config.get("overrides", {})
+        overrides = cast("dict[str, Any]", app_config.get("overrides", {}))
         if overrides:
             effective = self._deep_merge(effective, overrides)
 

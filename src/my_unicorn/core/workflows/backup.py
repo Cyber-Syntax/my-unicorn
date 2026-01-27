@@ -1,21 +1,21 @@
-"""Enhanced backup service for managing AppImage backups with folder structure and versioning.
+"""Enhanced backup service for managing AppImage backups.
 
 This module implements a robust backup system that:
 - Uses folder-based structure for each app
-- Maintains metadata.json files with version information and checksums
+- Maintains metadata.json files with version info and checksums
 - Supports version comparison and restore functionality
 - Provides migration from old flat backup structure
 - Implements atomic operations and error handling
 """
 
 import hashlib
-import json
 import shutil
 import tempfile
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
+import orjson
 from packaging.version import InvalidVersion, Version
 
 from my_unicorn.constants import (
@@ -28,13 +28,23 @@ from my_unicorn.constants import (
 )
 from my_unicorn.logger import get_logger
 
+if TYPE_CHECKING:
+    from my_unicorn.types import AppConfig, GlobalConfig
+
+# Import at module level to avoid runtime import cycle
+try:
+    from my_unicorn.config.config import ConfigManager
+except ImportError:
+    # Allow deferred import for tests
+    ConfigManager = None  # type: ignore[assignment,misc]
+
 logger = get_logger(__name__)
 
 
 class BackupMetadata:
     """Manages backup metadata for version tracking and integrity."""
 
-    def __init__(self, backup_dir: Path):
+    def __init__(self, backup_dir: Path) -> None:
         """Initialize metadata manager.
 
         Args:
@@ -55,9 +65,10 @@ class BackupMetadata:
             return {"versions": {}}
 
         try:
-            with open(self.metadata_file, encoding="utf-8") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError) as e:
+            with self.metadata_file.open("rb") as f:
+                data: dict[str, Any] = orjson.loads(f.read())
+                return data
+        except (orjson.JSONDecodeError, OSError) as e:
             logger.warning(
                 "Corrupted metadata file %s: %s", self.metadata_file, e
             )
@@ -84,14 +95,18 @@ class BackupMetadata:
 
         # Write to temporary file first for atomic operation
         with tempfile.NamedTemporaryFile(
-            mode="w",
+            mode="wb",
             dir=self.backup_dir,
             prefix=BACKUP_METADATA_TMP_PREFIX,
             suffix=BACKUP_METADATA_TMP_SUFFIX,
             delete=False,
-            encoding="utf-8",
         ) as tmp_file:
-            json.dump(metadata, tmp_file, indent=2, sort_keys=True)
+            tmp_file.write(
+                orjson.dumps(
+                    metadata,
+                    option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS,
+                )
+            )
             tmp_file.flush()
             temp_path = Path(tmp_file.name)
 
@@ -119,7 +134,8 @@ class BackupMetadata:
         metadata["versions"][version] = {
             "filename": filename,
             "sha256": sha256_hash,
-            "created": datetime.now().isoformat(),
+            # Use local timezone for created timestamp via astimezone()
+            "created": datetime.now().astimezone().isoformat(),
             "size": file_path.stat().st_size,
         }
 
@@ -127,7 +143,7 @@ class BackupMetadata:
         logger.debug("Added version %s to metadata", version)
 
     def _sort_versions(
-        self, versions: list[str], reverse: bool = True
+        self, versions: list[str], *, reverse: bool = True
     ) -> list[str]:
         """Sort versions using semantic versioning with fallback.
 
@@ -177,7 +193,8 @@ class BackupMetadata:
 
         """
         metadata = self.load()
-        return metadata["versions"].get(version)
+        version_info: dict[str, Any] | None = metadata["versions"].get(version)
+        return version_info
 
     def list_versions(self) -> list[str]:
         """List all available versions sorted by version number.
@@ -229,7 +246,7 @@ class BackupMetadata:
             return False
 
         actual_hash = self._calculate_sha256(file_path)
-        is_valid = actual_hash == stored_hash
+        is_valid: bool = actual_hash == stored_hash
 
         if not is_valid:
             logger.error(
@@ -252,7 +269,7 @@ class BackupMetadata:
 
         """
         sha256_hash = hashlib.sha256()
-        with open(file_path, "rb") as f:
+        with file_path.open("rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(chunk)
         return sha256_hash.hexdigest()
@@ -261,15 +278,11 @@ class BackupMetadata:
 # Helper functions for backup operations
 
 
-def _validate_backup_exists(
-    backup_path: Path, version: str, app_name: str
-) -> None:
+def _validate_backup_exists(backup_path: Path) -> None:
     """Validate that backup file exists.
 
     Args:
         backup_path: Path to backup file
-        version: Version string
-        app_name: Application name
 
     Raises:
         FileNotFoundError: If backup file doesn't exist
@@ -281,7 +294,7 @@ def _validate_backup_exists(
 
 
 def _validate_backup_integrity(
-    metadata: "BackupMetadata", version: str, backup_path: Path, app_name: str
+    metadata: "BackupMetadata", version: str, backup_path: Path
 ) -> None:
     """Validate backup file integrity using checksum.
 
@@ -289,13 +302,12 @@ def _validate_backup_integrity(
         metadata: BackupMetadata instance
         version: Version string
         backup_path: Path to backup file
-        app_name: Application name
 
     Raises:
         ValueError: If integrity check fails
     """
     if not metadata.verify_backup_integrity(version, backup_path):
-        msg = f"Backup integrity check failed for {app_name} v{version}"
+        msg = f"Backup integrity check failed for version {version}"
         logger.error(msg)
         raise ValueError(msg)
 
@@ -309,11 +321,12 @@ def _group_backups_by_version(backups: list[Path]) -> dict[str, list[Path]]:
     Returns:
         Dictionary mapping version strings to lists of backup paths
     """
+    min_version_parts = 2
     version_groups: dict[str, list[Path]] = {}
     for backup in backups:
         # Extract version from backup filename (format: app-version.AppImage)
         parts = backup.stem.split("-")
-        if len(parts) >= 2:
+        if len(parts) >= min_version_parts:
             version = parts[-1]
             version_groups.setdefault(version, []).append(backup)
     return version_groups
@@ -344,16 +357,21 @@ def _delete_old_backups(
                         backup_path,
                         version,
                     )
-                except Exception as e:
-                    logger.error(
-                        "Failed to remove backup %s: %s", backup_path, e
-                    )
+                except OSError:
+                    logger.exception("Failed to remove backup %s", backup_path)
 
 
 class BackupService:
-    """Enhanced service for creating and managing AppImage backups with versioning."""
+    """Enhanced service for creating and managing AppImage backups.
 
-    def __init__(self, config_manager, global_config) -> None:
+    Provides versioning, metadata tracking, and restore capabilities.
+    """
+
+    def __init__(
+        self,
+        config_manager: "ConfigManager",
+        global_config: "GlobalConfig",
+    ) -> None:
         """Initialize backup service with dependencies.
 
         Args:
@@ -365,20 +383,21 @@ class BackupService:
         self.global_config = global_config
 
     @classmethod
-    def create_default(cls, config_manager=None) -> "BackupService":
+    def create_default(
+        cls, config_manager: "ConfigManager | None" = None
+    ) -> "BackupService":
         """Create BackupService with default dependencies.
 
-        Factory method for simplified instantiation with sensible defaults.
+        Factory method for simplified instantiation with defaults.
 
         Args:
-            config_manager: Optional configuration manager (creates new if None)
+            config_manager: Optional configuration manager
+                (creates new if None)
 
         Returns:
             Configured BackupService instance
 
         """
-        from my_unicorn.config import ConfigManager
-
         config_mgr = config_manager or ConfigManager()
         global_config = config_mgr.load_global_config()
 
@@ -392,6 +411,7 @@ class BackupService:
         file_path: Path,
         app_name: str,
         version: str | None = None,
+        *,
         skip_cleanup: bool = False,
     ) -> Path | None:
         """Create versioned backup of existing file.
@@ -422,9 +442,10 @@ class BackupService:
                 config_version = app_config.get("config_version", "1.0.0")
                 if config_version == "2.0.0":
                     # v2 config: version is in state section
-                    version = app_config.get("state", {}).get(
-                        "version", "unknown"
+                    state_dict = cast(
+                        "dict[str, Any]", app_config.get("state", {})
                     )
+                    version = state_dict.get("version", "unknown")
                 else:
                     # v1 config: version is in appimage section
                     version = app_config.get("appimage", {}).get(
@@ -454,22 +475,27 @@ class BackupService:
 
             # Update metadata
             metadata = BackupMetadata(app_backup_dir)
+            # Version should not be None at this point
+            if version is None:
+                msg = f"Version is None when creating backup for {app_name}"
+                logger.error(msg)
+                raise ValueError(msg)
             metadata.add_version(version, backup_filename, backup_path)
 
+        except OSError:
+            # Cleanup temp file on error
+            if temp_path.exists():
+                temp_path.unlink()
+            logger.exception("Failed to create backup for %s", app_name)
+            raise
+        else:
             logger.info("Backup created: %s (v%s)", backup_path, version)
 
             # Cleanup old backups after successful backup (unless skipped)
             if not skip_cleanup:
-                self._cleanup_old_backups_for_app(app_name, app_backup_dir)
+                self._cleanup_old_backups_for_app(app_backup_dir)
 
             return backup_path
-
-        except Exception as e:
-            # Cleanup temp file on error
-            if temp_path.exists():
-                temp_path.unlink()
-            logger.error("Failed to create backup for %s: %s", app_name, e)
-            raise
 
     def restore_latest_backup(
         self, app_name: str, destination_dir: Path
@@ -561,11 +587,9 @@ class BackupService:
                     "Failed to backup current version, "
                     "continuing with restore..."
                 )
-        except Exception as e:
-            logger.warning(
-                "Failed to backup current version: %s, "
-                "continuing with restore...",
-                e,
+        except OSError:
+            logger.exception(
+                "Failed to backup current version, continuing with restore"
             )
 
     def _perform_atomic_restore(
@@ -610,7 +634,6 @@ class BackupService:
         version: str,
         version_info: dict[str, Any],
         app_config: dict[str, Any],
-        appimage_name: str,
     ) -> None:
         """Update app config with restored version info.
 
@@ -619,13 +642,12 @@ class BackupService:
             version: Restored version
             version_info: Version metadata from backup
             app_config: App configuration dictionary (v2 format)
-            appimage_name: Name of the AppImage
 
         """
         # v2 config: update state section
         state = app_config.get("state", {})
         state["version"] = version
-        state["installed_date"] = datetime.now().isoformat()
+        state["installed_date"] = datetime.now(tz=UTC).isoformat()
 
         # Update verification if we have sha256
         if version_info.get("sha256"):
@@ -661,13 +683,16 @@ class BackupService:
         app_config["state"] = state
 
         try:
-            self.config_manager.save_app_config(app_name, app_config)
+            self.config_manager.save_app_config(
+                app_name, cast("AppConfig", app_config), skip_validation=True
+            )
             logger.debug(
                 "Updated app config for %s with version %s", app_name, version
             )
-        except Exception as e:
-            logger.error("Failed to update app config for %s: %s", app_name, e)
+        except (ValueError, OSError):
+            logger.exception("Failed to update app config for %s", app_name)
 
+    # TODO: refactor to decrease statements count
     def _restore_specific_version(
         self, app_name: str, version: str, destination_dir: Path
     ) -> Path | None:
@@ -702,10 +727,8 @@ class BackupService:
 
         # Validate backup exists and integrity
         try:
-            _validate_backup_exists(backup_path, version, app_name)
-            _validate_backup_integrity(
-                metadata, version, backup_path, app_name
-            )
+            _validate_backup_exists(backup_path)
+            _validate_backup_integrity(metadata, version, backup_path)
         except (FileNotFoundError, ValueError):
             return None
 
@@ -738,8 +761,9 @@ class BackupService:
             logger.info("")
             return None
 
-        # v2 config structure: extract necessary fields from state and overrides
-        state = app_config.get("state", {})
+        # v2 config structure: extract necessary fields from state
+        # and overrides
+        state = cast("dict[str, Any]", app_config.get("state", {}))
         catalog_ref = app_config.get("catalog_ref")
 
         # Get rename from catalog or overrides
@@ -749,8 +773,10 @@ class BackupService:
             app_rename = app_name
         else:
             # URL-based install: get from overrides
-            overrides = app_config.get("overrides", {})
-            appimage_config = overrides.get("appimage", {})
+            overrides = cast("dict[str, Any]", app_config.get("overrides", {}))
+            appimage_config = cast(
+                "dict[str, Any]", overrides.get("appimage", {})
+            )
             app_rename = appimage_config.get("rename", app_name)
 
         # Use the rename field for the actual AppImage name
@@ -761,7 +787,7 @@ class BackupService:
         destination_dir.mkdir(parents=True, exist_ok=True)
 
         # Backup current version if different from restore version
-        current_version = state.get("version", "unknown")
+        current_version = cast("str", state.get("version", "unknown"))
         if current_version != version:
             self._backup_current_version(
                 destination_path, app_name, current_version
@@ -775,23 +801,26 @@ class BackupService:
 
             # Update app config with restored version info
             self._update_config_after_restore(
-                app_name, version, version_info, app_config, appimage_name
+                app_name,
+                version,
+                version_info,
+                cast("dict[str, Any]", app_config),
             )
 
+        except OSError:
+            logger.exception("Failed to restore %s v%s", app_name, version)
+            raise
+        else:
             # Cleanup old backups after successful restore
             backup_base_dir = Path(self.global_config["directory"]["backup"])
             app_backup_dir = backup_base_dir / app_name
-            self._cleanup_old_backups_for_app(app_name, app_backup_dir)
+            self._cleanup_old_backups_for_app(app_backup_dir)
 
             logger.info(
                 "Restored %s v%s to %s", app_name, version, destination_path
             )
             logger.info("Updated app configuration with restored version")
             return destination_path
-
-        except Exception as e:
-            logger.error("Failed to restore %s v%s: %s", app_name, version, e)
-            raise
 
     def get_backup_info(self, app_name: str) -> list[dict[str, Any]]:
         """Get information about available backups for an app.
@@ -800,7 +829,8 @@ class BackupService:
             app_name: Name of the app
 
         Returns:
-            List of backup information dictionaries sorted by version (newest first)
+            List of backup information dictionaries sorted by version
+            (newest first)
 
         """
         backup_base_dir = Path(self.global_config["directory"]["backup"])
@@ -843,7 +873,6 @@ class BackupService:
 
         """
         backup_base_dir = Path(self.global_config["directory"]["backup"])
-        max_backups = self.global_config["max_backup"]
 
         if not backup_base_dir.exists():
             return
@@ -851,25 +880,22 @@ class BackupService:
         if app_name:
             app_backup_dir = backup_base_dir / app_name
             if app_backup_dir.exists():
-                self._cleanup_old_backups_for_app(app_name, app_backup_dir)
+                self._cleanup_old_backups_for_app(app_backup_dir)
         else:
             # Clean up all apps
             for app_dir in backup_base_dir.iterdir():
                 if app_dir.is_dir():
-                    self._cleanup_old_backups_for_app(app_dir.name, app_dir)
+                    self._cleanup_old_backups_for_app(app_dir)
 
-    def _cleanup_old_backups_for_app(
-        self, app_name: str, app_backup_dir: Path
-    ) -> None:
+    def _cleanup_old_backups_for_app(self, app_backup_dir: Path) -> None:
         """Clean up old backups for a specific app.
 
         Args:
-            app_name: Name of the app
             app_backup_dir: Backup directory for the app
 
         """
-        max_backups = self.global_config["max_backup"]
         metadata = BackupMetadata(app_backup_dir)
+        max_backups = self.global_config["max_backup"]
 
         if max_backups == 0:
             # Delete all backups

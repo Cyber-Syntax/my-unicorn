@@ -15,6 +15,7 @@ Requirements:
 import importlib
 import logging
 from pathlib import Path
+from typing import cast
 
 from my_unicorn.config.app import AppConfigManager
 from my_unicorn.config.catalog import CatalogLoader
@@ -80,7 +81,7 @@ class ConfigManager:
     @property
     def settings_file(self) -> Path:
         """Get the settings file path."""
-        return self.global_config_manager.settings_file
+        return self.global_config_manager.settings_file  # type: ignore[no-any-return]
 
     @property
     def apps_dir(self) -> Path:
@@ -102,6 +103,7 @@ class ConfigManager:
             ValueError: If a configured path is a file or invalid
         """
         for key, directory in config["directory"].items():
+            directory = cast("Path", directory)
             if directory.exists() and directory.is_file():
                 msg = (
                     f"Configured {key} path '{directory}' is a file, "
@@ -113,7 +115,7 @@ class ConfigManager:
     # Global config manager delegates
     def load_global_config(self) -> GlobalConfig:
         """Load global configuration from INI file."""
-        return self.global_config_manager.load_global_config()
+        return self.global_config_manager.load_global_config()  # type: ignore[no-any-return]
 
     def save_global_config(self, config: GlobalConfig) -> None:
         """Save global configuration to INI file."""
@@ -124,9 +126,17 @@ class ConfigManager:
         """Load app-specific configuration."""
         return self.app_config_manager.load_app_config(app_name)
 
-    def save_app_config(self, app_name: str, config: AppConfig) -> None:
+    def save_app_config(
+        self,
+        app_name: str,
+        config: AppConfig,
+        *,
+        skip_validation: bool = False,
+    ) -> None:
         """Save app-specific configuration."""
-        self.app_config_manager.save_app_config(app_name, config)
+        self.app_config_manager.save_app_config(
+            app_name, config, skip_validation=skip_validation
+        )
 
     def list_installed_apps(self) -> list[str]:
         """Get list of installed apps."""
