@@ -5,8 +5,9 @@ This script converts all catalog JSON files in src/my_unicorn/catalog/
 from v1.0.0 format to v2.0.0 format with proper structure and naming.
 """
 
-import json
 from pathlib import Path
+
+import orjson
 
 CATALOG_DIR = Path("src/my_unicorn/catalog")
 
@@ -102,7 +103,7 @@ def _get_icon_config(old_catalog: dict) -> dict:
     return config
 
 
-def main():
+def main() -> int:
     """Migrate all catalog files."""
     if not CATALOG_DIR.exists():
         print(f"Error: Catalog directory {CATALOG_DIR} not found")
@@ -124,8 +125,7 @@ def main():
             print(f"Migrating {catalog_file.name}...", end=" ")
 
             # Read old catalog
-            with catalog_file.open(encoding="utf-8") as f:
-                old_catalog = json.load(f)
+            old_catalog = orjson.loads(catalog_file.read_bytes())
 
             # Check if already v2
             if old_catalog.get("config_version") == "2.0.0":
@@ -140,9 +140,9 @@ def main():
             new_catalog = migrate_catalog_v1_to_v2(old_catalog)
 
             # Write new catalog
-            with catalog_file.open("w", encoding="utf-8") as f:
-                json.dump(new_catalog, f, indent=2)
-                f.write("\n")
+            catalog_file.write_bytes(
+                orjson.dumps(new_catalog, option=orjson.OPT_INDENT_2) + b"\n"
+            )
 
             print(f"✓ migrated (backup: {backup_file.name})")
             migrated_count += 1

@@ -12,14 +12,17 @@ Author: Cyber-Syntax
 License: Same as my-unicorn project
 """
 
+
+
 import argparse
-import json
 import logging
 import os
 import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+
+import orjson
 
 # ======== Configuration ========
 
@@ -212,13 +215,13 @@ def set_version(app_name: str, version: str) -> bool:
         return False
 
     try:
-        with config_file.open() as f:
-            config = json.load(f)
+        config = orjson.loads(config_file.read_bytes())
 
         config["state"]["version"] = version
 
-        with config_file.open("w") as f:
-            json.dump(config, f, indent=2)
+        config_file.write_bytes(
+            orjson.dumps(config, option=orjson.OPT_INDENT_2)
+        )
 
         logger.info(
             "Set %s version to %s (for update test)", app_name, version
