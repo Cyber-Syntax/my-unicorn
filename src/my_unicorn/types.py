@@ -120,8 +120,6 @@ class NetworkConfig(TypedDict):
 class DirectoryConfig(TypedDict):
     """Directory paths configuration."""
 
-    repo: Path
-    package: Path
     download: Path
     storage: Path
     backup: Path
@@ -129,7 +127,6 @@ class DirectoryConfig(TypedDict):
     settings: Path
     logs: Path
     cache: Path
-    tmp: Path
 
 
 class GlobalConfig(TypedDict):

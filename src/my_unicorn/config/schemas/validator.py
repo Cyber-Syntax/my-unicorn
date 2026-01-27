@@ -22,6 +22,7 @@ CATALOG_V2_SCHEMA_PATH = SCHEMA_DIR / "catalog_v2.schema.json"
 APP_STATE_V1_SCHEMA_PATH = SCHEMA_DIR / "app_state_v1.schema.json"
 APP_STATE_V2_SCHEMA_PATH = SCHEMA_DIR / "app_state_v2.schema.json"
 CACHE_RELEASE_SCHEMA_PATH = SCHEMA_DIR / "cache_release.schema.json"
+GLOBAL_CONFIG_V1_SCHEMA_PATH = SCHEMA_DIR / "global_config_v1.schema.json"
 
 
 class SchemaValidationError(Exception):
@@ -62,11 +63,14 @@ class ConfigValidator:
 
     def __init__(self) -> None:
         """Initialize validator with loaded schemas."""
-        # Load app state and cache schemas only (catalogs are bundled and trusted)
+        # Load app state, cache, and global config schemas
         self._app_state_v1_schema = self._load_schema(APP_STATE_V1_SCHEMA_PATH)
         self._app_state_v2_schema = self._load_schema(APP_STATE_V2_SCHEMA_PATH)
         self._cache_release_schema = self._load_schema(
             CACHE_RELEASE_SCHEMA_PATH
+        )
+        self._global_config_v1_schema = self._load_schema(
+            GLOBAL_CONFIG_V1_SCHEMA_PATH
         )
 
         # Create validators
@@ -78,6 +82,9 @@ class ConfigValidator:
         )
         self._cache_release_validator = Draft7Validator(
             self._cache_release_schema
+        )
+        self._global_config_v1_validator = Draft7Validator(
+            self._global_config_v1_schema
         )
 
     @staticmethod
@@ -255,6 +262,35 @@ class ConfigValidator:
 
         logger.debug("Cache validation passed: %s", cache_name or "unknown")
 
+    def validate_global_config(self, config: dict[str, Any]) -> None:
+        """Validate global configuration against schema.
+
+        Args:
+            config: Global configuration dictionary
+
+        Raises:
+            SchemaValidationError: If validation fails
+
+        """
+        errors = list(self._global_config_v1_validator.iter_errors(config))
+        if errors:
+            # Get the most relevant error
+            best_error = best_match(errors)
+            error_msg = self._format_validation_error(
+                best_error, "global_config"
+            )
+
+            path = (
+                ".".join(str(p) for p in best_error.absolute_path)
+                if best_error.absolute_path
+                else None
+            )
+            raise SchemaValidationError(
+                error_msg, path=path, schema_type="global_config"
+            )
+
+        logger.debug("Global config validation passed")
+
 
 # Global validator instance
 _validator: ConfigValidator | None = None
@@ -303,3 +339,16 @@ def validate_cache_release(
 
     """
     get_validator().validate_cache_release(config, cache_name)
+
+
+def validate_global_config(config: dict[str, Any]) -> None:
+    """Validate global configuration (convenience function).
+
+    Args:
+        config: Global configuration dictionary
+
+    Raises:
+        SchemaValidationError: If validation fails
+
+    """
+    get_validator().validate_global_config(config)

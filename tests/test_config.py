@@ -198,8 +198,6 @@ def test_ensure_directories_from_config(
 ) -> None:
     """Test ensure_directories_from_config creates directories."""
     dirs = {
-        "repo": tmp_path / "repo",
-        "package": tmp_path / "package",
         "download": tmp_path / "download",
         "storage": tmp_path / "storage",
         "backup": tmp_path / "backup",
@@ -207,13 +205,13 @@ def test_ensure_directories_from_config(
         "settings": tmp_path / "settings",
         "logs": tmp_path / "logs",
         "cache": tmp_path / "cache",
-        "tmp": tmp_path / "tmp",
     }
     config = {
-        "config_version": "1.0.0",
+        "config_version": "1.1.0",
         "max_concurrent_downloads": 5,
         "max_backup": 1,
         "log_level": "INFO",
+        "console_log_level": "INFO",
         "network": {"retry_attempts": 3, "timeout_seconds": 10},
         "directory": dirs,
     }
@@ -674,7 +672,7 @@ config_version = 1.0.0
     assert user_config.has_section("network")
     assert user_config.has_section("directory")
     assert user_config.has_option("network", "retry_attempts")
-    assert user_config.has_option("directory", "repo")
+    assert user_config.has_option("directory", "storage")
 
     # Test with complete config (no fields should be added)
     complete_config = configparser.ConfigParser()
@@ -748,7 +746,7 @@ storage = /custom/storage
     config = manager.load_global_config()
 
     # Verify configuration was migrated
-    assert config["config_version"] == "1.0.2"  # Should be updated
+    assert config["config_version"] == "1.1.0"  # Should be updated
     assert config["max_backup"] == 3  # User value preserved
     assert config["network"]["retry_attempts"] == 5  # User value preserved
 
@@ -759,9 +757,8 @@ storage = /custom/storage
     )  # Default value (changed from WARNING)
     assert config["network"]["timeout_seconds"] == 10  # Default value
 
-    # Verify custom directory setting preserved but missing ones added
+    # Verify custom directory setting preserved
     assert str(config["directory"]["storage"]) == "/custom/storage"
-    assert config["directory"]["repo"]  # Should have default value
 
     # Verify backup was created
     backup_files = list(config_dir.glob("*.backup"))
@@ -809,7 +806,7 @@ def test_migration_with_new_config_file(config_dir: Path) -> None:
     config = manager.load_global_config()
 
     # Should create default configuration
-    assert config["config_version"] == "1.0.2"
+    assert config["config_version"] == "1.1.0"
     assert manager.settings_file.exists()
 
 
@@ -819,7 +816,7 @@ def test_migration_no_changes_needed(config_dir: Path) -> None:
 
     # Create current configuration file with all required fields
     complete_config_content = """[DEFAULT]
-    config_version = 1.0.2
+    config_version = 1.1.0
     max_concurrent_downloads = 5
     max_backup = 1
     log_level = INFO
@@ -830,8 +827,6 @@ def test_migration_no_changes_needed(config_dir: Path) -> None:
     timeout_seconds = 10
 
     [directory]
-    repo = /tmp/test-repo
-    package = /tmp/test-package
     download = /tmp/downloads
     storage = /tmp/storage
     backup = /tmp/backup
@@ -839,7 +834,6 @@ def test_migration_no_changes_needed(config_dir: Path) -> None:
     settings = /tmp/settings
     logs = /tmp/logs
     cache = /tmp/cache
-    tmp = /tmp/tmp
     """
 
     manager.settings_file.write_text(complete_config_content)
@@ -848,7 +842,7 @@ def test_migration_no_changes_needed(config_dir: Path) -> None:
     config = manager.load_global_config()
 
     # Verify no migration was performed (version stays the same)
-    assert config["config_version"] == "1.0.2"
+    assert config["config_version"] == "1.1.0"
 
     # No backup should be created for up-to-date config
     # Note: There might be backup files from other tests, so we just check

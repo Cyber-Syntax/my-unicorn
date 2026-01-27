@@ -103,8 +103,6 @@ class ConfigCommentManager:
 # Customize where my-unicorn stores files and directories.
 # Use absolute paths or paths starting with ~ for home directory.
 #
-# repo: Source code repository for my-unicorn cli (e.g git cloned)
-# package: Installation directory for my-unicorn (necessary code files)
 # download: Temporary download location for AppImages
 # storage: Where installed AppImages are stored
 # backup: Backup location for old AppImage versions

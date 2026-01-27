@@ -28,7 +28,6 @@ from my_unicorn.constants import (
     CONFIG_MIGRATION_PRINT_PREFIX,
     GLOBAL_CONFIG_VERSION,
     KEY_CONFIG_VERSION,
-    KEY_REPO,
     KEY_RETRY_ATTEMPTS,
     KEY_STORAGE,
     KEY_TIMEOUT_SECONDS,
@@ -325,7 +324,6 @@ class ConfigMigration:
                 (SECTION_DEFAULT, "console_log_level"),
                 (SECTION_NETWORK, KEY_RETRY_ATTEMPTS),
                 (SECTION_NETWORK, KEY_TIMEOUT_SECONDS),
-                (SECTION_DIRECTORY, KEY_REPO),
                 (SECTION_DIRECTORY, KEY_STORAGE),
             ]
 
@@ -360,11 +358,6 @@ class ConfigMigration:
             return
 
         try:
-            # Import logger only when needed (after config is loaded)
-            from my_unicorn.logger import get_logger
-
-            logger = get_logger("my_unicorn.config_migration")
-
             for level, message, args in self._messages:
                 log_method = getattr(logger, level.lower())
                 if args:

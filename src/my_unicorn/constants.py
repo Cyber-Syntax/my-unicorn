@@ -16,7 +16,7 @@ from typing import Final, Literal
 
 # Global settings config version (settings.conf)
 # This is separate from app state and catalog config versions
-GLOBAL_CONFIG_VERSION: Final[str] = "1.0.2"
+GLOBAL_CONFIG_VERSION: Final[str] = "1.1.0"
 
 # App state config version (apps/*.json)
 # If actual version in file doesn't match, migration is needed
@@ -62,8 +62,6 @@ KEY_CONSOLE_LOG_LEVEL: Final[str] = "console_log_level"
 
 # Known directory keys expected in the directory section
 DIRECTORY_KEYS: Final[tuple[str, ...]] = (
-    "repo",
-    "package",
     "download",
     "storage",
     "backup",
@@ -71,7 +69,6 @@ DIRECTORY_KEYS: Final[tuple[str, ...]] = (
     "settings",
     "logs",
     "cache",
-    "tmp",
 )
 
 # =============================================================================
@@ -98,7 +95,6 @@ CONFIG_MIGRATION_PRINT_PREFIX: Final[str] = "Config Migration"
 KEY_RETRY_ATTEMPTS: Final[str] = "retry_attempts"
 KEY_TIMEOUT_SECONDS: Final[str] = "timeout_seconds"
 
-KEY_REPO: Final[str] = "repo"
 KEY_STORAGE: Final[str] = "storage"
 
 # =============================================================================
