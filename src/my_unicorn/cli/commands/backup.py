@@ -4,9 +4,11 @@ Thin coordinator that delegates to BackupService and displays results.
 """
 
 from argparse import Namespace
+from typing import cast
 
 from my_unicorn.core.workflows.backup import BackupService
 from my_unicorn.logger import get_logger
+from my_unicorn.types import AppConfigV2
 
 from .base import BaseCommandHandler
 from .helpers import ensure_app_directories, get_install_paths
@@ -66,19 +68,15 @@ class BackupHandler(BaseCommandHandler):
         self, service: BackupService, app_name: str
     ) -> None:
         """Restore latest backup."""
-        if not self._check_app_installed(app_name):
+        config = self._check_app_installed(app_name)
+        if not config:
             return
 
         logger.info("🔄 Restoring latest backup for %s...", app_name)
         storage_dir, _ = get_install_paths(self.global_config)
 
         if path := service.restore_latest_backup(app_name, storage_dir):
-            config = self.config_manager.load_app_config(app_name)
-            version = (
-                config.get("state", {}).get("version", "unknown")
-                if config
-                else "unknown"
-            )
+            version = config.get("state", {}).get("version", "unknown")
             logger.info(
                 "✅ Successfully restored %s from latest backup", app_name
             )
@@ -109,11 +107,11 @@ class BackupHandler(BaseCommandHandler):
         self, service: BackupService, app_name: str
     ) -> None:
         """Create backup."""
-        if not self._check_app_installed(app_name):
+        config = self._check_app_installed(app_name)
+        if not config:
             return
 
         logger.info("Creating backup for %s...", app_name)
-        config = self.config_manager.load_app_config(app_name)
         storage_dir, _ = get_install_paths(self.global_config)
 
         # Get AppImage path
@@ -238,12 +236,13 @@ class BackupHandler(BaseCommandHandler):
             max_backups if max_backups > 0 else "unlimited",
         )
 
-    def _check_app_installed(self, app_name: str) -> bool:
-        """Check if app is installed."""
-        if not self.config_manager.load_app_config(app_name):
+    def _check_app_installed(self, app_name: str) -> AppConfigV2 | None:
+        """Check if app is installed and return config if found."""
+        config = self.config_manager.load_app_config(app_name)
+        if not config:
             logger.error("❌ App '%s' is not installed", app_name)
             logger.info(
                 "Use 'my-unicorn catalog' to see installed applications"
             )
-            return False
-        return True
+            return None
+        return cast("AppConfigV2", config)

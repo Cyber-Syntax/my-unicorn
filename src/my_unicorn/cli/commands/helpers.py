@@ -8,6 +8,7 @@ to avoid over-engineering (YAGNI principle).
 from pathlib import Path
 
 from my_unicorn.config import ConfigManager
+from my_unicorn.types import GlobalConfig
 
 
 def parse_targets(targets: list[str] | None) -> list[str]:
@@ -56,11 +57,11 @@ def parse_targets(targets: list[str] | None) -> list[str]:
     return unique_targets
 
 
-def get_install_paths(global_config: dict) -> tuple[Path, Path]:
+def get_install_paths(global_config: GlobalConfig) -> tuple[Path, Path]:
     """Extract installation paths from global configuration.
 
     Args:
-        global_config: Global configuration dictionary
+        global_config: Global configuration
 
     Returns:
         Tuple of (install_dir, download_dir) as Path objects
@@ -77,7 +78,7 @@ def get_install_paths(global_config: dict) -> tuple[Path, Path]:
 
 
 def ensure_app_directories(
-    config_manager: ConfigManager, global_config: dict
+    config_manager: ConfigManager, global_config: GlobalConfig
 ) -> None:
     """Ensure required application directories exist.
 
@@ -86,7 +87,7 @@ def ensure_app_directories(
 
     Args:
         config_manager: Configuration manager instance
-        global_config: Global configuration dictionary
+        global_config: Global configuration
 
     """
     config_manager.ensure_directories_from_config(global_config)
