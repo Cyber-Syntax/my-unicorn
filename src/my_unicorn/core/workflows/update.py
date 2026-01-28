@@ -16,6 +16,7 @@ from packaging.version import InvalidVersion, Version
 from my_unicorn.config import ConfigManager
 from my_unicorn.config.migration.helpers import get_apps_needing_migration
 from my_unicorn.core.auth import GitHubAuthManager
+from my_unicorn.core.backup import BackupService
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import (
@@ -30,7 +31,6 @@ from my_unicorn.core.workflows.appimage_setup import (
     rename_appimage,
     setup_appimage_icon,
 )
-from my_unicorn.core.workflows.backup import BackupService
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.appimage_utils import (
     select_best_appimage_asset,
