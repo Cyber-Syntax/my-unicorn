@@ -23,12 +23,12 @@ from my_unicorn.core.workflows.appimage_setup import (
     rename_appimage,
     setup_appimage_icon,
 )
-from my_unicorn.core.workflows.shared import (
+from my_unicorn.exceptions import InstallationError
+from my_unicorn.logger import get_logger
+from my_unicorn.utils.appimage_utils import (
     select_best_appimage_asset,
     verify_appimage_download,
 )
-from my_unicorn.exceptions import InstallationError
-from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
 
