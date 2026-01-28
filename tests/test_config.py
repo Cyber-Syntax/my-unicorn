@@ -2,13 +2,11 @@
 
 import configparser
 from pathlib import Path
-from typing import cast
 
 import orjson
 import pytest
 
 from my_unicorn.config import (
-    AppConfig,
     AppConfigManager,
     CatalogLoader,
     CommentAwareConfigParser,
@@ -389,7 +387,7 @@ def test_app_config_manager(config_dir: Path) -> None:
         },
     }
 
-    app_manager.save_app_config(app_name, cast("AppConfig", app_config))
+    app_manager.save_app_config(app_name, app_config)
     loaded = app_manager.load_app_config(app_name)
     assert loaded is not None
     # V2.0.0 format with state
@@ -545,9 +543,7 @@ def test_config_manager_facade_integration(config_dir: Path) -> None:
             },
         },
     }
-    config_manager.save_app_config(
-        "integration_test", cast("AppConfig", app_config)
-    )
+    config_manager.save_app_config("integration_test", app_config)
     loaded_app = config_manager.load_app_config("integration_test")
     assert loaded_app is not None
     # After migration to v2.0.0, structure changes

@@ -212,16 +212,8 @@ class TestUpdateManager:
         """Test version comparison logic through public interface."""
         # Test version comparison through check_single_update rather than private method
         with patch.object(update_manager, "config_manager") as mock_config:
+            # load_app_config now returns merged effective config
             mock_config.load_app_config.return_value = {
-                "appimage": {"version": current},
-                "owner": "test",
-                "repo": "test",
-            }
-            mock_config.load_catalog.return_value = None
-
-            # Mock app_config_manager.get_effective_config to return effective config
-            mock_app_config_manager = MagicMock()
-            mock_app_config_manager.get_effective_config.return_value = {
                 "config_version": "2.0.0",
                 "source": {
                     "owner": "test-owner",
@@ -230,7 +222,7 @@ class TestUpdateManager:
                 },
                 "state": {"version": current},
             }
-            mock_config.app_config_manager = mock_app_config_manager
+            mock_config.load_catalog.return_value = None
 
             # Create a proper Release object
             mock_release_data = Release(
@@ -272,14 +264,8 @@ class TestUpdateManager:
     ) -> None:
         """Test successful single app update check."""
         # Mock dependencies via the mock_config_manager
-        mock_config_manager.load_app_config.return_value = mock_app_config
-        mock_config_manager.load_catalog.return_value = {
-            "github": {"use_github_api": True, "use_prerelease": False}
-        }
-
-        # Mock app_config_manager.get_effective_config to return effective config
-        mock_app_config_manager = MagicMock()
-        mock_app_config_manager.get_effective_config.return_value = {
+        # load_app_config now returns merged effective config
+        mock_config_manager.load_app_config.return_value = {
             "config_version": "2.0.0",
             "source": {
                 "owner": "test-owner",
@@ -288,7 +274,9 @@ class TestUpdateManager:
             },
             "state": {"version": "1.0.0"},
         }
-        mock_config_manager.app_config_manager = mock_app_config_manager
+        mock_config_manager.load_catalog.return_value = {
+            "github": {"use_github_api": True, "use_prerelease": False}
+        }
 
         mock_release_data = Release(
             owner="test-owner",
@@ -363,12 +351,8 @@ class TestUpdateManager:
         mock_app_config: dict[str, Any],
     ) -> None:
         """Test single app update check when API call fails."""
-        mock_config_manager.load_app_config.return_value = mock_app_config
-        mock_config_manager.load_catalog.return_value = None
-
-        # Mock app_config_manager.get_effective_config to return effective config
-        mock_app_config_manager = MagicMock()
-        mock_app_config_manager.get_effective_config.return_value = {
+        # load_app_config now returns merged effective config
+        mock_config_manager.load_app_config.return_value = {
             "config_version": "2.0.0",
             "source": {
                 "owner": "test-owner",
@@ -377,7 +361,7 @@ class TestUpdateManager:
             },
             "state": {"version": "1.0.0"},
         }
-        mock_config_manager.app_config_manager = mock_app_config_manager
+        mock_config_manager.load_catalog.return_value = None
 
         with (
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
@@ -419,11 +403,8 @@ class TestUpdateManager:
         mock_app_config: dict[str, Any],
     ) -> None:
         """Test single app update check when GitHub auth fails."""
-        mock_config_manager.load_app_config.return_value = mock_app_config
-
-        # Mock app_config_manager.get_effective_config to return effective config
-        mock_app_config_manager = MagicMock()
-        mock_app_config_manager.get_effective_config.return_value = {
+        # load_app_config now returns merged effective config
+        mock_config_manager.load_app_config.return_value = {
             "config_version": "2.0.0",
             "source": {
                 "owner": "test-owner",
@@ -432,7 +413,6 @@ class TestUpdateManager:
             },
             "state": {"version": "1.0.0"},
         }
-        mock_config_manager.app_config_manager = mock_app_config_manager
 
         # Create proper mock request info and history
         mock_request_info = MagicMock()
@@ -710,7 +690,7 @@ class TestUpdateManager:
             )
 
             assert success is False
-            assert error_reason == "Configuration not found"
+            assert error_reason == "No config found for app"
 
     @pytest.mark.asyncio
     async def test_update_single_app_no_update_needed(

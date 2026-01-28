@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.core.remove import RemoveService
-from my_unicorn.types import AppConfig, GlobalConfig
+from my_unicorn.types import GlobalConfig
 
 
 @pytest.fixture
@@ -18,31 +18,7 @@ def mock_config_manager():
     def load_app_config_side_effect(app_name):
         if app_name == "missing_app":
             return None
-        # Return v2 format config
-        return {
-            "config_version": "2.0.0",
-            "source": "catalog",
-            "catalog_ref": app_name,
-            "state": {
-                "version": "1.0.0",
-                "installed_date": "2024-01-01T00:00:00",
-                "installed_path": f"/mock/storage/{app_name}.AppImage",
-                "verification": {
-                    "passed": True,
-                    "methods": [],
-                },
-                "icon": {
-                    "installed": True,
-                    "method": "extraction",
-                    "path": f"/mock/icons/{app_name}.png",
-                },
-            },
-        }
-
-    def get_effective_config_side_effect(app_name):
-        if app_name == "missing_app":
-            raise ValueError(f"No config found for {app_name}")
-        # Return effective config with source
+        # Return merged effective config (load_app_config now returns merged)
         return {
             "config_version": "2.0.0",
             "metadata": {
@@ -72,9 +48,6 @@ def mock_config_manager():
         }
 
     config_manager.load_app_config.side_effect = load_app_config_side_effect
-    config_manager.app_config_manager.get_effective_config.side_effect = (
-        get_effective_config_side_effect
-    )
     config_manager.remove_app_config = MagicMock()
     return config_manager
 
@@ -196,23 +169,8 @@ async def test_remove_app_cache_and_backup_clear(global_config):
     """Cache should be cleared and backups removed when owner/repo is present."""
     # Build a custom config manager with v2 format config
     custom_config_manager = MagicMock()
+    # load_app_config now returns merged effective config
     custom_config_manager.load_app_config.return_value = {
-        "config_version": "2.0.0",
-        "source": "catalog",
-        "catalog_ref": "test_app",
-        "state": {
-            "version": "1.0.0",
-            "installed_date": "2024-01-01T00:00:00",
-            "installed_path": "/mock/storage/test_app.AppImage",
-            "verification": {"passed": True, "methods": []},
-            "icon": {
-                "installed": True,
-                "method": "extraction",
-                "path": "/mock/icons/test_app.png",
-            },
-        },
-    }
-    custom_config_manager.app_config_manager.get_effective_config.return_value = {
         "config_version": "2.0.0",
         "metadata": {"name": "test_app", "display_name": "Test App"},
         "source": {
@@ -293,21 +251,18 @@ async def test_remove_appimage_files_removes_files(
     service = RemoveService(mock_config_manager, global_config)
 
     # v2 config format with installed_path in state
-    app_config = cast(
-        "AppConfig",
-        {
-            "config_version": "2.0.0",
-            "source": "catalog",
-            "catalog_ref": "test_app",
-            "state": {
-                "installed_path": "/mock/storage/test_app.AppImage",
-                "version": "1.0.0",
-                "installed_date": "2024-01-01T00:00:00",
-                "verification": {"passed": True, "methods": []},
-                "icon": {"installed": False, "method": "none", "path": ""},
-            },
+    app_config = {
+        "config_version": "2.0.0",
+        "source": "catalog",
+        "catalog_ref": "test_app",
+        "state": {
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "version": "1.0.0",
+            "installed_date": "2024-01-01T00:00:00",
+            "verification": {"passed": True, "methods": []},
+            "icon": {"installed": False, "method": "none", "path": ""},
         },
-    )
+    }
 
     with (
         patch(
@@ -434,25 +389,22 @@ def test_remove_icon_remove_and_report(mock_config_manager, global_config):
     """_remove_icon removes icon when present in state and returns its path."""
     service = RemoveService(mock_config_manager, global_config)
     # v2 config: icon path is in state.icon.path
-    app_config = cast(
-        "AppConfig",
-        {
-            "config_version": "2.0.0",
-            "source": "catalog",
-            "catalog_ref": "test_app",
-            "state": {
-                "version": "1.0.0",
-                "installed_date": "2024-01-01T00:00:00",
-                "installed_path": "/mock/storage/test_app.AppImage",
-                "verification": {"passed": True, "methods": []},
-                "icon": {
-                    "installed": True,
-                    "method": "extraction",
-                    "path": "/mock/icons/test_app.png",
-                },
+    app_config = {
+        "config_version": "2.0.0",
+        "source": "catalog",
+        "catalog_ref": "test_app",
+        "state": {
+            "version": "1.0.0",
+            "installed_date": "2024-01-01T00:00:00",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {"passed": True, "methods": []},
+            "icon": {
+                "installed": True,
+                "method": "extraction",
+                "path": "/mock/icons/test_app.png",
             },
         },
-    )
+    }
 
     def exists_side_effect(path_obj):
         return True
@@ -476,25 +428,22 @@ def test_remove_icon_skipped_when_missing(mock_config_manager, global_config):
     """_remove_icon should return False when icon file doesn't exist."""
     service = RemoveService(mock_config_manager, global_config)
     # v2 config: icon path in state
-    app_config = cast(
-        "AppConfig",
-        {
-            "config_version": "2.0.0",
-            "source": "catalog",
-            "catalog_ref": "test_app",
-            "state": {
-                "version": "1.0.0",
-                "installed_date": "2024-01-01T00:00:00",
-                "installed_path": "/mock/storage/test_app.AppImage",
-                "verification": {"passed": True, "methods": []},
-                "icon": {
-                    "installed": True,
-                    "method": "extraction",
-                    "path": "/mock/icons/test_app.png",
-                },
+    app_config = {
+        "config_version": "2.0.0",
+        "source": "catalog",
+        "catalog_ref": "test_app",
+        "state": {
+            "version": "1.0.0",
+            "installed_date": "2024-01-01T00:00:00",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {"passed": True, "methods": []},
+            "icon": {
+                "installed": True,
+                "method": "extraction",
+                "path": "/mock/icons/test_app.png",
             },
         },
-    )
+    }
 
     def exists_side_effect(path_obj):
         return False
