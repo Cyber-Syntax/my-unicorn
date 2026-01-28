@@ -10,7 +10,7 @@ from argparse import Namespace
 from my_unicorn.cli.commands.base import BaseCommandHandler
 from my_unicorn.config import ConfigManager
 from my_unicorn.core.auth import GitHubAuthManager
-from my_unicorn.core.workflows.services.catalog_service import CatalogService
+from my_unicorn.core.catalog import CatalogService
 from my_unicorn.core.workflows.update import UpdateManager
 
 

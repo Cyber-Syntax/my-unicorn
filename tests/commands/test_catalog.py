@@ -59,9 +59,7 @@ async def test_catalog_available_apps(
     catalog_handler: CatalogHandler, mocker: MockerFixture
 ) -> None:
     """Test CatalogHandler._list_available_apps."""
-    mock_logger = mocker.patch(
-        "my_unicorn.core.workflows.services.catalog_service.logger"
-    )
+    mock_logger = mocker.patch("my_unicorn.core.catalog.logger")
     args = Namespace(available=True, installed=False, info=None)
 
     await catalog_handler.execute(args)
@@ -82,9 +80,7 @@ async def test_catalog_installed_apps(
     catalog_handler: CatalogHandler, mocker: MockerFixture
 ) -> None:
     """Test CatalogHandler._list_installed_apps."""
-    mock_logger = mocker.patch(
-        "my_unicorn.core.workflows.services.catalog_service.logger"
-    )
+    mock_logger = mocker.patch("my_unicorn.core.catalog.logger")
     args = Namespace(available=False, installed=True, info=None)
 
     await catalog_handler.execute(args)
@@ -102,9 +98,7 @@ async def test_catalog_info(
     catalog_handler: CatalogHandler, mocker: MockerFixture
 ) -> None:
     """Test CatalogHandler._show_app_info."""
-    mock_logger = mocker.patch(
-        "my_unicorn.core.workflows.services.catalog_service.logger"
-    )
+    mock_logger = mocker.patch("my_unicorn.core.catalog.logger")
     args = Namespace(available=False, installed=False, info="app1")
 
     await catalog_handler.execute(args)
