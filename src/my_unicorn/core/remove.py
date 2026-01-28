@@ -16,7 +16,7 @@ import my_unicorn.core.cache as cache_module
 import my_unicorn.core.desktop_entry as desktop_entry_module
 from my_unicorn.config import ConfigManager
 from my_unicorn.logger import get_logger
-from my_unicorn.types import AppConfig, GlobalConfig
+from my_unicorn.types import AppStateConfig, GlobalConfig
 
 logger = get_logger(__name__)
 
@@ -131,15 +131,9 @@ class RemoveService:
                     error=f"App '{app_name}' not found",
                 )
 
-            effective_config = (
-                self.config_manager.app_config_manager.get_effective_config(
-                    app_name
-                )
-            )
-
-            # Execute removal operations
+            # Execute removal operations (load_app_config now returns merged config)
             appimage_op = self._remove_appimage_files(app_config)
-            cache_op = await self._clear_cache(effective_config)
+            cache_op = await self._clear_cache(app_config)
             backup_op = self._remove_backups(app_name)
             desktop_op = self._remove_desktop_entry(app_name)
             icon_op = self._remove_icon(app_config)
@@ -264,7 +258,7 @@ class RemoveService:
         )
 
     def _remove_appimage_files(
-        self, app_config: AppConfig
+        self, app_config: AppStateConfig
     ) -> RemovalOperation:
         """Remove appimage files recorded in app config from storage dir."""
         state = app_config.get("state", {})
@@ -367,7 +361,7 @@ class RemoveService:
             )
             return RemovalOperation(success=False)
 
-    def _remove_icon(self, app_config: AppConfig) -> RemovalOperation:
+    def _remove_icon(self, app_config: AppStateConfig) -> RemovalOperation:
         """Remove icon file from icon directory if configured."""
         try:
             state = app_config.get("state", {})

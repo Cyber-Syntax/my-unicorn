@@ -8,7 +8,7 @@ from typing import cast
 
 from my_unicorn.core.workflows.backup import BackupService
 from my_unicorn.logger import get_logger
-from my_unicorn.types import AppConfigV2
+from my_unicorn.types import AppStateConfig
 
 from .base import BaseCommandHandler
 from .helpers import ensure_app_directories, get_install_paths
@@ -236,7 +236,7 @@ class BackupHandler(BaseCommandHandler):
             max_backups if max_backups > 0 else "unlimited",
         )
 
-    def _check_app_installed(self, app_name: str) -> AppConfigV2 | None:
+    def _check_app_installed(self, app_name: str) -> AppStateConfig | None:
         """Check if app is installed and return config if found."""
         config = self.config_manager.load_app_config(app_name)
         if not config:
@@ -245,4 +245,4 @@ class BackupHandler(BaseCommandHandler):
                 "Use 'my-unicorn catalog' to see installed applications"
             )
             return None
-        return cast("AppConfigV2", config)
+        return cast("AppStateConfig", config)

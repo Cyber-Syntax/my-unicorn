@@ -17,12 +17,18 @@ logger = get_logger(__name__)
 
 # Schema file paths
 SCHEMA_DIR = Path(__file__).parent
-CATALOG_V1_SCHEMA_PATH = SCHEMA_DIR / "catalog_v1.schema.json"
+
+# V2 Schemas - ACTIVE RUNTIME USE
 CATALOG_V2_SCHEMA_PATH = SCHEMA_DIR / "catalog_v2.schema.json"
-APP_STATE_V1_SCHEMA_PATH = SCHEMA_DIR / "app_state_v1.schema.json"
 APP_STATE_V2_SCHEMA_PATH = SCHEMA_DIR / "app_state_v2.schema.json"
 CACHE_RELEASE_SCHEMA_PATH = SCHEMA_DIR / "cache_release.schema.json"
 GLOBAL_CONFIG_V1_SCHEMA_PATH = SCHEMA_DIR / "global_config_v1.schema.json"
+
+# V1 Schemas - MIGRATION DETECTION ONLY
+# These schemas are only used for detecting and migrating v1 configs.
+# DO NOT use for runtime validation of active configurations.
+CATALOG_V1_SCHEMA_PATH = SCHEMA_DIR / "catalog_v1.schema.json"
+APP_STATE_V1_SCHEMA_PATH = SCHEMA_DIR / "app_state_v1.schema.json"
 
 
 class SchemaValidationError(Exception):

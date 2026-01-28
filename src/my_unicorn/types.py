@@ -142,84 +142,17 @@ class GlobalConfig(TypedDict):
 
 
 # =============================================================================
-# AppImage Configuration Types
+# V1 Configuration Types (DEPRECATED - Migration Only)
+# These types are only used for detecting and migrating v1 configs.
+# Do NOT use in new code.
 # =============================================================================
 
-
-class AppImageConfig(TypedDict):
-    """AppImage specific configuration."""
-
-    version: str
-    name: str
-    rename: str
-    name_template: str
-    characteristic_suffix: list[str]
-    installed_date: str
-    digest: str
-
-
-class GitHubConfig(TypedDict):
-    """GitHub API configuration options."""
-
-    repo: bool
-    prerelease: bool
-
-
-class VerificationConfig(TypedDict):
-    """Verification configuration options."""
-
-    digest: bool
-    skip: bool
-    checksum_file: str
-    checksum_hash_type: str
+# V1 types removed - see migration code if needed
 
 
 # =============================================================================
-# Icon Types (Note: Two different IconAsset types exist)
+# Icon Types
 # =============================================================================
-
-
-class ConfigIconAsset(TypedDict):
-    """Icon configuration in app/catalog config files."""
-
-    url: str
-    name: str
-    installed: bool
-
-
-# =============================================================================
-# Application Configuration Types
-# =============================================================================
-
-
-class AppConfig(TypedDict):
-    """Per-application configuration."""
-
-    owner: str
-    repo: str
-    config_version: str
-    appimage: AppImageConfig
-    github: GitHubConfig
-    verification: VerificationConfig
-    icon: ConfigIconAsset
-
-
-class CatalogAppImageConfig(TypedDict):
-    """AppImage configuration within catalog entry."""
-
-    rename: str
-    name_template: str
-    characteristic_suffix: list[str]
-
-
-class CatalogEntry(TypedDict):
-    """Catalog entry for an application."""
-
-    owner: str
-    repo: str
-    appimage: CatalogAppImageConfig
-    verification: VerificationConfig
-    icon: ConfigIconAsset | None
 
 
 # =============================================================================
@@ -331,8 +264,13 @@ class AppOverrides(TypedDict, total=False):
     icon: IconConfigV2
 
 
-class AppConfigV2(TypedDict):
-    """App configuration v2.0.0."""
+class AppStateConfig(TypedDict):
+    """App state configuration stored in apps/*.json files.
+
+    This represents the hybrid storage model:
+    - Catalog apps: state + catalog_ref + optional overrides
+    - URL apps: state + complete config in overrides
+    """
 
     config_version: str
     source: str  # "catalog" or "url"
@@ -341,8 +279,12 @@ class AppConfigV2(TypedDict):
     overrides: AppOverrides  # Optional for catalog, required for URL
 
 
-class CatalogEntryV2(TypedDict):
-    """Catalog entry v2.0.0."""
+class CatalogConfig(TypedDict):
+    """Catalog entry configuration from catalog/*.json files.
+
+    Defines the default configuration for applications in the catalog.
+    Used as base configuration that can be overridden by user settings.
+    """
 
     config_version: str
     metadata: AppMetadata

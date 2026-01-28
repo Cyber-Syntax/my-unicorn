@@ -16,7 +16,7 @@ from my_unicorn.config.schemas.validator import (
     validate_app_state,
 )
 from my_unicorn.constants import APP_CONFIG_VERSION
-from my_unicorn.types import AppConfig
+from my_unicorn.types import AppStateConfig
 
 logger = logging.getLogger(__name__)
 
@@ -40,14 +40,39 @@ class AppConfigManager:
         self.apps_dir = apps_dir or Paths.APPS_DIR
         self.catalog_manager = catalog_manager
 
-    def load_app_config(self, app_name: str) -> AppConfig | None:
-        """Load app-specific configuration.
+    def load_app_config(self, app_name: str) -> dict | None:
+        """Load merged effective configuration (SINGLE SOURCE OF TRUTH).
+
+        This is the primary method for loading app configuration.
+        Returns fully merged config: Catalog + State + Overrides.
 
         Args:
             app_name: Name of the application
 
         Returns:
-            App configuration or None if not found
+            Merged configuration dictionary or None if not found
+
+        Raises:
+            ValueError: If config file is invalid or needs migration
+
+        """
+        raw_config = self.load_raw_app_config(app_name)
+        if not raw_config:
+            return None
+        return self._build_effective_config(raw_config)
+
+    def load_raw_app_config(self, app_name: str) -> AppStateConfig | None:
+        """Load raw app state config without merging.
+
+        This loads the raw app state structure (source, catalog_ref, state, overrides)
+        without merging catalog or building effective config.
+        Use this when you need to modify and save the state.
+
+        Args:
+            app_name: Name of the application
+
+        Returns:
+            Raw app state config or None if not found
 
         Raises:
             ValueError: If config file is invalid or needs migration
@@ -74,7 +99,7 @@ class AppConfigManager:
             # Validate against schema
             validate_app_state(config_data, app_name)
 
-            return cast("AppConfig", config_data)
+            return cast("AppStateConfig", config_data)
         except SchemaValidationError as e:
             msg = f"Invalid app config for {app_name}: {e}"
             raise ValueError(msg) from e
@@ -88,7 +113,7 @@ class AppConfigManager:
     def save_app_config(
         self,
         app_name: str,
-        config: AppConfig,
+        config: AppStateConfig,
         *,
         skip_validation: bool = False,
     ) -> None:
@@ -153,20 +178,17 @@ class AppConfigManager:
             return True
         return False
 
-    def get_effective_config(self, app_name: str) -> dict:
-        """Get merged effective configuration.
+    def _build_effective_config(self, app_config: AppStateConfig) -> dict:
+        """Build merged effective configuration (PRIVATE).
 
-        This is the SINGLE source of truth for app configuration.
         Merges: Catalog (if exists) + State + Overrides
+        This is called internally by load_app_config().
 
         Args:
-            app_name: Application name
+            app_config: Raw app state config
 
         Returns:
             Merged configuration dictionary
-
-        Raises:
-            ValueError: If app config not found
 
         Priority (low to high):
             1. Catalog defaults (if catalog_ref exists)
@@ -174,11 +196,6 @@ class AppConfigManager:
             3. User overrides (explicit customizations)
 
         """
-        app_config = self.load_app_config(app_name)
-        if not app_config:
-            msg = f"No config found for {app_name}"
-            raise ValueError(msg)
-
         effective = {}
 
         # Step 1: Load catalog as base (if referenced)

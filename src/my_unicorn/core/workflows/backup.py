@@ -29,7 +29,7 @@ from my_unicorn.constants import (
 from my_unicorn.logger import get_logger
 
 if TYPE_CHECKING:
-    from my_unicorn.types import AppConfig, GlobalConfig
+    from my_unicorn.types import GlobalConfig
 
 # Import at module level to avoid runtime import cycle
 try:
@@ -684,7 +684,7 @@ class BackupService:
 
         try:
             self.config_manager.save_app_config(
-                app_name, cast("AppConfig", app_config), skip_validation=True
+                app_name, app_config, skip_validation=True
             )
             logger.debug(
                 "Updated app config for %s with version %s", app_name, version

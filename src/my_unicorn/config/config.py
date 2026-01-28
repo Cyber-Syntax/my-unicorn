@@ -20,7 +20,7 @@ from typing import cast
 from my_unicorn.config.app import AppConfigManager
 from my_unicorn.config.catalog import CatalogLoader
 from my_unicorn.config.paths import Paths
-from my_unicorn.types import AppConfig, CatalogEntryV2, GlobalConfig
+from my_unicorn.types import AppStateConfig, CatalogConfig, GlobalConfig
 
 logger = logging.getLogger(__name__)
 
@@ -122,14 +122,39 @@ class ConfigManager:
         self.global_config_manager.save_global_config(config)
 
     # App config manager delegates
-    def load_app_config(self, app_name: str) -> AppConfig | None:
-        """Load app-specific configuration."""
+    def load_app_config(self, app_name: str) -> dict | None:
+        """Load merged effective app configuration (SINGLE SOURCE OF TRUTH).
+
+        Returns fully merged config: Catalog + State + Overrides.
+
+        Args:
+            app_name: Application name
+
+        Returns:
+            Merged configuration dictionary or None if not found
+
+        """
         return self.app_config_manager.load_app_config(app_name)
+
+    def load_raw_app_config(self, app_name: str) -> AppStateConfig | None:
+        """Load raw app state without merging (for updates).
+
+        Returns raw state structure: {source, catalog_ref, state, overrides}
+        Use when you need to modify and save the app state.
+
+        Args:
+            app_name: Name of the application
+
+        Returns:
+            Raw app state config or None if not found
+
+        """
+        return self.app_config_manager.load_raw_app_config(app_name)
 
     def save_app_config(
         self,
         app_name: str,
-        config: AppConfig,
+        config: AppStateConfig,
         *,
         skip_validation: bool = False,
     ) -> None:
@@ -147,7 +172,7 @@ class ConfigManager:
         return self.app_config_manager.remove_app_config(app_name)
 
     # Catalog loader delegates
-    def load_catalog(self, app_name: str) -> CatalogEntryV2:
+    def load_catalog(self, app_name: str) -> CatalogConfig:
         """Load catalog entry for an app from bundled catalog.
 
         Args:

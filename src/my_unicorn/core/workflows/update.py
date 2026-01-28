@@ -8,7 +8,7 @@ import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import aiohttp
 from packaging.version import InvalidVersion, Version
@@ -37,9 +37,6 @@ from my_unicorn.core.workflows.shared import (
 )
 from my_unicorn.logger import get_logger
 
-if TYPE_CHECKING:
-    from my_unicorn.types import AppConfig
-
 logger = get_logger(__name__)
 
 
@@ -47,8 +44,9 @@ logger = get_logger(__name__)
 class UpdateInfo:
     """Information about an available update.
 
-    This class now includes in-memory caching of release data to eliminate
-    redundant cache file reads during a single update operation.
+    This class now includes in-memory caching of release data AND loaded config
+    to eliminate redundant cache file reads and config validation during a single
+    update operation.
     """
 
     app_name: str
@@ -59,6 +57,7 @@ class UpdateInfo:
     prerelease: bool = False
     original_tag_name: str = ""
     release_data: Release | None = None
+    app_config: dict[str, Any] | None = None  # Cached loaded config
     error_reason: str | None = None
 
     def __post_init__(self) -> None:
@@ -235,16 +234,12 @@ class UpdateManager:
                     error_reason="No config found for app",
                 )
 
-            # Get effective config (all configs are v2 after migration)
-            effective_config = (
-                self.config_manager.app_config_manager.get_effective_config(
-                    app_name
-                )
-            )
-            current_version = effective_config.get("state", {}).get(
+            # Get config (all configs are v2 after migration)
+            # load_app_config now returns fully merged config
+            current_version = app_config.get("state", {}).get(
                 "version", "unknown"
             )
-            source_config = effective_config.get("source", {})
+            source_config = app_config.get("source", {})
             owner = source_config.get("owner", "unknown")
             repo = source_config.get("repo", "unknown")
             should_use_prerelease = source_config.get("prerelease", False)
@@ -305,8 +300,8 @@ class UpdateManager:
                 current_version, latest_version
             )
 
-            # Cache release data in UpdateInfo for in-memory reuse within single operation
-            # This eliminates redundant cache file reads in subsequent update phases
+            # Cache release data AND app_config in UpdateInfo for in-memory reuse within single operation
+            # This eliminates redundant cache file reads and config validation in subsequent update phases
             return UpdateInfo(
                 app_name=app_name,
                 current_version=current_version,
@@ -317,6 +312,7 @@ class UpdateManager:
                 original_tag_name=release_data.original_tag_name
                 or f"v{latest_version}",
                 release_data=release_data,  # Store for in-memory reuse
+                app_config=app_config,  # Store loaded config to avoid re-validation
             )
 
         except aiohttp.client_exceptions.ClientResponseError as e:
@@ -461,12 +457,6 @@ class UpdateManager:
             Tuple of (context dict, error message). Context is None on error.
 
         """
-        # Load app configuration
-        app_config = self.config_manager.load_app_config(app_name)
-        if not app_config:
-            logger.error("No config found for app: %s", app_name)
-            return None, "Configuration not found"
-
         # Use cached update info if provided, otherwise check for updates
         if not update_info:
             update_info = await self.check_single_update(app_name, session)
@@ -485,16 +475,23 @@ class UpdateManager:
             logger.info("%s is already up to date", app_name)
             return {"skip": True, "success": True}, None
 
-        # Get effective config and extract GitHub info
-        effective_config = (
-            self.config_manager.app_config_manager.get_effective_config(
-                app_name
-            )
-        )
-        owner, repo, _ = extract_github_config(effective_config)
+        # Get app config from cached UpdateInfo or load if not available
+        # This eliminates redundant validation (was loading 2-3 times before)
+        if update_info.app_config:
+            app_config = (
+                update_info.app_config
+            )  # Reuse cached config (no validation!)
+        else:
+            # Fallback: load if update_info didn't cache it (shouldn't happen in normal flow)
+            app_config = self.config_manager.load_app_config(app_name)
+            if not app_config:
+                msg = f"No config found for {app_name}"
+                raise ValueError(msg)
+
+        owner, repo, _ = extract_github_config(app_config)
 
         # Load catalog entry if referenced
-        catalog_ref = effective_config.get("catalog_ref")
+        catalog_ref = app_config.get("catalog_ref")
         catalog_entry = None
         if catalog_ref:
             try:
@@ -866,6 +863,12 @@ class UpdateManager:
             updated_icon_config: Updated icon config or None
 
         """
+        # Load raw state for modification (not merged effective config)
+        raw_state = self.config_manager.load_raw_app_config(app_name)
+        if not raw_state:
+            msg = f"Cannot update config: app state not found for {app_name}"
+            raise ValueError(msg)
+
         # Store computed hash (will be empty dict if no asset provided)
         stored_hash = ""
         if verification_results.get("digest", {}).get("passed"):
@@ -873,13 +876,12 @@ class UpdateManager:
         elif verification_results.get("checksum_file", {}).get("passed"):
             stored_hash = verification_results["checksum_file"]["hash"]
 
-        # Update app config (v2 format)
-        # Config is guaranteed to be v2 after load_app_config() migration
-        if "state" not in app_config:
-            app_config["state"] = {}
-        app_config["state"]["version"] = update_info.latest_version
-        app_config["state"]["installed_path"] = str(appimage_path)
-        app_config["state"]["installed_date"] = (
+        # Update state fields (v2 format)
+        if "state" not in raw_state:
+            raw_state["state"] = {}
+        raw_state["state"]["version"] = update_info.latest_version
+        raw_state["state"]["installed_path"] = str(appimage_path)
+        raw_state["state"]["installed_date"] = (
             datetime.now().astimezone().isoformat()
         )
         # Note: Verification results are stored in state.verification during install
@@ -888,7 +890,7 @@ class UpdateManager:
         if updated_icon_config:
             # Map workflow utility result to v2 schema format
             # v2 schema only allows: installed, method, path
-            app_config["state"]["icon"] = {
+            raw_state["state"]["icon"] = {
                 "installed": updated_icon_config.get("installed", False),
                 "method": updated_icon_config.get("source", "none"),
                 "path": updated_icon_config.get("path", ""),
@@ -898,12 +900,12 @@ class UpdateManager:
                 logger.debug(
                     "🎨 Icon updated for %s: method=%s, installed=%s",
                     app_name,
-                    app_config["state"]["icon"]["method"],
-                    app_config["state"]["icon"]["installed"],
+                    raw_state["state"]["icon"]["method"],
+                    raw_state["state"]["icon"]["installed"],
                 )
 
         self.config_manager.save_app_config(
-            app_name, cast("AppConfig", app_config), skip_validation=True
+            app_name, raw_state, skip_validation=True
         )
 
         # Clean up old backups after successful update
