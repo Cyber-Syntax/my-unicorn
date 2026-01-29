@@ -32,21 +32,17 @@ def mock_github_client():
 
 
 @pytest.fixture
-def mock_catalog_manager():
-    """Create mock catalog manager."""
-    catalog = MagicMock()
-    catalog.get_app.return_value = {
-        "name": "test-app",
-        "owner": "test",
-        "repo": "app",
-    }
-    return catalog
-
-
-@pytest.fixture
 def mock_config_manager():
     """Create mock config manager."""
-    return MagicMock()
+    manager = MagicMock()
+    # Add list_catalog_apps method for separate_targets_impl
+    manager.list_catalog_apps.return_value = ["test-app", "appflowy"]
+    # Add load_catalog method
+    manager.load_catalog.return_value = {
+        "name": "test-app",
+        "source": {"owner": "test", "repo": "app"},
+    }
+    return manager
 
 
 @pytest.fixture
@@ -78,7 +74,6 @@ def install_dir(tmp_path):
 def install_service(
     mock_session,
     mock_github_client,
-    mock_catalog_manager,
     mock_config_manager,
     install_dir,
     mock_progress_service,
@@ -87,7 +82,6 @@ def install_service(
     return InstallApplicationService(
         session=mock_session,
         github_client=mock_github_client,
-        catalog_manager=mock_catalog_manager,
         config_manager=mock_config_manager,
         install_dir=install_dir,
         progress_service=mock_progress_service,
@@ -130,7 +124,6 @@ class TestInstallApplicationService:
         """Test service initialization."""
         assert install_service.session is not None
         assert install_service.github is not None
-        assert install_service.catalog is not None
         assert install_service.config is not None
         assert install_service.install_dir is not None
         assert install_service.progress is not None

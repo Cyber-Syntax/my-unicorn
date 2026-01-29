@@ -42,7 +42,6 @@ class InstallHandler:
         storage_service: FileOperations,
         config_manager: Any,
         github_client: GitHubClient,
-        catalog_manager: Any,
     ) -> None:
         """Initialize install handler.
 
@@ -51,21 +50,18 @@ class InstallHandler:
             storage_service: Service for storage operations
             config_manager: Configuration manager
             github_client: GitHub API client
-            catalog_manager: Catalog manager for app configs
 
         """
         self.download_service = download_service
         self.storage_service = storage_service
         self.config_manager = config_manager
         self.github_client = github_client
-        self.catalog_manager = catalog_manager
 
     @classmethod
     def create_default(
         cls,
         session: Any,
         config_manager: Any,
-        catalog_manager: Any,
         github_client: GitHubClient,
         install_dir: Path,
         progress_service: Any = None,
@@ -77,7 +73,6 @@ class InstallHandler:
         Args:
             session: HTTP session for downloads
             config_manager: Configuration manager
-            catalog_manager: Catalog manager
             github_client: GitHub client
             install_dir: Installation directory
             progress_service: Optional progress service
@@ -94,7 +89,6 @@ class InstallHandler:
             storage_service=storage_service,
             config_manager=config_manager,
             github_client=github_client,
-            catalog_manager=catalog_manager,
         )
 
     async def install_from_catalog(
@@ -114,19 +108,13 @@ class InstallHandler:
         """
         logger.debug("Starting catalog install: app=%s", app_name)
 
-        def _raise_app_not_found() -> None:
-            msg = "App not found in catalog"
-            raise InstallationError(msg)
-
         def _raise_no_asset() -> None:
             msg = "No suitable AppImage asset found"
             raise ValueError(msg)
 
         try:
             # Get app configuration (v2 format from catalog)
-            app_config = self.catalog_manager.get_app_config(app_name)
-            if not app_config:
-                _raise_app_not_found()
+            app_config = self.config_manager.load_catalog(app_name)
 
             # Extract source info from v2 config
             source_config = app_config.get("source", {})
@@ -402,7 +390,7 @@ class InstallHandler:
 
     @staticmethod
     def separate_targets_impl(
-        catalog_manager: Any, targets: list[str]
+        config_manager: Any, targets: list[str]
     ) -> tuple[list[str], list[str]]:
         """Separate targets into URL and catalog targets.
 
@@ -410,7 +398,7 @@ class InstallHandler:
         same logic easily (and tests can target the behavior).
 
         Args:
-            catalog_manager: Catalog manager instance
+            config_manager: Configuration manager instance
             targets: List of mixed targets (URLs or catalog names)
 
         Returns:
@@ -426,7 +414,7 @@ class InstallHandler:
         catalog_targets: list[str] = []
         unknown_targets: list[str] = []
 
-        available_apps = catalog_manager.get_available_apps()
+        available_apps = set(config_manager.list_catalog_apps())
 
         for target in targets:
             if target.startswith("https://github.com/"):
@@ -438,7 +426,10 @@ class InstallHandler:
 
         if unknown_targets:
             unknown_list = ", ".join(unknown_targets)
-            msg = f"Unknown applications or invalid URLs: {unknown_list}. Use 'my-unicorn catalog --available' to see available apps."
+            msg = (
+                f"Unknown applications or invalid URLs: {unknown_list}. "
+                "Use 'my-unicorn catalog --available' to see available apps."
+            )
             raise InstallationError(msg)
 
         return url_targets, catalog_targets
@@ -457,12 +448,12 @@ class InstallHandler:
 
         """
         return InstallHandler.separate_targets_impl(
-            self.catalog_manager, targets
+            self.config_manager, targets
         )
 
     @staticmethod
     async def check_apps_needing_work_impl(
-        catalog_manager: Any,
+        config_manager: Any,
         url_targets: list[str],
         catalog_targets: list[str],
         install_options: dict[str, Any],
@@ -470,7 +461,7 @@ class InstallHandler:
         """Check which apps actually need installation work.
 
         Args:
-            catalog_manager: Catalog manager instance
+            config_manager: Configuration manager instance
             url_targets: List of URL targets
             catalog_targets: List of catalog targets
             install_options: Installation options
@@ -486,22 +477,28 @@ class InstallHandler:
 
         for app_name in catalog_targets:
             try:
-                app_config = catalog_manager.get_app_config(app_name)
-                if not app_config:
+                # Check if app exists in catalog
+                try:
+                    config_manager.load_catalog(app_name)
+                except (FileNotFoundError, ValueError):
                     catalog_needing_work.append(app_name)
                     continue
 
                 if not install_options.get("force", False):
-                    installed_config = (
-                        catalog_manager.get_installed_app_config(app_name)
-                    )
-                    if installed_config:
+                    # Check if app is already installed
+                    try:
+                        installed_config = config_manager.load_app_config(
+                            app_name
+                        )
                         installed_path = Path(
                             installed_config.get("installed_path", "")
                         )
                         if installed_path.exists():
                             already_installed.append(app_name)
                             continue
+                    except (FileNotFoundError, KeyError):
+                        # Not installed, needs work
+                        pass
 
                 catalog_needing_work.append(app_name)
             except Exception:
@@ -529,7 +526,7 @@ class InstallHandler:
 
         """
         return await InstallHandler.check_apps_needing_work_impl(
-            self.catalog_manager, url_targets, catalog_targets, install_options
+            self.config_manager, url_targets, catalog_targets, install_options
         )
 
     async def _install_workflow(

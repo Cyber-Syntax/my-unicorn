@@ -60,19 +60,22 @@ class TestInstallHandler:
         )
         github_client.get_latest_release = AsyncMock(return_value=release)
 
-        catalog_manager = Mock()
-        catalog_manager.get_app_config = Mock(
+        # Update config_manager to support both catalog and installed config
+        config_manager.load_catalog = Mock(
             return_value={
-                "owner": "test-owner",
-                "repo": "test-repo",
-                "appimage": {
-                    "rename": "test",
-                    "name_template": "",
-                    "characteristic_suffix": [],
+                "source": {
+                    "owner": "test-owner",
+                    "repo": "test-repo",
                 },
-                "github": {},
+                "appimage": {
+                    "naming": {
+                        "template": "",
+                        "target_name": "test",
+                        "architectures": [],
+                    },
+                },
                 "verification": {},
-                "icon": {"extraction": True, "url": None},
+                "icon": {"method": "extraction"},
             }
         )
 
@@ -81,7 +84,6 @@ class TestInstallHandler:
             "storage_service": storage_service,
             "config_manager": config_manager,
             "github_client": github_client,
-            "catalog_manager": catalog_manager,
         }
 
     @pytest.fixture
@@ -134,7 +136,9 @@ class TestInstallHandler:
         self, install_service, mock_services
     ):
         """Test installation fails when app not in catalog."""
-        mock_services["catalog_manager"].get_app_config.return_value = None
+        mock_services[
+            "config_manager"
+        ].load_catalog.side_effect = FileNotFoundError("App not found")
 
         result = await install_service.install_from_catalog("nonexistent")
 
@@ -261,10 +265,10 @@ class TestInstallHandler:
         rejects unknown entries.
         """
         # Set catalog listing
-        mock_services["catalog_manager"].get_available_apps.return_value = {
-            "app1": {},
-            "app2": {},
-        }
+        mock_services["config_manager"].list_catalog_apps.return_value = [
+            "app1",
+            "app2",
+        ]
 
         url_targets, catalog_targets = install_service.separate_targets(
             ["app1", "https://github.com/foo/bar"]
@@ -288,14 +292,14 @@ class TestInstallHandler:
         installed_file = tmp_path / "app-installed.AppImage"
         installed_file.write_text("x")
 
-        # Configure catalog manager responses
-        mock_services["catalog_manager"].get_app_config.return_value = {
-            "owner": "test-owner",
-            "repo": "test-repo",
+        # Configure config manager responses
+        mock_services["config_manager"].load_catalog.return_value = {
+            "source": {
+                "owner": "test-owner",
+                "repo": "test-repo",
+            },
         }
-        mock_services[
-            "catalog_manager"
-        ].get_installed_app_config.return_value = {
+        mock_services["config_manager"].load_app_config.return_value = {
             "installed_path": str(installed_file),
         }
 

@@ -226,6 +226,7 @@ class UpdateManager:
 
         """
         try:
+            # TODO: Decrease the config loads in this one by getting returns from the config manager?
             app_config = self.config_manager.load_app_config(app_name)
             if not app_config:
                 logger.warning("No config found for app: %s", app_name)

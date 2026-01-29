@@ -49,7 +49,11 @@ class CatalogLoader:
 
         # Load JSON
         with path.open("rb") as f:
-            data = orjson.loads(f.read())
+            try:
+                data = orjson.loads(f.read())
+            except orjson.JSONDecodeError as e:
+                msg = f"Invalid JSON in catalog entry for '{app_name}': {e}"
+                raise ValueError(msg) from e
 
         return cast("CatalogConfig", data)
 

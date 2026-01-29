@@ -19,7 +19,6 @@ from my_unicorn.ui.display_install import (
 from my_unicorn.ui.progress import ProgressDisplay
 
 from .base import BaseCommandHandler
-from .catalog_adapter import CatalogManagerAdapter
 from .helpers import ensure_app_directories, get_install_paths, parse_targets
 
 
@@ -54,7 +53,6 @@ class InstallCommandHandler(BaseCommandHandler):
                 github_client=GitHubClient(
                     session, progress_service=progress_service
                 ),
-                catalog_manager=CatalogManagerAdapter(self.config_manager),
                 config_manager=self.config_manager,
                 install_dir=install_dir,
                 progress_service=progress_service,

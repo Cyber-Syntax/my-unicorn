@@ -56,7 +56,6 @@ class InstallApplicationService:
         self,
         session: aiohttp.ClientSession,
         github_client: GitHubClient,
-        catalog_manager: Any,
         config_manager: ConfigManager,
         install_dir: Path,
         progress_service: ProgressDisplay | None = None,
@@ -66,7 +65,6 @@ class InstallApplicationService:
         Args:
             session: HTTP session for downloads
             github_client: GitHub API client
-            catalog_manager: Catalog manager for app lookup
             config_manager: Configuration manager
             install_dir: Installation directory
             progress_service: Optional progress tracking service
@@ -74,7 +72,6 @@ class InstallApplicationService:
         """
         self.session = session
         self.github = github_client
-        self.catalog = catalog_manager
         self.config = config_manager
         self.install_dir = install_dir
         self.progress = progress_service
@@ -102,7 +99,6 @@ class InstallApplicationService:
                 storage_service=storage_service,
                 config_manager=self.config,
                 github_client=self.github,
-                catalog_manager=self.catalog,
             )
         return self._install_handler
 
@@ -125,7 +121,7 @@ class InstallApplicationService:
 
         # Separate targets into URLs and catalog apps
         url_targets, catalog_targets = InstallHandler.separate_targets_impl(
-            self.catalog, targets
+            self.config, targets
         )
 
         # Build install options dict for handler
@@ -142,7 +138,7 @@ class InstallApplicationService:
             catalog_needing_work,
             already_installed,
         ) = await InstallHandler.check_apps_needing_work_impl(
-            self.catalog, url_targets, catalog_targets, install_opts
+            self.config, url_targets, catalog_targets, install_opts
         )
 
         # Handle all already installed case

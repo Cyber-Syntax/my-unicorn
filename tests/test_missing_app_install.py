@@ -16,36 +16,40 @@ class TestMissingAppImageInstall:
     """Test install command with missing AppImage scenarios."""
 
     @pytest.fixture
-    def mock_catalog_manager(self) -> MagicMock:
-        """Create mock catalog manager."""
+    def mock_config_manager(self) -> MagicMock:
+        """Create mock config manager."""
         mock_cm = MagicMock()
-        mock_cm.get_app_config.return_value = {
-            "name": "appflowy",
-            "owner": "AppFlowy-IO",
-            "repo": "AppFlowy",
+        mock_cm.load_catalog.return_value = {
+            "metadata": {
+                "name": "appflowy",
+            },
+            "source": {
+                "owner": "AppFlowy-IO",
+                "repo": "AppFlowy",
+            },
             "appimage": {
-                "rename": "appflowy",
-                "characteristic_suffix": ["x86_64"],
+                "naming": {
+                    "target_name": "appflowy",
+                    "architectures": ["x86_64"],
+                },
             },
         }
         return mock_cm
 
     @pytest.fixture
     def install_handler(
-        self, mock_catalog_manager: MagicMock
+        self, mock_config_manager: MagicMock
     ) -> InstallHandler:
         """Create install handler with mocked dependencies."""
         mock_download = MagicMock()
         mock_storage = MagicMock()
-        mock_config = MagicMock()
         mock_github = MagicMock()
 
         return InstallHandler(
             download_service=mock_download,
             storage_service=mock_storage,
-            config_manager=mock_config,
+            config_manager=mock_config_manager,
             github_client=mock_github,
-            catalog_manager=mock_catalog_manager,
         )
 
     @pytest.fixture
@@ -152,7 +156,7 @@ class TestMissingAppImageInstall:
 
     @pytest.mark.asyncio
     async def test_install_multiple_apps_some_missing(
-        self, mock_catalog_manager: MagicMock
+        self, mock_config_manager: MagicMock
     ) -> None:
         """Test installing multiple apps where some have missing AppImages.
 
@@ -162,15 +166,13 @@ class TestMissingAppImageInstall:
         # Setup mocks
         mock_download = MagicMock()
         mock_storage = MagicMock()
-        mock_config = MagicMock()
         mock_github = MagicMock()
 
         install_handler = InstallHandler(
             download_service=mock_download,
             storage_service=mock_storage,
-            config_manager=mock_config,
+            config_manager=mock_config_manager,
             github_client=mock_github,
-            catalog_manager=mock_catalog_manager,
         )
 
         # Mock catalog to return configs for multiple apps
@@ -248,7 +250,7 @@ class TestMissingAppImageInstall:
             }
             return configs.get(app_name)
 
-        mock_catalog_manager.get_app_config.side_effect = (
+        mock_config_manager.load_catalog.side_effect = (
             get_app_config_side_effect
         )
 
@@ -348,7 +350,7 @@ class TestMissingAppImageInstall:
 
     @pytest.mark.asyncio
     async def test_install_result_structure(
-        self, mock_catalog_manager: MagicMock
+        self, mock_config_manager: MagicMock
     ) -> None:
         """Test that install result has proper structure for error display.
 
@@ -357,15 +359,13 @@ class TestMissingAppImageInstall:
         """
         mock_download = MagicMock()
         mock_storage = MagicMock()
-        mock_config = MagicMock()
         mock_github = MagicMock()
 
         install_handler = InstallHandler(
             download_service=mock_download,
             storage_service=mock_storage,
-            config_manager=mock_config,
+            config_manager=mock_config_manager,
             github_client=mock_github,
-            catalog_manager=mock_catalog_manager,
         )
 
         mock_fetch = AsyncMock(
