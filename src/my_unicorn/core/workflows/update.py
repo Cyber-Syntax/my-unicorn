@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import aiohttp
-from packaging.version import InvalidVersion, Version
 
 from my_unicorn.config import ConfigManager
 from my_unicorn.config.migration.helpers import warn_about_migration
@@ -36,6 +35,7 @@ from my_unicorn.utils.appimage_utils import (
     select_best_appimage_asset,
     verify_appimage_download,
 )
+from my_unicorn.utils.version_utils import compare_versions
 
 logger = get_logger(__name__)
 
@@ -165,49 +165,6 @@ class UpdateManager:
             download_service, progress_service
         )
 
-    def _compare_versions(self, current: str, latest: str) -> bool:
-        """Compare version strings to determine if update is available.
-
-        Args:
-            current: Current version string
-            latest: Latest version string
-
-        Returns:
-            True if latest is newer than current
-
-        """
-        current_clean = current.lstrip("v").lower()
-        latest_clean = latest.lstrip("v").lower()
-
-        if current_clean == latest_clean:
-            return False
-
-        # Try using packaging.version for proper semantic version comparison
-        if Version is not None:
-            try:
-                current_version = Version(current_clean)
-                latest_version = Version(latest_clean)
-            except InvalidVersion:
-                # Fall through to legacy comparison if parsing fails
-                pass
-            else:
-                return latest_version > current_version
-
-        # Legacy comparison for backward compatibility
-        try:
-            current_parts = [int(x) for x in current_clean.split(".")]
-            latest_parts = [int(x) for x in latest_clean.split(".")]
-
-            # Pad shorter version with zeros
-            max_len = max(len(current_parts), len(latest_parts))
-            current_parts.extend([0] * (max_len - len(current_parts)))
-            latest_parts.extend([0] * (max_len - len(latest_parts)))
-        except ValueError:
-            # Fallback to string comparison
-            return latest_clean > current_clean
-        else:
-            return latest_parts > current_parts
-
     async def check_single_update(
         self,
         app_name: str,
@@ -297,9 +254,7 @@ class UpdateManager:
                 )
 
             latest_version = release_data.version
-            has_update = self._compare_versions(
-                current_version, latest_version
-            )
+            has_update = compare_versions(current_version, latest_version)
 
             # Cache release data AND app_config in UpdateInfo for in-memory reuse within single operation
             # This eliminates redundant cache file reads and config validation in subsequent update phases
