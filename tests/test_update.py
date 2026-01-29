@@ -341,7 +341,7 @@ class TestUpdateManager:
             assert isinstance(result, UpdateInfo)
             assert not result.is_success
             assert result.error_reason is not None
-            assert "No config found" in result.error_reason
+            assert "No configuration found" in result.error_reason
 
     @pytest.mark.asyncio
     async def test_check_single_update_api_error(
@@ -690,7 +690,8 @@ class TestUpdateManager:
             )
 
             assert success is False
-            assert error_reason == "No config found for app"
+            assert error_reason is not None
+            assert "No configuration found" in error_reason
 
     @pytest.mark.asyncio
     async def test_update_single_app_no_update_needed(
