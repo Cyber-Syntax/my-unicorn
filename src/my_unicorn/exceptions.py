@@ -35,3 +35,9 @@ class ValidationError(MyUnicornError):
     """Raised when target validation fails."""
 
     error_prefix = "Validation failed"
+
+
+class ConfigurationError(MyUnicornError):
+    """Raised when configuration is invalid or missing."""
+
+    error_prefix = "Configuration error"

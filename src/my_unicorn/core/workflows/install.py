@@ -29,6 +29,7 @@ from my_unicorn.utils.appimage_utils import (
     select_best_appimage_asset,
     verify_appimage_download,
 )
+from my_unicorn.utils.validation import validate_github_identifier
 
 logger = get_logger(__name__)
 
@@ -120,6 +121,15 @@ class InstallHandler:
             source_config = app_config.get("source", {})
             owner = source_config.get("owner", "")
             repo = source_config.get("repo", "")
+
+            # Validate GitHub identifiers for security
+            try:
+                validate_github_identifier(owner, "GitHub owner")
+                validate_github_identifier(repo, "GitHub repo")
+            except ValueError as e:
+                msg = f"Invalid GitHub configuration in catalog: {e}"
+                raise InstallationError(msg, target=app_name)
+
             characteristic_suffix = (
                 app_config.get("appimage", {})
                 .get("naming", {})
@@ -207,6 +217,15 @@ class InstallHandler:
             repo = url_info["repo"]
             app_name = url_info.get("app_name") or repo
             prerelease = url_info.get("prerelease", False)
+
+            # Validate GitHub identifiers for security
+            try:
+                validate_github_identifier(owner, "GitHub owner")
+                validate_github_identifier(repo, "GitHub repo")
+            except ValueError as e:
+                msg = f"Invalid GitHub URL: {e}"
+                raise InstallationError(msg, target=github_url)
+
             logger.debug(
                 "Parsed GitHub URL: owner=%s, repo=%s, app_name=%s",
                 owner,
