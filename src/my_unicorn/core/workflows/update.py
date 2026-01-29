@@ -14,7 +14,7 @@ import aiohttp
 from packaging.version import InvalidVersion, Version
 
 from my_unicorn.config import ConfigManager
-from my_unicorn.config.migration.helpers import get_apps_needing_migration
+from my_unicorn.config.migration.helpers import warn_about_migration
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.backup import BackupService
 from my_unicorn.core.download import DownloadService
@@ -355,29 +355,6 @@ class UpdateManager:
                 error_reason=f"Unexpected error: {e}",
             )
 
-    def _warn_about_migration(self) -> None:
-        """Check and warn about apps needing migration."""
-        apps_dir = self.config_manager.apps_dir
-        apps_needing_migration = get_apps_needing_migration(apps_dir)
-
-        if not apps_needing_migration:
-            return
-
-        logger.warning(
-            "Found %d app(s) with old config format. "
-            "Run 'my-unicorn migrate' to upgrade.",
-            len(apps_needing_migration),
-        )
-        logger.info(
-            "⚠️  Found %d app(s) with old config format.",
-            len(apps_needing_migration),
-        )
-        logger.info("   Run 'my-unicorn migrate' to upgrade these apps:")
-        for app_name, version in apps_needing_migration[:5]:
-            logger.info("   - %s (v%s)", app_name, version)
-        if len(apps_needing_migration) > 5:
-            logger.info("   ... and %d more", len(apps_needing_migration) - 5)
-
     async def check_updates(
         self,
         app_names: list[str] | None = None,
@@ -395,7 +372,7 @@ class UpdateManager:
             List of UpdateInfo objects
 
         """
-        self._warn_about_migration()
+        warn_about_migration(self.config_manager)
 
         if app_names is None:
             app_names = self.config_manager.list_installed_apps()

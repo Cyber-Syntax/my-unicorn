@@ -13,6 +13,9 @@ from packaging.version import InvalidVersion, Version
 from my_unicorn.constants import APP_CONFIG_VERSION
 from my_unicorn.logger import get_logger
 
+# Maximum number of apps to list in migration warning
+MAX_APPS_TO_LIST = 5
+
 logger = get_logger(__name__)
 
 
@@ -156,3 +159,34 @@ def get_apps_needing_migration(apps_dir: Path) -> list[tuple[str, str]]:
             apps_to_migrate.append((app_name, current_version))
 
     return apps_to_migrate
+
+
+def warn_about_migration(config_manager: Any) -> None:
+    """Check and warn about apps needing migration.
+
+    Args:
+        config_manager: ConfigManager instance with apps_dir attribute.
+            Using Any to avoid circular import.
+
+    """
+    apps_dir = config_manager.apps_dir
+    apps_needing_migration = get_apps_needing_migration(apps_dir)
+
+    if not apps_needing_migration:
+        return
+
+    logger.warning(
+        "Found %d app(s) with old config format. "
+        "Run 'my-unicorn migrate' to upgrade.",
+        len(apps_needing_migration),
+    )
+    logger.info(
+        "⚠️  Found %d app(s) with old config format.",
+        len(apps_needing_migration),
+    )
+    logger.info("   Run 'my-unicorn migrate' to upgrade these apps:")
+    for app_name, version in apps_needing_migration[:MAX_APPS_TO_LIST]:
+        logger.info("   - %s (v%s)", app_name, version)
+    if len(apps_needing_migration) > MAX_APPS_TO_LIST:
+        remaining = len(apps_needing_migration) - MAX_APPS_TO_LIST
+        logger.info("   ... and %d more", remaining)
