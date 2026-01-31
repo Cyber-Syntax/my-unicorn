@@ -50,7 +50,14 @@ logger = get_logger(__name__)
 
 
 class InstallHandler:
-    """Handles installation orchestration."""
+    """Handles installation orchestration.
+
+    Thread Safety:
+        - Safe for concurrent access across multiple asyncio tasks
+        - Each install operation should use a separate InstallHandler instance
+          for isolated progress tracking
+        - Download service manages its own progress state
+    """
 
     def __init__(
         self,
@@ -123,7 +130,14 @@ class InstallHandler:
             **options: Install options (verify_downloads, etc.)
 
         Returns:
-            Installation result dictionary
+            Installation result dictionary with 'success' key and error details
+            if installation failed
+
+        Raises:
+            InstallationError: If app configuration is invalid or installation
+                workflow fails
+            ValueError: If no AppImage asset found in release
+            aiohttp.ClientError: If GitHub API request fails
 
         """
         logger.debug("Starting catalog install: app=%s", app_name)
@@ -191,7 +205,14 @@ class InstallHandler:
             **options: Install options
 
         Returns:
-            Installation result dictionary
+            Installation result dictionary with 'success' key and error details
+            if installation failed
+
+        Raises:
+            InstallationError: If URL is invalid or installation workflow fails
+            ValueError: If no AppImage asset found in release or URL parsing
+                fails
+            aiohttp.ClientError: If GitHub API request fails
 
         """
         logger.debug("Starting URL install: url=%s", github_url)
@@ -288,10 +309,16 @@ class InstallHandler:
         Args:
             catalog_apps: List of catalog app names
             url_apps: List of GitHub URLs
-            **options: Install options
+            **options: Install options (concurrent, verify_downloads, etc.)
 
         Returns:
-            List of installation results
+            List of installation results, one per app. Each result contains
+            'success' key and error details if installation failed.
+
+        Note:
+            This method catches all exceptions to ensure partial success.
+            Individual failures are returned as error results rather than
+            raising exceptions.
 
         """
         concurrent = options.get("concurrent", 3)
@@ -594,10 +621,16 @@ class InstallHandler:
             release: Release information
             app_config: App configuration
             source: Install source (InstallSource.CATALOG or InstallSource.URL)
-            **options: Install options
+            **options: Install options (verify_downloads, download_dir)
 
         Returns:
-            Installation result dictionary
+            Installation result dictionary with verification, icon, config,
+            and desktop entry results
+
+        Raises:
+            InstallationError: If verification fails or installation step fails
+            OSError: If file operations fail (permissions, disk space)
+            aiohttp.ClientError: If download fails
 
         """
         # Get options
@@ -696,7 +729,20 @@ class InstallHandler:
             raise
 
     async def _fetch_release(self, owner: str, repo: str) -> Release:
-        """Fetch release data from GitHub."""
+        """Fetch release data from GitHub.
+
+        Args:
+            owner: GitHub repository owner
+            repo: GitHub repository name
+
+        Returns:
+            Release object with assets
+
+        Raises:
+            InstallationError: If no release found for repository
+            aiohttp.ClientError: If GitHub API request fails
+
+        """
         try:
             release = await self.github_client.get_latest_release(owner, repo)
             if not release:

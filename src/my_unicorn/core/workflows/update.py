@@ -101,6 +101,13 @@ class UpdateManager:
         - Catalog cache is protected by asyncio.Lock for concurrent reads/writes
         - Each update operation should use a separate UpdateManager instance
           for isolated progress tracking
+        - Shared verification service is initialized per-session and is
+          thread-safe
+
+    In-Memory Caching:
+        - Catalog entries are cached in _catalog_cache during an update session
+        - Cache is cleared when UpdateManager instance is destroyed
+        - Cache reduces redundant file I/O for multiple apps from same catalog
     """
 
     def __init__(
@@ -305,7 +312,13 @@ class UpdateManager:
             refresh_cache: If True, bypass cache and fetch fresh data from API
 
         Returns:
-            UpdateInfo object with error_reason set if check failed
+            UpdateInfo object with error_reason set if check failed.
+            Never raises - all errors are captured in UpdateInfo.error_reason.
+
+        Note:
+            This method catches all exceptions and returns them as error
+            reasons in the UpdateInfo object. It never raises exceptions to
+            ensure partial success in batch update checks.
 
         """
         try:
@@ -395,7 +408,13 @@ class UpdateManager:
                 API
 
         Returns:
-            List of UpdateInfo objects
+            List of UpdateInfo objects, one per app. Errors are captured in
+            individual UpdateInfo.error_reason fields rather than raising.
+
+        Note:
+            This method catches all exceptions per-app to ensure partial
+            success. Individual app failures are returned as UpdateInfo
+            objects with error_reason set.
 
         """
         warn_about_migration(self.config_manager)
@@ -650,6 +669,14 @@ class UpdateManager:
         Returns:
             Tuple of (success status, error reason or None)
 
+        Raises:
+            ConfigurationError: If app configuration is invalid or missing
+                required fields
+            ValueError: If catalog reference is invalid or AppImage asset
+                not found
+            OSError: If file operations fail (backup, download, move)
+            aiohttp.ClientError: If GitHub API or download requests fail
+
         """
         try:
             # Prepare update context
@@ -760,6 +787,10 @@ class UpdateManager:
         Returns:
             Catalog entry dict or None if not found
 
+        Raises:
+            FileNotFoundError: If catalog file not found
+            ValueError: If catalog JSON is invalid or malformed
+
         Performance:
             - First load: ~1-2ms (file I/O + JSON parse + validation)
             - Cached load: ~0.01ms (dict lookup)
@@ -864,6 +895,11 @@ class UpdateManager:
             Tuple of (success status dict, error reasons dict)
             - success status dict: maps app names to True/False
             - error reasons dict: maps failed app names to error messages
+
+        Note:
+            This method catches all exceptions per-app to ensure partial
+            success. Individual app failures are captured in the error_reasons
+            dict rather than propagating exceptions.
 
         """
         # Set shared API task ID for progress tracking
