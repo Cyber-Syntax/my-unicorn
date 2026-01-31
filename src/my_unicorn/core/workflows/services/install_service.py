@@ -15,6 +15,8 @@ from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import GitHubClient
 from my_unicorn.core.workflows.install import InstallHandler
+from my_unicorn.core.workflows.install_state_checker import InstallStateChecker
+from my_unicorn.core.workflows.target_resolver import TargetResolver
 from my_unicorn.logger import get_logger
 from my_unicorn.ui.progress import (
     ProgressDisplay,
@@ -120,7 +122,7 @@ class InstallApplicationService:
         logger.info("🚀 Starting installation of %d target(s)", len(targets))
 
         # Separate targets into URLs and catalog apps
-        url_targets, catalog_targets = InstallHandler.separate_targets_impl(
+        url_targets, catalog_targets = TargetResolver.separate_targets(
             self.config, targets
         )
 
@@ -133,13 +135,16 @@ class InstallApplicationService:
         }
 
         # Preflight checks
-        (
-            urls_needing_work,
-            catalog_needing_work,
-            already_installed,
-        ) = await InstallHandler.check_apps_needing_work_impl(
-            self.config, url_targets, catalog_targets, install_opts
+        checker = InstallStateChecker()
+        plan = await checker.get_apps_needing_installation(
+            self.config,
+            url_targets,
+            catalog_targets,
+            install_opts.get("force", False),
         )
+        urls_needing_work = plan.urls_needing_work
+        catalog_needing_work = plan.catalog_needing_work
+        already_installed = plan.already_installed
 
         # Handle all already installed case
         if (

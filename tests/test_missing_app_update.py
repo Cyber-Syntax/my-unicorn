@@ -70,8 +70,13 @@ class TestMissingAppImageUpdate:
         GitHub Actions is still building the AppImages.
         """
         mock_app_config = {
-            "owner": "AppFlowy-IO",
-            "repo": "AppFlowy",
+            "config_version": "2.0.0",
+            "source": {
+                "owner": "AppFlowy-IO",
+                "repo": "AppFlowy",
+                "prerelease": False,
+            },
+            "state": {"version": "0.10.1"},
             "appimage": {"name": "appflowy.AppImage"},
         }
         mock_config_manager.load_app_config.return_value = mock_app_config

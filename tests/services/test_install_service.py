@@ -149,17 +149,34 @@ class TestInstallApplicationService:
     @pytest.mark.asyncio
     async def test_install_successful(self, install_service):
         """Test successful installation workflow."""
-        # Mock separate_targets_impl
+        # Mock TargetResolver.separate_targets
         with patch(
-            "my_unicorn.core.workflows.install.InstallHandler.separate_targets_impl"
+            "my_unicorn.core.workflows.services.install_service.TargetResolver.separate_targets"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1"])
 
-            # Mock check_apps_needing_work_impl
+            # Mock InstallStateChecker
             with patch(
-                "my_unicorn.core.workflows.install.InstallHandler.check_apps_needing_work_impl"
-            ) as mock_check:
-                mock_check.return_value = ([], ["app1"], [])
+                "my_unicorn.core.workflows.services.install_service.InstallStateChecker"
+            ) as mock_checker_cls:
+                # Create a mock plan object
+                from dataclasses import dataclass
+
+                @dataclass
+                class MockPlan:
+                    urls_needing_work: list[str]
+                    catalog_needing_work: list[str]
+                    already_installed: list[str]
+
+                mock_checker = AsyncMock()
+                mock_checker_cls.return_value = mock_checker
+                mock_checker.get_apps_needing_installation.return_value = (
+                    MockPlan(
+                        urls_needing_work=[],
+                        catalog_needing_work=["app1"],
+                        already_installed=[],
+                    )
+                )
 
                 # Mock install_handler.install_multiple
                 install_service._install_handler = AsyncMock()
@@ -184,17 +201,33 @@ class TestInstallApplicationService:
     @pytest.mark.asyncio
     async def test_install_already_installed(self, install_service):
         """Test installation when app is already installed."""
-        # Mock separate_targets_impl
+        # Mock TargetResolver.separate_targets
         with patch(
-            "my_unicorn.core.workflows.install.InstallHandler.separate_targets_impl"
+            "my_unicorn.core.workflows.services.install_service.TargetResolver.separate_targets"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1"])
 
-            # Mock check_apps_needing_work_impl - app already installed
+            # Mock InstallStateChecker
             with patch(
-                "my_unicorn.core.workflows.install.InstallHandler.check_apps_needing_work_impl"
-            ) as mock_check:
-                mock_check.return_value = ([], [], ["app1"])
+                "my_unicorn.core.workflows.services.install_service.InstallStateChecker"
+            ) as mock_checker_cls:
+                from dataclasses import dataclass
+
+                @dataclass
+                class MockPlan:
+                    urls_needing_work: list[str]
+                    catalog_needing_work: list[str]
+                    already_installed: list[str]
+
+                mock_checker = AsyncMock()
+                mock_checker_cls.return_value = mock_checker
+                mock_checker.get_apps_needing_installation.return_value = (
+                    MockPlan(
+                        urls_needing_work=[],
+                        catalog_needing_work=[],
+                        already_installed=["app1"],
+                    )
+                )
 
                 options = InstallOptions()
                 results = await install_service.install(["app1"], options)
@@ -207,18 +240,33 @@ class TestInstallApplicationService:
     @pytest.mark.asyncio
     async def test_install_mixed_already_and_new(self, install_service):
         """Test installation with mix of already installed and new apps."""
-        # Mock separate_targets_impl
+        # Mock TargetResolver.separate_targets
         with patch(
-            "my_unicorn.core.workflows.install.InstallHandler.separate_targets_impl"
+            "my_unicorn.core.workflows.services.install_service.TargetResolver.separate_targets"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1", "app2"])
 
-            # Mock check_apps_needing_work_impl
+            # Mock InstallStateChecker
             with patch(
-                "my_unicorn.core.workflows.install.InstallHandler.check_apps_needing_work_impl"
-            ) as mock_check:
-                # app1 needs work, app2 already installed
-                mock_check.return_value = ([], ["app1"], ["app2"])
+                "my_unicorn.core.workflows.services.install_service.InstallStateChecker"
+            ) as mock_checker_cls:
+                from dataclasses import dataclass
+
+                @dataclass
+                class MockPlan:
+                    urls_needing_work: list[str]
+                    catalog_needing_work: list[str]
+                    already_installed: list[str]
+
+                mock_checker = AsyncMock()
+                mock_checker_cls.return_value = mock_checker
+                mock_checker.get_apps_needing_installation.return_value = (
+                    MockPlan(
+                        urls_needing_work=[],
+                        catalog_needing_work=["app1"],
+                        already_installed=["app2"],
+                    )
+                )
 
                 # Mock install_handler.install_multiple
                 install_service._install_handler = AsyncMock()
@@ -250,9 +298,9 @@ class TestInstallApplicationService:
     @pytest.mark.asyncio
     async def test_install_with_url_targets(self, install_service):
         """Test installation with URL targets."""
-        # Mock separate_targets_impl
+        # Mock TargetResolver.separate_targets
         with patch(
-            "my_unicorn.core.workflows.install.InstallHandler.separate_targets_impl"
+            "my_unicorn.core.workflows.services.install_service.TargetResolver.separate_targets"
         ) as mock_separate:
             mock_separate.return_value = (
                 [
@@ -261,16 +309,45 @@ class TestInstallApplicationService:
                 [],
             )
 
-            # Mock check_apps_needing_work_impl
+            # Mock InstallStateChecker
             with patch(
-                "my_unicorn.core.workflows.install.InstallHandler.check_apps_needing_work_impl"
-            ) as mock_check:
-                mock_check.return_value = (
+                "my_unicorn.core.workflows.services.install_service.InstallStateChecker"
+            ) as mock_checker_cls:
+                from dataclasses import dataclass
+
+                @dataclass
+                class MockPlan:
+                    urls_needing_work: list[str]
+                    catalog_needing_work: list[str]
+                    already_installed: list[str]
+
+                mock_checker = AsyncMock()
+                mock_checker_cls.return_value = mock_checker
+                values = (
                     [
                         "https://github.com/test/app/releases/download/v1/app.AppImage"
                     ],
                     [],
                     [],
+                )
+                mock_checker.get_apps_needing_installation.return_value = (
+                    MockPlan(
+                        urls_needing_work=values[0]
+                        if isinstance(values[0], list)
+                        else [values[0]]
+                        if values[0]
+                        else [],
+                        catalog_needing_work=values[1]
+                        if isinstance(values[1], list)
+                        else [values[1]]
+                        if values[1]
+                        else [],
+                        already_installed=values[2]
+                        if isinstance(values[2], list)
+                        else [values[2]]
+                        if values[2]
+                        else [],
+                    )
                 )
 
                 # Mock install_handler.install_multiple
@@ -301,17 +378,46 @@ class TestInstallApplicationService:
     @pytest.mark.asyncio
     async def test_install_with_progress_session(self, install_service):
         """Test that progress session is properly managed."""
-        # Mock separate_targets_impl
+        # Mock TargetResolver.separate_targets
         with patch(
-            "my_unicorn.core.workflows.install.InstallHandler.separate_targets_impl"
+            "my_unicorn.core.workflows.services.install_service.TargetResolver.separate_targets"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1"])
 
-            # Mock check_apps_needing_work_impl
+            # Mock InstallStateChecker
             with patch(
-                "my_unicorn.core.workflows.install.InstallHandler.check_apps_needing_work_impl"
-            ) as mock_check:
-                mock_check.return_value = ([], ["app1"], [])
+                "my_unicorn.core.workflows.services.install_service.InstallStateChecker"
+            ) as mock_checker_cls:
+                from dataclasses import dataclass
+
+                @dataclass
+                class MockPlan:
+                    urls_needing_work: list[str]
+                    catalog_needing_work: list[str]
+                    already_installed: list[str]
+
+                mock_checker = AsyncMock()
+                mock_checker_cls.return_value = mock_checker
+                values = ([], ["app1"], [])
+                mock_checker.get_apps_needing_installation.return_value = (
+                    MockPlan(
+                        urls_needing_work=values[0]
+                        if isinstance(values[0], list)
+                        else [values[0]]
+                        if values[0]
+                        else [],
+                        catalog_needing_work=values[1]
+                        if isinstance(values[1], list)
+                        else [values[1]]
+                        if values[1]
+                        else [],
+                        already_installed=values[2]
+                        if isinstance(values[2], list)
+                        else [values[2]]
+                        if values[2]
+                        else [],
+                    )
+                )
 
                 # Mock install_handler.install_multiple
                 install_service._install_handler = AsyncMock()
@@ -337,17 +443,46 @@ class TestInstallApplicationService:
     @pytest.mark.asyncio
     async def test_install_sets_shared_api_task(self, install_service):
         """Test that shared API task is set on GitHub client."""
-        # Mock separate_targets_impl
+        # Mock TargetResolver.separate_targets
         with patch(
-            "my_unicorn.core.workflows.install.InstallHandler.separate_targets_impl"
+            "my_unicorn.core.workflows.services.install_service.TargetResolver.separate_targets"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1"])
 
-            # Mock check_apps_needing_work_impl
+            # Mock InstallStateChecker
             with patch(
-                "my_unicorn.core.workflows.install.InstallHandler.check_apps_needing_work_impl"
-            ) as mock_check:
-                mock_check.return_value = ([], ["app1"], [])
+                "my_unicorn.core.workflows.services.install_service.InstallStateChecker"
+            ) as mock_checker_cls:
+                from dataclasses import dataclass
+
+                @dataclass
+                class MockPlan:
+                    urls_needing_work: list[str]
+                    catalog_needing_work: list[str]
+                    already_installed: list[str]
+
+                mock_checker = AsyncMock()
+                mock_checker_cls.return_value = mock_checker
+                values = ([], ["app1"], [])
+                mock_checker.get_apps_needing_installation.return_value = (
+                    MockPlan(
+                        urls_needing_work=values[0]
+                        if isinstance(values[0], list)
+                        else [values[0]]
+                        if values[0]
+                        else [],
+                        catalog_needing_work=values[1]
+                        if isinstance(values[1], list)
+                        else [values[1]]
+                        if values[1]
+                        else [],
+                        already_installed=values[2]
+                        if isinstance(values[2], list)
+                        else [values[2]]
+                        if values[2]
+                        else [],
+                    )
+                )
 
                 # Mock install_handler.install_multiple
                 install_service._install_handler = AsyncMock()

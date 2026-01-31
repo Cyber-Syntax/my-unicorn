@@ -7,6 +7,8 @@ import pytest
 
 from my_unicorn.core.github import Asset, Release
 from my_unicorn.core.workflows.install import InstallHandler
+from my_unicorn.core.workflows.install_state_checker import InstallStateChecker
+from my_unicorn.core.workflows.target_resolver import TargetResolver
 
 
 class TestInstallHandler:
@@ -270,7 +272,7 @@ class TestInstallHandler:
             "app2",
         ]
 
-        url_targets, catalog_targets = InstallHandler.separate_targets_impl(
+        url_targets, catalog_targets = TargetResolver.separate_targets(
             install_service.config_manager,
             ["app1", "https://github.com/foo/bar"],
         )
@@ -281,7 +283,7 @@ class TestInstallHandler:
         from my_unicorn.exceptions import InstallationError
 
         with pytest.raises(InstallationError):
-            InstallHandler.separate_targets_impl(
+            TargetResolver.separate_targets(
                 install_service.config_manager, ["missing-app"]
             )
 
@@ -306,31 +308,29 @@ class TestInstallHandler:
             "installed_path": str(installed_file),
         }
 
-        (
-            urls_needing,
-            catalog_needing,
-            already,
-        ) = await InstallHandler.check_apps_needing_work_impl(
+        checker = InstallStateChecker()
+        plan = await checker.get_apps_needing_installation(
             install_service.config_manager,
             ["https://github.com/owner/repo"],
             ["app1"],
-            {"force": False},
+            False,
         )
+        urls_needing = plan.urls_needing_work
+        catalog_needing = plan.catalog_needing_work
+        already = plan.already_installed
 
         assert urls_needing == ["https://github.com/owner/repo"]
         assert catalog_needing == []
         assert already == ["app1"]
 
         # If force=True, then even existing installs should be reinstalled
-        (
-            urls_needing,
-            catalog_needing,
-            already,
-        ) = await InstallHandler.check_apps_needing_work_impl(
+        plan = await checker.get_apps_needing_installation(
             install_service.config_manager,
             [],
             ["app1"],
-            {"force": True},
+            True,
         )
+        catalog_needing = plan.catalog_needing_work
+        already = plan.already_installed
         assert catalog_needing == ["app1"]
         assert already == []

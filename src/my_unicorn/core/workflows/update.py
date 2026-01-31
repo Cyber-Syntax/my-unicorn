@@ -13,7 +13,6 @@ import aiohttp
 
 from my_unicorn.config import ConfigManager
 from my_unicorn.config.migration.helpers import warn_about_migration
-from my_unicorn.config.validation import ConfigurationValidator
 from my_unicorn.constants import (
     ERROR_CATALOG_MISSING,
     ERROR_CONFIGURATION_GENERIC,
@@ -25,12 +24,7 @@ from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.backup import BackupService
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
-from my_unicorn.core.github import (
-    Asset,
-    Release,
-    ReleaseFetcher,
-    extract_github_config,
-)
+from my_unicorn.core.github import Release, ReleaseFetcher, get_github_config
 from my_unicorn.core.verification import VerificationService
 from my_unicorn.exceptions import ConfigurationError
 from my_unicorn.logger import get_logger
@@ -71,6 +65,20 @@ class UpdateInfo:
             and self.latest_version != VERSION_UNKNOWN
         ):
             self.original_tag_name = f"v{self.latest_version}"
+
+    @classmethod
+    def create_error(cls, app_name: str, reason: str) -> "UpdateInfo":
+        """Create an UpdateInfo representing an error condition.
+
+        Args:
+            app_name: Name of the application
+            reason: Error reason/message
+
+        Returns:
+            UpdateInfo with error_reason set
+
+        """
+        return cls(app_name=app_name, error_reason=reason)
 
     @property
     def is_success(self) -> bool:
@@ -278,9 +286,9 @@ class UpdateManager:
         current_version = app_config.get("state", {}).get(
             "version", VERSION_UNKNOWN
         )
-        source_config = app_config.get("source", {})
-        owner = source_config.get("owner", VERSION_UNKNOWN)
-        repo = source_config.get("repo", VERSION_UNKNOWN)
+        github_config = get_github_config(app_config)
+        owner = github_config.owner
+        repo = github_config.repo
 
         latest_version = release_data.version
         has_update = compare_versions(current_version, latest_version)
@@ -327,19 +335,15 @@ class UpdateManager:
                 app_name
             )
             if app_config is None:
-                return UpdateInfo(
-                    app_name=app_name,
-                    error_reason=error_msg or ERROR_CONFIGURATION_GENERIC,
+                return UpdateInfo.create_error(
+                    app_name, error_msg or ERROR_CONFIGURATION_GENERIC
                 )
 
             # Extract config values
-            current_version = app_config.get("state", {}).get(
-                "version", VERSION_UNKNOWN
-            )
-            source_config = app_config.get("source", {})
-            owner = source_config.get("owner", VERSION_UNKNOWN)
-            repo = source_config.get("repo", VERSION_UNKNOWN)
-            should_use_prerelease = source_config.get("prerelease", False)
+            github_config = get_github_config(app_config)
+            owner = github_config.owner
+            repo = github_config.repo
+            should_use_prerelease = github_config.prerelease
 
             logger.debug(
                 "Checking updates for %s (%s/%s)", app_name, owner, repo
@@ -373,25 +377,18 @@ class UpdateManager:
                     e.status,
                     e.message,
                 )
-            return UpdateInfo(
-                app_name=app_name,
-                error_reason=error_msg,
-            )
+            return UpdateInfo.create_error(app_name, error_msg)
 
         except ValueError as e:
             # Handle specific ValueError cases (no releases, parsing errors)
             logger.exception("Failed to check updates for %s", app_name)
-            return UpdateInfo(
-                app_name=app_name,
-                error_reason=str(e),
-            )
+            return UpdateInfo.create_error(app_name, str(e))
 
         except Exception as e:
             # Catch-all for unexpected errors
             logger.exception("Failed to check updates for %s", app_name)
-            return UpdateInfo(
-                app_name=app_name,
-                error_reason=ERROR_UNEXPECTED.format(error=e),
+            return UpdateInfo.create_error(
+                app_name, ERROR_UNEXPECTED.format(error=e)
             )
 
     async def check_updates(
@@ -437,9 +434,8 @@ class UpdateManager:
                     )
                 except Exception as e:
                     logger.exception("Update check failed for %s", app_name)
-                    return UpdateInfo(
-                        app_name=app_name,
-                        error_reason=f"Exception during check: {e}",
+                    return UpdateInfo.create_error(
+                        app_name, f"Exception during check: {e}"
                     )
 
             tasks = [check_single(app) for app in app_names]
@@ -451,38 +447,14 @@ class UpdateManager:
             if isinstance(result, Exception):
                 logger.error("Update check failed: %s", result)
                 update_infos.append(
-                    UpdateInfo(
-                        app_name=app_names[i],
-                        error_reason=f"Critical error: {result}",
+                    UpdateInfo.create_error(
+                        app_names[i], f"Critical error: {result}"
                     )
                 )
             elif isinstance(result, UpdateInfo):
                 update_infos.append(result)
 
         return update_infos
-
-    async def _validate_update_config(
-        self, owner: str, repo: str
-    ) -> str | None:
-        """Validate GitHub identifiers for security.
-
-        Args:
-            owner: GitHub owner
-            repo: GitHub repository
-
-        Returns:
-            Error message or None if valid
-
-        """
-        try:
-            # Create a minimal config structure for validation
-            config = {"source": {"owner": owner, "repo": repo}}
-            ConfigurationValidator.validate_app_config(config)
-            return None
-        except ValueError as e:
-            msg = f"Invalid GitHub configuration: {e}"
-            logger.error(msg)
-            return msg
 
     async def _load_catalog_if_needed(
         self, app_name: str, catalog_ref: str | None
@@ -510,38 +482,6 @@ class UpdateManager:
                 app_name=app_name, catalog_ref=catalog_ref
             )
             raise ValueError(msg) from e
-
-    async def _select_update_asset(
-        self,
-        app_name: str,
-        release_data: Release,
-        catalog_entry: dict[str, Any] | None,
-    ) -> tuple[Asset | None, str | None]:
-        """Select best AppImage asset for update.
-
-        Args:
-            app_name: Name of the app
-            release_data: Release data from GitHub
-            catalog_entry: Catalog entry or None
-
-        Returns:
-            Tuple of (asset, error message). Asset is None on error.
-
-        """
-        catalog_dict = dict(catalog_entry) if catalog_entry else None
-        appimage_asset = select_best_appimage_asset(
-            release_data,
-            catalog_entry=catalog_dict,
-            installation_source="url",
-            raise_on_not_found=False,
-        )
-        if not appimage_asset:
-            logger.error("No AppImage found for %s", app_name)
-            return (
-                None,
-                "AppImage not found in release - may still be building",
-            )
-        return appimage_asset, None
 
     async def _prepare_update_context(
         self,
@@ -596,16 +536,10 @@ class UpdateManager:
                 logger.error("Config error: %s", e)
                 return None, str(e)
 
-        owner, repo, _ = extract_github_config(app_config)
-
-        # Validate GitHub identifiers for security
-        try:
-            config = {"source": {"owner": owner, "repo": repo}}
-            ConfigurationValidator.validate_app_config(config)
-        except ValueError as e:
-            msg = f"Invalid GitHub configuration: {e}"
-            logger.error(msg)
-            return None, msg
+        # Extract and validate GitHub configuration
+        github_config = get_github_config(app_config)
+        owner = github_config.owner
+        repo = github_config.repo
 
         # Load catalog entry if referenced
         catalog_ref = app_config.get("catalog_ref")

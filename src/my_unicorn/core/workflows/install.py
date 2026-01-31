@@ -11,10 +11,7 @@ from typing import Any
 import aiohttp
 
 from my_unicorn.config import ConfigManager
-from my_unicorn.config.validation import ConfigurationValidator
 from my_unicorn.constants import (
-    ERROR_INVALID_GITHUB_CONFIG,
-    ERROR_INVALID_GITHUB_URL,
     ERROR_NO_APPIMAGE_ASSET,
     ERROR_NO_RELEASE_FOUND,
     ERROR_VERIFICATION_FAILED,
@@ -26,6 +23,7 @@ from my_unicorn.core.github import (
     Asset,
     GitHubClient,
     Release,
+    get_github_config,
     parse_github_url,
 )
 from my_unicorn.core.verification import VerificationService
@@ -34,8 +32,6 @@ from my_unicorn.core.workflows.appimage_setup import (
     rename_appimage,
     setup_appimage_icon,
 )
-from my_unicorn.core.workflows.install_state_checker import InstallStateChecker
-from my_unicorn.core.workflows.target_resolver import TargetResolver
 from my_unicorn.exceptions import InstallationError
 from my_unicorn.logger import get_logger
 from my_unicorn.ui.display import ProgressDisplay
@@ -146,17 +142,10 @@ class InstallHandler:
             # Get app configuration (v2 format from catalog)
             app_config = self.config_manager.load_catalog(app_name)
 
-            # Extract source info from v2 config
-            source_config = app_config.get("source", {})
-            owner = source_config.get("owner", "")
-            repo = source_config.get("repo", "")
-
-            # Validate GitHub identifiers for security
-            try:
-                ConfigurationValidator.validate_app_config(app_config)
-            except ValueError as e:
-                msg = ERROR_INVALID_GITHUB_CONFIG.format(error=e)
-                raise InstallationError(msg, target=app_name)
+            # Extract and validate GitHub configuration
+            github_config = get_github_config(app_config)
+            owner = github_config.owner
+            repo = github_config.repo
 
             characteristic_suffix = (
                 app_config.get("appimage", {})
@@ -226,12 +215,8 @@ class InstallHandler:
             prerelease = url_info.get("prerelease", False)
 
             # Validate GitHub identifiers for security
-            try:
-                config = {"source": {"owner": owner, "repo": repo}}
-                ConfigurationValidator.validate_app_config(config)
-            except ValueError as e:
-                msg = ERROR_INVALID_GITHUB_URL.format(error=e)
-                raise InstallationError(msg, target=github_url)
+            config = {"source": {"owner": owner, "repo": repo}}
+            get_github_config(config)  # Validates identifiers
 
             logger.debug(
                 "Parsed GitHub URL: owner=%s, repo=%s, app_name=%s",
@@ -285,7 +270,7 @@ class InstallHandler:
             # Install workflow
             return await self._install_workflow(
                 app_name=app_name,
-                asset=asset,  # type: ignore[arg-type]
+                asset=asset,
                 release=release,
                 app_config=app_config,
                 source=InstallSource.URL,
@@ -364,59 +349,6 @@ class InstallHandler:
             tasks.append(install_one(url, is_url=True))
 
         return await asyncio.gather(*tasks)
-
-    @staticmethod
-    def separate_targets_impl(
-        config_manager: ConfigManager, targets: list[str]
-    ) -> tuple[list[str], list[str]]:
-        """Separate targets into URL and catalog targets.
-
-        This method delegates to TargetResolver for backward compatibility.
-
-        Args:
-            config_manager: Configuration manager instance
-            targets: List of mixed targets (URLs or catalog names)
-
-        Returns:
-            (url_targets, catalog_targets)
-
-        Raises:
-            InstallationError: If unknown targets are present
-
-        """
-        return TargetResolver.separate_targets(config_manager, targets)
-
-    @staticmethod
-    async def check_apps_needing_work_impl(
-        config_manager: ConfigManager,
-        url_targets: list[str],
-        catalog_targets: list[str],
-        install_options: dict[str, Any],
-    ) -> tuple[list[str], list[str], list[str]]:
-        """Check which apps actually need installation work.
-
-        This method delegates to InstallStateChecker for backward compatibility.
-
-        Args:
-            config_manager: Configuration manager instance
-            url_targets: List of URL targets
-            catalog_targets: List of catalog targets
-            install_options: Installation options
-
-        Returns:
-            (urls_needing_work, catalog_needing_work, already_installed)
-
-        """
-        checker = InstallStateChecker()
-        force = install_options.get("force", False)
-        plan = await checker.get_apps_needing_installation(
-            config_manager, url_targets, catalog_targets, force
-        )
-        return (
-            plan.urls_needing_work,
-            plan.catalog_needing_work,
-            plan.already_installed,
-        )
 
     async def _setup_progress_tracking(
         self,
@@ -748,7 +680,7 @@ class InstallHandler:
             if not release:
                 msg = ERROR_NO_RELEASE_FOUND.format(owner=owner, repo=repo)
                 raise InstallationError(msg)
-            return release  # type: ignore[return-value]
+            return release
         except Exception as error:
             logger.error(
                 "Failed to fetch release for %s/%s: %s", owner, repo, error
