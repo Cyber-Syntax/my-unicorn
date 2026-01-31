@@ -110,10 +110,6 @@ class InstallHandler:
         """
         logger.debug("Starting catalog install: app=%s", app_name)
 
-        def _raise_no_asset() -> None:
-            msg = "No suitable AppImage asset found"
-            raise ValueError(msg)
-
         try:
             # Get app configuration (v2 format from catalog)
             app_config = self.config_manager.load_catalog(app_name)
@@ -147,7 +143,8 @@ class InstallHandler:
             )
             # Asset is guaranteed non-None (raise_on_not_found=True by default)
             if asset is None:
-                _raise_no_asset()
+                msg = "No suitable AppImage asset found"
+                raise ValueError(msg)
 
             # Install workflow
             return await self._install_workflow(
@@ -207,10 +204,6 @@ class InstallHandler:
         """
         logger.debug("Starting URL install: url=%s", github_url)
 
-        def _raise_no_asset() -> None:
-            msg = "No suitable AppImage asset found"
-            raise ValueError(msg)
-
         try:
             # Parse GitHub URL
             url_info = parse_github_url(github_url)
@@ -243,7 +236,8 @@ class InstallHandler:
             )
             # Asset is guaranteed non-None (raise_on_not_found=True by default)
             if asset is None:
-                _raise_no_asset()
+                msg = "No suitable AppImage asset found"
+                raise ValueError(msg)
 
             # Create v2 format app config template for URL installs
             # Note: verification method will auto-detect checksums
@@ -404,23 +398,6 @@ class InstallHandler:
 
         return url_targets, catalog_targets
 
-    # Backwards compatible instance wrapper
-    def separate_targets(
-        self, targets: list[str]
-    ) -> tuple[list[str], list[str]]:
-        """Separate targets into URL and catalog targets.
-
-        Args:
-            targets: List of mixed targets (URLs or catalog names)
-
-        Returns:
-            (url_targets, catalog_targets)
-
-        """
-        return InstallHandler.separate_targets_impl(
-            self.config_manager, targets
-        )
-
     @staticmethod
     async def check_apps_needing_work_impl(
         config_manager: Any,
@@ -477,28 +454,6 @@ class InstallHandler:
 
         return urls_needing_work, catalog_needing_work, already_installed
 
-    # Backwards compatible instance wrapper
-    async def check_apps_needing_work(
-        self,
-        url_targets: list[str],
-        catalog_targets: list[str],
-        install_options: dict[str, Any],
-    ) -> tuple[list[str], list[str], list[str]]:
-        """Check which apps actually need installation work.
-
-        Args:
-            url_targets: List of URL targets
-            catalog_targets: List of catalog targets
-            install_options: Installation options
-
-        Returns:
-            (urls_needing_work, catalog_needing_work, already_installed)
-
-        """
-        return await InstallHandler.check_apps_needing_work_impl(
-            self.config_manager, url_targets, catalog_targets, install_options
-        )
-
     async def _install_workflow(
         self,
         app_name: str,
@@ -538,10 +493,6 @@ class InstallHandler:
         # in the exception handler that attempts to finish progress tasks.
         verification_task_id = None
         installation_task_id = None
-
-        def _raise_verification_error(error_msg: str) -> None:
-            msg = f"Verification failed: {error_msg}"
-            raise InstallationError(msg)
 
         try:
             # 1. Download
@@ -587,7 +538,8 @@ class InstallHandler:
                 )
                 if not verify_result["passed"]:
                     error_msg = verify_result.get("error", "Unknown error")
-                    _raise_verification_error(error_msg)
+                    msg = f"Verification failed: {error_msg}"
+                    raise InstallationError(msg)
             logger.info("Installing %s", app_name)
             # Move file to install directory first
             moved_path = self.storage_service.move_to_install_dir(
@@ -681,15 +633,11 @@ class InstallHandler:
 
     async def _fetch_release(self, owner: str, repo: str) -> Release:
         """Fetch release data from GitHub."""
-
-        def _raise_no_release() -> None:
-            msg = f"No release found for {owner}/{repo}"
-            raise InstallationError(msg)
-
         try:
             release = await self.github_client.get_latest_release(owner, repo)
             if not release:
-                _raise_no_release()
+                msg = f"No release found for {owner}/{repo}"
+                raise InstallationError(msg)
             return release  # type: ignore[return-value]
         except Exception as error:
             logger.error(

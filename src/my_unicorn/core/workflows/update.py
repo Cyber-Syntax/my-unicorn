@@ -500,15 +500,6 @@ class UpdateManager:
             Tuple of (success status, error reason or None)
 
         """
-
-        def _raise_invalid_update_info() -> None:
-            msg = "update_info from context is guaranteed to be non-None"
-            raise ValueError(msg)
-
-        def _raise_no_release_data() -> None:
-            msg = "release_data must be available"
-            raise ValueError(msg)
-
         try:
             # Prepare update context
             context, error = await self._prepare_update_context(
@@ -571,7 +562,8 @@ class UpdateManager:
             # release_data is guaranteed to exist at this point
             # (checked in _prepare_update_context)
             if update_info.release_data is None:
-                _raise_no_release_data()
+                msg = "release_data must be available"
+                raise ValueError(msg)
             success = await process_post_download(
                 app_name=app_name,
                 app_config=app_config,

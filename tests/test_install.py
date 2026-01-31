@@ -270,8 +270,9 @@ class TestInstallHandler:
             "app2",
         ]
 
-        url_targets, catalog_targets = install_service.separate_targets(
-            ["app1", "https://github.com/foo/bar"]
+        url_targets, catalog_targets = InstallHandler.separate_targets_impl(
+            install_service.config_manager,
+            ["app1", "https://github.com/foo/bar"],
         )
         assert url_targets == ["https://github.com/foo/bar"]
         assert catalog_targets == ["app1"]
@@ -280,7 +281,9 @@ class TestInstallHandler:
         from my_unicorn.exceptions import InstallationError
 
         with pytest.raises(InstallationError):
-            install_service.separate_targets(["missing-app"])
+            InstallHandler.separate_targets_impl(
+                install_service.config_manager, ["missing-app"]
+            )
 
     @pytest.mark.asyncio
     async def test_check_apps_needing_work(
@@ -307,8 +310,11 @@ class TestInstallHandler:
             urls_needing,
             catalog_needing,
             already,
-        ) = await install_service.check_apps_needing_work(
-            ["https://github.com/owner/repo"], ["app1"], {"force": False}
+        ) = await InstallHandler.check_apps_needing_work_impl(
+            install_service.config_manager,
+            ["https://github.com/owner/repo"],
+            ["app1"],
+            {"force": False},
         )
 
         assert urls_needing == ["https://github.com/owner/repo"]
@@ -320,8 +326,11 @@ class TestInstallHandler:
             urls_needing,
             catalog_needing,
             already,
-        ) = await install_service.check_apps_needing_work(
-            [], ["app1"], {"force": True}
+        ) = await InstallHandler.check_apps_needing_work_impl(
+            install_service.config_manager,
+            [],
+            ["app1"],
+            {"force": True},
         )
         assert catalog_needing == ["app1"]
         assert already == []
