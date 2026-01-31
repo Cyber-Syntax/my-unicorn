@@ -5,7 +5,6 @@ template method pattern with a simpler, more maintainable approach.
 """
 
 import asyncio
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +28,8 @@ from my_unicorn.utils.appimage_utils import (
     select_best_appimage_asset,
     verify_appimage_download,
 )
+from my_unicorn.utils.config_builders import create_app_config_v2
+from my_unicorn.utils.error_formatters import build_install_error_result
 from my_unicorn.utils.validation import validate_github_identifier
 
 logger = get_logger(__name__)
@@ -332,7 +333,7 @@ class InstallHandler:
                     logger.error(
                         "Installation error for %s: %s", app_or_url, error
                     )
-                    return self._build_install_error_result(
+                    return build_install_error_result(
                         error, app_or_url, is_url
                     )
                 except Exception as error:
@@ -357,56 +358,6 @@ class InstallHandler:
         return await asyncio.gather(*tasks)
 
     @staticmethod
-    def _get_user_friendly_error(error: InstallationError) -> str:
-        """Convert InstallationError to user-friendly message.
-
-        Args:
-            error: Installation error to convert
-
-        Returns:
-            User-friendly error message
-
-        """
-        error_msg = str(error).lower()
-        error_mappings = [
-            ("not found in catalog", "App not found in catalog"),
-            (
-                "no assets found",
-                "No assets found in release - may still be building",
-            ),
-            (
-                "no suitable appimage",
-                "AppImage not found in release - may still be building",
-            ),
-            ("already installed", "Already installed"),
-        ]
-        for pattern, message in error_mappings:
-            if pattern in error_msg:
-                return message
-        return str(error)
-
-    def _build_install_error_result(
-        self, error: InstallationError, target: str, is_url: bool
-    ) -> dict[str, Any]:
-        """Build error result dict for failed installation.
-
-        Args:
-            error: The installation error
-            target: The app name or URL that failed
-            is_url: Whether target is a URL
-
-        Returns:
-            Error result dictionary
-
-        """
-        return {
-            "success": False,
-            "target": target,
-            "name": target,
-            "error": self._get_user_friendly_error(error),
-            "source": "url" if is_url else "catalog",
-        }
-
     @staticmethod
     def separate_targets_impl(
         config_manager: Any, targets: list[str]
@@ -668,7 +619,7 @@ class InstallHandler:
 
             # 5. Create configuration
             logger.info("Creating config for %s", app_name)
-            config_result = self._create_app_config(
+            config_result = create_app_config_v2(
                 app_name=app_name,
                 app_path=install_path,
                 app_config=app_config,
@@ -676,6 +627,7 @@ class InstallHandler:
                 verify_result=verify_result,
                 icon_result=icon_result,
                 source=source,
+                config_manager=self.config_manager,
             )
 
             # 6. Create desktop entry
@@ -744,227 +696,3 @@ class InstallHandler:
                 "Failed to fetch release for %s/%s: %s", owner, repo, error
             )
             raise
-
-    def _create_app_config(
-        self,
-        app_name: str,
-        app_path: Path,
-        app_config: dict[str, Any],
-        release: Release,
-        verify_result: dict[str, Any] | None,
-        icon_result: dict[str, Any],
-        source: str,
-    ) -> dict[str, Any]:
-        """Create app configuration in v2.0.0 format.
-
-        Args:
-            app_name: Application name
-            app_path: Path to installed AppImage
-            app_config: App configuration template
-            release: Release information
-            verify_result: Verification result
-            icon_result: Icon extraction result
-            source: Install source ("catalog" or "url")
-
-        Returns:
-            Config creation result
-
-        """
-        from my_unicorn.constants import APP_CONFIG_VERSION
-
-        # Determine catalog reference and overrides
-        catalog_ref = app_name if source == "catalog" else None
-        overrides = (
-            None
-            if source == "catalog"
-            else self._build_overrides_from_template(app_config)
-        )
-
-        # Build verification state
-        verification_state = self._build_verification_state(verify_result)
-
-        # Build state section
-        config_data = {
-            "config_version": APP_CONFIG_VERSION,
-            "source": source,
-            "catalog_ref": catalog_ref,
-            "state": {
-                "version": release.version,
-                "installed_date": datetime.now(tz=UTC).isoformat(),
-                "installed_path": str(app_path),
-                "verification": {
-                    "passed": verification_state["passed"],
-                    "methods": verification_state["methods"],
-                },
-                "icon": {
-                    "installed": bool(icon_result.get("icon_path")),
-                    "method": icon_result.get("source", "none"),
-                    "path": icon_result.get("icon_path", ""),
-                },
-            },
-        }
-
-        # Add overrides for URL installs
-        if overrides:
-            # Update verification method with actual result
-            if "verification" in overrides:
-                overrides["verification"]["method"] = verification_state[
-                    "actual_method"
-                ]
-
-            # Update icon filename with actual result
-            if icon_result.get("icon_path") and "icon" in overrides:
-                icon_path = Path(icon_result["icon_path"])
-                overrides["icon"]["filename"] = icon_path.name
-
-            config_data["overrides"] = overrides
-
-        # Save configuration
-        try:
-            self.config_manager.save_app_config(
-                app_name, config_data, skip_validation=True
-            )
-            return {
-                "success": True,
-                "config_path": str(
-                    self.config_manager.apps_dir / f"{app_name}.json"
-                ),
-                "config": config_data,
-            }
-        except Exception as error:
-            logger.error("Failed to save config for %s: %s", app_name, error)
-            return {
-                "success": False,
-                "error": str(error),
-            }
-
-    @staticmethod
-    def _build_method_entry(
-        method_type: str, method_result: Any
-    ) -> dict[str, Any]:
-        """Build verification method entry from result.
-
-        Args:
-            method_type: Type of verification (digest, checksum_file)
-            method_result: Result data (dict or simple bool)
-
-        Returns:
-            Method entry dictionary for config
-
-        """
-        method_entry: dict[str, Any] = {"type": method_type}
-
-        if not isinstance(method_result, dict):
-            method_entry["status"] = "passed" if method_result else "failed"
-            return method_entry
-
-        passed = method_result.get("passed", False)
-        hash_type = method_result.get("hash_type", "")
-        algorithm = hash_type.upper() if hash_type else "SHA256"
-
-        verification_source = method_result.get("url", "")
-        if not verification_source:
-            verification_source = (
-                "github_api" if method_type == "digest" else ""
-            )
-
-        method_entry.update(
-            {
-                "status": "passed" if passed else "failed",
-                "algorithm": algorithm,
-                "expected": method_result.get("hash", ""),
-                "computed": method_result.get("computed_hash", ""),
-                "source": verification_source,
-            }
-        )
-        return method_entry
-
-    def _build_verification_state(
-        self, verify_result: dict[str, Any] | None
-    ) -> dict[str, Any]:
-        """Build verification state from verification result.
-
-        Args:
-            verify_result: Verification result dictionary or None
-
-        Returns:
-            Dictionary with 'passed', 'methods', and 'actual_method' keys
-
-        """
-        if not verify_result:
-            return {"passed": False, "methods": [], "actual_method": "skip"}
-
-        methods_data = verify_result.get("methods", {})
-        if not methods_data:
-            return {"passed": False, "methods": [], "actual_method": "skip"}
-
-        verification_passed = verify_result.get("passed", False)
-        actual_method = next(iter(methods_data.keys()), "skip")
-
-        verification_methods = [
-            self._build_method_entry(method_type, method_result)
-            for method_type, method_result in methods_data.items()
-        ]
-
-        return {
-            "passed": verification_passed,
-            "methods": verification_methods,
-            "actual_method": actual_method,
-        }
-
-    def _build_overrides_from_template(
-        self, app_config: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Build overrides section from app config template.
-
-        Args:
-            app_config: App configuration template (v2 format)
-
-        Returns:
-            Overrides dictionary for v2.0.0 config
-
-        """
-        # Extract from v2 format
-        source_config = app_config.get("source", {})
-        owner = source_config.get("owner", "")
-        repo = source_config.get("repo", "")
-        prerelease = source_config.get("prerelease", False)
-
-        naming_config = app_config.get("appimage", {}).get("naming", {})
-        name_template = naming_config.get("template", "")
-        target_name = naming_config.get("target_name", "")
-
-        verification_config = app_config.get("verification", {})
-        verification_method = verification_config.get("method", "skip")
-
-        icon_config = app_config.get("icon", {})
-        icon_method = icon_config.get("method", "extraction")
-        icon_filename = icon_config.get("filename", "")
-
-        overrides = {
-            "metadata": {
-                "name": repo,
-                "display_name": repo,
-                "description": "",
-            },
-            "source": {
-                "type": "github",
-                "owner": owner,
-                "repo": repo,
-                "prerelease": prerelease,
-            },
-            "appimage": {
-                "naming": {
-                    "template": name_template,
-                    "target_name": target_name,
-                    "architectures": ["amd64", "x86_64"],
-                }
-            },
-            "verification": {"method": verification_method},
-            "icon": {
-                "method": icon_method,
-                "filename": icon_filename,
-            },
-        }
-
-        return overrides

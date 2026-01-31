@@ -6,7 +6,6 @@ and managing the update process for installed AppImages.
 
 import asyncio
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -19,24 +18,16 @@ from my_unicorn.core.backup import BackupService
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import (
-    Asset,
     Release,
     ReleaseFetcher,
     extract_github_config,
 )
 from my_unicorn.core.verification import VerificationService
-from my_unicorn.core.workflows.appimage_setup import (
-    create_desktop_entry,
-    rename_appimage,
-    setup_appimage_icon,
-)
 from my_unicorn.exceptions import ConfigurationError
 from my_unicorn.logger import get_logger
-from my_unicorn.utils.appimage_utils import (
-    select_best_appimage_asset,
-    verify_appimage_download,
-)
+from my_unicorn.utils.appimage_utils import select_best_appimage_asset
 from my_unicorn.utils.download_utils import extract_filename_from_url
+from my_unicorn.utils.update_utils import process_post_download
 from my_unicorn.utils.validation import validate_github_identifier
 from my_unicorn.utils.version_utils import compare_versions
 
@@ -581,10 +572,10 @@ class UpdateManager:
             # (checked in _prepare_update_context)
             if update_info.release_data is None:
                 _raise_no_release_data()
-            success = await self._process_post_download(
+            success = await process_post_download(
                 app_name=app_name,
                 app_config=app_config,
-                update_info=update_info,
+                latest_version=update_info.latest_version,
                 owner=context["owner"],
                 repo=context["repo"],
                 catalog_entry=context["catalog_entry"],
@@ -593,6 +584,11 @@ class UpdateManager:
                 icon_dir=icon_dir,
                 storage_dir=storage_dir,
                 downloaded_path=downloaded_path,
+                verification_service=self.verification_service,  # type: ignore[arg-type]
+                storage_service=self.storage_service,
+                config_manager=self.config_manager,
+                backup_service=self.backup_service,
+                progress_service=self._progress_service_param,
             )
 
             if success:
@@ -607,283 +603,6 @@ class UpdateManager:
         except Exception as e:
             logger.exception("Failed to update %s", app_name)
             return False, f"Update failed: {e}"
-
-    async def _process_post_download(
-        self,
-        app_name: str,
-        app_config: dict[str, Any],
-        update_info: UpdateInfo,
-        owner: str,
-        repo: str,
-        catalog_entry: dict[str, Any] | None,
-        appimage_asset: Asset,
-        release_data: Release,
-        icon_dir: Path,
-        storage_dir: Path,
-        downloaded_path: Path,
-    ) -> bool:
-        """Process post-download operations.
-
-        Args:
-            app_name: Name of the app
-            app_config: App configuration
-            update_info: Update information
-            owner: GitHub owner
-            repo: GitHub repository
-            catalog_entry: Catalog entry or None
-            appimage_asset: AppImage Asset object
-            release_data: Release data
-            icon_dir: Icon directory path
-            storage_dir: Storage directory path
-            downloaded_path: Path to downloaded AppImage
-
-        Returns:
-            True if processing was successful
-
-        """
-        progress_service = self._progress_service_param
-        progress_enabled = (
-            progress_service is not None and progress_service.is_active()
-        )
-
-        # Ensure these are defined prior to operations to avoid
-        # referencing them in exception handlers where they may
-        # otherwise be undefined.
-        verification_task_id = None
-        installation_task_id = None
-
-        def _raise_no_progress_service() -> None:
-            msg = "Progress service is required when progress is enabled"
-            raise ValueError(msg)
-
-        def _raise_no_verification_service() -> None:
-            msg = "verification_service must be initialized"
-            raise ValueError(msg)
-
-        def _raise_progress_required() -> None:
-            msg = "Progress service is required"
-            raise ValueError(msg)
-
-        try:
-            if progress_enabled:
-                # Type narrowing: progress_enabled is only True when
-                # progress_service is not None
-                if progress_service is None:
-                    _raise_no_progress_service()
-                (
-                    verification_task_id,
-                    installation_task_id,
-                ) = await progress_service.create_installation_workflow(
-                    app_name, with_verification=True
-                )
-
-            # Verify download if requested
-            # verification_service is initialized in _initialize_services called before this method
-            if self.verification_service is None:
-                _raise_no_verification_service()
-            verify_result = await verify_appimage_download(
-                file_path=downloaded_path,
-                asset=appimage_asset,
-                release=release_data,
-                app_name=app_name,
-                verification_service=self.verification_service,  # type: ignore[arg-type]
-                verification_config=app_config.get("verification"),
-                catalog_entry=catalog_entry,
-                owner=owner,
-                repo=repo,
-                progress_task_id=verification_task_id,
-            )
-            verification_results = verify_result.get("methods", {})
-            updated_verification_config = verify_result.get(
-                "updated_config", {}
-            )
-
-            # Move to install directory and make executable
-
-            self.storage_service.make_executable(downloaded_path)
-            appimage_path = self.storage_service.move_to_install_dir(
-                downloaded_path
-            )
-
-            # Rename to clean name using catalog configuration
-            appimage_path = rename_appimage(
-                appimage_path=appimage_path,
-                app_name=app_name,
-                app_config=app_config,
-                catalog_entry=catalog_entry,
-                storage_service=self.storage_service,
-            )
-
-            # Handle icon setup
-            icon_result = await setup_appimage_icon(
-                appimage_path=appimage_path,
-                app_name=app_name,
-                icon_dir=icon_dir,
-                app_config=app_config,
-                catalog_entry=catalog_entry,
-            )
-            icon_path = (
-                Path(icon_result["path"]) if icon_result.get("path") else None
-            )
-            updated_icon_config = {
-                "source": icon_result.get("source", "none"),
-                "installed": icon_result.get("installed", False),
-                "path": icon_result.get("path"),
-                "extraction": icon_result.get("extraction", False),
-                "name": icon_result.get("name", ""),
-            }
-
-            # Update configuration
-            await self._handle_configuration_update(
-                app_name,
-                app_config,
-                update_info,
-                appimage_path,
-                icon_path,
-                verification_results,
-                updated_verification_config,
-                updated_icon_config,
-            )
-
-            # Create desktop entry
-            try:
-                create_desktop_entry(
-                    appimage_path=appimage_path,
-                    app_name=app_name,
-                    icon_result={
-                        "icon_path": str(icon_path) if icon_path else None,
-                        "path": str(icon_path) if icon_path else None,
-                    },
-                    config_manager=self.config_manager,
-                )
-            except Exception:
-                logger.exception(
-                    "Failed to update desktop entry for %s", app_name
-                )
-
-            # Finish installation task
-            if installation_task_id and progress_enabled:
-                if progress_service is None:
-                    _raise_progress_required()
-                await progress_service.finish_task(
-                    installation_task_id,
-                    success=True,
-                    description=f"✅ {app_name}",
-                )
-
-            # Store the computed hash
-            stored_hash = self._get_stored_hash(
-                verification_results, appimage_asset
-            )
-            if stored_hash:
-                logger.debug("Updated stored hash: %s", stored_hash[:16])
-
-            return True
-
-        except Exception:
-            # Mark installation as failed if we have a progress task
-            if installation_task_id and progress_enabled:
-                if progress_service is None:
-                    _raise_progress_required()
-                await progress_service.finish_task(
-                    installation_task_id,
-                    success=False,
-                    description=f"❌ {app_name} installation failed",
-                )
-            raise  # Re-raise the exception to be handled by the main method
-
-    async def _handle_configuration_update(
-        self,
-        app_name: str,
-        app_config: dict[str, Any],
-        update_info: UpdateInfo,
-        appimage_path: Path,
-        icon_path: Path | None,
-        verification_results: dict[str, Any],
-        updated_verification_config: dict[str, Any],
-        updated_icon_config: dict[str, Any],
-    ) -> None:
-        """Handle configuration updates after successful processing.
-
-        Args:
-            app_name: Name of the app
-            app_config: App configuration
-            update_info: Update information
-            appimage_path: Path to installed AppImage
-            icon_path: Path to icon or None
-            verification_results: Verification results
-            updated_verification_config: Updated verification config
-            updated_icon_config: Updated icon config or None
-
-        """
-        # Load raw state for modification (not merged effective config)
-        raw_state = self.config_manager.load_raw_app_config(app_name)
-        if not raw_state:
-            msg = f"Cannot update config: app state not found for {app_name}"
-            raise ValueError(msg)
-
-        # Store computed hash (will be empty dict if no asset provided)
-        stored_hash = ""
-        if verification_results.get("digest", {}).get("passed"):
-            stored_hash = verification_results["digest"]["hash"]
-        elif verification_results.get("checksum_file", {}).get("passed"):
-            stored_hash = verification_results["checksum_file"]["hash"]
-
-        # Update state fields (v2 format)
-        if "state" not in raw_state:
-            raw_state["state"] = {}
-        raw_state["state"]["version"] = update_info.latest_version
-        raw_state["state"]["installed_path"] = str(appimage_path)
-        raw_state["state"]["installed_date"] = (
-            datetime.now().astimezone().isoformat()
-        )
-        # Note: Verification results are stored in state.verification during install
-
-        # Update icon configuration in state.icon (v2 format)
-        if updated_icon_config:
-            # Map workflow utility result to v2 schema format
-            # v2 schema only allows: installed, method, path
-            raw_state["state"]["icon"] = {
-                "installed": updated_icon_config.get("installed", False),
-                "method": updated_icon_config.get("source", "none"),
-                "path": updated_icon_config.get("path", ""),
-            }
-
-            if icon_path:
-                logger.debug(
-                    "🎨 Icon updated for %s: method=%s, installed=%s",
-                    app_name,
-                    raw_state["state"]["icon"]["method"],
-                    raw_state["state"]["icon"]["installed"],
-                )
-
-        self.config_manager.save_app_config(
-            app_name, raw_state, skip_validation=True
-        )
-
-        # Clean up old backups after successful update
-        try:
-            self.backup_service.cleanup_old_backups(app_name)
-        except Exception as e:
-            logger.warning(
-                "⚠️  Failed to cleanup old backups for %s: %s",
-                app_name,
-                e,
-            )
-
-    def _get_stored_hash(
-        self,
-        verification_results: dict[str, Any],
-        appimage_asset: Asset,
-    ) -> str:
-        """Get the hash to store from verification results or asset digest."""
-        if verification_results.get("digest", {}).get("passed"):
-            return str(verification_results["digest"]["hash"])
-        if verification_results.get("checksum_file", {}).get("passed"):
-            return str(verification_results["checksum_file"]["hash"])
-        if appimage_asset.digest:
-            return appimage_asset.digest
-        return ""
 
     def _load_catalog_cached(self, ref: str) -> dict[str, Any] | None:
         """Load catalog with in-memory caching for current session.
@@ -928,8 +647,8 @@ class UpdateManager:
             ConfigurationError: If config not found or invalid
 
         Example:
-            >>> config = self._load_app_config_or_fail("qownnotes", "update_check")
-            # If not found: raises ConfigurationError("update_check: No configuration found...")
+            config = self._load_app_config_or_fail("qownnotes", "update_check")
+
         """
         config = self.config_manager.load_app_config(app_name)
         if not config:
