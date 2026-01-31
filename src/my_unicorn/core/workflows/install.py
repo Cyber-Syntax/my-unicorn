@@ -48,6 +48,7 @@ class InstallHandler:
         storage_service: FileOperations,
         config_manager: ConfigManager,
         github_client: GitHubClient,
+        progress_service: ProgressDisplay | None = None,
     ) -> None:
         """Initialize install handler.
 
@@ -56,12 +57,14 @@ class InstallHandler:
             storage_service: Service for storage operations
             config_manager: Configuration manager
             github_client: GitHub API client
+            progress_service: Optional progress service for tracking installations
 
         """
         self.download_service = download_service
         self.storage_service = storage_service
         self.config_manager = config_manager
         self.github_client = github_client
+        self.progress_service = progress_service
 
     @classmethod
     def create_default(
@@ -95,6 +98,7 @@ class InstallHandler:
             storage_service=storage_service,
             config_manager=config_manager,
             github_client=github_client,
+            progress_service=progress_service,
         )
 
     async def install_from_catalog(
@@ -443,11 +447,8 @@ class InstallHandler:
             Tuple of (verification_task_id, installation_task_id)
 
         """
-        progress_service = getattr(
-            self.download_service, "progress_service", None
-        )
-        if progress_service:
-            return await progress_service.create_installation_workflow(
+        if self.progress_service:
+            return await self.progress_service.create_installation_workflow(
                 app_name, with_verification=verify
             )
         return None, None
@@ -610,11 +611,8 @@ class InstallHandler:
             config_manager=self.config_manager,
         )
 
-        progress_service = getattr(
-            self.download_service, "progress_service", None
-        )
-        if installation_task_id and progress_service:
-            await progress_service.finish_task(
+        if installation_task_id and self.progress_service:
+            await self.progress_service.finish_task(
                 installation_task_id, success=True
             )
 
@@ -730,12 +728,9 @@ class InstallHandler:
             )
 
             # Mark installation task as failed
-            progress_service = getattr(
-                self.download_service, "progress_service", None
-            )
-            if installation_task_id and progress_service:
+            if installation_task_id and self.progress_service:
                 error_msg = str(error)
-                await progress_service.finish_task(
+                await self.progress_service.finish_task(
                     installation_task_id, success=False, description=error_msg
                 )
 

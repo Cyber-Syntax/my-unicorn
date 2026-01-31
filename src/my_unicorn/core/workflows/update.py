@@ -84,7 +84,14 @@ class UpdateInfo:
 
 
 class UpdateManager:
-    """Manages updates for installed AppImages."""
+    """Manages updates for installed AppImages.
+
+    Thread Safety:
+        - Safe for concurrent access across multiple asyncio tasks
+        - Catalog cache is protected by asyncio.Lock for concurrent reads/writes
+        - Each update operation should use a separate UpdateManager instance
+          for isolated progress tracking
+    """
 
     def __init__(
         self,
@@ -124,7 +131,9 @@ class UpdateManager:
 
         # In-memory catalog cache for current update session
         # Cleared when UpdateManager instance is destroyed
+        # Thread-safe with asyncio.Lock for concurrent access
         self._catalog_cache: dict[str, dict[str, Any] | None] = {}
+        self._cache_lock = asyncio.Lock()
 
     @classmethod
     def create_default(
@@ -463,7 +472,7 @@ class UpdateManager:
             return None
 
         try:
-            return self._load_catalog_cached(catalog_ref)
+            return await self._load_catalog_cached(catalog_ref)
         except (FileNotFoundError, ValueError) as e:
             msg = (
                 f"App '{app_name}' references catalog '{catalog_ref}', "
@@ -572,7 +581,7 @@ class UpdateManager:
         catalog_entry = None
         if catalog_ref:
             try:
-                catalog_entry = self._load_catalog_cached(catalog_ref)
+                catalog_entry = await self._load_catalog_cached(catalog_ref)
             except (FileNotFoundError, ValueError):
                 msg = (
                     f"App '{app_name}' references catalog '{catalog_ref}', "
@@ -727,11 +736,12 @@ class UpdateManager:
             logger.exception("Failed to update %s", app_name)
             return False, f"Update failed: {e}"
 
-    def _load_catalog_cached(self, ref: str) -> dict[str, Any] | None:
+    async def _load_catalog_cached(self, ref: str) -> dict[str, Any] | None:
         """Load catalog with in-memory caching for current session.
 
         This cache persists for the lifetime of the UpdateManager instance,
         reducing redundant file I/O when multiple apps share the same catalog.
+        Uses asyncio.Lock to ensure thread-safe concurrent access.
 
         Args:
             ref: Catalog reference name (e.g., "qownnotes")
@@ -743,13 +753,18 @@ class UpdateManager:
             - First load: ~1-2ms (file I/O + JSON parse + validation)
             - Cached load: ~0.01ms (dict lookup)
             - Benefit: 100x faster for shared catalogs
-        """
-        if ref not in self._catalog_cache:
-            entry = self.config_manager.load_catalog(ref)
-            # Cache the result (even if None) to avoid repeated lookup failures
-            self._catalog_cache[ref] = entry  # type: ignore[assignment]
 
-        return self._catalog_cache.get(ref)
+        Thread Safety:
+            Protected by asyncio.Lock to prevent race conditions during
+            concurrent catalog loads.
+        """
+        async with self._cache_lock:
+            if ref not in self._catalog_cache:
+                entry = self.config_manager.load_catalog(ref)
+                # Cache the result (even if None) to avoid repeated lookup failures
+                self._catalog_cache[ref] = entry  # type: ignore[assignment]
+
+            return self._catalog_cache.get(ref)
 
     def _load_app_config_or_fail(
         self, app_name: str, context: str = ""
