@@ -384,3 +384,16 @@ class UpdateResult:
             result["error"] = self.error
 
         return result
+
+
+@dataclass
+class InstallPlan:
+    """Plan for installation operations.
+
+    Separates targets that need installation from those already installed.
+    This provides clear separation of concerns for the installation workflow.
+    """
+
+    urls_needing_work: list[str]
+    catalog_needing_work: list[str]
+    already_installed: list[str]

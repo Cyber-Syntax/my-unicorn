@@ -11,6 +11,7 @@ from typing import Any
 import aiohttp
 
 from my_unicorn.config import ConfigManager
+from my_unicorn.config.validation import ConfigurationValidator
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import (
@@ -25,6 +26,8 @@ from my_unicorn.core.workflows.appimage_setup import (
     rename_appimage,
     setup_appimage_icon,
 )
+from my_unicorn.core.workflows.install_state_checker import InstallStateChecker
+from my_unicorn.core.workflows.target_resolver import TargetResolver
 from my_unicorn.exceptions import InstallationError
 from my_unicorn.logger import get_logger
 from my_unicorn.ui.display import ProgressDisplay
@@ -34,7 +37,6 @@ from my_unicorn.utils.appimage_utils import (
 )
 from my_unicorn.utils.config_builders import create_app_config_v2
 from my_unicorn.utils.error_formatters import build_install_error_result
-from my_unicorn.utils.validation import validate_github_identifier
 
 logger = get_logger(__name__)
 
@@ -129,8 +131,7 @@ class InstallHandler:
 
             # Validate GitHub identifiers for security
             try:
-                validate_github_identifier(owner, "GitHub owner")
-                validate_github_identifier(repo, "GitHub repo")
+                ConfigurationValidator.validate_app_config(app_config)
             except ValueError as e:
                 msg = f"Invalid GitHub configuration in catalog: {e}"
                 raise InstallationError(msg, target=app_name)
@@ -198,8 +199,8 @@ class InstallHandler:
 
             # Validate GitHub identifiers for security
             try:
-                validate_github_identifier(owner, "GitHub owner")
-                validate_github_identifier(repo, "GitHub repo")
+                config = {"source": {"owner": owner, "repo": repo}}
+                ConfigurationValidator.validate_app_config(config)
             except ValueError as e:
                 msg = f"Invalid GitHub URL: {e}"
                 raise InstallationError(msg, target=github_url)
@@ -335,8 +336,7 @@ class InstallHandler:
     ) -> tuple[list[str], list[str]]:
         """Separate targets into URL and catalog targets.
 
-        This is a helper on the service so CLI code can reuse the
-        same logic easily (and tests can target the behavior).
+        This method delegates to TargetResolver for backward compatibility.
 
         Args:
             config_manager: Configuration manager instance
@@ -349,31 +349,7 @@ class InstallHandler:
             InstallationError: If unknown targets are present
 
         """
-        from my_unicorn.exceptions import InstallationError
-
-        url_targets: list[str] = []
-        catalog_targets: list[str] = []
-        unknown_targets: list[str] = []
-
-        available_apps = set(config_manager.list_catalog_apps())
-
-        for target in targets:
-            if target.startswith("https://github.com/"):
-                url_targets.append(target)
-            elif target in available_apps:
-                catalog_targets.append(target)
-            else:
-                unknown_targets.append(target)
-
-        if unknown_targets:
-            unknown_list = ", ".join(unknown_targets)
-            msg = (
-                f"Unknown applications or invalid URLs: {unknown_list}. "
-                "Use 'my-unicorn catalog --available' to see available apps."
-            )
-            raise InstallationError(msg)
-
-        return url_targets, catalog_targets
+        return TargetResolver.separate_targets(config_manager, targets)
 
     @staticmethod
     async def check_apps_needing_work_impl(
@@ -383,6 +359,8 @@ class InstallHandler:
         install_options: dict[str, Any],
     ) -> tuple[list[str], list[str], list[str]]:
         """Check which apps actually need installation work.
+
+        This method delegates to InstallStateChecker for backward compatibility.
 
         Args:
             config_manager: Configuration manager instance
@@ -394,43 +372,16 @@ class InstallHandler:
             (urls_needing_work, catalog_needing_work, already_installed)
 
         """
-        # Default behavior: all URLs need work
-        urls_needing_work: list[str] = list(url_targets)
-        catalog_needing_work: list[str] = []
-        already_installed: list[str] = []
-
-        for app_name in catalog_targets:
-            try:
-                # Check if app exists in catalog
-                try:
-                    config_manager.load_catalog(app_name)
-                except (FileNotFoundError, ValueError):
-                    catalog_needing_work.append(app_name)
-                    continue
-
-                if not install_options.get("force", False):
-                    # Check if app is already installed
-                    try:
-                        installed_config = config_manager.load_app_config(
-                            app_name
-                        )
-                        if installed_config:
-                            installed_path = Path(
-                                installed_config.get("installed_path", "")
-                            )
-                            if installed_path.exists():
-                                already_installed.append(app_name)
-                                continue
-                    except (FileNotFoundError, KeyError):
-                        # Not installed, needs work
-                        pass
-
-                catalog_needing_work.append(app_name)
-            except Exception:
-                # If we can't determine the status, assume it needs work
-                catalog_needing_work.append(app_name)
-
-        return urls_needing_work, catalog_needing_work, already_installed
+        checker = InstallStateChecker()
+        force = install_options.get("force", False)
+        plan = await checker.get_apps_needing_installation(
+            config_manager, url_targets, catalog_targets, force
+        )
+        return (
+            plan.urls_needing_work,
+            plan.catalog_needing_work,
+            plan.already_installed,
+        )
 
     async def _setup_progress_tracking(
         self,

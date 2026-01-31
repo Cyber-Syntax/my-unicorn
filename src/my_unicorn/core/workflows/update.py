@@ -13,6 +13,7 @@ import aiohttp
 
 from my_unicorn.config import ConfigManager
 from my_unicorn.config.migration.helpers import warn_about_migration
+from my_unicorn.config.validation import ConfigurationValidator
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.backup import BackupService
 from my_unicorn.core.download import DownloadService
@@ -30,7 +31,6 @@ from my_unicorn.ui.display import ProgressDisplay
 from my_unicorn.utils.appimage_utils import select_best_appimage_asset
 from my_unicorn.utils.download_utils import extract_filename_from_url
 from my_unicorn.utils.update_utils import process_post_download
-from my_unicorn.utils.validation import validate_github_identifier
 from my_unicorn.utils.version_utils import compare_versions
 
 logger = get_logger(__name__)
@@ -444,8 +444,9 @@ class UpdateManager:
 
         """
         try:
-            validate_github_identifier(owner, "GitHub owner")
-            validate_github_identifier(repo, "GitHub repo")
+            # Create a minimal config structure for validation
+            config = {"source": {"owner": owner, "repo": repo}}
+            ConfigurationValidator.validate_app_config(config)
             return None
         except ValueError as e:
             msg = f"Invalid GitHub configuration: {e}"
@@ -569,8 +570,8 @@ class UpdateManager:
 
         # Validate GitHub identifiers for security
         try:
-            validate_github_identifier(owner, "GitHub owner")
-            validate_github_identifier(repo, "GitHub repo")
+            config = {"source": {"owner": owner, "repo": repo}}
+            ConfigurationValidator.validate_app_config(config)
         except ValueError as e:
             msg = f"Invalid GitHub configuration: {e}"
             logger.error(msg)
