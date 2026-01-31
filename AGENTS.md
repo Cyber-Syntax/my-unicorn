@@ -190,7 +190,7 @@ ruff format .
 
 - One class per file (generally)
 - Group related functionality in modules
-- Keep files focused and under 500 lines when possible
+- Keep files focused and under 500 lines.
 - Use `__init__.py` for public API exports
 
 ## Build and Deployment

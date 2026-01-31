@@ -23,9 +23,9 @@
 
 # .log new created (continue with correct module which it is backup to save metadata after the validator)
 # So, this rotation work as expected.
-2026-01-25 16:03:10 - my_unicorn.core.workflows.backup - DEBUG - save:100 - Saved metadata to /home/developer/Applications/backups/appflowy/metadata.json
-2026-01-25 16:03:10 - my_unicorn.core.workflows.backup - DEBUG - add_version:127 - Added version 0.1.0 to metadata
-2026-01-25 16:03:10 - my_unicorn.core.workflows.backup - INFO - create_backup:459 - Backup created: /home/developer/Applications/backups/appflowy/appflowy-0.1.0.AppImage (v0.1.0)
+2026-01-25 16:03:10 - my_unicorn.core.backup - DEBUG - save:100 - Saved metadata to /home/developer/Applications/backups/appflowy/metadata.json
+2026-01-25 16:03:10 - my_unicorn.core.backup - DEBUG - add_version:127 - Added version 0.1.0 to metadata
+2026-01-25 16:03:10 - my_unicorn.core.backup - INFO - create_backup:459 - Backup created: /home/developer/Applications/backups/appflowy/appflowy-0.1.0.AppImage (v0.1.0)
 2026-01-25 16:03:10 - my_unicorn.core.workflows.update - DEBUG - update_single_app:570 - Backup created: /home/developer/Applications/backups/appflowy/appflowy-0.1.0.AppImage
 ...
 2026-01-25 16:03:57 - my_unicorn.main - DEBUG - async_main:28 - CLI completed successfully
@@ -33,6 +33,16 @@
 
 ## in-progress
 
+- [ ] workflows and workflows/services folder structure refactor for better structure.
+Currently install.py, update.py, appimage_setup.py(install and update use this, so I didn't move that to util folder which we might be make a new module to handle it there in class etc.) is work together.
+- [ ] Learn and add integration tests after workflows refactor.
+- [ ] learn testing trophy philosophy
+- [ ] progress_service written optional but we must make it required. Only upgrade module not use it currently and not need to use it because upgrade module only use uv package manager to handle the installation and update process.
+
+- [ ] p1-q1: load app config one time instead of loading on every function call like remove, backup, update... etc.
+- [ ] P1-Q2 decrease all the modules lines to less than 500 lines for better structure and maintainability.
+    - [ ] workflows/update.py
+    - [ ] workflows/install.py
 - [ ] P1-Q1: Improve manual test script #p1 #q1 #important #testing
     - [ ] make sure the api fetch install works (we do that by remove and install on manual test script but seems like remove didn't removed the cache and I couldn't able to detect the api bug correctly, so we need to make manual test to make sure remove did it's job correctly etc.)
     - [ ] add backup tests to make sure backup command also work as expected on tests etc.
@@ -49,10 +59,9 @@ we probably need to define one correct example or we can just use the json schem
 
 - [ ] P1-Q3: Never use the real user config logs, app location on pytest unittests which current is use them! #p1 #important #q3
 - [ ] P1-Q2: deprecate my-unicorn package and repo directories (migrated to uv) #q2 #important #refactor
-    - [ ] Remove legacy cli tool install from install.sh
+    - [x] Remove legacy cli tool install from install.sh
 
 - [ ] P2-Q4: fix all mypy issues #p2 #important #q4
-- [ ] P3-Q5: move workflow folder modules to utils folder for better structure
 - [ ] P3-Q6: Correct comman design pattern with receiver and invoker, commands need to be thin and execute receivers only, learn from examples/patterns/Command/ folder
 
 - [ ] P4-Q7:Make a better todo.md structure with priorities, labels etc.
@@ -66,6 +75,25 @@ we probably need to define one correct example or we can just use the json schem
 
 ## todo
 
+- [ ] P2: redundant remove prints:
+
+```
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _remove_appimage_files:276 - Removed AppImage: /home/developer/Applications/neovim.AppImage
+2026-01-28 13:22:47 - my_unicorn.core.cache - DEBUG - clear_cache:222 - Cleared cache for neovim/neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _clear_cache:300 - Removed cache for neovim/neovim
+2026-01-28 13:22:47 - my_unicorn.core.desktop_entry - DEBUG - remove_desktop_file:431 - Removed desktop file: /home/developer/.local/share/applications/neovim.desktop
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _remove_desktop_entry:354 - Removed desktop entry for neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _remove_icon:379 - Removed icon: /home/developer/Applications/icons/neovim.png
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _remove_config:399 - Removed config for neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:200 - ✅ Removed AppImage(s): /home/developer/Applications/neovim.AppImage
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:203 - ✅ Removed cache for neovim/neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:216 - ⚠️  No backups found at: /home/developer/Applications/backups/neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:219 - ✅ Removed desktop entry for neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:223 - ✅ Removed icon: /home/developer/Applications/icons/neovim.png
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:230 - ✅ Removed config for neovim
+```
+
+- [ ] P2-Q9: add cli upgrade command check for new version available in update command?
 - [ ] P4: Remove code smells: <https://refactoring.guru/refactoring/smells>
     - [ ] contexts
     - [ ] config
@@ -168,6 +196,8 @@ Confirm your GitHub token:
 
 ## done
 
+- [x] P3-Q5: move workflow folder modules to utils folder for better structure
+- [x] catalog_adapter.py is probably unnecessary because it just delegate the config manager...
 - [x] Test new features
     - [x] github action for releases
     - [x] `my-unicorn upgrade` command now use uv package manager.
