@@ -186,6 +186,84 @@ class InstallHandler:
             logger.error("Failed to install %s: %s", app_name, error)
             return build_install_error_result(error, app_name, is_url=False)
 
+    def _build_url_install_config(
+        self, app_name: str, owner: str, repo: str, prerelease: bool
+    ) -> dict[str, Any]:
+        """Build app config template for URL installations.
+
+        Args:
+            app_name: Application name
+            owner: GitHub repository owner
+            repo: GitHub repository name
+            prerelease: Whether to include pre-releases
+
+        Returns:
+            App configuration dictionary in v2 format
+
+        """
+        return {
+            "config_version": "2.0.0",
+            "metadata": {
+                "name": app_name,
+                "display_name": app_name,
+                "description": "",
+            },
+            "source": {
+                "type": "github",
+                "owner": owner,
+                "repo": repo,
+                "prerelease": prerelease,
+            },
+            "appimage": {
+                "naming": {
+                    "template": "",
+                    "target_name": app_name,
+                    "architectures": ["amd64", "x86_64"],
+                }
+            },
+            "verification": {
+                "method": "digest",  # Will auto-detect checksum files
+            },
+            "icon": {
+                "method": "extraction",
+                "filename": "",
+            },
+        }
+
+    async def _validate_and_fetch_release(
+        self, owner: str, repo: str
+    ) -> tuple[Release, Asset]:
+        """Validate GitHub identifiers and fetch release with AppImage.
+
+        Args:
+            owner: GitHub repository owner
+            repo: GitHub repository name
+
+        Returns:
+            Tuple of (release, appimage_asset)
+
+        Raises:
+            ValueError: If GitHub identifiers are invalid or no AppImage found
+            aiohttp.ClientError: If GitHub API request fails
+
+        """
+        # Validate GitHub identifiers for security
+        config = {"source": {"owner": owner, "repo": repo}}
+        get_github_config(config)  # Validates identifiers
+
+        # Fetch latest release (already filtered for x86_64 Linux)
+        release = await self._fetch_release(owner, repo)
+
+        # Select best AppImage (filters unstable versions for URLs)
+        asset = select_best_appimage_asset(
+            release, installation_source=InstallSource.URL
+        )
+        # Asset is guaranteed non-None (raise_on_not_found=True by default)
+        if asset is None:
+            raise ValueError(ERROR_NO_APPIMAGE_ASSET)
+
+        return release, asset
+
     async def install_from_url(
         self,
         github_url: str,
@@ -218,10 +296,6 @@ class InstallHandler:
             app_name = url_info.get("app_name") or repo
             prerelease = url_info.get("prerelease", False)
 
-            # Validate GitHub identifiers for security
-            config = {"source": {"owner": owner, "repo": repo}}
-            get_github_config(config)  # Validates identifiers
-
             logger.debug(
                 "Parsed GitHub URL: owner=%s, repo=%s, app_name=%s",
                 owner,
@@ -229,49 +303,17 @@ class InstallHandler:
                 app_name,
             )
 
-            # Fetch latest release (already filtered for x86_64 Linux)
-            release = await self._fetch_release(owner, repo)
-
-            # Select best AppImage (filters unstable versions for URLs)
-            asset = select_best_appimage_asset(
-                release, installation_source=InstallSource.URL
+            # Validate and fetch release with AppImage
+            release, asset = await self._validate_and_fetch_release(
+                owner, repo
             )
-            # Asset is guaranteed non-None (raise_on_not_found=True by default)
-            if asset is None:
-                raise ValueError(ERROR_NO_APPIMAGE_ASSET)
 
-            # Create v2 format app config template for URL installs
-            # Note: verification method will auto-detect checksums
-            app_config = {
-                "config_version": "2.0.0",
-                "metadata": {
-                    "name": app_name,
-                    "display_name": app_name,
-                    "description": "",
-                },
-                "source": {
-                    "type": "github",
-                    "owner": owner,
-                    "repo": repo,
-                    "prerelease": prerelease,
-                },
-                "appimage": {
-                    "naming": {
-                        "template": "",
-                        "target_name": app_name,
-                        "architectures": ["amd64", "x86_64"],
-                    }
-                },
-                "verification": {
-                    "method": "digest",  # Will auto-detect checksum files
-                },
-                "icon": {
-                    "method": "extraction",
-                    "filename": "",
-                },
-            }
+            # Build app config template for URL install
+            app_config = self._build_url_install_config(
+                app_name, owner, repo, prerelease
+            )
 
-            # Install workflow
+            # Execute install workflow
             return await self._install_workflow(
                 app_name=app_name,
                 asset=asset,

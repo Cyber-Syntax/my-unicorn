@@ -23,7 +23,12 @@ from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.backup import BackupService
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
-from my_unicorn.core.github import Release, ReleaseFetcher, get_github_config
+from my_unicorn.core.github import (
+    Asset,
+    Release,
+    ReleaseFetcher,
+    get_github_config,
+)
 from my_unicorn.core.verification import VerificationService
 from my_unicorn.core.workflows.post_download import (
     OperationType,
@@ -322,12 +327,9 @@ class UpdateManager:
         """
         try:
             # Load app config
-            try:
-                app_config = self._load_app_config_or_fail(
-                    app_name, "check_update"
-                )
-            except ConfigurationError as e:
-                return UpdateInfo.create_error(app_name, str(e))
+            app_config = self._load_app_config_or_fail(
+                app_name, "check_update"
+            )
 
             # Extract config values
             github_config = get_github_config(app_config)
@@ -369,8 +371,8 @@ class UpdateManager:
                 )
             return UpdateInfo.create_error(app_name, error_msg)
 
-        except ValueError as e:
-            # Handle specific ValueError cases (no releases, parsing errors)
+        except (ConfigurationError, ValueError) as e:
+            # Handle config and validation errors
             logger.exception("Failed to check updates for %s", app_name)
             return UpdateInfo.create_error(app_name, str(e))
 
@@ -416,33 +418,15 @@ class UpdateManager:
         logger.info("🔄 Checking %d app(s) for updates...", len(app_names))
 
         async with aiohttp.ClientSession() as session:
-
-            async def check_single(app_name: str) -> UpdateInfo:
-                try:
-                    return await self.check_single_update(
-                        app_name, session, refresh_cache=refresh_cache
-                    )
-                except Exception as e:
-                    logger.exception("Update check failed for %s", app_name)
-                    return UpdateInfo.create_error(
-                        app_name, f"Exception during check: {e}"
-                    )
-
-            tasks = [check_single(app) for app in app_names]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Handle any unexpected exceptions from gather
-        update_infos: list[UpdateInfo] = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                logger.error("Update check failed: %s", result)
-                update_infos.append(
-                    UpdateInfo.create_error(
-                        app_names[i], f"Critical error: {result}"
-                    )
+            tasks = [
+                self.check_single_update(
+                    app, session, refresh_cache=refresh_cache
                 )
-            elif isinstance(result, UpdateInfo):
-                update_infos.append(result)
+                for app in app_names
+            ]
+            update_infos = await asyncio.gather(*tasks)
+
+        return update_infos
 
         return update_infos
 
@@ -473,6 +457,139 @@ class UpdateManager:
             )
             raise ValueError(msg) from e
 
+    async def _resolve_update_info(
+        self,
+        app_name: str,
+        session: aiohttp.ClientSession,
+        force: bool,
+        update_info: UpdateInfo | None,
+    ) -> tuple[UpdateInfo | None, str | None]:
+        """Resolve update info by using cached or checking for updates.
+
+        Args:
+            app_name: Name of the app
+            session: aiohttp session
+            force: Force update even if no new version
+            update_info: Optional pre-fetched update info
+
+        Returns:
+            Tuple of (UpdateInfo, error message). UpdateInfo is None on error.
+
+        """
+        # Use cached update info if provided, otherwise check for updates
+        if not update_info:
+            update_info = await self.check_single_update(app_name, session)
+
+        # Check if update info indicates an error
+        if not update_info.is_success:
+            logger.error(
+                "Failed to check updates for %s: %s",
+                app_name,
+                update_info.error_reason,
+            )
+            return None, update_info.error_reason or "Failed to check updates"
+
+        # Check if update is needed (skip if up to date and not forced)
+        if not update_info.has_update and not force:
+            logger.info("%s is already up to date", app_name)
+            return update_info, None  # Return info for skip handling
+
+        return update_info, None
+
+    def _load_update_config(
+        self, app_name: str, update_info: UpdateInfo
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        """Load app config from UpdateInfo cache or filesystem.
+
+        Args:
+            app_name: Name of the app
+            update_info: UpdateInfo with cached config
+
+        Returns:
+            Tuple of (app_config dict, error message). Config is None on error.
+
+        """
+        # Get app config from cached UpdateInfo or load if not available
+        if update_info.app_config:
+            return update_info.app_config, None
+
+        # Fallback: load if update_info didn't cache it
+        try:
+            app_config = self._load_app_config_or_fail(
+                app_name, "prepare_update"
+            )
+            return app_config, None
+        except ConfigurationError as e:
+            logger.error("Config error: %s", e)
+            return None, str(e)
+
+    async def _load_catalog_for_update(
+        self, app_name: str, app_config: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Load catalog entry if referenced in app config.
+
+        Args:
+            app_name: Name of the app
+            app_config: App configuration dictionary
+
+        Returns:
+            Catalog entry dict or None if not referenced
+
+        Raises:
+            ValueError: If catalog is referenced but not found
+
+        """
+        catalog_ref = app_config.get("catalog_ref")
+        if not catalog_ref:
+            return None
+
+        try:
+            return await self._load_catalog_cached(catalog_ref)
+        except (FileNotFoundError, ValueError):
+            msg = ERROR_CATALOG_MISSING.format(
+                app_name=app_name, catalog_ref=catalog_ref
+            )
+            raise ValueError(msg)
+
+    def _select_asset_for_update(
+        self,
+        app_name: str,
+        update_info: UpdateInfo,
+        catalog_entry: dict[str, Any] | None,
+    ) -> tuple[Asset | None, str | None]:
+        """Select AppImage asset from release data.
+
+        Args:
+            app_name: Name of the app
+            update_info: UpdateInfo with release data
+            catalog_entry: Optional catalog entry for asset selection
+
+        Returns:
+            Tuple of (Asset, error message). Asset is None on error.
+
+        """
+        if not update_info.release_data:
+            logger.error("No release data available for %s", app_name)
+            return None, "No release data available"
+
+        # Convert catalog_entry to dict if needed
+        catalog_dict = dict(catalog_entry) if catalog_entry else None
+        appimage_asset = select_best_appimage_asset(
+            update_info.release_data,
+            catalog_entry=catalog_dict,
+            installation_source="url",
+            raise_on_not_found=False,
+        )
+
+        if not appimage_asset:
+            logger.error("No AppImage found for %s", app_name)
+            return (
+                None,
+                "AppImage not found in release - may still be building",
+            )
+
+        return appimage_asset, None
+
     async def _prepare_update_context(
         self,
         app_name: str,
@@ -492,79 +609,42 @@ class UpdateManager:
             Tuple of (context dict, error message). Context is None on error.
 
         """
-        # Use cached update info if provided, otherwise check for updates
+        # Resolve update info (cached or fresh check)
+        update_info, error = await self._resolve_update_info(
+            app_name, session, force, update_info
+        )
+        if error:
+            return None, error
         if not update_info:
-            update_info = await self.check_single_update(app_name, session)
+            return None, "Failed to resolve update info"
 
-        # Check if update info indicates an error
-        if not update_info.is_success:
-            logger.error(
-                "Failed to check updates for %s: %s",
-                app_name,
-                update_info.error_reason,
-            )
-            return None, update_info.error_reason or "Failed to check updates"
-
-        # Check if update is needed (skip context only if up to date and not forced)
+        # Handle skip case (already up to date and not forced)
         if not update_info.has_update and not force:
-            logger.info("%s is already up to date", app_name)
             return {"skip": True, "success": True}, None
 
-        # Get app config from cached UpdateInfo or load if not available
-        # This eliminates redundant validation (was loading 2-3 times before)
-        if update_info.app_config:
-            app_config = (
-                update_info.app_config
-            )  # Reuse cached config (no validation!)
-        else:
-            # Fallback: load if update_info didn't cache it (shouldn't happen in normal flow)
-            try:
-                app_config = self._load_app_config_or_fail(
-                    app_name, "prepare_update"
-                )
-            except ConfigurationError as e:
-                logger.error("Config error: %s", e)
-                return None, str(e)
+        # Load app configuration
+        app_config, error = self._load_update_config(app_name, update_info)
+        if error:
+            return None, error
+        if not app_config:
+            return None, "Failed to load app config"
 
-        # Extract and validate GitHub configuration
+        # Extract GitHub configuration
         github_config = get_github_config(app_config)
         owner = github_config.owner
         repo = github_config.repo
 
         # Load catalog entry if referenced
-        catalog_ref = app_config.get("catalog_ref")
-        catalog_entry = None
-        if catalog_ref:
-            try:
-                catalog_entry = await self._load_catalog_cached(catalog_ref)
-            except (FileNotFoundError, ValueError):
-                msg = ERROR_CATALOG_MISSING.format(
-                    app_name=app_name, catalog_ref=catalog_ref
-                )
-                raise ValueError(msg)
-
-        # Find AppImage asset from cached release data
-        if not update_info.release_data:
-            logger.error("No release data available for %s", app_name)
-            return (
-                None,
-                "No release data available",
-            )
-
-        # Convert catalog_entry to dict if needed for select_best_appimage_asset
-        catalog_dict = dict(catalog_entry) if catalog_entry else None
-        appimage_asset = select_best_appimage_asset(
-            update_info.release_data,
-            catalog_entry=catalog_dict,
-            installation_source="url",
-            raise_on_not_found=False,
+        catalog_entry = await self._load_catalog_for_update(
+            app_name, app_config
         )
-        if not appimage_asset:
-            logger.error("No AppImage found for %s", app_name)
-            return (
-                None,
-                "AppImage not found in release - may still be building",
-            )
+
+        # Select AppImage asset
+        appimage_asset, error = self._select_asset_for_update(
+            app_name, update_info, catalog_entry
+        )
+        if error:
+            return None, error
 
         return {
             "app_config": app_config,
