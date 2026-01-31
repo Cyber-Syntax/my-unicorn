@@ -18,6 +18,7 @@ from my_unicorn.core.backup import BackupService
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import (
+    Asset,
     Release,
     ReleaseFetcher,
     extract_github_config,
@@ -164,6 +165,111 @@ class UpdateManager:
             download_service, progress_service
         )
 
+    async def _load_app_config_for_update(
+        self, app_name: str
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        """Load and validate app config for update check.
+
+        Args:
+            app_name: Name of the app
+
+        Returns:
+            Tuple of (app_config, error_message). Config is None on error.
+
+        """
+        try:
+            config = self._load_app_config_or_fail(app_name, "check_update")
+            return config, None
+        except ConfigurationError as e:
+            logger.warning("Config error: %s", e)
+            return None, str(e)
+
+    async def _fetch_release_data(
+        self,
+        owner: str,
+        repo: str,
+        should_use_prerelease: bool,
+        session: aiohttp.ClientSession,
+        refresh_cache: bool,
+    ) -> Release:
+        """Fetch release data from GitHub.
+
+        Args:
+            owner: GitHub repository owner
+            repo: GitHub repository name
+            should_use_prerelease: Whether to prefer prerelease
+            session: aiohttp session
+            refresh_cache: Whether to bypass cache
+
+        Returns:
+            Release data
+
+        Raises:
+            ValueError: If no releases found
+            aiohttp.ClientError: If API request fails
+
+        """
+        fetcher = ReleaseFetcher(owner, repo, session, self.auth_manager)
+        if should_use_prerelease:
+            logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
+            try:
+                return await fetcher.fetch_latest_prerelease(
+                    ignore_cache=refresh_cache
+                )
+            except ValueError as e:
+                if "No prereleases found" in str(e):
+                    logger.warning(
+                        "No prereleases found for %s/%s, falling back to latest release",
+                        owner,
+                        repo,
+                    )
+                    return await fetcher.fetch_latest_release_or_prerelease(
+                        prefer_prerelease=False,
+                        ignore_cache=refresh_cache,
+                    )
+                raise
+        return await fetcher.fetch_latest_release_or_prerelease(
+            prefer_prerelease=False, ignore_cache=refresh_cache
+        )
+
+    async def _build_update_info(
+        self,
+        app_name: str,
+        app_config: dict[str, Any],
+        release_data: Release,
+    ) -> UpdateInfo:
+        """Build UpdateInfo from app config and release data.
+
+        Args:
+            app_name: Name of the app
+            app_config: App configuration
+            release_data: Release data from GitHub
+
+        Returns:
+            UpdateInfo object with update status
+
+        """
+        current_version = app_config.get("state", {}).get("version", "unknown")
+        source_config = app_config.get("source", {})
+        owner = source_config.get("owner", "unknown")
+        repo = source_config.get("repo", "unknown")
+
+        latest_version = release_data.version
+        has_update = compare_versions(current_version, latest_version)
+
+        return UpdateInfo(
+            app_name=app_name,
+            current_version=current_version,
+            latest_version=latest_version,
+            has_update=has_update,
+            release_url=f"https://github.com/{owner}/{repo}/releases/tag/{latest_version}",
+            prerelease=release_data.prerelease,
+            original_tag_name=release_data.original_tag_name
+            or f"v{latest_version}",
+            release_data=release_data,
+            app_config=app_config,
+        )
+
     async def check_single_update(
         self,
         app_name: str,
@@ -182,20 +288,17 @@ class UpdateManager:
 
         """
         try:
-            # Load app config with consistent error handling
-            try:
-                app_config = self._load_app_config_or_fail(
-                    app_name, "check_update"
-                )
-            except ConfigurationError as e:
-                logger.warning("Config error: %s", e)
+            # Load app config
+            app_config, error_msg = await self._load_app_config_for_update(
+                app_name
+            )
+            if app_config is None:
                 return UpdateInfo(
                     app_name=app_name,
-                    error_reason=str(e),
+                    error_reason=error_msg or "Configuration error",
                 )
 
-            # Get config (all configs are v2 after migration)
-            # load_app_config now returns fully merged config
+            # Extract config values
             current_version = app_config.get("state", {}).get(
                 "version", "unknown"
             )
@@ -208,69 +311,14 @@ class UpdateManager:
                 "Checking updates for %s (%s/%s)", app_name, owner, repo
             )
 
-            # NOTE: Catalog apps are optimized to avoid duplicate API calls:
-            # - If catalog specifies prerelease=true, we call fetch_latest_prerelease() directly (1 API call)
-            # - If catalog specifies prerelease=false, we call fetch_latest_release_or_prerelease()
-            #   which tries stable first (/releases/latest), then fallbacks to prerelease only if needed
-            #
-            # For URL installs (apps without catalog entries):
-            # - Must use fetch_latest_release_or_prerelease(prefer_prerelease=False) fallback pattern
-            # - This may result in 2 API calls for prerelease-only repos (try stable, then prerelease)
-            # - This is a known limitation due to GitHub API design (/releases/latest only returns stable)
-            #
-            # The release_data is cached in UpdateInfo.release_data for reuse in update_single_app()
-            # to avoid redundant API calls within the same operation.
-            #
             # Fetch latest release
-            fetcher = ReleaseFetcher(owner, repo, session, self.auth_manager)
-            if should_use_prerelease:
-                logger.debug(
-                    "Fetching latest prerelease for %s/%s", owner, repo
-                )
-                try:
-                    release_data = await fetcher.fetch_latest_prerelease(
-                        ignore_cache=refresh_cache
-                    )
-                except ValueError as e:
-                    if "No prereleases found" in str(e):
-                        logger.warning(
-                            "No prereleases found for %s/%s, falling back to latest release",
-                            owner,
-                            repo,
-                        )
-                        # Use fallback logic to handle repositories with only prereleases
-                        release_data = (
-                            await fetcher.fetch_latest_release_or_prerelease(
-                                prefer_prerelease=False,
-                                ignore_cache=refresh_cache,
-                            )
-                        )
-                    else:
-                        raise
-            else:
-                # Use fallback logic to handle repositories with only prereleases
-                release_data = (
-                    await fetcher.fetch_latest_release_or_prerelease(
-                        prefer_prerelease=False, ignore_cache=refresh_cache
-                    )
-                )
+            release_data = await self._fetch_release_data(
+                owner, repo, should_use_prerelease, session, refresh_cache
+            )
 
-            latest_version = release_data.version
-            has_update = compare_versions(current_version, latest_version)
-
-            # Cache release data AND app_config in UpdateInfo for in-memory reuse within single operation
-            # This eliminates redundant cache file reads and config validation in subsequent update phases
-            return UpdateInfo(
-                app_name=app_name,
-                current_version=current_version,
-                latest_version=latest_version,
-                has_update=has_update,
-                release_url=f"https://github.com/{owner}/{repo}/releases/tag/{latest_version}",
-                prerelease=release_data.prerelease,
-                original_tag_name=release_data.original_tag_name
-                or f"v{latest_version}",
-                release_data=release_data,  # Store for in-memory reuse
-                app_config=app_config,  # Store loaded config to avoid re-validation
+            # Build and return update info
+            return await self._build_update_info(
+                app_name, app_config, release_data
             )
 
         except aiohttp.client_exceptions.ClientResponseError as e:
@@ -372,6 +420,88 @@ class UpdateManager:
                 update_infos.append(result)
 
         return update_infos
+
+    async def _validate_update_config(
+        self, owner: str, repo: str
+    ) -> str | None:
+        """Validate GitHub identifiers for security.
+
+        Args:
+            owner: GitHub owner
+            repo: GitHub repository
+
+        Returns:
+            Error message or None if valid
+
+        """
+        try:
+            validate_github_identifier(owner, "GitHub owner")
+            validate_github_identifier(repo, "GitHub repo")
+            return None
+        except ValueError as e:
+            msg = f"Invalid GitHub configuration: {e}"
+            logger.error(msg)
+            return msg
+
+    async def _load_catalog_if_needed(
+        self, app_name: str, catalog_ref: str | None
+    ) -> dict[str, Any] | None:
+        """Load catalog entry if app references one.
+
+        Args:
+            app_name: Name of the app
+            catalog_ref: Catalog reference from app config
+
+        Returns:
+            Catalog entry dict or None
+
+        Raises:
+            ValueError: If catalog reference is invalid
+
+        """
+        if not catalog_ref:
+            return None
+
+        try:
+            return self._load_catalog_cached(catalog_ref)
+        except (FileNotFoundError, ValueError) as e:
+            msg = (
+                f"App '{app_name}' references catalog '{catalog_ref}', "
+                f"but catalog entry is missing or invalid. Please reinstall."
+            )
+            raise ValueError(msg) from e
+
+    async def _select_update_asset(
+        self,
+        app_name: str,
+        release_data: Release,
+        catalog_entry: dict[str, Any] | None,
+    ) -> tuple[Asset | None, str | None]:
+        """Select best AppImage asset for update.
+
+        Args:
+            app_name: Name of the app
+            release_data: Release data from GitHub
+            catalog_entry: Catalog entry or None
+
+        Returns:
+            Tuple of (asset, error message). Asset is None on error.
+
+        """
+        catalog_dict = dict(catalog_entry) if catalog_entry else None
+        appimage_asset = select_best_appimage_asset(
+            release_data,
+            catalog_entry=catalog_dict,
+            installation_source="url",
+            raise_on_not_found=False,
+        )
+        if not appimage_asset:
+            logger.error("No AppImage found for %s", app_name)
+            return (
+                None,
+                "AppImage not found in release - may still be building",
+            )
+        return appimage_asset, None
 
     async def _prepare_update_context(
         self,
@@ -562,10 +692,9 @@ class UpdateManager:
 
             # Verify, install, and configure
             # release_data is guaranteed to exist at this point
-            # (checked in _prepare_update_context)
             if update_info.release_data is None:
                 msg = "release_data must be available"
-                raise ValueError(msg)
+                raise ValueError(msg) from None
             success = await process_post_download(
                 app_name=app_name,
                 app_config=app_config,
