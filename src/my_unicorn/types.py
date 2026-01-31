@@ -292,3 +292,95 @@ class CatalogConfig(TypedDict):
     appimage: AppImageConfigV2
     verification: VerificationConfigV2
     icon: IconConfigV2
+
+
+# =============================================================================
+# Workflow Result Types (Phase 2: Type Safety Improvements)
+# =============================================================================
+
+
+@dataclass
+class InstallResult:
+    """Result of an installation operation.
+
+    Provides type-safe alternative to dictionary return values
+    for install operations.
+    """
+
+    success: bool
+    app_name: str
+    version: str
+    message: str
+    source: str  # "catalog" or "url"
+    installed_path: str | None = None
+    desktop_entry: str | None = None
+    icon_path: str | None = None
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for backward compatibility.
+
+        Returns:
+            Dictionary representation of install result
+
+        """
+        result: dict[str, Any] = {
+            "success": self.success,
+            "app_name": self.app_name,
+            "version": self.version,
+            "message": self.message,
+            "source": self.source,
+        }
+
+        if self.installed_path:
+            result["installed_path"] = self.installed_path
+        if self.desktop_entry:
+            result["desktop"] = self.desktop_entry
+        if self.icon_path:
+            result["icon"] = self.icon_path
+        if self.error:
+            result["error"] = self.error
+
+        return result
+
+
+@dataclass
+class UpdateResult:
+    """Result of an update operation.
+
+    Provides type-safe alternative to dictionary return values
+    for update operations.
+    """
+
+    success: bool
+    app_name: str
+    old_version: str
+    new_version: str
+    message: str
+    updated_path: str | None = None
+    backup_path: str | None = None
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for backward compatibility.
+
+        Returns:
+            Dictionary representation of update result
+
+        """
+        result: dict[str, Any] = {
+            "success": self.success,
+            "app_name": self.app_name,
+            "old_version": self.old_version,
+            "new_version": self.new_version,
+            "message": self.message,
+        }
+
+        if self.updated_path:
+            result["updated_path"] = self.updated_path
+        if self.backup_path:
+            result["backup_path"] = self.backup_path
+        if self.error:
+            result["error"] = self.error
+
+        return result

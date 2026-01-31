@@ -3,6 +3,9 @@
 from pathlib import Path
 from typing import Any
 
+from my_unicorn.config import ConfigManager
+from my_unicorn.core.backup import BackupService
+from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import Asset, Release
 from my_unicorn.core.verification import VerificationService
 from my_unicorn.core.workflows.appimage_setup import (
@@ -11,6 +14,7 @@ from my_unicorn.core.workflows.appimage_setup import (
     setup_appimage_icon,
 )
 from my_unicorn.logger import get_logger
+from my_unicorn.ui.display import ProgressDisplay
 from my_unicorn.utils.appimage_utils import verify_appimage_download
 from my_unicorn.utils.config_builders import get_stored_hash, update_app_config
 
@@ -30,10 +34,10 @@ async def process_post_download(
     storage_dir: Path,
     downloaded_path: Path,
     verification_service: VerificationService,
-    storage_service: Any,
-    config_manager: Any,
-    backup_service: Any,
-    progress_service: Any = None,
+    storage_service: FileOperations,
+    config_manager: ConfigManager,
+    backup_service: BackupService,
+    progress_service: ProgressDisplay | None = None,
 ) -> bool:
     """Process post-download operations for update workflow.
 

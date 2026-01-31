@@ -8,6 +8,9 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
+import aiohttp
+
+from my_unicorn.config import ConfigManager
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import (
@@ -24,6 +27,7 @@ from my_unicorn.core.workflows.appimage_setup import (
 )
 from my_unicorn.exceptions import InstallationError
 from my_unicorn.logger import get_logger
+from my_unicorn.ui.display import ProgressDisplay
 from my_unicorn.utils.appimage_utils import (
     select_best_appimage_asset,
     verify_appimage_download,
@@ -42,7 +46,7 @@ class InstallHandler:
         self,
         download_service: DownloadService,
         storage_service: FileOperations,
-        config_manager: Any,
+        config_manager: ConfigManager,
         github_client: GitHubClient,
     ) -> None:
         """Initialize install handler.
@@ -62,11 +66,11 @@ class InstallHandler:
     @classmethod
     def create_default(
         cls,
-        session: Any,
-        config_manager: Any,
+        session: aiohttp.ClientSession,
+        config_manager: ConfigManager,
         github_client: GitHubClient,
         install_dir: Path,
-        progress_service: Any = None,
+        progress_service: ProgressDisplay | None = None,
     ) -> "InstallHandler":
         """Create InstallHandler with default dependencies.
 
@@ -149,9 +153,9 @@ class InstallHandler:
             # Install workflow
             return await self._install_workflow(
                 app_name=app_name,
-                asset=asset,  # type: ignore[arg-type]
+                asset=asset,
                 release=release,
-                app_config=app_config,
+                app_config=app_config,  # type: ignore[arg-type]
                 source="catalog",
                 **options,
             )
@@ -352,9 +356,8 @@ class InstallHandler:
         return await asyncio.gather(*tasks)
 
     @staticmethod
-    @staticmethod
     def separate_targets_impl(
-        config_manager: Any, targets: list[str]
+        config_manager: ConfigManager, targets: list[str]
     ) -> tuple[list[str], list[str]]:
         """Separate targets into URL and catalog targets.
 
@@ -400,7 +403,7 @@ class InstallHandler:
 
     @staticmethod
     async def check_apps_needing_work_impl(
-        config_manager: Any,
+        config_manager: ConfigManager,
         url_targets: list[str],
         catalog_targets: list[str],
         install_options: dict[str, Any],

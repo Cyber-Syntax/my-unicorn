@@ -7,7 +7,7 @@ and managing the update process for installed AppImages.
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import aiohttp
 
@@ -25,6 +25,7 @@ from my_unicorn.core.github import (
 from my_unicorn.core.verification import VerificationService
 from my_unicorn.exceptions import ConfigurationError
 from my_unicorn.logger import get_logger
+from my_unicorn.ui.display import ProgressDisplay
 from my_unicorn.utils.appimage_utils import select_best_appimage_asset
 from my_unicorn.utils.download_utils import extract_filename_from_url
 from my_unicorn.utils.update_utils import process_post_download
@@ -88,7 +89,7 @@ class UpdateManager:
         self,
         config_manager: ConfigManager | None = None,
         auth_manager: GitHubAuthManager | None = None,
-        progress_service: Any = None,
+        progress_service: ProgressDisplay | None = None,
     ) -> None:
         """Initialize update manager.
 
@@ -128,7 +129,7 @@ class UpdateManager:
     def create_default(
         cls,
         config_manager: ConfigManager | None = None,
-        progress_service: Any = None,
+        progress_service: ProgressDisplay | None = None,
     ) -> "UpdateManager":
         """Create UpdateManager with default dependencies.
 
@@ -147,7 +148,7 @@ class UpdateManager:
             progress_service=progress_service,
         )
 
-    def _initialize_services(self, session: Any) -> None:
+    def _initialize_services(self, session: aiohttp.ClientSession) -> None:
         """Initialize shared services with HTTP session.
 
         Args:
@@ -510,13 +511,14 @@ class UpdateManager:
             if context.get("skip"):
                 return True, None
 
-            # Extract from context
+            # Extract from context with runtime type checking
             app_config = context["app_config"]
-            update_info = cast("UpdateInfo", context["update_info"])
+            update_info_raw = context.get("update_info")
+            if not isinstance(update_info_raw, UpdateInfo):
+                msg = "Invalid update context: missing or invalid UpdateInfo"
+                return False, msg
+            update_info = update_info_raw
             appimage_asset = context["appimage_asset"]
-
-            # Type narrowing: update_info from context is guaranteed
-            # to be non-None and successful (checked in _prepare_update_context)
 
             # Setup paths
             storage_dir = Path(self.global_config["directory"]["storage"])
@@ -572,7 +574,7 @@ class UpdateManager:
                 repo=context["repo"],
                 catalog_entry=context["catalog_entry"],
                 appimage_asset=appimage_asset,
-                release_data=update_info.release_data,  # type: ignore[arg-type]
+                release_data=update_info.release_data,
                 icon_dir=icon_dir,
                 storage_dir=storage_dir,
                 downloaded_path=downloaded_path,
@@ -616,7 +618,7 @@ class UpdateManager:
         if ref not in self._catalog_cache:
             entry = self.config_manager.load_catalog(ref)
             # Cache the result (even if None) to avoid repeated lookup failures
-            self._catalog_cache[ref] = entry
+            self._catalog_cache[ref] = entry  # type: ignore[assignment]
 
         return self._catalog_cache.get(ref)
 
