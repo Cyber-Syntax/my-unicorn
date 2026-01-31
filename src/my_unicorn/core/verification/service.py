@@ -22,6 +22,7 @@ from my_unicorn.constants import (
     SUPPORTED_HASH_ALGORITHMS,
     YAML_DEFAULT_HASH,
     HashType,
+    VerificationMethod,
 )
 from my_unicorn.core.github import Asset, AssetSelector, ChecksumFileInfo
 from my_unicorn.core.verification.verifier import Verifier
@@ -58,7 +59,7 @@ class VerificationConfig:
             skip=config.get("skip", False),
             checksum_file=config.get("checksum_file"),
             checksum_hash_type=config.get("checksum_hash_type", "sha256"),
-            digest_enabled=config.get("digest", False),
+            digest_enabled=config.get(VerificationMethod.DIGEST, False),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -72,7 +73,7 @@ class VerificationConfig:
             "skip": self.skip,
             "checksum_file": self.checksum_file,
             "checksum_hash_type": self.checksum_hash_type,
-            "digest": self.digest_enabled,
+            VerificationMethod.DIGEST: self.digest_enabled,
         }
 
 
@@ -243,7 +244,7 @@ class VerificationService:
             context.app_name,
             context.config.get("skip", False),
             context.config.get("checksum_file", ""),
-            context.config.get("digest", False),
+            context.config.get(VerificationMethod.DIGEST, False),
         )
         logger.debug("Asset digest: %s", context.asset.digest or "None")
         logger.debug(
@@ -348,7 +349,9 @@ class VerificationService:
             skip_configured,
         )
         if digest_result:
-            context.verification_methods["digest"] = digest_result.to_dict()
+            context.verification_methods[VerificationMethod.DIGEST] = (
+                digest_result.to_dict()
+            )
             if digest_result.passed:
                 context.verification_passed = True
                 logger.debug(
@@ -357,7 +360,7 @@ class VerificationService:
                 logger.info(
                     "Digest verification passed for %s", context.app_name
                 )
-                context.updated_config["digest"] = True
+                context.updated_config[VerificationMethod.DIGEST] = True
             else:
                 logger.warning(
                     "Digest verification failed: app=%s", context.app_name
@@ -467,7 +470,7 @@ class VerificationService:
             )
             available_methods = []
             if context.has_digest:
-                available_methods.append("digest")
+                available_methods.append(VerificationMethod.DIGEST)
             if has_checksum_files:
                 available_methods.append("checksum_files")
             raise Exception(
@@ -639,7 +642,7 @@ class VerificationService:
         """
         digest_value = asset.digest or ""
         has_digest = bool(digest_value and digest_value.strip())
-        digest_requested = config.get("digest", False)
+        digest_requested = config.get(VerificationMethod.DIGEST, False)
 
         if digest_requested and not has_digest:
             logger.warning(
@@ -707,11 +710,11 @@ class VerificationService:
             and owner
             and repo
             and tag_name
-            and not config.get("digest", False)
+            and not config.get(VerificationMethod.DIGEST, False)
         ):
             return self._auto_detect_checksum_files(assets, tag_name)
 
-        if assets and config.get("digest", False):
+        if assets and config.get(VerificationMethod.DIGEST, False):
             logger.debug(
                 "i  Skipping auto-detection: "
                 "digest verification explicitly enabled"

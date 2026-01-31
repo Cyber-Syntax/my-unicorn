@@ -277,3 +277,55 @@ HASH_PREFERENCE_ORDER: Final[tuple[str, ...]] = (
     "sha1",
     "md5",
 )
+
+# =============================================================================
+# Installation and Update Constants
+# =============================================================================
+
+
+# Installation source identifiers
+class InstallSource:
+    """Constants for installation sources."""
+
+    CATALOG: Final[str] = "catalog"
+    URL: Final[str] = "url"
+
+
+# Verification method identifiers
+class VerificationMethod:
+    """Constants for verification methods."""
+
+    DIGEST: Final[str] = "digest"
+    SIGNATURE: Final[str] = "signature"
+    NONE: Final[str] = "none"
+
+
+# Version placeholder for unknown/missing versions
+VERSION_UNKNOWN: Final[str] = "unknown"
+
+# =============================================================================
+# Common Error Message Patterns
+# =============================================================================
+
+# Error message templates for consistency
+ERROR_NO_APPIMAGE_ASSET: Final[str] = "No suitable AppImage asset found"
+ERROR_NO_RELEASE_FOUND: Final[str] = "No release found for {owner}/{repo}"
+ERROR_INVALID_GITHUB_CONFIG: Final[str] = (
+    "Invalid GitHub configuration in catalog: {error}"
+)
+ERROR_INVALID_GITHUB_URL: Final[str] = "Invalid GitHub URL: {error}"
+ERROR_VERIFICATION_FAILED: Final[str] = "Verification failed: {error}"
+ERROR_CONFIGURATION_MISSING: Final[str] = (
+    "No configuration found for app: {app_name}"
+)
+ERROR_CATALOG_MISSING: Final[str] = (
+    "App '{app_name}' references catalog '{catalog_ref}', "
+    "but catalog entry is missing or invalid. Please reinstall."
+)
+ERROR_UNKNOWN_APPS_OR_URLS: Final[str] = (
+    "Unknown applications or invalid URLs: {targets}. "
+    "Use 'my-unicorn catalog --available' to see available apps."
+)
+ERROR_DESKTOP_ENTRY_FAILED: Final[str] = "Desktop entry creation failed"
+ERROR_CONFIGURATION_GENERIC: Final[str] = "Configuration error"
+ERROR_UNEXPECTED: Final[str] = "Unexpected error: {error}"

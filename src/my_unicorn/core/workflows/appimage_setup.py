@@ -7,6 +7,7 @@ icon extraction, and desktop entry creation.
 from pathlib import Path
 from typing import Any
 
+from my_unicorn.constants import ERROR_DESKTOP_ENTRY_FAILED
 from my_unicorn.core.desktop_entry import DesktopEntry
 from my_unicorn.core.file_ops import FileOperations, extract_icon_from_appimage
 from my_unicorn.logger import get_logger
@@ -212,5 +213,5 @@ def create_desktop_entry(
         logger.exception("Failed to create desktop entry for %s", app_name)
         return {
             "success": False,
-            "error": "Desktop entry creation failed",
+            "error": ERROR_DESKTOP_ENTRY_FAILED,
         }

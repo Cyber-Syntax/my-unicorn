@@ -12,6 +12,14 @@ import aiohttp
 
 from my_unicorn.config import ConfigManager
 from my_unicorn.config.validation import ConfigurationValidator
+from my_unicorn.constants import (
+    ERROR_INVALID_GITHUB_CONFIG,
+    ERROR_INVALID_GITHUB_URL,
+    ERROR_NO_APPIMAGE_ASSET,
+    ERROR_NO_RELEASE_FOUND,
+    ERROR_VERIFICATION_FAILED,
+    InstallSource,
+)
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import (
@@ -133,7 +141,7 @@ class InstallHandler:
             try:
                 ConfigurationValidator.validate_app_config(app_config)
             except ValueError as e:
-                msg = f"Invalid GitHub configuration in catalog: {e}"
+                msg = ERROR_INVALID_GITHUB_CONFIG.format(error=e)
                 raise InstallationError(msg, target=app_name)
 
             characteristic_suffix = (
@@ -148,12 +156,11 @@ class InstallHandler:
             asset = select_best_appimage_asset(
                 release,
                 preferred_suffixes=characteristic_suffix,
-                installation_source="catalog",
+                installation_source=InstallSource.CATALOG,
             )
             # Asset is guaranteed non-None (raise_on_not_found=True by default)
             if asset is None:
-                msg = "No suitable AppImage asset found"
-                raise ValueError(msg)
+                raise ValueError(ERROR_NO_APPIMAGE_ASSET)
 
             # Install workflow
             return await self._install_workflow(
@@ -161,7 +168,7 @@ class InstallHandler:
                 asset=asset,
                 release=release,
                 app_config=app_config,  # type: ignore[arg-type]
-                source="catalog",
+                source=InstallSource.CATALOG,
                 **options,
             )
 
@@ -202,7 +209,7 @@ class InstallHandler:
                 config = {"source": {"owner": owner, "repo": repo}}
                 ConfigurationValidator.validate_app_config(config)
             except ValueError as e:
-                msg = f"Invalid GitHub URL: {e}"
+                msg = ERROR_INVALID_GITHUB_URL.format(error=e)
                 raise InstallationError(msg, target=github_url)
 
             logger.debug(
@@ -217,12 +224,11 @@ class InstallHandler:
 
             # Select best AppImage (filters unstable versions for URLs)
             asset = select_best_appimage_asset(
-                release, installation_source="url"
+                release, installation_source=InstallSource.URL
             )
             # Asset is guaranteed non-None (raise_on_not_found=True by default)
             if asset is None:
-                msg = "No suitable AppImage asset found"
-                raise ValueError(msg)
+                raise ValueError(ERROR_NO_APPIMAGE_ASSET)
 
             # Create v2 format app config template for URL installs
             # Note: verification method will auto-detect checksums
@@ -261,7 +267,7 @@ class InstallHandler:
                 asset=asset,  # type: ignore[arg-type]
                 release=release,
                 app_config=app_config,
-                source="url",
+                source=InstallSource.URL,
                 **options,
             )
 
@@ -318,7 +324,9 @@ class InstallHandler:
                         "target": app_or_url,
                         "name": app_or_url,
                         "error": f"Installation failed: {error}",
-                        "source": "url" if is_url else "catalog",
+                        "source": InstallSource.URL
+                        if is_url
+                        else InstallSource.CATALOG,
                     }
 
         # Create tasks
@@ -452,7 +460,7 @@ class InstallHandler:
         )
         if not verify_result["passed"]:
             error_msg = verify_result.get("error", "Unknown error")
-            msg = f"Verification failed: {error_msg}"
+            msg = ERROR_VERIFICATION_FAILED.format(error=error_msg)
             raise InstallationError(msg)
 
         return verify_result
@@ -585,7 +593,7 @@ class InstallHandler:
             asset: GitHub asset to download
             release: Release information
             app_config: App configuration
-            source: Install source ("catalog" or "url")
+            source: Install source (InstallSource.CATALOG or InstallSource.URL)
             **options: Install options
 
         Returns:
@@ -692,7 +700,7 @@ class InstallHandler:
         try:
             release = await self.github_client.get_latest_release(owner, repo)
             if not release:
-                msg = f"No release found for {owner}/{repo}"
+                msg = ERROR_NO_RELEASE_FOUND.format(owner=owner, repo=repo)
                 raise InstallationError(msg)
             return release  # type: ignore[return-value]
         except Exception as error:

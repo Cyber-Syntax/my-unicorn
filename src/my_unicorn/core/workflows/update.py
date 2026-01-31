@@ -14,6 +14,13 @@ import aiohttp
 from my_unicorn.config import ConfigManager
 from my_unicorn.config.migration.helpers import warn_about_migration
 from my_unicorn.config.validation import ConfigurationValidator
+from my_unicorn.constants import (
+    ERROR_CATALOG_MISSING,
+    ERROR_CONFIGURATION_GENERIC,
+    ERROR_CONFIGURATION_MISSING,
+    ERROR_UNEXPECTED,
+    VERSION_UNKNOWN,
+)
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.backup import BackupService
 from my_unicorn.core.download import DownloadService
@@ -46,8 +53,8 @@ class UpdateInfo:
     """
 
     app_name: str
-    current_version: str = "unknown"
-    latest_version: str = "unknown"
+    current_version: str = VERSION_UNKNOWN
+    latest_version: str = VERSION_UNKNOWN
     has_update: bool = False
     release_url: str = ""
     prerelease: bool = False
@@ -59,7 +66,10 @@ class UpdateInfo:
     def __post_init__(self) -> None:
         """Post-initialization processing."""
         # Set default original_tag_name if not provided
-        if not self.original_tag_name and self.latest_version != "unknown":
+        if (
+            not self.original_tag_name
+            and self.latest_version != VERSION_UNKNOWN
+        ):
             self.original_tag_name = f"v{self.latest_version}"
 
     @property
@@ -258,10 +268,12 @@ class UpdateManager:
             UpdateInfo object with update status
 
         """
-        current_version = app_config.get("state", {}).get("version", "unknown")
+        current_version = app_config.get("state", {}).get(
+            "version", VERSION_UNKNOWN
+        )
         source_config = app_config.get("source", {})
-        owner = source_config.get("owner", "unknown")
-        repo = source_config.get("repo", "unknown")
+        owner = source_config.get("owner", VERSION_UNKNOWN)
+        repo = source_config.get("repo", VERSION_UNKNOWN)
 
         latest_version = release_data.version
         has_update = compare_versions(current_version, latest_version)
@@ -304,16 +316,16 @@ class UpdateManager:
             if app_config is None:
                 return UpdateInfo(
                     app_name=app_name,
-                    error_reason=error_msg or "Configuration error",
+                    error_reason=error_msg or ERROR_CONFIGURATION_GENERIC,
                 )
 
             # Extract config values
             current_version = app_config.get("state", {}).get(
-                "version", "unknown"
+                "version", VERSION_UNKNOWN
             )
             source_config = app_config.get("source", {})
-            owner = source_config.get("owner", "unknown")
-            repo = source_config.get("repo", "unknown")
+            owner = source_config.get("owner", VERSION_UNKNOWN)
+            repo = source_config.get("repo", VERSION_UNKNOWN)
             should_use_prerelease = source_config.get("prerelease", False)
 
             logger.debug(
@@ -366,7 +378,7 @@ class UpdateManager:
             logger.exception("Failed to check updates for %s", app_name)
             return UpdateInfo(
                 app_name=app_name,
-                error_reason=f"Unexpected error: {e}",
+                error_reason=ERROR_UNEXPECTED.format(error=e),
             )
 
     async def check_updates(
@@ -475,9 +487,8 @@ class UpdateManager:
         try:
             return await self._load_catalog_cached(catalog_ref)
         except (FileNotFoundError, ValueError) as e:
-            msg = (
-                f"App '{app_name}' references catalog '{catalog_ref}', "
-                f"but catalog entry is missing or invalid. Please reinstall."
+            msg = ERROR_CATALOG_MISSING.format(
+                app_name=app_name, catalog_ref=catalog_ref
             )
             raise ValueError(msg) from e
 
@@ -584,9 +595,8 @@ class UpdateManager:
             try:
                 catalog_entry = await self._load_catalog_cached(catalog_ref)
             except (FileNotFoundError, ValueError):
-                msg = (
-                    f"App '{app_name}' references catalog '{catalog_ref}', "
-                    f"but catalog entry is missing or invalid. Please reinstall."
+                msg = ERROR_CATALOG_MISSING.format(
+                    app_name=app_name, catalog_ref=catalog_ref
                 )
                 raise ValueError(msg)
 
@@ -792,7 +802,7 @@ class UpdateManager:
         config = self.config_manager.load_app_config(app_name)
         if not config:
             prefix = f"{context}: " if context else ""
-            msg = f"{prefix}No configuration found for app: {app_name}"
+            msg = f"{prefix}{ERROR_CONFIGURATION_MISSING.format(app_name=app_name)}"
             raise ConfigurationError(msg)
         return config
 
@@ -904,6 +914,6 @@ class UpdateManager:
                         error_reasons[app_name] = error_reason
                 elif isinstance(result, Exception):
                     logger.error("Update task failed: %s", result)
-                    error_reasons["unknown"] = f"Task failed: {result}"
+                    error_reasons[VERSION_UNKNOWN] = f"Task failed: {result}"
 
         return results, error_reasons

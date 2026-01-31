@@ -5,6 +5,7 @@ This module provides functionality to separate mixed installation targets
 """
 
 from my_unicorn.config.config import ConfigManager
+from my_unicorn.constants import ERROR_UNKNOWN_APPS_OR_URLS
 from my_unicorn.exceptions import InstallationError
 
 
@@ -47,10 +48,7 @@ class TargetResolver:
 
         if unknown_targets:
             unknown_list = ", ".join(unknown_targets)
-            msg = (
-                f"Unknown applications or invalid URLs: {unknown_list}. "
-                "Use 'my-unicorn catalog --available' to see available apps."
-            )
+            msg = ERROR_UNKNOWN_APPS_OR_URLS.format(targets=unknown_list)
             raise InstallationError(msg)
 
         return url_targets, catalog_targets
