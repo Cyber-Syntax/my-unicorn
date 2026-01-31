@@ -91,7 +91,27 @@ class TestInstallHandler:
     @pytest.fixture
     def install_service(self, mock_services):
         """Create InstallHandler instance with mocked dependencies."""
-        return InstallHandler(**mock_services)
+        from pathlib import Path
+        from unittest.mock import AsyncMock
+
+        from my_unicorn.core.workflows.post_download import PostDownloadResult
+
+        # Create a mock PostDownloadProcessor with AsyncMock
+        mock_processor = AsyncMock()
+        # Configure process method to return a successful result
+        mock_processor.process.return_value = PostDownloadResult(
+            success=True,
+            install_path=Path("/tmp/install/test-app.AppImage"),
+            verification_result={"sha256": "abc123"},
+            icon_result={"path": "/tmp/icons/test-app.png"},
+            config_result={"saved": True},
+            desktop_result={"path": "/tmp/desktop/test-app.desktop"},
+            error=None,
+        )
+
+        return InstallHandler(
+            **mock_services, post_download_processor=mock_processor
+        )
 
     @pytest.mark.asyncio
     async def test_install_from_catalog_success(
@@ -99,7 +119,7 @@ class TestInstallHandler:
     ):
         """Test successful installation from catalog."""
         with patch(
-            "my_unicorn.core.workflows.install.VerificationService"
+            "my_unicorn.core.workflows.post_download.VerificationService"
         ) as mock_verification:
             from dataclasses import dataclass
 
@@ -153,7 +173,7 @@ class TestInstallHandler:
     ):
         """Test installing multiple apps concurrently."""
         with patch(
-            "my_unicorn.core.workflows.install.VerificationService"
+            "my_unicorn.core.workflows.post_download.VerificationService"
         ) as mock_verification:
             from dataclasses import dataclass
 
@@ -195,7 +215,7 @@ class TestInstallHandler:
     ):
         """Test successful installation from URL."""
         with patch(
-            "my_unicorn.core.workflows.install.VerificationService"
+            "my_unicorn.core.workflows.post_download.VerificationService"
         ) as mock_verification:
             from dataclasses import dataclass
 
@@ -245,7 +265,7 @@ class TestInstallHandler:
                 )
 
                 with patch(
-                    "my_unicorn.core.workflows.install.VerificationService"
+                    "my_unicorn.core.workflows.post_download.VerificationService"
                 ) as mock_verification:
                     mock_verification.return_value.verify_file = AsyncMock(
                         return_value=Mock(

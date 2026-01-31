@@ -15,7 +15,6 @@ from my_unicorn.config import ConfigManager
 from my_unicorn.config.migration.helpers import warn_about_migration
 from my_unicorn.constants import (
     ERROR_CATALOG_MISSING,
-    ERROR_CONFIGURATION_GENERIC,
     ERROR_CONFIGURATION_MISSING,
     ERROR_UNEXPECTED,
     VERSION_UNKNOWN,
@@ -26,12 +25,16 @@ from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import Release, ReleaseFetcher, get_github_config
 from my_unicorn.core.verification import VerificationService
+from my_unicorn.core.workflows.post_download import (
+    OperationType,
+    PostDownloadContext,
+    PostDownloadProcessor,
+)
 from my_unicorn.exceptions import ConfigurationError
 from my_unicorn.logger import get_logger
 from my_unicorn.ui.display import ProgressDisplay
 from my_unicorn.utils.appimage_utils import select_best_appimage_asset
 from my_unicorn.utils.download_utils import extract_filename_from_url
-from my_unicorn.utils.update_utils import process_post_download
 from my_unicorn.utils.version_utils import compare_versions
 
 logger = get_logger(__name__)
@@ -150,10 +153,7 @@ class UpdateManager:
 
         # Initialize shared services - will be set when session is available
         self.verification_service: VerificationService | None = None
-
-        # Shared API progress task ID for consolidated API progress tracking
-        self._shared_api_task_id: str | None = None
-
+        self.post_download_processor: PostDownloadProcessor | None = None
         # In-memory catalog cache for current update session
         # Cleared when UpdateManager instance is destroyed
         # Thread-safe with asyncio.Lock for concurrent access
@@ -199,24 +199,15 @@ class UpdateManager:
             download_service, progress_service
         )
 
-    async def _load_app_config_for_update(
-        self, app_name: str
-    ) -> tuple[dict[str, Any] | None, str | None]:
-        """Load and validate app config for update check.
-
-        Args:
-            app_name: Name of the app
-
-        Returns:
-            Tuple of (app_config, error_message). Config is None on error.
-
-        """
-        try:
-            config = self._load_app_config_or_fail(app_name, "check_update")
-            return config, None
-        except ConfigurationError as e:
-            logger.warning("Config error: %s", e)
-            return None, str(e)
+        # Initialize post-download processor
+        self.post_download_processor = PostDownloadProcessor(
+            download_service=download_service,
+            storage_service=self.storage_service,
+            config_manager=self.config_manager,
+            verification_service=self.verification_service,
+            backup_service=self.backup_service,
+            progress_service=self._progress_service_param,
+        )
 
     async def _fetch_release_data(
         self,
@@ -331,13 +322,12 @@ class UpdateManager:
         """
         try:
             # Load app config
-            app_config, error_msg = await self._load_app_config_for_update(
-                app_name
-            )
-            if app_config is None:
-                return UpdateInfo.create_error(
-                    app_name, error_msg or ERROR_CONFIGURATION_GENERIC
+            try:
+                app_config = self._load_app_config_or_fail(
+                    app_name, "check_update"
                 )
+            except ConfigurationError as e:
+                return UpdateInfo.create_error(app_name, str(e))
 
             # Extract config values
             github_config = get_github_config(app_config)
@@ -671,38 +661,37 @@ class UpdateManager:
             if not downloaded_path:
                 return False, "Download failed"
 
-            # Verify, install, and configure
             # release_data is guaranteed to exist at this point
             if update_info.release_data is None:
                 msg = "release_data must be available"
                 raise ValueError(msg) from None
-            success = await process_post_download(
+
+            # Create processing context
+            post_context = PostDownloadContext(
                 app_name=app_name,
+                downloaded_path=downloaded_path,
+                asset=appimage_asset,
+                release=update_info.release_data,
                 app_config=app_config,
-                latest_version=update_info.latest_version,
+                catalog_entry=context["catalog_entry"],
+                operation_type=OperationType.UPDATE,
                 owner=context["owner"],
                 repo=context["repo"],
-                catalog_entry=context["catalog_entry"],
-                appimage_asset=appimage_asset,
-                release_data=update_info.release_data,
-                icon_dir=icon_dir,
-                storage_dir=storage_dir,
-                downloaded_path=downloaded_path,
-                verification_service=self.verification_service,  # type: ignore[arg-type]
-                storage_service=self.storage_service,
-                config_manager=self.config_manager,
-                backup_service=self.backup_service,
-                progress_service=self._progress_service_param,
+                verify_downloads=True,  # Always verify updates
+                source="catalog" if context.get("catalog_entry") else "url",
             )
 
-            if success:
+            # Process download
+            result = await self.post_download_processor.process(post_context)
+
+            if result.success:
                 logger.debug(
                     "✅ Successfully updated %s to %s",
                     app_name,
                     update_info.latest_version,
                 )
                 return True, None
-            return False, "Post-download processing failed"
+            return False, result.error or "Post-download processing failed"
 
         except Exception as e:
             logger.exception("Failed to update %s", app_name)

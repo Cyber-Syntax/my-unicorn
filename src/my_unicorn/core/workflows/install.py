@@ -14,7 +14,6 @@ from my_unicorn.config import ConfigManager
 from my_unicorn.constants import (
     ERROR_NO_APPIMAGE_ASSET,
     ERROR_NO_RELEASE_FOUND,
-    ERROR_VERIFICATION_FAILED,
     InstallSource,
 )
 from my_unicorn.core.download import DownloadService
@@ -26,20 +25,15 @@ from my_unicorn.core.github import (
     get_github_config,
     parse_github_url,
 )
-from my_unicorn.core.verification import VerificationService
-from my_unicorn.core.workflows.appimage_setup import (
-    create_desktop_entry,
-    rename_appimage,
-    setup_appimage_icon,
+from my_unicorn.core.workflows.post_download import (
+    OperationType,
+    PostDownloadContext,
+    PostDownloadProcessor,
 )
 from my_unicorn.exceptions import InstallationError
 from my_unicorn.logger import get_logger
 from my_unicorn.ui.display import ProgressDisplay
-from my_unicorn.utils.appimage_utils import (
-    select_best_appimage_asset,
-    verify_appimage_download,
-)
-from my_unicorn.utils.config_builders import create_app_config_v2
+from my_unicorn.utils.appimage_utils import select_best_appimage_asset
 from my_unicorn.utils.error_formatters import build_install_error_result
 
 logger = get_logger(__name__)
@@ -61,6 +55,7 @@ class InstallHandler:
         storage_service: FileOperations,
         config_manager: ConfigManager,
         github_client: GitHubClient,
+        post_download_processor: PostDownloadProcessor,
         progress_service: ProgressDisplay | None = None,
     ) -> None:
         """Initialize install handler.
@@ -70,6 +65,7 @@ class InstallHandler:
             storage_service: Service for storage operations
             config_manager: Configuration manager
             github_client: GitHub API client
+            post_download_processor: Processor for post-download operations
             progress_service: Optional progress service for tracking installations
 
         """
@@ -78,6 +74,7 @@ class InstallHandler:
         self.config_manager = config_manager
         self.github_client = github_client
         self.progress_service = progress_service
+        self.post_download_processor = post_download_processor
 
     @classmethod
     def create_default(
@@ -105,12 +102,19 @@ class InstallHandler:
         """
         download_service = DownloadService(session, progress_service)
         storage_service = FileOperations(install_dir)
+        post_download_processor = PostDownloadProcessor(
+            download_service=download_service,
+            storage_service=storage_service,
+            config_manager=config_manager,
+            progress_service=progress_service,
+        )
 
         return cls(
             download_service=download_service,
             storage_service=storage_service,
             config_manager=config_manager,
             github_client=github_client,
+            post_download_processor=post_download_processor,
             progress_service=progress_service,
         )
 
@@ -350,192 +354,6 @@ class InstallHandler:
 
         return await asyncio.gather(*tasks)
 
-    async def _setup_progress_tracking(
-        self,
-        app_name: str,
-        verify: bool,
-    ) -> tuple[str | None, str | None]:
-        """Setup progress tracking tasks.
-
-        Args:
-            app_name: Name of the app being installed
-            verify: Whether verification will be performed
-
-        Returns:
-            Tuple of (verification_task_id, installation_task_id)
-
-        """
-        if self.progress_service:
-            return await self.progress_service.create_installation_workflow(
-                app_name, with_verification=verify
-            )
-        return None, None
-
-    async def _verify_download(
-        self,
-        downloaded_path: Path,
-        asset: Asset,
-        release: Release,
-        app_name: str,
-        app_config: dict[str, Any],
-        verification_task_id: str | None,
-    ) -> dict[str, Any]:
-        """Verify downloaded AppImage.
-
-        Args:
-            downloaded_path: Path to downloaded file
-            asset: Asset information
-            release: Release information
-            app_name: Name of the app
-            app_config: App configuration
-            verification_task_id: Progress task ID for verification
-
-        Returns:
-            Verification result dict
-
-        Raises:
-            InstallationError: If verification fails
-
-        """
-        logger.info("Verifying %s", app_name)
-
-        verification_service = VerificationService(
-            download_service=self.download_service,
-            progress_service=getattr(
-                self.download_service, "progress_service", None
-            ),
-        )
-
-        verify_result = await verify_appimage_download(
-            file_path=downloaded_path,
-            asset=asset,
-            release=release,
-            app_name=app_name,
-            verification_service=verification_service,
-            verification_config=app_config.get("verification"),
-            owner=app_config.get("owner", ""),
-            repo=app_config.get("repo", ""),
-            progress_task_id=verification_task_id,
-        )
-        if not verify_result["passed"]:
-            error_msg = verify_result.get("error", "Unknown error")
-            msg = ERROR_VERIFICATION_FAILED.format(error=error_msg)
-            raise InstallationError(msg)
-
-        return verify_result
-
-    async def _install_and_rename(
-        self,
-        downloaded_path: Path,
-        app_name: str,
-        app_config: dict[str, Any],
-    ) -> Path:
-        """Move and rename AppImage to installation directory.
-
-        Args:
-            downloaded_path: Path to downloaded file
-            app_name: Name of the app
-            app_config: App configuration
-
-        Returns:
-            Final installation path
-
-        """
-        logger.info("Installing %s", app_name)
-        moved_path = self.storage_service.move_to_install_dir(downloaded_path)
-        install_path = rename_appimage(
-            appimage_path=moved_path,
-            app_name=app_name,
-            app_config=app_config,
-            catalog_entry=None,
-            storage_service=self.storage_service,
-        )
-        logger.debug("Installed to path: %s", install_path)
-        return install_path
-
-    async def _setup_icon_and_config(
-        self,
-        install_path: Path,
-        app_name: str,
-        app_config: dict[str, Any],
-        release: Release,
-        verify_result: dict[str, Any] | None,
-        source: str,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Setup icon and create app configuration.
-
-        Args:
-            install_path: Path where AppImage is installed
-            app_name: Name of the app
-            app_config: App configuration
-            release: Release information
-            verify_result: Verification result or None
-            source: Installation source
-
-        Returns:
-            Tuple of (icon_result, config_result)
-
-        """
-        logger.info("Extracting icon for %s", app_name)
-        global_config = self.config_manager.load_global_config()
-        icon_dir = Path(global_config["directory"]["icon"])
-
-        icon_result = await setup_appimage_icon(
-            appimage_path=install_path,
-            app_name=app_name,
-            icon_dir=icon_dir,
-            app_config=app_config,
-            catalog_entry=None,
-        )
-
-        logger.info("Creating config for %s", app_name)
-        config_result = create_app_config_v2(
-            app_name=app_name,
-            app_path=install_path,
-            app_config=app_config,
-            release=release,
-            verify_result=verify_result,
-            icon_result=icon_result,
-            source=source,
-            config_manager=self.config_manager,
-        )
-
-        return icon_result, config_result
-
-    async def _finalize_installation(
-        self,
-        install_path: Path,
-        app_name: str,
-        icon_result: dict[str, Any],
-        installation_task_id: str | None,
-    ) -> dict[str, Any]:
-        """Create desktop entry and finish installation task.
-
-        Args:
-            install_path: Path where AppImage is installed
-            app_name: Name of the app
-            icon_result: Icon setup result
-            installation_task_id: Progress task ID for installation
-
-        Returns:
-            Desktop entry creation result
-
-        """
-        logger.info("Creating desktop entry for %s", app_name)
-        desktop_result = create_desktop_entry(
-            appimage_path=install_path,
-            app_name=app_name,
-            icon_result=icon_result,
-            config_manager=self.config_manager,
-        )
-
-        if installation_task_id and self.progress_service:
-            await self.progress_service.finish_task(
-                installation_task_id, success=True
-            )
-
-        return desktop_result
-
     async def _install_workflow(
         self,
         app_name: str,
@@ -576,11 +394,6 @@ class InstallHandler:
             source,
         )
 
-        # Ensure task ids are always defined even if an early exception is
-        # raised (such as during download). This prevents UnboundLocalError
-        verification_task_id = None
-        installation_task_id = None
-
         try:
             # 1. Download
             download_path = download_dir / asset.name
@@ -589,75 +402,55 @@ class InstallHandler:
                 asset, download_path
             )
 
-            # 2. Setup progress tracking
-            (
-                verification_task_id,
-                installation_task_id,
-            ) = await self._setup_progress_tracking(app_name, verify)
+            # 2. Use PostDownloadProcessor for all post-download operations
+            # Extract owner/repo from app_config
+            github_config = get_github_config(app_config)
 
-            # 3. Verify if enabled
-            verify_result = None
-            if verify:
-                verify_result = await self._verify_download(
-                    downloaded_path,
-                    asset,
-                    release,
-                    app_name,
-                    app_config,
-                    verification_task_id,
-                )
-
-            # 4. Install and rename
-            install_path = await self._install_and_rename(
-                downloaded_path, app_name, app_config
+            # Create processing context
+            context = PostDownloadContext(
+                app_name=app_name,
+                downloaded_path=downloaded_path,
+                asset=asset,
+                release=release,
+                app_config=app_config,
+                catalog_entry=None,
+                operation_type=OperationType.INSTALL,
+                owner=github_config.owner,
+                repo=github_config.repo,
+                verify_downloads=verify,
+                source=source,
             )
 
-            # 5. Setup icon and config
-            icon_result, config_result = await self._setup_icon_and_config(
-                install_path,
-                app_name,
-                app_config,
-                release,
-                verify_result,
-                source,
-            )
+            # Process download
+            result = await self.post_download_processor.process(context)
 
-            # 6. Create desktop entry and finalize
-            desktop_result = await self._finalize_installation(
-                install_path, app_name, icon_result, installation_task_id
-            )
+            if not result.success:
+                msg = result.error or "Post-download processing failed"
+                raise InstallationError(msg)
 
-            logger.info("Successfully installed %s", app_name)
-
+            # Build result dictionary
             return {
                 "success": True,
                 "target": app_name,
                 "name": app_name,
-                "path": str(install_path),
+                "path": str(result.install_path),
                 "source": source,
                 "version": release.version,
-                "verification": verify_result,
-                # Pass warning through if present
+                "verification": result.verification_result,
                 "warning": (
-                    verify_result.get("warning") if verify_result else None
+                    result.verification_result.get("warning")
+                    if result.verification_result
+                    else None
                 ),
-                "icon": icon_result,
-                "config": config_result,
-                "desktop": desktop_result,
+                "icon": result.icon_result,
+                "config": result.config_result,
+                "desktop": result.desktop_result,
             }
 
         except Exception as error:
             logger.error(
                 "Installation workflow failed for %s: %s", app_name, error
             )
-
-            # Mark installation task as failed
-            if installation_task_id and self.progress_service:
-                error_msg = str(error)
-                await self.progress_service.finish_task(
-                    installation_task_id, success=False, description=error_msg
-                )
-
             raise
 
     async def _fetch_release(self, owner: str, repo: str) -> Release:

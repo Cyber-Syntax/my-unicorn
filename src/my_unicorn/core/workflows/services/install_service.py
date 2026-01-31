@@ -95,12 +95,24 @@ class InstallApplicationService:
     def install_handler(self) -> InstallHandler:
         """Get or create install handler."""
         if self._install_handler is None:
+            from my_unicorn.core.workflows.post_download import (
+                PostDownloadProcessor,
+            )
+
             storage_service = FileOperations(self.install_dir)
+            post_download_processor = PostDownloadProcessor(
+                download_service=self.download_service,
+                storage_service=storage_service,
+                config_manager=self.config,
+                progress_service=self.progress,
+            )
             self._install_handler = InstallHandler(
                 download_service=self.download_service,
                 storage_service=storage_service,
                 config_manager=self.config,
                 github_client=self.github,
+                post_download_processor=post_download_processor,
+                progress_service=self.progress,
             )
         return self._install_handler
 

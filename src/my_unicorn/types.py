@@ -387,6 +387,22 @@ class UpdateResult:
 
 
 @dataclass
+class UpdateContext:
+    """Typed context for update operations.
+
+    Replaces dictionary-based context passing with type-safe dataclass.
+    Enables IDE autocomplete and compile-time type checking.
+    """
+
+    app_config: dict[str, Any]
+    update_info: "UpdateInfo"  # Forward reference from update.py
+    owner: str
+    repo: str
+    catalog_entry: dict[str, Any] | None
+    appimage_asset: Asset
+
+
+@dataclass
 class InstallPlan:
     """Plan for installation operations.
 

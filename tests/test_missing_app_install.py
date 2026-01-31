@@ -4,7 +4,7 @@ This test suite validates handling of releases where AppImages are not yet
 available (still building). Based on real-world AppFlowy 0.10.2 scenario.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
@@ -44,12 +44,14 @@ class TestMissingAppImageInstall:
         mock_download = MagicMock()
         mock_storage = MagicMock()
         mock_github = MagicMock()
+        mock_processor = MagicMock()
 
         return InstallHandler(
             download_service=mock_download,
             storage_service=mock_storage,
             config_manager=mock_config_manager,
             github_client=mock_github,
+            post_download_processor=mock_processor,
         )
 
     @pytest.fixture
@@ -109,7 +111,6 @@ class TestMissingAppImageInstall:
             result = await install_handler.install_from_catalog(
                 "appflowy",
                 verify_downloads=False,
-                show_progress=False,
             )
 
             # Should fail gracefully
@@ -139,7 +140,6 @@ class TestMissingAppImageInstall:
             result = await install_handler.install_from_catalog(
                 "appflowy",
                 verify_downloads=False,
-                show_progress=False,
             )
 
             # Should fail gracefully
@@ -169,6 +169,7 @@ class TestMissingAppImageInstall:
         mock_github = MagicMock()
 
         install_handler = InstallHandler(
+            post_download_processor=Mock(),
             download_service=mock_download,
             storage_service=mock_storage,
             config_manager=mock_config_manager,
@@ -318,7 +319,6 @@ class TestMissingAppImageInstall:
                 url_apps=[],
                 concurrent=3,
                 verify_downloads=False,
-                show_progress=False,
             )
 
             # Should have 3 results
@@ -362,6 +362,7 @@ class TestMissingAppImageInstall:
         mock_github = MagicMock()
 
         install_handler = InstallHandler(
+            post_download_processor=Mock(),
             download_service=mock_download,
             storage_service=mock_storage,
             config_manager=mock_config_manager,
@@ -382,7 +383,6 @@ class TestMissingAppImageInstall:
             result = await install_handler.install_from_catalog(
                 "appflowy",
                 verify_downloads=False,
-                show_progress=False,
             )
 
             # Verify result structure matches display requirements
