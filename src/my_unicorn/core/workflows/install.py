@@ -162,34 +162,10 @@ class InstallHandler:
 
         except InstallationError as error:
             logger.error("Failed to install %s: %s", app_name, error)
-            # Context-aware error message
-            error_msg = str(error)
-            if "not found in catalog" in error_msg.lower():
-                error_msg = "App not found in catalog"
-            elif "no assets found" in error_msg.lower():
-                error_msg = (
-                    "No assets found in release - may still be building"
-                )
-            elif "no suitable appimage" in error_msg.lower():
-                error_msg = (
-                    "AppImage not found in release - may still be building"
-                )
-            return {
-                "success": False,
-                "target": app_name,
-                "name": app_name,
-                "error": error_msg,
-                "source": "catalog",
-            }
+            return build_install_error_result(error, app_name, is_url=False)
         except Exception as error:
             logger.error("Failed to install %s: %s", app_name, error)
-            return {
-                "success": False,
-                "target": app_name,
-                "name": app_name,
-                "error": f"Installation failed: {error}",
-                "source": "catalog",
-            }
+            return build_install_error_result(error, app_name, is_url=False)
 
     async def install_from_url(
         self,
@@ -288,13 +264,7 @@ class InstallHandler:
             logger.error(
                 "Failed to install from URL %s: %s", github_url, error
             )
-            return {
-                "success": False,
-                "target": github_url,
-                "name": github_url,
-                "error": str(error),
-                "source": "url",
-            }
+            return build_install_error_result(error, github_url, is_url=True)
 
     async def install_multiple(
         self,

@@ -681,8 +681,13 @@ class UpdateManager:
                 completed=float(new_completed),
                 description=f"🌐 Retrieved {app_name} (cached) ({new_completed}/{total})",
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(
+                "Progress update failed for %s: %s",
+                app_name,
+                e,
+                exc_info=True,
+            )
 
     async def update_multiple_apps(
         self,
