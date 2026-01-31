@@ -411,7 +411,9 @@ class TestVerificationService:
             )
 
             assert result.passed is True
-            assert "sha512:" in result.hash
+            assert result.hash == LEGCORD_EXPECTED_HEX
+            assert result.computed_hash == LEGCORD_EXPECTED_HEX
+            assert result.hash_type == "sha512"
             assert "yaml checksum file" in result.details
             mock_download_service.download_checksum_file.assert_called_once_with(
                 checksum_file.url
@@ -455,7 +457,9 @@ class TestVerificationService:
             )
 
             assert result.passed is True
-            assert result.hash == f"sha256:{expected_hash}"
+            assert result.hash == expected_hash
+            assert result.computed_hash == expected_hash
+            assert result.hash_type == "sha256"
             assert "traditional checksum file" in result.details
 
     @pytest.mark.asyncio

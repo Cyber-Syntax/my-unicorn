@@ -121,51 +121,102 @@ def create_app_config_v2(
         }
 
 
+def _find_primary_method(methods_data: dict[str, Any]) -> str:
+    """Find the primary verification method from methods data.
+
+    Prefers digest over checksum_file.
+    """
+    # Prefer digest if available and passed
+    if "digest" in methods_data:
+        digest_result = methods_data["digest"]
+        if isinstance(digest_result, dict) and digest_result.get("passed"):
+            return "digest"
+
+    # Fall back to first checksum that passed
+    for method_type, method_result in methods_data.items():
+        if method_type.startswith("checksum"):
+            if isinstance(method_result, dict) and method_result.get("passed"):
+                return method_type
+
+    # Return first available method if none passed
+    return next(iter(methods_data.keys()), "skip")
+
+
+def _add_backward_compat_flags(
+    result: dict[str, Any],
+    primary_method: str,
+    methods_data: dict[str, Any],
+) -> None:
+    """Add backward compatibility flags based on primary method."""
+    primary_data = methods_data.get(primary_method, {})
+    if not isinstance(primary_data, dict) or not primary_data.get("passed"):
+        return
+
+    if primary_method == "digest":
+        result["digest"] = True
+    elif primary_method == "checksum_file":
+        url = primary_data.get("url", "")
+        result["checksum_file"] = Path(url).name if url else "checksum"
+
+
+def _empty_verification_state() -> dict[str, Any]:
+    """Return empty verification state for missing/invalid results."""
+    return {
+        "passed": False,
+        "overall_passed": False,
+        "methods": [],
+        "actual_method": "skip",
+    }
+
+
 def build_verification_state(
     verify_result: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """Build verification state from verification result.
 
+    Supports multi-method verification with concurrent digest and checksum
+    file verification. Returns state with overall status, individual method
+    results, and backward compatibility flags.
+
     Args:
-        verify_result: Verification result dictionary or None
+        verify_result: Verification result dictionary or None. Expected format:
+            - passed: bool - overall verification status
+            - methods: dict[str, Any] - results per method
+            - warning: str | None - optional warning message
 
     Returns:
-        Dictionary with 'passed', 'methods', and 'actual_method' keys
-
-    Example:
-        >>> verify_result = {
-        ...     "passed": True,
-        ...     "methods": {
-        ...         "digest": {"passed": True, "hash_type": "sha256"}
-        ...     }
-        ... }
-        >>> state = build_verification_state(verify_result)
-        >>> state["passed"]
-        True
-        >>> state["actual_method"]
-        'digest'
+        Dictionary with passed, overall_passed, methods, actual_method,
+        and optional warning and backward compat flags.
 
     """
     if not verify_result:
-        return {"passed": False, "methods": [], "actual_method": "skip"}
+        return _empty_verification_state()
 
     methods_data = verify_result.get("methods", {})
     if not methods_data:
-        return {"passed": False, "methods": [], "actual_method": "skip"}
+        return _empty_verification_state()
 
     verification_passed = verify_result.get("passed", False)
-    actual_method = next(iter(methods_data.keys()), "skip")
+    primary_method = _find_primary_method(methods_data)
 
     verification_methods = [
         build_method_entry(method_type, method_result)
         for method_type, method_result in methods_data.items()
     ]
 
-    return {
+    result: dict[str, Any] = {
         "passed": verification_passed,
+        "overall_passed": verification_passed,
         "methods": verification_methods,
-        "actual_method": actual_method,
+        "actual_method": primary_method,
     }
+
+    warning = verify_result.get("warning")
+    if warning:
+        result["warning"] = warning
+
+    _add_backward_compat_flags(result, primary_method, methods_data)
+    return result
 
 
 def build_method_entry(method_type: str, method_result: Any) -> dict[str, Any]:
@@ -384,3 +435,66 @@ def get_stored_hash(
     if appimage_asset.digest:
         return appimage_asset.digest
     return ""
+
+
+def _get_hash_from_method(method: dict[str, Any]) -> str | None:
+    """Extract hash value from a method entry."""
+    hash_value = method.get("expected") or method.get("hash")
+    return str(hash_value) if hash_value else None
+
+
+def _get_hash_from_methods_list(methods: list[Any]) -> str | None:
+    """Get hash from new format methods list, preferring primary."""
+    # Find primary method first
+    for method in methods:
+        if isinstance(method, dict) and method.get("primary"):
+            hash_val = _get_hash_from_method(method)
+            if hash_val:
+                return hash_val
+
+    # No primary found, use first passed method
+    for method in methods:
+        if isinstance(method, dict) and method.get("status") == "passed":
+            hash_val = _get_hash_from_method(method)
+            if hash_val:
+                return hash_val
+
+    return None
+
+
+def _get_hash_from_legacy_format(verification: dict[str, Any]) -> str | None:
+    """Get hash from legacy format (direct digest/checksum_file fields)."""
+    for method_key in ["digest", "checksum_file"]:
+        method_data = verification.get(method_key, {})
+        if isinstance(method_data, dict) and method_data.get("hash"):
+            return str(method_data["hash"])
+    return None
+
+
+def get_stored_hash_from_config(config: dict[str, Any]) -> str | None:
+    """Get stored verification hash from app config.
+
+    Supports both new multi-method format and legacy single-method format.
+    Prefers primary method when multiple exist, falls back to first passed.
+
+    Args:
+        config: App configuration dictionary
+
+    Returns:
+        Stored hash value or None if no hash found
+
+    """
+    state = config.get("state", {})
+    verification = state.get("verification", {}) or config.get(
+        "verification", {}
+    )
+
+    # Try new format: methods list
+    methods = verification.get("methods", [])
+    if methods and isinstance(methods, list):
+        hash_val = _get_hash_from_methods_list(methods)
+        if hash_val:
+            return hash_val
+
+    # Legacy format: direct fields under verification
+    return _get_hash_from_legacy_format(verification)

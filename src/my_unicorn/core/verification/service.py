@@ -13,6 +13,7 @@ Logging Strategy:
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -111,12 +112,20 @@ class MethodResult:
 
 @dataclass(slots=True, frozen=True)
 class VerificationResult:
-    """Result of verification attempt."""
+    """Result of verification attempt.
+
+    Attributes:
+        passed: Overall verification success status
+        methods: Dictionary of all verification method results
+        updated_config: Configuration with verification results
+        warning: Optional warning message for partial verification success
+
+    """
 
     passed: bool
     methods: dict[str, Any]
     updated_config: dict[str, Any]
-    warning: str | None = None  # Warning message if applicable
+    warning: str | None = None
 
 
 @dataclass(slots=True)
@@ -144,6 +153,7 @@ class VerificationContext:
     # Results
     verification_passed: bool = False
     verification_methods: dict[str, Any] | None = None
+    verification_warning: str | None = None
 
     def __post_init__(self) -> None:
         """Initialize mutable state after dataclass creation."""
@@ -309,35 +319,22 @@ class VerificationService:
 
         return None
 
-    async def _execute_verification(
+    async def _execute_digest_verification_async(
         self, context: VerificationContext
-    ) -> None:
-        """Execute verification methods: digest and checksum files.
+    ) -> MethodResult | None:
+        """Execute digest verification asynchronously.
 
         Args:
-            context: Verification context (modified in place)
+            context: Verification context
+
+        Returns:
+            MethodResult or None if digest not available
 
         """
+        if not context.has_digest or not context.asset.digest:
+            return None
+
         skip_configured = context.config.get("skip", False)
-
-        # Try digest verification first if available
-        if context.has_digest:
-            await self._execute_digest_verification(context, skip_configured)
-
-        # Try checksum file verification
-        if context.checksum_files:
-            await self._execute_checksum_verification(context)
-
-    async def _execute_digest_verification(
-        self, context: VerificationContext, skip_configured: bool
-    ) -> None:
-        """Execute digest verification.
-
-        Args:
-            context: Verification context (modified in place)
-            skip_configured: Whether skip was configured
-
-        """
         logger.debug(
             "Attempting digest verification: app=%s", context.app_name
         )
@@ -348,19 +345,15 @@ class VerificationService:
             context.app_name,
             skip_configured,
         )
+
         if digest_result:
-            context.verification_methods[VerificationMethod.DIGEST] = (
-                digest_result.to_dict()
-            )
             if digest_result.passed:
-                context.verification_passed = True
                 logger.debug(
                     "Digest verification passed: app=%s", context.app_name
                 )
                 logger.info(
                     "Digest verification passed for %s", context.app_name
                 )
-                context.updated_config[VerificationMethod.DIGEST] = True
             else:
                 logger.warning(
                     "Digest verification failed: app=%s", context.app_name
@@ -368,121 +361,304 @@ class VerificationService:
                 logger.info(
                     "Digest verification failed for %s", context.app_name
                 )
-        else:
-            logger.debug("i  No digest available for verification")
 
-    async def _execute_checksum_verification(
-        self, context: VerificationContext
-    ) -> None:
-        """Execute checksum file verification.
+        return digest_result
+
+    async def _execute_checksum_file_verification_async(
+        self,
+        context: VerificationContext,
+        checksum_file: ChecksumFileInfo,
+        index: int,
+    ) -> MethodResult | None:
+        """Execute checksum file verification asynchronously.
 
         Args:
-            context: Verification context (modified in place)
+            context: Verification context
+            checksum_file: Checksum file information
+            index: Index of checksum file in list (for naming)
+
+        Returns:
+            MethodResult or None if failed
 
         """
-        logger.debug(
-            "🔍 Checksum file verification available - found %d files",
-            len(context.checksum_files),
-        )
-        for cf in context.checksum_files:
-            logger.debug(
-                "Available: %s (%s format)",
-                cf.filename,
-                cf.format_type,
-            )
-
         # Use original asset name for checksum lookups
         original_asset_name = (
             context.asset.name
             if context.asset.name
             else context.file_path.name
         )
+
         logger.debug(
-            "🔍 Using original asset name for checksum verification: %s",
+            "Attempting checksum verification with: %s",
+            checksum_file.filename,
+        )
+
+        checksum_result = await self._verify_checksum_file(
+            context.verifier,
+            checksum_file,
             original_asset_name,
+            context.app_name,
         )
 
-        # Prioritize checksum files
-        prioritized_files = self._prioritize_checksum_files(
-            context.checksum_files, original_asset_name
-        )
-
-        for i, checksum_file in enumerate(prioritized_files):
-            logger.debug(
-                "🔍 Attempting checksum verification with: %s",
-                checksum_file.filename,
-            )
-            method_key = f"checksum_file_{i}" if i > 0 else "checksum_file"
-
-            checksum_result = await self._verify_checksum_file(
-                context.verifier,
-                checksum_file,
-                original_asset_name,
-                context.app_name,
-            )
-
-            if checksum_result:
-                context.verification_methods[method_key] = (
-                    checksum_result.to_dict()
-                )
-                if checksum_result.passed:
-                    context.verification_passed = True
-                    logger.debug(
-                        "✅ Checksum verification succeeded with: %s",
-                        checksum_file.filename,
-                    )
-                    logger.info(
-                        "Checksum verification passed for %s using %s",
-                        context.app_name,
-                        checksum_file.filename,
-                    )
-                    context.updated_config["checksum_file"] = (
-                        checksum_file.filename
-                    )
-                    break
-                logger.warning(
-                    "❌ Checksum verification failed with: %s",
+        if checksum_result:
+            if checksum_result.passed:
+                logger.debug(
+                    "Checksum verification succeeded with: %s",
                     checksum_file.filename,
                 )
+                logger.info(
+                    "Checksum verification passed for %s using %s",
+                    context.app_name,
+                    checksum_file.filename,
+                )
+            else:
+                logger.warning(
+                    "Checksum verification failed with: %s",
+                    checksum_file.filename,
+                )
+
+        return checksum_result
+
+    async def _execute_verification(
+        self, context: VerificationContext
+    ) -> None:
+        """Execute all available verification methods concurrently.
+
+        This method builds tasks for all available verification methods
+        (digest and checksum files) and executes them concurrently using
+        asyncio.gather(). All results are stored in context.verification_methods.
+
+        Args:
+            context: Verification context (modified in place)
+
+        """
+        tasks = []
+
+        # Add digest verification task if available
+        if context.has_digest:
+            logger.debug("Adding digest verification to concurrent execution")
+            tasks.append(self._execute_digest_verification_async(context))
+
+        # Add checksum file verification tasks
+        if context.checksum_files:
+            logger.debug(
+                "Checksum file verification available - found %d files",
+                len(context.checksum_files),
+            )
+            for cf in context.checksum_files:
+                logger.debug(
+                    "Available: %s (%s format)",
+                    cf.filename,
+                    cf.format_type,
+                )
+
+            # Prioritize checksum files
+            original_asset_name = (
+                context.asset.name
+                if context.asset.name
+                else context.file_path.name
+            )
+            prioritized_files = self._prioritize_checksum_files(
+                context.checksum_files, original_asset_name
+            )
+
+            # Add task for each checksum file
+            for i, checksum_file in enumerate(prioritized_files):
+                logger.debug(
+                    "Adding checksum file verification to concurrent execution: %s",
+                    checksum_file.filename,
+                )
+                tasks.append(
+                    (
+                        self._execute_checksum_file_verification_async(
+                            context, checksum_file, i
+                        ),
+                        checksum_file,  # Store checksum_file reference
+                    )
+                )
+
+        # Execute all tasks concurrently
+        if tasks:
+            logger.debug(
+                "Executing %d verification methods concurrently", len(tasks)
+            )
+
+            # Extract just the coroutines for gather
+            task_coroutines = []
+            checksum_file_map = {}  # Map index to checksum_file
+
+            for idx, item in enumerate(tasks):
+                if isinstance(item, tuple):
+                    # Checksum file task (coroutine, checksum_file)
+                    task_coroutines.append(item[0])
+                    checksum_file_map[idx] = item[1]
+                else:
+                    # Digest task (just coroutine)
+                    task_coroutines.append(item)
+
+            results = await asyncio.gather(
+                *task_coroutines, return_exceptions=True
+            )
+
+            # Process results
+            digest_index = 0 if context.has_digest else -1
+            checksum_start_index = 1 if context.has_digest else 0
+
+            for i, result in enumerate(results):
+                # Handle exceptions
+                if isinstance(result, Exception):
+                    logger.error(
+                        "Verification method raised exception: %s", result
+                    )
+                    # Record as failed method
+                    if i == digest_index:
+                        method_key = VerificationMethod.DIGEST
+                        error_result = MethodResult(
+                            passed=False,
+                            hash="",
+                            details=f"Exception: {result}",
+                            primary=True,
+                        )
+                    else:
+                        checksum_index = i - checksum_start_index
+                        method_key = (
+                            f"checksum_file_{checksum_index}"
+                            if checksum_index > 0
+                            else "checksum_file"
+                        )
+                        is_primary = (
+                            not context.has_digest and checksum_index == 0
+                        )
+                        error_result = MethodResult(
+                            passed=False,
+                            hash="",
+                            details=f"Exception: {result}",
+                            primary=is_primary,
+                        )
+                    context.verification_methods[method_key] = (
+                        error_result.to_dict()
+                    )
+                    continue
+
+                # Skip None results
+                if result is None:
+                    continue
+
+                # Store successful method results
+                if i == digest_index:
+                    # Digest result
+                    context.verification_methods[VerificationMethod.DIGEST] = (
+                        result.to_dict()
+                    )
+                    if result.passed:
+                        context.updated_config[VerificationMethod.DIGEST] = (
+                            True
+                        )
+                else:
+                    # Checksum file result
+                    checksum_index = i - checksum_start_index
+                    method_key = (
+                        f"checksum_file_{checksum_index}"
+                        if checksum_index > 0
+                        else "checksum_file"
+                    )
+                    context.verification_methods[method_key] = result.to_dict()
+                    if result.passed:
+                        # Store the first passing checksum file in config
+                        # Only update if not already set to a non-empty value
+                        current_checksum = context.updated_config.get(
+                            "checksum_file", ""
+                        )
+                        if not current_checksum:
+                            # Get checksum_file from the map
+                            checksum_file = checksum_file_map.get(i)
+                            if checksum_file:
+                                context.updated_config["checksum_file"] = (
+                                    checksum_file.filename
+                                )
+
+            logger.debug(
+                "Concurrent verification completed: %d methods executed",
+                len(context.verification_methods),
+            )
 
     async def _finalize_verification(
         self, context: VerificationContext
     ) -> VerificationResult:
-        """Finalize verification: check results, update progress.
+        """Finalize verification: evaluate all results, determine overall status.
+
+        This method evaluates all verification method results to determine
+        the overall pass/fail status. It implements partial success logic
+        where installation is allowed if at least one strong method passes,
+        but warnings are generated if some methods fail.
 
         Args:
             context: Verification context
 
         Returns:
-            VerificationResult with final status
+            VerificationResult with final status and optional warning
 
         Raises:
-            Exception: If strong methods available but none passed
+            Exception: If strong methods available but all failed
 
         """
         has_checksum_files = bool(context.checksum_files)
         strong_methods_available = context.has_digest or has_checksum_files
 
-        # If strong methods available but none passed, fail
-        if strong_methods_available and not context.verification_passed:
+        # Collect passed and failed methods
+        passed_methods = []
+        failed_methods = []
+
+        for method_key, method_result in (
+            context.verification_methods or {}
+        ).items():
+            if method_result.get("passed"):
+                passed_methods.append(method_key)
+            else:
+                failed_methods.append(method_key)
+
+        # Determine overall verification status
+        has_passing_method = len(passed_methods) > 0
+
+        # Log method results
+        logger.debug(
+            "Verification methods summary: passed=%d, failed=%d",
+            len(passed_methods),
+            len(failed_methods),
+        )
+        if passed_methods:
+            logger.debug("Passed methods: %s", ", ".join(passed_methods))
+        if failed_methods:
+            logger.debug("Failed methods: %s", ", ".join(failed_methods))
+
+        # If strong methods available but ALL failed, block installation
+        if strong_methods_available and not has_passing_method:
             await self._finish_progress(
                 context.progress_task_id, False, "verification failed"
+            )
+            logger.error(
+                "All verification methods failed for %s", context.app_name
             )
             available_methods = []
             if context.has_digest:
                 available_methods.append(VerificationMethod.DIGEST)
             if has_checksum_files:
                 available_methods.append("checksum_files")
-            raise Exception(
+            msg = (
                 f"Available verification methods failed: "
                 f"{', '.join(available_methods)}"
             )
+            raise Exception(msg)
 
-        # Determine overall result
-        # If no verification methods available, allow installation with warning
+        # Determine overall result and warning message
+        warning_message = None
+        overall_passed = True  # Default to allow installation
+
         if not strong_methods_available:
-            overall_passed = True  # Allow installation to proceed
-            # Log for debugging only (not shown in terminal during progress)
+            # No verification methods available - allow with warning
+            warning_message = (
+                "Not verified - developer did not provide checksums"
+            )
             logger.debug(
                 "No verification methods available for %s - "
                 "developer did not provide checksums or digest. "
@@ -490,8 +666,22 @@ class VerificationService:
                 "Security risk: File integrity cannot be verified.",
                 context.app_name,
             )
-        else:
-            overall_passed = context.verification_passed
+        elif has_passing_method and failed_methods:
+            # Partial success - some passed, some failed
+            warning_message = (
+                f"Partial verification: {len(passed_methods)} passed, "
+                f"{len(failed_methods)} failed"
+            )
+            logger.warning(
+                "Partial verification success for %s: %s passed, %s failed",
+                context.app_name,
+                ", ".join(passed_methods),
+                ", ".join(failed_methods),
+            )
+
+        # Set context.verification_passed for backward compatibility
+        context.verification_passed = has_passing_method
+        context.verification_warning = warning_message
 
         # Log final verification summary
         self._log_verification_summary(
@@ -499,8 +689,8 @@ class VerificationService:
         )
 
         # Update progress with appropriate message and status
-        warning_message = None
-        if overall_passed and strong_methods_available:
+        if overall_passed and strong_methods_available and not warning_message:
+            # Complete success - all methods passed
             await self._finish_progress(
                 context.progress_task_id, True, "verification passed"
             )
@@ -509,14 +699,26 @@ class VerificationService:
                 context.app_name,
             )
             logger.info(
-                "Verification completed for %s: passed",
+                "Verification completed for %s: passed", context.app_name
+            )
+        elif (
+            overall_passed
+            and strong_methods_available
+            and warning_message
+            and "Partial" in warning_message
+        ):
+            # Partial success - some passed, some failed
+            await self._finish_progress(
+                context.progress_task_id,
+                True,
+                "verification passed (with warnings)",
+            )
+            logger.info(
+                "Verification completed for %s: passed with warnings",
                 context.app_name,
             )
         elif overall_passed and not strong_methods_available:
-            # Mark as finished with warning message
-            warning_message = (
-                "Not verified - developer did not provide checksums"
-            )
+            # No verification methods available
             await self._finish_progress(
                 context.progress_task_id,
                 True,
@@ -528,6 +730,7 @@ class VerificationService:
                 context.app_name,
             )
         else:
+            # Should not reach here, but handle defensively
             await self._finish_progress(
                 context.progress_task_id,
                 False,
@@ -538,8 +741,7 @@ class VerificationService:
                 context.app_name,
             )
             logger.info(
-                "Verification completed for %s: failed",
-                context.app_name,
+                "Verification completed for %s: failed", context.app_name
             )
 
         return VerificationResult(
@@ -1134,7 +1336,8 @@ class VerificationService:
                 logger.debug("✓ Hash match confirmed")
                 return MethodResult(
                     passed=True,
-                    hash=f"{hash_type}:{computed_hash}",
+                    hash=expected_hash,
+                    computed_hash=computed_hash,
                     details=(
                         f"Verified against {checksum_file.format_type} "
                         f"checksum file"

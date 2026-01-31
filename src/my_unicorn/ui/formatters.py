@@ -7,6 +7,7 @@ across different display modules.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,3 +208,75 @@ def should_show_error_message(status_info: TaskStatusInfo) -> bool:
         and not status_info.success
         and status_info.error_message
     )
+
+
+def format_verification_info(verification: dict[str, Any]) -> str:
+    """Format verification information for display.
+
+    Supports both new multi-method format and legacy single-method format.
+
+    Args:
+        verification: Verification state from app config
+
+    Returns:
+        Formatted string for display
+
+    Example output:
+        ● ✓ SHA256 digest (github_api)
+        ○ ✗ SHA256 checksum (SHA256SUMS.txt)
+        ⚠ Partial verification: 1 passed, 1 failed
+
+    """
+    methods = verification.get("methods")
+    if not methods or not isinstance(methods, list):
+        return _format_verification_legacy(verification)
+
+    lines = []
+    for method in methods:
+        status_marker = "✓" if method.get("status") == "passed" else "✗"
+        algorithm = str(method.get("algorithm", "SHA256")).upper()
+        method_type = method.get("type", "unknown")
+        source = method.get("source", "unknown")
+
+        # Shorten source display for readability
+        if source.startswith("https://"):
+            # Extract filename from URL
+            source = source.split("/")[-1] if "/" in source else source
+
+        line = f"{status_marker} {algorithm} {method_type} ({source})"
+        lines.append(line)
+
+    warning = verification.get("warning")
+    if warning:
+        lines.append(f"⚠ {warning}")
+
+    return "\n".join(lines)
+
+
+def _format_verification_legacy(verification: dict[str, Any]) -> str:
+    """Format legacy verification info (backward compatibility).
+
+    Args:
+        verification: Legacy verification state from app config
+
+    Returns:
+        Formatted string for display
+
+    """
+    if "digest" in verification:
+        digest = verification["digest"]
+        if isinstance(digest, dict):
+            passed = digest.get("passed", False)
+            hash_type = str(digest.get("hash_type", "sha256")).upper()
+            status_marker = "✓" if passed else "✗"
+            return f"● {status_marker} {hash_type} digest"
+
+    if "checksum_file" in verification:
+        checksum = verification["checksum_file"]
+        if isinstance(checksum, dict):
+            passed = checksum.get("passed", False)
+            hash_type = str(checksum.get("hash_type", "sha256")).upper()
+            status_marker = "✓" if passed else "✗"
+            return f"● {status_marker} {hash_type} checksum file"
+
+    return "Not verified"

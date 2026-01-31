@@ -344,6 +344,31 @@ class CatalogService:
         return "None"
 
     @staticmethod
+    def _build_multi_method_verification_display(
+        verification: dict[str, Any],
+    ) -> str:
+        """Build verification display for multi-method catalogs.
+
+        Args:
+            verification: Verification configuration from catalog entry
+
+        Returns:
+            Human-readable multi-method verification description
+
+        """
+        has_digest = verification.get("digest") is not None
+        has_checksum_file = verification.get("checksum_file") is not None
+
+        if has_digest and has_checksum_file:
+            return "SHA256 digest + checksum file (concurrent)"
+
+        # Single method available - delegate to existing function
+        if has_digest or has_checksum_file or verification.get("method"):
+            return CatalogService._build_verification_display(verification)
+
+        return "No verification available"
+
+    @staticmethod
     def _build_icon_display(icon: dict[str, Any]) -> str:
         """Build icon method display string.
 

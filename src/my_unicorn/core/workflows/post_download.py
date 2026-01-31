@@ -269,8 +269,11 @@ class PostDownloadProcessor:
 
         # Lazy initialization of verification service
         if self._verification_service is None:
+            progress_service = getattr(
+                self.download_service, "progress_service", None
+            )
             self._verification_service = VerificationService(
-                self.download_service.session
+                self.download_service, progress_service
             )
 
         return await verify_appimage_download(
