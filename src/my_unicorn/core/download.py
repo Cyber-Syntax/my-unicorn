@@ -6,13 +6,16 @@ checksum files with progress tracking via the `ProgressReporter` protocol.
 The service depends on the abstract `ProgressReporter` protocol rather than
 concrete UI implementations, enabling testing without UI dependencies and
 supporting alternative progress display backends.
+
+File I/O is performed asynchronously using aiofiles when available, with a
+fallback to synchronous I/O in a thread executor for compatibility.
 """
 
 import asyncio
 import contextlib
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import TypeVar
+from typing import IO, TypeVar
 from urllib.parse import urlparse
 
 import aiohttp
@@ -30,6 +33,16 @@ from my_unicorn.logger import get_logger
 T = TypeVar("T")
 
 logger = get_logger(__name__)
+
+try:
+    import aiofiles
+
+    HAS_AIOFILES = True
+except ImportError:
+    HAS_AIOFILES = False
+    logger.debug(
+        "aiofiles not available, using sync I/O fallback in thread executor"
+    )
 
 # Download constants
 CHUNK_SIZE = 8192
@@ -124,6 +137,9 @@ class DownloadService:
     ) -> None:
         """Download file without progress tracking.
 
+        Uses async file I/O via aiofiles when available, falling back to
+        sync I/O in a thread executor for compatibility.
+
         Args:
             response: HTTP response to read from
             dest: Destination path for the file
@@ -133,10 +149,13 @@ class DownloadService:
             TimeoutError: If download times out
 
         """
-        with open(dest, "wb") as f:
-            async for chunk in response.content.iter_chunked(CHUNK_SIZE):
-                if chunk:
-                    f.write(chunk)
+        if HAS_AIOFILES:
+            async with aiofiles.open(dest, mode="wb") as f:
+                async for chunk in response.content.iter_chunked(CHUNK_SIZE):
+                    if chunk:
+                        await f.write(chunk)
+        else:
+            await self._download_sync_fallback(response, dest)
 
     async def _download_with_progress(
         self,
@@ -172,27 +191,36 @@ class DownloadService:
             chunk_count = 0
             last_progress_update = 0.0
 
-            with open(dest, "wb") as f:
-                async for chunk in response.content.iter_chunked(CHUNK_SIZE):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded_bytes += len(chunk)
-                        chunk_count += 1
+            if HAS_AIOFILES:
+                async with aiofiles.open(dest, mode="wb") as f:
+                    async for chunk in response.content.iter_chunked(
+                        CHUNK_SIZE
+                    ):
+                        if chunk:
+                            await f.write(chunk)
+                            downloaded_bytes += len(chunk)
+                            chunk_count += 1
 
-                        # Update progress in bytes (throttle updates to every
-                        # PROGRESS_MB_THRESHOLD MB or every 100 chunks)
-                        mb_threshold_bytes = (
-                            PROGRESS_MB_THRESHOLD * 1024 * 1024
-                        )
-                        if (
-                            downloaded_bytes - last_progress_update
-                            >= mb_threshold_bytes
-                        ) or (chunk_count % 100 == 0):
-                            await self.progress_reporter.update_task(
-                                task_id,
-                                completed=downloaded_bytes,
+                            mb_threshold_bytes = (
+                                PROGRESS_MB_THRESHOLD * 1024 * 1024
                             )
-                            last_progress_update = downloaded_bytes
+                            if (
+                                downloaded_bytes - last_progress_update
+                                >= mb_threshold_bytes
+                            ) or (chunk_count % 100 == 0):
+                                await self.progress_reporter.update_task(
+                                    task_id,
+                                    completed=downloaded_bytes,
+                                )
+                                last_progress_update = downloaded_bytes
+            else:
+                downloaded_bytes = (
+                    await self._download_sync_fallback_with_progress(
+                        response,
+                        dest,
+                        task_id,
+                    )
+                )
 
             # Always ensure final progress update with actual downloaded size
             # This handles cases where Content-Length differs from actual size
@@ -235,6 +263,76 @@ class DownloadService:
             progress_type=ProgressType.DOWNLOAD,
         )
         return dest
+
+    async def _download_sync_fallback(
+        self,
+        response: aiohttp.ClientResponse,
+        dest: Path,
+    ) -> None:
+        """Fallback download using sync I/O in thread executor.
+
+        Used when aiofiles is not available. Runs blocking file writes
+        in a thread executor to avoid blocking the event loop.
+
+        Args:
+            response: HTTP response to read from
+            dest: Destination path for the file
+
+        """
+        loop = asyncio.get_running_loop()
+
+        def write_chunk(f: IO[bytes], chunk: bytes) -> None:
+            f.write(chunk)
+
+        with dest.open("wb") as f:
+            async for chunk in response.content.iter_chunked(CHUNK_SIZE):
+                if chunk:
+                    await loop.run_in_executor(None, write_chunk, f, chunk)
+
+    async def _download_sync_fallback_with_progress(
+        self,
+        response: aiohttp.ClientResponse,
+        dest: Path,
+        task_id: str,
+    ) -> int:
+        """Fallback download with progress using sync I/O in thread executor.
+
+        Args:
+            response: HTTP response to read from
+            dest: Destination path for the file
+            task_id: Progress task ID for updates
+
+        Returns:
+            Total bytes downloaded
+
+        """
+        loop = asyncio.get_running_loop()
+        downloaded_bytes = 0
+        chunk_count = 0
+        last_progress_update = 0.0
+
+        def write_chunk(f: IO[bytes], chunk: bytes) -> None:
+            f.write(chunk)
+
+        with dest.open("wb") as f:
+            async for chunk in response.content.iter_chunked(CHUNK_SIZE):
+                if chunk:
+                    await loop.run_in_executor(None, write_chunk, f, chunk)
+                    downloaded_bytes += len(chunk)
+                    chunk_count += 1
+
+                    mb_threshold_bytes = PROGRESS_MB_THRESHOLD * 1024 * 1024
+                    if (
+                        downloaded_bytes - last_progress_update
+                        >= mb_threshold_bytes
+                    ) or (chunk_count % 100 == 0):
+                        await self.progress_reporter.update_task(
+                            task_id,
+                            completed=downloaded_bytes,
+                        )
+                        last_progress_update = downloaded_bytes
+
+        return downloaded_bytes
 
     def get_filename_from_url(self, url: str) -> str:
         """Extract filename from URL.
