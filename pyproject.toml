@@ -186,6 +186,10 @@ lines-between-types = 0
   "FBT",     # Don't care about booleans as positional arguments in tests, e.g. via @pytest.mark.parametrize()
   "PLR2004", # Magic value used in comparison, ...
   "S311",    # Standard pseudo-random generators are not suitable for cryptographic purposes
+  "ANN",     # No type annotations required in tests
+  "TRY003",  # Long exception messages are fine in tests
+  "EM101",   # String literals in exceptions are fine in tests
+  "S108",    # Insecure temp file paths are fine in tests (not real I/O)
 ]
 
 [tool.ruff.lint.pydocstyle]
