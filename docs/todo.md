@@ -33,6 +33,7 @@
 
 ## in-progress
 
+- [ ] learn Makefile
 - [ ] workflows and workflows/services folder structure refactor for better structure.
 Currently install.py, update.py, appimage_setup.py(install and update use this, so I didn't move that to util folder which we might be make a new module to handle it there in class etc.) is work together.
 - [ ] Learn and add integration tests after workflows refactor.
@@ -195,6 +196,19 @@ Confirm your GitHub token:
 - [ ] Switch to stable releases only when we publish stable versions (currently using prereleases in upgrade module)
 
 ## done
+
+- [x] P1: BUG: missing computed hashes on verified app when used checksum_file (example tagspace)
+
+```json
+      "methods": [
+        {
+          "algorithm": "sha256",
+          "filename": "SHA256SUMS.txt",
+          "status": "passed",
+          "type": "checksum_file"
+        }
+      ],
+```
 
 - [x] P3-Q5: move workflow folder modules to utils folder for better structure
 - [x] catalog_adapter.py is probably unnecessary because it just delegate the config manager...

@@ -7,16 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Breaking Changes
-
-- Production install command updated:
-    - Use `./install.sh -i` or `./install.sh --install` to perform a standard installation.
-- Development install command updated:
-    - Use `./install.sh -e` or `./install.sh --editable` to install in editable mode.
-
 ### Added
 
+- Added comprehensive Raises sections to all public method docstrings in workflow modules for better error documentation
+- Added async safety documentation to class docstrings explaining thread safety and concurrent access patterns
+- Added 49 new tests for refactored service classes and domain types:
+    - 8 tests for TargetResolver (installation target separation logic)
+    - 8 tests for InstallStateChecker (installation planning logic)
+    - 16 tests for ConfigurationValidator (security-critical validation)
+    - 16 tests for workflow result types (InstallResult, UpdateResult, InstallPlan)
+- Enhanced in-memory caching documentation with performance metrics and thread safety notes
+
 ### Changed
+
+- Improved docstring quality across install.py and update.py workflow modules
+- Standardized exception documentation with detailed error conditions and scenarios
+- setup.sh script renamed to install.sh and updated installation commands:
+    - Production install command updated:
+        - Use `./install.sh -i` or `./install.sh --install` to perform a standard installation.
+    - Development install command updated:
+        - Use `./install.sh -e` or `./install.sh --editable` to install in editable mode.
 
 ### Removed
 

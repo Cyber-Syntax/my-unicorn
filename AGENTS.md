@@ -6,6 +6,7 @@
 - **DRY** (Don't Repeat Yourself): Reuse code appropriately but avoid over-engineering. Each command handler has single responsibility.
 - **YAGNI** (You Aren't Gonna Need It): Always implement things when you actually need them, never when you just foresee that you need them.
 - ALWAYS run `ruff check --fix <filepath>` and `ruff format <filepath>` on each Python file you modify.
+- Use a subagent to avoid context-limit issues when reading modules.
 
 ## Project Overview
 
@@ -62,26 +63,6 @@ My Unicorn is a Python 3.12+ CLI tool for managing AppImages on Linux. It instal
 - `tests/` - Comprehensive test suite (same structure as src/my_unicorn/)
 - `docs/` - Documentation and design decisions
 - `scripts/` - Helper scripts for development
-
-## Setup Commands
-
-### Environment Setup
-
-- No virtual environment needed - uv manages environments automatically
-- Dependencies are defined in `pyproject.toml`
-- uv lockfile: `uv.lock` (auto-generated, commit to version control)
-
-### Optional: Install Locally
-
-```bash
-# Install in editable mode for development 
-./install.sh -e
-uv tool install --editable . --force
-
-# Or install from GitHub for production use (both commands do the same)
-./install.sh -i
-uv tool install git+https://github.com/Cyber-Syntax/my-unicorn --force
-```
 
 ## Development Workflow
 
@@ -160,30 +141,6 @@ ruff format path/to/code/
 
 # Format all files in current directory
 ruff format .
-```
-
-### Ruff Error Fixes (Only for non-test code)
-
-**S100**: Replace `assert` with `if-raise` blocks:
-
-```python
-# Bad: assert condition, "message"
-# Good: if not condition: raise ValueError("message")
-```
-
-**TRY003**: Assign exception messages to variables:
-
-```python
-# Bad: raise ValueError(f"Error: {value}")
-# Good: msg = f"Error: {value}"; raise ValueError(msg)
-```
-
-**TRY301**: Move `raise` statements outside try blocks using inner functions:
-
-```python
-# Bad: try: ... raise ValueError("msg") except:
-# Good: def _raise_error() -> None: raise ValueError("msg")
-#       try: ... _raise_error() except:
 ```
 
 ### File Organization
