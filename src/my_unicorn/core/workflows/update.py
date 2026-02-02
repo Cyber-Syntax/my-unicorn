@@ -198,10 +198,11 @@ class UpdateManager:
         download_service = DownloadService(
             session, self._progress_service_param
         )
-        # Get progress service from download service if available
-        progress_service = getattr(download_service, "progress_service", None)
+        # Get progress reporter from download service
+        # (renamed from progress_service in Task 2.1)
+        progress_reporter = download_service.progress_reporter
         self.verification_service = VerificationService(
-            download_service, progress_service
+            download_service, progress_reporter
         )
 
         # Initialize post-download processor

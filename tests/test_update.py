@@ -789,7 +789,7 @@ class TestUpdateManager:
 
             mock_download = MagicMock()
             mock_download_cls.return_value = mock_download
-            mock_download.progress_service = MagicMock()
+            mock_download.progress_reporter = MagicMock()
 
             mock_verify = MagicMock()
             mock_verify_cls.return_value = mock_verify
@@ -809,7 +809,7 @@ class TestUpdateManager:
                 mock_session, mock_progress
             )
             mock_verify_cls.assert_called_once_with(
-                mock_download, mock_download.progress_service
+                mock_download, mock_download.progress_reporter
             )
 
             # Verify that verification service was set
