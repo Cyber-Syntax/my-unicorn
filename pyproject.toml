@@ -181,6 +181,10 @@ lines-after-imports = -1
 lines-between-types = 0
 
 [tool.ruff.lint.per-file-ignores]
+"scripts/*.py" = [
+  "INP001",  # Scripts are standalone, not part of a package
+  "T201",    # print() is expected in CLI scripts
+]
 "test_*.py" = [
   "S101",    # asserts allowed in tests...
   "ARG",     # Unused function args -> fixtures nevertheless are functionally relevant...
@@ -191,6 +195,7 @@ lines-between-types = 0
   "TRY003",  # Long exception messages are fine in tests
   "EM101",   # String literals in exceptions are fine in tests
   "S108",    # Insecure temp file paths are fine in tests (not real I/O)
+  "SLF001",  # Private member access is necessary for unit testing internal methods
 ]
 
 [tool.ruff.lint.pydocstyle]
