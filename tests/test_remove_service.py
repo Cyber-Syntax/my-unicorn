@@ -67,7 +67,11 @@ def global_config():
 @pytest.mark.asyncio
 async def test_remove_app_success(mock_config_manager, global_config):
     """Removal should succeed and report expected flags when app exists."""
-    service = RemoveService(mock_config_manager, global_config)
+    mock_cache_manager = MagicMock()
+    mock_cache_manager.clear_cache = AsyncMock()
+    service = RemoveService(
+        mock_config_manager, global_config, cache_manager=mock_cache_manager
+    )
 
     # Paths obtained for readability, not used directly
 
@@ -75,16 +79,9 @@ async def test_remove_app_success(mock_config_manager, global_config):
         patch("pathlib.Path.exists", autospec=True, return_value=True),
         patch("pathlib.Path.unlink", autospec=True) as unlink_mock,
         patch(
-            "my_unicorn.core.cache.get_cache_manager",
-        ) as mock_get_cache,
-        patch(
             "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
         ),
     ):
-        mock_cache_manager = MagicMock()
-        mock_cache_manager.clear_cache = AsyncMock()
-        mock_get_cache.return_value = mock_cache_manager
-
         result = await service.remove_app("test_app", keep_config=False)
 
         assert result.success is True
@@ -193,16 +190,18 @@ async def test_remove_app_cache_and_backup_clear(global_config):
     }
     custom_config_manager.remove_app_config = MagicMock()
 
-    service = RemoveService(custom_config_manager, global_config)
+    mock_cache_manager = MagicMock()
+    mock_cache_manager.clear_cache = AsyncMock()
+
+    service = RemoveService(
+        custom_config_manager, global_config, cache_manager=mock_cache_manager
+    )
 
     # backup_dir value is used indirectly by mocked Path.exists
 
     def exists_side_effect(self_path):
         # Simulate that all paths exist including backup dir
         return True
-
-    mock_cache_manager = MagicMock()
-    mock_cache_manager.clear_cache = AsyncMock()
 
     with (
         patch(
@@ -211,10 +210,6 @@ async def test_remove_app_cache_and_backup_clear(global_config):
             side_effect=exists_side_effect,
         ),
         patch("pathlib.Path.unlink", autospec=True),
-        patch(
-            "my_unicorn.core.cache.get_cache_manager",
-            return_value=mock_cache_manager,
-        ),
         patch("shutil.rmtree") as rmtree_mock,
         patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
     ):
@@ -284,24 +279,22 @@ async def test_remove_appimage_files_removes_files(
 async def test_clear_cache_calls_api_when_owner_repo_present(global_config):
     """_clear_cache should call the cache manager when owner and repo exist in effective config."""
     mock_config_manager = MagicMock()
-    service = RemoveService(mock_config_manager, global_config)
-
     mock_cache_manager = MagicMock()
     mock_cache_manager.clear_cache = AsyncMock()
 
-    with patch(
-        "my_unicorn.core.cache.get_cache_manager",
-        return_value=mock_cache_manager,
-    ):
-        # v2: owner/repo are in effective_config.source dict
-        effective_config = {
-            "source": {"type": "github", "owner": "o", "repo": "r"},
-        }
-        result = await service._clear_cache(effective_config)
-        assert result.success is True
-        assert result.metadata.get("owner") == "o"
-        assert result.metadata.get("repo") == "r"
-        mock_cache_manager.clear_cache.assert_awaited_once_with("o", "r")
+    service = RemoveService(
+        mock_config_manager, global_config, cache_manager=mock_cache_manager
+    )
+
+    # v2: owner/repo are in effective_config.source dict
+    effective_config = {
+        "source": {"type": "github", "owner": "o", "repo": "r"},
+    }
+    result = await service._clear_cache(effective_config)
+    assert result.success is True
+    assert result.metadata.get("owner") == "o"
+    assert result.metadata.get("repo") == "r"
+    mock_cache_manager.clear_cache.assert_awaited_once_with("o", "r")
 
 
 @pytest.mark.asyncio

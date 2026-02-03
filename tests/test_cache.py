@@ -12,11 +12,7 @@ import orjson
 import pytest
 
 from my_unicorn.config import ConfigManager
-from my_unicorn.core.cache import (
-    CacheEntry,
-    ReleaseCacheManager,
-    get_cache_manager,
-)
+from my_unicorn.core.cache import CacheEntry, ReleaseCacheManager
 
 
 class TestReleaseCacheManager:
@@ -495,17 +491,3 @@ class TestReleaseCacheManager:
                 "owner", "repo", cache_type=cache_type
             )
             assert result == sample_release_data
-
-    def test_get_cache_manager_singleton(self):
-        """Test the module-level cache manager getter."""
-        # Test that it creates a new instance when none exists
-        with patch("my_unicorn.core.cache._cache_manager", None):
-            manager = get_cache_manager(ttl_hours=48)
-            assert isinstance(manager, ReleaseCacheManager)
-            assert manager.ttl_hours == 48
-
-    def test_get_cache_manager_existing_instance(self):
-        """Test get_cache_manager returns existing instance when available."""
-        with patch("my_unicorn.core.cache._cache_manager") as mock_manager:
-            result = get_cache_manager()
-            assert result == mock_manager

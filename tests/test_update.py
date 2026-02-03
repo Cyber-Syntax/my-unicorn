@@ -104,6 +104,7 @@ class TestUpdateManager:
                 "download": Path("/test/download"),
                 "backup": Path("/test/backup"),
                 "icon": Path("/test/icon"),
+                "cache": Path("/test/cache"),
             },
         }
         mock_config.list_installed_apps.return_value = ["app1", "app2"]
@@ -139,6 +140,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             manager = UpdateManager(mock_config_manager)
             return manager
@@ -151,6 +153,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             manager = UpdateManager(mock_config_manager)
 
@@ -166,6 +169,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             mock_config_instance = MagicMock()
             mock_config_cls.return_value = mock_config_instance
@@ -187,6 +191,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             manager = UpdateManager(mock_config_manager)
 
@@ -311,6 +316,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -352,6 +358,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
             patch("my_unicorn.core.workflows.update.logger"),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -388,6 +395,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -446,6 +454,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -487,6 +496,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -521,6 +531,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -547,6 +558,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
             patch("my_unicorn.core.workflows.update.logger"),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -570,6 +582,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -602,6 +615,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -648,6 +662,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
             patch("my_unicorn.core.workflows.update.logger"),
             patch("builtins.print"),
         ):
@@ -669,6 +684,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -704,6 +720,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
             patch("my_unicorn.core.workflows.update.logger"),
         ):
             update_manager = UpdateManager(mock_config_manager)
@@ -732,6 +749,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -765,6 +783,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             update_manager = UpdateManager(mock_config_manager)
 
@@ -797,6 +816,7 @@ class TestUpdateManager:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
             patch(
                 "my_unicorn.core.workflows.update.DownloadService"
             ) as mock_download_cls,
@@ -853,6 +873,7 @@ class TestUpdateWorkflowProtocolUsage:
                 "download": Path("/test/download"),
                 "backup": Path("/test/backup"),
                 "icon": Path("/test/icon"),
+                "cache": Path("/test/cache"),
             },
         }
         mock_config.list_installed_apps.return_value = ["app1", "app2"]
@@ -904,6 +925,7 @@ class TestUpdateWorkflowProtocolUsage:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             manager = UpdateManager(
                 mock_config_manager, progress_reporter=mock_reporter
@@ -918,6 +940,7 @@ class TestUpdateWorkflowProtocolUsage:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             manager = UpdateManager(
                 mock_config_manager, progress_reporter=None
@@ -932,6 +955,7 @@ class TestUpdateWorkflowProtocolUsage:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             manager = UpdateManager(mock_config_manager)
             assert isinstance(manager.progress_reporter, NullProgressReporter)
@@ -981,6 +1005,7 @@ class TestUpdateWorkflowProtocolUsage:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             manager = UpdateManager(
                 mock_config_manager, progress_reporter=reporter
@@ -998,6 +1023,7 @@ class TestUpdateWorkflowProtocolUsage:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             manager = UpdateManager(
                 mock_config_manager, progress_reporter=None
@@ -1013,6 +1039,7 @@ class TestUpdateWorkflowProtocolUsage:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             manager = UpdateManager(
                 mock_config_manager, progress_reporter=None
@@ -1038,6 +1065,7 @@ class TestUpdateWorkflowDomainExceptions:
                 "download": Path("/test/download"),
                 "backup": Path("/test/backup"),
                 "icon": Path("/test/icon"),
+                "cache": Path("/test/cache"),
             },
         }
         return mock_config
@@ -1067,6 +1095,7 @@ class TestUpdateWorkflowDomainExceptions:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             manager = UpdateManager(mock_config_manager)
 
@@ -1099,6 +1128,7 @@ class TestUpdateWorkflowDomainExceptions:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             manager = UpdateManager(mock_config_manager)
 
@@ -1128,6 +1158,7 @@ class TestUpdateWorkflowDomainExceptions:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             manager = UpdateManager(mock_config_manager)
 
@@ -1157,6 +1188,7 @@ class TestUpdateWorkflowDomainExceptions:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
             patch("my_unicorn.core.workflows.update.logger"),
         ):
             manager = UpdateManager(mock_config_manager)
@@ -1222,6 +1254,7 @@ class TestUpdateWorkflowDomainExceptions:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
             patch(
                 "my_unicorn.core.workflows.update.DownloadService"
             ) as mock_download_cls,
@@ -1301,6 +1334,7 @@ class TestUpdateWorkflowDomainExceptions:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
             patch(
                 "my_unicorn.core.workflows.update.DownloadService"
             ) as mock_download_cls,
@@ -1400,6 +1434,7 @@ class TestUpdateWorkflowDomainExceptions:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
             patch(
                 "my_unicorn.core.workflows.update.DownloadService"
             ) as mock_download_cls,
@@ -1452,6 +1487,7 @@ class TestUpdateWorkflowDomainExceptions:
             patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
             patch("my_unicorn.core.workflows.update.FileOperations"),
             patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.ReleaseCacheManager"),
         ):
             manager = UpdateManager(mock_config_manager)
 

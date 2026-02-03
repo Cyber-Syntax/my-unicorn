@@ -35,17 +35,18 @@ def mock_asyncio_sleep(monkeypatch):
 
 @pytest.fixture
 def mock_config(monkeypatch):
-    """Mock config_manager to return predictable test values."""
+    """Mock ConfigManager to return predictable test values."""
     mock_config_data = {
         "network": {"retry_attempts": "3", "timeout_seconds": "10"}
     }
 
-    def mock_load_global_config():
-        return mock_config_data
+    class MockConfigManager:
+        def load_global_config(self):
+            return mock_config_data
 
     monkeypatch.setattr(
-        "my_unicorn.config.config_manager.load_global_config",
-        mock_load_global_config,
+        "my_unicorn.core.github.client.ConfigManager",
+        MockConfigManager,
     )
     return mock_config_data
 
@@ -57,7 +58,7 @@ async def test_fetch_latest_release_success(mock_session):
         owner="Cyber-Syntax",
         repo="my-unicorn",
         session=mock_session,
-        use_cache=False,
+        cache_manager=None,
     )
     # Prepare mock response
     mock_response = AsyncMock()
@@ -497,7 +498,7 @@ async def test_fetch_latest_release_api_error(mock_session):
         owner="Cyber-Syntax",
         repo="my-unicorn",
         session=mock_session,
-        use_cache=False,
+        cache_manager=None,
     )
     mock_response = AsyncMock()
     mock_response.__aenter__.return_value = mock_response
@@ -521,7 +522,7 @@ async def test_fetch_latest_release_network_error(
         owner="Cyber-Syntax",
         repo="my-unicorn",
         session=mock_session,
-        use_cache=False,
+        cache_manager=None,
     )
     # Simulate aiohttp.ClientError (network error)
     mock_session.get.side_effect = aiohttp.ClientError("Network down")
@@ -538,7 +539,7 @@ async def test_fetch_latest_release_timeout(
         owner="Cyber-Syntax",
         repo="my-unicorn",
         session=mock_session,
-        use_cache=False,
+        cache_manager=None,
     )
     mock_session.get.side_effect = asyncio.TimeoutError
     with pytest.raises(asyncio.TimeoutError):
@@ -549,7 +550,10 @@ async def test_fetch_latest_release_timeout(
 async def test_fetch_latest_release_malformed_response(mock_session):
     """Test fetch_latest_release handles malformed API response."""
     fetcher = ReleaseFetcher(
-        owner="Cyber-Syntax", repo="my-unicorn", session=mock_session
+        owner="Cyber-Syntax",
+        repo="my-unicorn",
+        session=mock_session,
+        cache_manager=None,
     )
     mock_response = AsyncMock()
     mock_response.__aenter__.return_value = mock_response

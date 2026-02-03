@@ -364,17 +364,18 @@ def test_update_logger_from_config(monkeypatch):
     # Setup root logger first
     _ = get_logger("my_unicorn", enable_file_logging=True)
 
-    # Create a mock config_manager that returns DEBUG levels
-    mock_config_manager = MagicMock()
-    mock_config_manager.load_global_config.return_value = {
+    # Create a mock ConfigManager class that returns DEBUG levels
+    mock_config_mgr_instance = MagicMock()
+    mock_config_mgr_instance.load_global_config.return_value = {
         "console_log_level": "ERROR",
         "log_level": "WARNING",
     }
+    mock_cfg_cls = MagicMock(return_value=mock_config_mgr_instance)
 
-    # Monkey patch the config_manager import
+    # Monkey patch the ConfigManager class import
     import my_unicorn.config as config_module
 
-    monkeypatch.setattr(config_module, "config_manager", mock_config_manager)
+    monkeypatch.setattr(config_module, "ConfigManager", mock_cfg_cls)
 
     # Update from config
     update_logger_from_config()

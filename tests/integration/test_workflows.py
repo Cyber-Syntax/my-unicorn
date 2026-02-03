@@ -206,7 +206,10 @@ class TestProgressReporterProtocolIntegration:
             "my_unicorn.core.workflows.update.ConfigManager"
         ) as mock_cm:
             mock_cm.return_value.load_global_config.return_value = {
-                "directory": {"storage": "/tmp/storage"},
+                "directory": {
+                    "storage": Path("/tmp/storage"),
+                    "cache": Path("/tmp/cache"),
+                },
             }
             manager = UpdateManager(progress_reporter=reporter)
 
@@ -342,7 +345,10 @@ class TestDomainExceptionPropagation:
             "my_unicorn.core.workflows.update.ConfigManager"
         ) as mock_cm:
             mock_cm.return_value.load_global_config.return_value = {
-                "directory": {"storage": "/tmp/storage"},
+                "directory": {
+                    "storage": Path("/tmp/storage"),
+                    "cache": Path("/tmp/cache"),
+                },
             }
             mock_cm.return_value.load_catalog.side_effect = FileNotFoundError(
                 "Catalog not found"
@@ -527,7 +533,10 @@ class TestCoreModuleIndependence:
             "my_unicorn.core.workflows.update.ConfigManager"
         ) as mock_cm:
             mock_cm.return_value.load_global_config.return_value = {
-                "directory": {"storage": "/tmp/storage"},
+                "directory": {
+                    "storage": Path("/tmp/storage"),
+                    "cache": Path("/tmp/cache"),
+                },
             }
             manager = UpdateManager()
 
