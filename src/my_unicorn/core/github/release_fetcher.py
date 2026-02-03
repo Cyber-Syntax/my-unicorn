@@ -10,8 +10,11 @@ from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.cache import get_cache_manager
 from my_unicorn.core.github.client import ReleaseAPIClient
 from my_unicorn.core.github.models import Release
+from my_unicorn.core.protocols.progress import (
+    NullProgressReporter,
+    ProgressReporter,
+)
 from my_unicorn.logger import get_logger
-from my_unicorn.ui.progress import ProgressDisplay
 
 logger = get_logger(__name__)
 
@@ -27,7 +30,7 @@ class ReleaseFetcher:
         auth_manager: GitHubAuthManager | None = None,
         shared_api_task_id: str | None = None,
         use_cache: bool = True,
-        progress_service: ProgressDisplay | None = None,
+        progress_reporter: ProgressReporter | None = None,
     ) -> None:
         """Initialize the release fetcher.
 
@@ -39,7 +42,7 @@ class ReleaseFetcher:
                          (creates default if not provided)
             shared_api_task_id: Optional shared API progress task ID
             use_cache: Whether to use persistent caching
-            progress_service: Optional progress service for tracking
+            progress_reporter: Optional progress reporter for tracking
 
         """
         self.owner = owner
@@ -47,15 +50,15 @@ class ReleaseFetcher:
         self.use_cache = use_cache
         self.cache_manager = get_cache_manager() if use_cache else None
         self.auth_manager = auth_manager or GitHubAuthManager.create_default()
+        self.progress_reporter = progress_reporter or NullProgressReporter()
         self.api_client = ReleaseAPIClient(
             owner,
             repo,
             session,
             self.auth_manager,
             shared_api_task_id,
-            progress_service,
+            progress_reporter=self.progress_reporter,
         )
-        self.progress_service = progress_service
         self.shared_api_task_id = shared_api_task_id
         self.session = session
 
@@ -133,10 +136,9 @@ class ReleaseFetcher:
                 # Update shared progress even for cache hits
                 if (
                     self.shared_api_task_id
-                    and self.progress_service
-                    and self.progress_service.is_active()
+                    and self.progress_reporter.is_active()
                 ):
-                    await self.api_client._update_shared_progress(
+                    await self.api_client.update_shared_progress(
                         f"Retrieved {self.owner}/{self.repo} (cached)"
                     )
                 return cached
@@ -175,10 +177,9 @@ class ReleaseFetcher:
                 # Update shared progress even for cache hits
                 if (
                     self.shared_api_task_id
-                    and self.progress_service
-                    and self.progress_service.is_active()
+                    and self.progress_reporter.is_active()
                 ):
-                    await self.api_client._update_shared_progress(
+                    await self.api_client.update_shared_progress(
                         f"Retrieved {self.owner}/{self.repo} (cached)"
                     )
                 return cached
@@ -220,12 +221,8 @@ class ReleaseFetcher:
         if release:
             return release
 
-        if (
-            self.shared_api_task_id
-            and self.progress_service
-            and self.progress_service.is_active()
-        ):
-            await self.api_client._update_shared_progress(
+        if self.shared_api_task_id and self.progress_reporter.is_active():
+            await self.api_client.update_shared_progress(
                 f"No releases found for {self.owner}/{self.repo}"
             )
 
@@ -253,11 +250,10 @@ class ReleaseFetcher:
         """Update shared progress for cached release."""
         if (
             not self.shared_api_task_id
-            or not self.progress_service
-            or not self.progress_service.is_active()
+            or not self.progress_reporter.is_active()
         ):
             return
-        await self.api_client._update_shared_progress(
+        await self.api_client.update_shared_progress(
             f"Retrieved {self.owner}/{self.repo} (cached)"
         )
 
@@ -340,7 +336,7 @@ class GitHubClient:
         self,
         session: aiohttp.ClientSession,
         auth_manager: GitHubAuthManager | None = None,
-        progress_service: ProgressDisplay | None = None,
+        progress_reporter: ProgressReporter | None = None,
     ) -> None:
         """Initialize GitHub client.
 
@@ -348,12 +344,12 @@ class GitHubClient:
             session: aiohttp session for making requests
             auth_manager: Optional GitHub authentication manager
                          (creates default if not provided)
-            progress_service: Optional progress service for tracking
+            progress_reporter: Optional progress reporter for tracking
 
         """
         self.session = session
         self.auth_manager = auth_manager or GitHubAuthManager.create_default()
-        self.progress_service = progress_service
+        self.progress_reporter = progress_reporter or NullProgressReporter()
         self.shared_api_task_id: str | None = None
 
     def set_shared_api_task(self, task_id: str | None) -> None:

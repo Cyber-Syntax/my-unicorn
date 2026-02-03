@@ -1,8 +1,22 @@
-"""Progress display UI component using ASCII backend.
+"""Public API for progress display.
 
-This module provides the high-level interface for managing progress sessions
-and tasks. It orchestrates task lifecycle, speed calculations, and background
-rendering, delegating low-level rendering to the ASCII backend.
+This module is the canonical import path for ProgressDisplay.
+Core modules should not import from this module directly;
+they should depend on the ProgressReporter protocol from
+core.protocols.progress.
+
+Example:
+    from my_unicorn.ui.display import ProgressDisplay
+
+    progress = ProgressDisplay()
+    task_id = progress.add_task("Download", ProgressType.DOWNLOAD, total=1000)
+    progress.update_task(task_id, completed=500)
+    progress.finish_task(task_id, success=True)
+
+Implementation Details:
+    ProgressDisplay implements the ProgressReporter protocol defined in
+    my_unicorn.core.protocols.progress. It provides rich ASCII-based progress
+    display with session management and background rendering.
 
 Key features:
 - Task management: Add, update, and finish tasks with metadata.
@@ -10,6 +24,11 @@ Key features:
 - Workflow helpers: Convenience methods for common operations like
     installation workflows.
 - Background rendering: Asynchronous loop for periodic UI updates.
+
+Note:
+    For internal progress.py module usage - that module contains helper
+    functions and type definitions used by this display implementation.
+    External consumers should only import from this module.
 """
 
 from __future__ import annotations
@@ -25,6 +44,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+from my_unicorn.core.protocols.progress import ProgressReporter
+from my_unicorn.core.protocols.progress import ProgressType as CoreProgressType
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.progress_utils import calculate_speed
 
@@ -34,14 +55,33 @@ from .progress_types import ProgressConfig, ProgressType, TaskConfig, TaskInfo
 
 logger = get_logger(__name__)
 
+# Mapping from core protocol ProgressType to UI ProgressType
+_CORE_TO_UI_PROGRESS_TYPE: dict[CoreProgressType, ProgressType] = {
+    CoreProgressType.API: ProgressType.API_FETCHING,
+    CoreProgressType.DOWNLOAD: ProgressType.DOWNLOAD,
+    CoreProgressType.VERIFICATION: ProgressType.VERIFICATION,
+    CoreProgressType.EXTRACTION: ProgressType.ICON_EXTRACTION,
+    CoreProgressType.PROCESSING: ProgressType.ICON_EXTRACTION,  # Map to icon
+    CoreProgressType.INSTALLATION: ProgressType.INSTALLATION,
+    CoreProgressType.UPDATE: ProgressType.UPDATE,
+}
 
-#TODO: maybe better to move this to progress.py ?
-class ProgressDisplay:
-    """Progress display UI component using ASCII backend.
+
+# TODO: maybe better to move this to progress.py ?
+class ProgressDisplay(ProgressReporter):
+    """Progress display UI component implementing ProgressReporter protocol.
+
+    This is the primary implementation of the ProgressReporter protocol for
+    CLI usage. It provides rich ASCII-based progress display with session
+    management and background rendering.
 
     During active progress sessions, logger.info() is automatically
     suppressed to prevent interference with progress bar rendering.
     Warning/error logs are always shown.
+
+    Note:
+        Core domain services should depend on the ProgressReporter protocol,
+        not this concrete implementation directly.
     """
 
     def __init__(
@@ -92,18 +132,25 @@ class ProgressDisplay:
         self._original_console_levels: dict[logging.Handler, int] = {}
 
     def _generate_namespaced_id(
-        self, progress_type: ProgressType, name: str
+        self, progress_type: ProgressType | CoreProgressType, name: str
     ) -> str:
         """Generate a unique namespaced ID for a task with optimized caching.
 
         Args:
             progress_type: Type of progress operation
+                (UI or core protocol type)
             name: Task name
 
         Returns:
             Unique namespaced ID
 
         """
+        # Convert core ProgressType to UI ProgressType if needed
+        if isinstance(progress_type, CoreProgressType):
+            progress_type = _CORE_TO_UI_PROGRESS_TYPE.get(
+                progress_type, ProgressType.DOWNLOAD
+            )
+
         # Check cache first (move-to-end on access)
         cache_key = (progress_type, name)
         if cache_key in self._id_cache:
@@ -300,7 +347,7 @@ class ProgressDisplay:
     async def add_task(
         self,
         name: str,
-        progress_type: ProgressType,
+        progress_type: ProgressType | CoreProgressType,
         total: float = 0.0,
         description: str | None = None,
         parent_task_id: str | None = None,
@@ -312,6 +359,7 @@ class ProgressDisplay:
         Args:
             name: Task name
             progress_type: Type of progress operation
+                (UI or core protocol type)
             total: Total units for the task
             description: Task description
             parent_task_id: Parent task ID for multi-phase operations
@@ -322,9 +370,18 @@ class ProgressDisplay:
             Unique namespaced task ID
 
         """
+        # Convert core ProgressType to UI ProgressType if needed
+        ui_progress_type: ProgressType
+        if isinstance(progress_type, CoreProgressType):
+            ui_progress_type = _CORE_TO_UI_PROGRESS_TYPE.get(
+                progress_type, ProgressType.DOWNLOAD
+            )
+        else:
+            ui_progress_type = progress_type
+
         config = TaskConfig(
             name=name,
-            progress_type=progress_type,
+            progress_type=ui_progress_type,
             total=total,
             description=description,
             parent_task_id=parent_task_id,
@@ -557,14 +614,39 @@ class ProgressDisplay:
         finally:
             await self.stop_session()
 
-    def get_task_info(self, task_id: str) -> TaskInfo | None:
+    def get_task_info(self, task_id: str) -> dict[str, object]:
         """Get task information by ID.
+
+        Returns task info as a dict matching the ProgressReporter protocol.
 
         Args:
             task_id: Task identifier
 
         Returns:
-            Task information or None if not found
+            Dictionary with completed, total, and description keys.
+            Returns empty defaults if task not found.
+
+        """
+        task = self._tasks.get(task_id)
+        if task is None:
+            return {"completed": 0.0, "total": None, "description": ""}
+        return {
+            "completed": task.completed,
+            "total": task.total,
+            "description": task.description,
+        }
+
+    def get_task_info_full(self, task_id: str) -> TaskInfo | None:
+        """Get full task information by ID (internal use).
+
+        This method returns the full TaskInfo object for internal UI
+        operations. Use get_task_info() for protocol-compliant access.
+
+        Args:
+            task_id: Task identifier
+
+        Returns:
+            Full TaskInfo object or None if not found
 
         """
         return self._tasks.get(task_id)

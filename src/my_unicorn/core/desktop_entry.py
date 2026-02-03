@@ -11,7 +11,6 @@ Design Philosophy:
 - This ensures stable desktop integration without constant file rewrites
 """
 
-import os
 import re
 import shutil
 from pathlib import Path

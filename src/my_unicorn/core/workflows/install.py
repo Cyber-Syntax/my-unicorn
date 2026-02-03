@@ -25,14 +25,21 @@ from my_unicorn.core.github import (
     get_github_config,
     parse_github_url,
 )
+from my_unicorn.core.protocols.progress import (
+    NullProgressReporter,
+    ProgressReporter,
+)
 from my_unicorn.core.workflows.post_download import (
     OperationType,
     PostDownloadContext,
     PostDownloadProcessor,
 )
-from my_unicorn.exceptions import InstallationError
+from my_unicorn.exceptions import (
+    InstallationError,
+    InstallError,
+    VerificationError,
+)
 from my_unicorn.logger import get_logger
-from my_unicorn.ui.display import ProgressDisplay
 from my_unicorn.utils.appimage_utils import select_best_appimage_asset
 from my_unicorn.utils.error_formatters import build_install_error_result
 
@@ -40,13 +47,37 @@ logger = get_logger(__name__)
 
 
 class InstallHandler:
-    """Handles installation orchestration.
+    """Handles AppImage installation orchestration from catalog or URL sources.
+
+    This handler consolidates all installation logic including downloading,
+    verification, icon extraction, desktop entry creation, and configuration
+    management.
+
+    Attributes:
+        download_service: Service for downloading AppImage files.
+        storage_service: Service for file storage operations.
+        config_manager: Configuration manager for app settings.
+        github_client: GitHub API client for release fetching.
+        progress_reporter: Progress reporter for tracking installation steps.
+        post_download_processor: Processor for post-download workflow.
 
     Thread Safety:
         - Safe for concurrent access across multiple asyncio tasks
         - Each install operation should use a separate InstallHandler instance
           for isolated progress tracking
         - Download service manages its own progress state
+
+    Example:
+        >>> from my_unicorn.cli.container import ServiceContainer
+        >>> container = ServiceContainer(config, progress)
+        >>> try:
+        ...     handler = container.create_install_handler()
+        ...     result = await handler.install_from_catalog("firefox")
+        ...     if result["success"]:
+        ...         print(f"Installed to {result['path']}")
+        ... finally:
+        ...     await container.cleanup()
+
     """
 
     def __init__(
@@ -56,7 +87,7 @@ class InstallHandler:
         config_manager: ConfigManager,
         github_client: GitHubClient,
         post_download_processor: PostDownloadProcessor,
-        progress_service: ProgressDisplay | None = None,
+        progress_reporter: ProgressReporter | None = None,
     ) -> None:
         """Initialize install handler.
 
@@ -66,14 +97,14 @@ class InstallHandler:
             config_manager: Configuration manager
             github_client: GitHub API client
             post_download_processor: Processor for post-download operations
-            progress_service: Optional progress service for tracking installations
+            progress_reporter: Optional reporter for tracking installations
 
         """
         self.download_service = download_service
         self.storage_service = storage_service
         self.config_manager = config_manager
         self.github_client = github_client
-        self.progress_service = progress_service
+        self.progress_reporter = progress_reporter or NullProgressReporter()
         self.post_download_processor = post_download_processor
 
     @classmethod
@@ -83,7 +114,7 @@ class InstallHandler:
         config_manager: ConfigManager,
         github_client: GitHubClient,
         install_dir: Path,
-        progress_service: ProgressDisplay | None = None,
+        progress_reporter: ProgressReporter | None = None,
     ) -> "InstallHandler":
         """Create InstallHandler with default dependencies.
 
@@ -94,19 +125,19 @@ class InstallHandler:
             config_manager: Configuration manager
             github_client: GitHub client
             install_dir: Installation directory
-            progress_service: Optional progress service
+            progress_reporter: Optional progress reporter
 
         Returns:
             Configured InstallHandler instance
 
         """
-        download_service = DownloadService(session, progress_service)
+        download_service = DownloadService(session, progress_reporter)
         storage_service = FileOperations(install_dir)
         post_download_processor = PostDownloadProcessor(
             download_service=download_service,
             storage_service=storage_service,
             config_manager=config_manager,
-            progress_service=progress_service,
+            progress_reporter=progress_reporter,
         )
 
         return cls(
@@ -115,7 +146,7 @@ class InstallHandler:
             config_manager=config_manager,
             github_client=github_client,
             post_download_processor=post_download_processor,
-            progress_service=progress_service,
+            progress_reporter=progress_reporter,
         )
 
     async def install_from_catalog(
@@ -167,7 +198,15 @@ class InstallHandler:
             )
             # Asset is guaranteed non-None (raise_on_not_found=True by default)
             if asset is None:
-                raise ValueError(ERROR_NO_APPIMAGE_ASSET)
+                raise InstallError(
+                    ERROR_NO_APPIMAGE_ASSET,
+                    context={
+                        "app_name": app_name,
+                        "owner": owner,
+                        "repo": repo,
+                        "source": InstallSource.CATALOG,
+                    },
+                )
 
             # Install workflow
             return await self._install_workflow(
@@ -182,9 +221,22 @@ class InstallHandler:
         except InstallationError as error:
             logger.error("Failed to install %s: %s", app_name, error)
             return build_install_error_result(error, app_name, is_url=False)
-        except Exception as error:
+        except (InstallError, VerificationError) as error:
             logger.error("Failed to install %s: %s", app_name, error)
             return build_install_error_result(error, app_name, is_url=False)
+        except Exception as error:
+            install_error = InstallError(
+                str(error),
+                context={
+                    "app_name": app_name,
+                    "source": InstallSource.CATALOG,
+                },
+                cause=error,
+            )
+            logger.error("Failed to install %s: %s", app_name, install_error)
+            return build_install_error_result(
+                install_error, app_name, is_url=False
+            )
 
     def _build_url_install_config(
         self, app_name: str, owner: str, repo: str, prerelease: bool
@@ -260,7 +312,14 @@ class InstallHandler:
         )
         # Asset is guaranteed non-None (raise_on_not_found=True by default)
         if asset is None:
-            raise ValueError(ERROR_NO_APPIMAGE_ASSET)
+            raise InstallError(
+                ERROR_NO_APPIMAGE_ASSET,
+                context={
+                    "owner": owner,
+                    "repo": repo,
+                    "source": InstallSource.URL,
+                },
+            )
 
         return release, asset
 
@@ -323,11 +382,23 @@ class InstallHandler:
                 **options,
             )
 
-        except Exception as error:
+        except (InstallError, VerificationError) as error:
             logger.error(
                 "Failed to install from URL %s: %s", github_url, error
             )
             return build_install_error_result(error, github_url, is_url=True)
+        except Exception as error:
+            install_error = InstallError(
+                str(error),
+                context={"url": github_url, "source": InstallSource.URL},
+                cause=error,
+            )
+            logger.error(
+                "Failed to install from URL %s: %s", github_url, install_error
+            )
+            return build_install_error_result(
+                install_error, github_url, is_url=True
+            )
 
     async def install_multiple(
         self,
@@ -373,18 +444,33 @@ class InstallHandler:
                     return build_install_error_result(
                         error, app_or_url, is_url
                     )
-                except Exception as error:
+                except (InstallError, VerificationError) as error:
                     logger.error(
-                        "Unexpected error installing %s: %s", app_or_url, error
+                        "Domain error installing %s: %s", app_or_url, error
+                    )
+                    return build_install_error_result(
+                        error, app_or_url, is_url
+                    )
+                except Exception as error:
+                    source = (
+                        InstallSource.URL if is_url else InstallSource.CATALOG
+                    )
+                    install_error = InstallError(
+                        str(error),
+                        context={"target": app_or_url, "source": source},
+                        cause=error,
+                    )
+                    logger.error(
+                        "Unexpected error installing %s: %s",
+                        app_or_url,
+                        install_error,
                     )
                     return {
                         "success": False,
                         "target": app_or_url,
                         "name": app_or_url,
-                        "error": f"Installation failed: {error}",
-                        "source": InstallSource.URL
-                        if is_url
-                        else InstallSource.CATALOG,
+                        "error": str(install_error),
+                        "source": source,
                     }
 
         # Create tasks
@@ -489,11 +575,20 @@ class InstallHandler:
                 "desktop": result.desktop_result,
             }
 
-        except Exception as error:
-            logger.error(
-                "Installation workflow failed for %s: %s", app_name, error
-            )
+        except (InstallError, VerificationError):
+            # Domain exceptions already have context, re-raise as-is
             raise
+        except Exception as error:
+            # Wrap unexpected exceptions in InstallError with context
+            raise InstallError(
+                str(error),
+                context={
+                    "app_name": app_name,
+                    "asset_name": asset.name,
+                    "source": source,
+                },
+                cause=error,
+            ) from error
 
     async def _fetch_release(self, owner: str, repo: str) -> Release:
         """Fetch release data from GitHub.
@@ -506,18 +601,25 @@ class InstallHandler:
             Release object with assets
 
         Raises:
-            InstallationError: If no release found for repository
-            aiohttp.ClientError: If GitHub API request fails
+            InstallError: If no release found or fetch fails
 
         """
         try:
             release = await self.github_client.get_latest_release(owner, repo)
             if not release:
                 msg = ERROR_NO_RELEASE_FOUND.format(owner=owner, repo=repo)
-                raise InstallationError(msg)
+                raise InstallError(
+                    msg,
+                    context={"owner": owner, "repo": repo},
+                )
             return release
-        except Exception as error:
-            logger.error(
-                "Failed to fetch release for %s/%s: %s", owner, repo, error
-            )
+        except InstallError:
+            # Re-raise domain exceptions as-is
             raise
+        except Exception as error:
+            msg = f"Failed to fetch release for {owner}/{repo}"
+            raise InstallError(
+                msg,
+                context={"owner": owner, "repo": repo},
+                cause=error,
+            ) from error

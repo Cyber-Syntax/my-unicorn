@@ -15,6 +15,10 @@ from my_unicorn.core.backup import BackupService
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import Asset, Release
+from my_unicorn.core.protocols.progress import (
+    NullProgressReporter,
+    ProgressReporter,
+)
 from my_unicorn.core.verification import VerificationService
 from my_unicorn.core.workflows.appimage_setup import (
     create_desktop_entry,
@@ -22,7 +26,6 @@ from my_unicorn.core.workflows.appimage_setup import (
     setup_appimage_icon,
 )
 from my_unicorn.logger import get_logger
-from my_unicorn.ui.display import ProgressDisplay
 from my_unicorn.utils.appimage_utils import verify_appimage_download
 from my_unicorn.utils.config_builders import (
     create_app_config_v2,
@@ -46,6 +49,20 @@ class PostDownloadContext:
 
     Contains all information needed to process a downloaded AppImage
     for either install or update operations.
+
+    Attributes:
+        app_name: Name of the application being processed.
+        downloaded_path: Path to the downloaded AppImage file.
+        asset: GitHub asset metadata for the downloaded file.
+        release: GitHub release information.
+        app_config: Application configuration dictionary (v2 format).
+        catalog_entry: Catalog entry if installed from catalog, None otherwise.
+        operation_type: Type of operation (INSTALL or UPDATE).
+        owner: GitHub repository owner.
+        repo: GitHub repository name.
+        verify_downloads: Whether to verify downloaded file hash.
+        source: Installation source ("catalog" or "url").
+
     """
 
     app_name: str
@@ -66,6 +83,16 @@ class PostDownloadResult:
     """Result of post-download processing.
 
     Provides structured output with all processing results.
+
+    Attributes:
+        success: Whether all processing steps completed successfully.
+        install_path: Final path to the installed AppImage, None on failure.
+        verification_result: Hash verification result dict, None if skipped.
+        icon_result: Icon extraction result dict, None on failure.
+        config_result: Configuration save result dict, None on failure.
+        desktop_result: Desktop entry creation result dict, None on failure.
+        error: Error message if processing failed, None on success.
+
     """
 
     success: bool
@@ -78,19 +105,53 @@ class PostDownloadResult:
 
 
 class PostDownloadProcessor:
-    """Handles post-download workflow for both install and update.
+    """Handles post-download workflow for both install and update operations.
 
     This class consolidates the common post-download steps:
-    1. Verification (if enabled)
-    2. Move and rename AppImage
-    3. Setup icon
-    4. Create or update configuration
-    5. Create desktop entry
+    1. Verification (if enabled) - hash/signature verification
+    2. Move and rename AppImage - to final install location
+    3. Setup icon - extract from AppImage or use fallback
+    4. Create or update configuration - save app state
+    5. Create desktop entry - for desktop integration
+
+    Attributes:
+        download_service: Service for downloading files (used for hash files).
+        storage_service: Service for file storage operations.
+        config_manager: Configuration manager for app settings.
+        backup_service: Service for backup operations (updates only).
+        progress_reporter: Progress reporter for tracking steps.
 
     Thread Safety:
         - Safe for concurrent access across multiple asyncio tasks
         - Each operation should use a separate context instance
         - Progress tracking is isolated per context
+
+    Example:
+        >>> from my_unicorn.core.workflows.post_download import (
+        ...     PostDownloadProcessor, PostDownloadContext, OperationType
+        ... )
+        >>>
+        >>> processor = PostDownloadProcessor(
+        ...     download_service=download_service,
+        ...     storage_service=file_ops,
+        ...     config_manager=config_manager,
+        ...     progress_reporter=progress,
+        ... )
+        >>> context = PostDownloadContext(
+        ...     app_name="firefox",
+        ...     downloaded_path=Path("/tmp/firefox.AppImage"),
+        ...     asset=asset,
+        ...     release=release,
+        ...     app_config=app_config,
+        ...     catalog_entry=None,
+        ...     operation_type=OperationType.INSTALL,
+        ...     owner="AcmeInc",
+        ...     repo="firefox-appimage",
+        ... )
+        >>> result = await processor.process(context)
+        >>> if result.success:
+        ...     print(f"Installed to {result.install_path}")
+
     """
 
     def __init__(
@@ -100,7 +161,7 @@ class PostDownloadProcessor:
         config_manager: ConfigManager,
         verification_service: VerificationService | None = None,
         backup_service: BackupService | None = None,
-        progress_service: ProgressDisplay | None = None,
+        progress_reporter: ProgressReporter | None = None,
     ) -> None:
         """Initialize post-download processor.
 
@@ -110,7 +171,7 @@ class PostDownloadProcessor:
             config_manager: Configuration manager
             verification_service: Optional verification service
             backup_service: Optional backup service (required for updates)
-            progress_service: Optional progress service for tracking
+            progress_reporter: Optional progress reporter for tracking
 
         """
         self.download_service = download_service
@@ -118,7 +179,8 @@ class PostDownloadProcessor:
         self.config_manager = config_manager
         self._verification_service = verification_service
         self.backup_service = backup_service
-        self.progress_service = progress_service
+        # Apply null object pattern for progress reporter
+        self.progress_reporter = progress_reporter or NullProgressReporter()
 
     async def process(
         self, context: PostDownloadContext
@@ -182,9 +244,9 @@ class PostDownloadProcessor:
             if context.operation_type == OperationType.UPDATE:
                 await self._cleanup_after_update(context.app_name)
 
-            # Step 7: Finalize progress
-            if installation_task_id and self.progress_service:
-                await self.progress_service.finish_task(
+            # Step 7: Finalize progress (null object handles inactive)
+            if installation_task_id:
+                await self.progress_reporter.finish_task(
                     installation_task_id,
                     success=True,
                     description=f"✅ {context.app_name}",
@@ -213,9 +275,9 @@ class PostDownloadProcessor:
                 context.app_name,
             )
 
-            # Mark installation task as failed
-            if installation_task_id and self.progress_service:
-                await self.progress_service.finish_task(
+            # Mark installation task as failed (null object handles inactive)
+            if installation_task_id:
+                await self.progress_reporter.finish_task(
                     installation_task_id,
                     success=False,
                     description=f"❌ {context.app_name} failed",
@@ -244,12 +306,16 @@ class PostDownloadProcessor:
             Tuple of (verification_task_id, installation_task_id)
 
         """
-        if not self.progress_service or not self.progress_service.is_active():
+        if not self.progress_reporter.is_active():
             return None, None
 
-        return await self.progress_service.create_installation_workflow(
-            app_name, with_verification=with_verification
-        )
+        # Protocol doesn't define create_installation_workflow,
+        # check if concrete implementation has it
+        if hasattr(self.progress_reporter, "create_installation_workflow"):
+            return await self.progress_reporter.create_installation_workflow(
+                app_name, with_verification=with_verification
+            )
+        return None, None
 
     async def _verify_download(
         self, context: PostDownloadContext, verification_task_id: str | None
@@ -269,11 +335,11 @@ class PostDownloadProcessor:
 
         # Lazy initialization of verification service
         if self._verification_service is None:
-            progress_service = getattr(
-                self.download_service, "progress_service", None
+            progress_reporter = getattr(
+                self.download_service, "progress_reporter", None
             )
             self._verification_service = VerificationService(
-                self.download_service, progress_service
+                self.download_service, progress_reporter
             )
 
         return await verify_appimage_download(
@@ -434,10 +500,14 @@ class PostDownloadProcessor:
                 icon_result=icon_result,
                 config_manager=self.config_manager,
             )
-        except Exception:
-            logger.exception(
-                "Failed to create desktop entry for %s", context.app_name
+        except Exception as e:
+            logger.warning(
+                "Failed to create desktop entry for %s: %s",
+                context.app_name,
+                e,
             )
+            # Desktop entry failures are non-fatal,
+            # return error dict instead of raising
             return {"success": False, "error": "Desktop entry creation failed"}
 
     async def _cleanup_after_update(self, app_name: str) -> None:

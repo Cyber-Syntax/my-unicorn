@@ -1,15 +1,12 @@
 """Update command coordinator.
 
 Thin coordinator that validates input and delegates to
-UpdateApplicationService.
+UpdateApplicationService via ServiceContainer for dependency injection.
 """
 
 from argparse import Namespace
 
-from my_unicorn.core.workflows.services.update_service import (
-    UpdateApplicationService,
-)
-from my_unicorn.core.workflows.update import UpdateManager
+from my_unicorn.cli.container import ServiceContainer
 from my_unicorn.logger import get_logger
 from my_unicorn.ui.display_update import (
     display_check_results,
@@ -17,7 +14,7 @@ from my_unicorn.ui.display_update import (
     display_update_error,
     display_update_results,
 )
-from my_unicorn.ui.progress import progress_session
+from my_unicorn.ui.progress import ProgressDisplay
 
 from .base import BaseCommandHandler
 from .helpers import parse_targets
@@ -29,34 +26,41 @@ class UpdateHandler(BaseCommandHandler):
     """Thin coordinator for update command."""
 
     async def execute(self, args: Namespace) -> None:
-        """Execute update command."""
+        """Execute update command using ServiceContainer for DI."""
         try:
-            async with progress_session() as progress:
-                # Create UpdateManager with progress service
-                update_manager = UpdateManager(
-                    config_manager=self.config_manager,
-                    progress_service=progress,
-                )
+            progress_display = ProgressDisplay()
 
-                service = UpdateApplicationService(
-                    config_manager=self.config_manager,
-                    update_manager=update_manager,
-                    progress_service=progress,
-                )
+            container = ServiceContainer(
+                config_manager=self.config_manager,
+                progress_reporter=progress_display,
+            )
 
-                app_names = parse_targets(args.apps) if args.apps else None
-                refresh = getattr(args, "refresh_cache", False)
+            try:
+                # Estimate operations: check mode uses API fetching,
+                # update mode uses download/verify/icon/install per app
+                # Use a reasonable default; actual count may vary
+                total_operations = 10
 
-                if getattr(args, "check_only", False):
-                    results = await service.check_for_updates(
-                        app_names=app_names, refresh_cache=refresh
-                    )
-                else:
-                    results = await service.perform_updates(
-                        app_names=app_names, refresh_cache=refresh, force=False
-                    )
+                async with progress_display.session(total_operations):
+                    service = container.create_update_application_service()
 
-            # Display results after progress session ends
+                    app_names = parse_targets(args.apps) if args.apps else None
+                    refresh = getattr(args, "refresh_cache", False)
+
+                    if getattr(args, "check_only", False):
+                        results = await service.check_for_updates(
+                            app_names=app_names, refresh_cache=refresh
+                        )
+                    else:
+                        results = await service.perform_updates(
+                            app_names=app_names,
+                            refresh_cache=refresh,
+                            force=False,
+                        )
+            finally:
+                await container.cleanup()
+
+            # Display results after cleanup
             if getattr(args, "check_only", False):
                 display_check_results(results)
             else:

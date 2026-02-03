@@ -34,8 +34,12 @@ Usage in domain services::
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from enum import Enum, auto
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 
 class ProgressType(Enum):
@@ -241,7 +245,7 @@ class NullProgressReporter:
         """
         return False
 
-    def add_task(
+    async def add_task(
         self,
         name: str,  # noqa: ARG002
         progress_type: ProgressType,  # noqa: ARG002
@@ -260,7 +264,7 @@ class NullProgressReporter:
         """
         return "null-task"
 
-    def update_task(
+    async def update_task(
         self,
         task_id: str,
         completed: float | None = None,
@@ -275,7 +279,7 @@ class NullProgressReporter:
 
         """
 
-    def finish_task(
+    async def finish_task(
         self,
         task_id: str,
         *,
@@ -302,3 +306,95 @@ class NullProgressReporter:
 
         """
         return {"completed": 0.0, "total": None, "description": ""}
+
+
+# ============================================================================
+# Progress Context Managers for Core Workflows
+# ============================================================================
+
+
+@asynccontextmanager
+async def github_api_progress_task(
+    progress: ProgressReporter | None,
+    *,
+    task_name: str,
+    total: int,
+) -> AsyncIterator[str | None]:
+    """Manage GitHub API progress task lifecycle.
+
+    This context manager handles the complete lifecycle of a GitHub API
+    progress task, including creation, updates, and cleanup on both
+    success and failure.
+
+    Args:
+        progress: Progress reporter (can be None or NullProgressReporter)
+        task_name: Name for the progress task
+        total: Total number of API calls expected
+
+    Yields:
+        Task ID if progress reporter is active, None otherwise
+
+    Example:
+        >>> async with github_api_progress_task(
+        ...     progress, task_name="Fetching releases", total=5
+        ... ) as task_id:
+        ...     # Perform API operations
+        ...     pass
+
+    """
+    if not progress or not progress.is_active():
+        yield None
+        return
+
+    task_id = await progress.add_task(
+        name=task_name,
+        progress_type=ProgressType.API,
+        total=float(total),
+    )
+
+    try:
+        yield task_id
+        await progress.finish_task(task_id, success=True)
+    except Exception:
+        await progress.finish_task(task_id, success=False)
+        raise
+
+
+@asynccontextmanager
+async def operation_progress_session(
+    progress: ProgressReporter | None,
+    *,
+    total_operations: int,
+) -> AsyncIterator[ProgressReporter | None]:
+    """Manage progress session lifecycle for operations.
+
+    This context manager handles the progress session lifecycle for
+    operations that need progress tracking. It automatically handles
+    the case where progress is None or total_operations is 0.
+
+    For ProgressReporter protocol, this is a no-op that just yields the
+    reporter since session management is handled by the concrete UI layer.
+
+    Args:
+        progress: Progress reporter (can be None or NullProgressReporter)
+        total_operations: Total number of operations to track
+
+    Yields:
+        Progress reporter if available, None otherwise
+
+    Example:
+        >>> async with operation_progress_session(
+        ...     progress, total_operations=10
+        ... ) as prog:
+        ...     if prog and prog.is_active():
+        ...         prog.update_task(...)
+
+    """
+    if not progress or not progress.is_active() or total_operations == 0:
+        yield progress
+        return
+
+    # For the protocol-based approach, session management is handled
+    # by the concrete UI implementation. This context manager just
+    # provides a consistent interface for core services.
+    yield progress

@@ -7,6 +7,7 @@ from my_unicorn.config import ConfigManager
 from my_unicorn.core.backup import BackupService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import Asset, Release
+from my_unicorn.core.protocols.progress import ProgressReporter
 from my_unicorn.core.verification import VerificationService
 from my_unicorn.core.workflows.appimage_setup import (
     create_desktop_entry,
@@ -14,7 +15,6 @@ from my_unicorn.core.workflows.appimage_setup import (
     setup_appimage_icon,
 )
 from my_unicorn.logger import get_logger
-from my_unicorn.ui.display import ProgressDisplay
 from my_unicorn.utils.appimage_utils import verify_appimage_download
 from my_unicorn.utils.config_builders import get_stored_hash, update_app_config
 
@@ -37,7 +37,7 @@ async def process_post_download(
     storage_service: FileOperations,
     config_manager: ConfigManager,
     backup_service: BackupService,
-    progress_service: ProgressDisplay | None = None,
+    progress_reporter: ProgressReporter | None = None,
 ) -> bool:
     """Process post-download operations for update workflow.
 
@@ -60,7 +60,7 @@ async def process_post_download(
         storage_service: Storage service instance
         config_manager: Configuration manager instance
         backup_service: Backup service instance
-        progress_service: Optional progress service instance
+        progress_reporter: Optional ProgressReporter protocol implementation
 
     Returns:
         True if processing was successful, False otherwise
@@ -70,14 +70,14 @@ async def process_post_download(
 
     """
     progress_enabled = (
-        progress_service is not None and progress_service.is_active()
+        progress_reporter is not None and progress_reporter.is_active()
     )
 
     verification_task_id = None
     installation_task_id = None
 
-    def _raise_no_progress_service() -> None:
-        msg = "Progress service is required when progress is enabled"
+    def _raise_no_progress_reporter() -> None:
+        msg = "Progress reporter is required when progress is enabled"
         raise ValueError(msg)
 
     def _raise_progress_required() -> None:
@@ -86,14 +86,17 @@ async def process_post_download(
 
     try:
         if progress_enabled:
-            if progress_service is None:
-                _raise_no_progress_service()
-            (
-                verification_task_id,
-                installation_task_id,
-            ) = await progress_service.create_installation_workflow(
-                app_name, with_verification=True
-            )
+            if progress_reporter is None:
+                _raise_no_progress_reporter()
+            # Protocol doesn't define create_installation_workflow,
+            # check if concrete implementation has it
+            if hasattr(progress_reporter, "create_installation_workflow"):
+                (
+                    verification_task_id,
+                    installation_task_id,
+                ) = await progress_reporter.create_installation_workflow(
+                    app_name, with_verification=True
+                )
 
         # Verify download
         verify_result = await verify_appimage_download(
@@ -179,9 +182,9 @@ async def process_post_download(
 
         # Finish installation task
         if installation_task_id and progress_enabled:
-            if progress_service is None:
+            if progress_reporter is None:
                 _raise_progress_required()
-            await progress_service.finish_task(
+            await progress_reporter.finish_task(
                 installation_task_id,
                 success=True,
                 description=f"✅ {app_name}",
@@ -197,9 +200,9 @@ async def process_post_download(
     except Exception:
         # Mark installation as failed if we have a progress task
         if installation_task_id and progress_enabled:
-            if progress_service is None:
+            if progress_reporter is None:
                 _raise_progress_required()
-            await progress_service.finish_task(
+            await progress_reporter.finish_task(
                 installation_task_id,
                 success=False,
                 description=f"❌ {app_name} installation failed",

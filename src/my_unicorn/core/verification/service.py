@@ -26,12 +26,17 @@ from my_unicorn.constants import (
     VerificationMethod,
 )
 from my_unicorn.core.github import Asset, AssetSelector, ChecksumFileInfo
+from my_unicorn.core.protocols.progress import (
+    NullProgressReporter,
+    ProgressReporter,
+    ProgressType,
+)
 from my_unicorn.core.verification.verifier import Verifier
+from my_unicorn.exceptions import VerificationError
 from my_unicorn.logger import get_logger
 
 if TYPE_CHECKING:
     from my_unicorn.core.download import DownloadService
-    from my_unicorn.ui.progress import ProgressDisplay
 
 logger = get_logger(__name__, enable_file_logging=True)
 
@@ -169,17 +174,17 @@ class VerificationService:
     def __init__(
         self,
         download_service: DownloadService,
-        progress_service: ProgressDisplay | None = None,
+        progress_reporter: ProgressReporter | None = None,
     ) -> None:
         """Initialize verification service.
 
         Args:
             download_service: Service for downloading checksum files
-            progress_service: Optional progress service for tracking
+            progress_reporter: Optional progress reporter for tracking
 
         """
         self.download_service = download_service
-        self.progress_service = progress_service
+        self.progress_reporter = progress_reporter or NullProgressReporter()
 
     async def verify_file(
         self,
@@ -210,7 +215,7 @@ class VerificationService:
             VerificationResult with success status and methods used
 
         Raises:
-            Exception: If verification fails and strong methods available
+            VerificationError: If all available verification methods fail
 
         """
         # Create context for verification state
@@ -264,15 +269,11 @@ class VerificationService:
         )
 
         # Create progress task if needed
-        if (
-            self.progress_service
-            and context.progress_task_id is None
-            and self.progress_service.is_active()
-        ):
-            context.progress_task_id = (
-                await self.progress_service.create_verification_task(
-                    context.app_name
-                )
+        is_active = self.progress_reporter.is_active()
+        if context.progress_task_id is None and is_active:
+            context.progress_task_id = await self.progress_reporter.add_task(
+                f"Verifying {context.app_name}",
+                ProgressType.VERIFICATION,
             )
 
         # Detect available methods
@@ -599,7 +600,7 @@ class VerificationService:
             VerificationResult with final status and optional warning
 
         Raises:
-            Exception: If strong methods available but all failed
+            VerificationError: If strong methods are available but all fail
 
         """
         has_checksum_files = bool(context.checksum_files)
@@ -644,11 +645,17 @@ class VerificationService:
                 available_methods.append(VerificationMethod.DIGEST)
             if has_checksum_files:
                 available_methods.append("checksum_files")
-            msg = (
-                f"Available verification methods failed: "
-                f"{', '.join(available_methods)}"
+            failed_methods_str = ", ".join(available_methods)
+            msg = f"All verification methods failed: {failed_methods_str}"
+            raise VerificationError(
+                msg,
+                context={
+                    "app_name": context.app_name,
+                    "file_path": str(context.file_path),
+                    "available_methods": available_methods,
+                    "failed_methods": failed_methods,
+                },
             )
-            raise Exception(msg)
 
         # Determine overall result and warning message
         warning_message = None
@@ -793,8 +800,8 @@ class VerificationService:
             description: Final status description
 
         """
-        if task_id and self.progress_service:
-            await self.progress_service.finish_task(
+        if task_id:
+            await self.progress_reporter.finish_task(
                 task_id,
                 success=success,
                 description=description,

@@ -10,9 +10,13 @@ Clean Architecture. It orchestrates the complete update workflow including:
 """
 
 from my_unicorn.config import ConfigManager
+from my_unicorn.core.protocols.progress import (
+    NullProgressReporter,
+    ProgressReporter,
+    github_api_progress_task,
+)
 from my_unicorn.core.workflows.update import UpdateInfo, UpdateManager
 from my_unicorn.logger import get_logger
-from my_unicorn.ui.progress import ProgressDisplay, github_api_progress_task
 
 logger = get_logger(__name__)
 
@@ -31,19 +35,19 @@ class UpdateApplicationService:
         self,
         config_manager: ConfigManager,
         update_manager: UpdateManager,
-        progress_service: ProgressDisplay | None = None,
+        progress_reporter: ProgressReporter | None = None,
     ) -> None:
         """Initialize update application service.
 
         Args:
             config_manager: Configuration manager
             update_manager: Update manager (domain service)
-            progress_service: Optional progress tracking
+            progress_reporter: Optional progress reporter for tracking
 
         """
         self.config_manager = config_manager
         self.update_manager = update_manager
-        self.progress = progress_service
+        self.progress_reporter = progress_reporter or NullProgressReporter()
 
     def _validate_app_names(
         self, app_names: list[str] | None
@@ -134,7 +138,7 @@ class UpdateApplicationService:
 
         # Execute updates with progress management
         async with github_api_progress_task(
-            self.progress,
+            self.progress_reporter,
             task_name="GitHub Releases",
             total=len(apps_to_update),
         ) as api_task_id:

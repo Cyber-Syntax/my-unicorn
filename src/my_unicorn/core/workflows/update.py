@@ -29,15 +29,22 @@ from my_unicorn.core.github import (
     ReleaseFetcher,
     get_github_config,
 )
+from my_unicorn.core.protocols.progress import (
+    NullProgressReporter,
+    ProgressReporter,
+)
 from my_unicorn.core.verification import VerificationService
 from my_unicorn.core.workflows.post_download import (
     OperationType,
     PostDownloadContext,
     PostDownloadProcessor,
 )
-from my_unicorn.exceptions import ConfigurationError
+from my_unicorn.exceptions import (
+    ConfigurationError,
+    UpdateError,
+    VerificationError,
+)
 from my_unicorn.logger import get_logger
-from my_unicorn.ui.display import ProgressDisplay
 from my_unicorn.utils.appimage_utils import select_best_appimage_asset
 from my_unicorn.utils.download_utils import extract_filename_from_url
 from my_unicorn.utils.version_utils import compare_versions
@@ -47,11 +54,31 @@ logger = get_logger(__name__)
 
 @dataclass
 class UpdateInfo:
-    """Information about an available update.
+    r"""Information about an available update for an installed application.
 
-    This class now includes in-memory caching of release data AND loaded config
-    to eliminate redundant cache file reads and config validation during a single
-    update operation.
+    This class encapsulates update status and metadata, including in-memory
+    caching of release data and loaded config to eliminate redundant cache
+    file reads during a single update operation.
+
+    Attributes:
+        app_name: Name of the application.
+        current_version: Currently installed version string.
+        latest_version: Latest available version from GitHub.
+        has_update: True if latest_version is newer than current_version.
+        release_url: URL to the GitHub release page.
+        prerelease: True if the latest release is a prerelease.
+        original_tag_name: Original Git tag name for the release.
+        release_data: Cached Release object from GitHub API.
+        app_config: Cached loaded application configuration.
+        error_reason: Error message if update check failed, None on success.
+
+    Example:
+        >>> info = await manager.check_single_update("firefox", session)
+        >>> if info.is_success and info.has_update:
+        ...     print(f"Update: {info.current_version} -> {info.latest_version}")
+        >>> elif info.error_reason:
+        ...     print(f"Check failed: {info.error_reason}")
+
     """
 
     app_name: str
@@ -110,34 +137,64 @@ class UpdateInfo:
 
 
 class UpdateManager:
-    """Manages updates for installed AppImages.
+    r"""Manages updates for installed AppImage applications.
+
+    Provides functionality to check for updates, download new versions,
+    and manage the update process for installed AppImages. Supports both
+    single app updates and batch update operations.
+
+    Attributes:
+        config_manager: Configuration manager for app settings.
+        global_config: Global configuration dictionary.
+        auth_manager: GitHub authentication manager.
+        storage_service: File operations service.
+        backup_service: Backup service for pre-update backups.
+        progress_reporter: Progress reporter for tracking updates.
+        verification_service: Hash verification service (on demand).
+        post_download_processor: Post-download processor (on demand).
+        _shared_api_task_id: Shared API task ID for progress tracking.
+        _catalog_cache: In-memory cache for catalog entries.
+        _cache_lock: Async lock for thread-safe catalog cache access.
 
     Thread Safety:
         - Safe for concurrent access across multiple asyncio tasks
-        - Catalog cache is protected by asyncio.Lock for concurrent reads/writes
+        - Catalog cache is protected by asyncio.Lock for concurrent access
         - Each update operation should use a separate UpdateManager instance
           for isolated progress tracking
         - Shared verification service is initialized per-session and is
           thread-safe
 
     In-Memory Caching:
-        - Catalog entries are cached in _catalog_cache during an update session
+        - Catalog entries are cached in _catalog_cache during update session
         - Cache is cleared when UpdateManager instance is destroyed
-        - Cache reduces redundant file I/O for multiple apps from same catalog
+        - Cache reduces redundant file I/O for multiple apps from catalog
+
+    Example:
+        >>> from my_unicorn.cli.container import ServiceContainer
+        >>> container = ServiceContainer(config, progress)
+        >>> try:
+        ...     manager = container.create_update_manager()
+        ...     updates = await manager.check_updates()
+        ...     for info in updates:
+        ...         if info.has_update:
+        ...             print(f"{info.app_name}: {info.current_version}")
+        ... finally:
+        ...     await container.cleanup()
+
     """
 
     def __init__(
         self,
         config_manager: ConfigManager | None = None,
         auth_manager: GitHubAuthManager | None = None,
-        progress_service: ProgressDisplay | None = None,
+        progress_reporter: ProgressReporter | None = None,
     ) -> None:
         """Initialize update manager.
 
         Args:
             config_manager: Configuration manager instance
             auth_manager: GitHub authentication manager instance
-            progress_service: Optional progress service for tracking updates
+            progress_reporter: Optional progress reporter for tracking updates
 
         """
         self.config_manager = config_manager or ConfigManager()
@@ -153,8 +210,8 @@ class UpdateManager:
             self.config_manager, self.global_config
         )
 
-        # Store progress service parameter but don't cache global service
-        self._progress_service_param = progress_service
+        # Apply null object pattern for progress reporter
+        self.progress_reporter = progress_reporter or NullProgressReporter()
 
         # Initialize shared services - will be set when session is available
         self.verification_service: VerificationService | None = None
@@ -164,12 +221,14 @@ class UpdateManager:
         # Thread-safe with asyncio.Lock for concurrent access
         self._catalog_cache: dict[str, dict[str, Any] | None] = {}
         self._cache_lock = asyncio.Lock()
+        # Shared API task ID for progress tracking across update operations
+        self._shared_api_task_id: str | None = None
 
     @classmethod
     def create_default(
         cls,
         config_manager: ConfigManager | None = None,
-        progress_service: ProgressDisplay | None = None,
+        progress_reporter: ProgressReporter | None = None,
     ) -> "UpdateManager":
         """Create UpdateManager with default dependencies.
 
@@ -177,7 +236,7 @@ class UpdateManager:
 
         Args:
             config_manager: Optional configuration manager (creates new if None)
-            progress_service: Optional progress service for tracking
+            progress_reporter: Optional progress reporter for tracking
 
         Returns:
             Configured UpdateManager instance
@@ -185,7 +244,7 @@ class UpdateManager:
         """
         return cls(
             config_manager=config_manager,
-            progress_service=progress_service,
+            progress_reporter=progress_reporter,
         )
 
     def _initialize_services(self, session: aiohttp.ClientSession) -> None:
@@ -195,11 +254,8 @@ class UpdateManager:
             session: aiohttp session for downloads
 
         """
-        download_service = DownloadService(
-            session, self._progress_service_param
-        )
+        download_service = DownloadService(session, self.progress_reporter)
         # Get progress reporter from download service
-        # (renamed from progress_service in Task 2.1)
         progress_reporter = download_service.progress_reporter
         self.verification_service = VerificationService(
             download_service, progress_reporter
@@ -212,7 +268,7 @@ class UpdateManager:
             config_manager=self.config_manager,
             verification_service=self.verification_service,
             backup_service=self.backup_service,
-            progress_service=self._progress_service_param,
+            progress_reporter=self.progress_reporter,
         )
 
     async def _fetch_release_data(
@@ -444,7 +500,7 @@ class UpdateManager:
             Catalog entry dict or None
 
         Raises:
-            ValueError: If catalog reference is invalid
+            UpdateError: If catalog reference is invalid or not found
 
         """
         if not catalog_ref:
@@ -456,7 +512,11 @@ class UpdateManager:
             msg = ERROR_CATALOG_MISSING.format(
                 app_name=app_name, catalog_ref=catalog_ref
             )
-            raise ValueError(msg) from e
+            raise UpdateError(
+                message=msg,
+                context={"app_name": app_name, "catalog_ref": catalog_ref},
+                cause=e,
+            ) from e
 
     async def _resolve_update_info(
         self,
@@ -537,7 +597,7 @@ class UpdateManager:
             Catalog entry dict or None if not referenced
 
         Raises:
-            ValueError: If catalog is referenced but not found
+            UpdateError: If catalog is referenced but not found
 
         """
         catalog_ref = app_config.get("catalog_ref")
@@ -546,11 +606,15 @@ class UpdateManager:
 
         try:
             return await self._load_catalog_cached(catalog_ref)
-        except (FileNotFoundError, ValueError):
+        except (FileNotFoundError, ValueError) as e:
             msg = ERROR_CATALOG_MISSING.format(
                 app_name=app_name, catalog_ref=catalog_ref
             )
-            raise ValueError(msg)
+            raise UpdateError(
+                message=msg,
+                context={"app_name": app_name, "catalog_ref": catalog_ref},
+                cause=e,
+            ) from e
 
     def _select_asset_for_update(
         self,
@@ -675,12 +739,9 @@ class UpdateManager:
             Tuple of (success status, error reason or None)
 
         Raises:
+            UpdateError: If update fails (download, verification, processing)
+            VerificationError: If hash verification fails
             ConfigurationError: If app configuration is invalid or missing
-                required fields
-            ValueError: If catalog reference is invalid or AppImage asset
-                not found
-            OSError: If file operations fail (backup, download, move)
-            aiohttp.ClientError: If GitHub API or download requests fail
 
         """
         try:
@@ -732,20 +793,26 @@ class UpdateManager:
                     logger.debug("Backup created: %s", backup_path)
 
             # Download AppImage
-            download_service = DownloadService(
-                session, self._progress_service_param
-            )
+            download_service = DownloadService(session, self.progress_reporter)
             self._initialize_services(session)
             downloaded_path = await download_service.download_appimage(
                 appimage_asset, download_path
             )
             if not downloaded_path:
-                return False, "Download failed"
+                raise UpdateError(
+                    message="Download failed",
+                    context={
+                        "app_name": app_name,
+                        "download_url": appimage_asset.browser_download_url,
+                    },
+                )
 
             # release_data is guaranteed to exist at this point
             if update_info.release_data is None:
-                msg = "release_data must be available"
-                raise ValueError(msg) from None
+                raise UpdateError(
+                    message="release_data must be available",
+                    context={"app_name": app_name},
+                )
 
             # Create processing context
             post_context = PostDownloadContext(
@@ -774,9 +841,21 @@ class UpdateManager:
                 return True, None
             return False, result.error or "Post-download processing failed"
 
-        except Exception as e:
+        except (UpdateError, VerificationError) as e:
+            # Re-raise domain exceptions as they already have context
             logger.exception("Failed to update %s", app_name)
-            return False, f"Update failed: {e}"
+            return False, str(e)
+        except Exception as e:
+            # Wrap unexpected exceptions in UpdateError with context
+            logger.exception("Failed to update %s", app_name)
+            raise UpdateError(
+                message=f"Update failed: {e}",
+                context={
+                    "app_name": app_name,
+                    "force": force,
+                },
+                cause=e,
+            ) from e
 
     async def _load_catalog_cached(self, ref: str) -> dict[str, Any] | None:
         """Load catalog with in-memory caching for current session.
@@ -851,22 +930,26 @@ class UpdateManager:
         if not self._shared_api_task_id:
             return
 
-        progress_service = self._progress_service_param
-        if not progress_service or not progress_service.is_active():
+        # Null object pattern: no need for None check on progress_reporter
+        if not self.progress_reporter.is_active():
             return
 
         try:
-            task_info = progress_service.get_task_info(
+            task_info = self.progress_reporter.get_task_info(
                 self._shared_api_task_id
             )
             if not task_info:
                 return
 
-            new_completed = int(task_info.completed) + 1
+            completed = task_info.get("completed", 0)
+            total_value = task_info.get("total")
+            new_completed = int(completed) + 1
             total = (
-                int(task_info.total) if task_info.total > 0 else new_completed
+                int(total_value)
+                if total_value and total_value > 0
+                else new_completed
             )
-            await progress_service.update_task(
+            await self.progress_reporter.update_task(
                 self._shared_api_task_id,
                 completed=float(new_completed),
                 description=f"🌐 Retrieved {app_name} (cached) ({new_completed}/{total})",

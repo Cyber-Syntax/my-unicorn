@@ -14,15 +14,17 @@ from my_unicorn.config import ConfigManager
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import GitHubClient
-from my_unicorn.core.workflows.install import InstallHandler
-from my_unicorn.core.workflows.install_state_checker import InstallStateChecker
-from my_unicorn.core.workflows.target_resolver import TargetResolver
-from my_unicorn.logger import get_logger
-from my_unicorn.ui.progress import (
-    ProgressDisplay,
+from my_unicorn.core.protocols.progress import (
+    NullProgressReporter,
+    ProgressReporter,
     github_api_progress_task,
     operation_progress_session,
 )
+from my_unicorn.core.workflows.install import InstallHandler
+from my_unicorn.core.workflows.install_state_checker import InstallStateChecker
+from my_unicorn.core.workflows.post_download import PostDownloadProcessor
+from my_unicorn.core.workflows.target_resolver import TargetResolver
+from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -60,7 +62,7 @@ class InstallApplicationService:
         github_client: GitHubClient,
         config_manager: ConfigManager,
         install_dir: Path,
-        progress_service: ProgressDisplay | None = None,
+        progress_reporter: ProgressReporter | None = None,
     ) -> None:
         """Initialize install application service.
 
@@ -69,14 +71,14 @@ class InstallApplicationService:
             github_client: GitHub API client
             config_manager: Configuration manager
             install_dir: Installation directory
-            progress_service: Optional progress tracking service
+            progress_reporter: Optional progress reporter for tracking
 
         """
         self.session = session
         self.github = github_client
         self.config = config_manager
         self.install_dir = install_dir
-        self.progress = progress_service
+        self.progress_reporter = progress_reporter or NullProgressReporter()
 
         # Initialized on demand
         self._download_service: DownloadService | None = None
@@ -87,7 +89,7 @@ class InstallApplicationService:
         """Get or create download service with progress tracking."""
         if self._download_service is None:
             self._download_service = DownloadService(
-                self.session, self.progress
+                self.session, self.progress_reporter
             )
         return self._download_service
 
@@ -95,16 +97,12 @@ class InstallApplicationService:
     def install_handler(self) -> InstallHandler:
         """Get or create install handler."""
         if self._install_handler is None:
-            from my_unicorn.core.workflows.post_download import (
-                PostDownloadProcessor,
-            )
-
             storage_service = FileOperations(self.install_dir)
             post_download_processor = PostDownloadProcessor(
                 download_service=self.download_service,
                 storage_service=storage_service,
                 config_manager=self.config,
-                progress_service=self.progress,
+                progress_reporter=self.progress_reporter,
             )
             self._install_handler = InstallHandler(
                 download_service=self.download_service,
@@ -112,7 +110,7 @@ class InstallApplicationService:
                 config_manager=self.config,
                 github_client=self.github,
                 post_download_processor=post_download_processor,
-                progress_service=self.progress,
+                progress_reporter=self.progress_reporter,
             )
         return self._install_handler
 
@@ -178,10 +176,10 @@ class InstallApplicationService:
         results = []
         async with (
             operation_progress_session(
-                self.progress, total_operations=total_operations
+                self.progress_reporter, total_operations=total_operations
             ),
             github_api_progress_task(
-                self.progress,
+                self.progress_reporter,
                 task_name="GitHub Releases",
                 total=apps_needing_work,
             ) as api_task_id,
