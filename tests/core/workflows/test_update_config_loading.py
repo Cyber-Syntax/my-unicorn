@@ -22,7 +22,7 @@ def update_manager(mock_config_manager):
     manager = UpdateManager(
         config_manager=mock_config_manager,
         auth_manager=MagicMock(),
-        progress_service=MagicMock(),
+        progress_reporter=MagicMock(),
     )
     manager.global_config = {
         "directory": {

@@ -4,7 +4,6 @@ This module tests the application service layer for installation workflows,
 ensuring proper orchestration, progress management, and service coordination.
 """
 
-from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -47,18 +46,18 @@ def mock_config_manager():
 
 @pytest.fixture
 def mock_progress_service() -> Any:
-    """Create mock progress service."""
-    progress = AsyncMock()
-    progress.create_api_fetching_task = AsyncMock(return_value="api-task-1")
+    """Create mock progress reporter (ProgressReporter protocol)."""
+    progress = MagicMock()
+    # ProgressReporter protocol methods
+    progress.is_active.return_value = True
+    progress.add_task = AsyncMock(return_value="api-task-1")
     progress.update_task = AsyncMock()
     progress.finish_task = AsyncMock()
-
-    # Create async context manager for session
-    @asynccontextmanager
-    async def mock_session(total_operations: int) -> Any:
-        yield progress
-
-    progress.session = MagicMock(side_effect=mock_session)
+    progress.get_task_info.return_value = {
+        "completed": 0.0,
+        "total": None,
+        "description": "",
+    }
     return progress
 
 
@@ -84,7 +83,7 @@ def install_service(
         github_client=mock_github_client,
         config_manager=mock_config_manager,
         install_dir=install_dir,
-        progress_service=mock_progress_service,
+        progress_reporter=mock_progress_service,
     )
 
 
@@ -126,7 +125,7 @@ class TestInstallApplicationService:
         assert install_service.github is not None
         assert install_service.config is not None
         assert install_service.install_dir is not None
-        assert install_service.progress is not None
+        assert install_service.progress_reporter is not None
 
     def test_lazy_download_service_creation(self, install_service):
         """Test download service is created on demand."""
@@ -435,10 +434,12 @@ class TestInstallApplicationService:
                 options = InstallOptions()
                 await install_service.install(["app1"], options)
 
-                # Verify progress session was used
-                install_service.progress.session.assert_called_once()
-                # Verify GitHub API task was created
-                install_service.progress.create_api_fetching_task.assert_called_once()
+                # Verify progress reporter was active
+                install_service.progress_reporter.is_active.assert_called()
+                # Verify GitHub API task was created via add_task()
+                install_service.progress_reporter.add_task.assert_called()
+                # Verify task was finished
+                install_service.progress_reporter.finish_task.assert_called()
 
     @pytest.mark.asyncio
     async def test_install_sets_shared_api_task(self, install_service):

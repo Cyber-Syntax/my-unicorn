@@ -21,7 +21,7 @@ def update_manager(mock_config_manager):
     manager = UpdateManager(
         config_manager=mock_config_manager,
         auth_manager=MagicMock(),
-        progress_service=MagicMock(),
+        progress_reporter=MagicMock(),
     )
     # Mock global config
     manager.global_config = {
@@ -125,7 +125,7 @@ async def test_catalog_cache_isolated_per_instance(mock_config_manager):
     manager1 = UpdateManager(
         config_manager=mock_config_manager,
         auth_manager=MagicMock(),
-        progress_service=MagicMock(),
+        progress_reporter=MagicMock(),
     )
     manager1.global_config = {
         "directory": {"download": "/tmp", "icon": "/tmp"}
@@ -139,7 +139,7 @@ async def test_catalog_cache_isolated_per_instance(mock_config_manager):
     manager2 = UpdateManager(
         config_manager=mock_config_manager,
         auth_manager=MagicMock(),
-        progress_service=MagicMock(),
+        progress_reporter=MagicMock(),
     )
     manager2.global_config = {
         "directory": {"download": "/tmp", "icon": "/tmp"}

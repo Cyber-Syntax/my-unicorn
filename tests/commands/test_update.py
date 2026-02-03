@@ -2,10 +2,11 @@
 
 from argparse import Namespace
 from typing import Any
-from unittest.mock import ANY, AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from my_unicorn.cli.commands.helpers import parse_targets
 from my_unicorn.cli.commands.update import UpdateHandler
 
 
@@ -38,11 +39,9 @@ def update_handler(
 @pytest.mark.asyncio
 async def test_update_handler_check_only_mode(
     update_handler: UpdateHandler,
-    mock_update_manager: Any,
     mock_config_manager: Any,
 ) -> None:
     """Test UpdateHandler executes check-only mode successfully."""
-    # Mock the service's check_for_updates method
     mock_results = {
         "available_updates": [
             {
@@ -55,34 +54,29 @@ async def test_update_handler_check_only_mode(
         "invalid_apps": [],
     }
 
-    # Mock progress_session context manager
-    mock_progress = MagicMock()
-    mock_progress_ctx = AsyncMock()
-    mock_progress_ctx.__aenter__ = AsyncMock(return_value=mock_progress)
-    mock_progress_ctx.__aexit__ = AsyncMock(return_value=None)
+    mock_service = MagicMock()
+    mock_service.check_for_updates = AsyncMock(return_value=mock_results)
 
-    with (
-        patch(
-            "my_unicorn.cli.commands.update.UpdateApplicationService"
-        ) as mock_service_class,
-        patch(
-            "my_unicorn.cli.commands.update.progress_session",
-            return_value=mock_progress_ctx,
-        ),
-    ):
-        mock_service = MagicMock()
-        mock_service.check_for_updates = AsyncMock(return_value=mock_results)
-        mock_service_class.return_value = mock_service
+    mock_container = MagicMock()
+    mock_container.create_update_application_service.return_value = (
+        mock_service
+    )
+    mock_container.cleanup = AsyncMock()
 
+    with patch(
+        "my_unicorn.cli.commands.update.ServiceContainer",
+        return_value=mock_container,
+    ) as mock_container_class:
         args = Namespace(apps=["app1"], check_only=True, refresh_cache=False)
         await update_handler.execute(args)
 
-        # Verify service was created with correct dependencies
-        mock_service_class.assert_called_once_with(
-            config_manager=mock_config_manager,
-            update_manager=ANY,  # UpdateManager created in execute()
-            progress_service=mock_progress,
-        )
+        # Verify container was created with correct dependencies
+        mock_container_class.assert_called_once()
+        call_kwargs = mock_container_class.call_args.kwargs
+        assert call_kwargs["config_manager"] == mock_config_manager
+
+        # Verify service was obtained from container
+        mock_container.create_update_application_service.assert_called_once()
 
         # Verify check_for_updates was called
         mock_service.check_for_updates.assert_awaited_once_with(
@@ -90,15 +84,16 @@ async def test_update_handler_check_only_mode(
             refresh_cache=False,
         )
 
+        # Verify cleanup was called
+        mock_container.cleanup.assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_update_handler_perform_updates(
     update_handler: UpdateHandler,
-    mock_update_manager: Any,
     mock_config_manager: Any,
 ) -> None:
     """Test UpdateHandler performs updates successfully."""
-    # Mock the service's perform_updates method
     mock_results = {
         "updated": ["app1"],
         "failed": [],
@@ -107,34 +102,29 @@ async def test_update_handler_perform_updates(
         "update_infos": [],
     }
 
-    # Mock progress_session context manager
-    mock_progress = MagicMock()
-    mock_progress_ctx = AsyncMock()
-    mock_progress_ctx.__aenter__ = AsyncMock(return_value=mock_progress)
-    mock_progress_ctx.__aexit__ = AsyncMock(return_value=None)
+    mock_service = MagicMock()
+    mock_service.perform_updates = AsyncMock(return_value=mock_results)
 
-    with (
-        patch(
-            "my_unicorn.cli.commands.update.UpdateApplicationService"
-        ) as mock_service_class,
-        patch(
-            "my_unicorn.cli.commands.update.progress_session",
-            return_value=mock_progress_ctx,
-        ),
-    ):
-        mock_service = MagicMock()
-        mock_service.perform_updates = AsyncMock(return_value=mock_results)
-        mock_service_class.return_value = mock_service
+    mock_container = MagicMock()
+    mock_container.create_update_application_service.return_value = (
+        mock_service
+    )
+    mock_container.cleanup = AsyncMock()
 
+    with patch(
+        "my_unicorn.cli.commands.update.ServiceContainer",
+        return_value=mock_container,
+    ) as mock_container_class:
         args = Namespace(apps=["app1"], check_only=False, refresh_cache=False)
         await update_handler.execute(args)
 
-        # Verify service was created
-        mock_service_class.assert_called_once_with(
-            config_manager=mock_config_manager,
-            update_manager=ANY,  # UpdateManager created in execute()
-            progress_service=mock_progress,
-        )
+        # Verify container was created
+        mock_container_class.assert_called_once()
+        call_kwargs = mock_container_class.call_args.kwargs
+        assert call_kwargs["config_manager"] == mock_config_manager
+
+        # Verify service was obtained from container
+        mock_container.create_update_application_service.assert_called_once()
 
         # Verify perform_updates was called
         mock_service.perform_updates.assert_awaited_once_with(
@@ -143,6 +133,9 @@ async def test_update_handler_perform_updates(
             force=False,
         )
 
+        # Verify cleanup was called
+        mock_container.cleanup.assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_update_handler_exception_handling(
@@ -150,10 +143,16 @@ async def test_update_handler_exception_handling(
     mock_config_manager: Any,
 ) -> None:
     """Test UpdateHandler handles exceptions and displays error."""
+    mock_container = MagicMock()
+    mock_container.create_update_application_service.side_effect = Exception(
+        "Boom"
+    )
+    mock_container.cleanup = AsyncMock()
+
     with (
         patch(
-            "my_unicorn.cli.commands.update.UpdateApplicationService",
-            side_effect=Exception("Boom"),
+            "my_unicorn.cli.commands.update.ServiceContainer",
+            return_value=mock_container,
         ),
         patch(
             "my_unicorn.cli.commands.update.display_update_error"
@@ -169,11 +168,11 @@ async def test_update_handler_exception_handling(
             "Update operation failed: Boom"
             in mock_display_error.call_args[0][0]
         )
+        # Verify cleanup was still called despite the exception
+        mock_container.cleanup.assert_awaited_once()
 
 
 def test_parse_targets_handles_comma_separated() -> None:
     """Test parse_targets expands comma-separated app names."""
-    from my_unicorn.cli.commands.helpers import parse_targets
-
     expanded = parse_targets(["foo,bar", "baz"])
     assert expanded == ["foo", "bar", "baz"]

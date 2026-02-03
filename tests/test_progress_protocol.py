@@ -62,52 +62,65 @@ class TestNullProgressReporter:
         """is_active() always returns False."""
         assert reporter.is_active() is False
 
-    def test_add_task_returns_null_task_id(
+    @pytest.mark.asyncio
+    async def test_add_task_returns_null_task_id(
         self, reporter: NullProgressReporter
     ) -> None:
         """add_task() returns placeholder task ID."""
-        task_id = reporter.add_task("Test", ProgressType.DOWNLOAD, total=100.0)
+        task_id = await reporter.add_task(
+            "Test", ProgressType.DOWNLOAD, total=100.0
+        )
         assert task_id == "null-task"
 
-    def test_add_task_accepts_all_progress_types(
+    @pytest.mark.asyncio
+    async def test_add_task_accepts_all_progress_types(
         self, reporter: NullProgressReporter
     ) -> None:
         """add_task() accepts any ProgressType value."""
         for pt in ProgressType:
-            task_id = reporter.add_task("Test", pt)
+            task_id = await reporter.add_task("Test", pt)
             assert task_id == "null-task"
 
-    def test_add_task_without_total(
+    @pytest.mark.asyncio
+    async def test_add_task_without_total(
         self, reporter: NullProgressReporter
     ) -> None:
         """add_task() works without total (indeterminate progress)."""
-        task_id = reporter.add_task("Test", ProgressType.API)
+        task_id = await reporter.add_task("Test", ProgressType.API)
         assert task_id == "null-task"
 
-    def test_update_task_is_noop(self, reporter: NullProgressReporter) -> None:
+    @pytest.mark.asyncio
+    async def test_update_task_is_noop(
+        self, reporter: NullProgressReporter
+    ) -> None:
         """update_task() does nothing and returns None."""
-        result = reporter.update_task("task-id", completed=50.0)
+        result = await reporter.update_task("task-id", completed=50.0)
         assert result is None
 
-    def test_update_task_with_description(
+    @pytest.mark.asyncio
+    async def test_update_task_with_description(
         self, reporter: NullProgressReporter
     ) -> None:
         """update_task() accepts description parameter."""
-        result = reporter.update_task(
+        result = await reporter.update_task(
             "task-id", completed=50.0, description="Halfway"
         )
         assert result is None
 
-    def test_finish_task_is_noop(self, reporter: NullProgressReporter) -> None:
+    @pytest.mark.asyncio
+    async def test_finish_task_is_noop(
+        self, reporter: NullProgressReporter
+    ) -> None:
         """finish_task() does nothing and returns None."""
-        result = reporter.finish_task("task-id", success=True)
+        result = await reporter.finish_task("task-id", success=True)
         assert result is None
 
-    def test_finish_task_failure_case(
+    @pytest.mark.asyncio
+    async def test_finish_task_failure_case(
         self, reporter: NullProgressReporter
     ) -> None:
         """finish_task() handles success=False."""
-        result = reporter.finish_task(
+        result = await reporter.finish_task(
             "task-id", success=False, description="Failed"
         )
         assert result is None
@@ -187,22 +200,25 @@ class TestNullPatternIntegration:
         assert isinstance(progress, ProgressReporter)
         assert progress.is_active() is False
 
-    def test_full_lifecycle(self) -> None:
+    @pytest.mark.asyncio
+    async def test_full_lifecycle(self) -> None:
         """Complete task lifecycle with NullProgressReporter."""
         reporter = NullProgressReporter()
 
-        task_id = reporter.add_task(
+        task_id = await reporter.add_task(
             name="Download file",
             progress_type=ProgressType.DOWNLOAD,
             total=1024.0,
         )
         assert task_id == "null-task"
 
-        reporter.update_task(task_id, completed=256.0)
-        reporter.update_task(task_id, completed=512.0, description="50%")
-        reporter.update_task(task_id, completed=1024.0)
+        await reporter.update_task(task_id, completed=256.0)
+        await reporter.update_task(task_id, completed=512.0, description="50%")
+        await reporter.update_task(task_id, completed=1024.0)
 
-        reporter.finish_task(task_id, success=True, description="Complete")
+        await reporter.finish_task(
+            task_id, success=True, description="Complete"
+        )
 
         info = reporter.get_task_info(task_id)
         assert info["completed"] == 0.0  # Null reporter doesn't track state

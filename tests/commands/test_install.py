@@ -65,28 +65,30 @@ async def test_install_handler_with_targets(
 
     with (
         patch(
-            "my_unicorn.cli.commands.install.create_http_session"
-        ) as mock_session,
-        patch(
-            "my_unicorn.cli.commands.install.InstallApplicationService"
-        ) as mock_service_class,
+            "my_unicorn.cli.commands.install.ServiceContainer"
+        ) as mock_container_class,
         patch("my_unicorn.cli.commands.install.print_install_summary"),
     ):
-        # Setup async context manager for session
-        mock_session_instance = MagicMock()
-        mock_session.return_value.__aenter__ = AsyncMock(
-            return_value=mock_session_instance
-        )
-        mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
+        # Setup container mock
+        mock_container = MagicMock()
+        mock_container_class.return_value = mock_container
 
-        # Setup install service
+        # Setup install service via container
         mock_service = MagicMock()
         mock_service.install = AsyncMock(return_value=mock_results)
-        mock_service_class.return_value = mock_service
+        mock_container.create_install_application_service.return_value = (
+            mock_service
+        )
+
+        # Setup cleanup
+        mock_container.cleanup = AsyncMock()
 
         await install_handler.execute(args)
 
-        # Verify service.install was called
+        # Verify container was used correctly
+        mock_container_class.assert_called_once()
+        mock_container.create_install_application_service.assert_called_once()
         mock_service.install.assert_awaited_once()
+        mock_container.cleanup.assert_awaited_once()
         call_args = mock_service.install.call_args
         assert call_args[0][0] == ["app1"]  # targets

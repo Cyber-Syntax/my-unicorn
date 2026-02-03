@@ -604,7 +604,31 @@ class TestProgressDisplay:
     def test_get_task_info_existing(
         self, progress_service: ProgressDisplay
     ) -> None:
-        """Test getting info for an existing task."""
+        """Test getting info for an existing task returns dict."""
+        # Manually create a task info
+        task_info = TaskInfo(
+            task_id="test_task_1",
+            namespaced_id="test_1_task",
+            name="test_task",
+            progress_type=ProgressType.DOWNLOAD,
+            completed=50.0,
+            total=100.0,
+            description="Test description",
+        )
+        progress_service._tasks["test_task"] = task_info
+
+        info = progress_service.get_task_info("test_task")
+
+        # get_task_info returns dict per ProgressReporter protocol
+        assert isinstance(info, dict)
+        assert info["completed"] == 50.0
+        assert info["total"] == 100.0
+        assert info["description"] == "Test description"
+
+    def test_get_task_info_full_existing(
+        self, progress_service: ProgressDisplay
+    ) -> None:
+        """Test getting full TaskInfo for an existing task."""
         # Manually create a task info
         task_info = TaskInfo(
             task_id="test_task_1",
@@ -614,15 +638,27 @@ class TestProgressDisplay:
         )
         progress_service._tasks["test_task"] = task_info
 
-        info = progress_service.get_task_info("test_task")
+        info = progress_service.get_task_info_full("test_task")
 
         assert info == task_info
 
     def test_get_task_info_nonexistent(
         self, progress_service: ProgressDisplay
     ) -> None:
-        """Test getting info for nonexistent task returns None."""
+        """Test getting info for nonexistent task returns defaults."""
         info = progress_service.get_task_info("nonexistent_task")
+
+        # Protocol requires returning dict with defaults for missing task
+        assert isinstance(info, dict)
+        assert info["completed"] == 0.0
+        assert info["total"] is None
+        assert info["description"] == ""
+
+    def test_get_task_info_full_nonexistent(
+        self, progress_service: ProgressDisplay
+    ) -> None:
+        """Test getting full TaskInfo for nonexistent task returns None."""
+        info = progress_service.get_task_info_full("nonexistent_task")
 
         assert info is None
 
@@ -935,7 +971,7 @@ class TestErrorScenarios:
             task_id, description="🔍 Checking integrity...", completed=75.0
         )
 
-        task_info = progress_service.get_task_info(task_id)
+        task_info = progress_service.get_task_info_full(task_id)
         assert task_info is not None
         assert task_info.description == "🔍 Checking integrity..."
         assert task_info.completed == 75.0
@@ -963,8 +999,8 @@ class TestErrorScenarios:
         # Test task updates
         await service.update_task(task_id, completed=50.0)
 
-        # Test task info
-        task_info = service.get_task_info(task_id)
+        # Test task info - use get_task_info_full for full TaskInfo
+        task_info = service.get_task_info_full(task_id)
         assert task_info is not None
         assert task_info.name == "test_task"
         assert task_info.progress_type == ProgressType.DOWNLOAD
@@ -991,15 +1027,15 @@ class TestErrorScenarios:
         assert verify_id is not None
         assert install_id is not None
 
-        # Check verification task
-        verify_task = service.get_task_info(verify_id)
+        # Check verification task - use get_task_info_full for full TaskInfo
+        verify_task = service.get_task_info_full(verify_id)
         assert verify_task is not None
         assert verify_task.phase == 1
         assert verify_task.total_phases == 2
         assert verify_task.progress_type == ProgressType.VERIFICATION
 
         # Check installation task
-        install_task = service.get_task_info(install_id)
+        install_task = service.get_task_info_full(install_id)
         assert install_task is not None
         assert install_task.phase == 2
         assert install_task.total_phases == 2
@@ -1022,7 +1058,7 @@ class TestErrorScenarios:
         assert verify_id is None
         assert install_id is not None
 
-        install_task = service.get_task_info(install_id)
+        install_task = service.get_task_info_full(install_id)
         assert install_task is not None
         assert install_task.phase == 1
         assert install_task.total_phases == 1
@@ -1053,7 +1089,7 @@ class TestErrorScenarios:
         with patch("time.time", return_value=1002.0):
             await service.update_task(task_id, completed=3000.0)
 
-        task_info = service.get_task_info(task_id)
+        task_info = service.get_task_info_full(task_id)
         assert task_info is not None
         # Speed should be calculated from history
         assert task_info.current_speed_mbps > 0
@@ -1074,7 +1110,7 @@ class TestErrorScenarios:
         )
 
         assert task_id is not None
-        task_info = service.get_task_info(task_id)
+        task_info = service.get_task_info_full(task_id)
         assert task_info is not None
         assert task_info.progress_type == ProgressType.UPDATE
         assert task_info.description == "Updating MyApp"
@@ -1114,9 +1150,9 @@ class TestErrorScenarios:
 
         api_task = await service.create_api_fetching_task("GitHub API")
 
-        # Verify tasks were created
-        assert service.get_task_info(dl_task) is not None
-        assert service.get_task_info(api_task) is not None
+        # Verify tasks were created - use get_task_info_full to check existence
+        assert service.get_task_info_full(dl_task) is not None
+        assert service.get_task_info_full(api_task) is not None
 
         await service.stop_session()
 

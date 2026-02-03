@@ -1,5 +1,6 @@
 """Tests for update management functionality."""
 
+import asyncio
 from pathlib import Path
 from typing import Any
 from unittest.mock import ANY, AsyncMock, MagicMock, patch
@@ -7,8 +8,14 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import aiohttp
 import pytest
 
-from my_unicorn.core.github import Release
+from my_unicorn.core.github import Asset, Release
+from my_unicorn.core.protocols.progress import (
+    NullProgressReporter,
+    ProgressReporter,
+    ProgressType,
+)
 from my_unicorn.core.workflows.update import UpdateInfo, UpdateManager
+from my_unicorn.exceptions import UpdateError, VerificationError
 
 # Test constants
 EXPECTED_APP_COUNT = 2
@@ -172,6 +179,20 @@ class TestUpdateManager:
             mock_config_cls.assert_called_once_with()
             assert manager.config_manager == mock_config_instance
 
+    def test_shared_api_task_id_initialized(
+        self, mock_config_manager: MagicMock
+    ) -> None:
+        """Test that _shared_api_task_id is initialized to None."""
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+        ):
+            manager = UpdateManager(mock_config_manager)
+
+            assert hasattr(manager, "_shared_api_task_id")
+            assert manager._shared_api_task_id is None
+
     @pytest.mark.parametrize(
         "current,latest,expected",
         [
@@ -210,7 +231,8 @@ class TestUpdateManager:
         expected: bool,
     ) -> None:
         """Test version comparison logic through public interface."""
-        # Test version comparison through check_single_update rather than private method
+        # Test version comparison through check_single_update
+        # rather than private method
         with patch.object(update_manager, "config_manager") as mock_config:
             # load_app_config now returns merged effective config
             mock_config.load_app_config.return_value = {
@@ -239,7 +261,8 @@ class TestUpdateManager:
             ) as mock_fetcher_cls:
                 mock_fetcher = AsyncMock()
                 mock_fetcher_cls.return_value = mock_fetcher
-                mock_fetcher.fetch_latest_release_or_prerelease.return_value = mock_release_data
+                method = mock_fetcher.fetch_latest_release_or_prerelease
+                method.return_value = mock_release_data
 
                 async def run_test() -> None:
                     result = await update_manager.check_single_update(
@@ -249,9 +272,6 @@ class TestUpdateManager:
                         f"Check failed: {result.error_reason}"
                     )
                     assert result.has_update == expected
-
-                # Run the async test
-                import asyncio
 
                 asyncio.run(run_test())
 
@@ -303,7 +323,8 @@ class TestUpdateManager:
                 mock_fetcher.fetch_latest_release.return_value = (
                     mock_release_data
                 )
-                mock_fetcher.fetch_latest_release_or_prerelease.return_value = mock_release_data
+                method = mock_fetcher.fetch_latest_release_or_prerelease
+                method.return_value = mock_release_data
                 # Ensure the shared API task ID is properly mocked
                 mock_fetcher.set_shared_api_task = MagicMock()
 
@@ -587,7 +608,8 @@ class TestUpdateManager:
             with patch.object(
                 update_manager, "check_single_update", new=AsyncMock()
             ) as mock_check:
-                # app1 succeeds, app2 returns error UpdateInfo, app3 raises exception
+                # app1 succeeds, app2 returns error UpdateInfo
+                # app3 raises exception
                 error_info2 = UpdateInfo(
                     app_name="app2",
                     error_reason="Failed to fetch",
@@ -726,7 +748,8 @@ class TestUpdateManager:
                         "test-app", mock_session
                     )
 
-                    # Method returns True when no update is needed (successful check)
+                    # Method returns True when no update needed
+                    # (successful check)
                     assert success is True
                     assert error_reason is None
 
@@ -784,7 +807,7 @@ class TestUpdateManager:
             mock_progress = MagicMock()
 
             update_manager = UpdateManager(
-                mock_config_manager, progress_service=mock_progress
+                mock_config_manager, progress_reporter=mock_progress
             )
 
             mock_download = MagicMock()
@@ -814,3 +837,633 @@ class TestUpdateManager:
 
             # Verify that verification service was set
             assert update_manager.verification_service == mock_verify
+
+
+class TestUpdateWorkflowProtocolUsage:
+    """Tests for UpdateWorkflow ProgressReporter protocol usage (Task 3.4)."""
+
+    @pytest.fixture
+    def mock_config_manager(self) -> MagicMock:
+        """Create mock ConfigManager."""
+        mock_config = MagicMock()
+        mock_config.load_global_config.return_value = {
+            "max_concurrent_downloads": 3,
+            "directory": {
+                "storage": Path("/test/storage"),
+                "download": Path("/test/download"),
+                "backup": Path("/test/backup"),
+                "icon": Path("/test/icon"),
+            },
+        }
+        mock_config.list_installed_apps.return_value = ["app1", "app2"]
+        return mock_config
+
+    def test_accepts_progress_reporter_protocol(
+        self, mock_config_manager: MagicMock
+    ) -> None:
+        """Test UpdateManager accepts ProgressReporter protocol type."""
+
+        class MockProgressReporter:
+            """Mock progress reporter implementing the protocol."""
+
+            def is_active(self) -> bool:
+                return True
+
+            def add_task(
+                self,
+                name: str,
+                progress_type: ProgressType,
+                total: float | None = None,
+            ) -> str:
+                return "mock-task-id"
+
+            def update_task(
+                self,
+                task_id: str,
+                completed: float | None = None,
+                description: str | None = None,
+            ) -> None:
+                pass
+
+            def finish_task(
+                self,
+                task_id: str,
+                *,
+                success: bool = True,
+                description: str | None = None,
+            ) -> None:
+                pass
+
+            def get_task_info(self, task_id: str) -> dict[str, object]:
+                return {"completed": 0.0, "total": None, "description": ""}
+
+        mock_reporter = MockProgressReporter()
+        assert isinstance(mock_reporter, ProgressReporter)
+
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+        ):
+            manager = UpdateManager(
+                mock_config_manager, progress_reporter=mock_reporter
+            )
+            assert manager.progress_reporter is mock_reporter
+
+    def test_uses_null_reporter_when_none_provided(
+        self, mock_config_manager: MagicMock
+    ) -> None:
+        """Test UpdateManager uses NullProgressReporter when None provided."""
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+        ):
+            manager = UpdateManager(
+                mock_config_manager, progress_reporter=None
+            )
+            assert isinstance(manager.progress_reporter, NullProgressReporter)
+
+    def test_uses_null_reporter_by_default(
+        self, mock_config_manager: MagicMock
+    ) -> None:
+        """Test UpdateManager uses NullProgressReporter by default."""
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+        ):
+            manager = UpdateManager(mock_config_manager)
+            assert isinstance(manager.progress_reporter, NullProgressReporter)
+
+    def test_progress_reporter_attribute_accessible(
+        self, mock_config_manager: MagicMock
+    ) -> None:
+        """Test progress_reporter attribute is accessible."""
+
+        class TestReporter:
+            """Test reporter for attribute access test."""
+
+            def is_active(self) -> bool:
+                return True
+
+            def add_task(
+                self,
+                name: str,
+                progress_type: ProgressType,
+                total: float | None = None,
+            ) -> str:
+                return "test-id"
+
+            def update_task(
+                self,
+                task_id: str,
+                completed: float | None = None,
+                description: str | None = None,
+            ) -> None:
+                pass
+
+            def finish_task(
+                self,
+                task_id: str,
+                *,
+                success: bool = True,
+                description: str | None = None,
+            ) -> None:
+                pass
+
+            def get_task_info(self, task_id: str) -> dict[str, object]:
+                return {}
+
+        reporter = TestReporter()
+
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+        ):
+            manager = UpdateManager(
+                mock_config_manager, progress_reporter=reporter
+            )
+
+            assert hasattr(manager, "progress_reporter")
+            assert manager.progress_reporter is reporter
+            assert manager.progress_reporter.is_active() is True
+
+    def test_null_reporter_is_active_returns_false(
+        self, mock_config_manager: MagicMock
+    ) -> None:
+        """Test NullProgressReporter.is_active() returns False."""
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+        ):
+            manager = UpdateManager(
+                mock_config_manager, progress_reporter=None
+            )
+            assert manager.progress_reporter.is_active() is False
+
+    @pytest.mark.asyncio
+    async def test_null_reporter_add_task_returns_null_task(
+        self, mock_config_manager: MagicMock
+    ) -> None:
+        """Test NullProgressReporter.add_task() returns 'null-task'."""
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+        ):
+            manager = UpdateManager(
+                mock_config_manager, progress_reporter=None
+            )
+
+            task_id = await manager.progress_reporter.add_task(
+                "Test Task", ProgressType.UPDATE, total=100.0
+            )
+            assert task_id == "null-task"
+
+
+class TestUpdateWorkflowDomainExceptions:
+    """Tests for UpdateWorkflow domain exception usage (Task 3.4)."""
+
+    @pytest.fixture
+    def mock_config_manager(self) -> MagicMock:
+        """Create mock ConfigManager for exception testing."""
+        mock_config = MagicMock()
+        mock_config.load_global_config.return_value = {
+            "max_concurrent_downloads": 3,
+            "directory": {
+                "storage": Path("/test/storage"),
+                "download": Path("/test/download"),
+                "backup": Path("/test/backup"),
+                "icon": Path("/test/icon"),
+            },
+        }
+        return mock_config
+
+    @pytest.fixture
+    def mock_session(self) -> AsyncMock:
+        """Create mock aiohttp session."""
+        return AsyncMock(spec=aiohttp.ClientSession)
+
+    @pytest.mark.asyncio
+    async def test_update_error_when_catalog_not_found(
+        self, mock_config_manager: MagicMock, mock_session: AsyncMock
+    ) -> None:
+        """Test UpdateError context when catalog reference not found."""
+        mock_config_manager.load_app_config.return_value = {
+            "config_version": "2.0.0",
+            "catalog_ref": "nonexistent-catalog",
+            "source": {
+                "owner": "test-owner",
+                "repo": "test-repo",
+                "prerelease": False,
+            },
+            "state": {"version": "1.0.0"},
+        }
+
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+        ):
+            manager = UpdateManager(mock_config_manager)
+
+            # Mock _load_catalog_cached to raise FileNotFoundError
+            with patch.object(
+                manager,
+                "_load_catalog_cached",
+                side_effect=FileNotFoundError(),
+            ):
+                # Call update_single_app which uses _load_catalog_if_needed
+                # Check for UpdateError being raised when catalog missing
+                with pytest.raises(UpdateError) as exc_info:
+                    await manager._load_catalog_for_update(
+                        "test-app",
+                        {"catalog_ref": "nonexistent-catalog"},
+                    )
+
+                has_app_name = (
+                    "test-app" in str(exc_info.value)
+                    or exc_info.value.context.get("app_name") == "test-app"
+                )
+                assert has_app_name
+
+    @pytest.mark.asyncio
+    async def test_update_error_includes_catalog_ref_context(
+        self, mock_config_manager: MagicMock
+    ) -> None:
+        """Test UpdateError includes catalog_ref in context."""
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+        ):
+            manager = UpdateManager(mock_config_manager)
+
+            # Mock _load_catalog_cached to raise ValueError
+            with patch.object(
+                manager,
+                "_load_catalog_cached",
+                side_effect=ValueError("Invalid catalog format"),
+            ):
+                with pytest.raises(UpdateError) as exc_info:
+                    await manager._load_catalog_for_update(
+                        "test-app",
+                        {"catalog_ref": "invalid-catalog"},
+                    )
+
+                # Verify context includes catalog_ref
+                catalog_ref = exc_info.value.context.get("catalog_ref")
+                assert catalog_ref == "invalid-catalog"
+                assert exc_info.value.context.get("app_name") == "test-app"
+
+    @pytest.mark.asyncio
+    async def test_update_error_preserves_cause_chain(
+        self, mock_config_manager: MagicMock
+    ) -> None:
+        """Test UpdateError preserves original exception as cause."""
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+        ):
+            manager = UpdateManager(mock_config_manager)
+
+            original_error = FileNotFoundError("Catalog file missing")
+            with patch.object(
+                manager,
+                "_load_catalog_cached",
+                side_effect=original_error,
+            ):
+                with pytest.raises(UpdateError) as exc_info:
+                    await manager._load_catalog_for_update(
+                        "test-app",
+                        {"catalog_ref": "missing-catalog"},
+                    )
+
+                # Verify cause chain is preserved
+                assert exc_info.value.__cause__ is original_error
+
+    @pytest.mark.asyncio
+    async def test_update_single_app_returns_error_for_missing_config(
+        self, mock_config_manager: MagicMock, mock_session: AsyncMock
+    ) -> None:
+        """Test update_single_app returns error when config not found."""
+        mock_config_manager.load_app_config.return_value = None
+
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.workflows.update.logger"),
+        ):
+            manager = UpdateManager(mock_config_manager)
+            success, error_reason = await manager.update_single_app(
+                "nonexistent-app", mock_session
+            )
+
+            assert success is False
+            assert error_reason is not None
+            assert "No configuration found" in error_reason
+
+    @pytest.mark.asyncio
+    async def test_update_error_on_download_failure(
+        self, mock_config_manager: MagicMock, mock_session: AsyncMock
+    ) -> None:
+        """Test UpdateError context when download fails during update."""
+        mock_config_manager.load_app_config.return_value = {
+            "config_version": "2.0.0",
+            "source": {
+                "owner": "test-owner",
+                "repo": "test-repo",
+                "prerelease": False,
+            },
+            "state": {"version": "1.0.0"},
+        }
+
+        mock_release_data = Release(
+            owner="test-owner",
+            repo="test-repo",
+            version="1.2.0",
+            prerelease=False,
+            assets=[
+                Asset(
+                    name="test-app.AppImage",
+                    size=1024,
+                    digest="",
+                    browser_download_url="https://example.com/test.appimage",
+                ),
+            ],
+            original_tag_name="v1.2.0",
+        )
+
+        update_info = UpdateInfo(
+            app_name="test-app",
+            current_version="1.0.0",
+            latest_version="1.2.0",
+            has_update=True,
+            release_data=mock_release_data,
+            app_config=mock_config_manager.load_app_config.return_value,
+        )
+
+        # Mock _prepare_update_context to return a valid context
+        mock_context = {
+            "app_config": mock_config_manager.load_app_config.return_value,
+            "update_info": update_info,
+            "appimage_asset": mock_release_data.assets[0],
+            "catalog_entry": None,
+            "owner": "test-owner",
+            "repo": "test-repo",
+        }
+
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+            patch(
+                "my_unicorn.core.workflows.update.DownloadService"
+            ) as mock_download_cls,
+            patch("my_unicorn.core.workflows.update.logger"),
+        ):
+            manager = UpdateManager(mock_config_manager)
+
+            # Mock DownloadService to return None (download failure)
+            mock_download = MagicMock()
+            mock_download.download_appimage = AsyncMock(return_value=None)
+            mock_download_cls.return_value = mock_download
+
+            with patch.object(
+                manager,
+                "_prepare_update_context",
+                return_value=(mock_context, None),
+            ):
+                # UpdateError is caught and returned as (False, error_message)
+                success, error_reason = await manager.update_single_app(
+                    "test-app", mock_session, force=True
+                )
+
+                assert success is False
+                assert error_reason is not None
+                assert "Download failed" in error_reason
+
+    @pytest.mark.asyncio
+    async def test_update_handles_verification_error_gracefully(
+        self, mock_config_manager: MagicMock, mock_session: AsyncMock
+    ) -> None:
+        """Test VerificationError is handled gracefully during update."""
+        mock_config_manager.load_app_config.return_value = {
+            "config_version": "2.0.0",
+            "source": {
+                "owner": "test-owner",
+                "repo": "test-repo",
+                "prerelease": False,
+            },
+            "state": {"version": "1.0.0"},
+        }
+
+        mock_release_data = Release(
+            owner="test-owner",
+            repo="test-repo",
+            version="1.2.0",
+            prerelease=False,
+            assets=[
+                Asset(
+                    name="test-app.AppImage",
+                    size=1024,
+                    digest="",
+                    browser_download_url="https://example.com/test.appimage",
+                ),
+            ],
+            original_tag_name="v1.2.0",
+        )
+
+        update_info = UpdateInfo(
+            app_name="test-app",
+            current_version="1.0.0",
+            latest_version="1.2.0",
+            has_update=True,
+            release_data=mock_release_data,
+            app_config=mock_config_manager.load_app_config.return_value,
+        )
+
+        mock_context = {
+            "app_config": mock_config_manager.load_app_config.return_value,
+            "update_info": update_info,
+            "appimage_asset": mock_release_data.assets[0],
+            "catalog_entry": None,
+            "owner": "test-owner",
+            "repo": "test-repo",
+        }
+
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+            patch(
+                "my_unicorn.core.workflows.update.DownloadService"
+            ) as mock_download_cls,
+            patch(
+                "my_unicorn.core.workflows.update.PostDownloadProcessor"
+            ) as mock_processor_cls,
+            patch("my_unicorn.core.workflows.update.logger"),
+        ):
+            manager = UpdateManager(mock_config_manager)
+
+            # Mock successful download
+            mock_download = MagicMock()
+            mock_download.download_appimage = AsyncMock(
+                return_value=Path("/tmp/test.appimage")
+            )
+            mock_download.progress_reporter = MagicMock()
+            mock_download_cls.return_value = mock_download
+
+            # Mock PostDownloadProcessor to raise VerificationError
+            mock_processor = MagicMock()
+            mock_processor.process = AsyncMock(
+                side_effect=VerificationError(
+                    message="Hash mismatch",
+                    context={
+                        "app_name": "test-app",
+                        "expected": "abc",
+                        "actual": "xyz",
+                    },
+                )
+            )
+            mock_processor_cls.return_value = mock_processor
+
+            with patch.object(
+                manager,
+                "_prepare_update_context",
+                return_value=(mock_context, None),
+            ):
+                # Domain exception is caught and returns error tuple
+                success, error_reason = await manager.update_single_app(
+                    "test-app", mock_session, force=True
+                )
+
+                assert success is False
+                assert error_reason is not None
+                assert "Hash mismatch" in error_reason
+
+    @pytest.mark.asyncio
+    async def test_update_error_wraps_unexpected_exceptions(
+        self, mock_config_manager: MagicMock, mock_session: AsyncMock
+    ) -> None:
+        """Test unexpected exceptions wrapped in UpdateError."""
+        mock_config_manager.load_app_config.return_value = {
+            "config_version": "2.0.0",
+            "source": {
+                "owner": "test-owner",
+                "repo": "test-repo",
+                "prerelease": False,
+            },
+            "state": {"version": "1.0.0"},
+        }
+
+        mock_release_data = Release(
+            owner="test-owner",
+            repo="test-repo",
+            version="1.2.0",
+            prerelease=False,
+            assets=[
+                Asset(
+                    name="test-app.AppImage",
+                    size=1024,
+                    digest="",
+                    browser_download_url="https://example.com/test.appimage",
+                ),
+            ],
+            original_tag_name="v1.2.0",
+        )
+
+        update_info = UpdateInfo(
+            app_name="test-app",
+            current_version="1.0.0",
+            latest_version="1.2.0",
+            has_update=True,
+            release_data=mock_release_data,
+            app_config=mock_config_manager.load_app_config.return_value,
+        )
+
+        mock_context = {
+            "app_config": mock_config_manager.load_app_config.return_value,
+            "update_info": update_info,
+            "appimage_asset": mock_release_data.assets[0],
+            "catalog_entry": None,
+            "owner": "test-owner",
+            "repo": "test-repo",
+        }
+
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+            patch(
+                "my_unicorn.core.workflows.update.DownloadService"
+            ) as mock_download_cls,
+            patch(
+                "my_unicorn.core.workflows.update.PostDownloadProcessor"
+            ) as mock_processor_cls,
+            patch("my_unicorn.core.workflows.update.logger"),
+        ):
+            manager = UpdateManager(mock_config_manager)
+
+            # Mock successful download
+            mock_download = MagicMock()
+            mock_download.download_appimage = AsyncMock(
+                return_value=Path("/tmp/test.appimage")
+            )
+            mock_download.progress_reporter = MagicMock()
+            mock_download_cls.return_value = mock_download
+
+            # Mock PostDownloadProcessor to raise unexpected RuntimeError
+            mock_processor = MagicMock()
+            mock_processor.process = AsyncMock(
+                side_effect=RuntimeError("Unexpected internal error")
+            )
+            mock_processor_cls.return_value = mock_processor
+
+            with patch.object(
+                manager,
+                "_prepare_update_context",
+                return_value=(mock_context, None),
+            ):
+                # Unexpected exceptions are wrapped in UpdateError
+                # and re-raised
+                with pytest.raises(UpdateError) as exc_info:
+                    await manager.update_single_app(
+                        "test-app", mock_session, force=True
+                    )
+
+                # Verify exception is wrapped with context
+                assert "Update failed" in str(exc_info.value)
+                assert exc_info.value.context.get("app_name") == "test-app"
+                assert exc_info.value.__cause__ is not None
+                assert isinstance(exc_info.value.__cause__, RuntimeError)
+
+    @pytest.mark.asyncio
+    async def test_update_error_context_contains_app_name(
+        self, mock_config_manager: MagicMock
+    ) -> None:
+        """Test UpdateError context always contains app_name."""
+        with (
+            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
+            patch("my_unicorn.core.workflows.update.FileOperations"),
+            patch("my_unicorn.core.workflows.update.BackupService"),
+        ):
+            manager = UpdateManager(mock_config_manager)
+
+            with patch.object(
+                manager,
+                "_load_catalog_cached",
+                side_effect=FileNotFoundError("Missing"),
+            ):
+                with pytest.raises(UpdateError) as exc_info:
+                    await manager._load_catalog_if_needed(
+                        "my-test-app", "some-catalog-ref"
+                    )
+
+                # Verify app_name is in context
+                assert exc_info.value.context.get("app_name") == "my-test-app"

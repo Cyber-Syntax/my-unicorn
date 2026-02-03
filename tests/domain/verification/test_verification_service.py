@@ -1,15 +1,29 @@
 """Tests for VerificationService with enhanced YAML and checksum file support."""
 
+import asyncio
+import hashlib
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from my_unicorn.core.github import Asset, ChecksumFileInfo
+from my_unicorn.core.protocols.progress import (
+    NullProgressReporter,
+    ProgressReporter,
+    ProgressType,
+)
 from my_unicorn.core.verification.service import (
     VerificationConfig,
+    VerificationContext,
     VerificationResult,
     VerificationService,
 )
+from my_unicorn.core.verification.verifier import (
+    LARGE_FILE_THRESHOLD,
+    Verifier,
+)
+from my_unicorn.exceptions import VerificationError
 
 # Test data constants
 LEGCORD_YAML_CONTENT = """version: 1.1.5
@@ -688,7 +702,7 @@ releaseDate: '2025-05-26T17:26:48.710Z'"""
         )
 
         with pytest.raises(
-            Exception, match="Available verification methods failed"
+            VerificationError, match="All verification methods failed"
         ):
             await verification_service.verify_file(
                 file_path=test_file_path,
@@ -1150,3 +1164,497 @@ class TestSHA1MD5Verification:
         )
         expected = "https://github.com/owner/repo/releases/download/v1.0.0-beta/SHA256SUMS.txt"
         assert url == expected
+
+
+# =============================================================================
+# Task 2.4: Protocol Usage Tests
+# =============================================================================
+
+
+class TestVerificationServiceProtocolUsage:
+    """Tests for VerificationService protocol-based progress reporting."""
+
+    @pytest.fixture
+    def mock_download_service(self):
+        """Create a mock download service."""
+        return MagicMock()
+
+    def test_accepts_progress_reporter_protocol(self, mock_download_service):
+        """VerificationService accepts ProgressReporter protocol objects."""
+        # Create a mock implementing ProgressReporter protocol
+        mock_reporter = MagicMock(spec=ProgressReporter)
+        mock_reporter.is_active.return_value = True
+        mock_reporter.add_task.return_value = "task-123"
+
+        service = VerificationService(
+            download_service=mock_download_service,
+            progress_reporter=mock_reporter,
+        )
+
+        assert service.progress_reporter is mock_reporter
+        assert isinstance(service.progress_reporter, ProgressReporter)
+
+    def test_uses_null_progress_reporter_when_none_provided(
+        self, mock_download_service
+    ):
+        """NullProgressReporter is used when no reporter is provided."""
+        service = VerificationService(download_service=mock_download_service)
+
+        assert isinstance(service.progress_reporter, NullProgressReporter)
+        assert service.progress_reporter.is_active() is False
+
+    def test_uses_null_progress_reporter_when_explicitly_none(
+        self, mock_download_service
+    ):
+        """NullProgressReporter is used when None is explicitly passed."""
+        service = VerificationService(
+            download_service=mock_download_service,
+            progress_reporter=None,
+        )
+
+        assert isinstance(service.progress_reporter, NullProgressReporter)
+
+    def test_progress_reporter_attribute_accessible(
+        self, mock_download_service
+    ):
+        """progress_reporter attribute is accessible (not progress_service)."""
+        service = VerificationService(download_service=mock_download_service)
+
+        # Check attribute name is progress_reporter, not progress_service
+        assert hasattr(service, "progress_reporter")
+        assert isinstance(service.progress_reporter, NullProgressReporter)
+
+    @pytest.mark.asyncio
+    async def test_progress_task_created_with_verification_type(
+        self, mock_download_service
+    ):
+        """Progress task is created with ProgressType.VERIFICATION."""
+        mock_reporter = MagicMock(spec=ProgressReporter)
+        mock_reporter.is_active.return_value = True
+        mock_reporter.add_task = AsyncMock(return_value="task-verification")
+        mock_reporter.finish_task = AsyncMock()
+        mock_reporter.get_task_info.return_value = {}
+
+        service = VerificationService(
+            download_service=mock_download_service,
+            progress_reporter=mock_reporter,
+        )
+
+        # Create minimal context for _prepare_verification
+        context = VerificationContext(
+            file_path=Path("/tmp/test.AppImage"),
+            asset=Asset(
+                name="test.AppImage",
+                size=100,
+                browser_download_url="https://example.com/test.AppImage",
+                digest=None,
+            ),
+            config={"skip": True},
+            owner="test",
+            repo="test",
+            tag_name="v1.0.0",
+            app_name="test",
+            assets=None,
+            progress_task_id=None,
+        )
+
+        # Call prepare to trigger task creation
+        await service._prepare_verification(context)
+
+        # Verify add_task was called with ProgressType.VERIFICATION
+        mock_reporter.add_task.assert_called_once()
+        call_args = mock_reporter.add_task.call_args
+        assert call_args[0][1] == ProgressType.VERIFICATION
+
+    @pytest.mark.asyncio
+    async def test_null_progress_reporter_no_errors(
+        self, mock_download_service
+    ):
+        """NullProgressReporter allows verification to complete."""
+        service = VerificationService(download_service=mock_download_service)
+
+        context = VerificationContext(
+            file_path=Path("/tmp/test.AppImage"),
+            asset=Asset(
+                name="test.AppImage",
+                size=100,
+                browser_download_url="https://example.com/test.AppImage",
+                digest=None,
+            ),
+            config={"skip": True},
+            owner="test",
+            repo="test",
+            tag_name="v1.0.0",
+            app_name="test",
+            assets=None,
+            progress_task_id=None,
+        )
+
+        # Should complete without raising any errors
+        result = await service._prepare_verification(context)
+        assert result is not None
+        assert result.passed is True
+
+
+# =============================================================================
+# Task 2.5: Domain Exception Tests
+# =============================================================================
+
+
+class TestVerificationServiceDomainExceptions:
+    """Tests for VerificationService domain exception usage (Task 2.5)."""
+
+    @pytest.fixture
+    def mock_download_service(self):
+        """Create a mock download service."""
+        return MagicMock()
+
+    @pytest.fixture
+    def verification_service(self, mock_download_service):
+        """Create a VerificationService instance."""
+        return VerificationService(mock_download_service)
+
+    @pytest.fixture
+    def test_file_path(self, tmp_path):
+        """Create a temporary file for testing."""
+        file_path = tmp_path / "test.AppImage"
+        file_path.write_bytes(b"test content")
+        return file_path
+
+    @pytest.mark.asyncio
+    async def test_verification_error_raised_when_all_methods_fail(
+        self, verification_service, test_file_path, mock_download_service
+    ):
+        """VerificationError is raised when all verification methods fail."""
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/test.AppImage",
+            digest="sha256:wrong_hash_that_will_fail",
+        )
+        config = {"skip": False}
+
+        with pytest.raises(VerificationError) as exc_info:
+            await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="test",
+                tag_name="v1.0.0",
+                app_name="testapp",
+                assets=None,
+            )
+
+        # Verify it's the correct exception type
+        assert isinstance(exc_info.value, VerificationError)
+
+    @pytest.mark.asyncio
+    async def test_verification_error_includes_context_fields(
+        self, verification_service, test_file_path, mock_download_service
+    ):
+        """VerificationError includes app_name, file_path, and method info."""
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/test.AppImage",
+            digest="sha256:invalid_hash",
+        )
+        config = {"skip": False}
+
+        with pytest.raises(VerificationError) as exc_info:
+            await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="test",
+                tag_name="v1.0.0",
+                app_name="testapp",
+                assets=None,
+            )
+
+        error = exc_info.value
+        # Check context dictionary contains expected fields
+        assert hasattr(error, "context")
+        assert "app_name" in error.context
+        assert "file_path" in error.context
+        assert "available_methods" in error.context
+        assert "failed_methods" in error.context
+
+        # Verify context values
+        assert error.context["app_name"] == "testapp"
+        assert str(test_file_path) in error.context["file_path"]
+        assert "digest" in error.context["available_methods"]
+
+    @pytest.mark.asyncio
+    async def test_verification_error_not_raised_when_skip_configured(
+        self, verification_service, test_file_path
+    ):
+        """VerificationError not raised when skip=True and no methods available."""
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/test.AppImage",
+            digest=None,
+        )
+        config = {"skip": True}
+
+        # Should not raise - verification is skipped
+        result = await verification_service.verify_file(
+            file_path=test_file_path,
+            asset=asset,
+            config=config,
+            owner="test",
+            repo="test",
+            tag_name="v1.0.0",
+            app_name="testapp",
+            assets=None,
+        )
+
+        assert result.passed is True
+
+    @pytest.mark.asyncio
+    async def test_verification_error_not_raised_when_method_passes(
+        self, verification_service, test_file_path
+    ):
+        """VerificationError not raised when at least one method passes."""
+        # Compute correct hash for test content
+        content = b"test content"
+        correct_hash = hashlib.sha256(content).hexdigest()
+
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/test.AppImage",
+            digest=f"sha256:{correct_hash}",
+        )
+        config = {"skip": False}
+
+        # Should not raise - digest verification passes
+        result = await verification_service.verify_file(
+            file_path=test_file_path,
+            asset=asset,
+            config=config,
+            owner="test",
+            repo="test",
+            tag_name="v1.0.0",
+            app_name="testapp",
+            assets=None,
+        )
+
+        assert result.passed is True
+        assert "digest" in result.methods
+        assert result.methods["digest"]["passed"] is True
+
+    @pytest.mark.asyncio
+    async def test_verification_error_contains_all_failed_methods(
+        self, verification_service, test_file_path, mock_download_service
+    ):
+        """VerificationError lists all methods that were attempted and failed."""
+        # Mock checksum file download to also fail
+        mock_download_service.download_checksum_file = AsyncMock(
+            return_value="wrong_hash test.AppImage"
+        )
+
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://github.com/test/test/releases/download/v1.0.0/test.AppImage",
+            digest="sha256:invalid_hash",
+        )
+        config = {"skip": False}
+        assets = [
+            Asset(
+                name="SHA256SUMS.txt",
+                browser_download_url="https://github.com/test/test/releases/download/v1.0.0/SHA256SUMS.txt",
+                size=100,
+                digest=None,
+            )
+        ]
+
+        with pytest.raises(VerificationError) as exc_info:
+            await verification_service.verify_file(
+                file_path=test_file_path,
+                asset=asset,
+                config=config,
+                owner="test",
+                repo="test",
+                tag_name="v1.0.0",
+                app_name="testapp",
+                assets=assets,
+            )
+
+        error = exc_info.value
+        # Both digest and checksum file should be in available_methods
+        assert len(error.context["available_methods"]) >= 1
+        # Failed methods should also be populated
+        assert len(error.context["failed_methods"]) >= 1
+
+
+# =============================================================================
+# Task 2.6: Async Hash Computation Tests
+# =============================================================================
+
+
+class TestHashVerifierAsyncComputation:
+    """Tests for HashVerifier async hash computation (Task 2.6)."""
+
+    @pytest.fixture
+    def small_test_file(self, tmp_path):
+        """Create a small test file (< 100MB threshold)."""
+        file_path = tmp_path / "small_test.bin"
+        file_path.write_bytes(b"small file content")
+        return file_path
+
+    @pytest.fixture
+    def verifier_for_small_file(self, small_test_file):
+        """Create a Verifier for the small test file."""
+        return Verifier(small_test_file)
+
+    def test_large_file_threshold_constant_exists(self):
+        """LARGE_FILE_THRESHOLD constant exists and is 100MB."""
+        assert LARGE_FILE_THRESHOLD == 100 * 1024 * 1024  # 100MB
+
+    def test_compute_hash_sync_still_available(self, verifier_for_small_file):
+        """Sync compute_hash() still works for backward compatibility."""
+        expected = hashlib.sha256(b"small file content").hexdigest()
+        result = verifier_for_small_file.compute_hash("sha256")
+
+        assert result == expected
+
+    @pytest.mark.asyncio
+    async def test_compute_hash_async_small_file_uses_sync(
+        self, verifier_for_small_file
+    ):
+        """Small files use synchronous computation directly (no executor)."""
+        expected = hashlib.sha256(b"small file content").hexdigest()
+        result = await verifier_for_small_file.compute_hash_async("sha256")
+
+        assert result == expected
+
+    @pytest.mark.asyncio
+    async def test_compute_hash_async_returns_correct_hash(
+        self, small_test_file
+    ):
+        """compute_hash_async returns correct hash value."""
+        verifier = Verifier(small_test_file)
+        expected = hashlib.sha256(b"small file content").hexdigest()
+
+        result = await verifier.compute_hash_async("sha256")
+
+        assert result == expected
+
+    @pytest.mark.asyncio
+    async def test_compute_hash_async_sha512(self, small_test_file):
+        """compute_hash_async works with SHA512 algorithm."""
+        verifier = Verifier(small_test_file)
+        expected = hashlib.sha512(b"small file content").hexdigest()
+
+        result = await verifier.compute_hash_async("sha512")
+
+        assert result == expected
+
+    @pytest.mark.asyncio
+    async def test_compute_hash_async_file_not_found(self, tmp_path):
+        """compute_hash_async raises FileNotFoundError for missing files."""
+        verifier = Verifier(tmp_path / "nonexistent.bin")
+
+        with pytest.raises(FileNotFoundError, match="File not found"):
+            await verifier.compute_hash_async("sha256")
+
+    @pytest.mark.asyncio
+    async def test_compute_hash_async_invalid_algorithm(
+        self, verifier_for_small_file
+    ):
+        """compute_hash_async raises ValueError for unsupported algorithms."""
+        with pytest.raises(ValueError, match="Unsupported hash type"):
+            await verifier_for_small_file.compute_hash_async("sha999")
+
+    @pytest.mark.asyncio
+    async def test_compute_hash_async_large_file_uses_executor(self, tmp_path):
+        """Large files (>=100MB) use run_in_executor."""
+        # Create a large file by using a mock that reports large size
+        large_file = tmp_path / "large_test.bin"
+        large_file.write_bytes(b"test content")
+
+        verifier = Verifier(large_file)
+
+        # Track whether run_in_executor was called
+        executor_was_called = False
+
+        def mock_stat(*args, **kwargs):
+            # Create a mock that returns large file size
+            mock_result = MagicMock()
+            mock_result.st_size = LARGE_FILE_THRESHOLD + 1
+            return mock_result
+
+        # Patch at module level and track executor usage
+        with patch("pathlib.Path.stat", mock_stat):
+            # Patch run_in_executor to track if it's called
+            async def tracking_executor(executor, func, *args):
+                nonlocal executor_was_called
+                executor_was_called = True
+                # Actually run the computation
+                return func(*args)
+
+            with patch.object(
+                asyncio.get_running_loop(),
+                "run_in_executor",
+                side_effect=tracking_executor,
+            ):
+                result = await verifier.compute_hash_async("sha256")
+
+        # Verify executor was called for large file
+        assert executor_was_called, (
+            "run_in_executor should be called for large files"
+        )
+        # Result should still be valid
+        expected = hashlib.sha256(b"test content").hexdigest()
+        assert result == expected
+
+    @pytest.mark.asyncio
+    async def test_compute_hash_async_small_file_no_executor(self, tmp_path):
+        """Small files (<100MB) do NOT use run_in_executor (avoid overhead)."""
+        small_file = tmp_path / "small_test.bin"
+        content = b"small file content"
+        small_file.write_bytes(content)
+
+        verifier = Verifier(small_file)
+
+        # Verify run_in_executor is NOT called
+        original_run_in_executor = asyncio.get_running_loop().run_in_executor
+
+        executor_called = False
+
+        async def tracking_run_in_executor(executor, func, *args):
+            nonlocal executor_called
+            executor_called = True
+            return await original_run_in_executor(executor, func, *args)
+
+        with patch.object(
+            asyncio.get_running_loop(),
+            "run_in_executor",
+            side_effect=tracking_run_in_executor,
+        ):
+            result = await verifier.compute_hash_async("sha256")
+
+        # Small files should NOT use executor
+        assert not executor_called, (
+            "Executor should not be used for small files"
+        )
+
+        # Result should still be correct
+        expected = hashlib.sha256(content).hexdigest()
+        assert result == expected
+
+    def test_compute_hash_sync_matches_async(self, small_test_file):
+        """Sync and async compute_hash return identical results."""
+        verifier = Verifier(small_test_file)
+
+        sync_result = verifier.compute_hash("sha256")
+        async_result = asyncio.get_event_loop().run_until_complete(
+            verifier.compute_hash_async("sha256")
+        )
+
+        assert sync_result == async_result

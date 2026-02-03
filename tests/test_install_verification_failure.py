@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from my_unicorn.core.workflows.install import InstallHandler
-from my_unicorn.exceptions import InstallationError
+from my_unicorn.exceptions import InstallError
 
 
 class TestVerificationFailure:
@@ -91,8 +91,8 @@ class TestVerificationFailure:
             },
         }
 
-        # This should raise InstallationError due to verification failure
-        with pytest.raises(InstallationError, match="Verification failed"):
+        # This should raise InstallError due to verification failure
+        with pytest.raises(InstallError, match="Verification failed"):
             await handler._install_workflow(
                 app_name="test-app",
                 asset=asset,

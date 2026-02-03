@@ -50,13 +50,13 @@ class TestProcessPostDownload:
         storage_service = Mock()
         config_manager = Mock()
         backup_service = Mock()
-        progress_service = Mock()
+        progress_reporter = Mock()
 
         # Setup mock returns
         storage_service.move_to_install_dir.return_value = Path(
             "/opt/test-app.AppImage"
         )
-        progress_service.is_active.return_value = False
+        progress_reporter.is_active.return_value = False
 
         # Mock config_manager to return proper dict
         config_manager.load_raw_app_config.return_value = {
@@ -69,7 +69,7 @@ class TestProcessPostDownload:
             "storage_service": storage_service,
             "config_manager": config_manager,
             "backup_service": backup_service,
-            "progress_service": progress_service,
+            "progress_reporter": progress_reporter,
         }
 
     @pytest.mark.asyncio
@@ -125,7 +125,7 @@ class TestProcessPostDownload:
                 storage_service=mock_services["storage_service"],
                 config_manager=mock_services["config_manager"],
                 backup_service=mock_services["backup_service"],
-                progress_service=None,
+                progress_reporter=None,
             )
 
             assert result is True
@@ -151,18 +151,18 @@ class TestProcessPostDownload:
     async def test_process_post_download_with_progress(
         self, mock_asset, mock_release, app_config, mock_services, tmp_path
     ) -> None:
-        """Test post-download processing with progress service."""
+        """Test post-download processing with progress reporter."""
         downloaded_path = tmp_path / "test.AppImage"
         downloaded_path.touch()
 
-        # Enable progress service
-        mock_services["progress_service"].is_active.return_value = True
+        # Enable progress reporter
+        mock_services["progress_reporter"].is_active.return_value = True
         mock_services[
-            "progress_service"
+            "progress_reporter"
         ].create_installation_workflow = AsyncMock(
             return_value=("verify_task", "install_task")
         )
-        mock_services["progress_service"].finish_task = AsyncMock()
+        mock_services["progress_reporter"].finish_task = AsyncMock()
 
         # Mock async functions
         mock_verify = AsyncMock(
@@ -208,16 +208,16 @@ class TestProcessPostDownload:
                 storage_service=mock_services["storage_service"],
                 config_manager=mock_services["config_manager"],
                 backup_service=mock_services["backup_service"],
-                progress_service=mock_services["progress_service"],
+                progress_reporter=mock_services["progress_reporter"],
             )
 
             assert result is True
             mock_services[
-                "progress_service"
+                "progress_reporter"
             ].create_installation_workflow.assert_called_once_with(
                 "test-app", with_verification=True
             )
-            mock_services["progress_service"].finish_task.assert_called_once()
+            mock_services["progress_reporter"].finish_task.assert_called_once()
 
         finally:
             my_unicorn.utils.update_utils.verify_appimage_download = (

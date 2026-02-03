@@ -17,6 +17,7 @@ import pytest
 
 from my_unicorn.core.github import Asset
 from my_unicorn.core.verification.service import VerificationService
+from my_unicorn.exceptions import VerificationError
 
 # Test data constants - SHA256 hash of b"test content"
 TEST_HASH = "6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72"
@@ -224,8 +225,8 @@ class TestConcurrentVerification:
             AsyncMock(return_value=wrong_checksum)
         )
 
-        # Should raise exception when all methods fail
-        with pytest.raises(Exception, match=r"verification|failed"):
+        # Should raise VerificationError when all methods fail
+        with pytest.raises(VerificationError, match=r"verification|failed"):
             await verification_service.verify_file(
                 file_path=test_file_path,
                 asset=asset_with_wrong_digest,
