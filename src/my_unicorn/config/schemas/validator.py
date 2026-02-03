@@ -65,7 +65,24 @@ class SchemaValidationError(Exception):
 
 
 class ConfigValidator:
-    """Validates configuration files against JSON schemas."""
+    """Validates configuration files against JSON schemas.
+
+    Create instances as needed:
+        validator = ConfigValidator()
+        validator.validate_app_state(config, app_name)
+
+    Or use via dependency injection:
+        class MyService:
+            def __init__(self, validator: ConfigValidator):
+                self.validator = validator
+
+    Or use the module-level convenience functions:
+        validate_app_state(config, app_name)
+
+    Note:
+        This class no longer uses a singleton pattern. Create instances
+        explicitly or accept via dependency injection.
+    """
 
     def __init__(self) -> None:
         """Initialize validator with loaded schemas."""
@@ -298,63 +315,65 @@ class ConfigValidator:
         logger.debug("Global config validation passed")
 
 
-# Global validator instance
-_validator: ConfigValidator | None = None
-
-
-def get_validator() -> ConfigValidator:
-    """Get or create global validator instance.
-
-    Returns:
-        ConfigValidator instance
-
-    """
-    global _validator
-    if _validator is None:
-        _validator = ConfigValidator()
-    return _validator
-
-
 def validate_app_state(
-    config: dict[str, Any], app_name: str | None = None
+    config: dict[str, Any],
+    app_name: str | None = None,
+    validator: ConfigValidator | None = None,
 ) -> None:
-    """Validate app state configuration (convenience function).
+    """Validate app state configuration.
 
     Args:
         config: App state configuration dictionary
         app_name: Optional app name for better error messages
+        validator: Optional ConfigValidator instance.
+            If not provided, a new instance is created.
 
     Raises:
         SchemaValidationError: If validation fails
 
     """
-    get_validator().validate_app_state(config, app_name)
+    if validator is None:
+        validator = ConfigValidator()
+    validator.validate_app_state(config, app_name)
 
 
 def validate_cache_release(
-    config: dict[str, Any], cache_name: str | None = None
+    config: dict[str, Any],
+    cache_name: str | None = None,
+    validator: ConfigValidator | None = None,
 ) -> None:
-    """Validate release cache entry (convenience function).
+    """Validate release cache entry.
 
     Args:
         config: Cache entry dictionary
         cache_name: Optional cache name for better error messages
+        validator: Optional ConfigValidator instance.
+            If not provided, a new instance is created.
 
     Raises:
         SchemaValidationError: If validation fails
 
     """
-    get_validator().validate_cache_release(config, cache_name)
+    if validator is None:
+        validator = ConfigValidator()
+    validator.validate_cache_release(config, cache_name)
 
 
-def validate_global_config(config: dict[str, Any]) -> None:
-    """Validate global configuration (convenience function).
+def validate_global_config(
+    config: dict[str, Any],
+    validator: ConfigValidator | None = None,
+) -> None:
+    """Validate global configuration.
 
     Args:
         config: Global configuration dictionary
+        validator: Optional ConfigValidator instance.
+            If not provided, a new instance is created.
 
     Raises:
         SchemaValidationError: If validation fails
 
     """
-    get_validator().validate_global_config(config)
+    if validator is None:
+        validator = ConfigValidator()
+    validator.validate_global_config(config)

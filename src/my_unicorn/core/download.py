@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 
 import aiohttp
 
-from my_unicorn.config import config_manager
+from my_unicorn.config import ConfigManager
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.github import Asset
 from my_unicorn.core.protocols import (
@@ -378,7 +378,8 @@ class DownloadService:
 
     def _get_network_config(self) -> tuple[int, aiohttp.ClientTimeout]:
         """Get network configuration (retries and timeout)."""
-        network_cfg = config_manager.load_global_config()["network"]
+        config = ConfigManager()
+        network_cfg = config.load_global_config()["network"]
         retry_attempts = int(network_cfg.get("retry_attempts", 3))
         timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
 

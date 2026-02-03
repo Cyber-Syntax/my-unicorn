@@ -349,9 +349,9 @@ def update_logger_from_config() -> None:
     initialized to apply config-based log levels. Only updates handler
     levels, never adds/removes handlers.
 
-    The function safely handles circular import issues by importing
-    config_manager locally. If configuration loading fails, the logger
-    continues with existing settings without raising an exception.
+    Creates a local ConfigManager instance to avoid depending on the
+    module-level singleton. This supports dependency injection patterns
+    and prevents circular import issues.
 
     Example:
         >>> from my_unicorn.logger import update_logger_from_config
@@ -367,10 +367,13 @@ def update_logger_from_config() -> None:
     """
     try:
         # Import here to avoid circular dependency
-        from my_unicorn.config import config_manager  # noqa: PLC0415
+        from my_unicorn.config import ConfigManager  # noqa: PLC0415
+
+        # Create a local ConfigManager instance (not using singleton)
+        config_mgr = ConfigManager()
 
         # Load configuration
-        config = config_manager.load_global_config()
+        config = config_mgr.load_global_config()
 
         # Extract log settings from config
         console_level_str = config.get("console_log_level", "WARNING")

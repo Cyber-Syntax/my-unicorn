@@ -31,6 +31,18 @@ class ReleaseCacheManager:
     - Provides transparent fallback to API calls
     - Handles cache corruption gracefully
     - Uses atomic writes to prevent file corruption
+
+    Usage:
+        # Create explicitly:
+        config = ConfigManager()
+        cache = ReleaseCacheManager(config, ttl_hours=24)
+
+        # Or via dependency injection:
+        fetcher = GitHubReleaseFetcher(session, cache_manager=cache)
+
+    Note:
+        This class no longer uses a singleton pattern. Create instances
+        explicitly or accept via dependency injection.
     """
 
     def __init__(
@@ -310,21 +322,18 @@ class ReleaseCacheManager:
             }
 
 
-# Module-level cache manager instance
-_cache_manager: ReleaseCacheManager | None = None
-
-
 def get_cache_manager(ttl_hours: int = 24) -> ReleaseCacheManager:
-    """Get the global cache manager instance.
+    """Create a new ReleaseCacheManager instance.
+
+    .. deprecated::
+        This function is deprecated. Create ReleaseCacheManager directly
+        or accept it via dependency injection instead.
 
     Args:
         ttl_hours: Cache TTL in hours (default: 24)
 
     Returns:
-        ReleaseCacheManager instance
+        New ReleaseCacheManager instance
 
     """
-    global _cache_manager
-    if _cache_manager is None:
-        _cache_manager = ReleaseCacheManager(ttl_hours=ttl_hours)
-    return _cache_manager
+    return ReleaseCacheManager(ttl_hours=ttl_hours)

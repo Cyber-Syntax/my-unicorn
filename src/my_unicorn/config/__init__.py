@@ -14,7 +14,7 @@ import importlib
 
 from my_unicorn.config.app import AppConfigManager
 from my_unicorn.config.catalog import CatalogLoader
-from my_unicorn.config.config import ConfigManager, config_manager
+from my_unicorn.config.config import ConfigManager
 from my_unicorn.config.parser import (
     CommentAwareConfigParser,
     ConfigCommentManager,
@@ -35,5 +35,4 @@ __all__ = [
     "GlobalConfig",
     "GlobalConfigManager",
     "Paths",
-    "config_manager",
 ]

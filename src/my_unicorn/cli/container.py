@@ -290,6 +290,7 @@ class ServiceContainer:
             self._github_client = GitHubClient(
                 session=self.session,
                 auth_manager=self.auth_manager,
+                cache_manager=self.cache_manager,
                 progress_reporter=self.progress,
             )
         return self._github_client

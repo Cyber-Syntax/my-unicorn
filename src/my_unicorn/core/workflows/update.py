@@ -4,6 +4,8 @@ This module handles checking for updates, downloading new versions,
 and managing the update process for installed AppImages.
 """
 
+from __future__ import annotations
+
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +23,7 @@ from my_unicorn.constants import (
 )
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.backup import BackupService
+from my_unicorn.core.cache import ReleaseCacheManager
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import (
@@ -102,7 +105,7 @@ class UpdateInfo:
             self.original_tag_name = f"v{self.latest_version}"
 
     @classmethod
-    def create_error(cls, app_name: str, reason: str) -> "UpdateInfo":
+    def create_error(cls, app_name: str, reason: str) -> UpdateInfo:
         """Create an UpdateInfo representing an error condition.
 
         Args:
@@ -187,6 +190,7 @@ class UpdateManager:
         self,
         config_manager: ConfigManager | None = None,
         auth_manager: GitHubAuthManager | None = None,
+        cache_manager: ReleaseCacheManager | None = None,
         progress_reporter: ProgressReporter | None = None,
     ) -> None:
         """Initialize update manager.
@@ -194,12 +198,16 @@ class UpdateManager:
         Args:
             config_manager: Configuration manager instance
             auth_manager: GitHub authentication manager instance
+            cache_manager: Optional release cache manager instance
             progress_reporter: Optional progress reporter for tracking updates
 
         """
         self.config_manager = config_manager or ConfigManager()
         self.global_config = self.config_manager.load_global_config()
         self.auth_manager = auth_manager or GitHubAuthManager.create_default()
+        self.cache_manager = cache_manager or ReleaseCacheManager(
+            self.config_manager, ttl_hours=24
+        )
 
         # Initialize storage service with install directory
         storage_dir = self.global_config["directory"]["storage"]
@@ -229,7 +237,7 @@ class UpdateManager:
         cls,
         config_manager: ConfigManager | None = None,
         progress_reporter: ProgressReporter | None = None,
-    ) -> "UpdateManager":
+    ) -> UpdateManager:
         """Create UpdateManager with default dependencies.
 
         Factory method for simplified instantiation with sensible defaults.
@@ -296,7 +304,13 @@ class UpdateManager:
             aiohttp.ClientError: If API request fails
 
         """
-        fetcher = ReleaseFetcher(owner, repo, session, self.auth_manager)
+        fetcher = ReleaseFetcher(
+            owner,
+            repo,
+            session,
+            cache_manager=self.cache_manager,
+            auth_manager=self.auth_manager,
+        )
         if should_use_prerelease:
             logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
             try:

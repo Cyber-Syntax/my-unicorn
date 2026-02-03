@@ -20,6 +20,7 @@ from typing import cast
 from my_unicorn.config.app import AppConfigManager
 from my_unicorn.config.catalog import CatalogLoader
 from my_unicorn.config.paths import Paths
+from my_unicorn.config.schemas.validator import ConfigValidator
 from my_unicorn.types import AppStateConfig, CatalogConfig, GlobalConfig
 
 logger = logging.getLogger(__name__)
@@ -34,10 +35,30 @@ class ConfigManager:
 
     This class provides a unified interface to the configuration system,
     delegating to specialized managers for different concerns.
+
+    Usage:
+        # Create explicitly:
+        config = ConfigManager()
+
+        # Or with custom validator:
+        validator = ConfigValidator()
+        config = ConfigManager(validator=validator)
+
+        # Or via dependency injection:
+        class MyService:
+            def __init__(self, config_manager: ConfigManager):
+                self.config = config_manager
+
+    Note:
+        This class supports dependency injection for the validator.
+        Create instances explicitly or accept via dependency injection.
     """
 
     def __init__(
-        self, config_dir: Path | None = None, catalog_dir: Path | None = None
+        self,
+        config_dir: Path | None = None,
+        catalog_dir: Path | None = None,
+        validator: ConfigValidator | None = None,
     ) -> None:
         """Initialize configuration manager.
 
@@ -46,10 +67,15 @@ class ConfigManager:
                 Defaults to Paths.CONFIG_DIR
             catalog_dir: Optional custom catalog directory.
                 Defaults to Paths.CATALOG_DIR
+            validator: Optional validator instance for config validation.
+                Creates new ConfigValidator if None.
         """
         # Use Paths class for directory management
         self._config_dir = config_dir or Paths.CONFIG_DIR
         self._catalog_dir = catalog_dir or Paths.CATALOG_DIR
+
+        # Store validator for config validation
+        self.validator = validator or ConfigValidator()
 
         # Initialize specialized managers
         self.global_config_manager = GlobalConfigManager(self._config_dir)
@@ -201,7 +227,3 @@ class ConfigManager:
             True if catalog exists, False otherwise
         """
         return self.catalog_loader.exists(app_name)
-
-
-# Global instance for easy access
-config_manager = ConfigManager()

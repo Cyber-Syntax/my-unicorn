@@ -9,7 +9,7 @@ from typing import Any
 
 import aiohttp
 
-from my_unicorn.config import config_manager
+from my_unicorn.config import ConfigManager
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
@@ -24,7 +24,31 @@ HTTP_NOT_FOUND = 404
 
 
 class ReleaseAPIClient:
-    """Handles direct communication with GitHub API for release data."""
+    """Handles direct communication with GitHub API for release data.
+
+    This class is typically created by ReleaseFetcher and receives its
+    dependencies via constructor injection. It handles authentication,
+    rate limiting, and retry logic for GitHub API calls.
+
+    Usage:
+        # Create with injected dependencies:
+        auth = GitHubAuthManager.create_default()
+        api_client = ReleaseAPIClient(
+            owner="owner",
+            repo="repo",
+            session=session,
+            auth_manager=auth,
+        )
+
+        # Typically created internally by ReleaseFetcher:
+        fetcher = ReleaseFetcher(
+            owner="owner",
+            repo="repo",
+            session=session,
+            cache_manager=cache,
+        )
+        # fetcher.api_client is created automatically
+    """
 
     def __init__(
         self,
@@ -127,7 +151,8 @@ class ReleaseAPIClient:
             pass
 
         # Load network configuration (retry and timeout)
-        network_cfg = config_manager.load_global_config()["network"]
+        config = ConfigManager()
+        network_cfg = config.load_global_config()["network"]
         retry_attempts = int(network_cfg.get("retry_attempts", 3))
         timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
 

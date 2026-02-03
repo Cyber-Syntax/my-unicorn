@@ -9,7 +9,9 @@ from argparse import Namespace
 
 from my_unicorn.cli.commands.base import BaseCommandHandler
 from my_unicorn.config import ConfigManager
+from my_unicorn.config.schemas.validator import ConfigValidator
 from my_unicorn.core.auth import GitHubAuthManager
+from my_unicorn.core.cache import ReleaseCacheManager
 from my_unicorn.core.catalog import CatalogService
 from my_unicorn.core.workflows.update import UpdateManager
 
@@ -22,9 +24,17 @@ class CatalogHandler(BaseCommandHandler):
         config_manager: ConfigManager,
         auth_manager: GitHubAuthManager,
         update_manager: UpdateManager,
+        cache_manager: ReleaseCacheManager | None = None,
+        validator: ConfigValidator | None = None,
     ) -> None:
         """Initialize catalog handler with service."""
-        super().__init__(config_manager, auth_manager, update_manager)
+        super().__init__(
+            config_manager,
+            auth_manager,
+            update_manager,
+            cache_manager,
+            validator,
+        )
         self.catalog_service = CatalogService(self.config_manager)
 
     async def execute(self, args: Namespace) -> None:

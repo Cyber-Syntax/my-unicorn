@@ -4,11 +4,17 @@ This module orchestrates release fetching operations, managing cache
 interactions and coordinating with the low-level HTTP client.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import aiohttp
 
 from my_unicorn.core.auth import GitHubAuthManager
-from my_unicorn.core.cache import get_cache_manager
 from my_unicorn.core.github.client import ReleaseAPIClient
+
+if TYPE_CHECKING:
+    from my_unicorn.core.cache import ReleaseCacheManager
 from my_unicorn.core.github.models import Release
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
@@ -20,16 +26,39 @@ logger = get_logger(__name__)
 
 
 class ReleaseFetcher:
-    """Orchestrates release fetching with caching support."""
+    """Orchestrates release fetching with caching support.
+
+    This class uses dependency injection for the cache manager rather than
+    accessing a global singleton. Create instances explicitly with an injected
+    cache manager.
+
+    Usage:
+        # Create with injected cache manager:
+        cache = ReleaseCacheManager(config_manager)
+        fetcher = ReleaseFetcher(
+            owner="owner",
+            repo="repo",
+            session=session,
+            cache_manager=cache,
+        )
+
+        # Or without caching:
+        fetcher = ReleaseFetcher(
+            owner="owner",
+            repo="repo",
+            session=session,
+            cache_manager=None,
+        )
+    """
 
     def __init__(
         self,
         owner: str,
         repo: str,
         session: aiohttp.ClientSession,
+        cache_manager: ReleaseCacheManager | None = None,
         auth_manager: GitHubAuthManager | None = None,
         shared_api_task_id: str | None = None,
-        use_cache: bool = True,
         progress_reporter: ProgressReporter | None = None,
     ) -> None:
         """Initialize the release fetcher.
@@ -38,17 +67,17 @@ class ReleaseFetcher:
             owner: Repository owner
             repo: Repository name
             session: aiohttp session for making requests
+            cache_manager: Optional cache manager for release data
+                          (None disables caching)
             auth_manager: Optional GitHub authentication manager
                          (creates default if not provided)
             shared_api_task_id: Optional shared API progress task ID
-            use_cache: Whether to use persistent caching
             progress_reporter: Optional progress reporter for tracking
 
         """
         self.owner = owner
         self.repo = repo
-        self.use_cache = use_cache
-        self.cache_manager = get_cache_manager() if use_cache else None
+        self.cache_manager = cache_manager
         self.auth_manager = auth_manager or GitHubAuthManager.create_default()
         self.progress_reporter = progress_reporter or NullProgressReporter()
         self.api_client = ReleaseAPIClient(
@@ -330,12 +359,26 @@ class ReleaseFetcher:
 
 
 class GitHubClient:
-    """High-level GitHub client for release operations."""
+    """High-level GitHub client for release operations.
+
+    Uses dependency injection for cache management. Create instances with an
+    injected cache_manager for caching support, or leave as None to disable
+    caching.
+
+    Usage:
+        # With caching:
+        cache = ReleaseCacheManager(config_manager)
+        client = GitHubClient(session, cache_manager=cache)
+
+        # Without caching:
+        client = GitHubClient(session, cache_manager=None)
+    """
 
     def __init__(
         self,
         session: aiohttp.ClientSession,
         auth_manager: GitHubAuthManager | None = None,
+        cache_manager: ReleaseCacheManager | None = None,
         progress_reporter: ProgressReporter | None = None,
     ) -> None:
         """Initialize GitHub client.
@@ -344,11 +387,14 @@ class GitHubClient:
             session: aiohttp session for making requests
             auth_manager: Optional GitHub authentication manager
                          (creates default if not provided)
+            cache_manager: Optional cache manager for release data
+                          (None disables caching)
             progress_reporter: Optional progress reporter for tracking
 
         """
         self.session = session
         self.auth_manager = auth_manager or GitHubAuthManager.create_default()
+        self.cache_manager = cache_manager
         self.progress_reporter = progress_reporter or NullProgressReporter()
         self.shared_api_task_id: str | None = None
 
@@ -376,11 +422,12 @@ class GitHubClient:
         """
         try:
             fetcher = ReleaseFetcher(
-                owner,
-                repo,
-                self.session,
-                self.auth_manager,
-                self.shared_api_task_id,
+                owner=owner,
+                repo=repo,
+                session=self.session,
+                cache_manager=self.cache_manager,
+                auth_manager=self.auth_manager,
+                shared_api_task_id=self.shared_api_task_id,
             )
             return await fetcher.fetch_latest_release_or_prerelease(
                 prefer_prerelease=False
@@ -410,11 +457,12 @@ class GitHubClient:
         """
         try:
             fetcher = ReleaseFetcher(
-                owner,
-                repo,
-                self.session,
-                self.auth_manager,
-                self.shared_api_task_id,
+                owner=owner,
+                repo=repo,
+                session=self.session,
+                cache_manager=self.cache_manager,
+                auth_manager=self.auth_manager,
+                shared_api_task_id=self.shared_api_task_id,
             )
             return await fetcher.fetch_specific_release(tag)
         except Exception:

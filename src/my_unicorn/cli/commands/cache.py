@@ -1,13 +1,17 @@
 """Cache command handler for my-unicorn CLI.
 
-Handles cache management operations for the CLI, including clearing cache entries
-and displaying cache statistics.
+Handles cache management operations for the CLI, including clearing
+cache entries and displaying cache statistics.
+
+Dependency Injection:
+    CacheHandler receives its cache_manager via BaseCommandHandler's
+    constructor. This is injected by CLIRunner (composition root) and
+    stored as self.cache_manager.
 """
 
 import sys
 from argparse import Namespace
 
-from my_unicorn.core.cache import get_cache_manager
 from my_unicorn.logger import get_logger
 
 from .base import BaseCommandHandler
@@ -24,6 +28,10 @@ class CacheHandler(BaseCommandHandler):
 
     Note:
         Cache refresh is handled by the update command (--refresh-cache flag).
+
+    Dependency Injection:
+        Uses self.cache_manager inherited from BaseCommandHandler.
+        The cache_manager is injected by CLIRunner during handler creation.
 
     """
 
@@ -62,14 +70,13 @@ class CacheHandler(BaseCommandHandler):
             SystemExit: If neither --all nor app name is specified.
 
         """
-        cache_manager = get_cache_manager()
         if args.all:
-            await cache_manager.clear_cache()
+            await self.cache_manager.clear_cache()
             logger.info("✅ Cleared all cache entries")
         elif args.app_name:
             # Parse owner/repo from app name
             owner, repo = self._parse_app_name(args.app_name)
-            await cache_manager.clear_cache(owner, repo)
+            await self.cache_manager.clear_cache(owner, repo)
             logger.info("✅ Cleared cache for %s/%s", owner, repo)
         else:
             logger.error("Please specify either --all or an app name to clear")
@@ -85,9 +92,8 @@ class CacheHandler(BaseCommandHandler):
             SystemExit: On error.
 
         """
-        cache_manager = get_cache_manager()
         try:
-            stats = await cache_manager.get_cache_stats()
+            stats = await self.cache_manager.get_cache_stats()
             logger.info("📁 Cache Directory: %s", stats["cache_directory"])
             logger.info("Total Entries: %s", stats["total_entries"])
             logger.info("TTL Hours: %s", stats["ttl_hours"])
