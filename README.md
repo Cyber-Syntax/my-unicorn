@@ -183,6 +183,11 @@ Changes to the source code will be reflected immediately without reinstalling.
         - Look for the latest hash in the GitHub release page (e.g., [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
         - Check the [catalog](src/my_unicorn/catalog) folder for examples.
 
+## 📚 Documentation
+
+- **User Guide:** [wiki.md](docs/wiki.md) - Comprehensive usage documentation
+- **Developer Docs:** [developers.md](docs/developers.md) - Contributing guidelines and development setup
+
 # **🙏 Support This Project**
 
 - **Consider giving it a star ⭐** on GitHub to show your support and keep me motivated on my coding journey!

@@ -85,6 +85,7 @@ uv run my-unicorn update
 3. Run formatting: `ruff format <filepath>`
 4. Run tests: `uv run pytest` (see Testing Instructions below)
 5. Verify CLI still works: `uv run my-unicorn --help`
+6. Verify ui still work as expected: `uv run scripts/test.py --quick`
 
 ### Adding New Dependencies
 

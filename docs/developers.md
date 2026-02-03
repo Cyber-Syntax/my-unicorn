@@ -140,3 +140,213 @@ Project Structure:
 > This example of latest release but beta is similar to this one. Only changes beta provide all the assets and we use the asset 0 for latest version informations, latest release provide directly to that asset 0.
 
 [raw_api_returned_data.json](/docs/data/raw_api_returned_data.json)
+
+---
+
+## Dependency Injection
+
+My Unicorn uses dependency injection (DI) to decouple service creation from usage. The `ServiceContainer` manages service lifecycles and wires dependencies together.
+
+### ServiceContainer
+
+The `ServiceContainer` class in `cli/container.py` centralizes service instantiation:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         ServiceContainer                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Inputs:                                                                │
+│  ┌──────────────────┐    ┌────────────────────┐                        │
+│  │  ConfigManager   │    │  ProgressReporter  │                        │
+│  └────────┬─────────┘    └─────────┬──────────┘                        │
+│           │                        │                                    │
+│           ▼                        ▼                                    │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │                    Lazy-Loaded Services                          │  │
+│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐  │  │
+│  │  │  Session   │  │ AuthMgr    │  │ CacheMgr   │  │ FileOps    │  │  │
+│  │  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘  │  │
+│  │        │               │               │               │         │  │
+│  │  ┌─────▼──────┐  ┌─────▼──────┐  ┌─────▼──────┐  ┌─────▼──────┐  │  │
+│  │  │ Download   │  │ GitHub     │  │ Verify     │  │ PostProc   │  │  │
+│  │  │ Service    │  │ Client     │  │ Service    │  │ Processor  │  │  │
+│  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘  │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                                                         │
+│  Factory Methods:                                                       │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌────────────────┐  │
+│  │ create_install_     │  │ create_update_      │  │ create_remove_ │  │
+│  │ handler()           │  │ manager()           │  │ service()      │  │
+│  └─────────────────────┘  └─────────────────────┘  └────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+Key characteristics:
+
+- **Lazy initialization**: Services are created only when first accessed
+- **Singleton pattern**: Each service exists once per container instance
+- **Dependency wiring**: Services receive their dependencies automatically
+- **Resource cleanup**: `cleanup()` method releases resources (e.g., HTTP sessions)
+
+### ProgressReporter Protocol
+
+The `ProgressReporter` protocol in `core/protocols/progress.py` decouples core services from UI:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      UI Layer                                   │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                   ProgressDisplay                        │   │
+│  │  (Implements ProgressReporter - shows progress bars)     │   │
+│  └──────────────────────────┬──────────────────────────────┘   │
+└─────────────────────────────┼───────────────────────────────────┘
+                              │ implements
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 ProgressReporter Protocol                       │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────────────────┐ │
+│  │ is_active()  │ │ add_task()   │ │ update_task()            │ │
+│  │ -> bool      │ │ -> str       │ │ finish_task()            │ │
+│  │              │ │              │ │ get_task_info() -> dict  │ │
+│  └──────────────┘ └──────────────┘ └──────────────────────────┘ │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │ implements
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   Core/Testing Layer                            │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                 NullProgressReporter                     │   │
+│  │  (Null object pattern - all methods are no-ops)          │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+Protocol methods:
+
+| Method | Purpose |
+|--------|---------|
+| `is_active()` | Check if progress reporting is enabled |
+| `add_task(name, progress_type, total)` | Start tracking a new task, returns task ID |
+| `update_task(task_id, completed, description)` | Update task progress |
+| `finish_task(task_id, success, description)` | Mark task complete |
+| `get_task_info(task_id)` | Get task state for testing |
+
+`ProgressType` enum categorizes operations: `DOWNLOAD`, `VERIFICATION`, `EXTRACTION`, `API`, `PROCESSING`, `INSTALLATION`, `UPDATE`.
+
+### Usage Examples
+
+#### Creating services via container
+
+```python
+from my_unicorn.cli.container import ServiceContainer
+from my_unicorn.config import ConfigManager
+from my_unicorn.core.protocols.progress import NullProgressReporter
+
+# Create container with dependencies
+config = ConfigManager()
+progress = NullProgressReporter()  # Or ProgressDisplay for CLI
+container = ServiceContainer(config, progress)
+
+try:
+    # Get workflow handlers from factory methods
+    install_handler = container.create_install_handler()
+    await install_handler.install_from_catalog("zen-browser")
+
+    # Or access services directly via properties
+    github_client = container.github_client
+    releases = await github_client.get_releases("owner", "repo")
+finally:
+    await container.cleanup()
+```
+
+#### Adding a new service to the container
+
+1. Add instance variable in `__init__`:
+
+```python
+self._my_service: MyService | None = None
+```
+
+1. Add lazy-loading property:
+
+```python
+@property
+def my_service(self) -> MyService:
+    """My service description (singleton, lazy-loaded)."""
+    if self._my_service is None:
+        self._my_service = MyService(
+            dependency=self.some_other_service,
+            progress_reporter=self.progress,
+        )
+    return self._my_service
+```
+
+1. Use in factory methods if needed:
+
+```python
+def create_my_handler(self) -> MyHandler:
+    return MyHandler(
+        my_service=self.my_service,
+        progress_reporter=self.progress,
+    )
+```
+
+#### Using ProgressReporter in services
+
+```python
+from my_unicorn.core.protocols.progress import (
+    NullProgressReporter,
+    ProgressReporter,
+    ProgressType,
+)
+
+class MyService:
+    def __init__(
+        self,
+        progress_reporter: ProgressReporter | None = None,
+    ) -> None:
+        # Null object pattern: no None checks needed
+        self.progress = progress_reporter or NullProgressReporter()
+
+    async def do_work(self, items: list[str]) -> None:
+        task_id = self.progress.add_task(
+            "Processing items",
+            ProgressType.PROCESSING,
+            total=len(items),
+        )
+
+        for i, item in enumerate(items):
+            # Do work...
+            self.progress.update_task(task_id, completed=i + 1)
+
+        self.progress.finish_task(task_id, success=True)
+```
+
+### When to Use DI vs Direct Instantiation
+
+| Scenario | Approach |
+|----------|----------|
+| CLI commands that need multiple services | Use `ServiceContainer` |
+| Services with shared resources (HTTP session) | Use `ServiceContainer` |
+| Unit tests needing isolated components | Direct instantiation with mocks |
+| Simple scripts or one-off operations | Direct instantiation |
+| Services requiring progress reporting | Inject via `ServiceContainer` |
+
+### Resource Cleanup
+
+Always use `cleanup()` in a finally block to release resources:
+
+```python
+container = ServiceContainer(config, progress)
+try:
+    handler = container.create_install_handler()
+    await handler.install_from_catalog(app_name)
+finally:
+    await container.cleanup()  # Closes HTTP session
+```
+
+The `cleanup()` method:
+
+- Closes the shared `aiohttp.ClientSession`
+- Is idempotent (safe to call multiple times)
+- Sets internal references to `None` to prevent reuse
