@@ -133,7 +133,7 @@ class GitHubActionTester:
 
         # Normalize core version without leading 'v' for matching
         # bracketed headers
-        core_version = version[1:] if version.startswith("v") else version
+        core_version = version.removeprefix("v")
 
         for line in lines:
             # Detect a header that contains the version in one of these forms:

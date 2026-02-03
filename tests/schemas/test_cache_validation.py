@@ -2,7 +2,10 @@
 
 import pytest
 
-from my_unicorn.config.schemas import SchemaValidationError, validate_cache_release
+from my_unicorn.config.schemas import (
+    SchemaValidationError,
+    validate_cache_release,
+)
 
 
 @pytest.fixture

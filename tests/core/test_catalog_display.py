@@ -1,6 +1,5 @@
 """Tests for CatalogService display functions."""
 
-# ruff: noqa: SLF001
 
 from my_unicorn.core.catalog import CatalogService
 

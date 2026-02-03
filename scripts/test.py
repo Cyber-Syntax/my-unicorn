@@ -12,8 +12,6 @@ Author: Cyber-Syntax
 License: Same as my-unicorn project
 """
 
-
-
 import argparse
 import logging
 import os

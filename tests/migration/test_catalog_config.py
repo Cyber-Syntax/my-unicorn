@@ -235,7 +235,7 @@ class TestCatalogMigrator:
             '"appimage": {}, "github": {}}'
         )
 
-        result = migrator._migrate_catalog_file(catalog_file)  # noqa: SLF001
+        result = migrator._migrate_catalog_file(catalog_file)
 
         assert result is True
         assert "Migrated catalog" in caplog.text
@@ -259,7 +259,7 @@ class TestCatalogMigrator:
             f'{{"config_version": "{CATALOG_CONFIG_VERSION}"}}'
         )
 
-        result = migrator._migrate_catalog_file(catalog_file)  # noqa: SLF001
+        result = migrator._migrate_catalog_file(catalog_file)
 
         assert result is False
 
@@ -278,4 +278,4 @@ class TestCatalogMigrator:
 
         # Should raise ValueError for unsupported version
         with pytest.raises(ValueError, match="Unsupported catalog version"):
-            migrator._migrate_catalog_file(catalog_file)  # noqa: SLF001
+            migrator._migrate_catalog_file(catalog_file)

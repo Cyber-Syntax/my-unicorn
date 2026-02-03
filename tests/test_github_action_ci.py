@@ -38,7 +38,7 @@ def _extract_notes_from_changelog(changelog_path: Path, version: str) -> str:
     lines = text.splitlines()
     notes = []
     capturing = False
-    core_version = version[1:] if version.startswith("v") else version
+    core_version = version.removeprefix("v")
     for line in lines:
         if line.startswith("## "):
             if not capturing and core_version in line:
