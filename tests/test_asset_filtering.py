@@ -115,6 +115,15 @@ class TestAssetSelectorChecksumFiltering:
         assert AssetSelector.is_relevant_checksum("app.AppImage.sha256")
         assert AssetSelector.is_relevant_checksum("app.AppImage.md5sum")
 
+    def test_is_relevant_checksum_accepts_standalone_checksum_files(self):
+        """Test that standalone checksum files are accepted."""
+        # These were previously being filtered out incorrectly
+        assert AssetSelector.is_relevant_checksum("SHA256SUMS.txt")
+        assert AssetSelector.is_relevant_checksum("SHA256SUMS")
+        assert AssetSelector.is_relevant_checksum("latest-linux.yml")
+        assert AssetSelector.is_relevant_checksum("checksums.txt")
+        assert AssetSelector.is_relevant_checksum("MD5SUMS")
+
     def test_is_relevant_checksum_rejects_windows_checksums(self):
         """Test that checksums for Windows files are rejected."""
         assert not AssetSelector.is_relevant_checksum(
@@ -138,6 +147,9 @@ class TestAssetSelectorChecksumFiltering:
         """Test that checksums for macOS files are rejected."""
         assert not AssetSelector.is_relevant_checksum("latest-mac-arm64.yml")
         assert not AssetSelector.is_relevant_checksum("app-darwin.dmg.sha256")
+        # Test standalone macOS checksum files are also rejected
+        assert not AssetSelector.is_relevant_checksum("latest-mac.yml")
+        assert not AssetSelector.is_relevant_checksum("latest-darwin.yml")
 
     def test_is_relevant_checksum_requires_appimage_base(self):
         """Test that non-AppImage checksums are rejected."""
@@ -237,6 +249,25 @@ class TestAssetSelectorFilterForCache:
         assert "app-x86_64.AppImage" in [a.name for a in filtered]
         assert "app-x86_64.AppImage.sha256sum" in [a.name for a in filtered]
         assert "app-x86_64.AppImage.DIGEST" in [a.name for a in filtered]
+
+    def test_filter_for_cache_keeps_standalone_checksum_files(self):
+        """Test that standalone checksum files are now kept in cache."""
+        # These were previously being filtered out incorrectly
+        assets = [
+            self.create_asset("app-x86_64.AppImage"),
+            self.create_asset("SHA256SUMS.txt"),
+            self.create_asset("latest-linux.yml"),
+            self.create_asset("MD5SUMS"),
+        ]
+
+        filtered = AssetSelector.filter_for_cache(assets)
+
+        assert len(filtered) == 4
+        filtered_names = [a.name for a in filtered]
+        assert "app-x86_64.AppImage" in filtered_names
+        assert "SHA256SUMS.txt" in filtered_names
+        assert "latest-linux.yml" in filtered_names
+        assert "MD5SUMS" in filtered_names
 
     def test_filter_for_cache_removes_irrelevant_checksums(self):
         """Test that checksums for incompatible files are filtered out."""

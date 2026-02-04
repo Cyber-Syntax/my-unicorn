@@ -371,7 +371,10 @@ class TestUpdateAppConfig:
 
     def test_update_app_config_success(self, mock_config_manager):
         """Test successful app config update."""
-        verification_results = {"digest": {"passed": True, "hash": "abc123"}}
+        verify_result = {
+            "passed": True,
+            "methods": {"digest": {"passed": True, "hash": "abc123"}},
+        }
         icon_config = {
             "installed": True,
             "source": "extraction",
@@ -383,7 +386,7 @@ class TestUpdateAppConfig:
             latest_version="2.0.0",
             appimage_path=Path("/apps/myapp.AppImage"),
             icon_path=Path("/icons/app.png"),
-            verification_results=verification_results,
+            verify_result=verify_result,
             updated_icon_config=icon_config,
             config_manager=mock_config_manager,
         )
@@ -408,7 +411,7 @@ class TestUpdateAppConfig:
                 latest_version="2.0.0",
                 appimage_path=Path("/apps/app.AppImage"),
                 icon_path=None,
-                verification_results={},
+                verify_result={},
                 updated_icon_config=None,
                 config_manager=mock_config_manager,
             )
@@ -420,7 +423,7 @@ class TestUpdateAppConfig:
             latest_version="2.0.0",
             appimage_path=Path("/apps/myapp.AppImage"),
             icon_path=None,
-            verification_results={},
+            verify_result={},
             updated_icon_config=None,
             config_manager=mock_config_manager,
         )

@@ -111,7 +111,7 @@ async def process_post_download(
             repo=repo,
             progress_task_id=verification_task_id,
         )
-        verification_results = verify_result.get("methods", {})
+        verification_results = verify_result
 
         # Move to install directory and make executable
         storage_service.make_executable(downloaded_path)
@@ -151,7 +151,7 @@ async def process_post_download(
             latest_version=latest_version,
             appimage_path=appimage_path,
             icon_path=icon_path,
-            verification_results=verification_results,
+            verify_result=verification_results,
             updated_icon_config=updated_icon_config,
             config_manager=config_manager,
         )
@@ -191,7 +191,9 @@ async def process_post_download(
             )
 
         # Store the computed hash
-        stored_hash = get_stored_hash(verification_results, appimage_asset)
+        stored_hash = get_stored_hash(
+            verification_results.get("methods", {}), appimage_asset
+        )
         if stored_hash:
             logger.debug("Updated stored hash: %s", stored_hash[:16])
 

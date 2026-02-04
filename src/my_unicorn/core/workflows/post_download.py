@@ -442,9 +442,7 @@ class PostDownloadProcessor:
             )
 
         # UPDATE operation
-        verification_results = (
-            verify_result.get("methods", {}) if verify_result else {}
-        )
+        verify_result_for_config = verify_result
 
         icon_path = (
             Path(icon_result["path"]) if icon_result.get("path") else None
@@ -462,13 +460,15 @@ class PostDownloadProcessor:
             latest_version=context.release.version,
             appimage_path=install_path,
             icon_path=icon_path,
-            verification_results=verification_results,
+            verify_result=verify_result_for_config,
             updated_icon_config=updated_icon_config,
             config_manager=self.config_manager,
         )
 
         # Store the computed hash
-        stored_hash = get_stored_hash(verification_results, context.asset)
+        stored_hash = get_stored_hash(
+            verify_result_for_config.get("methods", {}), context.asset
+        )
         if stored_hash:
             logger.debug("Updated stored hash: %s", stored_hash[:16])
 

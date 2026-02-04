@@ -61,6 +61,8 @@ def format_bytes(num_bytes: float) -> str:
     return f"{size:.1f} {units[unit_index]}"
 
 
+# TODO: Coupling-cohesion: Consider splitting hash computation and verification
+# into separate classes for better single responsibility adherence.
 class Verifier:
     """Handles verification of downloaded AppImage files."""
 

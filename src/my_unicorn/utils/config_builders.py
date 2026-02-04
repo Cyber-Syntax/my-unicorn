@@ -344,7 +344,7 @@ def update_app_config(
     latest_version: str,
     appimage_path: Path,
     icon_path: Path | None,
-    verification_results: dict[str, Any],  # noqa: ARG001
+    verify_result: dict[str, Any] | None,
     updated_icon_config: dict[str, Any] | None,
     config_manager: Any,
 ) -> None:
@@ -355,7 +355,7 @@ def update_app_config(
         latest_version: Latest version string
         appimage_path: Path to installed AppImage
         icon_path: Path to icon or None
-        verification_results: Verification results
+        verify_result: Verification result dictionary or None
         updated_icon_config: Updated icon config or None
         config_manager: Configuration manager for loading/saving config
 
@@ -368,7 +368,10 @@ def update_app_config(
         ...     latest_version="1.2.3",
         ...     appimage_path=Path("/path/to/myapp.AppImage"),
         ...     icon_path=Path("/path/to/icon.png"),
-        ...     verification_results={"digest": {"passed": True}},
+        ...     verify_result={
+        ...         "passed": True,
+        ...         "methods": {"digest": {"passed": True}}
+        ...     },
         ...     updated_icon_config={"installed": True},
         ...     config_manager=config_mgr
         ... )
@@ -404,6 +407,10 @@ def update_app_config(
                 raw_state["state"]["icon"]["method"],
                 raw_state["state"]["icon"]["installed"],
             )
+
+    # Update verification state
+    verification_state = build_verification_state(verify_result)
+    raw_state["state"]["verification"] = verification_state
 
     config_manager.save_app_config(app_name, raw_state, skip_validation=True)
 

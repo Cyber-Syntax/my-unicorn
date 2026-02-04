@@ -32,7 +32,6 @@ from my_unicorn.core.protocols.progress import (
     ProgressType,
 )
 from my_unicorn.core.verification.verifier import Verifier
-from my_unicorn.exceptions import VerificationError
 from my_unicorn.logger import get_logger
 
 if TYPE_CHECKING:
@@ -632,34 +631,9 @@ class VerificationService:
         if failed_methods:
             logger.debug("Failed methods: %s", ", ".join(failed_methods))
 
-        # If strong methods available but ALL failed, block installation
-        if strong_methods_available and not has_passing_method:
-            await self._finish_progress(
-                context.progress_task_id, False, "verification failed"
-            )
-            logger.error(
-                "All verification methods failed for %s", context.app_name
-            )
-            available_methods = []
-            if context.has_digest:
-                available_methods.append(VerificationMethod.DIGEST)
-            if has_checksum_files:
-                available_methods.append("checksum_files")
-            failed_methods_str = ", ".join(available_methods)
-            msg = f"All verification methods failed: {failed_methods_str}"
-            raise VerificationError(
-                msg,
-                context={
-                    "app_name": context.app_name,
-                    "file_path": str(context.file_path),
-                    "available_methods": available_methods,
-                    "failed_methods": failed_methods,
-                },
-            )
-
         # Determine overall result and warning message
         warning_message = None
-        overall_passed = True  # Default to allow installation
+        overall_passed = not strong_methods_available or has_passing_method
 
         if not strong_methods_available:
             # No verification methods available - allow with warning
@@ -684,6 +658,12 @@ class VerificationService:
                 context.app_name,
                 ", ".join(passed_methods),
                 ", ".join(failed_methods),
+            )
+        elif not has_passing_method and strong_methods_available:
+            # All methods failed
+            warning_message = "All verification methods failed"
+            logger.error(
+                "All verification methods failed for %s", context.app_name
             )
 
         # Set context.verification_passed for backward compatibility
