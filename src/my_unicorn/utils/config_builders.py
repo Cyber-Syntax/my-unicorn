@@ -410,7 +410,10 @@ def update_app_config(
 
     # Update verification state
     verification_state = build_verification_state(verify_result)
-    raw_state["state"]["verification"] = verification_state
+    raw_state["state"]["verification"] = {
+        "passed": verification_state["passed"],
+        "methods": verification_state["methods"],
+    }
 
     config_manager.save_app_config(app_name, raw_state, skip_validation=True)
 
