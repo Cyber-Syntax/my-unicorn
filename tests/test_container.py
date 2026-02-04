@@ -240,7 +240,7 @@ class TestSingletonBehavior:
         """GitHub client returns the same instance on repeated calls."""
         config = MagicMock(spec=ConfigManager)
         config.load_global_config.return_value = {
-            "directory": {"storage": MagicMock()}
+            "directory": {"storage": MagicMock(), "cache": MagicMock()}
         }
         container = ServiceContainer(config_manager=config)
 
@@ -266,7 +266,7 @@ class TestFactoryMethods:
         """create_install_handler returns an InstallHandler instance."""
         config = MagicMock(spec=ConfigManager)
         config.load_global_config.return_value = {
-            "directory": {"storage": MagicMock()}
+            "directory": {"storage": MagicMock(), "cache": MagicMock()}
         }
         progress = MagicMock(spec=ProgressReporter)
         container = ServiceContainer(
@@ -296,7 +296,7 @@ class TestFactoryMethods:
         """create_install_handler injects the progress reporter."""
         config = MagicMock(spec=ConfigManager)
         config.load_global_config.return_value = {
-            "directory": {"storage": MagicMock()}
+            "directory": {"storage": MagicMock(), "cache": MagicMock()}
         }
         progress = MagicMock(spec=ProgressReporter)
         container = ServiceContainer(
@@ -323,7 +323,7 @@ class TestFactoryMethods:
         """create_install_application_service returns the service."""
         config = MagicMock(spec=ConfigManager)
         config.load_global_config.return_value = {
-            "directory": {"storage": MagicMock()}
+            "directory": {"storage": MagicMock(), "cache": MagicMock()}
         }
         progress = MagicMock(spec=ProgressReporter)
         container = ServiceContainer(
@@ -558,7 +558,7 @@ class TestProgressReporterInjection:
         """GitHubClient receives the injected progress reporter."""
         config = MagicMock(spec=ConfigManager)
         config.load_global_config.return_value = {
-            "directory": {"storage": MagicMock()}
+            "directory": {"storage": MagicMock(), "cache": MagicMock()}
         }
         progress = MagicMock(spec=ProgressReporter)
         container = ServiceContainer(
