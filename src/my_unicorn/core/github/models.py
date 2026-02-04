@@ -1,7 +1,6 @@
 """GitHub domain models for releases and assets.
 
 This module contains data classes representing GitHub releases and assets.
-Note: These should eventually move to domain/ layer in Phase 2 refactoring.
 """
 
 import re

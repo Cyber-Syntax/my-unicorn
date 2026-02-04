@@ -23,6 +23,33 @@ logger = get_logger(__name__)
 HTTP_NOT_FOUND = 404
 
 
+def create_api_timeout(base_seconds: int) -> aiohttp.ClientTimeout:
+    """Create configured timeout for GitHub API requests.
+
+    Timeout multipliers based on typical API response patterns:
+    - sock_connect: 1x base - Initial connection should be fast
+    - sock_read: 2x base - Reading may take longer for large responses
+    - total: 3x base - Total budget includes potential retries
+
+    Args:
+        base_seconds: Base timeout from network configuration
+
+    Returns:
+        Configured ClientTimeout instance
+
+    Example:
+        >>> timeout = create_api_timeout(10)
+        >>> timeout.total
+        30.0
+
+    """
+    return aiohttp.ClientTimeout(
+        total=base_seconds * 3,
+        sock_read=base_seconds * 2,
+        sock_connect=base_seconds,
+    )
+
+
 class ReleaseAPIClient:
     """Handles direct communication with GitHub API for release data.
 
@@ -156,13 +183,7 @@ class ReleaseAPIClient:
         retry_attempts = int(network_cfg.get("retry_attempts", 3))
         timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
 
-        # Compose a ClientTimeout derived from configured base seconds.
-        # Use modest multipliers to keep behavior similar to prior defaults.
-        timeout = aiohttp.ClientTimeout(
-            total=timeout_seconds * 3,
-            sock_read=timeout_seconds * 2,
-            sock_connect=timeout_seconds,
-        )
+        timeout = create_api_timeout(timeout_seconds)
 
         last_exc: Exception | None = None
 

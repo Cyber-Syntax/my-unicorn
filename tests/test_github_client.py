@@ -14,6 +14,16 @@ from my_unicorn.core.github import (
     GitHubClient,
     ReleaseFetcher,
 )
+from my_unicorn.core.github.client import create_api_timeout
+
+
+def test_create_api_timeout():
+    """Test timeout factory creates correct configuration."""
+    timeout = create_api_timeout(10)
+
+    assert timeout.total == 30.0
+    assert timeout.sock_read == 20.0
+    assert timeout.sock_connect == 10.0
 
 
 @pytest_asyncio.fixture
