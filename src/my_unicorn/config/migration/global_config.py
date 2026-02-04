@@ -12,7 +12,6 @@ The migration process:
 
 import configparser
 import shutil
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +35,7 @@ from my_unicorn.constants import (
     SECTION_NETWORK,
 )
 from my_unicorn.logger import get_logger
+from my_unicorn.utils.datetime_utils import get_current_datetime_local
 
 logger = get_logger(__name__)
 
@@ -207,11 +207,9 @@ class ConfigMigration:
             # No config to backup
             return self.settings_file
 
-        # Prepare backup filename with timestamp (use astimezone for local time)
-        timestamp = (
-            datetime.now()
-            .astimezone()
-            .strftime(CONFIG_BACKUP_TIMESTAMP_FORMAT)
+        # Prepare backup filename with timestamp (use local time)
+        timestamp = get_current_datetime_local().strftime(
+            CONFIG_BACKUP_TIMESTAMP_FORMAT
         )
         backup_path: Path = self.settings_file.with_suffix(
             CONFIG_BACKUP_SUFFIX_TEMPLATE.format(timestamp=timestamp)

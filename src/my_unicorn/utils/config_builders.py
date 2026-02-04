@@ -5,13 +5,13 @@ configurations in the v2.0.0 format. It centralizes config building logic
 used across install and update workflows.
 """
 
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from my_unicorn.constants import APP_CONFIG_VERSION
 from my_unicorn.core.github import Asset, Release
 from my_unicorn.logger import get_logger
+from my_unicorn.utils.datetime_utils import get_current_datetime_local_iso
 
 logger = get_logger(__name__)
 
@@ -74,7 +74,7 @@ def create_app_config_v2(
         "catalog_ref": catalog_ref,
         "state": {
             "version": release.version,
-            "installed_date": datetime.now(tz=UTC).isoformat(),
+            "installed_date": get_current_datetime_local_iso(),
             "installed_path": str(app_path),
             "verification": {
                 "passed": verification_state["passed"],
@@ -134,9 +134,12 @@ def _find_primary_method(methods_data: dict[str, Any]) -> str:
 
     # Fall back to first checksum that passed
     for method_type, method_result in methods_data.items():
-        if method_type.startswith("checksum"):
-            if isinstance(method_result, dict) and method_result.get("passed"):
-                return method_type
+        if (
+            method_type.startswith("checksum")
+            and isinstance(method_result, dict)
+            and method_result.get("passed")
+        ):
+            return method_type
 
     # Return first available method if none passed
     return next(iter(methods_data.keys()), "skip")
@@ -382,9 +385,7 @@ def update_app_config(
         raw_state["state"] = {}
     raw_state["state"]["version"] = latest_version
     raw_state["state"]["installed_path"] = str(appimage_path)
-    raw_state["state"]["installed_date"] = (
-        datetime.now().astimezone().isoformat()
-    )
+    raw_state["state"]["installed_date"] = get_current_datetime_local_iso()
 
     # Update icon configuration in state.icon (v2 format)
     if updated_icon_config:

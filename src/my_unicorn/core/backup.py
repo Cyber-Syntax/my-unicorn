@@ -11,7 +11,7 @@ This module implements a robust backup system that:
 import hashlib
 import shutil
 import tempfile
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -27,6 +27,7 @@ from my_unicorn.constants import (
     BACKUP_TEMP_SUFFIX,
 )
 from my_unicorn.logger import get_logger
+from my_unicorn.utils.datetime_utils import get_current_datetime_local_iso
 
 if TYPE_CHECKING:
     from my_unicorn.types import GlobalConfig
@@ -134,8 +135,8 @@ class BackupMetadata:
         metadata["versions"][version] = {
             "filename": filename,
             "sha256": sha256_hash,
-            # Use local timezone for created timestamp via astimezone()
-            "created": datetime.now().astimezone().isoformat(),
+            # Use local timezone for created timestamp
+            "created": get_current_datetime_local_iso(),
             "size": file_path.stat().st_size,
         }
 
@@ -647,7 +648,7 @@ class BackupService:
         # v2 config: update state section
         state = app_config.get("state", {})
         state["version"] = version
-        state["installed_date"] = datetime.now(tz=UTC).isoformat()
+        state["installed_date"] = get_current_datetime_local_iso()
 
         # Update verification if we have sha256
         if version_info.get("sha256"):

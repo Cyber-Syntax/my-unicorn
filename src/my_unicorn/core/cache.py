@@ -9,7 +9,7 @@ Live) validation to ensure data freshness while minimizing API calls.
 """
 
 import contextlib
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +18,10 @@ import orjson
 from my_unicorn.config import ConfigManager
 from my_unicorn.logger import get_logger
 from my_unicorn.types import CacheEntry
+from my_unicorn.utils.datetime_utils import (
+    get_current_datetime_local,
+    get_current_datetime_local_iso,
+)
 
 logger = get_logger(__name__)
 
@@ -99,7 +103,7 @@ class ReleaseCacheManager:
             cached_at = datetime.fromisoformat(cache_entry["cached_at"])
             ttl_hours = cache_entry.get("ttl_hours", self.ttl_hours)
             expiry = cached_at + timedelta(hours=ttl_hours)
-            return datetime.now(UTC) < expiry
+            return get_current_datetime_local() < expiry
         except (ValueError, KeyError) as e:
             logger.debug("Invalid cache timestamp format: %s", e)
             return False
@@ -188,7 +192,7 @@ class ReleaseCacheManager:
             # Note: No filtering here - data is pre-filtered by ReleaseFetcher
             cache_entry = CacheEntry(
                 {
-                    "cached_at": datetime.now(UTC).isoformat(),
+                    "cached_at": get_current_datetime_local_iso(),
                     "ttl_hours": self.ttl_hours,
                     "release_data": release_data,
                 }
@@ -250,7 +254,9 @@ class ReleaseCacheManager:
 
         """
         try:
-            cutoff = datetime.now(UTC) - timedelta(days=max_age_days)
+            cutoff = get_current_datetime_local() - timedelta(
+                days=max_age_days
+            )
             removed_count = 0
 
             for cache_file in self.cache_dir.glob("*.json"):
