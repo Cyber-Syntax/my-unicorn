@@ -345,7 +345,8 @@ class AssetSelector:
 
     @staticmethod
     def detect_checksum_files(
-        assets: list[Asset], tag_name: str
+        assets: list[Asset],
+        tag_name: str,  # noqa: ARG004
     ) -> list[ChecksumFileInfo]:
         """Detect checksum files in release assets.
 
@@ -440,12 +441,20 @@ class AssetSelector:
 
     @staticmethod
     def is_relevant_checksum(filename: str) -> bool:
-        """Check if checksum file is for a platform-compatible AppImage.
+        """Check if checksum file is platform-compatible.
+
+        Handles two types of checksum files:
+        1. AppImage-specific: "app.AppImage.sha256sum" - requires valid base
+        2. Standalone: "SHA256SUMS.txt", "latest-linux.yml" - needs platform
+           compatibility
 
         Examples:
-            ✅ "QOwnNotes-x86_64.AppImage.sha256sum"
-            ✅ "KeePassXC-2.7.10-x86_64.AppImage.DIGEST"
-            ✅ "Joplin-3.4.12.AppImage.sha512"
+            ✅ "QOwnNotes-x86_64.AppImage.sha256sum" (AppImage-specific)
+            ✅ "KeePassXC-2.7.10-x86_64.AppImage.DIGEST" (AppImage-specific)
+            ✅ "Joplin-3.4.12.AppImage.sha512" (AppImage-specific)
+            ✅ "SHA256SUMS.txt" (standalone)
+            ✅ "latest-linux.yml" (standalone)
+            ✅ "SHA256SUMS" (standalone)
             ❌ "KeePassXC-2.7.10-Win64.msi.DIGEST" (Windows)
             ❌ "Obsidian-1.9.14-arm64.AppImage.sha256" (ARM)
             ❌ "latest-mac-arm64.yml" (macOS)
@@ -454,7 +463,7 @@ class AssetSelector:
             filename: Checksum filename to check
 
         Returns:
-            True if checksum is for a compatible AppImage, False otherwise
+            True if checksum is platform-compatible, False otherwise
 
         """
         if not filename:
@@ -464,18 +473,39 @@ class AssetSelector:
         if not is_checksum_file(filename):
             return False
 
+        # First check if file itself is platform-compatible
+        if not AssetSelector.is_platform_compatible(filename):
+            return False
+
+        return AssetSelector._validate_checksum_type(filename)
+
+    @staticmethod
+    def _validate_checksum_type(filename: str) -> bool:
+        """Validate checksum type (AppImage-specific vs standalone).
+
+        Args:
+            filename: Checksum filename to validate
+
+        Returns:
+            True if valid checksum type, False otherwise
+
+        """
         filename_lower = filename.lower()
 
-        # Extract base filename (remove checksum extension)
+        # Check if this is an AppImage-specific checksum file
+        # These have format: <appimage_name>.<checksum_ext>
         base_name = filename
+        is_appimage_specific = False
+
+        # Check specific checksum extensions (these require AppImage base)
         for ext in SPECIFIC_CHECKSUM_EXTENSIONS:
             if filename_lower.endswith(ext):
                 base_name = filename[: -len(ext)]
+                is_appimage_specific = True
                 break
 
         # Also handle pattern-based checksums (e.g., .sha256, .sha512)
-        if base_name == filename:
-            # Try removing common checksum suffixes
+        if not is_appimage_specific:
             checksum_suffixes = [
                 ".sha256",
                 ".sha512",
@@ -485,14 +515,22 @@ class AssetSelector:
             for suffix in checksum_suffixes:
                 if filename_lower.endswith(suffix):
                     base_name = filename[: -len(suffix)]
+                    # Only consider AppImage-specific if base ends with
+                    # .AppImage
+                    if is_appimage_file(base_name):
+                        is_appimage_specific = True
                     break
 
-        # Base must be an AppImage
-        if not is_appimage_file(base_name):
-            return False
+        # For AppImage-specific checksums, validate the base AppImage
+        if is_appimage_specific:
+            if not is_appimage_file(base_name):
+                return False
+            # Base must be platform-compatible (not Windows, macOS, ARM)
+            return AssetSelector.is_platform_compatible(base_name)
 
-        # Base must be platform-compatible (not Windows, macOS, ARM)
-        return AssetSelector.is_platform_compatible(base_name)
+        # For standalone checksum files (like SHA256SUMS.txt, latest-linux.yml)
+        # we already validated platform compatibility above, so accept them
+        return True
 
     @staticmethod
     def filter_for_cache(assets: list[Asset]) -> list[Asset]:
