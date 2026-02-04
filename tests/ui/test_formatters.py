@@ -33,8 +33,8 @@ class TestFormatVerificationInfo:
 
         result = format_verification_info(verification)
 
-        assert "● ✓ SHA256 digest (github_api)" in result
-        assert "○ ✓ SHA256 checksum_file (SHA256SUMS.txt)" in result
+        assert "✓ SHA256 digest (github_api)" in result
+        assert "✓ SHA256 checksum_file (SHA256SUMS.txt)" in result
 
     def test_multi_method_partial_failure(self) -> None:
         """Test formatting when some methods fail."""
@@ -61,8 +61,8 @@ class TestFormatVerificationInfo:
 
         result = format_verification_info(verification)
 
-        assert "● ✓ SHA256 digest (github_api)" in result
-        assert "○ ✗ SHA256 checksum_file (SHA256SUMS.txt)" in result
+        assert "✓ SHA256 digest (github_api)" in result
+        assert "✗ SHA256 checksum_file (SHA256SUMS.txt)" in result
         assert "⚠ Partial verification: 1 passed, 1 failed" in result
 
     def test_multi_method_url_source_shortened(self) -> None:
@@ -125,7 +125,7 @@ class TestFormatVerificationInfo:
 
         result = format_verification_info(verification)
 
-        assert result.startswith("●")
+        assert result.startswith("✓")
         assert "○" not in result
 
 

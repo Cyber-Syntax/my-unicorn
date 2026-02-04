@@ -222,8 +222,8 @@ def format_verification_info(verification: dict[str, Any]) -> str:
         Formatted string for display
 
     Example output:
-        ● ✓ SHA256 digest (github_api)
-        ○ ✗ SHA256 checksum (SHA256SUMS.txt)
+        ✓ SHA256 digest (github_api)
+        ✗ SHA256 checksum (SHA256SUMS.txt)
         ⚠ Partial verification: 1 passed, 1 failed
 
     """
