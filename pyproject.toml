@@ -64,7 +64,7 @@ dev = [
   "pytest-asyncio",
   "aioresponses",
   "requests",
-  "mypy>=1.19.1",
+  "mypy",
 ]
 lint = ["ruff"]
 
@@ -88,14 +88,14 @@ include = ["my_unicorn*"]
 source = ["my_unicorn"]
 
 [tool.pytest.ini_options]
-addopts = ["-vq"]
+addopts = ["--import-mode=importlib"]
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-pythonpath = [".", "my_unicorn"]
+pythonpath = ["src"]
 markers = [
   "slow: marks tests as slow (deselect with '-m \"not slow\"')",
   "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",

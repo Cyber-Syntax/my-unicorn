@@ -1,4 +1,5 @@
 # Specific files
+.copilot-tracking
 test_github_release_desc.md
 CHANGELOG_commits.md
 memory-bank/
