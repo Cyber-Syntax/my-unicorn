@@ -41,6 +41,11 @@ _HASH_LENGTH_MAP: dict[int, HashType] = {
     128: "sha512",
 }
 
+_BSD_CHECKSUM_PATTERN = re.compile(
+    r"(?P<algo>SHA\d+|MD5|sha\d+|md5)\s*\((?P<filename>.+)\)\s*=\s*(?P<hash>[A-Fa-f0-9]+)",
+    re.IGNORECASE,
+)
+
 
 @dataclass(frozen=True)
 class ChecksumEntry:
@@ -49,6 +54,38 @@ class ChecksumEntry:
     filename: str
     hash_value: str
     algorithm: HashType
+
+
+@dataclass(frozen=True)
+class ChecksumFileResult:
+    """Complete parsed checksum file data for caching.
+
+    Attributes:
+        source: Download URL for the checksum file.
+        filename: Filename of the checksum file.
+        algorithm: Hash algorithm used (SHA256, SHA512).
+        hashes: Mapping of asset filename to hash value.
+
+    """
+
+    source: str
+    filename: str
+    algorithm: str
+    hashes: dict[str, str]
+
+    def to_cache_dict(self) -> dict[str, str | dict[str, str]]:
+        """Convert to dictionary format for cache storage.
+
+        Returns:
+            Dictionary with source, filename, algorithm, and hashes fields.
+
+        """
+        return {
+            "source": self.source,
+            "filename": self.filename,
+            "algorithm": self.algorithm,
+            "hashes": self.hashes,
+        }
 
 
 class ChecksumParser:
@@ -424,11 +461,6 @@ class StandardChecksumParser(ChecksumParser):
 class BSDChecksumParser(ChecksumParser):
     """Parser for BSD checksum format (e.g., "SHA256 (file) = hash")."""
 
-    _pattern = re.compile(
-        r"(?P<algo>SHA\d+|MD5|sha\d+|md5)\s*\((?P<filename>.+)\)\s*=\s*(?P<hash>[A-Fa-f0-9]+)",
-        re.IGNORECASE,
-    )
-
     def parse(
         self, content: str, filename: str, hash_type: HashType | None = None
     ) -> ChecksumEntry | None:
@@ -447,7 +479,7 @@ class BSDChecksumParser(ChecksumParser):
             if not line:
                 continue
 
-            match = self._pattern.match(line)
+            match = _BSD_CHECKSUM_PATTERN.match(line)
             if not match:
                 continue
 
@@ -549,3 +581,116 @@ def detect_hash_type_from_checksum_filename(filename: str) -> HashType | None:
         return "sha256"
 
     return None
+
+
+def _parse_all_traditional_checksums(content: str) -> dict[str, str]:
+    """Parse all filename-to-hash mappings from traditional checksum format.
+
+    Args:
+        content: The checksum file content.
+
+    Returns:
+        Dictionary mapping filenames to hash values.
+
+    """
+    hashes: dict[str, str] = {}
+
+    for raw_line in content.strip().split("\n"):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        parsed = _parse_sha256sums_line(line)
+        if not parsed:
+            continue
+
+        hash_value, filename = parsed
+
+        if not all(char in "0123456789abcdefABCDEF" for char in hash_value):
+            continue
+
+        hashes[filename] = hash_value
+
+    return hashes
+
+
+def _parse_all_bsd_checksums(content: str) -> dict[str, str]:
+    """Parse all filename-to-hash mappings from BSD checksum format.
+
+    Args:
+        content: The checksum file content.
+
+    Returns:
+        Dictionary mapping filenames to hash values.
+
+    """
+    hashes: dict[str, str] = {}
+
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        match = _BSD_CHECKSUM_PATTERN.match(line)
+        if match:
+            filename = match.group("filename")
+            hash_value = match.group("hash")
+            hashes[filename] = hash_value
+
+    return hashes
+
+
+def _parse_all_yaml_checksums(content: str) -> dict[str, str]:
+    """Parse all filename-to-hash mappings from YAML checksum format.
+
+    Args:
+        content: The YAML checksum file content.
+
+    Returns:
+        Dictionary mapping filenames to hash values.
+
+    """
+    if not _YAML_AVAILABLE or not yaml:
+        return {}
+
+    hashes: dict[str, str] = {}
+
+    try:
+        data = yaml.safe_load(content)
+        if not isinstance(data, dict):
+            return {}
+
+        for filename, hash_data in data.items():
+            if isinstance(hash_data, dict):
+                result = _extract_hash_from_dict(hash_data)
+                if result:
+                    hash_value, _ = result
+                    hashes[filename] = hash_value
+            elif isinstance(hash_data, str):
+                hashes[filename] = _normalize_hash_value(hash_data)
+
+    except yaml.YAMLError:
+        logger.debug("Failed to parse YAML for all checksums")
+        return {}
+
+    return hashes
+
+
+def parse_all_checksums(content: str) -> dict[str, str]:
+    """Parse all filename-to-hash mappings from a checksum file.
+
+    Automatically detects the checksum file format (YAML, BSD, or traditional)
+    and parses all entries.
+
+    Args:
+        content: The checksum file content.
+
+    Returns:
+        Dictionary mapping filenames to hash values.
+
+    """
+    if _is_yaml_content(content):
+        return _parse_all_yaml_checksums(content)
+    if _looks_like_bsd(content):
+        return _parse_all_bsd_checksums(content)
+    return _parse_all_traditional_checksums(content)

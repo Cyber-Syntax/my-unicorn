@@ -222,15 +222,34 @@ def build_verification_state(
     return result
 
 
+def _normalize_method_type(method_type: str) -> str:
+    """Normalize verification method type to schema-valid value.
+
+    The verification service may generate indexed method keys like
+    'checksum_file_0', 'checksum_file_1' for multiple checksum files.
+    The JSON schema only allows 'digest', 'checksum_file', or 'skip'.
+
+    Args:
+        method_type: Raw method type from verification service
+
+    Returns:
+        Schema-valid method type ('digest', 'checksum_file', or 'skip')
+
+    """
+    if method_type.startswith("checksum_file"):
+        return "checksum_file"
+    return method_type
+
+
 def build_method_entry(method_type: str, method_result: Any) -> dict[str, Any]:
     """Build verification method entry from result.
 
     Args:
-        method_type: Type of verification (digest, checksum_file)
+        method_type: Type of verification (digest, checksum_file, etc.)
         method_result: Result data (dict or simple bool)
 
     Returns:
-        Method entry dictionary for config
+        Method entry dictionary for config with normalized type
 
     Example:
         >>> result = {
@@ -246,7 +265,8 @@ def build_method_entry(method_type: str, method_result: Any) -> dict[str, Any]:
         'passed'
 
     """
-    method_entry: dict[str, Any] = {"type": method_type}
+    normalized_type = _normalize_method_type(method_type)
+    method_entry: dict[str, Any] = {"type": normalized_type}
 
     if not isinstance(method_result, dict):
         method_entry["status"] = "passed" if method_result else "failed"
@@ -258,7 +278,9 @@ def build_method_entry(method_type: str, method_result: Any) -> dict[str, Any]:
 
     verification_source = method_result.get("url", "")
     if not verification_source:
-        verification_source = "github_api" if method_type == "digest" else ""
+        verification_source = (
+            "github_api" if normalized_type == "digest" else ""
+        )
 
     method_entry.update(
         {

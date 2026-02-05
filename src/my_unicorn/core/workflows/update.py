@@ -266,7 +266,9 @@ class UpdateManager:
         # Get progress reporter from download service
         progress_reporter = download_service.progress_reporter
         self.verification_service = VerificationService(
-            download_service, progress_reporter
+            download_service,
+            progress_reporter,
+            cache_manager=self.cache_manager,
         )
 
         # Initialize post-download processor

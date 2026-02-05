@@ -75,6 +75,23 @@
                             "type": "boolean",
                             "description": "Whether verification passed overall"
                         },
+                        "overall_passed": {
+                            "type": "boolean",
+                            "description": "Overall verification status (same as passed, for compatibility)"
+                        },
+                        "actual_method": {
+                            "type": "string",
+                            "enum": [
+                                "digest",
+                                "checksum_file",
+                                "skip"
+                            ],
+                            "description": "Primary verification method used"
+                        },
+                        "warning": {
+                            "type": "string",
+                            "description": "Optional warning message from verification"
+                        },
                         "methods": {
                             "type": "array",
                             "minItems": 1,
@@ -110,19 +127,23 @@
                                     },
                                     "expected": {
                                         "type": "string",
-                                        "description": "Expected hash value (for digest method)"
+                                        "description": "Expected hash value"
                                     },
                                     "computed": {
                                         "type": "string",
-                                        "description": "Computed hash value (for digest method)"
+                                        "description": "Computed hash value"
                                     },
                                     "source": {
                                         "type": "string",
-                                        "description": "Source of hash (e.g., 'github_api')"
+                                        "description": "Source of hash (e.g., 'github_api' or 'browser_download_url'(for checksum_file))"
                                     },
                                     "filename": {
                                         "type": "string",
                                         "description": "Checksum filename (for checksum_file method)"
+                                    },
+                                    "digest": {
+                                        "type": "string",
+                                        "description": "Single digest value (alternative to computed/expected)"
                                     }
                                 }
                             },

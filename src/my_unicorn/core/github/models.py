@@ -345,30 +345,50 @@ class AssetSelector:
     @staticmethod
     def detect_checksum_files(
         assets: list[Asset],
-        tag_name: str,  # noqa: ARG004
+        tag_name: str,
     ) -> list[ChecksumFileInfo]:
         """Detect checksum files in release assets.
+
+        Filters to x86_64 Linux compatible checksum files only.
+        Excludes ARM, macOS, and Windows checksums.
+
+        Platform Exclusions:
+            - ARM: latest-linux-arm.yml, *-arm64.AppImage.sha256
+            - macOS: latest-mac.yml, *.dmg.DIGEST
+            - Windows: latest-windows.yml, *.exe.sha256
 
         Args:
             assets: List of release assets
             tag_name: Release tag name
 
         Returns:
-            List of detected checksum files with their info
+            List of detected checksum files (x86_64 Linux only)
 
         """
         checksum_files = []
+        filtered_count = 0
 
         for asset in assets:
             if is_checksum_file(asset.name):
-                format_type = get_checksum_file_format_type(asset.name)
-                checksum_files.append(
-                    ChecksumFileInfo(
-                        filename=asset.name,
-                        url=asset.browser_download_url,
-                        format_type=format_type,
+                # Apply platform compatibility filtering
+                if AssetSelector.is_relevant_checksum(asset.name):
+                    format_type = get_checksum_file_format_type(asset.name)
+                    checksum_files.append(
+                        ChecksumFileInfo(
+                            filename=asset.name,
+                            url=asset.browser_download_url,
+                            format_type=format_type,
+                        )
                     )
-                )
+                else:
+                    filtered_count += 1
+
+        if filtered_count > 0:
+            logger.debug(
+                "Filtered %d non-x86_64 checksum files from %s",
+                filtered_count,
+                tag_name,
+            )
 
         # Prioritize YAML files first as they're often more reliable
         checksum_files.sort(
@@ -412,6 +432,9 @@ class AssetSelector:
             r"(?i)darwin",
             r"(?i)osx",
             r"(?i)apple",
+            # ARM-specific YAML files (e.g., latest-linux-arm.yml)
+            r"(?i)latest.*arm.*\.ya?ml$",
+            r"(?i)arm.*latest.*\.ya?ml$",
             # macOS-specific YAML files
             r"(?i)latest.*mac.*\.ya?ml$",
             r"(?i)mac.*latest.*\.ya?ml$",
@@ -456,6 +479,7 @@ class AssetSelector:
             ✅ "SHA256SUMS" (standalone)
             ❌ "KeePassXC-2.7.10-Win64.msi.DIGEST" (Windows)
             ❌ "Obsidian-1.9.14-arm64.AppImage.sha256" (ARM)
+            ❌ "latest-linux-arm.yml" (ARM)
             ❌ "latest-mac-arm64.yml" (macOS)
 
         Args:

@@ -31,10 +31,16 @@ from my_unicorn.core.protocols.progress import (
     ProgressReporter,
     ProgressType,
 )
+from my_unicorn.core.verification.checksum_parser import (
+    ChecksumFileResult,
+    parse_all_checksums,
+)
 from my_unicorn.core.verification.verifier import Verifier
+from my_unicorn.exceptions import VerificationError
 from my_unicorn.logger import get_logger
 
 if TYPE_CHECKING:
+    from my_unicorn.core.cache import ReleaseCacheManager
     from my_unicorn.core.download import DownloadService
 
 logger = get_logger(__name__, enable_file_logging=True)
@@ -174,16 +180,19 @@ class VerificationService:
         self,
         download_service: DownloadService,
         progress_reporter: ProgressReporter | None = None,
+        cache_manager: ReleaseCacheManager | None = None,
     ) -> None:
         """Initialize verification service.
 
         Args:
             download_service: Service for downloading checksum files
             progress_reporter: Optional progress reporter for tracking
+            cache_manager: Optional cache manager for storing checksum files
 
         """
         self.download_service = download_service
         self.progress_reporter = progress_reporter or NullProgressReporter()
+        self.cache_manager = cache_manager
 
     async def verify_file(
         self,
@@ -368,14 +377,12 @@ class VerificationService:
         self,
         context: VerificationContext,
         checksum_file: ChecksumFileInfo,
-        index: int,
     ) -> MethodResult | None:
         """Execute checksum file verification asynchronously.
 
         Args:
             context: Verification context
             checksum_file: Checksum file information
-            index: Index of checksum file in list (for naming)
 
         Returns:
             MethodResult or None if failed
@@ -398,6 +405,7 @@ class VerificationService:
             checksum_file,
             original_asset_name,
             context.app_name,
+            context=context,
         )
 
         if checksum_result:
@@ -452,7 +460,7 @@ class VerificationService:
                     cf.format_type,
                 )
 
-            # Prioritize checksum files
+            # Prioritize checksum files and select only the best match (YAGNI)
             original_asset_name = (
                 context.asset.name
                 if context.asset.name
@@ -462,20 +470,20 @@ class VerificationService:
                 context.checksum_files, original_asset_name
             )
 
-            # Add task for each checksum file
-            for i, checksum_file in enumerate(prioritized_files):
-                logger.debug(
-                    "Adding checksum file verification to concurrent execution: %s",
-                    checksum_file.filename,
+            # Use only the highest-priority checksum file (first in list)
+            best_checksum_file = prioritized_files[0]
+            logger.debug(
+                "Selected best checksum file: %s",
+                best_checksum_file.filename,
+            )
+            tasks.append(
+                (
+                    self._execute_checksum_file_verification_async(
+                        context, best_checksum_file
+                    ),
+                    best_checksum_file,
                 )
-                tasks.append(
-                    (
-                        self._execute_checksum_file_verification_async(
-                            context, checksum_file, i
-                        ),
-                        checksum_file,  # Store checksum_file reference
-                    )
-                )
+            )
 
         # Execute all tasks concurrently
         if tasks:
@@ -502,7 +510,6 @@ class VerificationService:
 
             # Process results
             digest_index = 0 if context.has_digest else -1
-            checksum_start_index = 1 if context.has_digest else 0
 
             for i, result in enumerate(results):
                 # Handle exceptions
@@ -520,15 +527,9 @@ class VerificationService:
                             primary=True,
                         )
                     else:
-                        checksum_index = i - checksum_start_index
-                        method_key = (
-                            f"checksum_file_{checksum_index}"
-                            if checksum_index > 0
-                            else "checksum_file"
-                        )
-                        is_primary = (
-                            not context.has_digest and checksum_index == 0
-                        )
+                        # Single checksum file - always use "checksum_file" key
+                        method_key = "checksum_file"
+                        is_primary = not context.has_digest
                         error_result = MethodResult(
                             passed=False,
                             hash="",
@@ -555,27 +556,16 @@ class VerificationService:
                             True
                         )
                 else:
-                    # Checksum file result
-                    checksum_index = i - checksum_start_index
-                    method_key = (
-                        f"checksum_file_{checksum_index}"
-                        if checksum_index > 0
-                        else "checksum_file"
-                    )
+                    # Single checksum file result - always use "checksum_file" key
+                    method_key = "checksum_file"
                     context.verification_methods[method_key] = result.to_dict()
                     if result.passed:
-                        # Store the first passing checksum file in config
-                        # Only update if not already set to a non-empty value
-                        current_checksum = context.updated_config.get(
-                            "checksum_file", ""
-                        )
-                        if not current_checksum:
-                            # Get checksum_file from the map
-                            checksum_file = checksum_file_map.get(i)
-                            if checksum_file:
-                                context.updated_config["checksum_file"] = (
-                                    checksum_file.filename
-                                )
+                        # Store the checksum file in config
+                        checksum_file = checksum_file_map.get(i)
+                        if checksum_file:
+                            context.updated_config["checksum_file"] = (
+                                checksum_file.filename
+                            )
 
             logger.debug(
                 "Concurrent verification completed: %d methods executed",
@@ -660,10 +650,33 @@ class VerificationService:
                 ", ".join(failed_methods),
             )
         elif not has_passing_method and strong_methods_available:
-            # All methods failed
+            # All methods failed - this is a security failure, raise exception
             warning_message = "All verification methods failed"
             logger.error(
                 "All verification methods failed for %s", context.app_name
+            )
+
+            # Finish progress before raising
+            await self._finish_progress(
+                context.progress_task_id,
+                success=False,
+                description="verification failed",
+            )
+
+            # Raise VerificationError with context for callers
+            msg = f"All verification methods failed for {context.app_name}"
+            raise VerificationError(
+                msg,
+                context={
+                    "app_name": context.app_name,
+                    "file_path": str(context.file_path),
+                    "available_methods": list(
+                        context.verification_methods.keys()
+                    )
+                    if context.verification_methods
+                    else [],
+                    "failed_methods": failed_methods,
+                },
             )
 
         # Set context.verification_passed for backward compatibility
@@ -1216,6 +1229,7 @@ class VerificationService:
         checksum_file: ChecksumFileInfo,
         target_filename: str,
         app_name: str,
+        context: VerificationContext | None = None,
     ) -> MethodResult | None:
         """Verify file using checksum file.
 
@@ -1224,6 +1238,7 @@ class VerificationService:
             checksum_file: Checksum file information
             target_filename: Target filename to look for
             app_name: Application name for logging
+            context: Verification context for cache storage
 
         Returns:
             MethodResult or None if failed
@@ -1321,6 +1336,12 @@ class VerificationService:
                     checksum_file.format_type,
                 )
                 logger.debug("✓ Hash match confirmed")
+
+                # Cache checksum file data after successful verification
+                await self._cache_checksum_file_data(
+                    content, checksum_file, hash_type, context
+                )
+
                 return MethodResult(
                     passed=True,
                     hash=expected_hash,
@@ -1353,4 +1374,72 @@ class VerificationService:
                 passed=False,
                 hash="",
                 details=str(e),
+            )
+
+    async def _cache_checksum_file_data(
+        self,
+        content: str,
+        checksum_file: ChecksumFileInfo,
+        hash_type: HashType,
+        context: VerificationContext | None,
+    ) -> None:
+        """Cache checksum file data after successful verification.
+
+        Parses all hashes from the checksum file and stores them in cache
+        for future use.
+
+        Args:
+            content: Downloaded checksum file content.
+            checksum_file: Checksum file information.
+            hash_type: Detected hash algorithm type.
+            context: Verification context with owner/repo/version.
+
+        """
+        if not self.cache_manager or not context:
+            return
+
+        try:
+            all_hashes = parse_all_checksums(content)
+            if not all_hashes:
+                logger.debug(
+                    "No hashes parsed from checksum file: %s",
+                    checksum_file.filename,
+                )
+                return
+
+            algorithm = hash_type.upper()
+            if algorithm not in ("SHA256", "SHA512"):
+                algorithm = "SHA256"
+
+            checksum_result = ChecksumFileResult(
+                source=checksum_file.url,
+                filename=checksum_file.filename,
+                algorithm=algorithm,
+                hashes=all_hashes,
+            )
+
+            stored = await self.cache_manager.store_checksum_file(
+                context.owner,
+                context.repo,
+                context.tag_name,
+                checksum_result.to_cache_dict(),
+            )
+
+            if stored:
+                logger.debug(
+                    "Cached checksum file: %s with %d hashes",
+                    checksum_file.filename,
+                    len(all_hashes),
+                )
+            else:
+                logger.debug(
+                    "Failed to cache checksum file: %s (cache may be missing)",
+                    checksum_file.filename,
+                )
+
+        except Exception as e:
+            logger.debug(
+                "Error caching checksum file %s: %s",
+                checksum_file.filename,
+                e,
             )

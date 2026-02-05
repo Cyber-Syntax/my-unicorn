@@ -16,6 +16,7 @@ from my_unicorn.utils.asset_validation import (
 )
 
 
+# TODO: detect unused
 class Platform(Enum):
     """Supported platforms."""
 
@@ -205,20 +206,44 @@ class AppImageConfigV2(TypedDict):
 
 
 class VerificationMethod(TypedDict, total=False):
-    """Single verification method result."""
+    """Single verification method result.
+
+    Attributes:
+        type: Verification method type ("skip", "digest", "checksum_file")
+        status: Result status ("passed", "failed", "skipped")
+        algorithm: Hash algorithm used ("SHA256", "SHA512")
+        expected: Expected hash value with algorithm prefix
+        computed: Computed hash value without prefix
+        source: Source of expected hash ("github_api", "checksum_file")
+        filename: Checksum filename for checksum_file method
+        digest: Alternative single field for hash
+    """
 
     type: str  # "skip", "digest", "checksum_file"
     status: str  # "passed", "failed", "skipped"
-    algorithm: str  # "sha256", "sha512"
+    algorithm: str  # "SHA256", "SHA512"
     expected: str
     computed: str
-    source: str  # "github_api", "release_assets"
+    source: str  # "github_api", "checksum_file"
+    filename: str  # checksum filename (for checksum_file method)
+    digest: str  # alternative single field (instead of computed/expected)
 
 
-class StateVerification(TypedDict):
-    """Verification state tracking."""
+class StateVerification(TypedDict, total=False):
+    """Verification state tracking.
+
+    Attributes:
+        passed: Whether verification passed overall (required)
+        overall_passed: Same as passed, for backward compatibility
+        actual_method: Primary method used (digest/checksum_file/skip)
+        warning: Optional warning message from verification
+        methods: Array of verification method results (required)
+    """
 
     passed: bool
+    overall_passed: bool
+    actual_method: str  # "digest", "checksum_file", "skip"
+    warning: str
     methods: list[VerificationMethod]
 
 
