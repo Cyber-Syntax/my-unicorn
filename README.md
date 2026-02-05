@@ -186,7 +186,7 @@ Changes to the source code will be reflected immediately without reinstalling.
 ## 📚 Documentation
 
 - **User Guide:** [wiki.md](docs/wiki.md) - Comprehensive usage documentation
-- **Developer Docs:** [developers.md](docs/developers.md) - Contributing guidelines and development setup
+- **Developer Docs:** [developers.md](docs/dev/developers.md) - Contributing guidelines and development setup
 
 # **🙏 Support This Project**
 

@@ -26,3 +26,25 @@ weektodo                  ✅ 2.2.0
 🎉 Successfully installed 1 app(s)
 ⚠️  1 app(s) installed with warnings
 ```
+
+```bash
+my-unicorn install https://github.com/Legcord/Legcord
+Fetching from API:
+GitHub Releases      1/1 Retrieved
+
+Downloading:
+Legcord-1.2.1-linux-x86_64  139.5 MiB  10.7 MB/s 00:00 [==============================]   100% ✓
+
+Installing:
+(1/2) Verifying legcord ✓
+(2/2) Installing legcord ✓
+
+
+📦 Installation Summary:
+--------------------------------------------------
+legcord                   ✅ 1.2.1
+                             ⚠️  Partial verification: 2 passed, 1 failed
+
+🎉 Successfully installed 1 app(s)
+⚠️  1 app(s) installed with warnings
+```

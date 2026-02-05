@@ -139,7 +139,7 @@ Project Structure:
 >
 > This example of latest release but beta is similar to this one. Only changes beta provide all the assets and we use the asset 0 for latest version informations, latest release provide directly to that asset 0.
 
-[raw_api_returned_data.json](/docs/data/raw_api_returned_data.json)
+[raw_api_returned_data.json](/docs/dev/data/raw_api_returned_data.json)
 
 ---
 

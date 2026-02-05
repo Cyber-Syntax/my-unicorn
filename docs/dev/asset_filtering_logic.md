@@ -50,6 +50,7 @@ These should NOT appear in cache files:
 ❌ "QOwnNotes-x86_64-Qt6-experimental.AppImage.sha256sum"  # Experimental checksum
 ❌ "Obsidian-1.9.14-arm64.AppImage"                  # ARM 64-bit
 ❌ "nvim-linux-arm64.appimage"                       # ARM 64-bit
+❌ "latest-linux-arm.yml"                            # ARM
 ❌ "latest-mac-arm64.yml"                            # macOS
 ❌ "KeePassXC-2.7.10-Win64.zip.DIGEST"               # Windows
 ❌ "KeePassXC-2.7.10-Win64.msi.DIGEST"               # Windows

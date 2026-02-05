@@ -26,9 +26,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - 16 tests for ConfigurationValidator (security-critical validation)
     - 16 tests for workflow result types (InstallResult, UpdateResult, InstallPlan)
 - Enhanced in-memory caching documentation with performance metrics and thread safety notes
+- Extended `app_state_v2.schema.json` with new verification fields for enhanced state tracking:
+    - `overall_passed`: Boolean indicating if any verification method succeeded
+    - `actual_method`: Enum (`digest`|`checksum_file`|`skip`) indicating which method was used
+    - `warning`: Optional warning message for unverified installations
+    - `methods[].digest`: Alternative single hash field (replaces separate computed/expected)
+- Extended `cache_release.schema.json` with `checksum_files[]` array for caching downloaded checksum files:
+    - Stores source URL, filename, algorithm, and hash mappings
+    - Enables verification reuse without re-downloading checksum files
+- Added `get_checksum_files()`, `has_checksum_files()`, and `get_checksum_file_for_asset()` methods to `CacheManager`
+- Added 100+ tests covering schema validation, cache operations, and verification workflows
 
 ### Changed
 
+- setup.sh script renamed to install.sh and updated installation commands:
+    - Production install command updated:
+        - Use `./install.sh -i` or `./install.sh --install` to perform a standard installation.
+    - Development install command updated:
+        - Use `./install.sh -e` or `./install.sh --editable` to install in editable mode.
 - Refactored core architecture to use dependency injection via `ServiceContainer`
 - Replaced UI dependencies in core modules with protocol-based abstractions (`ProgressReporter`)
 - Refactored `DownloadService` and `VerificationService` to use `ProgressReporter` protocol
@@ -41,15 +56,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reduced event loop blocking during downloads and verification operations
 - Moved hash computation to executor threads for large files (>100MB threshold)
 - Improved progress reporting smoothness with non-blocking updates
-- setup.sh script renamed to install.sh and updated installation commands:
-    - Production install command updated:
-        - Use `./install.sh -i` or `./install.sh --install` to perform a standard installation.
-    - Development install command updated:
-        - Use `./install.sh -e` or `./install.sh --editable` to install in editable mode.
+- `VerificationService` now passes checksum file data to `CacheManager` for persistence
+- Update workflow recalculates verification state with fresh hashes instead of preserving stale data
+- Enhanced `StateVerification` and `VerificationMethod` TypedDicts with comprehensive docstrings
+
+### Fixed
+
+- Fixed update command not refreshing verification data when updating to new versions
+- Fixed `VerificationError` not being raised when all verification methods fail
+- Fixed checksum file references not persisting to cache JSON files
 
 ### Removed
 
 - Legacy venv-wrapper.bash script and install functionality removed from install.sh.
+
+### Notes
+
+- All new schema fields are optional for backward compatibility
+- Existing app state configurations continue to work without migration
+- Legacy verification format (passed + methods only) remains valid
 
 ## [2.2.1-alpha] - 2026-02-05
 

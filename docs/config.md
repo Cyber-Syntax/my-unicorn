@@ -13,12 +13,12 @@ This reduces duplication and makes catalog apps easier to maintain.
 
 ## Global Config (settings.conf)
 
-**Version**: 1.0.2  
+**Version**: 1.1.0  
 **Location**: `~/.config/my-unicorn/settings.conf`
 
 ```INI
 # Configuration version for migration support
-config_version = 1.0.2
+config_version = 1.1.0
 
 # This is the maximum number of concurrent downloads allowed.
 # Please note that this value shouldn't be too high, as it may trigger rate limiting.
@@ -235,7 +235,10 @@ The `verification` object in state tracks all verification attempts:
 
 ```json
 "verification": {
-  "passed": true,  // Overall verification result
+  "passed": true,              // Overall verification result (required)
+  "overall_passed": true,      // Same as passed (optional, for compatibility)
+  "actual_method": "digest",   // Primary method used: digest|checksum_file|skip (optional)
+  "warning": null,             // Optional warning message from verification
   "methods": [
     {
       "type": "digest",           // digest, checksum_file, or skip
@@ -243,17 +246,27 @@ The `verification` object in state tracks all verification attempts:
       "algorithm": "SHA256",      // SHA1, SHA256, SHA512, MD5
       "expected": "sha256:...",   // Expected hash with prefix
       "computed": "...",          // Computed hash (no prefix)
-      "source": "github_api"      // github_api, checksum_file, or skip
+      "source": "github_api",     // github_api, checksum_file, or skip
+      "digest": "sha256:..."      // Alternative single field (optional)
     }
   ]
 }
 ```
+
+**Field Descriptions**:
+
+- `passed`: Required boolean indicating whether verification succeeded
+- `overall_passed`: Optional boolean, same as `passed` (for backward compatibility)
+- `actual_method`: Optional string enum showing which method was actually used for verification
+- `warning`: Optional warning message if verification had issues but still passed
+- `methods[].digest`: Alternative single field that can be used instead of computed/expected pair
 
 **When no verification available**:
 
 ```json
 "verification": {
   "passed": false,
+  "actual_method": "skip",
   "methods": [
     {
       "type": "skip",
@@ -312,7 +325,7 @@ Config validation failed at '/state/verification/methods/0/type':
 'invalid_type' is not one of ['digest', 'checksum_file', 'skip']
 ```
 
-For complete examples, see [docs/example_app_state_configs/](data/example_app_state_configs).
+For complete examples, see [docs/example_app_state_configs/](dev/data/example_app_state_configs).
 
 #### Backup metadata.json implementation
 
@@ -358,7 +371,7 @@ For complete examples, see [docs/example_app_state_configs/](data/example_app_st
 
 Example zen browser cache:
 
-```bash
+```json
 {
   "cached_at": "2025-08-30T16:55:48.294102+00:00",
   "ttl_hours": 24,
@@ -375,7 +388,37 @@ Example zen browser cache:
         "browser_download_url": "https://github.com/zen-browser/desktop/releases/download/1.15.2b/zen-x86_64.AppImage"
       }
     ],
-    "original_tag_name": "1.15.2b"
+    "original_tag_name": "1.15.2b",
+    "checksum_files": [
+      {
+        "source": "https://github.com/zen-browser/desktop/releases/download/1.15.2b/SHA256SUMS.txt",
+        "filename": "SHA256SUMS.txt",
+        "algorithm": "SHA256",
+        "hashes": {
+          "zen-x86_64.AppImage": "9035c485921102f77fdfaa37536200fd7ce61ec9ae8f694c0f472911df182cbd"
+        }
+      }
+    ]
   }
 }
+```
+
+**Cache Structure Fields**:
+
+- `release_data.assets[].digest`: SHA256/SHA512 hash from GitHub API (format: `algorithm:hash`)
+- `release_data.checksum_files[]`: Array of detected checksum files from the release
+    - `source`: Download URL for the checksum file
+    - `filename`: Filename (e.g., "SHA256SUMS.txt", "latest-linux.yml")
+    - `algorithm`: Hash algorithm ("SHA256" or "SHA512")
+    - `hashes`: Object mapping asset filenames to their hash values
+
+**Checksum File Caching**:
+
+When a release includes checksum files (SHA256SUMS.txt, SHA512SUMS.txt, latest-linux.yml), my-unicorn:
+
+1. Downloads and parses the checksum file during verification
+2. Caches the parsed hashes in `checksum_files[]` for future use
+3. Uses cached hashes on subsequent operations without re-downloading
+4. Clears and re-fetches when `--refresh-cache` flag is used
+
 ```
