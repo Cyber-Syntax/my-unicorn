@@ -1,0 +1,16 @@
+# Dangerous Hex - Hexadecimal that looks like valid base64
+# These are PURE HEX hashes that happen to have valid base64 characters
+# The system MUST detect these as hex and NOT decode them as base64
+#
+# Hash: deadbeef repeated (looks like valid base64 alphabet subset)
+version: 1.0.0
+files:
+  - url: dangerous-app-1.0.0.AppImage
+    sha512: deadbeef12345678deadbeef12345678deadbeef12345678deadbeef12345678deadbeef12345678deadbeef12345678deadbeef12345678deadbeef12345678
+    size: 100000000
+  - url: dangerous-app-1.0.0-arm64.AppImage
+    sha512: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+    size: 98000000
+path: dangerous-app-1.0.0.AppImage
+sha512: deadbeef12345678deadbeef12345678deadbeef12345678deadbeef12345678deadbeef12345678deadbeef12345678deadbeef12345678deadbeef12345678
+releaseDate: '2024-04-01T00:00:00.000Z'

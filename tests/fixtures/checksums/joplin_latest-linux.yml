@@ -1,0 +1,13 @@
+# Joplin - Base64 SHA512 in YAML format
+version: 3.5.12
+files:
+  - url: Joplin-3.5.12.AppImage
+    sha512: b/aYTAy3/VlkBtHvCxgEaHGzzYsK2r35akb+vm5CWLsFmE9Q7Fa4TYjNxtz/dgjGLPfAli3NicBB78NWYacVEg==
+    size: 158078830
+    blockMapSize: 165762
+  - url: Joplin-3.5.12.deb
+    sha512: dVTxu3h9dfND5OmuTary7hVEpmImFRbVW+JaTM/xm4kvRhBC2FLhkqA4FHth43gd+AIwG7iiYAkkGz1+Ijoejg==
+    size: 103333950
+path: Joplin-3.5.12.AppImage
+sha512: b/aYTAy3/VlkBtHvCxgEaHGzzYsK2r35akb+vm5CWLsFmE9Q7Fa4TYjNxtz/dgjGLPfAli3NicBB78NWYacVEg==
+releaseDate: '2026-01-17T12:16:41.514Z'

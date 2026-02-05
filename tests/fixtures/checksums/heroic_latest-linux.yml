@@ -1,0 +1,10 @@
+# Heroic Games Launcher - Pure Hexadecimal SHA512
+# This file contains hex-encoded SHA512 hashes that should NOT be decoded as base64
+version: 2.15.2
+files:
+  - url: Heroic-2.15.2.AppImage
+    sha512: 3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef24d9980531bd96a5edfd55e67acdf6a6eddb9f3fd868a3337e31552fed09f92f
+    size: 252108108
+path: Heroic-2.15.2.AppImage
+sha512: 3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef24d9980531bd96a5edfd55e67acdf6a6eddb9f3fd868a3337e31552fed09f92f
+releaseDate: '2024-01-15T10:30:00.000Z'
