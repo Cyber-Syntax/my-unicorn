@@ -1,96 +1,182 @@
 # AGENTS.md
 
-## General Guidelines
-
-- **KISS** (Keep It Simple, Stupid): Aim for simplicity and clarity. Avoid unnecessary abstractions or metaprogramming.
-- **DRY** (Don't Repeat Yourself): Reuse code appropriately but avoid over-engineering. Each command handler has single responsibility.
-- **YAGNI** (You Aren't Gonna Need It): Always implement things when you actually need them, never when you just foresee that you need them.
-- ALWAYS run `ruff check --fix <filepath>` and `ruff format <filepath>` on each Python file you modify.
-- Use a subagent to avoid context-limit issues when reading modules.
+This document provides context, patterns, and guidelines for AI coding assistants working in this repository.
 
 ## Project Overview
 
-My Unicorn is a Python 3.12+ CLI tool for managing AppImages on Linux. It installs, updates, and verifies AppImages from GitHub with hash verification (SHA256/SHA512).
+**What**: My Unicorn is a Python 3.12+ CLI tool for managing AppImages on Linux  
+**Core Features**: Install, update, and verify AppImages from GitHub with hash verification (SHA256/SHA512)  
+**Entry Point**: `my-unicorn = "my_unicorn.main:main"` (defined in pyproject.toml)  
+**Package Manager**: uv (replaces pip/poetry)
 
-### Key Technologies
+## Quick Start
 
-- **Python 3.12+** with asyncio/aiohttp for async operations
-- **uv** - Fast Python package installer and resolver
-- **aiohttp** - Async HTTP client for GitHub API interactions
-- **orjson** - Fast JSON library for config and cache files
-- **uvloop** - Fast asyncio event loop
-- **keyring** - Secure credential storage for GitHub tokens
-- **pytest** - Testing framework with pytest-asyncio and pytest-mock
-- **ruff** - Fast Python linter and formatter
+```bash
+# Clone and setup
+git clone https://github.com/Cyber-Syntax/my-unicorn
+cd my-unicorn
 
-### Architecture
+# Install dependencies (uv creates virtual environment automatically)
+uv sync
 
-- `src/my_unicorn/` - Main package source code
-    - `catalog/` - Application catalog JSON files
-    - `cli/` - CLI argument parsing and command runners
-        - `commands/` - Individual command handlers (install, update, remove, list, etc.)
-        - `parser.py` - Argument parser setup
-        - `runner.py` - Command execution orchestration
-    - `config/` - Configuration management
-        - `global.py` - Global INI configuration
-        - `app.py` - Per-app JSON configuration
-        - `catalog.py` - Application catalog loader
-        - `migration/` - Configuration migration logic
-        - `schemas/` - JSON schema validation
-    - `core/` - Core functionality and integrations
-        - `auth.py` - Authentication handling
-        - `cache.py` - Release cache management
-        - `desktop_entry.py` - Desktop file generation
-        - `download.py` - File download logic
-        - `file_ops.py` - File system operations
-        - `http_session.py` - HTTP session management
-        - `icon.py` - Icon extraction and management
-        - `remove.py` - Remove operations
-        - `token.py` - Token storage and retrieval
-        - `github/` - GitHub API client
-        - `verification/` - Hash verification logic
-        - `workflows/` - Business workflows (install, update, remove)
-    - `ui/` - User interface and display
-        - `progress.py` - Progress bar management
-        - `display.py` - Output formatting and rendering
-        - `formatters.py` - Text formatters
-    - `utils/` - Utility functions and helpers
-    - `constants.py` - Application constants (versions, paths, defaults)
-    - `types.py` - Type definitions and dataclasses
-    - `exceptions.py` - Custom exception classes
-    - `logger.py` - Logging setup and configuration
-    - `main.py` - Application entry point
-- `tests/` - Comprehensive test suite (same structure as src/my_unicorn/)
-- `docs/` - Documentation and design decisions
-- `scripts/` - Helper scripts for development
+# Run CLI from source
+uv run my-unicorn --help
+
+# Run fast tests (excludes slow logger integration tests)
+uv run pytest -m "not slow"
+
+# Run all tests
+uv run pytest
+```
+
+## Core Technologies
+
+- **Python**: 3.12+ with asyncio/aiohttp for async operations
+- **HTTP Client**: aiohttp for GitHub API interactions
+- **JSON**: orjson for fast config/cache file handling
+- **Event Loop**: uvloop for performance
+- **Security**: keyring for secure GitHub token storage
+- **Testing**: pytest with pytest-asyncio, pytest-mock, pytest-cov
+- **Linting**: ruff (linter + formatter)
+- **Type Checking**: mypy
+
+## Repository Structure
+
+```
+src/my_unicorn/
+├── main.py                 # Application entry point
+├── types.py                # Type definitions and dataclasses
+├── constants.py            # Application constants (versions, paths, defaults)
+├── exceptions.py           # Custom exception classes
+├── logger.py               # Logging setup and configuration
+├── catalog/                # Application catalog JSON files
+├── cli/                    # CLI parsing and command execution
+│   ├── parser.py           # Argument parser setup
+│   ├── runner.py           # Command execution orchestration
+│   └── commands/           # Command handlers (install, update, remove, list)
+├── config/                 # Configuration management
+│   ├── global.py           # Global INI configuration
+│   ├── app.py              # Per-app JSON configuration
+│   ├── catalog.py          # Application catalog loader
+│   ├── schemas/            # JSON schema validation
+│   └── migration/          # Config migration logic (v1→v2)
+├── core/                   # Core functionality
+│   ├── auth.py             # Authentication handling
+│   ├── token.py            # Token storage via keyring
+│   ├── cache.py            # Release cache management
+│   ├── http_session.py     # HTTP session management
+│   ├── download.py         # File download logic
+│   ├── icon.py             # Icon extraction
+│   ├── desktop_entry.py    # Desktop file generation
+│   ├── github/             # GitHub API client
+│   ├── verification/       # Hash verification (SHA256/SHA512)
+│   └── workflows/          # Business workflows (install, update, remove)
+├── ui/                     # User interface
+│   ├── progress.py         # Progress bar management
+│   └── display.py          # Output formatting
+└── utils/                  # Utility functions
+
+tests/                      # Test suite (mirrors src structure)
+├── conftest.py             # Pytest fixtures and configuration
+├── integration/            # Integration tests (network calls allowed)
+├── test_*.py               # Unit tests (no network calls)
+└── [subdirs mirror src/my_unicorn structure]
+
+docs/                       # Technical documentation
+├── adr/                    # Architecture Decision Records
+├── architecture/           # Architecture blueprints
+└── dev/                    # Development guides
+
+scripts/                    # Helper scripts
+├── test.py                 # UI testing script
+├── autocomplete.bash       # Shell autocomplete setup
+└── update.bash             # Self-update script
+
+autocomplete/               # Shell autocomplete scripts (bash, zsh)
+container/                  # Container configuration (Dockerfile, podman-compose.yml)
+```
 
 ## Development Workflow
 
-### Running the CLI
+### Initial Setup
 
 ```bash
-# Run via uv
+# Ensure uv is installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# or: brew install uv  # macOS
+# or: apt install uv   # Ubuntu/Debian
+
+# Clone repository
+git clone https://github.com/Cyber-Syntax/my-unicorn
+cd my-unicorn
+
+# Install dependencies (creates .venv automatically)
+uv sync
+
+# Verify installation
+uv run my-unicorn --version
+```
+
+### Common Development Tasks
+
+#### Running the CLI
+
+```bash
+# Run from source without installation
 uv run my-unicorn <command> [options]
 
 # Examples
-uv run my-unicorn catalog
 uv run my-unicorn install qownnotes
-uv run my-unicorn update
+uv run my-unicorn update qownnotes --refresh-cache
+uv run my-unicorn update --all --refresh-cache
 ```
 
-### Making Code Changes
+#### Making Code Changes
 
-1. Make your changes to files in `src/my_unicorn/`
-2. Run linting: `ruff check --fix <filepath>`
-3. Run formatting: `ruff format <filepath>`
-4. Run tests: `uv run pytest` (see Testing Instructions below)
-5. Verify CLI still works: `uv run my-unicorn --help`
-6. Verify ui still work as expected: `uv run scripts/test.py --quick`
-
-### Adding New Dependencies
+**CRITICAL**: Always run ruff on modified files before committing.
 
 ```bash
-# Add a dependency
+# 1. Make your changes to files in src/my_unicorn/
+
+# 2. Run linting (auto-fix issues)
+ruff check --fix path/to/file.py
+
+# 3. Run formatting
+ruff format path/to/file.py
+
+# 4. Run type checking
+uv run mypy src/my_unicorn/
+
+# 5. Run fast tests (excludes slow logger tests)
+uv run pytest -m "not slow"
+
+# 6. Verify CLI still works
+uv run my-unicorn --help
+
+# 7. Test UI behavior (quick smoke test)
+uv run scripts/test.py --quick
+```
+
+#### Linting and Formatting Commands
+
+```bash
+# Check and auto-fix all Python files
+ruff check --fix .
+
+# Format all Python files
+ruff format .
+
+# Check specific file
+ruff check --fix src/my_unicorn/main.py
+
+# Format specific directory
+ruff format src/my_unicorn/cli/
+```
+
+### Managing Dependencies
+
+```bash
+# Add a runtime dependency
 uv add <package-name>
 
 # Add a dev dependency
@@ -98,58 +184,183 @@ uv add --dev <package-name>
 
 # Update all dependencies
 uv lock --upgrade
+
+# Sync dependencies after pulling changes
+uv sync
+
+# Remove a dependency
+uv remove <package-name>
 ```
 
-## Testing Instructions
+## Code Quality Standards
 
-Critical: Run tests after any change on cli code to ensure nothing breaks.
+### Type Hints (REQUIRED)
 
-- Run the full suite (≈995 tests): `uv run pytest`
-- Focused runs:
-    - File: `uv run pytest tests/test_backup.py`
-    - Marker filtering: `uv run pytest -m "not slow"` (skips slow tests, keeps fast integration tests)
-    - Full marker filtering: `uv run pytest -m "not slow and not integration"` (skips all integration tests)
-    - Single test: `uv run pytest tests/test_backup.py::test_restore_doesnt_delete_restore_target`
-- Coverage examples:
-    - `uv run pytest --cov=my_unicorn`
-    - `uv run pytest --cov=my_unicorn.commands.migrate tests/migration/test_migrate_command.py`
+All Python code MUST include type hints and return types.
 
-Note: The `slow` marker is applied to performance-heavy tests (e.g., 10MB log file rotation). Integration tests in `tests/integration/` are marked with `integration` but may not be slow—use `-m "not slow"` for quick runs that include fast integration tests. Skip integration tests entirely if changes don't affect config, upgrade, or cross-component interactions.
+```python
+# ✅ CORRECT
+def filter_unknown_users(users: list[str], known_users: set[str]) -> list[str]:
+    """Filter out users that are not in the known users set.
 
-## Code Style Guidelines
+    Args:
+        users: List of user identifiers to filter.
+        known_users: Set of known/valid user identifiers.
 
-### Python Conventions
+    Returns:
+        List of users that are not in the `known_users` set.
+    """
+    return [u for u in users if u not in known_users]
 
-- Use built-in types: `list[str]`, `dict[str, int]` (not typing.List, typing.Dict)
-- Use `%s` style formatting in logging statements
-- Use `logger.exception("message")` for stack traces
-- Follow PEP 8 standards (enforced by ruff)
-- Use `astimezone()` for local time in datetime operations
+# ❌ INCORRECT (no type hints)
+def filter_unknown_users(users, known_users):
+    return [u for u in users if u not in known_users]
+```
 
-### Linting and Formatting
+### Coding Standards
 
-ALWAYS run ruff on each Python file you modify:
+- **Type Annotations**: Use built-in types: `list[str]`, `dict[str, int]` (not `typing.List`, `typing.Dict`)
+- **Logging Format**: Use `%s` style formatting in logging statements: `logger.info("User %s logged in", username)`
+- **PEP 8**: Enforced by ruff
+- **Datetime**: Use `astimezone()` for local time conversions
+- **Variable Names**: Use descriptive, self-explanatory names
+- **Function Size**: Keep functions focused (<20 lines when possible)
+- **Error Handling**: Use custom exceptions from `exceptions.py`
 
-```bash
-# Check and auto-fix linting errors
-ruff check --fix <filepath>
+### Error Handling Guidelines
 
-# Format a specific file
-ruff format path/to/file.py
+```python
+# ✅ CORRECT - Use custom exceptions
+from my_unicorn.exceptions import NetworkError, VerificationError
 
-# Format all files in a directory
-ruff format path/to/code/
+if not hash_matches:
+    raise VerificationError(f"Hash mismatch for {filename}")
 
-# Format all files in current directory
-ruff format .
+# ✅ CORRECT - Handle expected errors gracefully (no exception logging)
+try:
+    response = await session.get(url)
+except aiohttp.ClientError as e:
+    logger.warning("Network request failed: %s", e)
+    return None
+
+# ❌ INCORRECT - Don't use logger.exception() for expected errors
+try:
+    response = await session.get(url)
+except aiohttp.ClientError as e:
+    logger.exception("Network error")  # Leaks stack trace unnecessarily
+
+# ❌ INCORRECT - Don't log tokens or sensitive data
+logger.debug("Token: %s", token)  # Security risk!
 ```
 
 ### File Organization
 
-- One class per file (generally)
-- Group related functionality in modules
-- Keep files focused and under 500 lines.
-- Use `__init__.py` for public API exports
+**Target**: Keep files between 150-500 lines
+
+```bash
+# Check file line counts
+uv run pytest tests/test_lines.py -v
+
+# If tests fail, refactor large files:
+# 1. Find natural split points (don't force arbitrary divisions)
+# 2. Extract related functionality into new modules
+# 3. Re-run tests until they pass
+```
+
+## Testing Instructions
+
+### Test Organization
+
+- **Unit tests**: `tests/test_*.py` - No network calls, use mocks/fixtures
+- **Integration tests**: `tests/integration/` - Network calls permitted
+- **Test structure**: Mirrors `src/my_unicorn/` structure
+- **Framework**: pytest with pytest-asyncio, pytest-mock, pytest-cov
+
+### Running Tests
+
+```bash
+# Run fast tests only (excludes slow logger integration tests)
+uv run pytest -m "not slow"
+
+# Run all tests (including slow tests)
+uv run pytest
+
+# Run tests with coverage
+uv run pytest --cov=my_unicorn --cov-report=html
+
+# Run specific test file
+uv run pytest tests/test_install.py
+
+# Run specific test function
+uv run pytest tests/test_install.py::test_install_success
+```
+
+### Writing Tests
+
+**CRITICAL**: Every new feature or bugfix MUST be covered by unit tests.
+
+```python
+# Example test structure
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from my_unicorn.core.workflows import InstallWorkflow
+from my_unicorn.exceptions import VerificationError
+
+
+@pytest.mark.asyncio
+async def test_install_workflow_success(tmp_path, mock_session):
+    """Test successful installation workflow."""
+    # Arrange
+    workflow = InstallWorkflow(...)
+    
+    # Act
+    result = await workflow.execute()
+    
+    # Assert
+    assert result.success is True
+    assert result.app_name == "test-app"
+
+
+def test_hash_verification_failure():
+    """Test that verification fails with incorrect hash."""
+    # Arrange
+    expected_hash = "abc123"
+    actual_hash = "def456"
+    
+    # Act & Assert
+    with pytest.raises(VerificationError):
+        verify_hash(actual_hash, expected_hash)
+```
+
+### Test Checklist
+
+Before committing, verify:
+
+- [ ] Tests fail when your new logic is broken
+- [ ] Happy path is covered
+- [ ] Edge cases and error conditions are tested
+- [ ] External dependencies are mocked (no real network calls in unit tests)
+- [ ] Tests are deterministic (no flaky tests)
+- [ ] Async tests use `@pytest.mark.asyncio`
+- [ ] Test names clearly describe what they test
+
+### Test Fixtures
+
+Common fixtures are defined in `tests/conftest.py`:
+
+```python
+# Example fixtures (check conftest.py for full list)
+@pytest.fixture
+def tmp_config_dir(tmp_path):
+    """Temporary config directory for testing."""
+    return tmp_path / ".config" / "my-unicorn"
+
+@pytest.fixture
+def mock_session():
+    """Mock aiohttp ClientSession."""
+    return AsyncMock()
+```
 
 ## Build and Deployment
 
@@ -165,29 +376,65 @@ uv run my-unicorn <command>
 ```bash
 # Install from GitHub (main branch, for production use)
 uv tool install git+https://github.com/Cyber-Syntax/my-unicorn
+
+# Or use the install script
 ./install.sh -i
 
 # Upgrade to latest from GitHub
 my-unicorn upgrade
+# or
 uv tool install --upgrade git+https://github.com/Cyber-Syntax/my-unicorn
+
+# Uninstall
+uv tool uninstall my-unicorn
 ```
 
-## Review Checklist
+## Debugging and Troubleshooting
 
-- [ ] Code follows KISS, DRY, and YAGNI principles
-- [ ] All tests pass (`uv run pytest`)
-- [ ] Code is formatted (`ruff format`)
-- [ ] No linting errors (`ruff check`)
-- [ ] No unnecessary dependencies added
-- [ ] Exception handling follows Ruff guidelines (TRY003, TRY301)
-- [ ] No assert statements used (S100)
+### Common Issues and Solutions
+
+#### Linting/Formatting Issues
+
+```bash
+# Problem: Ruff errors that can't be auto-fixed
+# Solution: Review ruff output and fix manually
+ruff check path/to/file.py
+
+# Problem: Type checking errors
+# Solution: Run mypy with verbose output
+uv run mypy --show-error-codes src/my_unicorn/
+
+# Common type error fixes:
+# - Add type: ignore[<error-code>] comment if necessary
+# - Update type hints to match actual usage
+# - Check for missing return type annotations
+# - Ensure correct use of built-in types (list[str], dict[str, int], etc.)
+```
+
+### Debugging Tips
+
+#### Gather Runtime Information
+
+```bash
+# Check log file
+tail -f ~/.config/my-unicorn/logs/my-unicorn.log
+
+# Check app state config
+cat ~/.config/my-unicorn/apps/<app-name>.json
+
+# Check cache file
+cat ~/.config/my-unicorn/cache/releases/<owner_repo>.json
+
+# View global config
+cat ~/.config/my-unicorn/settings.conf
+```
 
 ## Project-Specific Notes
 
 ### Configuration Structure
 
 - Configuration stored in `~/.config/my-unicorn/`:
-    - `settings.conf` - Global configuration file (GLOBAL_CONFIG_VERSION="1.0.2")
+    - `settings.conf` - Global configuration file (GLOBAL_CONFIG_VERSION="1.1.0")
     - `cache/releases/` - Cache files, filtered for AppImage/checksums only (Windows, mac removed)
         - `AppFlowy-IO_AppFlowy.json` - AppFlowy cache config
         - `zen-browser_desktop.json` - Zen Browser cache config
@@ -222,17 +469,12 @@ uv tool install --upgrade git+https://github.com/Cyber-Syntax/my-unicorn
     - `global_config.py` - Global INI config migrations
     - `app_config.py` - Per-app JSON config migrations
 - Always bump VERSION constants in `constants.py` when changing config schema
-    - `GLOBAL_CONFIG_VERSION` - Currently "1.0.2"
+    - `GLOBAL_CONFIG_VERSION` - Currently "1.1.0"
     - `APP_CONFIG_VERSION` - Currently "2.0.0"
-
-### Error Handling
-
-- Use custom exceptions from `exceptions.py`
-- Always log exceptions with `logger.exception()` unless if it is token-related.
-- Do not use `logger.exception()` for expected errors (e.g., network issues, invalid user input) and secure data (e.g., tokens) to avoid leaking sensitive information.
-- Handle network errors gracefully with retries
 
 ## Additional Resources
 
-- **Documentation:** See `docs/` directory for detailed design decisions
+- **Documentation:** See `docs/` directory for detailed design decisions, architecture diagrams, and API documentation
 - **Scripts:** Helper scripts in `scripts/` for development tasks
+- **Architecture Decision Records:** `docs/adr/` for major technical decisions
+- **Development Guides:** `docs/dev/` for in-depth development patterns and best practices

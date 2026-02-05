@@ -33,12 +33,35 @@
 
 ## in-progress
 
+- [ ] Improve security
+    - [ ] Verify checksum_file via digest verification provided from github_api to prevent tampered checksum_file attacks. Most of the new apps provide digest for their appimage and checksum_file on github api.
+
+- [ ] Improve schema
+    - [ ] consider schema validation testing with hypothesis?
+    - [ ] consider schema update v2.1.0 with optional fields for better backward compatibility?
+    - [ ] remove schema one digest or use that instead of computed expected?
+
+- [ ] <https://github.com/carlosperate/awesome-pyproject?tab=readme-ov-file#testing>
+- [ ] Improve code quality with better practices:
+    - [ ] learn dependency injection better which seems like protocol used for that to make better decoupling.
+    - [ ] <https://github.com/ArjanCodes/betterpython/blob/main/1%20-%20coupling%20and%20cohesion/coupling-cohesion-after.py>
+    - [ ] <https://docs.python-guide.org/writing/style/>
+
+- [ ] Improve agents.md
+    - [x] <https://github.com/langchain-ai/langchain/blob/master/AGENTS.md>
+    - [ ] <https://alexop.dev/posts/stop-bloating-your-claude-md-progressive-disclosure-ai-coding-tools/>
+
+- [x] Create architecture-blueprint file
+- [ ] Create code-exemplars-blueprint file
+
+- [ ] use functools.cache for reading json files, caches for performance?
 - [ ] learn Makefile
 - [ ] workflows and workflows/services folder structure refactor for better structure.
-Currently install.py, update.py, appimage_setup.py(install and update use this, so I didn't move that to util folder which we might be make a new module to handle it there in class etc.) is work together.
+      Currently install.py, update.py, appimage_setup.py(install and update use this, so I didn't move that to util folder which we might be make a new module to handle it there in class etc.) is work together.
 - [ ] Learn and add integration tests after workflows refactor.
 - [ ] learn testing trophy philosophy
 - [ ] progress_service written optional but we must make it required. Only upgrade module not use it currently and not need to use it because upgrade module only use uv package manager to handle the installation and update process.
+- [ ] P4-Q7: backup create command feature
 
 - [ ] p1-q1: load app config one time instead of loading on every function call like remove, backup, update... etc.
 - [ ] P1-Q2 decrease all the modules lines to less than 500 lines for better structure and maintainability.
@@ -76,6 +99,7 @@ we probably need to define one correct example or we can just use the json schem
 
 ## todo
 
+- [ ] P9: remove unused `"method": "extraction",` from icon app state which we only use extraction type now.
 - [ ] P2: redundant remove prints:
 
 ```
@@ -114,9 +138,9 @@ we probably need to define one correct example or we can just use the json schem
     - [ ] APIGateway would be useful when we impemented gitlab support
     - [ ] GraphQL-like query system for REST APIs
 - [ ] Add command to migrate from URL installs to Catalog installs
-Example; `my-unicorn migrate --app appflowy` or `my-unicorn migrate --all`
-but we use migrate command to migrate old config to new config structure
-so we need to use flags like `--from-url-to-catalog` or something like that.
+      Example; `my-unicorn migrate --app appflowy` or `my-unicorn migrate --all`
+      but we use migrate command to migrate old config to new config structure
+      so we need to use flags like `--from-url-to-catalog` or something like that.
 
 - [ ] Add option in global config for [auth]
 - [ ] What about threading usage on logging? Example: <https://github.com/Roulbac/uv-func/blob/main/src/uv_func/logging.py>
@@ -197,7 +221,7 @@ Confirm your GitHub token:
 
 ## done
 
-- [x] P1: BUG: missing computed hashes on verified app when used checksum_file (example tagspace)
+- [x] P1: BUG: missing computed hashes on verified app when used checksum_file (example tagspace) this happens on update command, install command show the hashes computed etc.
 
 ```json
       "methods": [
@@ -208,6 +232,45 @@ Confirm your GitHub token:
           "type": "checksum_file"
         }
       ],
+
+            "methods": [
+        {
+          "algorithm": "SHA256",
+          "source": "github_api",
+          "status": "passed",
+          "type": "digest"
+        },
+        {
+          "algorithm": "SHA256",
+          "source": "https://github.com/tagspaces/tagspaces/releases/download/v6.8.2/SHA256SUMS.txt",
+          "status": "passed",
+          "type": "checksum_file"
+        }
+      ],
+```
+
+- [x] P1:BUG: cache also won't save the checksum_file if digest exist?
+
+```json
+{
+    "cached_at": "2026-02-04T15:04:13.654171+03:00",
+    "ttl_hours": 24,
+    "release_data": {
+        "owner": "tagspaces",
+        "repo": "tagspaces",
+        "version": "6.8.2",
+        "prerelease": false,
+        "assets": [
+            {
+                "name": "tagspaces-linux-x86_64-6.8.2.AppImage",
+                "size": 159537674,
+                "digest": "sha256:3c8ca310ab79d09202b55c2a832d5d09c7caf81c5db2270821dc05e90172e2df",
+                "browser_download_url": "https://github.com/tagspaces/tagspaces/releases/download/v6.8.2/tagspaces-linux-x86_64-6.8.2.AppImage"
+            }
+        ],
+        "original_tag_name": "v6.8.2"
+    }
+}
 ```
 
 - [x] P3-Q5: move workflow folder modules to utils folder for better structure

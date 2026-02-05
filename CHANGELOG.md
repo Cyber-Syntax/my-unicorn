@@ -62,6 +62,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Critical Bug Fix: Hash Detection in Checksum Verification**
+    - Fixed a critical bug where hexadecimal checksums were incorrectly processed as base64, causing hash detection failure called `binascii.Error: Incorrect padding` during verification for certain apps (e.g., Heroic, QOwnNotes) that use latest-linux.yml file with hex hashes.
+    - This fix ensures that the normalization function correctly detects and processes both hex and base64 encodings, preventing corruption of hex hashes and allowing all verification methods to function properly.
+    - Hex hashes (e.g., from Heroic, QOwnNotes) are now preserved without corruption
+    - Base64 hashes (e.g., from Legcord, Superproductivity) continue to work correctly
 - Fixed update command not refreshing verification data when updating to new versions
 - Fixed `VerificationError` not being raised when all verification methods fail
 - Fixed checksum file references not persisting to cache JSON files
