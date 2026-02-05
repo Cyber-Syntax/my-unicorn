@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from my_unicorn.core.workflows.install_state_checker import InstallStateChecker
+from my_unicorn.core.services.install_service import InstallStateChecker
 from my_unicorn.types import InstallPlan
 
 
@@ -50,7 +50,7 @@ class TestInstallStateChecker:
 
         # Mock the path existence check
         with patch(
-            "my_unicorn.core.workflows.install_state_checker.Path.exists",
+            "my_unicorn.core.services.install_service.Path.exists",
             return_value=True,
         ):
             plan = await checker.get_apps_needing_installation(
@@ -78,7 +78,7 @@ class TestInstallStateChecker:
         checker = InstallStateChecker()
 
         with patch(
-            "my_unicorn.core.workflows.install_state_checker.Path.exists",
+            "my_unicorn.core.services.install_service.Path.exists",
             return_value=True,
         ):
             plan = await checker.get_apps_needing_installation(
@@ -106,7 +106,7 @@ class TestInstallStateChecker:
         checker = InstallStateChecker()
 
         with patch(
-            "my_unicorn.core.workflows.install_state_checker.Path.exists",
+            "my_unicorn.core.services.install_service.Path.exists",
             return_value=False,
         ):
             plan = await checker.get_apps_needing_installation(
@@ -161,7 +161,7 @@ class TestInstallStateChecker:
         checker = InstallStateChecker()
 
         with patch(
-            "my_unicorn.core.workflows.install_state_checker.Path.exists",
+            "my_unicorn.core.services.install_service.Path.exists",
             return_value=True,
         ):
             plan = await checker.get_apps_needing_installation(

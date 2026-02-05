@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.core.github import Release
-from my_unicorn.core.workflows.update import UpdateInfo, UpdateManager
+from my_unicorn.core.update.update import UpdateInfo, UpdateManager
 
 
 class TestMissingAppImageUpdate:
@@ -103,17 +103,17 @@ class TestMissingAppImageUpdate:
         )
 
         with (
-            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
-            patch("my_unicorn.core.workflows.update.FileOperations"),
-            patch("my_unicorn.core.workflows.update.BackupService"),
-            patch("my_unicorn.core.workflows.update.logger"),
+            patch("my_unicorn.core.update.update.GitHubAuthManager"),
+            patch("my_unicorn.core.update.update.FileOperations"),
+            patch("my_unicorn.core.update.update.BackupService"),
+            patch("my_unicorn.core.update.update.logger"),
             patch.object(
                 UpdateManager,
                 "check_single_update",
                 return_value=update_info,
             ),
             patch(
-                "my_unicorn.core.workflows.update.select_best_appimage_asset",
+                "my_unicorn.core.update.update.select_best_appimage_asset",
                 return_value=None,
             ),
         ):
@@ -140,9 +140,9 @@ class TestMissingAppImageUpdate:
         are complete, others are still building.
         """
         with (
-            patch("my_unicorn.core.workflows.update.GitHubAuthManager"),
-            patch("my_unicorn.core.workflows.update.FileOperations"),
-            patch("my_unicorn.core.workflows.update.BackupService"),
+            patch("my_unicorn.core.update.update.GitHubAuthManager"),
+            patch("my_unicorn.core.update.update.FileOperations"),
+            patch("my_unicorn.core.update.update.BackupService"),
             patch.object(
                 UpdateManager, "update_single_app", new=AsyncMock()
             ) as mock_update_single,

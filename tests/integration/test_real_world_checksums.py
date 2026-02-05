@@ -24,6 +24,14 @@ FIXTURES_DIR = Path(__file__).parent.parent / "fixtures" / "checksums"
 class TestRealWorldChecksumFiles:
     """Test parsing of real-world checksum files from GitHub."""
 
+    # TODO: use this helper in all tests to verify hex validity and length
+    def assert_hex_hash(entry, algorithm, length):
+        assert entry is not None
+        assert entry.algorithm == algorithm
+        assert len(entry.hash_value) == length
+        assert all(c in "0123456789abcdef" for c in entry.hash_value)
+
+
     def test_parse_heroic_yaml_hex_sha512(self) -> None:
         """Test Heroic YAML with pure hex SHA512.
 

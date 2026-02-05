@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from my_unicorn.core.services.update_service import UpdateApplicationService
-from my_unicorn.core.workflows.update import UpdateInfo
+from my_unicorn.core.update.update import UpdateInfo
 
 
 @pytest.fixture

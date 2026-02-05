@@ -12,9 +12,11 @@ Services follow Clean Architecture principles:
 from my_unicorn.core.services.install_service import (
     InstallApplicationService,
     InstallOptions,
+    InstallStateChecker,
 )
 
 __all__: list[str] = [
     "InstallApplicationService",
     "InstallOptions",
+    "InstallStateChecker",
 ]

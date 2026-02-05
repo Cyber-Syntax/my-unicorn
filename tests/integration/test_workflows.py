@@ -22,15 +22,15 @@ import pytest
 
 from my_unicorn.core.download import HAS_AIOFILES, DownloadService
 from my_unicorn.core.github import Asset, Release
+from my_unicorn.core.install.install import InstallHandler
+from my_unicorn.core.post_download import PostDownloadResult
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
     ProgressType,
 )
+from my_unicorn.core.update.update import UpdateManager
 from my_unicorn.core.verification.service import VerificationService
-from my_unicorn.core.workflows.install import InstallHandler
-from my_unicorn.core.workflows.post_download import PostDownloadResult
-from my_unicorn.core.workflows.update import UpdateManager
 from my_unicorn.exceptions import InstallError, UpdateError, VerificationError
 
 
@@ -202,9 +202,7 @@ class TestProgressReporterProtocolIntegration:
         """Verify UpdateManager accepts any ProgressReporter implementation."""
         reporter = MockProgressReporter()
 
-        with patch(
-            "my_unicorn.core.workflows.update.ConfigManager"
-        ) as mock_cm:
+        with patch("my_unicorn.core.update.update.ConfigManager") as mock_cm:
             mock_cm.return_value.load_global_config.return_value = {
                 "directory": {
                     "storage": Path("/tmp/storage"),
@@ -341,9 +339,7 @@ class TestDomainExceptionPropagation:
     @pytest.mark.asyncio
     async def test_update_error_contains_context(self) -> None:
         """Verify UpdateError contains rich context when catalog fails."""
-        with patch(
-            "my_unicorn.core.workflows.update.ConfigManager"
-        ) as mock_cm:
+        with patch("my_unicorn.core.update.update.ConfigManager") as mock_cm:
             mock_cm.return_value.load_global_config.return_value = {
                 "directory": {
                     "storage": Path("/tmp/storage"),
@@ -529,9 +525,7 @@ class TestCoreModuleIndependence:
 
     def test_update_manager_works_with_null_reporter(self) -> None:
         """Verify UpdateManager functions with NullProgressReporter."""
-        with patch(
-            "my_unicorn.core.workflows.update.ConfigManager"
-        ) as mock_cm:
+        with patch("my_unicorn.core.update.update.ConfigManager") as mock_cm:
             mock_cm.return_value.load_global_config.return_value = {
                 "directory": {
                     "storage": Path("/tmp/storage"),

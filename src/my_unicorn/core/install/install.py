@@ -25,14 +25,14 @@ from my_unicorn.core.github import (
     get_github_config,
     parse_github_url,
 )
-from my_unicorn.core.protocols.progress import (
-    NullProgressReporter,
-    ProgressReporter,
-)
-from my_unicorn.core.workflows.post_download import (
+from my_unicorn.core.post_download import (
     OperationType,
     PostDownloadContext,
     PostDownloadProcessor,
+)
+from my_unicorn.core.protocols.progress import (
+    NullProgressReporter,
+    ProgressReporter,
 )
 from my_unicorn.exceptions import (
     InstallationError,

@@ -10,21 +10,20 @@ from typing import Any
 
 import aiohttp
 
-from my_unicorn.config import ConfigManager
+from my_unicorn.config.config import ConfigManager
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import GitHubClient
+from my_unicorn.core.install.install import InstallHandler
+from my_unicorn.core.post_download import PostDownloadProcessor
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
     github_api_progress_task,
     operation_progress_session,
 )
-from my_unicorn.core.workflows.install import InstallHandler
-from my_unicorn.core.workflows.install_state_checker import InstallStateChecker
-from my_unicorn.core.workflows.post_download import PostDownloadProcessor
-from my_unicorn.core.workflows.target_resolver import TargetResolver
 from my_unicorn.logger import get_logger
+from my_unicorn.types import InstallPlan
 
 logger = get_logger(__name__)
 
@@ -239,3 +238,131 @@ class InstallApplicationService:
         )
         for app_name in already_installed:
             logger.info("   • %s", app_name)
+
+
+"""Installation state checking for workflow planning.
+
+This module provides functionality to determine which applications
+actually need installation work based on their current state.
+"""
+
+
+class InstallStateChecker:
+    """Checks which apps need installation work."""
+
+    async def get_apps_needing_installation(
+        self,
+        config_manager: ConfigManager,
+        url_targets: list[str],
+        catalog_targets: list[str],
+        force: bool,
+    ) -> InstallPlan:
+        """Check which apps actually need installation work.
+
+        Args:
+            config_manager: Configuration manager instance
+            url_targets: List of URL targets
+            catalog_targets: List of catalog targets
+            force: Force installation even if already installed
+
+        Returns:
+            InstallPlan with categorized targets
+
+        """
+        # All URLs need work by default
+        urls_needing_work: list[str] = list(url_targets)
+        catalog_needing_work: list[str] = []
+        already_installed: list[str] = []
+
+        for app_name in catalog_targets:
+            try:
+                # Check if app exists in catalog
+                try:
+                    config_manager.load_catalog(app_name)
+                except (FileNotFoundError, ValueError):
+                    catalog_needing_work.append(app_name)
+                    continue
+
+                if not force:
+                    # Check if app is already installed
+                    try:
+                        installed_config = config_manager.load_app_config(
+                            app_name
+                        )
+                        if installed_config:
+                            installed_path = Path(
+                                installed_config.get("installed_path", "")
+                            )
+                            if installed_path.exists():
+                                already_installed.append(app_name)
+                                continue
+                    except (FileNotFoundError, KeyError):
+                        # Not installed, needs work
+                        pass
+
+                catalog_needing_work.append(app_name)
+            except Exception:
+                # If we can't determine the status, assume it needs work
+                catalog_needing_work.append(app_name)
+
+        return InstallPlan(
+            urls_needing_work=urls_needing_work,
+            catalog_needing_work=catalog_needing_work,
+            already_installed=already_installed,
+        )
+
+
+"""Target resolution for installation workflows.
+
+This module provides functionality to separate mixed installation targets
+(URLs and catalog names) into their respective categories.
+"""
+
+from my_unicorn.config.config import ConfigManager
+from my_unicorn.constants import ERROR_UNKNOWN_APPS_OR_URLS
+from my_unicorn.exceptions import InstallationError
+
+
+class TargetResolver:
+    """Resolves installation targets into URLs and catalog names."""
+
+    @staticmethod
+    def separate_targets(
+        config_manager: ConfigManager, targets: list[str]
+    ) -> tuple[list[str], list[str]]:
+        """Separate targets into URL and catalog targets.
+
+        This is a helper for CLI code and tests to reuse the same logic
+        for categorizing installation targets.
+
+        Args:
+            config_manager: Configuration manager instance
+            targets: List of mixed targets (URLs or catalog names)
+
+        Returns:
+            Tuple of (url_targets, catalog_targets)
+
+        Raises:
+            InstallationError: If unknown targets are present
+
+        """
+        url_targets: list[str] = []
+        catalog_targets: list[str] = []
+        unknown_targets: list[str] = []
+
+        available_apps = set(config_manager.list_catalog_apps())
+
+        for target in targets:
+            if target.startswith("https://github.com/"):
+                url_targets.append(target)
+            elif target in available_apps:
+                catalog_targets.append(target)
+            else:
+                unknown_targets.append(target)
+
+        if unknown_targets:
+            unknown_list = ", ".join(unknown_targets)
+            msg = ERROR_UNKNOWN_APPS_OR_URLS.format(targets=unknown_list)
+            raise InstallationError(msg)
+
+        return url_targets, catalog_targets

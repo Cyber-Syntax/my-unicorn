@@ -12,7 +12,7 @@ from my_unicorn.config import ConfigManager
 from my_unicorn.config.schemas.validator import ConfigValidator
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.cache import ReleaseCacheManager
-from my_unicorn.core.workflows.update import UpdateManager
+from my_unicorn.core.update.update import UpdateManager
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)

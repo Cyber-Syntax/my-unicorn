@@ -20,12 +20,12 @@ from my_unicorn.core.protocols.progress import (
     ProgressReporter,
 )
 from my_unicorn.core.verification import VerificationService
-from my_unicorn.core.workflows.appimage_setup import (
+from my_unicorn.logger import get_logger
+from my_unicorn.utils.appimage_setup import (
     create_desktop_entry,
     rename_appimage,
     setup_appimage_icon,
 )
-from my_unicorn.logger import get_logger
 from my_unicorn.utils.appimage_utils import verify_appimage_download
 from my_unicorn.utils.config_builders import (
     create_app_config_v2,
@@ -127,7 +127,7 @@ class PostDownloadProcessor:
         - Progress tracking is isolated per context
 
     Example:
-        >>> from my_unicorn.core.workflows.post_download import (
+        >>> from my_unicorn.core.post_download import (
         ...     PostDownloadProcessor, PostDownloadContext, OperationType
         ... )
         >>>

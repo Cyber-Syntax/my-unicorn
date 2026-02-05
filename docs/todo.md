@@ -14,7 +14,7 @@
 2026-01-25 16:03:09 - my_unicorn.main - DEBUG - async_main:28 - CLI completed successfully
 2026-01-25 16:03:09 - my_unicorn.main - DEBUG - async_main:25 - CLI started
 2026-01-25 16:03:09 - my_unicorn.ui.display - DEBUG - start_session:265 - Progress session started with 0 total operations
-2026-01-25 16:03:09 - my_unicorn.core.workflows.update - INFO - check_updates:400 - 🔄 Checking 5 app(s) for updates...
+2026-01-25 16:03:09 - my_unicorn.core.update.update - INFO - check_updates:400 - 🔄 Checking 5 app(s) for updates...
 ...
 2026-01-25 16:03:10 - my_unicorn.core.token - DEBUG - get:131 - GitHub token retrieved from keyring (value hidden)
 2026-01-25 16:03:10 - my_unicorn.core.auth - DEBUG - apply_auth:183 - Applied GitHub authentication (token present)
@@ -26,7 +26,7 @@
 2026-01-25 16:03:10 - my_unicorn.core.backup - DEBUG - save:100 - Saved metadata to /home/developer/Applications/backups/appflowy/metadata.json
 2026-01-25 16:03:10 - my_unicorn.core.backup - DEBUG - add_version:127 - Added version 0.1.0 to metadata
 2026-01-25 16:03:10 - my_unicorn.core.backup - INFO - create_backup:459 - Backup created: /home/developer/Applications/backups/appflowy/appflowy-0.1.0.AppImage (v0.1.0)
-2026-01-25 16:03:10 - my_unicorn.core.workflows.update - DEBUG - update_single_app:570 - Backup created: /home/developer/Applications/backups/appflowy/appflowy-0.1.0.AppImage
+2026-01-25 16:03:10 - my_unicorn.core.update.update - DEBUG - update_single_app:570 - Backup created: /home/developer/Applications/backups/appflowy/appflowy-0.1.0.AppImage
 ...
 2026-01-25 16:03:57 - my_unicorn.main - DEBUG - async_main:28 - CLI completed successfully
 ```

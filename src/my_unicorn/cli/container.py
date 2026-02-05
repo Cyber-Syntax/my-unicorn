@@ -38,6 +38,8 @@ from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.github import GitHubClient
 from my_unicorn.core.icon import AppImageIconExtractor
+from my_unicorn.core.install.install import InstallHandler
+from my_unicorn.core.post_download import PostDownloadProcessor
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
@@ -45,10 +47,8 @@ from my_unicorn.core.protocols.progress import (
 from my_unicorn.core.remove import RemoveService
 from my_unicorn.core.services.install_service import InstallApplicationService
 from my_unicorn.core.services.update_service import UpdateApplicationService
+from my_unicorn.core.update.update import UpdateManager
 from my_unicorn.core.verification import VerificationService
-from my_unicorn.core.workflows.install import InstallHandler
-from my_unicorn.core.workflows.post_download import PostDownloadProcessor
-from my_unicorn.core.workflows.update import UpdateManager
 from my_unicorn.logger import get_logger
 
 if TYPE_CHECKING:

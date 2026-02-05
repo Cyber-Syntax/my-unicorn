@@ -1085,11 +1085,11 @@ from my_unicorn.core.icon import AppImageIconExtractor
 from my_unicorn.core.github import GitHubClient
 
 # Workflows
-from my_unicorn.core.workflows.install import InstallHandler
-from my_unicorn.core.workflows.update import UpdateManager
+from my_unicorn.core.install.install import InstallHandler
+from my_unicorn.core.update.update import UpdateManager
 from my_unicorn.core.services.install_service import InstallApplicationService
 from my_unicorn.core.services.update_service import UpdateApplicationService
-from my_unicorn.core.workflows.post_download import PostDownloadProcessor
+from my_unicorn.core.post_download import PostDownloadProcessor
 
 # Other Services
 from my_unicorn.core.backup import BackupService

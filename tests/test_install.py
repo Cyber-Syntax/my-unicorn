@@ -8,15 +8,17 @@ import pytest
 
 from my_unicorn.constants import InstallSource
 from my_unicorn.core.github import Asset, Release
+from my_unicorn.core.install.install import InstallHandler
+from my_unicorn.core.post_download import PostDownloadResult
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
     ProgressType,
 )
-from my_unicorn.core.workflows.install import InstallHandler
-from my_unicorn.core.workflows.install_state_checker import InstallStateChecker
-from my_unicorn.core.workflows.post_download import PostDownloadResult
-from my_unicorn.core.workflows.target_resolver import TargetResolver
+from my_unicorn.core.services.install_service import (
+    InstallStateChecker,
+    TargetResolver,
+)
 from my_unicorn.exceptions import (
     InstallationError,
     InstallError,
@@ -127,7 +129,7 @@ class TestInstallHandler:
     ):
         """Test successful installation from catalog."""
         with patch(
-            "my_unicorn.core.workflows.post_download.VerificationService"
+            "my_unicorn.core.post_download.VerificationService"
         ) as mock_verification:
 
             @dataclass
@@ -147,7 +149,7 @@ class TestInstallHandler:
             )
 
             with patch(
-                "my_unicorn.core.workflows.appimage_setup.DesktopEntry"
+                "my_unicorn.utils.appimage_setup.DesktopEntry"
             ) as mock_desktop:
                 mock_desktop.return_value.create = Mock(
                     return_value=Path("/desktop/test.desktop")
@@ -180,7 +182,7 @@ class TestInstallHandler:
     ):
         """Test installing multiple apps concurrently."""
         with patch(
-            "my_unicorn.core.workflows.post_download.VerificationService"
+            "my_unicorn.core.post_download.VerificationService"
         ) as mock_verification:
 
             @dataclass
@@ -200,7 +202,7 @@ class TestInstallHandler:
             )
 
             with patch(
-                "my_unicorn.core.workflows.appimage_setup.DesktopEntry"
+                "my_unicorn.utils.appimage_setup.DesktopEntry"
             ) as mock_desktop:
                 mock_desktop.return_value.create_desktop_file = Mock(
                     return_value=Path("/desktop/test.desktop")
@@ -221,7 +223,7 @@ class TestInstallHandler:
     ):
         """Test successful installation from URL."""
         with patch(
-            "my_unicorn.core.workflows.post_download.VerificationService"
+            "my_unicorn.core.post_download.VerificationService"
         ) as mock_verification:
 
             @dataclass
@@ -241,7 +243,7 @@ class TestInstallHandler:
             )
 
             with patch(
-                "my_unicorn.core.workflows.appimage_setup.DesktopEntry"
+                "my_unicorn.utils.appimage_setup.DesktopEntry"
             ) as mock_desktop:
                 mock_desktop.return_value.create_desktop_file = Mock(
                     return_value=Path("/desktop/test.desktop")
@@ -270,7 +272,7 @@ class TestInstallHandler:
         )
 
         with patch(
-            "my_unicorn.core.workflows.post_download.VerificationService"
+            "my_unicorn.core.post_download.VerificationService"
         ) as mock_verification:
             mock_verification.return_value.verify_file = AsyncMock(
                 return_value=Mock(passed=True, methods={}, updated_config={})

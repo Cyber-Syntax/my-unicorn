@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from my_unicorn.core.workflows.target_resolver import TargetResolver
+from my_unicorn.core.services.install_service import TargetResolver
 from my_unicorn.exceptions import InstallationError
 
 

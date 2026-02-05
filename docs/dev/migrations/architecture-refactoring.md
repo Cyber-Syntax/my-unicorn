@@ -177,7 +177,7 @@ from my_unicorn.core.http_session import create_http_session
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.verification import VerificationService
-from my_unicorn.core.workflows.install import InstallHandler
+from my_unicorn.core.install.install import InstallHandler
 
 class InstallCommandHandler:
     async def execute(self, args: Namespace) -> int:

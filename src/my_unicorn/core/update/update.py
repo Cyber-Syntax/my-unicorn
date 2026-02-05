@@ -32,16 +32,16 @@ from my_unicorn.core.github import (
     ReleaseFetcher,
     get_github_config,
 )
+from my_unicorn.core.post_download import (
+    OperationType,
+    PostDownloadContext,
+    PostDownloadProcessor,
+)
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
 )
 from my_unicorn.core.verification import VerificationService
-from my_unicorn.core.workflows.post_download import (
-    OperationType,
-    PostDownloadContext,
-    PostDownloadProcessor,
-)
 from my_unicorn.exceptions import (
     ConfigurationError,
     UpdateError,

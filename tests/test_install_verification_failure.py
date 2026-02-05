@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from my_unicorn.core.workflows.install import InstallHandler
+from my_unicorn.core.install.install import InstallHandler
 from my_unicorn.exceptions import InstallError
 
 
@@ -29,7 +29,7 @@ class TestVerificationFailure:
         added in Phase 1 (TASK-001) properly prevents corrupted or tampered
         AppImages from being installed.
         """
-        from my_unicorn.core.workflows.post_download import PostDownloadResult
+        from my_unicorn.core.post_download import PostDownloadResult
 
         download_service = Mock()
         storage_service = Mock()
@@ -107,7 +107,7 @@ class TestVerificationFailure:
 
         Ensures the happy path still works after the verification failure fix.
         """
-        from my_unicorn.core.workflows.post_download import PostDownloadResult
+        from my_unicorn.core.post_download import PostDownloadResult
 
         download_service = Mock()
         download_service.download_appimage = AsyncMock(

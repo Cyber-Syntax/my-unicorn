@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from my_unicorn.config import ConfigManager
-    from my_unicorn.core.workflows.update import UpdateInfo
+    from my_unicorn.core.update.update import UpdateInfo
 
 from my_unicorn.logger import get_logger
 
@@ -214,7 +214,7 @@ def _find_update_info(
         if info.app_name == app_name:
             return info
     # Return default error UpdateInfo if not found
-    from my_unicorn.core.workflows.update import UpdateInfo
+    from my_unicorn.core.update.update import UpdateInfo
 
     return UpdateInfo(
         app_name=app_name,
