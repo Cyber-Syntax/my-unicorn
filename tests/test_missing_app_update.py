@@ -4,10 +4,12 @@ This test suite validates handling of releases where AppImages are not yet
 available (still building). Based on real-world AppFlowy 0.10.2 scenario.
 """
 
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from my_unicorn.core.github import Release
 from my_unicorn.core.workflows.update import UpdateInfo, UpdateManager
 
 
@@ -20,10 +22,11 @@ class TestMissingAppImageUpdate:
         mock_cm = MagicMock()
         mock_cm.load_global_config.return_value = {
             "directory": {
-                "storage": "/tmp/storage",
-                "backup": "/tmp/backup",
-                "icon": "/tmp/icon",
-                "download": "/tmp/download",
+                "storage": Path("/tmp/storage"),
+                "backup": Path("/tmp/backup"),
+                "icon": Path("/tmp/icon"),
+                "download": Path("/tmp/download"),
+                "cache": Path("/tmp/cache"),
             },
             "max_concurrent_downloads": 3,
         }
@@ -82,8 +85,6 @@ class TestMissingAppImageUpdate:
         mock_config_manager.load_app_config.return_value = mock_app_config
 
         # Create mock Release object with no assets
-        from my_unicorn.core.github import Release
-
         mock_release = Release(
             owner="AppFlowy-IO",
             repo="AppFlowy",
@@ -153,7 +154,7 @@ class TestMissingAppImageUpdate:
                 (True, None),
                 (
                     False,
-                    "AppImage not found in release - may still be building",
+                    "AppImage not found - may still be building",
                 ),
                 (True, None),
             ]
@@ -189,7 +190,7 @@ class TestMissingAppImageUpdate:
             current_version="0.10.1",
             latest_version="0.10.2",
             has_update=True,
-            error_reason="AppImage not found in release - may still be building",
+            error_reason="AppImage not found - may still be building",
         )
 
         # Verify error reason is stored

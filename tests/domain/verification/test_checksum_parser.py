@@ -3,9 +3,11 @@ from unittest.mock import patch
 import pytest
 
 from my_unicorn.core.verification.checksum_parser import (
+    ChecksumFileResult,
     convert_base64_to_hex,
     detect_hash_type_from_checksum_filename,
     find_checksum_entry,
+    parse_all_checksums,
     parse_checksum_file,
 )
 
@@ -299,3 +301,129 @@ def test_find_checksum_entry_yaml_md5_files_dict() -> None:
     assert entry.filename == "test.AppImage"
     assert entry.hash_value == "abc123def4567890abcdef1234567890"
     assert entry.algorithm == "md5"
+
+
+class TestChecksumFileResult:
+    """Tests for ChecksumFileResult dataclass."""
+
+    def test_to_cache_dict(self) -> None:
+        """Test conversion to cache dictionary format."""
+        result = ChecksumFileResult(
+            source="https://github.com/owner/repo/releases/download/v1.0/SHA256SUMS.txt",
+            filename="SHA256SUMS.txt",
+            algorithm="SHA256",
+            hashes={
+                "app-1.0.AppImage": "abc123def456",
+                "app-1.0.tar.gz": "789xyz012345",
+            },
+        )
+
+        cache_dict = result.to_cache_dict()
+
+        assert cache_dict["source"] == result.source
+        assert cache_dict["filename"] == result.filename
+        assert cache_dict["algorithm"] == result.algorithm
+        assert cache_dict["hashes"] == result.hashes
+
+    def test_frozen_dataclass(self) -> None:
+        """Test that ChecksumFileResult is immutable."""
+        result = ChecksumFileResult(
+            source="https://example.com/SHA256SUMS.txt",
+            filename="SHA256SUMS.txt",
+            algorithm="SHA256",
+            hashes={"file.AppImage": "hash123"},
+        )
+
+        with pytest.raises(AttributeError):
+            result.source = "modified"
+
+
+class TestParseAllChecksums:
+    """Tests for parse_all_checksums function."""
+
+    def test_parse_all_traditional_checksums(self) -> None:
+        """Test parsing all hashes from traditional SHA256SUMS format."""
+        content = """abc123def456abc123def456abc123def456abc123def456abc123def456abc12345 app-1.0-x86_64.AppImage
+789abc012345789abc012345789abc012345789abc012345789abc012345789abc01 app-1.0.tar.gz
+fedcba987654fedcba987654fedcba987654fedcba987654fedcba987654fedcba98 app-1.0.deb"""
+
+        hashes = parse_all_checksums(content)
+
+        assert len(hashes) == 3
+        assert "app-1.0-x86_64.AppImage" in hashes
+        assert "app-1.0.tar.gz" in hashes
+        assert "app-1.0.deb" in hashes
+
+    def test_parse_all_traditional_checksums_with_asterisk(self) -> None:
+        """Test parsing traditional format with binary mode asterisk."""
+        content = """abc123def456abc123def456abc123def456abc123def456abc123def456abc12345 *app-1.0.AppImage
+789abc012345789abc012345789abc012345789abc012345789abc012345789abc01 *app-1.0.tar.gz"""
+
+        hashes = parse_all_checksums(content)
+
+        assert len(hashes) == 2
+        assert "app-1.0.AppImage" in hashes
+        assert "app-1.0.tar.gz" in hashes
+
+    def test_parse_all_traditional_checksums_with_comments(self) -> None:
+        """Test parsing traditional format with comment lines."""
+        content = """# SHA256 checksums for release v1.0
+abc123def456abc123def456abc123def456abc123def456abc123def456abc12345 app-1.0.AppImage
+# End of file"""
+
+        hashes = parse_all_checksums(content)
+
+        assert len(hashes) == 1
+        assert "app-1.0.AppImage" in hashes
+
+    def test_parse_all_bsd_checksums(self) -> None:
+        """Test parsing all hashes from BSD checksum format."""
+        content = """SHA256 (app-1.0.AppImage) = abc123def456abc123def456abc123def456abc123def456abc123def456abc12345
+SHA256 (app-1.0.tar.gz) = 789abc012345789abc012345789abc012345789abc012345789abc012345789abc01
+SHA512 (app-1.0.deb) = fedcba987654fedcba987654fedcba987654fedcba987654"""
+
+        hashes = parse_all_checksums(content)
+
+        assert len(hashes) == 3
+        assert "app-1.0.AppImage" in hashes
+        assert "app-1.0.tar.gz" in hashes
+        assert "app-1.0.deb" in hashes
+
+    def test_parse_all_yaml_checksums_dict_format(self) -> None:
+        """Test parsing all hashes from YAML checksum format with dict structure."""
+        content = """app-1.0.AppImage:
+  sha256: abc123def456abc123def456abc123def456abc123def456abc123def456abc12345
+app-1.0.rpm:
+  sha512: 789abc012345789abc012345789abc012345789abc012345789abc012345789abc01"""
+
+        hashes = parse_all_checksums(content)
+
+        assert len(hashes) == 2
+        assert "app-1.0.AppImage" in hashes
+        assert "app-1.0.rpm" in hashes
+
+    def test_parse_all_empty_content(self) -> None:
+        """Test parsing empty content returns empty dict."""
+        hashes = parse_all_checksums("")
+
+        assert hashes == {}
+
+    def test_parse_all_invalid_hex_skipped(self) -> None:
+        """Test that lines with invalid hex characters are skipped."""
+        content = """abc123def456abc123def456abc123def456abc123def456abc123def456abc12345 valid.AppImage
+xyz_not_hex_at_all another.AppImage"""
+
+        hashes = parse_all_checksums(content)
+
+        assert len(hashes) == 1
+        assert "valid.AppImage" in hashes
+
+    def test_parse_all_siyuan_sha256sums(self) -> None:
+        """Test parsing Siyuan SHA256SUMS content."""
+        hashes = parse_all_checksums(SIYUAN_SHA256SUMS_CONTENT)
+
+        assert len(hashes) == 11
+        expected_linux_hash = (
+            "3afc23ec03118744c300df152a37bf64593f98cb73159501b6ab23d58e159eef"
+        )
+        assert hashes["siyuan-3.2.1-linux.AppImage"] == expected_linux_hash

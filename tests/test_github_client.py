@@ -144,7 +144,11 @@ def test_detect_checksum_files_yaml_priority():
 
 
 def test_detect_checksum_files_multiple_patterns():
-    """Test detection of various checksum file patterns."""
+    """Test detection of various checksum file patterns.
+
+    Now filters out platform-incompatible files (Windows, macOS).
+    Also filters out non-AppImage checksums per is_relevant_checksum logic.
+    """
     assets = [
         {
             "name": "latest-windows.yml",
@@ -208,22 +212,25 @@ def test_detect_checksum_files_multiple_patterns():
 
     detected_names = [cf.filename for cf in checksum_files]
 
-    # Should detect all checksum files but not regular file
+    # Should detect platform-compatible standalone checksum files only
+    # Windows and macOS YAML files are filtered out (platform incompatible)
+    # app.sum and hashes.digest are filtered out (no AppImage base)
     expected_checksum_files = [
-        "latest-windows.yml",
-        "latest-mac.yaml",
         "checksums.txt",
         "SHA512SUMS",
         "MD5SUMS",
-        "app.sum",
-        "hashes.digest",
     ]
 
     for expected in expected_checksum_files:
         assert expected in detected_names
 
-    assert "regular-file.txt" not in detected_names
-    assert len(checksum_files) == 7
+    # These should be filtered out
+    assert "latest-windows.yml" not in detected_names  # Windows
+    assert "latest-mac.yaml" not in detected_names  # macOS
+    assert "app.sum" not in detected_names  # No AppImage base
+    assert "hashes.digest" not in detected_names  # No AppImage base
+    assert "regular-file.txt" not in detected_names  # Not a checksum
+    assert len(checksum_files) == 3
 
 
 def test_detect_checksum_files_format_detection():

@@ -1,13 +1,16 @@
 """Unit tests for the RemoveService receiver."""
 
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from my_unicorn.config.schemas import validate_app_state
 from my_unicorn.core.remove import RemoveService
-from my_unicorn.types import GlobalConfig
+
+if TYPE_CHECKING:
+    from my_unicorn.types import GlobalConfig
 
 
 @pytest.fixture
@@ -466,3 +469,784 @@ def test_remove_config_calls_manager(mock_config_manager, global_config):
     mock_config_manager.remove_app_config.return_value = False
     result2 = service._remove_config("test_app")
     assert result2.success is False
+
+
+# ============================================================================
+# Task 5.1: Tests for remove command with new verification fields
+# ============================================================================
+
+
+@pytest.fixture
+def config_with_new_verification_fields():
+    """App config with new verification fields.
+
+    Includes overall_passed, actual_method, warning, and digest fields.
+    """
+    return {
+        "config_version": "2.0.0",
+        "catalog_ref": "test_app",
+        "metadata": {"name": "test_app", "display_name": "Test App"},
+        "source": {
+            "type": "github",
+            "owner": "test-owner",
+            "repo": "test-repo",
+            "prerelease": False,
+        },
+        "state": {
+            "version": "1.0.0",
+            "installed_date": "2024-01-01T00:00:00",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {
+                "passed": True,
+                "overall_passed": True,
+                "actual_method": "digest",
+                "warning": None,
+                "methods": [
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                        "expected": "abc123def456",
+                        "computed": "abc123def456",
+                        "source": "github_api",
+                        "digest": "sha256:abc123def456",
+                    }
+                ],
+            },
+            "icon": {
+                "installed": True,
+                "method": "extraction",
+                "path": "/mock/icons/test_app.png",
+            },
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_remove_app_with_new_verification_fields_succeeds(
+    global_config, config_with_new_verification_fields
+):
+    """Remove should succeed when app has new verification fields.
+
+    Task 5.1: Verify remove command loads app state with new verification
+    fields (overall_passed, actual_method, digest) without errors.
+    """
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_app_config.return_value = (
+        config_with_new_verification_fields
+    )
+    mock_config_manager.remove_app_config = MagicMock(return_value=True)
+
+    mock_cache_manager = MagicMock()
+    mock_cache_manager.clear_cache = AsyncMock()
+
+    service = RemoveService(
+        mock_config_manager, global_config, cache_manager=mock_cache_manager
+    )
+
+    with (
+        patch("pathlib.Path.exists", autospec=True, return_value=True),
+        patch("pathlib.Path.unlink", autospec=True),
+        patch("shutil.rmtree"),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
+    ):
+        result = await service.remove_app("test_app", keep_config=False)
+
+        assert result.success is True
+        assert result.app_name == "test_app"
+        assert result.error is None
+
+
+@pytest.mark.asyncio
+async def test_remove_does_not_modify_verification_section(
+    global_config, config_with_new_verification_fields
+):
+    """Remove should not modify the verification section of app state.
+
+    Task 5.1: The remove command must not alter verification data.
+    Verifies that verification object is unchanged during removal.
+    """
+    original_verification = config_with_new_verification_fields["state"][
+        "verification"
+    ].copy()
+    original_methods = original_verification["methods"].copy()
+
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_app_config.return_value = (
+        config_with_new_verification_fields
+    )
+    mock_config_manager.remove_app_config = MagicMock(return_value=True)
+
+    mock_cache_manager = MagicMock()
+    mock_cache_manager.clear_cache = AsyncMock()
+
+    service = RemoveService(
+        mock_config_manager, global_config, cache_manager=mock_cache_manager
+    )
+
+    with (
+        patch("pathlib.Path.exists", autospec=True, return_value=True),
+        patch("pathlib.Path.unlink", autospec=True),
+        patch("shutil.rmtree"),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
+    ):
+        result = await service.remove_app("test_app", keep_config=True)
+
+        assert result.success is True
+
+        # Verify verification section was not modified
+        current_verification = config_with_new_verification_fields["state"][
+            "verification"
+        ]
+        assert (
+            current_verification["passed"] == original_verification["passed"]
+        )
+        assert (
+            current_verification["overall_passed"]
+            == original_verification["overall_passed"]
+        )
+        assert (
+            current_verification["actual_method"]
+            == original_verification["actual_method"]
+        )
+        assert current_verification["methods"] == original_methods
+
+
+@pytest.mark.asyncio
+async def test_remove_with_checksum_file_verification_succeeds(global_config):
+    """Remove should succeed when app has checksum_file verification.
+
+    Task 5.1: Tests removal with checksum_file verification method
+    to ensure schema compatibility.
+    """
+    app_config = {
+        "config_version": "2.0.0",
+        "metadata": {"name": "test_app", "display_name": "Test App"},
+        "source": {
+            "type": "github",
+            "owner": "test-owner",
+            "repo": "test-repo",
+            "prerelease": False,
+        },
+        "state": {
+            "version": "2.0.0",
+            "installed_date": "2024-02-01T12:00:00",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {
+                "passed": True,
+                "overall_passed": True,
+                "actual_method": "checksum_file",
+                "methods": [
+                    {
+                        "type": "checksum_file",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                        "expected": "abc123",
+                        "computed": "abc123",
+                        "source": "SHA256SUMS.txt",
+                        "filename": "test_app.AppImage",
+                    }
+                ],
+            },
+            "icon": {"installed": False, "method": "none"},
+        },
+    }
+
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_app_config.return_value = app_config
+    mock_config_manager.remove_app_config = MagicMock(return_value=True)
+
+    mock_cache_manager = MagicMock()
+    mock_cache_manager.clear_cache = AsyncMock()
+
+    service = RemoveService(
+        mock_config_manager, global_config, cache_manager=mock_cache_manager
+    )
+
+    with (
+        patch("pathlib.Path.exists", autospec=True, return_value=True),
+        patch("pathlib.Path.unlink", autospec=True),
+        patch("shutil.rmtree"),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
+    ):
+        result = await service.remove_app("test_app", keep_config=False)
+
+        assert result.success is True
+        assert result.error is None
+
+
+@pytest.mark.asyncio
+async def test_remove_with_skip_verification_succeeds(global_config):
+    """Remove should succeed when app has skip verification.
+
+    Task 5.1: Tests removal with skip verification method
+    to ensure schema compatibility.
+    """
+    app_config = {
+        "config_version": "2.0.0",
+        "metadata": {"name": "test_app", "display_name": "Test App"},
+        "source": {
+            "type": "github",
+            "owner": "test-owner",
+            "repo": "test-repo",
+            "prerelease": False,
+        },
+        "state": {
+            "version": "1.0.0",
+            "installed_date": "2024-01-01T00:00:00",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {
+                "passed": True,
+                "overall_passed": True,
+                "actual_method": "skip",
+                "warning": "No hash available for verification",
+                "methods": [{"type": "skip", "status": "skipped"}],
+            },
+            "icon": {"installed": False, "method": "none"},
+        },
+    }
+
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_app_config.return_value = app_config
+    mock_config_manager.remove_app_config = MagicMock(return_value=True)
+
+    mock_cache_manager = MagicMock()
+    mock_cache_manager.clear_cache = AsyncMock()
+
+    service = RemoveService(
+        mock_config_manager, global_config, cache_manager=mock_cache_manager
+    )
+
+    with (
+        patch("pathlib.Path.exists", autospec=True, return_value=True),
+        patch("pathlib.Path.unlink", autospec=True),
+        patch("shutil.rmtree"),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
+    ):
+        result = await service.remove_app("test_app", keep_config=False)
+
+        assert result.success is True
+        assert result.error is None
+
+
+@pytest.mark.asyncio
+async def test_remove_with_legacy_verification_succeeds(global_config):
+    """Remove should succeed when app has legacy verification format.
+
+    Task 5.1: Tests removal with minimal verification format (only passed
+    and methods) to ensure backward compatibility.
+    """
+    app_config = {
+        "config_version": "2.0.0",
+        "metadata": {"name": "test_app", "display_name": "Test App"},
+        "source": {
+            "type": "github",
+            "owner": "test-owner",
+            "repo": "test-repo",
+            "prerelease": False,
+        },
+        "state": {
+            "version": "1.0.0",
+            "installed_date": "2024-01-01T00:00:00",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {
+                "passed": True,
+                "methods": [{"type": "skip", "status": "skipped"}],
+            },
+            "icon": {"installed": False, "method": "none"},
+        },
+    }
+
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_app_config.return_value = app_config
+    mock_config_manager.remove_app_config = MagicMock(return_value=True)
+
+    mock_cache_manager = MagicMock()
+    mock_cache_manager.clear_cache = AsyncMock()
+
+    service = RemoveService(
+        mock_config_manager, global_config, cache_manager=mock_cache_manager
+    )
+
+    with (
+        patch("pathlib.Path.exists", autospec=True, return_value=True),
+        patch("pathlib.Path.unlink", autospec=True),
+        patch("shutil.rmtree"),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
+    ):
+        result = await service.remove_app("test_app", keep_config=False)
+
+        assert result.success is True
+        assert result.error is None
+
+
+@pytest.mark.asyncio
+async def test_remove_with_keep_config_preserves_verification(
+    global_config, config_with_new_verification_fields
+):
+    """Remove with keep_config=True should preserve verification in config.
+
+    Task 5.1: When keep_config=True, the app config (including verification)
+    should remain intact after removal.
+    """
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_app_config.return_value = (
+        config_with_new_verification_fields
+    )
+    mock_config_manager.remove_app_config = MagicMock()
+
+    mock_cache_manager = MagicMock()
+    mock_cache_manager.clear_cache = AsyncMock()
+
+    service = RemoveService(
+        mock_config_manager, global_config, cache_manager=mock_cache_manager
+    )
+
+    with (
+        patch("pathlib.Path.exists", autospec=True, return_value=True),
+        patch("pathlib.Path.unlink", autospec=True),
+        patch("shutil.rmtree"),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
+    ):
+        result = await service.remove_app("test_app", keep_config=True)
+
+        assert result.success is True
+        assert result.config_removed is False
+        # remove_app_config should NOT be called when keep_config=True
+        mock_config_manager.remove_app_config.assert_not_called()
+
+
+# ============================================================================
+# Task 5.2: Tests for remove on apps with new verification format
+# These tests verify schema validation works correctly with new verification
+# fields when removing apps that were installed with the updated format.
+# ============================================================================
+
+
+@pytest.fixture
+def config_with_all_new_verification_fields():
+    """App config with all new verification fields populated.
+
+    Includes: overall_passed, actual_method, warning (string), and digest.
+    """
+    return {
+        "config_version": "2.0.0",
+        "source": "catalog",
+        "catalog_ref": "test_app",
+        "state": {
+            "version": "2.0.0",
+            "installed_date": "2024-02-01T12:00:00.000000",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {
+                "passed": True,
+                "overall_passed": True,
+                "actual_method": "digest",
+                "warning": "Hash verified using GitHub API digest",
+                "methods": [
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                        "expected": "abc123def456789",
+                        "computed": "abc123def456789",
+                        "source": "github_api",
+                        "digest": "sha256:abc123def456789",
+                    }
+                ],
+            },
+            "icon": {
+                "installed": True,
+                "method": "extraction",
+                "path": "/mock/icons/test_app.png",
+            },
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_remove_app_schema_validation_with_new_fields(
+    global_config, config_with_all_new_verification_fields
+):
+    """Remove should succeed with schema-valid new verification fields.
+
+    Task 5.2: Verifies that app configs with new verification fields
+    (overall_passed, actual_method, warning, digest) pass schema validation
+    during removal.
+    """
+
+    # First, validate the config passes schema validation
+    validate_app_state(config_with_all_new_verification_fields, "test_app")
+
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_app_config.return_value = (
+        config_with_all_new_verification_fields
+    )
+    mock_config_manager.remove_app_config = MagicMock(return_value=True)
+
+    mock_cache_manager = MagicMock()
+    mock_cache_manager.clear_cache = AsyncMock()
+
+    service = RemoveService(
+        mock_config_manager, global_config, cache_manager=mock_cache_manager
+    )
+
+    with (
+        patch("pathlib.Path.exists", autospec=True, return_value=True),
+        patch("pathlib.Path.unlink", autospec=True),
+        patch("shutil.rmtree"),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
+    ):
+        result = await service.remove_app("test_app", keep_config=False)
+
+        assert result.success is True
+        assert result.error is None
+
+
+@pytest.mark.asyncio
+async def test_remove_app_with_warning_null(global_config):
+    """Remove should succeed when verification has warning: null.
+
+    Task 5.2: The warning field can be null or a string. This tests
+    the null case which is common when verification completes without issues.
+    """
+    app_config = {
+        "config_version": "2.0.0",
+        "source": "catalog",
+        "catalog_ref": "test_app",
+        "state": {
+            "version": "1.0.0",
+            "installed_date": "2024-01-01T00:00:00.000000",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {
+                "passed": True,
+                "overall_passed": True,
+                "actual_method": "digest",
+                "methods": [
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                    }
+                ],
+            },
+            "icon": {"installed": False, "method": "none"},
+        },
+    }
+
+    # Schema validation should pass (warning field is optional)
+    validate_app_state(app_config, "test_app")
+
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_app_config.return_value = app_config
+    mock_config_manager.remove_app_config = MagicMock(return_value=True)
+
+    mock_cache_manager = MagicMock()
+    mock_cache_manager.clear_cache = AsyncMock()
+
+    service = RemoveService(
+        mock_config_manager, global_config, cache_manager=mock_cache_manager
+    )
+
+    with (
+        patch("pathlib.Path.exists", autospec=True, return_value=True),
+        patch("pathlib.Path.unlink", autospec=True),
+        patch("shutil.rmtree"),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
+    ):
+        result = await service.remove_app("test_app", keep_config=False)
+        assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_remove_app_with_warning_string(global_config):
+    """Remove should succeed when verification has warning as string.
+
+    Task 5.2: Tests the warning field with an actual warning message.
+    """
+    app_config = {
+        "config_version": "2.0.0",
+        "source": "catalog",
+        "catalog_ref": "test_app",
+        "state": {
+            "version": "1.0.0",
+            "installed_date": "2024-01-01T00:00:00.000000",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {
+                "passed": True,
+                "overall_passed": True,
+                "actual_method": "checksum_file",
+                "warning": "Checksum file fallback, API digest unavailable",
+                "methods": [
+                    {
+                        "type": "checksum_file",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                        "expected": "fedcba987654321",
+                        "computed": "fedcba987654321",
+                        "source": "SHA256SUMS.txt",
+                        "filename": "test_app.AppImage",
+                    }
+                ],
+            },
+            "icon": {"installed": False, "method": "none"},
+        },
+    }
+
+    validate_app_state(app_config, "test_app")
+
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_app_config.return_value = app_config
+    mock_config_manager.remove_app_config = MagicMock(return_value=True)
+
+    service = RemoveService(mock_config_manager, global_config)
+
+    with (
+        patch("pathlib.Path.exists", autospec=True, return_value=True),
+        patch("pathlib.Path.unlink", autospec=True),
+        patch("shutil.rmtree"),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
+    ):
+        result = await service.remove_app("test_app", keep_config=False)
+        assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_remove_app_with_digest_field_in_method(global_config):
+    """Remove should succeed when method has digest field.
+
+    Task 5.2: The digest field in method items is an alternative to
+    computed/expected fields. This tests schema compatibility.
+    """
+
+    app_config = {
+        "config_version": "2.0.0",
+        "source": "catalog",
+        "catalog_ref": "test_app",
+        "state": {
+            "version": "3.0.0",
+            "installed_date": "2024-03-01T15:30:00.000000",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {
+                "passed": True,
+                "overall_passed": True,
+                "actual_method": "digest",
+                "methods": [
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": "sha512",
+                        "digest": "sha512:abcdef123456789abcdef",
+                        "source": "github_api",
+                    }
+                ],
+            },
+            "icon": {"installed": False, "method": "none"},
+        },
+    }
+
+    validate_app_state(app_config, "test_app")
+
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_app_config.return_value = app_config
+    mock_config_manager.remove_app_config = MagicMock(return_value=True)
+
+    service = RemoveService(mock_config_manager, global_config)
+
+    with (
+        patch("pathlib.Path.exists", autospec=True, return_value=True),
+        patch("pathlib.Path.unlink", autospec=True),
+        patch("shutil.rmtree"),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
+    ):
+        result = await service.remove_app("test_app", keep_config=False)
+        assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_remove_app_with_multiple_verification_methods(global_config):
+    """Remove should succeed with multiple verification methods.
+
+    Task 5.2: Apps can have multiple verification methods recorded.
+    This tests removal with both digest and checksum_file methods.
+    """
+    app_config = {
+        "config_version": "2.0.0",
+        "source": "catalog",
+        "catalog_ref": "test_app",
+        "state": {
+            "version": "4.0.0",
+            "installed_date": "2024-04-01T00:00:00.000000",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {
+                "passed": True,
+                "overall_passed": True,
+                "actual_method": "digest",
+                "methods": [
+                    {
+                        "type": "digest",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                        "expected": "primary_hash_value",
+                        "computed": "primary_hash_value",
+                        "source": "github_api",
+                    },
+                    {
+                        "type": "checksum_file",
+                        "status": "passed",
+                        "algorithm": "sha256",
+                        "expected": "checksum_file_hash",
+                        "computed": "checksum_file_hash",
+                        "source": "SHA256SUMS.txt",
+                        "filename": "test_app.AppImage",
+                    },
+                ],
+            },
+            "icon": {
+                "installed": True,
+                "method": "extraction",
+                "path": "/mock/icons/test_app.png",
+            },
+        },
+    }
+
+    validate_app_state(app_config, "test_app")
+
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_app_config.return_value = app_config
+    mock_config_manager.remove_app_config = MagicMock(return_value=True)
+
+    mock_cache_manager = MagicMock()
+    mock_cache_manager.clear_cache = AsyncMock()
+
+    service = RemoveService(
+        mock_config_manager, global_config, cache_manager=mock_cache_manager
+    )
+
+    with (
+        patch("pathlib.Path.exists", autospec=True, return_value=True),
+        patch("pathlib.Path.unlink", autospec=True),
+        patch("shutil.rmtree"),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
+    ):
+        result = await service.remove_app("test_app", keep_config=False)
+        assert result.success is True
+        assert result.config_removed is True
+
+
+@pytest.mark.asyncio
+async def test_remove_app_url_source_with_new_verification(global_config):
+    """Remove should succeed for URL-sourced app with new verification.
+
+    Task 5.2: URL-sourced apps have a different structure (overrides section).
+    This tests removal with new verification fields on URL-sourced apps.
+    """
+    app_config = {
+        "config_version": "2.0.0",
+        "source": "url",
+        "catalog_ref": None,
+        "state": {
+            "version": "1.0.0",
+            "installed_date": "2024-01-15T10:00:00.000000",
+            "installed_path": "/mock/storage/custom_app.AppImage",
+            "verification": {
+                "passed": True,
+                "overall_passed": True,
+                "actual_method": "skip",
+                "warning": "No verification method available for URL source",
+                "methods": [{"type": "skip", "status": "skipped"}],
+            },
+            "icon": {"installed": False, "method": "none"},
+        },
+        "overrides": {
+            "metadata": {
+                "name": "custom_app",
+                "display_name": "Custom App",
+                "description": "",
+            },
+            "source": {
+                "type": "github",
+                "owner": "user",
+                "repo": "custom",
+                "prerelease": False,
+            },
+            "appimage": {
+                "naming": {
+                    "target_name": "custom_app",
+                    "architectures": ["amd64"],
+                }
+            },
+            "verification": {"method": "skip"},
+            "icon": {"method": "extraction", "filename": "custom_app.png"},
+        },
+    }
+
+    validate_app_state(app_config, "custom_app")
+
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_app_config.return_value = app_config
+    mock_config_manager.remove_app_config = MagicMock(return_value=True)
+
+    service = RemoveService(mock_config_manager, global_config)
+
+    with (
+        patch("pathlib.Path.exists", autospec=True, return_value=True),
+        patch("pathlib.Path.unlink", autospec=True),
+        patch("shutil.rmtree"),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
+    ):
+        result = await service.remove_app("custom_app", keep_config=False)
+        assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_remove_app_failed_verification_with_new_fields(global_config):
+    """Remove should succeed even when verification failed.
+
+    Task 5.2: Apps with failed verification should still be removable.
+    Tests that new verification fields work correctly in failure scenarios.
+    """
+
+    app_config = {
+        "config_version": "2.0.0",
+        "source": "catalog",
+        "catalog_ref": "test_app",
+        "state": {
+            "version": "1.0.0",
+            "installed_date": "2024-01-01T00:00:00.000000",
+            "installed_path": "/mock/storage/test_app.AppImage",
+            "verification": {
+                "passed": False,
+                "overall_passed": False,
+                "actual_method": "digest",
+                "warning": "Hash mismatch detected, app may be corrupted",
+                "methods": [
+                    {
+                        "type": "digest",
+                        "status": "failed",
+                        "algorithm": "sha256",
+                        "expected": "expected_hash_abc123",
+                        "computed": "actual_hash_xyz789",
+                        "source": "github_api",
+                    }
+                ],
+            },
+            "icon": {"installed": False, "method": "none"},
+        },
+    }
+
+    validate_app_state(app_config, "test_app")
+
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_app_config.return_value = app_config
+    mock_config_manager.remove_app_config = MagicMock(return_value=True)
+
+    service = RemoveService(mock_config_manager, global_config)
+
+    with (
+        patch("pathlib.Path.exists", autospec=True, return_value=True),
+        patch("pathlib.Path.unlink", autospec=True),
+        patch("shutil.rmtree"),
+        patch("my_unicorn.core.desktop_entry.remove_desktop_entry_for_app"),
+    ):
+        result = await service.remove_app("test_app", keep_config=False)
+        assert result.success is True

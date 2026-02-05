@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from my_unicorn.config.schemas import validate_app_state
 from my_unicorn.core.github import Asset, Release
 from my_unicorn.utils.config_builders import (
     build_method_entry,
@@ -97,6 +98,67 @@ class TestBuildMethodEntry:
 
         assert entry["algorithm"] == "SHA256"  # Default
 
+    def test_build_method_entry_normalizes_checksum_file_0(self):
+        """Test that checksum_file_0 is normalized to checksum_file."""
+        result = {
+            "passed": True,
+            "hash_type": "sha256",
+            "hash": "abc123",
+            "computed_hash": "abc123",
+            "url": "https://example.com/SHA256SUMS",
+        }
+        entry = build_method_entry("checksum_file_0", result)
+
+        assert entry["type"] == "checksum_file"
+        assert entry["status"] == "passed"
+
+    def test_build_method_entry_normalizes_checksum_file_1(self):
+        """Test that checksum_file_1 is normalized to checksum_file."""
+        result = {
+            "passed": True,
+            "hash_type": "sha512",
+            "hash": "def456",
+            "computed_hash": "def456",
+            "url": "https://example.com/SHA512SUMS",
+        }
+        entry = build_method_entry("checksum_file_1", result)
+
+        assert entry["type"] == "checksum_file"
+        assert entry["status"] == "passed"
+
+    def test_build_method_entry_normalizes_checksum_file_with_high_index(self):
+        """Test that checksum_file_99 is normalized to checksum_file."""
+        entry = build_method_entry("checksum_file_99", True)
+
+        assert entry["type"] == "checksum_file"
+        assert entry["status"] == "passed"
+
+    def test_build_method_entry_keeps_plain_checksum_file_unchanged(self):
+        """Test that plain checksum_file type remains unchanged."""
+        result = {
+            "passed": True,
+            "hash_type": "sha256",
+            "hash": "abc123",
+            "computed_hash": "abc123",
+            "url": "https://example.com/checksums.txt",
+        }
+        entry = build_method_entry("checksum_file", result)
+
+        assert entry["type"] == "checksum_file"
+
+    def test_build_method_entry_keeps_digest_unchanged(self):
+        """Test that digest method type remains unchanged."""
+        result = {"passed": True, "hash_type": "sha256"}
+        entry = build_method_entry("digest", result)
+
+        assert entry["type"] == "digest"
+
+    def test_build_method_entry_keeps_skip_unchanged(self):
+        """Test that skip method type remains unchanged."""
+        entry = build_method_entry("skip", True)
+
+        assert entry["type"] == "skip"
+
 
 class TestBuildVerificationState:
     """Test build_verification_state function."""
@@ -176,6 +238,264 @@ class TestBuildVerificationState:
         assert state["passed"] is False
         assert state["actual_method"] == "digest"
         assert state["methods"][0]["status"] == "failed"
+
+    def test_build_verification_state_includes_overall_passed(self):
+        """Test that build_verification_state always includes overall_passed.
+
+        Schema compatibility test: overall_passed is now a valid optional field
+        in app_state_v2.schema.json and config_builders must include it.
+        """
+        verify_result = {
+            "passed": True,
+            "methods": {"digest": {"passed": True, "hash_type": "sha256"}},
+        }
+        state = build_verification_state(verify_result)
+
+        assert "overall_passed" in state
+        assert state["overall_passed"] is True
+        assert state["overall_passed"] == state["passed"]
+
+    def test_build_verification_state_includes_actual_method(self):
+        """Test that build_verification_state always includes actual_method.
+
+        Schema compatibility test: actual_method is now a valid optional
+        field in app_state_v2.schema.json with enum values: digest,
+        checksum_file, skip.
+        """
+        verify_result = {
+            "passed": True,
+            "methods": {"digest": {"passed": True, "hash_type": "sha256"}},
+        }
+        state = build_verification_state(verify_result)
+
+        assert "actual_method" in state
+        assert state["actual_method"] in ("digest", "checksum_file", "skip")
+
+    def test_build_verification_state_actual_method_prefers_digest(self):
+        """Test actual_method prefers digest over checksum_file."""
+        verify_result = {
+            "passed": True,
+            "methods": {
+                "digest": {"passed": True, "hash_type": "sha256"},
+                "checksum_file": {
+                    "passed": True,
+                    "hash_type": "sha512",
+                    "url": "https://example.com/SHA512SUMS.txt",
+                },
+            },
+        }
+        state = build_verification_state(verify_result)
+
+        assert state["actual_method"] == "digest"
+
+    def test_build_verification_state_empty_returns_skip(self):
+        """Test actual_method is 'skip' when no verification data available."""
+        state = build_verification_state(None)
+
+        assert state["actual_method"] == "skip"
+        assert state["overall_passed"] is False
+        assert state["passed"] is False
+
+    def test_build_verification_state_with_warning(self):
+        """Test that warnings are included when present in verify result.
+
+        Schema compatibility test: warning is now a valid optional field
+        in app_state_v2.schema.json.
+        """
+        verify_result = {
+            "passed": True,
+            "warning": "Hash algorithm is deprecated",
+            "methods": {"digest": {"passed": True, "hash_type": "sha256"}},
+        }
+        state = build_verification_state(verify_result)
+
+        assert "warning" in state
+        assert state["warning"] == "Hash algorithm is deprecated"
+
+
+class TestBuildVerificationStateSchemaCompatibility:
+    """Test build_verification_state output matches the app state schema.
+
+    These tests validate the contract between config_builders and the schema.
+    They ensure that verification objects created by config_builders will pass
+    schema validation when saved as part of app state.
+    """
+
+    def test_verification_state_validates_against_schema(self):
+        """Test that build_verification_state output passes schema validation.
+
+        This is the primary integration test ensuring config_builders output
+        is compatible with app_state_v2.schema.json.
+        """
+        verify_result = {
+            "passed": True,
+            "methods": {
+                "digest": {
+                    "passed": True,
+                    "hash_type": "sha256",
+                    "hash": "abc123def456",
+                    "computed_hash": "abc123def456",
+                }
+            },
+        }
+        state = build_verification_state(verify_result)
+
+        app_state = {
+            "config_version": "2.0.0",
+            "source": "catalog",
+            "catalog_ref": "testapp",
+            "state": {
+                "version": "1.0.0",
+                "installed_date": "2026-02-04T10:00:00.000000",
+                "installed_path": "/home/user/Applications/testapp.AppImage",
+                "verification": {
+                    "passed": state["passed"],
+                    "overall_passed": state["overall_passed"],
+                    "actual_method": state["actual_method"],
+                    "methods": state["methods"],
+                },
+                "icon": {"installed": True, "method": "extraction"},
+            },
+        }
+
+        validate_app_state(app_state, "testapp")
+
+    def test_verification_state_with_checksum_file_validates(self):
+        """Test checksum_file verification state passes schema validation."""
+        verify_result = {
+            "passed": True,
+            "methods": {
+                "checksum_file": {
+                    "passed": True,
+                    "hash_type": "sha512",
+                    "hash": "xyz789",
+                    "computed_hash": "xyz789",
+                    "url": "https://example.com/SHA512SUMS.txt",
+                }
+            },
+        }
+        state = build_verification_state(verify_result)
+
+        app_state = {
+            "config_version": "2.0.0",
+            "source": "catalog",
+            "catalog_ref": "testapp",
+            "state": {
+                "version": "1.0.0",
+                "installed_date": "2026-02-04T10:00:00.000000",
+                "installed_path": "/home/user/Applications/testapp.AppImage",
+                "verification": {
+                    "passed": state["passed"],
+                    "overall_passed": state["overall_passed"],
+                    "actual_method": state["actual_method"],
+                    "methods": state["methods"],
+                },
+                "icon": {"installed": True, "method": "extraction"},
+            },
+        }
+
+        validate_app_state(app_state, "testapp")
+
+    def test_verification_state_with_warning_validates(self):
+        """Test verification state with warning passes schema validation."""
+        verify_result = {
+            "passed": True,
+            "warning": "Checksum algorithm SHA1 is deprecated",
+            "methods": {
+                "digest": {
+                    "passed": True,
+                    "hash_type": "sha256",
+                    "hash": "abc123",
+                    "computed_hash": "abc123",
+                }
+            },
+        }
+        state = build_verification_state(verify_result)
+
+        app_state = {
+            "config_version": "2.0.0",
+            "source": "catalog",
+            "catalog_ref": "testapp",
+            "state": {
+                "version": "1.0.0",
+                "installed_date": "2026-02-04T10:00:00.000000",
+                "installed_path": "/home/user/Applications/testapp.AppImage",
+                "verification": {
+                    "passed": state["passed"],
+                    "overall_passed": state["overall_passed"],
+                    "actual_method": state["actual_method"],
+                    "warning": state["warning"],
+                    "methods": state["methods"],
+                },
+                "icon": {"installed": True, "method": "extraction"},
+            },
+        }
+
+        validate_app_state(app_state, "testapp")
+
+    def test_empty_verification_state_validates(self):
+        """Test empty verification state passes schema validation."""
+        state = build_verification_state(None)
+
+        app_state = {
+            "config_version": "2.0.0",
+            "source": "catalog",
+            "catalog_ref": "testapp",
+            "state": {
+                "version": "1.0.0",
+                "installed_date": "2026-02-04T10:00:00.000000",
+                "installed_path": "/home/user/Applications/testapp.AppImage",
+                "verification": {
+                    "passed": state["passed"],
+                    "methods": [{"type": "skip", "status": "skipped"}],
+                },
+                "icon": {"installed": True, "method": "extraction"},
+            },
+        }
+
+        validate_app_state(app_state, "testapp")
+
+    def test_multi_method_verification_state_validates(self):
+        """Test verification state with multiple methods passes validation."""
+        verify_result = {
+            "passed": True,
+            "methods": {
+                "digest": {
+                    "passed": True,
+                    "hash_type": "sha256",
+                    "hash": "abc123",
+                    "computed_hash": "abc123",
+                },
+                "checksum_file": {
+                    "passed": True,
+                    "hash_type": "sha512",
+                    "hash": "xyz789",
+                    "computed_hash": "xyz789",
+                    "url": "https://example.com/SHA512SUMS.txt",
+                },
+            },
+        }
+        state = build_verification_state(verify_result)
+
+        app_state = {
+            "config_version": "2.0.0",
+            "source": "catalog",
+            "catalog_ref": "testapp",
+            "state": {
+                "version": "1.0.0",
+                "installed_date": "2026-02-04T10:00:00.000000",
+                "installed_path": "/home/user/Applications/testapp.AppImage",
+                "verification": {
+                    "passed": state["passed"],
+                    "overall_passed": state["overall_passed"],
+                    "actual_method": state["actual_method"],
+                    "methods": state["methods"],
+                },
+                "icon": {"installed": True, "method": "extraction"},
+            },
+        }
+
+        validate_app_state(app_state, "testapp")
 
 
 class TestBuildOverridesFromTemplate:

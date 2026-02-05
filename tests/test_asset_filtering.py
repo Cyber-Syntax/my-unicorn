@@ -168,6 +168,214 @@ class TestAssetSelectorChecksumFiltering:
         assert not AssetSelector.is_relevant_checksum(None)
 
 
+class TestAssetSelectorDetectChecksumFiles:
+    """Test checksum file detection with platform filtering."""
+
+    def test_detect_checksum_files_excludes_arm_yaml(self):
+        """Test that ARM YAML files are excluded from checksum detection."""
+        assets = [
+            Asset(
+                name="latest-linux.yml",
+                browser_download_url="https://example.com/latest-linux.yml",
+                size=1024,
+                digest="",
+            ),
+            Asset(
+                name="latest-linux-arm.yml",
+                browser_download_url="https://example.com/latest-linux-arm.yml",
+                size=1024,
+                digest="",
+            ),
+            Asset(
+                name="app-x86_64.AppImage",
+                browser_download_url="https://example.com/app.AppImage",
+                size=10240,
+                digest="",
+            ),
+        ]
+
+        result = AssetSelector.detect_checksum_files(assets, "v1.0.0")
+
+        assert len(result) == 1, "Should detect only x86_64 YAML file"
+        assert result[0].filename == "latest-linux.yml"
+        assert result[0].format_type == "yaml"
+
+    def test_detect_checksum_files_excludes_macos_yaml(self):
+        """Test that macOS YAML files are excluded from checksum detection."""
+        assets = [
+            Asset(
+                name="latest-linux.yml",
+                browser_download_url="https://example.com/latest-linux.yml",
+                size=1024,
+                digest="",
+            ),
+            Asset(
+                name="latest-mac.yml",
+                browser_download_url="https://example.com/latest-mac.yml",
+                size=1024,
+                digest="",
+            ),
+            Asset(
+                name="latest-mac-arm64.yml",
+                browser_download_url="https://example.com/latest-mac-arm64.yml",
+                size=1024,
+                digest="",
+            ),
+        ]
+
+        result = AssetSelector.detect_checksum_files(assets, "v1.0.0")
+
+        assert len(result) == 1, "Should detect only Linux YAML file"
+        assert result[0].filename == "latest-linux.yml"
+
+    def test_detect_checksum_files_excludes_windows_checksums(self):
+        """Test that Windows checksum files are excluded from detection."""
+        assets = [
+            Asset(
+                name="app-x86_64.AppImage.sha256",
+                browser_download_url="https://example.com/app.AppImage.sha256",
+                size=64,
+                digest="",
+            ),
+            Asset(
+                name="app-Win64.msi.DIGEST",
+                browser_download_url="https://example.com/app-Win64.msi.DIGEST",
+                size=128,
+                digest="",
+            ),
+            Asset(
+                name="KeePassXC-Win64-LegacyWindows.zip.DIGEST",
+                browser_download_url="https://example.com/keepass.DIGEST",
+                size=128,
+                digest="",
+            ),
+        ]
+
+        result = AssetSelector.detect_checksum_files(assets, "v2.7.10")
+
+        assert len(result) == 1, "Should detect only x86_64 Linux checksum"
+        assert result[0].filename == "app-x86_64.AppImage.sha256"
+
+    def test_detect_checksum_files_excludes_arm_appimage_checksums(self):
+        """Test that ARM AppImage checksums are excluded from detection."""
+        assets = [
+            Asset(
+                name="app-x86_64.AppImage.sha256",
+                browser_download_url="https://example.com/app-x86_64.AppImage.sha256",
+                size=64,
+                digest="",
+            ),
+            Asset(
+                name="Obsidian-1.9.14-arm64.AppImage.sha256",
+                browser_download_url="https://example.com/obsidian-arm.sha256",
+                size=64,
+                digest="",
+            ),
+            Asset(
+                name="app-aarch64.AppImage.sha512sum",
+                browser_download_url="https://example.com/app-aarch64.sha512sum",
+                size=128,
+                digest="",
+            ),
+            Asset(
+                name="freetube-0.23.12-beta-armv7l.AppImage.sha256",
+                browser_download_url="https://example.com/freetube-arm.sha256",
+                size=64,
+                digest="",
+            ),
+        ]
+
+        result = AssetSelector.detect_checksum_files(assets, "v1.9.14")
+
+        assert len(result) == 1, "Should detect only x86_64 AppImage checksum"
+        assert result[0].filename == "app-x86_64.AppImage.sha256"
+
+    def test_detect_checksum_files_arm_only_release(self):
+        """Test that ARM-only releases return empty checksum file list."""
+        assets = [
+            Asset(
+                name="app-arm64.AppImage",
+                browser_download_url="https://example.com/app-arm64.AppImage",
+                size=10240,
+                digest="",
+            ),
+            Asset(
+                name="latest-linux-arm.yml",
+                browser_download_url="https://example.com/latest-linux-arm.yml",
+                size=1024,
+                digest="",
+            ),
+            Asset(
+                name="app-arm64.AppImage.sha256",
+                browser_download_url="https://example.com/app-arm64.sha256",
+                size=64,
+                digest="",
+            ),
+        ]
+
+        result = AssetSelector.detect_checksum_files(assets, "v1.0.0-arm")
+
+        assert len(result) == 0, "ARM-only release should return empty list"
+
+    def test_detect_checksum_files_mixed_platforms(self):
+        """Test x86_64 checksums selected from mixed-platform release."""
+        assets = [
+            # AppImages
+            Asset(
+                name="app-x86_64.AppImage",
+                browser_download_url="https://example.com/app-x86_64.AppImage",
+                size=10240,
+                digest="",
+            ),
+            Asset(
+                name="app-arm64.AppImage",
+                browser_download_url="https://example.com/app-arm64.AppImage",
+                size=10240,
+                digest="",
+            ),
+            # YAML checksums
+            Asset(
+                name="latest-linux.yml",
+                browser_download_url="https://example.com/latest-linux.yml",
+                size=1024,
+                digest="",
+            ),
+            Asset(
+                name="latest-linux-arm.yml",
+                browser_download_url="https://example.com/latest-linux-arm.yml",
+                size=1024,
+                digest="",
+            ),
+            Asset(
+                name="latest-mac.yml",
+                browser_download_url="https://example.com/latest-mac.yml",
+                size=1024,
+                digest="",
+            ),
+            # Traditional checksums
+            Asset(
+                name="SHA256SUMS.txt",
+                browser_download_url="https://example.com/SHA256SUMS.txt",
+                size=512,
+                digest="",
+            ),
+        ]
+
+        result = AssetSelector.detect_checksum_files(assets, "v1.0.0")
+
+        assert len(result) == 2, "Should detect 2 x86_64 checksum files"
+
+        filenames = {r.filename for r in result}
+        assert filenames == {
+            "latest-linux.yml",
+            "SHA256SUMS.txt",
+        }, "Should include only x86_64 Linux checksums"
+
+        # Verify YAML is prioritized first
+        assert result[0].format_type == "yaml"
+        assert result[0].filename == "latest-linux.yml"
+
+
 class TestAssetSelectorFilterForCache:
     """Test complete cache filtering logic."""
 

@@ -164,3 +164,118 @@ def test_invalid_url_format(valid_cache_entry):
     with pytest.raises(SchemaValidationError) as exc_info:
         validate_cache_release(valid_cache_entry)
     assert "browser_download_url" in str(exc_info.value).lower()
+
+
+def test_valid_cache_with_checksum_files(valid_cache_entry):
+    """Test validation passes for cache entry with checksum_files array."""
+    valid_cache_entry["release_data"]["checksum_files"] = [
+        {
+            "source": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.10.6/SHA256SUMS.txt",
+            "filename": "SHA256SUMS.txt",
+            "algorithm": "SHA256",
+            "hashes": {
+                "Obsidian-1.10.6.AppImage": (
+                    "162d753076d0610e4dccfdccf391c13a"
+                    "f5fcb557ba7574b77f0e90ac3c522b1c"
+                )
+            },
+        }
+    ]
+    validate_cache_release(valid_cache_entry)
+
+
+def test_valid_cache_with_multiple_checksum_files(valid_cache_entry):
+    """Test validation passes for cache entry with multiple checksum files."""
+    valid_cache_entry["release_data"]["checksum_files"] = [
+        {
+            "source": "https://github.com/test/repo/releases/download/v1.0.0/SHA256SUMS.txt",
+            "filename": "SHA256SUMS.txt",
+            "algorithm": "SHA256",
+            "hashes": {
+                "app.AppImage": "a" * 64,
+                "app-arm64.AppImage": "b" * 64,
+            },
+        },
+        {
+            "source": "https://github.com/test/repo/releases/download/v1.0.0/SHA512SUMS",
+            "filename": "SHA512SUMS",
+            "algorithm": "SHA512",
+            "hashes": {
+                "app.AppImage": "c" * 128,
+            },
+        },
+    ]
+    validate_cache_release(valid_cache_entry)
+
+
+def test_valid_cache_with_sha512_checksum_file(valid_cache_entry):
+    """Test validation passes for checksum file with SHA512 algorithm."""
+    valid_cache_entry["release_data"]["checksum_files"] = [
+        {
+            "source": "https://github.com/test/repo/releases/download/v1.0.0/SHA512SUMS",
+            "filename": "SHA512SUMS",
+            "algorithm": "SHA512",
+            "hashes": {"app.AppImage": "a" * 128},
+        }
+    ]
+    validate_cache_release(valid_cache_entry)
+
+
+def test_backward_compatible_cache_without_checksum_files(valid_cache_entry):
+    """Test validation passes for cache without checksum_files.
+
+    This validates backward compatibility with existing cache files.
+    """
+    assert "checksum_files" not in valid_cache_entry["release_data"]
+    validate_cache_release(valid_cache_entry)
+
+
+def test_cache_with_empty_checksum_files_array(valid_cache_entry):
+    """Test validation passes for empty checksum_files array."""
+    valid_cache_entry["release_data"]["checksum_files"] = []
+    validate_cache_release(valid_cache_entry)
+
+
+def test_checksum_file_missing_required_field(valid_cache_entry):
+    """Test validation fails when checksum file item misses required field."""
+    valid_cache_entry["release_data"]["checksum_files"] = [
+        {
+            "source": "https://github.com/test/repo/releases/download/v1.0.0/SHA256SUMS.txt",
+            "filename": "SHA256SUMS.txt",
+            # Missing algorithm
+            "hashes": {"app.AppImage": "a" * 64},
+        }
+    ]
+    with pytest.raises(SchemaValidationError) as exc_info:
+        validate_cache_release(valid_cache_entry)
+    assert "algorithm" in str(exc_info.value).lower()
+
+
+def test_checksum_file_invalid_algorithm(valid_cache_entry):
+    """Test validation fails for invalid checksum algorithm enum value."""
+    valid_cache_entry["release_data"]["checksum_files"] = [
+        {
+            "source": "https://github.com/test/repo/releases/download/v1.0.0/MD5SUMS.txt",
+            "filename": "MD5SUMS.txt",
+            "algorithm": "MD5",  # Invalid - only SHA256, SHA512 allowed
+            "hashes": {"app.AppImage": "d" * 32},
+        }
+    ]
+    with pytest.raises(SchemaValidationError) as exc_info:
+        validate_cache_release(valid_cache_entry)
+    assert "algorithm" in str(exc_info.value).lower()
+
+
+def test_checksum_file_invalid_hash_value_format(valid_cache_entry):
+    """Test validation fails for invalid hash value format."""
+    valid_cache_entry["release_data"]["checksum_files"] = [
+        {
+            "source": "https://github.com/test/repo/releases/download/v1.0.0/SHA256SUMS.txt",
+            "filename": "SHA256SUMS.txt",
+            "algorithm": "SHA256",
+            "hashes": {"app.AppImage": "invalid_hash_not_hex"},
+        }
+    ]
+    with pytest.raises(SchemaValidationError) as exc_info:
+        validate_cache_release(valid_cache_entry)
+    assert "hashes" in str(exc_info.value).lower()

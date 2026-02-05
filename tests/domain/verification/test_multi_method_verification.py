@@ -21,6 +21,10 @@ from my_unicorn.exceptions import VerificationError
 
 # Test data constants - SHA256 hash of b"test content"
 TEST_HASH = "6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72"
+TEST_HASH_SHA512_BASE64 = (
+    "DL9MrvOAR7upok5iGpYUhOXSqSF2qFnn6yffND3TTrmNU4psX02hzjAuwlC4IcwA"
+    "HkbMl6cEmIKXGFpN9+mWAg=="
+)
 TEST_CONTENT = b"test content"
 WRONG_HASH = "0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -633,7 +637,7 @@ class TestMultipleChecksumFiles:
         test_file_path: Path,
         assets_with_multiple_checksums: list[Asset],
     ) -> None:
-        """Multiple checksum files produce unique method keys in result."""
+        """Only the best checksum file is used, producing single method key."""
         # Use asset without digest to force checksum verification
         asset = Asset(
             name="test.AppImage",
@@ -643,8 +647,13 @@ class TestMultipleChecksumFiles:
         )
         config = {"skip": False}
 
-        checksum_content = f"{TEST_HASH}  test.AppImage"
-        mock_download = AsyncMock(return_value=checksum_content)
+        # YAML format is selected (highest priority), mock YAML content
+        yaml_content = f"""
+version: 1.0
+path: test.AppImage
+sha512: {TEST_HASH_SHA512_BASE64}
+"""
+        mock_download = AsyncMock(return_value=yaml_content)
         verification_service.download_service.download_checksum_file = (
             mock_download
         )
@@ -661,9 +670,10 @@ class TestMultipleChecksumFiles:
         )
 
         assert result.passed is True
-        # At least one checksum method should be present
+        # Exactly one checksum method should be present (best match only)
         checksum_keys = [k for k in result.methods if "checksum" in k]
-        assert len(checksum_keys) >= 1
+        assert len(checksum_keys) == 1
+        assert "checksum_file" in result.methods
 
     @pytest.mark.asyncio
     async def test_first_successful_checksum_used_as_primary(
@@ -672,7 +682,7 @@ class TestMultipleChecksumFiles:
         test_file_path: Path,
         assets_with_multiple_checksums: list[Asset],
     ) -> None:
-        """First successful checksum is marked primary when no digest."""
+        """Best-priority checksum file is used when no digest is present."""
         asset = Asset(
             name="test.AppImage",
             browser_download_url=f"{GITHUB_BASE}/test.AppImage",
@@ -681,8 +691,13 @@ class TestMultipleChecksumFiles:
         )
         config = {"skip": False}
 
-        checksum_content = f"{TEST_HASH}  test.AppImage"
-        mock_download = AsyncMock(return_value=checksum_content)
+        # YAML format is selected (highest priority), mock YAML content
+        yaml_content = f"""
+version: 1.0
+path: test.AppImage
+sha512: {TEST_HASH_SHA512_BASE64}
+"""
+        mock_download = AsyncMock(return_value=yaml_content)
         verification_service.download_service.download_checksum_file = (
             mock_download
         )
@@ -700,11 +715,131 @@ class TestMultipleChecksumFiles:
 
         assert result.passed is True
 
-        # All three checksum files should be attempted
+        # Only one checksum file (best priority) should be attempted
         checksum_methods = [
-            k for k in result.methods.keys() if k.startswith("checksum")
+            k for k in result.methods if k.startswith("checksum")
         ]
-        assert len(checksum_methods) >= 1
+        assert len(checksum_methods) == 1
+        assert "checksum_file" in result.methods
+
+    @pytest.mark.asyncio
+    async def test_selects_highest_priority_checksum_file(
+        self,
+        verification_service: VerificationService,
+        test_file_path: Path,
+    ) -> None:
+        """Verification selects best-match checksum file per priority rules.
+
+        Priority order:
+        1. Exact .DIGEST match (e.g., test.AppImage.DIGEST)
+        2. Platform-specific hash (e.g., test.AppImage.sha256)
+        3. YAML files (most comprehensive)
+        4. Generic checksum files (SHA256SUMS.txt)
+        """
+        asset = Asset(
+            name="test.AppImage",
+            browser_download_url=f"{GITHUB_BASE}/test.AppImage",
+            size=len(TEST_CONTENT),
+            digest="",  # No digest - forces checksum verification
+        )
+
+        # Multiple checksum files with different priorities
+        assets = [
+            asset,
+            # Priority 5 - generic
+            Asset(
+                name="SHA256SUMS.txt",
+                browser_download_url=f"{GITHUB_BASE}/SHA256SUMS.txt",
+                size=100,
+                digest="",
+            ),
+            # Priority 3 - YAML
+            Asset(
+                name="latest-linux.yml",
+                browser_download_url=f"{GITHUB_BASE}/latest-linux.yml",
+                size=200,
+                digest="",
+            ),
+        ]
+
+        config = {"skip": False}
+
+        # YAML checksum format
+        yaml_content = f"""
+version: 1.0
+path: test.AppImage
+sha512: {TEST_HASH_SHA512_BASE64}
+"""
+        mock_download = AsyncMock(return_value=yaml_content)
+        verification_service.download_service.download_checksum_file = (
+            mock_download
+        )
+
+        result = await verification_service.verify_file(
+            file_path=test_file_path,
+            asset=asset,
+            config=config,
+            owner="test",
+            repo="repo",
+            tag_name="v1.0",
+            app_name="test.AppImage",
+            assets=assets,
+        )
+
+        assert result.passed is True
+        # Only ONE checksum_file method should exist
+        checksum_keys = [k for k in result.methods if "checksum" in k]
+        assert len(checksum_keys) == 1
+        assert "checksum_file" in result.methods
+        # YAML file should be selected (higher priority than SHA256SUMS)
+        assert result.updated_config.get("checksum_file") == "latest-linux.yml"
+
+    @pytest.mark.asyncio
+    async def test_no_indexed_checksum_method_keys(
+        self,
+        verification_service: VerificationService,
+        test_file_path: Path,
+        assets_with_multiple_checksums: list[Asset],
+    ) -> None:
+        """Verify no checksum_file_0, checksum_file_1 keys are generated."""
+        asset = Asset(
+            name="test.AppImage",
+            browser_download_url=f"{GITHUB_BASE}/test.AppImage",
+            size=len(TEST_CONTENT),
+            digest="",  # No digest
+        )
+        config = {"skip": False}
+
+        # YAML format is selected (highest priority), mock YAML content
+        yaml_content = f"""
+version: 1.0
+path: test.AppImage
+sha512: {TEST_HASH_SHA512_BASE64}
+"""
+        mock_download = AsyncMock(return_value=yaml_content)
+        verification_service.download_service.download_checksum_file = (
+            mock_download
+        )
+
+        result = await verification_service.verify_file(
+            file_path=test_file_path,
+            asset=asset,
+            config=config,
+            owner="test",
+            repo="repo",
+            tag_name="v1.0",
+            app_name="test.AppImage",
+            assets=assets_with_multiple_checksums,
+        )
+
+        assert result.passed is True
+        # No indexed keys should exist
+        indexed_keys = [
+            k for k in result.methods if k.startswith("checksum_file_")
+        ]
+        assert len(indexed_keys) == 0, (
+            f"Found indexed checksum keys: {indexed_keys}"
+        )
 
 
 class TestExceptionHandling:

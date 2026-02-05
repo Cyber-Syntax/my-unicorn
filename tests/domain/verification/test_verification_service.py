@@ -608,7 +608,12 @@ class TestVerificationService:
     async def test_verify_file_multiple_checksum_files_priority(
         self, verification_service, test_file_path, sample_assets_with_both
     ):
-        """Test that multiple checksum files are tried and YAML is prioritized."""
+        """Test that only the highest-priority checksum file is selected.
+
+        With YAGNI principle, only ONE checksum file is used per verification.
+        YAML files have priority 3, while generic files (SHA256SUMS) have
+        priority 5, so YAML should be selected.
+        """
         asset = Asset(
             name="app.AppImage",
             size=12,
@@ -617,16 +622,14 @@ class TestVerificationService:
         )
         config = {"skip": False}
 
-        # Mock first checksum file (YAML) to fail
-        async def mock_download_side_effect(url):
-            if "latest-linux.yml" in url:
-                return "invalid yaml content"
-            if "SHA256SUMS.txt" in url:
-                return SIYUAN_SHA256SUMS_CONTENT
-            return ""
+        # Mock YAML checksum with correct hash for app.AppImage
+        # Base64 of SHA512(b"test content")
+        yaml_content = """version: 1.0
+path: app.AppImage
+sha512: DL9MrvOAR7upok5iGpYUhOXSqSF2qFnn6yffND3TTrmNU4psX02hzjAuwlC4IcwAHkbMl6cEmIKXGFpN9+mWAg=="""
 
         verification_service.download_service.download_checksum_file = (
-            AsyncMock(side_effect=mock_download_side_effect)
+            AsyncMock(return_value=yaml_content)
         )
 
         result = await verification_service.verify_file(
@@ -641,11 +644,16 @@ class TestVerificationService:
         )
 
         assert result.passed is True
-        # Should have tried both checksum files
+        # Should only try ONE checksum file (highest priority)
         assert (
             verification_service.download_service.download_checksum_file.call_count
-            == 2
+            == 1
         )
+        # Should select YAML (priority 3) over SHA256SUMS (priority 5)
+        call_url = verification_service.download_service.download_checksum_file.call_args[
+            0
+        ][0]
+        assert "latest-linux.yml" in call_url
 
     @pytest.mark.asyncio
     async def test_verify_file_skip_verification(
@@ -1658,3 +1666,151 @@ class TestHashVerifierAsyncComputation:
         )
 
         assert sync_result == async_result
+
+
+class TestVerificationServiceCacheIntegration:
+    """Tests for VerificationService cache integration."""
+
+    @pytest.fixture
+    def mock_cache_manager(self):
+        """Create a mock cache manager."""
+        cache_manager = AsyncMock()
+        cache_manager.store_checksum_file = AsyncMock(return_value=True)
+        cache_manager.get_checksum_file = AsyncMock(return_value=None)
+        cache_manager.has_checksum_file = AsyncMock(return_value=False)
+        return cache_manager
+
+    @pytest.fixture
+    def test_file(self, tmp_path):
+        """Create a test file with known content."""
+        test_file = tmp_path / "test.AppImage"
+        test_file.write_text("test content")
+        return test_file
+
+    @pytest.fixture
+    def mock_download_service(self):
+        """Create a mock download service."""
+        service = AsyncMock()
+        service.download_checksum_file = AsyncMock(
+            return_value=SIYUAN_SHA256SUMS_CONTENT
+        )
+        return service
+
+    def test_init_with_cache_manager(
+        self, mock_download_service, mock_cache_manager
+    ):
+        """Test that VerificationService accepts cache_manager parameter."""
+        service = VerificationService(
+            download_service=mock_download_service,
+            cache_manager=mock_cache_manager,
+        )
+
+        assert service.cache_manager is mock_cache_manager
+        assert service.download_service is mock_download_service
+
+    def test_init_without_cache_manager(self, mock_download_service):
+        """Test that VerificationService works without cache_manager."""
+        service = VerificationService(
+            download_service=mock_download_service,
+        )
+
+        assert service.cache_manager is None
+
+    async def test_cache_checksum_file_stores_data_on_success(
+        self, tmp_path, mock_download_service, mock_cache_manager
+    ):
+        """Test that checksum file data is cached after successful verification."""
+        test_file = tmp_path / "test.AppImage"
+        test_file.write_text("test content")
+        expected_hash = hashlib.sha256(b"test content").hexdigest()
+
+        sha256sums = (
+            f"{expected_hash} test.AppImage\nother_hash_value other.AppImage"
+        )
+        mock_download_service.download_checksum_file = AsyncMock(
+            return_value=sha256sums
+        )
+
+        service = VerificationService(
+            download_service=mock_download_service,
+            cache_manager=mock_cache_manager,
+        )
+
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://example.com/test.AppImage",
+            digest=None,
+        )
+        checksum_asset = Asset(
+            name="SHA256SUMS.txt",
+            size=100,
+            browser_download_url="https://example.com/SHA256SUMS.txt",
+            digest=None,
+        )
+
+        result = await service.verify_file(
+            file_path=test_file,
+            asset=asset,
+            config={"skip": False},
+            owner="testowner",
+            repo="testrepo",
+            tag_name="v1.0.0",
+            app_name="testapp",
+            assets=[asset, checksum_asset],
+        )
+
+        assert result.passed is True
+
+        mock_cache_manager.store_checksum_file.assert_called_once()
+        call_args = mock_cache_manager.store_checksum_file.call_args
+        assert call_args[0][0] == "testowner"
+        assert call_args[0][1] == "testrepo"
+        assert call_args[0][2] == "v1.0.0"
+        file_data = call_args[0][3]
+        assert file_data["algorithm"] == "SHA256"
+        assert "hashes" in file_data
+        assert "test.AppImage" in file_data["hashes"]
+
+    async def test_cache_not_called_without_cache_manager(
+        self, tmp_path, mock_download_service
+    ):
+        """Test that caching is skipped when no cache_manager provided."""
+        test_file = tmp_path / "test.AppImage"
+        test_file.write_text("test content")
+        expected_hash = hashlib.sha256(b"test content").hexdigest()
+
+        sha256sums = f"{expected_hash} test.AppImage"
+        mock_download_service.download_checksum_file = AsyncMock(
+            return_value=sha256sums
+        )
+
+        service = VerificationService(
+            download_service=mock_download_service,
+        )
+
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url="https://example.com/test.AppImage",
+            digest=None,
+        )
+        checksum_asset = Asset(
+            name="SHA256SUMS.txt",
+            size=100,
+            browser_download_url="https://example.com/SHA256SUMS.txt",
+            digest=None,
+        )
+
+        result = await service.verify_file(
+            file_path=test_file,
+            asset=asset,
+            config={"skip": False},
+            owner="testowner",
+            repo="testrepo",
+            tag_name="v1.0.0",
+            app_name="testapp",
+            assets=[asset, checksum_asset],
+        )
+
+        assert result.passed is True
