@@ -250,6 +250,9 @@ def _normalize_hash_value(hash_value: str) -> str:
         >>> _normalize_hash_value("sha256:deadbeef12345678" * 4)
         'deadbeef12345678deadbeef12345678deadbeef12345678deadbeef12345678'
     """
+    # Type coercion: convert non-string input to string
+    hash_value = str(hash_value)
+
     # Strip algorithm prefix (e.g., "sha256:")
     if ":" in hash_value:
         _, _, hash_value = hash_value.partition(":")
