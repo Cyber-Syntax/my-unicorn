@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.core.workflows.services.install_service import (
+from my_unicorn.core.services.install_service import (
     InstallApplicationService,
     InstallOptions,
 )
@@ -150,13 +150,13 @@ class TestInstallApplicationService:
         """Test successful installation workflow."""
         # Mock TargetResolver.separate_targets
         with patch(
-            "my_unicorn.core.workflows.services.install_service.TargetResolver.separate_targets"
+            "my_unicorn.core.services.install_service.TargetResolver.separate_targets"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1"])
 
             # Mock InstallStateChecker
             with patch(
-                "my_unicorn.core.workflows.services.install_service.InstallStateChecker"
+                "my_unicorn.core.services.install_service.InstallStateChecker"
             ) as mock_checker_cls:
                 # Create a mock plan object
                 from dataclasses import dataclass
@@ -202,13 +202,13 @@ class TestInstallApplicationService:
         """Test installation when app is already installed."""
         # Mock TargetResolver.separate_targets
         with patch(
-            "my_unicorn.core.workflows.services.install_service.TargetResolver.separate_targets"
+            "my_unicorn.core.services.install_service.TargetResolver.separate_targets"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1"])
 
             # Mock InstallStateChecker
             with patch(
-                "my_unicorn.core.workflows.services.install_service.InstallStateChecker"
+                "my_unicorn.core.services.install_service.InstallStateChecker"
             ) as mock_checker_cls:
                 from dataclasses import dataclass
 
@@ -241,13 +241,13 @@ class TestInstallApplicationService:
         """Test installation with mix of already installed and new apps."""
         # Mock TargetResolver.separate_targets
         with patch(
-            "my_unicorn.core.workflows.services.install_service.TargetResolver.separate_targets"
+            "my_unicorn.core.services.install_service.TargetResolver.separate_targets"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1", "app2"])
 
             # Mock InstallStateChecker
             with patch(
-                "my_unicorn.core.workflows.services.install_service.InstallStateChecker"
+                "my_unicorn.core.services.install_service.InstallStateChecker"
             ) as mock_checker_cls:
                 from dataclasses import dataclass
 
@@ -299,7 +299,7 @@ class TestInstallApplicationService:
         """Test installation with URL targets."""
         # Mock TargetResolver.separate_targets
         with patch(
-            "my_unicorn.core.workflows.services.install_service.TargetResolver.separate_targets"
+            "my_unicorn.core.services.install_service.TargetResolver.separate_targets"
         ) as mock_separate:
             mock_separate.return_value = (
                 [
@@ -310,7 +310,7 @@ class TestInstallApplicationService:
 
             # Mock InstallStateChecker
             with patch(
-                "my_unicorn.core.workflows.services.install_service.InstallStateChecker"
+                "my_unicorn.core.services.install_service.InstallStateChecker"
             ) as mock_checker_cls:
                 from dataclasses import dataclass
 
@@ -379,13 +379,13 @@ class TestInstallApplicationService:
         """Test that progress session is properly managed."""
         # Mock TargetResolver.separate_targets
         with patch(
-            "my_unicorn.core.workflows.services.install_service.TargetResolver.separate_targets"
+            "my_unicorn.core.services.install_service.TargetResolver.separate_targets"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1"])
 
             # Mock InstallStateChecker
             with patch(
-                "my_unicorn.core.workflows.services.install_service.InstallStateChecker"
+                "my_unicorn.core.services.install_service.InstallStateChecker"
             ) as mock_checker_cls:
                 from dataclasses import dataclass
 
@@ -446,13 +446,13 @@ class TestInstallApplicationService:
         """Test that shared API task is set on GitHub client."""
         # Mock TargetResolver.separate_targets
         with patch(
-            "my_unicorn.core.workflows.services.install_service.TargetResolver.separate_targets"
+            "my_unicorn.core.services.install_service.TargetResolver.separate_targets"
         ) as mock_separate:
             mock_separate.return_value = ([], ["app1"])
 
             # Mock InstallStateChecker
             with patch(
-                "my_unicorn.core.workflows.services.install_service.InstallStateChecker"
+                "my_unicorn.core.services.install_service.InstallStateChecker"
             ) as mock_checker_cls:
                 from dataclasses import dataclass
 

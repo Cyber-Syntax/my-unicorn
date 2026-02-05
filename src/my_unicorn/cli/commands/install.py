@@ -7,7 +7,7 @@ InstallApplicationService via ServiceContainer for dependency injection.
 from argparse import Namespace
 
 from my_unicorn.cli.container import ServiceContainer
-from my_unicorn.core.workflows.services.install_service import InstallOptions
+from my_unicorn.core.services.install_service import InstallOptions
 from my_unicorn.ui.display_install import (
     display_no_targets_error,
     print_install_summary,

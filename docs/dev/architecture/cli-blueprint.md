@@ -1087,8 +1087,8 @@ from my_unicorn.core.github import GitHubClient
 # Workflows
 from my_unicorn.core.workflows.install import InstallHandler
 from my_unicorn.core.workflows.update import UpdateManager
-from my_unicorn.core.workflows.services.install_service import InstallApplicationService
-from my_unicorn.core.workflows.services.update_service import UpdateApplicationService
+from my_unicorn.core.services.install_service import InstallApplicationService
+from my_unicorn.core.services.update_service import UpdateApplicationService
 from my_unicorn.core.workflows.post_download import PostDownloadProcessor
 
 # Other Services

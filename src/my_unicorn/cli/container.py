@@ -43,15 +43,11 @@ from my_unicorn.core.protocols.progress import (
     ProgressReporter,
 )
 from my_unicorn.core.remove import RemoveService
+from my_unicorn.core.services.install_service import InstallApplicationService
+from my_unicorn.core.services.update_service import UpdateApplicationService
 from my_unicorn.core.verification import VerificationService
 from my_unicorn.core.workflows.install import InstallHandler
 from my_unicorn.core.workflows.post_download import PostDownloadProcessor
-from my_unicorn.core.workflows.services.install_service import (
-    InstallApplicationService,
-)
-from my_unicorn.core.workflows.services.update_service import (
-    UpdateApplicationService,
-)
 from my_unicorn.core.workflows.update import UpdateManager
 from my_unicorn.logger import get_logger
 

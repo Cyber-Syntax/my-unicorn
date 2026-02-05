@@ -9,7 +9,7 @@ Services follow Clean Architecture principles:
 - Domain service layer (core business logic)
 """
 
-from my_unicorn.core.workflows.services.install_service import (
+from my_unicorn.core.services.install_service import (
     InstallApplicationService,
     InstallOptions,
 )
