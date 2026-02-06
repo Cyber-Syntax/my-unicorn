@@ -4,14 +4,16 @@ import pytest
 
 from my_unicorn.core.verification.checksum_parser import (
     ChecksumFileResult,
-    _is_likely_base64,
-    _is_likely_hex,
-    _normalize_hash_value,
     convert_base64_to_hex,
     detect_hash_type_from_checksum_filename,
     find_checksum_entry,
     parse_all_checksums,
     parse_checksum_file,
+)
+from my_unicorn.core.verification.checksum_parser.normalizer import (
+    _is_likely_base64,
+    _is_likely_hex,
+    _normalize_hash_value,
 )
 
 LEGCORD_YAML_CONTENT = """version: 1.1.5
@@ -104,7 +106,10 @@ def test_find_checksum_entry_yaml_not_found() -> None:
     assert entry is None
 
 
-@patch("my_unicorn.core.verification.checksum_parser._YAML_AVAILABLE", False)
+@patch(
+    "my_unicorn.core.verification.checksum_parser.yaml_parser._YAML_AVAILABLE",
+    False,
+)
 def test_find_checksum_entry_yaml_not_available() -> None:
     entry = find_checksum_entry(
         LEGCORD_YAML_CONTENT,
