@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from my_unicorn.core.update.update import UpdateManager
+from my_unicorn.core.update.manager import UpdateManager
 from my_unicorn.exceptions import ConfigurationError
 
 

@@ -11,7 +11,7 @@ import pytest
 
 from my_unicorn.core.github import Release
 from my_unicorn.core.update.info import UpdateInfo
-from my_unicorn.core.update.update import UpdateManager
+from my_unicorn.core.update.manager import UpdateManager
 
 
 class TestMissingAppImageUpdate:
@@ -104,17 +104,17 @@ class TestMissingAppImageUpdate:
         )
 
         with (
-            patch("my_unicorn.core.update.update.GitHubAuthManager"),
-            patch("my_unicorn.core.update.update.FileOperations"),
-            patch("my_unicorn.core.update.update.BackupService"),
-            patch("my_unicorn.core.update.update.logger"),
+            patch("my_unicorn.core.update.manager.GitHubAuthManager"),
+            patch("my_unicorn.core.update.manager.FileOperations"),
+            patch("my_unicorn.core.update.manager.BackupService"),
+            patch("my_unicorn.core.update.manager.logger"),
             patch.object(
                 UpdateManager,
                 "check_single_update",
                 return_value=update_info,
             ),
             patch(
-                "my_unicorn.core.update.update.select_best_appimage_asset",
+                "my_unicorn.core.update.context.select_best_appimage_asset",
                 return_value=None,
             ),
         ):
@@ -141,9 +141,9 @@ class TestMissingAppImageUpdate:
         are complete, others are still building.
         """
         with (
-            patch("my_unicorn.core.update.update.GitHubAuthManager"),
-            patch("my_unicorn.core.update.update.FileOperations"),
-            patch("my_unicorn.core.update.update.BackupService"),
+            patch("my_unicorn.core.update.manager.GitHubAuthManager"),
+            patch("my_unicorn.core.update.manager.FileOperations"),
+            patch("my_unicorn.core.update.manager.BackupService"),
             patch.object(
                 UpdateManager, "update_single_app", new=AsyncMock()
             ) as mock_update_single,

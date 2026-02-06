@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from my_unicorn.core.update.update import UpdateManager
+from my_unicorn.core.update.manager import UpdateManager
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ async def test_catalog_caching_first_load(update_manager, mock_config_manager):
     mock_config_manager.load_catalog.return_value = catalog_data
 
     # First call - should load from file
-    result = await update_manager._load_catalog_cached("qownnotes")
+    result = await update_manager._catalog_cache.load_catalog("qownnotes")
 
     assert result == catalog_data
     assert mock_config_manager.load_catalog.call_count == 1
@@ -54,11 +54,11 @@ async def test_catalog_caching_cached_load(
     mock_config_manager.load_catalog.return_value = catalog_data
 
     # First call - loads from file
-    result1 = await update_manager._load_catalog_cached("qownnotes")
+    result1 = await update_manager._catalog_cache.load_catalog("qownnotes")
     assert mock_config_manager.load_catalog.call_count == 1
 
     # Second call - returns cached value
-    result2 = await update_manager._load_catalog_cached("qownnotes")
+    result2 = await update_manager._catalog_cache.load_catalog("qownnotes")
     assert (
         mock_config_manager.load_catalog.call_count == 1
     )  # No additional call
@@ -82,17 +82,17 @@ async def test_catalog_caching_different_catalogs(
     mock_config_manager.load_catalog.side_effect = load_catalog_side_effect
 
     # Load first catalog
-    result1 = await update_manager._load_catalog_cached("qownnotes")
+    result1 = await update_manager._catalog_cache.load_catalog("qownnotes")
     assert result1 == catalog1
     assert mock_config_manager.load_catalog.call_count == 1
 
     # Load second catalog
-    result2 = await update_manager._load_catalog_cached("zen-browser")
+    result2 = await update_manager._catalog_cache.load_catalog("zen-browser")
     assert result2 == catalog2
     assert mock_config_manager.load_catalog.call_count == 2
 
     # Access first catalog again - should be cached
-    result3 = await update_manager._load_catalog_cached("qownnotes")
+    result3 = await update_manager._catalog_cache.load_catalog("qownnotes")
     assert result3 == catalog1
     assert mock_config_manager.load_catalog.call_count == 2  # No new call
 
@@ -104,12 +104,12 @@ async def test_catalog_caching_none_result(
     mock_config_manager.load_catalog.return_value = None
 
     # First call - returns None
-    result1 = await update_manager._load_catalog_cached("nonexistent")
+    result1 = await update_manager._catalog_cache.load_catalog("nonexistent")
     assert result1 is None
     assert mock_config_manager.load_catalog.call_count == 1
 
     # Second call - should use cached None
-    result2 = await update_manager._load_catalog_cached("nonexistent")
+    result2 = await update_manager._catalog_cache.load_catalog("nonexistent")
     assert result2 is None
     assert (
         mock_config_manager.load_catalog.call_count == 1
@@ -132,7 +132,7 @@ async def test_catalog_cache_isolated_per_instance(mock_config_manager):
     }
 
     # Load catalog in first instance
-    await manager1._load_catalog_cached("qownnotes")
+    await manager1._catalog_cache.load_catalog("qownnotes")
     assert mock_config_manager.load_catalog.call_count == 1
 
     # Create second instance
@@ -146,5 +146,5 @@ async def test_catalog_cache_isolated_per_instance(mock_config_manager):
     }
 
     # Load same catalog in second instance - should load again (different cache)
-    await manager2._load_catalog_cached("qownnotes")
+    await manager2._catalog_cache.load_catalog("qownnotes")
     assert mock_config_manager.load_catalog.call_count == 2

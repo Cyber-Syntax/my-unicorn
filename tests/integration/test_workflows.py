@@ -29,7 +29,7 @@ from my_unicorn.core.protocols.progress import (
     ProgressReporter,
     ProgressType,
 )
-from my_unicorn.core.update.update import UpdateManager
+from my_unicorn.core.update.manager import UpdateManager
 from my_unicorn.core.verification.service import VerificationService
 from my_unicorn.exceptions import InstallError, UpdateError, VerificationError
 
@@ -202,7 +202,7 @@ class TestProgressReporterProtocolIntegration:
         """Verify UpdateManager accepts any ProgressReporter implementation."""
         reporter = MockProgressReporter()
 
-        with patch("my_unicorn.core.update.update.ConfigManager") as mock_cm:
+        with patch("my_unicorn.core.update.manager.ConfigManager") as mock_cm:
             mock_cm.return_value.load_global_config.return_value = {
                 "directory": {
                     "storage": Path("/tmp/storage"),
@@ -339,7 +339,7 @@ class TestDomainExceptionPropagation:
     @pytest.mark.asyncio
     async def test_update_error_contains_context(self) -> None:
         """Verify UpdateError contains rich context when catalog fails."""
-        with patch("my_unicorn.core.update.update.ConfigManager") as mock_cm:
+        with patch("my_unicorn.core.update.manager.ConfigManager") as mock_cm:
             mock_cm.return_value.load_global_config.return_value = {
                 "directory": {
                     "storage": Path("/tmp/storage"),
@@ -352,9 +352,9 @@ class TestDomainExceptionPropagation:
 
             manager = UpdateManager(config_manager=mock_cm.return_value)
 
-            # _load_catalog_if_needed takes (app_name, catalog_ref)
+            # load_catalog_if_needed takes (app_name, catalog_ref)
             with pytest.raises(UpdateError) as exc_info:
-                await manager._load_catalog_if_needed(
+                await manager._catalog_cache.load_catalog_if_needed(
                     "test-app", "nonexistent-catalog"
                 )
 
@@ -525,7 +525,7 @@ class TestCoreModuleIndependence:
 
     def test_update_manager_works_with_null_reporter(self) -> None:
         """Verify UpdateManager functions with NullProgressReporter."""
-        with patch("my_unicorn.core.update.update.ConfigManager") as mock_cm:
+        with patch("my_unicorn.core.update.manager.ConfigManager") as mock_cm:
             mock_cm.return_value.load_global_config.return_value = {
                 "directory": {
                     "storage": Path("/tmp/storage"),

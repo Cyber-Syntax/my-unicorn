@@ -13,7 +13,7 @@ from my_unicorn.config.schemas.validator import ConfigValidator
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.cache import ReleaseCacheManager
 from my_unicorn.core.catalog import CatalogService
-from my_unicorn.core.update.update import UpdateManager
+from my_unicorn.core.update.manager import UpdateManager
 
 
 class CatalogHandler(BaseCommandHandler):
