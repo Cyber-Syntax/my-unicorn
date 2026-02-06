@@ -18,7 +18,7 @@ try:
 
     _YAML_AVAILABLE = True
 except ImportError:  # pragma: no cover - exercised via patching in tests
-    yaml = None
+    yaml = None  # type: ignore[assignment]
     _YAML_AVAILABLE = False
 
 
@@ -87,7 +87,8 @@ def _parse_yaml_files_dict(
         return None
 
     if isinstance(hash_value, str):
-        return _normalize_hash_value(hash_value), YAML_DEFAULT_HASH
+        normalized_hash = _normalize_hash_value(hash_value)
+        return normalized_hash, YAML_DEFAULT_HASH
     if isinstance(hash_value, dict):
         return _extract_hash_from_dict(hash_value)
 

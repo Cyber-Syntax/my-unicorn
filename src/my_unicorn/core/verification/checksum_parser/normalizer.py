@@ -180,9 +180,20 @@ def _extract_hash_from_dict(data: dict) -> tuple[str, HashType] | None:
 
     if data:
         first_key, first_value = next(iter(data.items()))
+        # Validate hash type
+        validated_hash: HashType
+        if isinstance(first_key, str) and first_key in (
+            "sha1",
+            "sha256",
+            "sha512",
+            "md5",
+        ):
+            validated_hash = first_key  # type: ignore[assignment]
+        else:
+            validated_hash = DEFAULT_HASH_TYPE
         return (
             _normalize_hash_value(first_value),
-            first_key if isinstance(first_key, str) else DEFAULT_HASH_TYPE,
+            validated_hash,
         )
 
     return None

@@ -65,6 +65,7 @@ dev = [
   "aioresponses",
   "requests",
   "mypy",
+  "types-pyyaml",
 ]
 lint = ["ruff"]
 

@@ -17,8 +17,17 @@ from my_unicorn.core.verification.context import (
     VerificationConfig,
     VerificationContext,
 )
+from my_unicorn.core.verification.detection import (
+    detect_available_methods,
+    should_skip_verification,
+)
+from my_unicorn.core.verification.helpers import build_checksum_url
 from my_unicorn.core.verification.results import VerificationResult
 from my_unicorn.core.verification.service import VerificationService
+from my_unicorn.core.verification.verification_methods import (
+    verify_checksum_file,
+    verify_digest,
+)
 from my_unicorn.core.verification.verifier import (
     LARGE_FILE_THRESHOLD,
     Verifier,
@@ -210,10 +219,8 @@ class TestVerificationService:
         )
         config = {"checksum_file": ""}
 
-        has_digest, checksum_files = (
-            verification_service._detect_available_methods(
-                asset, config, sample_assets, "Legcord", "Legcord", "v1.1.5"
-            )
+        has_digest, checksum_files = detect_available_methods(
+            asset, config, sample_assets, "Legcord", "Legcord", "v1.1.5"
         )
 
         assert has_digest is False
@@ -234,15 +241,13 @@ class TestVerificationService:
         )
         config = {"checksum_file": ""}
 
-        has_digest, checksum_files = (
-            verification_service._detect_available_methods(
-                asset,
-                config,
-                sample_assets_with_both,
-                "test",
-                "test",
-                "v1.0.0",
-            )
+        has_digest, checksum_files = detect_available_methods(
+            asset,
+            config,
+            sample_assets_with_both,
+            "test",
+            "test",
+            "v1.0.0",
         )
 
         assert has_digest is True
@@ -261,7 +266,7 @@ class TestVerificationService:
         config = {"checksum_file": "manual-checksums.txt"}
 
         has_digest, checksum_files = (
-            verification_service._detect_available_methods(
+            detect_available_methods(
                 asset, config, None, "owner", "repo", "v1.0.0"
             )
         )
@@ -295,7 +300,7 @@ class TestVerificationService:
         }
 
         has_digest, checksum_files = (
-            verification_service._detect_available_methods(
+            detect_available_methods(
                 asset, config, None, "owner", "repo", "v1.0.0"
             )
         )
@@ -320,7 +325,7 @@ class TestVerificationService:
 
         # Without assets parameter (old behavior)
         has_digest, checksum_files = (
-            verification_service._detect_available_methods(asset, config)
+            detect_available_methods(asset, config)
         )
 
         assert has_digest is True
@@ -330,7 +335,7 @@ class TestVerificationService:
         """Test skip verification decision logic."""
         # Skip with no strong methods available
         should_skip, updated_config = (
-            verification_service._should_skip_verification(
+            should_skip_verification(
                 {"skip": True}, has_digest=False, has_checksum_files=False
             )
         )
@@ -339,7 +344,7 @@ class TestVerificationService:
 
         # Override skip when strong methods available
         should_skip, updated_config = (
-            verification_service._should_skip_verification(
+            should_skip_verification(
                 {"skip": True}, has_digest=True, has_checksum_files=False
             )
         )
@@ -348,7 +353,7 @@ class TestVerificationService:
 
         # No skip when not configured
         should_skip, updated_config = (
-            verification_service._should_skip_verification(
+            should_skip_verification(
                 {"skip": False}, has_digest=False, has_checksum_files=True
             )
         )
@@ -364,7 +369,7 @@ class TestVerificationService:
             mock_verifier_class.return_value = mock_verifier
             mock_verifier.verify_digest.return_value = None
 
-            result = await verification_service._verify_digest(
+            result = await verify_digest(
                 mock_verifier, "sha256:abc123", "testapp", False
             )
 
@@ -384,7 +389,7 @@ class TestVerificationService:
                 "Hash mismatch"
             )
 
-            result = await verification_service._verify_digest(
+            result = await verify_digest(
                 mock_verifier, "sha256:abc123", "testapp", False
             )
 
@@ -417,11 +422,12 @@ class TestVerificationService:
             )
             mock_verifier.compute_hash.return_value = LEGCORD_EXPECTED_HEX
 
-            result = await verification_service._verify_checksum_file(
+            result = await verify_checksum_file(
                 mock_verifier,
                 checksum_file,
                 "Legcord-1.1.5-linux-x86_64.AppImage",
                 "testapp",
+                mock_download_service,
             )
 
             assert result.passed is True
@@ -463,11 +469,12 @@ class TestVerificationService:
             mock_verifier.parse_checksum_file.return_value = expected_hash
             mock_verifier.compute_hash.return_value = expected_hash
 
-            result = await verification_service._verify_checksum_file(
+            result = await verify_checksum_file(
                 mock_verifier,
                 checksum_file,
                 "siyuan-3.2.1-linux.AppImage",
                 "testapp",
+                mock_download_service,
             )
 
             assert result.passed is True
@@ -501,11 +508,12 @@ class TestVerificationService:
             )
             mock_verifier.compute_hash.return_value = "different_hash"
 
-            result = await verification_service._verify_checksum_file(
+            result = await verify_checksum_file(
                 mock_verifier,
                 checksum_file,
                 "Legcord-1.1.5-linux-x86_64.AppImage",
                 "testapp",
+                mock_download_service,
             )
 
             assert result.passed is False
@@ -533,11 +541,12 @@ class TestVerificationService:
             mock_verifier_class.return_value = mock_verifier
             mock_verifier.parse_checksum_file.return_value = None  # Not found
 
-            result = await verification_service._verify_checksum_file(
+            result = await verify_checksum_file(
                 mock_verifier,
                 checksum_file,
                 "NonExistentFile.AppImage",
                 "testapp",
+                mock_download_service,
             )
 
             assert result.passed is False
@@ -1159,7 +1168,7 @@ class TestSHA1MD5Verification:
 
     def test_build_checksum_url(self, verification_service):
         """Test checksum URL building."""
-        url = verification_service._build_checksum_url(
+        url = build_checksum_url(
             "owner", "repo", "v1.0.0", "checksums.txt"
         )
         expected = "https://github.com/owner/repo/releases/download/v1.0.0/checksums.txt"
@@ -1167,7 +1176,7 @@ class TestSHA1MD5Verification:
 
     def test_build_checksum_url_special_characters(self, verification_service):
         """Test checksum URL building with special characters."""
-        url = verification_service._build_checksum_url(
+        url = build_checksum_url(
             "owner", "repo", "v1.0.0-beta", "SHA256SUMS.txt"
         )
         expected = "https://github.com/owner/repo/releases/download/v1.0.0-beta/SHA256SUMS.txt"

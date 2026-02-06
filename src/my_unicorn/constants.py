@@ -268,10 +268,10 @@ HashType = Literal["sha1", "sha256", "sha512", "md5"]
 DEFAULT_HASH_TYPE: Final[HashType] = "sha256"
 
 # Default hash to prefer for YAML checksum files
-YAML_DEFAULT_HASH: Final[str] = "sha512"
+YAML_DEFAULT_HASH: Final[HashType] = "sha512"
 
 # Preferred order when checking multiple hash types
-HASH_PREFERENCE_ORDER: Final[tuple[str, ...]] = (
+HASH_PREFERENCE_ORDER: Final[tuple[HashType, ...]] = (
     "sha512",
     "sha256",
     "sha1",
