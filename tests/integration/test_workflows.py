@@ -22,7 +22,7 @@ import pytest
 
 from my_unicorn.core.download import HAS_AIOFILES, DownloadService
 from my_unicorn.core.github import Asset, Release
-from my_unicorn.core.install.install import InstallHandler
+from my_unicorn.core.install import InstallHandler
 from my_unicorn.core.post_download import PostDownloadResult
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,

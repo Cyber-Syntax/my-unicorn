@@ -8,7 +8,7 @@ import pytest
 
 from my_unicorn.constants import InstallSource
 from my_unicorn.core.github import Asset, Release
-from my_unicorn.core.install.install import InstallHandler
+from my_unicorn.core.install import InstallHandler
 from my_unicorn.core.post_download import PostDownloadResult
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,

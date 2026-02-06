@@ -1,6 +1,5 @@
 """Tests for CatalogService display functions."""
 
-
 from my_unicorn.core.catalog import CatalogService
 
 

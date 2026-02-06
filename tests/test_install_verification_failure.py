@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from my_unicorn.core.install.install import InstallHandler
+from my_unicorn.core.install import InstallHandler
 from my_unicorn.exceptions import InstallError
 
 

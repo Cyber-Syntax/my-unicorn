@@ -31,7 +31,6 @@ class TestRealWorldChecksumFiles:
         assert len(entry.hash_value) == length
         assert all(c in "0123456789abcdef" for c in entry.hash_value)
 
-
     def test_parse_heroic_yaml_hex_sha512(self) -> None:
         """Test Heroic YAML with pure hex SHA512.
 
