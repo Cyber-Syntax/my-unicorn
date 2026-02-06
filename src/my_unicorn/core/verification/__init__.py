@@ -10,12 +10,12 @@ from my_unicorn.core.verification.checksum_parser import (
     find_checksum_entry,
     parse_checksum_file,
 )
-from my_unicorn.core.verification.service import (
+from my_unicorn.core.verification.context import VerificationConfig
+from my_unicorn.core.verification.results import (
     MethodResult,
-    VerificationConfig,
     VerificationResult,
-    VerificationService,
 )
+from my_unicorn.core.verification.service import VerificationService
 from my_unicorn.core.verification.verifier import Verifier
 
 __all__ = [

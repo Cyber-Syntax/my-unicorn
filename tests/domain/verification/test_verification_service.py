@@ -13,12 +13,12 @@ from my_unicorn.core.protocols.progress import (
     ProgressReporter,
     ProgressType,
 )
-from my_unicorn.core.verification.service import (
+from my_unicorn.core.verification.context import (
     VerificationConfig,
     VerificationContext,
-    VerificationResult,
-    VerificationService,
 )
+from my_unicorn.core.verification.results import VerificationResult
+from my_unicorn.core.verification.service import VerificationService
 from my_unicorn.core.verification.verifier import (
     LARGE_FILE_THRESHOLD,
     Verifier,

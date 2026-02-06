@@ -15,7 +15,8 @@ from my_unicorn.core.protocols.progress import (
     ProgressReporter,
     ProgressType,
 )
-from my_unicorn.core.update.update import UpdateInfo, UpdateManager
+from my_unicorn.core.update.info import UpdateInfo
+from my_unicorn.core.update.update import UpdateManager
 from my_unicorn.exceptions import UpdateError, VerificationError
 
 # Test constants

@@ -10,7 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.core.github import Release
-from my_unicorn.core.update.update import UpdateInfo, UpdateManager
+from my_unicorn.core.update.info import UpdateInfo
+from my_unicorn.core.update.update import UpdateManager
 
 
 class TestMissingAppImageUpdate:

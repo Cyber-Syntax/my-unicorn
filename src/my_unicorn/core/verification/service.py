@@ -14,7 +14,6 @@ Logging Strategy:
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -35,6 +34,11 @@ from my_unicorn.core.verification.checksum_parser import (
     ChecksumFileResult,
     parse_all_checksums,
 )
+from my_unicorn.core.verification.context import VerificationContext
+from my_unicorn.core.verification.results import (
+    MethodResult,
+    VerificationResult,
+)
 from my_unicorn.core.verification.verifier import Verifier
 from my_unicorn.exceptions import VerificationError
 from my_unicorn.logger import get_logger
@@ -44,133 +48,6 @@ if TYPE_CHECKING:
     from my_unicorn.core.download import DownloadService
 
 logger = get_logger(__name__, enable_file_logging=True)
-
-
-@dataclass(slots=True, frozen=True)
-class VerificationConfig:
-    """Verification configuration data."""
-
-    skip: bool = False
-    checksum_file: str | None = None
-    checksum_hash_type: str = "sha256"
-    digest_enabled: bool = False
-
-    @classmethod
-    def from_dict(cls, config: dict[str, Any]) -> VerificationConfig:
-        """Create VerificationConfig from a dictionary.
-
-        Args:
-            config: Dictionary with configuration values
-
-        Returns:
-            VerificationConfig instance
-
-        """
-        return cls(
-            skip=config.get("skip", False),
-            checksum_file=config.get("checksum_file"),
-            checksum_hash_type=config.get("checksum_hash_type", "sha256"),
-            digest_enabled=config.get(VerificationMethod.DIGEST, False),
-        )
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for backward compatibility.
-
-        Returns:
-            Dictionary with configuration values
-
-        """
-        return {
-            "skip": self.skip,
-            "checksum_file": self.checksum_file,
-            "checksum_hash_type": self.checksum_hash_type,
-            VerificationMethod.DIGEST: self.digest_enabled,
-        }
-
-
-@dataclass(slots=True, frozen=True)
-class MethodResult:
-    """Result of a single verification method attempt."""
-
-    passed: bool
-    hash: str
-    details: str
-    computed_hash: str | None = None
-    url: str | None = None
-    hash_type: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for backward compatibility.
-
-        Returns:
-            Dictionary representation
-
-        """
-        result: dict[str, Any] = {
-            "passed": self.passed,
-            "hash": self.hash,
-            "details": self.details,
-        }
-        if self.computed_hash:
-            result["computed_hash"] = self.computed_hash
-        if self.url:
-            result["url"] = self.url
-        if self.hash_type:
-            result["hash_type"] = self.hash_type
-        return result
-
-
-@dataclass(slots=True, frozen=True)
-class VerificationResult:
-    """Result of verification attempt.
-
-    Attributes:
-        passed: Overall verification success status
-        methods: Dictionary of all verification method results
-        updated_config: Configuration with verification results
-        warning: Optional warning message for partial verification success
-
-    """
-
-    passed: bool
-    methods: dict[str, Any]
-    updated_config: dict[str, Any]
-    warning: str | None = None
-
-
-@dataclass(slots=True)
-class VerificationContext:
-    """Internal context for verification state management.
-
-    Holds mutable state during verification process to reduce
-    parameter passing.
-    """
-
-    file_path: Path
-    asset: Asset
-    config: dict[str, Any]
-    owner: str
-    repo: str
-    tag_name: str
-    app_name: str
-    assets: list[Asset] | None
-    progress_task_id: Any | None
-    # Computed during preparation
-    has_digest: bool = False
-    checksum_files: list[ChecksumFileInfo] | None = None
-    verifier: Verifier | None = None
-    updated_config: dict[str, Any] | None = None
-    # Results
-    verification_passed: bool = False
-    verification_methods: dict[str, Any] | None = None
-    verification_warning: str | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize mutable state after dataclass creation."""
-        if self.verification_methods is None:
-            self.verification_methods = {}
-        if self.updated_config is None:
-            self.updated_config = self.config.copy()
 
 
 class VerificationService:

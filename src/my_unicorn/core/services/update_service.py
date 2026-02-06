@@ -15,7 +15,8 @@ from my_unicorn.core.protocols.progress import (
     ProgressReporter,
     github_api_progress_task,
 )
-from my_unicorn.core.update.update import UpdateInfo, UpdateManager
+from my_unicorn.core.update.info import UpdateInfo
+from my_unicorn.core.update.update import UpdateManager
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
