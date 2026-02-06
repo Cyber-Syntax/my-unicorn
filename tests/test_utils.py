@@ -1,8 +1,8 @@
-from my_unicorn.core.desktop_entry import (
+from my_unicorn.core.verification.verifier import format_bytes
+from my_unicorn.utils.desktop_utils import (
     create_desktop_entry_name,
     sanitize_filename,
 )
-from my_unicorn.core.verification.verifier import format_bytes
 
 
 def test_sanitize_filename_removes_invalid_chars():
