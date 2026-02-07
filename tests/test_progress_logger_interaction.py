@@ -10,9 +10,9 @@ import logging
 
 import pytest
 
+from my_unicorn.core.progress.display import ProgressDisplay
+from my_unicorn.core.progress.progress_types import ProgressType
 from my_unicorn.logger import get_logger
-from my_unicorn.ui.display import ProgressDisplay
-from my_unicorn.ui.progress_types import ProgressType
 
 
 @pytest.mark.asyncio

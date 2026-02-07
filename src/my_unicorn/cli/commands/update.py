@@ -7,6 +7,7 @@ UpdateApplicationService via ServiceContainer for dependency injection.
 from argparse import Namespace
 
 from my_unicorn.cli.container import ServiceContainer
+from my_unicorn.core.progress.progress import ProgressDisplay
 from my_unicorn.logger import get_logger
 from my_unicorn.ui.display_update import (
     display_check_results,
@@ -14,7 +15,6 @@ from my_unicorn.ui.display_update import (
     display_update_error,
     display_update_results,
 )
-from my_unicorn.ui.progress import ProgressDisplay
 
 from .base import BaseCommandHandler
 from .helpers import parse_targets

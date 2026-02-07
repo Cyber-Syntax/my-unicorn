@@ -7,12 +7,12 @@ InstallApplicationService via ServiceContainer for dependency injection.
 from argparse import Namespace
 
 from my_unicorn.cli.container import ServiceContainer
+from my_unicorn.core.progress.progress import ProgressDisplay
 from my_unicorn.core.services.install_service import InstallOptions
 from my_unicorn.ui.display_install import (
     display_no_targets_error,
     print_install_summary,
 )
-from my_unicorn.ui.progress import ProgressDisplay
 
 from .base import BaseCommandHandler
 from .helpers import ensure_app_directories, get_install_paths, parse_targets

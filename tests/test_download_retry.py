@@ -15,7 +15,7 @@ import aiohttp
 import pytest
 
 from my_unicorn.core.download import DownloadService
-from my_unicorn.ui.progress import ProgressType
+from my_unicorn.core.progress.progress import ProgressType
 
 # Test constants
 DEFAULT_RETRY_ATTEMPTS = 3

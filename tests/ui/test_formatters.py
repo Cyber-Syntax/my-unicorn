@@ -1,6 +1,6 @@
 """Tests for UI formatters module."""
 
-from my_unicorn.ui.formatters import (
+from my_unicorn.core.progress.formatters import (
     _format_verification_legacy,
     format_verification_info,
 )

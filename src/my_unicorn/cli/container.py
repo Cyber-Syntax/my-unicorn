@@ -101,7 +101,7 @@ class ServiceContainer:
     Example:
         >>> from my_unicorn.cli.container import ServiceContainer
         >>> from my_unicorn.config import ConfigManager
-        >>> from my_unicorn.ui.progress import ProgressDisplay
+        >>> from my_unicorn.core.progress.progress import ProgressDisplay
         >>>
         >>> config = ConfigManager()
         >>> progress = ProgressDisplay()

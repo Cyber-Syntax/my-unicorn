@@ -6,7 +6,7 @@ they should depend on the ProgressReporter protocol from
 core.protocols.progress.
 
 Example:
-    from my_unicorn.ui.display import ProgressDisplay
+    from my_unicorn.core.progress.display import ProgressDisplay
 
     progress = ProgressDisplay()
     task_id = progress.add_task("Download", ProgressType.DOWNLOAD, total=1000)

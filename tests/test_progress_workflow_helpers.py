@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from my_unicorn.ui.progress import (
+from my_unicorn.core.progress.progress import (
     github_api_progress_task,
     operation_progress_session,
 )

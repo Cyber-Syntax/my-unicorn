@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from my_unicorn.ui.progress import (
+from my_unicorn.core.progress.progress import (
     AsciiProgressBackend,
     ProgressConfig,
     ProgressDisplay,
@@ -2041,7 +2041,7 @@ class TestProgressCoverageExtras:
         """Force ID cache eviction and ensure _calculate_speed returns 0 when no current speed."""
         pd = ProgressDisplay()
         # Temporarily shrink the cache limit to trigger eviction
-        from my_unicorn.ui import progress_types
+        from my_unicorn.core.progress import progress_types
 
         old_limit = getattr(progress_types, "ID_CACHE_LIMIT", None)
         try:
