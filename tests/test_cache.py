@@ -12,7 +12,8 @@ import orjson
 import pytest
 
 from my_unicorn.config import ConfigManager
-from my_unicorn.core.cache import CacheEntry, ReleaseCacheManager
+from my_unicorn.core.cache import ReleaseCacheManager
+from my_unicorn.types import CacheEntry
 
 
 class TestReleaseCacheManager:

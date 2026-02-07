@@ -20,7 +20,7 @@ class TestDisplayUpdateSummary:
 
     def test_display_update_summary_no_apps(self, capsys):
         """Test display_update_summary with no apps."""
-        from my_unicorn.ui.display_update import display_update_summary
+        from my_unicorn.core.update import display_update_summary
 
         display_update_summary([], [], [], [], check_only=False)
 
@@ -29,7 +29,7 @@ class TestDisplayUpdateSummary:
 
     def test_display_update_summary_check_only(self, capsys):
         """Test display_update_summary in check-only mode."""
-        from my_unicorn.ui.display_update import display_update_summary
+        from my_unicorn.core.update import display_update_summary
 
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -47,7 +47,7 @@ class TestDisplayUpdateSummary:
 
     def test_display_update_summary_update_operation(self, capsys):
         """Test display_update_summary for update operation."""
-        from my_unicorn.ui.display_update import display_update_summary
+        from my_unicorn.core.update import display_update_summary
 
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -74,7 +74,7 @@ class TestDisplayUpdateSummary:
 
     def test_display_update_summary_with_failures(self, capsys):
         """Test display_update_summary with failed updates."""
-        from my_unicorn.ui.display_update import display_update_summary
+        from my_unicorn.core.update import display_update_summary
 
         update_infos = [
             MockUpdateInfo(
@@ -110,7 +110,9 @@ class TestDisplayCheckOnlySummary:
 
     def test_display_check_only_summary_no_apps(self, capsys):
         """Test _display_check_only_summary with no apps."""
-        from my_unicorn.ui.display_update import _display_check_only_summary
+        from my_unicorn.core.update.display_update import (
+            _display_check_only_summary,
+        )
 
         _display_check_only_summary([])
 
@@ -119,7 +121,9 @@ class TestDisplayCheckOnlySummary:
 
     def test_display_check_only_summary_with_updates(self, capsys):
         """Test _display_check_only_summary with apps having updates."""
-        from my_unicorn.ui.display_update import _display_check_only_summary
+        from my_unicorn.core.update.display_update import (
+            _display_check_only_summary,
+        )
 
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -140,7 +144,9 @@ class TestDisplayCheckOnlySummary:
 
     def test_display_check_only_summary_no_updates(self, capsys):
         """Test _display_check_only_summary with no updates available."""
-        from my_unicorn.ui.display_update import _display_check_only_summary
+        from my_unicorn.core.update.display_update import (
+            _display_check_only_summary,
+        )
 
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "1.0.0", has_update=False),
@@ -162,7 +168,7 @@ class TestDisplayUpdateDetails:
 
     def test_display_update_details_no_info(self, capsys):
         """Test display_update_details with no information."""
-        from my_unicorn.ui.display_update import display_update_details
+        from my_unicorn.core.update import display_update_details
 
         display_update_details([], [], [])
 
@@ -171,7 +177,7 @@ class TestDisplayUpdateDetails:
 
     def test_display_update_details_with_data(self, capsys):
         """Test display_update_details with complete data."""
-        from my_unicorn.ui.display_update import display_update_details
+        from my_unicorn.core.update import display_update_details
 
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -198,7 +204,7 @@ class TestGetUpdateStatus:
 
     def test_get_update_status_updated(self):
         """Test _get_update_status for updated app."""
-        from my_unicorn.ui.display_update import _get_update_status
+        from my_unicorn.core.update.display_update import _get_update_status
 
         info = MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True)
         status = _get_update_status(info, ["app1"], [])
@@ -207,7 +213,7 @@ class TestGetUpdateStatus:
 
     def test_get_update_status_failed(self):
         """Test _get_update_status for failed app."""
-        from my_unicorn.ui.display_update import _get_update_status
+        from my_unicorn.core.update.display_update import _get_update_status
 
         info = MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True)
         status = _get_update_status(info, [], ["app1"])
@@ -216,7 +222,7 @@ class TestGetUpdateStatus:
 
     def test_get_update_status_update_available(self):
         """Test _get_update_status for app with update available."""
-        from my_unicorn.ui.display_update import _get_update_status
+        from my_unicorn.core.update.display_update import _get_update_status
 
         info = MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True)
         status = _get_update_status(info, [], [])
@@ -225,7 +231,7 @@ class TestGetUpdateStatus:
 
     def test_get_update_status_up_to_date(self):
         """Test _get_update_status for up-to-date app."""
-        from my_unicorn.ui.display_update import _get_update_status
+        from my_unicorn.core.update.display_update import _get_update_status
 
         info = MockUpdateInfo("app1", "1.0.0", "1.0.0", has_update=False)
         status = _get_update_status(info, [], [])
@@ -238,7 +244,9 @@ class TestFormatUpdateVersionInfo:
 
     def test_format_update_version_info_with_update(self):
         """Test _format_update_version_info with update available."""
-        from my_unicorn.ui.display_update import _format_update_version_info
+        from my_unicorn.core.update.display_update import (
+            _format_update_version_info,
+        )
 
         info = MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True)
         version_str = _format_update_version_info(info)
@@ -247,7 +255,9 @@ class TestFormatUpdateVersionInfo:
 
     def test_format_update_version_info_no_update(self):
         """Test _format_update_version_info without update."""
-        from my_unicorn.ui.display_update import _format_update_version_info
+        from my_unicorn.core.update.display_update import (
+            _format_update_version_info,
+        )
 
         info = MockUpdateInfo("app1", "1.0.0", "1.0.0", has_update=False)
         version_str = _format_update_version_info(info)
@@ -256,7 +266,9 @@ class TestFormatUpdateVersionInfo:
 
     def test_format_update_version_info_long_string(self):
         """Test _format_update_version_info with long version string."""
-        from my_unicorn.ui.display_update import _format_update_version_info
+        from my_unicorn.core.update.display_update import (
+            _format_update_version_info,
+        )
 
         long_version = "1.0.0-very-long-version-string-that-exceeds-limit"
         info = MockUpdateInfo(
@@ -273,7 +285,7 @@ class TestFindUpdateInfo:
 
     def test_find_update_info_found(self):
         """Test _find_update_info when app is found."""
-        from my_unicorn.ui.display_update import _find_update_info
+        from my_unicorn.core.update.display_update import _find_update_info
 
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -288,7 +300,7 @@ class TestFindUpdateInfo:
 
     def test_find_update_info_not_found(self):
         """Test _find_update_info when app is not found."""
-        from my_unicorn.ui.display_update import _find_update_info
+        from my_unicorn.core.update.display_update import _find_update_info
 
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -307,7 +319,7 @@ class TestDisplayMessageFunctions:
 
     def test_display_update_progress(self, capsys):
         """Test display_update_progress function."""
-        from my_unicorn.ui.display_update import display_update_progress
+        from my_unicorn.core.update import display_update_progress
 
         display_update_progress("Processing app1...")
 
@@ -316,7 +328,7 @@ class TestDisplayMessageFunctions:
 
     def test_display_update_success(self, capsys):
         """Test display_update_success function."""
-        from my_unicorn.ui.display_update import display_update_success
+        from my_unicorn.core.update import display_update_success
 
         display_update_success("App updated successfully")
 
@@ -325,7 +337,7 @@ class TestDisplayMessageFunctions:
 
     def test_display_update_error(self, capsys):
         """Test display_update_error function."""
-        from my_unicorn.ui.display_update import display_update_error
+        from my_unicorn.core.update import display_update_error
 
         display_update_error("Update failed")
 
@@ -334,7 +346,7 @@ class TestDisplayMessageFunctions:
 
     def test_display_update_warning(self, capsys):
         """Test display_update_warning function."""
-        from my_unicorn.ui.display_update import display_update_warning
+        from my_unicorn.core.update import display_update_warning
 
         display_update_warning("Low disk space")
 
@@ -347,7 +359,7 @@ class TestDisplayCheckResults:
 
     def test_display_check_results_with_updates(self):
         """Test display_check_results with available updates."""
-        from my_unicorn.ui.display_update import display_check_results
+        from my_unicorn.core.update import display_check_results
 
         results = {
             "available_updates": [
@@ -364,7 +376,9 @@ class TestDisplayCheckResults:
             ]
         }
 
-        with patch("my_unicorn.ui.display_update.logger") as mock_logger:
+        with patch(
+            "my_unicorn.core.update.display_update.logger"
+        ) as mock_logger:
             display_check_results(results)
 
             assert mock_logger.info.call_count >= 3
@@ -375,11 +389,13 @@ class TestDisplayCheckResults:
 
     def test_display_check_results_no_updates(self):
         """Test display_check_results with no updates."""
-        from my_unicorn.ui.display_update import display_check_results
+        from my_unicorn.core.update import display_check_results
 
         results = {"available_updates": []}
 
-        with patch("my_unicorn.ui.display_update.logger") as mock_logger:
+        with patch(
+            "my_unicorn.core.update.display_update.logger"
+        ) as mock_logger:
             display_check_results(results)
 
             mock_logger.info.assert_called_once_with(
@@ -392,7 +408,7 @@ class TestDisplayUpdateResults:
 
     def test_display_update_results_with_infos(self, capsys):
         """Test display_update_results with update_infos."""
-        from my_unicorn.ui.display_update import display_update_results
+        from my_unicorn.core.update import display_update_results
 
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -415,7 +431,7 @@ class TestDisplayUpdateResults:
 
     def test_display_update_results_with_failures(self, capsys):
         """Test display_update_results with failed updates."""
-        from my_unicorn.ui.display_update import display_update_results
+        from my_unicorn.core.update import display_update_results
 
         update_infos = [
             MockUpdateInfo(
@@ -443,7 +459,7 @@ class TestDisplayUpdateResults:
 
     def test_display_update_results_with_up_to_date(self, capsys):
         """Test display_update_results with up-to-date apps."""
-        from my_unicorn.ui.display_update import display_update_results
+        from my_unicorn.core.update import display_update_results
 
         update_infos = [
             MockUpdateInfo("app1", "2.0.0", "2.0.0", has_update=False),
@@ -464,7 +480,7 @@ class TestDisplayUpdateResults:
 
     def test_display_update_results_fallback_without_infos(self):
         """Test display_update_results fallback when no update_infos."""
-        from my_unicorn.ui.display_update import display_update_results
+        from my_unicorn.core.update import display_update_results
 
         results = {
             "updated": ["app1"],
@@ -473,7 +489,9 @@ class TestDisplayUpdateResults:
             "update_infos": [],
         }
 
-        with patch("my_unicorn.ui.display_update.logger") as mock_logger:
+        with patch(
+            "my_unicorn.core.update.display_update.logger"
+        ) as mock_logger:
             display_update_results(results)
 
             mock_logger.info.assert_any_call(
@@ -486,7 +504,7 @@ class TestDisplayUpdateResults:
 
     def test_display_update_results_mixed(self, capsys):
         """Test display_update_results with mixed results."""
-        from my_unicorn.ui.display_update import display_update_results
+        from my_unicorn.core.update import display_update_results
 
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -513,7 +531,7 @@ class TestDisplayInvalidApps:
 
     def test_display_invalid_apps_with_suggestions(self):
         """Test display_invalid_apps with installed apps for suggestions."""
-        from my_unicorn.ui.display_update import display_invalid_apps
+        from my_unicorn.core.update import display_invalid_apps
 
         mock_config_manager = MagicMock()
         mock_config_manager.list_installed_apps.return_value = [
@@ -521,7 +539,9 @@ class TestDisplayInvalidApps:
             "chrome",
         ]
 
-        with patch("my_unicorn.ui.display_update.logger") as mock_logger:
+        with patch(
+            "my_unicorn.core.update.display_update.logger"
+        ) as mock_logger:
             display_invalid_apps(["unknown"], mock_config_manager)
 
             mock_logger.warning.assert_called_once_with(
@@ -533,12 +553,14 @@ class TestDisplayInvalidApps:
 
     def test_display_invalid_apps_no_installed(self):
         """Test display_invalid_apps with no installed apps."""
-        from my_unicorn.ui.display_update import display_invalid_apps
+        from my_unicorn.core.update import display_invalid_apps
 
         mock_config_manager = MagicMock()
         mock_config_manager.list_installed_apps.return_value = []
 
-        with patch("my_unicorn.ui.display_update.logger") as mock_logger:
+        with patch(
+            "my_unicorn.core.update.display_update.logger"
+        ) as mock_logger:
             display_invalid_apps(["unknown"], mock_config_manager)
 
             mock_logger.warning.assert_called_once()
@@ -546,11 +568,13 @@ class TestDisplayInvalidApps:
 
     def test_display_invalid_apps_empty_list(self):
         """Test display_invalid_apps with empty list."""
-        from my_unicorn.ui.display_update import display_invalid_apps
+        from my_unicorn.core.update import display_invalid_apps
 
         mock_config_manager = MagicMock()
 
-        with patch("my_unicorn.ui.display_update.logger") as mock_logger:
+        with patch(
+            "my_unicorn.core.update.display_update.logger"
+        ) as mock_logger:
             display_invalid_apps([], mock_config_manager)
 
             mock_logger.warning.assert_not_called()
