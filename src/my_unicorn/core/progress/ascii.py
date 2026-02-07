@@ -24,6 +24,7 @@ from typing import TextIO
 
 from my_unicorn.logger import get_logger
 
+from .ascii_output import TerminalWriter
 from .ascii_sections import (
     SectionRenderConfig,
     render_api_section,
@@ -105,13 +106,50 @@ class AsciiProgressBackend:
         # Synchronous lock to protect shared state from sync writers
         # (writers may be called from non-async contexts)
         self._sync_lock = threading.Lock()
-        self._last_output_lines = 0  # Track lines written for clearing
 
-        # Non-interactive output cache to avoid duplicate headers and spam
-        self._last_noninteractive_output: str = ""
-        self._last_noninteractive_write_time: float = 0.0
-        # Track which sections have been written to avoid duplicates
-        self._written_sections: set[str] = set()
+        # Terminal writer for managing output
+        self._writer = TerminalWriter(self.output, self.interactive)
+
+    # Properties to expose writer state for backward compatibility with tests
+    @property
+    def _last_output_lines(self) -> int:
+        """Get number of lines last written (interactive mode)."""
+        return self._writer._last_output_lines
+
+    @_last_output_lines.setter
+    def _last_output_lines(self, value: int) -> None:
+        """Set number of lines last written (interactive mode)."""
+        self._writer._last_output_lines = value
+
+    @property
+    def _written_sections(self) -> set[str]:
+        """Get set of written section signatures (non-interactive mode)."""
+        return self._writer._written_sections
+
+    @_written_sections.setter
+    def _written_sections(self, value: set[str]) -> None:
+        """Set set of written section signatures (non-interactive mode)."""
+        self._writer._written_sections = value
+
+    @property
+    def _last_noninteractive_output(self) -> str:
+        """Get cached non-interactive output."""
+        return self._writer._last_noninteractive_output
+
+    @_last_noninteractive_output.setter
+    def _last_noninteractive_output(self, value: str) -> None:
+        """Set cached non-interactive output."""
+        self._writer._last_noninteractive_output = value
+
+    @property
+    def _last_noninteractive_write_time(self) -> float:
+        """Get timestamp of last non-interactive write."""
+        return self._writer._last_noninteractive_write_time
+
+    @_last_noninteractive_write_time.setter
+    def _last_noninteractive_write_time(self, value: float) -> None:
+        """Set timestamp of last non-interactive write."""
+        self._writer._last_noninteractive_write_time = value
 
     def add_task(  # noqa: PLR0913
         self,
@@ -241,73 +279,38 @@ class AsciiProgressBackend:
         return self._build_output_from_snapshot(tasks_snapshot, order_snapshot)
 
     def _clear_previous_output(self) -> None:
-        """Clear previously written lines in interactive mode."""
-        if not self.interactive or self._last_output_lines == 0:
-            return
+        """Clear previously written lines in interactive mode.
 
-        # Move cursor up to start of previous output
-        self.output.write(f"\033[{self._last_output_lines}A")
-        # Clear from cursor to end of screen
-        self.output.write("\033[J")
-
-        # Ensure output is written immediately
-        self.output.flush()
+        Thin wrapper for backward compatibility; delegates to TerminalWriter.
+        """
+        self._writer._clear_previous_output()
 
     def _write_interactive(self, output: str) -> int:
         """Write output in interactive mode with cursor control.
 
+        Thin wrapper for backward compatibility; delegates to TerminalWriter.
+
         Args:
             output: Output string to write
 
+        Returns:
+            Number of lines written
         """
-        self._clear_previous_output()
-
-        if output:
-            lines = output.split("\n")
-            # Filter out trailing empty string from split to get accurate count
-            if lines and lines[-1] == "":
-                lines = lines[:-1]
-
-            # Write all lines at once to minimize flickering
-            output_text = "\n".join(lines) + "\n"
-            try:
-                self.output.write(output_text)
-                self.output.flush()
-            except Exception:
-                # swallow IO errors
-                pass
-
-            # Return number of lines written and update writer state
-            lines_written = len(lines)
-            try:
-                with self._sync_lock:
-                    self._last_output_lines = lines_written
-            except Exception:
-                # best-effort: do not fail render on sync-lock issues
-                pass
-
-            return lines_written
-
-        # Ensure last output lines is zero when nothing was written
-        try:
-            with self._sync_lock:
-                self._last_output_lines = 0
-        except Exception:
-            pass
-        return 0
+        return self._writer.write_interactive(output)
 
     def _write_output_safe(self, text: str) -> None:
-        """Write text to output stream, suppressing IO errors."""
-        try:
-            self.output.write(text)
-            self.output.flush()
-        except Exception:
-            pass
+        """Write text to output stream, suppressing IO errors.
+
+        Thin wrapper for backward compatibility; delegates to TerminalWriter.
+        """
+        self._writer._write_output_safe(text)
 
     def _find_new_sections(
         self, output: str, known_sections: set[str]
     ) -> tuple[list[str], set[str]]:
         """Parse output and find sections not in known_sections.
+
+        Thin wrapper for backward compatibility; delegates to TerminalWriter.
 
         Args:
             output: Output string containing sections separated by blank lines
@@ -315,24 +318,15 @@ class AsciiProgressBackend:
 
         Returns:
             Tuple of (new_sections_list, new_signatures_set)
-
         """
-        sections = output.split("\n\n")
-        new_sections: list[str] = []
-        new_signatures: set[str] = set()
-
-        for section in sections:
-            section_sig = section.strip()
-            if section_sig and section_sig not in known_sections:
-                new_sections.append(section)
-                new_signatures.add(section_sig)
-
-        return new_sections, new_signatures
+        return self._writer._find_new_sections(output, known_sections)
 
     def _write_noninteractive(
         self, output: str, known_sections: set[str] | None = None
     ) -> set[str]:
         """Write output in non-interactive mode (minimal output).
+
+        Thin wrapper for backward compatibility; delegates to TerminalWriter.
 
         Args:
             output: Output string to write
@@ -342,29 +336,8 @@ class AsciiProgressBackend:
 
         Returns:
             Set of section signatures that were written
-
         """
-        if not hasattr(self.output, "write"):
-            return set()
-
-        if "Summary:" in output:
-            self._write_output_safe(output + "\n")
-            return {output.strip()}
-
-        if not output.strip():
-            return set()
-
-        if known_sections is None:
-            known_sections = set(self._written_sections)
-
-        new_sections, added_signatures = self._find_new_sections(
-            output, known_sections
-        )
-
-        if new_sections:
-            self._write_output_safe("\n\n".join(new_sections) + "\n")
-
-        return added_signatures
+        return self._writer.write_noninteractive(output, known_sections)
 
     async def render_once(self) -> None:
         """Render current state once.
@@ -377,7 +350,7 @@ class AsciiProgressBackend:
             with self._sync_lock:
                 tasks_snapshot = dict(self.tasks)
                 order_snapshot = list(self._task_order)
-                written_snapshot = set(self._written_sections)
+                written_snapshot = set(self._writer._written_sections)
 
             # Build output from snapshot (pure function)
             output = self._build_output_from_snapshot(
@@ -388,19 +361,21 @@ class AsciiProgressBackend:
                 return
 
             if self.interactive:
-                lines_written = self._write_interactive(output)
+                lines_written = self._writer.write_interactive(output)
                 # Update writer state under sync lock
                 with self._sync_lock:
-                    self._last_output_lines = lines_written
+                    self._writer._last_output_lines = lines_written
             else:
-                added_sections = self._write_noninteractive(
+                added_sections = self._writer.write_noninteractive(
                     output, written_snapshot
                 )
                 with self._sync_lock:
                     if added_sections:
-                        self._written_sections.update(added_sections)
-                        self._last_noninteractive_output = output
-                        self._last_noninteractive_write_time = time.monotonic()
+                        self._writer._written_sections.update(added_sections)
+                        self._writer._last_noninteractive_output = output
+                        self._writer._last_noninteractive_write_time = (
+                            time.monotonic()
+                        )
 
     async def cleanup(self) -> None:
         """Clean up and write final output."""
@@ -409,13 +384,13 @@ class AsciiProgressBackend:
                 # Final render with all completed tasks
                 output = self._build_output()
                 if output:
-                    self._clear_previous_output()
+                    self._writer._clear_previous_output()
                     self.output.write(output + "\n")
                     self.output.flush()
-                self._last_output_lines = 0
+                self._writer._last_output_lines = 0
 
             # Reset written sections for next session
-            self._written_sections.clear()
+            self._writer._written_sections.clear()
 
     def _build_output_from_snapshot(
         self, tasks_snapshot: dict[str, TaskState], order_snapshot: list[str]
