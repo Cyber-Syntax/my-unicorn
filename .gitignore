@@ -5,6 +5,7 @@ CHANGELOG_commits.md
 memory-bank/
 backups
 plan
+plans
 
 # ignore appimages
 *.AppImage*

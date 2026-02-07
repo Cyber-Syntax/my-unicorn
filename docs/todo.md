@@ -33,8 +33,18 @@
 
 ## in-progress
 
+- [ ] remove interactive argument on the AsciiProgressBackend when you understand what it's do which we don't use any kind of interactive mode on our progress bar, so we can remove that and just use the output.isatty() to detect the interactive mode if needed.
+
+- [ ] manual test improve:
+    - [ ] add backup test to --quick flag on test.py
+    - [ ] add --refresh-cache flag to --quick and --all flags to make sure cache also work after test passed without refresh cache flag.
+    - [ ] Update container to test with this manual test script, so we don't need to test in our local machine.
+        - [ ] add env variable support for github token to use on container tests.
+        - [ ] add flag to close progress bar on cli for better support on ci tests.
+
 - [ ] Improve security
     - [ ] Verify checksum_file via digest verification provided from github_api to prevent tampered checksum_file attacks. Most of the new apps provide digest for their appimage and checksum_file on github api.
+    - [ ] remove sha1/md5 support "“We recommend that anyone relying on SHA-1 for security migrate to SHA-2 or SHA-3 as soon as possible.” —Chris Celi, NIST computer scientist" + "MD5 is a deprecated hash algorithm that has practical known collision attacks. You are strongly discouraged from using it. Existing applications should strongly consider moving away." from <https://cryptography.io/en/latest/hazmat/primitives/cryptographic-hashes/#md5>
 
 - [ ] Improve schema
     - [ ] consider schema validation testing with hypothesis?

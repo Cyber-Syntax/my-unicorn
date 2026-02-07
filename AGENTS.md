@@ -4,9 +4,8 @@ This document provides context, patterns, and guidelines for AI coding assistant
 
 ## Project Overview
 
-**What**: My Unicorn is a Python 3.12+ CLI tool for managing AppImages on Linux  
-**Core Features**: Install, update, and verify AppImages from GitHub with hash verification (SHA256/SHA512)  
-**Entry Point**: `my-unicorn = "my_unicorn.main:main"` (defined in pyproject.toml)  
+My Unicorn is a Python 3.12+ CLI tool for managing AppImages on Linux
+**Core Features**: Install, update, and verify AppImages from GitHub with hash verification (SHA256/SHA512)
 **Package Manager**: uv (replaces pip/poetry)
 
 ## Quick Start
@@ -83,9 +82,7 @@ tests/                      # Test suite (mirrors src structure)
 └── [subdirs mirror src/my_unicorn structure]
 
 docs/                       # Technical documentation
-├── adr/                    # Architecture Decision Records
-├── architecture/           # Architecture blueprints
-└── dev/                    # Development guides
+└── dev/                    # Development guides (architecture, adr records)
 
 scripts/                    # Helper scripts
 ├── test.py                 # UI testing script
@@ -97,25 +94,6 @@ container/                  # Container configuration (Dockerfile, podman-compos
 ```
 
 ## Development Workflow
-
-### Initial Setup
-
-```bash
-# Ensure uv is installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
-# or: brew install uv  # macOS
-# or: apt install uv   # Ubuntu/Debian
-
-# Clone repository
-git clone https://github.com/Cyber-Syntax/my-unicorn
-cd my-unicorn
-
-# Install dependencies (creates .venv automatically)
-uv sync
-
-# Verify installation
-uv run my-unicorn --version
-```
 
 ### Common Development Tasks
 
@@ -129,6 +107,7 @@ uv run my-unicorn <command> [options]
 uv run my-unicorn install qownnotes
 uv run my-unicorn update qownnotes --refresh-cache
 uv run my-unicorn update --all --refresh-cache
+uv run my-unicorn --help # for more command examples
 ```
 
 #### Making Code Changes
@@ -140,9 +119,11 @@ uv run my-unicorn update --all --refresh-cache
 
 # 2. Run linting (auto-fix issues)
 ruff check --fix path/to/file.py
+ruff check --fix . # or all Python files
 
 # 3. Run formatting
 ruff format path/to/file.py
+ruff format . # or all Python files
 
 # 4. Run type checking
 uv run mypy src/my_unicorn/
@@ -155,22 +136,6 @@ uv run my-unicorn --help
 
 # 7. Test UI behavior (quick smoke test)
 uv run scripts/test.py --quick
-```
-
-#### Linting and Formatting Commands
-
-```bash
-# Check and auto-fix all Python files
-ruff check --fix .
-
-# Format all Python files
-ruff format .
-
-# Check specific file
-ruff check --fix src/my_unicorn/main.py
-
-# Format specific directory
-ruff format src/my_unicorn/cli/
 ```
 
 ### Managing Dependencies
@@ -194,12 +159,12 @@ uv remove <package-name>
 
 ## Code Quality Standards
 
-### Type Hints (REQUIRED)
+### Type Hints
 
-All Python code MUST include type hints and return types.
+CRITICAL: All Python code MUST include type hints and return types.
 
 ```python
-# ✅ CORRECT
+# CORRECT
 def filter_unknown_users(users: list[str], known_users: set[str]) -> list[str]:
     """Filter out users that are not in the known users set.
 
@@ -212,44 +177,52 @@ def filter_unknown_users(users: list[str], known_users: set[str]) -> list[str]:
     """
     return [u for u in users if u not in known_users]
 
-# ❌ INCORRECT (no type hints)
+# INCORRECT (no type hints)
 def filter_unknown_users(users, known_users):
     return [u for u in users if u not in known_users]
 ```
 
+- **Type Annotations**: Use built-in types: `list[str]`, `dict[str, int]` (not `typing.List`, `typing.Dict`)
+
 ### Coding Standards
 
-- **Type Annotations**: Use built-in types: `list[str]`, `dict[str, int]` (not `typing.List`, `typing.Dict`)
 - **Logging Format**: Use `%s` style formatting in logging statements: `logger.info("User %s logged in", username)`
 - **PEP 8**: Enforced by ruff
 - **Datetime**: Use `astimezone()` for local time conversions
 - **Variable Names**: Use descriptive, self-explanatory names
 - **Function Size**: Keep functions focused (<20 lines when possible)
 - **Error Handling**: Use custom exceptions from `exceptions.py`
+- **Async Safe**:
+    - All I/O operations must have async variants
+    - Never block the event loop with sync I/O in async context
+- **DRY Approach**:
+    - Reuse existing abstractions; don't duplicate
+    - Refactor safely when duplication is found
+    - Check existing protocols before creating new ones
 
 ### Error Handling Guidelines
 
 ```python
-# ✅ CORRECT - Use custom exceptions
+# CORRECT - Use custom exceptions
 from my_unicorn.exceptions import NetworkError, VerificationError
 
 if not hash_matches:
     raise VerificationError(f"Hash mismatch for {filename}")
 
-# ✅ CORRECT - Handle expected errors gracefully (no exception logging)
+# CORRECT - Handle expected errors gracefully (no exception logging)
 try:
     response = await session.get(url)
 except aiohttp.ClientError as e:
     logger.warning("Network request failed: %s", e)
     return None
 
-# ❌ INCORRECT - Don't use logger.exception() for expected errors
+# INCORRECT - Don't use logger.exception() for expected errors
 try:
     response = await session.get(url)
 except aiohttp.ClientError as e:
     logger.exception("Network error")  # Leaks stack trace unnecessarily
 
-# ❌ INCORRECT - Don't log tokens or sensitive data
+# INCORRECT - Don't log tokens or sensitive data
 logger.debug("Token: %s", token)  # Security risk!
 ```
 
@@ -269,12 +242,43 @@ uv run pytest tests/test_lines.py -v
 
 ## Testing Instructions
 
-### Test Organization
+### Writing Tests
 
-- **Unit tests**: `tests/test_*.py` - No network calls, use mocks/fixtures
-- **Integration tests**: `tests/integration/` - Network calls permitted
-- **Test structure**: Mirrors `src/my_unicorn/` structure
-- **Framework**: pytest with pytest-asyncio, pytest-mock, pytest-cov
+**CRITICAL**: Every new feature or bugfix MUST be covered by unit tests.
+
+```python
+# Example test structure
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from my_unicorn.core.workflows import InstallWorkflow
+from my_unicorn.exceptions import VerificationError
+
+
+@pytest.mark.asyncio
+async def test_install_workflow_success(tmp_path, mock_session):
+    """Test successful installation workflow."""
+    # Arrange
+    workflow = InstallWorkflow(...)
+
+    # Act
+    result = await workflow.execute()
+
+    # Assert
+    assert result.success is True
+    assert result.app_name == "test-app"
+
+
+def test_hash_verification_failure():
+    """Test that verification fails with incorrect hash."""
+    # Arrange
+    expected_hash = "abc123"
+    actual_hash = "def456"
+
+    # Act & Assert
+    with pytest.raises(VerificationError):
+        verify_hash(actual_hash, expected_hash)
+```
 
 ### Running Tests
 
@@ -295,44 +299,6 @@ uv run pytest tests/test_install.py
 uv run pytest tests/test_install.py::test_install_success
 ```
 
-### Writing Tests
-
-**CRITICAL**: Every new feature or bugfix MUST be covered by unit tests.
-
-```python
-# Example test structure
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-
-from my_unicorn.core.workflows import InstallWorkflow
-from my_unicorn.exceptions import VerificationError
-
-
-@pytest.mark.asyncio
-async def test_install_workflow_success(tmp_path, mock_session):
-    """Test successful installation workflow."""
-    # Arrange
-    workflow = InstallWorkflow(...)
-    
-    # Act
-    result = await workflow.execute()
-    
-    # Assert
-    assert result.success is True
-    assert result.app_name == "test-app"
-
-
-def test_hash_verification_failure():
-    """Test that verification fails with incorrect hash."""
-    # Arrange
-    expected_hash = "abc123"
-    actual_hash = "def456"
-    
-    # Act & Assert
-    with pytest.raises(VerificationError):
-        verify_hash(actual_hash, expected_hash)
-```
-
 ### Test Checklist
 
 Before committing, verify:
@@ -342,52 +308,9 @@ Before committing, verify:
 - [ ] Edge cases and error conditions are tested
 - [ ] External dependencies are mocked (no real network calls in unit tests)
 - [ ] Tests are deterministic (no flaky tests)
+- [ ] **Async-safe**: Support async/await patterns
 - [ ] Async tests use `@pytest.mark.asyncio`
 - [ ] Test names clearly describe what they test
-
-### Test Fixtures
-
-Common fixtures are defined in `tests/conftest.py`:
-
-```python
-# Example fixtures (check conftest.py for full list)
-@pytest.fixture
-def tmp_config_dir(tmp_path):
-    """Temporary config directory for testing."""
-    return tmp_path / ".config" / "my-unicorn"
-
-@pytest.fixture
-def mock_session():
-    """Mock aiohttp ClientSession."""
-    return AsyncMock()
-```
-
-## Build and Deployment
-
-### Running Locally (Development)
-
-```bash
-# Run from source without installation
-uv run my-unicorn <command>
-```
-
-### Installation Methods
-
-```bash
-# Install from GitHub (main branch, for production use)
-uv tool install git+https://github.com/Cyber-Syntax/my-unicorn
-
-# Or use the install script
-./install.sh -i
-
-# Upgrade to latest from GitHub
-my-unicorn upgrade
-# or
-uv tool install --upgrade git+https://github.com/Cyber-Syntax/my-unicorn
-
-# Uninstall
-uv tool uninstall my-unicorn
-```
 
 ## Debugging and Troubleshooting
 
@@ -405,7 +328,6 @@ ruff check path/to/file.py
 uv run mypy --show-error-codes src/my_unicorn/
 
 # Common type error fixes:
-# - Add type: ignore[<error-code>] comment if necessary
 # - Update type hints to match actual usage
 # - Check for missing return type annotations
 # - Ensure correct use of built-in types (list[str], dict[str, int], etc.)
@@ -471,6 +393,16 @@ cat ~/.config/my-unicorn/settings.conf
 - Always bump VERSION constants in `constants.py` when changing config schema
     - `GLOBAL_CONFIG_VERSION` - Currently "1.1.0"
     - `APP_CONFIG_VERSION` - Currently "2.0.0"
+
+### 8.3 Documentation Principles
+
+| Principle | Description |
+|-----------|-------------|
+| **Beginner-friendly** | Non-developers should understand core concepts |
+| **Copy-paste success** | Code examples must run with minimal setup |
+| **Less text, more interaction** | Prefer components over long paragraphs |
+| **Show, don't tell** | Use diagrams, tabs, and accordions to explain |
+| **Few lines, big impact** | Examples should feel like "only 3 lines to do this" |
 
 ## Additional Resources
 
