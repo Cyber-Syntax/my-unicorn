@@ -234,7 +234,7 @@ def format_processing_task_lines(
     status = determine_task_status_symbol(status_info, spinner)
 
     name = truncate_text(task.name, name_width)
-    lines.append(f"{phase_str} {operation} {name:<{name_width}} {status}")
+    lines.append(f"{phase_str} {operation} {name} {status}")
 
     # Show warning message if applicable
     if should_show_warning_message(status_info):

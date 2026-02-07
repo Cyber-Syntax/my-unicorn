@@ -474,7 +474,10 @@ class PostDownloadProcessor:
 
         # Store the computed hash
         stored_hash = get_stored_hash(
-            verify_result_for_config.get("methods", {}), context.asset
+            verify_result_for_config.get("methods", {})
+            if verify_result_for_config
+            else {},
+            context.asset,
         )
         if stored_hash:
             logger.debug("Updated stored hash: %s", stored_hash[:16])
