@@ -10,6 +10,16 @@ from unittest.mock import patch
 
 import pytest
 
+from my_unicorn.core.progress.ascii_sections import (
+    SectionRenderConfig,
+    calculate_dynamic_name_width,
+    format_download_lines,
+    format_processing_task_lines,
+    render_api_section,
+    render_downloads_section,
+    render_processing_section,
+    select_current_task,
+)
 from my_unicorn.core.progress.progress import (
     AsciiProgressBackend,
     ProgressConfig,
@@ -1209,14 +1219,13 @@ class TestProgressCoverageExtras:
         assert backend.interactive is False
 
     def test_format_download_lines_variations(self) -> None:
-        """Cover branches in _format_download_lines (sizes, speeds, eta, errors)."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
+        """Cover branches in format_download_lines (sizes, speeds, eta, errors)."""
 
         # Case: no total, no speed
         t1 = TaskState(
             task_id="a", name="no_size", progress_type=ProgressType.DOWNLOAD
         )
-        lines = backend._format_download_lines(t1, max_name_width=10)
+        lines = format_download_lines(t1, max_name_width=10, bar_width=30)
         assert any("--" in l or "00:00" in l for l in lines)
 
         # Case: total and speed present, unfinished
@@ -1229,7 +1238,7 @@ class TestProgressCoverageExtras:
             speed=100.0,
             is_finished=False,
         )
-        lines2 = backend._format_download_lines(t2, max_name_width=15)
+        lines2 = format_download_lines(t2, max_name_width=15, bar_width=30)
         assert any("00:00" not in l for l in lines2)
 
         # Case: finished with error message
@@ -1244,7 +1253,7 @@ class TestProgressCoverageExtras:
             success=False,
             error_message="Something went wrong while downloading",
         )
-        lines3 = backend._format_download_lines(t3, max_name_width=15)
+        lines3 = format_download_lines(t3, max_name_width=15, bar_width=30)
         assert any("Error:" in l for l in lines3)
 
     def test_update_finish_nonexistent_no_raise(self) -> None:
@@ -1256,23 +1265,38 @@ class TestProgressCoverageExtras:
 
     def test_api_rendering_status_variations(self) -> None:
         """Cover API fetching status formatting permutations."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
-
         # in-progress with total
-        backend.add_task("api1", "repo", ProgressType.API_FETCHING, total=10.0)
-        backend.update_task("api1", completed=3.0)
-        api_lines = backend._render_api_section()
+        api_task1 = TaskState(
+            task_id="api1",
+            name="repo",
+            progress_type=ProgressType.API_FETCHING,
+            total=10.0,
+            completed=3.0,
+            is_finished=False,
+        )
+        api_lines = render_api_section(
+            tasks={"api1": api_task1}, order=["api1"]
+        )
         assert any("Fetching..." in l or "Retrieved" in l for l in api_lines)
 
         # finished and cached
-        backend.add_task("api2", "repo2", ProgressType.API_FETCHING, total=5.0)
-        backend.finish_task("api2", success=True, description="Cached content")
-        api_lines2 = backend._render_api_section()
+        api_task2 = TaskState(
+            task_id="api2",
+            name="repo2",
+            progress_type=ProgressType.API_FETCHING,
+            total=5.0,
+            completed=5.0,
+            is_finished=True,
+            success=True,
+            description="Cached content",
+        )
+        api_lines2 = render_api_section(
+            tasks={"api2": api_task2}, order=["api2"]
+        )
         assert any("Retrieved" in l for l in api_lines2)
 
     def test_calculate_dynamic_name_width_and_spinner_header(self) -> None:
         """Trigger terminal-size exception and spinner/header helpers."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=True)
         # Force shutil.get_terminal_size to raise by monkeypatching
         import shutil
 
@@ -1283,8 +1307,8 @@ class TestProgressCoverageExtras:
 
         shutil.get_terminal_size = bad_getter  # type: ignore[assignment]
         try:
-            name_w = backend._calculate_dynamic_name_width(
-                "name", fixed_width=10
+            name_w = calculate_dynamic_name_width(
+                interactive=True, min_name_width=10
             )
             assert isinstance(name_w, int)
         finally:
@@ -1293,16 +1317,19 @@ class TestProgressCoverageExtras:
         # Spinner deterministic value
         with patch("time.monotonic", return_value=0.25):
             from my_unicorn.core.progress.ascii_format import compute_spinner
+
             spin = compute_spinner(4)  # 4 FPS
             assert isinstance(spin, str) and len(spin) > 0
 
         # header
-        from my_unicorn.core.progress.ascii_format import compute_download_header
+        from my_unicorn.core.progress.ascii_format import (
+            compute_download_header,
+        )
+
         assert compute_download_header(2).startswith("Downloading")
 
     def test_format_processing_task_lines(self) -> None:
         """Cover processing task formatting (spinner, finished, errors)."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
         t = TaskState(
             task_id="p1",
             name="MyApp",
@@ -1311,9 +1338,7 @@ class TestProgressCoverageExtras:
             total_phases=2,
             is_finished=False,
         )
-        lines = backend._format_processing_task_lines(
-            t, name_width=10, spinner="*"
-        )
+        lines = format_processing_task_lines(t, name_width=10, spinner="*")
         assert any(
             "Processing" in l or "Verifying" in l or "*" in l for l in lines
         )
@@ -1329,9 +1354,7 @@ class TestProgressCoverageExtras:
             success=False,
             error_message="boom",
         )
-        lines2 = backend._format_processing_task_lines(
-            t2, name_width=10, spinner="~"
-        )
+        lines2 = format_processing_task_lines(t2, name_width=10, spinner="~")
         assert any("Error:" in l for l in lines2)
 
     def test_clear_and_write_paths(self) -> None:
@@ -1355,7 +1378,9 @@ class TestProgressCoverageExtras:
 
     def test_format_api_task_status_all_cases(self) -> None:
         """Exercise different status outputs from format_api_task_status."""
-        from my_unicorn.core.progress.ascii_format import format_api_task_status
+        from my_unicorn.core.progress.ascii_format import (
+            format_api_task_status,
+        )
 
         # total > 0, unfinished
         t = TaskState(
@@ -1391,7 +1416,6 @@ class TestProgressCoverageExtras:
 
     def test_select_current_task_variants(self) -> None:
         """Select current task from list with various finished/failed states."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
         t1 = TaskState(
             task_id="1",
             name="a",
@@ -1417,7 +1441,7 @@ class TestProgressCoverageExtras:
             phase=3,
         )
 
-        sel = backend._select_current_task([t1, t2, t3])
+        sel = select_current_task([t1, t2, t3])
         # According to selection logic, first failing phase is preferred
         assert sel is t2
 
@@ -1487,35 +1511,55 @@ class TestProgressCoverageExtras:
 
     def test_render_api_section_no_tasks(self) -> None:
         """API section should return empty list when there are no API tasks."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
-        assert backend._render_api_section() == []
+        assert render_api_section(tasks={}, order=[]) == []
 
     def test_render_downloads_and_processing_sections(self) -> None:
         """Ensure downloads and processing renderers handle empty and populated lists."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
+        config = SectionRenderConfig(
+            bar_width=30,
+            min_name_width=15,
+            spinner_fps=4,
+            interactive=False,
+        )
 
         # No downloads initially
-        assert backend._render_downloads_section() == []
+        assert (
+            render_downloads_section(tasks={}, order=[], config=config) == []
+        )
 
         # Add a download and ensure section renders
-        backend.add_task(
-            "dl_a", "file.AppImage", ProgressType.DOWNLOAD, total=100.0
+        dl_task = TaskState(
+            task_id="dl_a",
+            name="file.AppImage",
+            progress_type=ProgressType.DOWNLOAD,
+            total=100.0,
+            completed=10.0,
+            speed=50.0,
         )
-        backend.update_task("dl_a", completed=10.0, speed=50.0)
-        dl_lines = backend._render_downloads_section()
+        dl_lines = render_downloads_section(
+            tasks={"dl_a": dl_task}, order=["dl_a"], config=config
+        )
         assert any(
             "Downloading" in l or "00:00" in l or "Error:" in l
             for l in dl_lines
         )
 
         # Processing: no post tasks
-        assert backend._render_processing_section() == []
+        assert (
+            render_processing_section(tasks={}, order=[], config=config) == []
+        )
 
         # Add a verification task to trigger 'Verifying' header
-        backend.add_task(
-            "vf_a", "MyApp", ProgressType.VERIFICATION, phase=1, total_phases=2
+        vf_task = TaskState(
+            task_id="vf_a",
+            name="MyApp",
+            progress_type=ProgressType.VERIFICATION,
+            phase=1,
+            total_phases=2,
         )
-        proc_lines = backend._render_processing_section()
+        proc_lines = render_processing_section(
+            tasks={"vf_a": vf_task}, order=["vf_a"], config=config
+        )
         assert any(
             l.startswith("Verifying")
             or l.startswith("Installing")
@@ -1673,8 +1717,6 @@ class TestProgressCoverageExtras:
 
     def test_api_status_branches_snapshot_and_nonsnapshot(self) -> None:
         """Exercise all API status branches in both snapshot and non-snapshot renderers."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
-
         # total >0 unfinished
         api_a = TaskState(
             task_id="a",
@@ -1719,16 +1761,12 @@ class TestProgressCoverageExtras:
         tasks = {t.task_id: t for t in (api_a, api_b, api_c, api_d, api_e)}
         order = ["a", "b", "c", "d", "e"]
 
-        # Snapshot-based builder
-        out = backend._build_output_from_snapshot(tasks, order)
-        assert "Fetching from API:" in out
-        assert "Retrieved from cache" in out
-        assert "Retrieved" in out or "Fetching..." in out
-
-        # Non-snapshot renderer by setting internal state
-        backend.tasks = tasks
-        backend._task_order = order
-        api_lines = backend._render_api_section()
+        api_lines = render_api_section(tasks, order)
+        assert any("Fetching from API:" in l for l in api_lines)
+        assert any(
+            "Retrieved from cache" in l or "cached" in l.lower()
+            for l in api_lines
+        )
         assert any("Retrieved" in l or "Fetching" in l for l in api_lines)
 
     def test_processing_section_installing_header(self) -> None:
@@ -1798,7 +1836,9 @@ class TestProgressCoverageExtras:
 
     def test_format_api_task_status_variants(self) -> None:
         """Explicitly exercise all branches of format_api_task_status."""
-        from my_unicorn.core.progress.ascii_format import format_api_task_status
+        from my_unicorn.core.progress.ascii_format import (
+            format_api_task_status,
+        )
 
         # total > 0, finished, cached
         t1 = TaskState(
@@ -1862,7 +1902,9 @@ class TestProgressCoverageExtras:
 
     def test_format_api_task_status_exact_retrieved(self) -> None:
         """Ensure exact formatting for total/total Retrieved branch."""
-        from my_unicorn.core.progress.ascii_format import format_api_task_status
+        from my_unicorn.core.progress.ascii_format import (
+            format_api_task_status,
+        )
 
         t = TaskState(
             task_id="x",
@@ -1923,15 +1965,24 @@ class TestProgressCoverageExtras:
         assert "Retrieved" in out
 
     def test_render_api_section_retrieved_no_cached(self) -> None:
-        """_non-snapshot API rendering should show 'Retrieved' for finished non-cached tasks."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
-        backend.add_task("a", "app", ProgressType.API_FETCHING, total=0)
-        backend.finish_task("a", success=True, description="done")
-        lines = backend._render_api_section()
+        """API rendering should show 'Retrieved' for finished non-cached tasks."""
+        task = TaskState(
+            task_id="a",
+            name="app",
+            progress_type=ProgressType.API_FETCHING,
+            total=0,
+            completed=0,
+            is_finished=True,
+            success=True,
+            description="done",
+        )
+        lines = render_api_section(tasks={"a": task}, order=["a"])
         assert any("Retrieved" in l for l in lines)
 
     def test_format_api_task_status_return_retrieved(self) -> None:
-        from my_unicorn.core.progress.ascii_format import format_api_task_status
+        from my_unicorn.core.progress.ascii_format import (
+            format_api_task_status,
+        )
 
         t = TaskState(
             task_id="x",
@@ -1945,27 +1996,46 @@ class TestProgressCoverageExtras:
         assert format_api_task_status(t) == "Retrieved"
 
     def test_render_processing_section_headers_non_snapshot(self) -> None:
-        """Non-snapshot rendering: verify all processing header branches."""
-        # Verifying only
-        backend_v = AsciiProgressBackend(
-            output=io.StringIO(), interactive=False
+        """Verify all processing header branches."""
+        config = SectionRenderConfig(
+            bar_width=30,
+            min_name_width=15,
+            spinner_fps=4,
+            interactive=False,
         )
-        backend_v.add_task("v", "app", ProgressType.VERIFICATION)
-        assert "Verifying:" in backend_v._render_processing_section()
+
+        # Verifying only
+        v_task = TaskState(
+            task_id="v",
+            name="app",
+            progress_type=ProgressType.VERIFICATION,
+        )
+        v_lines = render_processing_section(
+            tasks={"v": v_task}, order=["v"], config=config
+        )
+        assert any("Verifying:" in l for l in v_lines)
 
         # Installation present
-        backend_i = AsciiProgressBackend(
-            output=io.StringIO(), interactive=False
+        i_task = TaskState(
+            task_id="i",
+            name="app",
+            progress_type=ProgressType.INSTALLATION,
         )
-        backend_i.add_task("i", "app", ProgressType.INSTALLATION)
-        assert "Installing:" in backend_i._render_processing_section()
+        i_lines = render_processing_section(
+            tasks={"i": i_task}, order=["i"], config=config
+        )
+        assert any("Installing:" in l for l in i_lines)
 
         # Other post-task (processing)
-        backend_p = AsciiProgressBackend(
-            output=io.StringIO(), interactive=False
+        p_task = TaskState(
+            task_id="p",
+            name="app",
+            progress_type=ProgressType.ICON_EXTRACTION,
         )
-        backend_p.add_task("p", "app", ProgressType.ICON_EXTRACTION)
-        assert "Processing:" in backend_p._render_processing_section()
+        p_lines = render_processing_section(
+            tasks={"p": p_task}, order=["p"], config=config
+        )
+        assert any("Processing:" in l for l in p_lines)
 
     def test_build_output_snapshot_processing_processing_header(self) -> None:
         """When only non-verification/non-installation post-tasks exist, header is 'Processing:'"""

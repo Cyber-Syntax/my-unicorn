@@ -17,37 +17,22 @@ from __future__ import annotations
 
 import asyncio
 import os
-import shutil
 import sys
 import threading
 import time
 from typing import TextIO
 
 from my_unicorn.logger import get_logger
-from my_unicorn.utils.progress_utils import (
-    format_eta,
-    format_percentage,
-    human_mib,
-    human_speed_bps,
-    render_bar,
-    truncate_text,
-)
 
-from .ascii_format import (
-    compute_display_name,
-    compute_download_header,
-    compute_spinner,
-)
-from .formatters import (
-    TaskStatusInfo,
-    determine_task_status_symbol,
-    should_show_error_message,
-    should_show_warning_message,
+from .ascii_sections import (
+    SectionRenderConfig,
+    render_api_section,
+    render_downloads_section,
+    render_processing_section,
 )
 from .progress_types import (
     DEFAULT_MIN_NAME_WIDTH,
     DEFAULT_SPINNER_FPS,
-    OPERATION_NAMES,
     ProgressConfig,
     ProgressType,
     TaskState,
@@ -106,6 +91,14 @@ class AsciiProgressBackend:
         )
         self._spinner_fps = getattr(cfg, "spinner_fps", DEFAULT_SPINNER_FPS)
 
+        # Create section render config for delegated rendering functions
+        self._section_config = SectionRenderConfig(
+            bar_width=self.bar_width,
+            min_name_width=self._min_name_width,
+            spinner_fps=self._spinner_fps,
+            interactive=self.interactive,
+        )
+
         self.tasks: dict[str, TaskState] = {}
         self._task_order: list[str] = []  # Maintain insertion order
         self._lock = asyncio.Lock()
@@ -119,75 +112,6 @@ class AsciiProgressBackend:
         self._last_noninteractive_write_time: float = 0.0
         # Track which sections have been written to avoid duplicates
         self._written_sections: set[str] = set()
-
-    # Helpers for downloads rendering (kept small and testable)
-    def _compute_max_name_width(self, display_names: list[str]) -> int:
-        """Compute maximum name width across downloads for alignment."""
-        max_name_width = 0
-        fixed_width = 10 + 10 + 5 + (self.bar_width + 2) + 6 + 1 + 6
-        for display_name in display_names:
-            name_width = self._calculate_dynamic_name_width(
-                display_name, fixed_width
-            )
-            max_name_width = max(
-                max_name_width, min(name_width, len(display_name))
-            )
-        return max_name_width
-
-    def _format_download_lines(
-        self, task: TaskState, max_name_width: int
-    ) -> list[str]:
-        """Format lines for a single download task (main + optional error)."""
-        lines: list[str] = []
-        display_name = compute_display_name(task)
-        name = truncate_text(display_name, max_name_width)
-
-        if task.total > 0:
-            size_str = f"{human_mib(task.total):>10}"
-        else:
-            size_str = "    --    "
-
-        if task.speed > 0:
-            speed_str = f"{human_speed_bps(task.speed):>10}"
-        else:
-            speed_str = "   --     "
-
-        if task.speed > 0 and task.total > task.completed:
-            remaining_bytes = task.total - task.completed
-            eta_seconds = remaining_bytes / task.speed
-            eta_str = format_eta(eta_seconds)
-        else:
-            eta_str = "00:00"
-
-        bar = render_bar(task.completed, task.total, self.bar_width)
-        pct = format_percentage(task.completed, task.total)
-
-        # Create status info for status determination
-        status_info = TaskStatusInfo(
-            is_finished=task.is_finished,
-            success=task.success,
-            description=task.description,
-            error_message=task.error_message,
-        )
-
-        # Use status symbol, but show empty space for in-progress downloads
-        status = (
-            ("✓" if status_info.success else "✖")
-            if status_info.is_finished
-            else " "
-        )
-
-        lines.append(
-            f"{name:<{max_name_width}} {size_str} {speed_str} "
-            f"{eta_str:>5} {bar} {pct:>6} {status}"
-        )
-
-        # Show error message if applicable
-        if should_show_error_message(status_info):
-            error_msg = truncate_text(task.error_message, 60)
-            lines.append(f"    Error: {error_msg}")
-
-        return lines
 
     def add_task(  # noqa: PLR0913
         self,
@@ -296,260 +220,6 @@ class AsciiProgressBackend:
                     task.error_message = description
                 task.description = description
             task.last_update = time.monotonic()
-
-    def _render_api_section(
-        self,
-        tasks_snapshot: dict[str, TaskState] | None = None,
-        order_snapshot: list[str] | None = None,
-    ) -> list[str]:
-        """Render API fetching section.
-
-        Accepts optional snapshots so callers can render from a copied
-        state without holding backend locks.
-        """
-        order = (
-            order_snapshot if order_snapshot is not None else self._task_order
-        )
-        tasks = tasks_snapshot if tasks_snapshot is not None else self.tasks
-
-        api_tasks = [
-            t
-            for t in order
-            if tasks[t].progress_type == ProgressType.API_FETCHING
-        ]
-
-        if not api_tasks:
-            return []
-
-        lines = ["Fetching from API:"]
-        for task_id in api_tasks:
-            task = tasks[task_id]
-            name = truncate_text(task.name, 18)
-
-            if task.total > 0:
-                completed = int(task.completed)
-                total = int(task.total)
-                if task.is_finished or completed >= total:
-                    if "cached" in task.description.lower():
-                        status = f"{total}/{total} Retrieved from cache"
-                    else:
-                        status = f"{total}/{total} Retrieved"
-                else:
-                    status = f"{completed}/{total} Fetching..."
-            elif task.is_finished:
-                if "cached" in task.description.lower():
-                    status = "Retrieved from cache"
-                else:
-                    status = "Retrieved"
-            else:
-                status = "Fetching..."
-
-            lines.append(f"{name:20} {status}")
-
-        lines.append("")
-        return lines
-
-    def _calculate_dynamic_name_width(
-        self, name: str, fixed_width: int
-    ) -> int:
-        """Calculate dynamic name width based on terminal size.
-
-        Args:
-            name: The task name to display
-            fixed_width: Width needed for fixed elements (size, speed, etc.)
-
-        Returns:
-            Width to use for name (either full length or truncated)
-
-        """
-        if self.interactive:
-            try:
-                terminal_width = shutil.get_terminal_size().columns
-            except (AttributeError, ValueError, OSError):
-                # Fallback if terminal size cannot be determined
-                terminal_width = 80
-        else:
-            # Use fixed width in non-interactive mode for consistent rendering
-            terminal_width = 80
-
-        # Calculate available space for name
-        available_width = terminal_width - fixed_width
-
-        # Use the smaller of: available width or actual name length
-        # But ensure a minimum for readability
-        min_width = self._min_name_width
-        max_width = max(min_width, available_width)
-
-        return min(len(name), max_width)
-
-    def _select_current_task(
-        self, tasks_sorted: list[TaskState]
-    ) -> TaskState | None:
-        """Select the current task to display for a multi-phase app.
-
-        Preference order:
-          - first unfinished task
-          - first failed task
-          - otherwise the last (completed) phase
-        """
-        return next(
-            (
-                t
-                for t in tasks_sorted
-                if (not t.is_finished) or (t.is_finished and not t.success)
-            ),
-            tasks_sorted[-1] if tasks_sorted else None,
-        )
-
-    def _format_processing_task_lines(
-        self, current_task: TaskState, name_width: int, spinner: str
-    ) -> list[str]:
-        """Format the main and optional error lines for a processing task."""
-        lines: list[str] = []
-        phase_str = f"({current_task.phase}/{current_task.total_phases})"
-        operation = OPERATION_NAMES.get(
-            current_task.progress_type, "Processing"
-        )
-
-        # Create status info for status determination
-        status_info = TaskStatusInfo(
-            is_finished=current_task.is_finished,
-            success=current_task.success,
-            description=current_task.description,
-            error_message=current_task.error_message,
-        )
-
-        # Determine status symbol using helper function
-        status = determine_task_status_symbol(status_info, spinner)
-
-        name = truncate_text(current_task.name, name_width)
-        lines.append(f"{phase_str} {operation} {name:<{name_width}} {status}")
-
-        # Show warning message if applicable
-        if should_show_warning_message(status_info):
-            msg = truncate_text(current_task.description, 60)
-            lines.append(f"    {msg}")
-        # Show error message if applicable
-        elif should_show_error_message(status_info):
-            error_msg = truncate_text(current_task.error_message, 60)
-            lines.append(f"    Error: {error_msg}")
-
-        return lines
-
-    def _render_downloads_section(
-        self,
-        tasks_snapshot: dict[str, TaskState] | None = None,
-        order_snapshot: list[str] | None = None,
-    ) -> list[str]:
-        """Render downloads section with progress bars.
-
-        Returns a list of output lines. Accepts optional snapshots to render
-        from a copied state.
-        """
-        order = (
-            order_snapshot if order_snapshot is not None else self._task_order
-        )
-        tasks = tasks_snapshot if tasks_snapshot is not None else self.tasks
-
-        download_tasks = [
-            t for t in order if tasks[t].progress_type == ProgressType.DOWNLOAD
-        ]
-
-        if not download_tasks:
-            return []
-
-        display_names = {
-            t: compute_display_name(tasks[t]) for t in download_tasks
-        }
-
-        max_name_width = self._compute_max_name_width(
-            list(display_names.values())
-        )
-
-        total_downloads = len(download_tasks)
-
-        header = compute_download_header(total_downloads)
-
-        lines = [header]
-        for task_id in download_tasks:
-            task = tasks[task_id]
-            lines.extend(self._format_download_lines(task, max_name_width))
-
-        lines.append("")
-        return lines
-
-    def _render_processing_section(
-        self,
-        tasks_snapshot: dict[str, TaskState] | None = None,
-        order_snapshot: list[str] | None = None,
-    ) -> list[str]:
-        """Render installation/verification/post-processing section.
-
-        Accepts optional snapshots for rendering from a copied state.
-        """
-        order = (
-            order_snapshot if order_snapshot is not None else self._task_order
-        )
-        tasks = tasks_snapshot if tasks_snapshot is not None else self.tasks
-
-        post_tasks = [
-            t
-            for t in order
-            if tasks[t].progress_type
-            in (
-                ProgressType.VERIFICATION,
-                ProgressType.ICON_EXTRACTION,
-                ProgressType.INSTALLATION,
-                ProgressType.UPDATE,
-            )
-        ]
-
-        if not post_tasks:
-            return []
-
-        has_verification = any(
-            tasks[t].progress_type == ProgressType.VERIFICATION
-            for t in post_tasks
-        )
-        has_installation = any(
-            tasks[t].progress_type == ProgressType.INSTALLATION
-            for t in post_tasks
-        )
-
-        if has_verification and not has_installation:
-            section_header = "Verifying:"
-        elif has_installation:
-            section_header = "Installing:"
-        else:
-            section_header = "Processing:"
-
-        lines = [section_header]
-
-        spinner = compute_spinner(self._spinner_fps)
-
-        app_tasks: dict[str, list[TaskState]] = {}
-        for task_id in post_tasks:
-            task = tasks[task_id]
-            app_name = task.name
-            app_tasks.setdefault(app_name, []).append(task)
-
-        for app_task_list in app_tasks.values():
-            tasks_sorted = sorted(app_task_list, key=lambda t: t.phase)
-
-            fixed_width = 5 + 1 + 16 + 1 + 1 + 1
-            name_width = self._calculate_dynamic_name_width(
-                tasks_sorted[-1].name, fixed_width
-            )
-
-            for task in tasks_sorted:
-                lines.extend(
-                    self._format_processing_task_lines(
-                        task, name_width, spinner
-                    )
-                )
-
-        lines.append("")
-        return lines
 
     def _build_output(self) -> str:
         """Build complete output string.
@@ -752,7 +422,7 @@ class AsciiProgressBackend:
     ) -> str:
         """Build output string using a snapshot of tasks and order.
 
-        Delegates to the existing section renderers to avoid code duplication.
+        Delegates to section renderers from ascii_sections module.
 
         Args:
             tasks_snapshot: Snapshot of task states
@@ -763,11 +433,15 @@ class AsciiProgressBackend:
 
         """
         lines: list[str] = []
-        lines.extend(self._render_api_section(tasks_snapshot, order_snapshot))
+        lines.extend(render_api_section(tasks_snapshot, order_snapshot))
         lines.extend(
-            self._render_downloads_section(tasks_snapshot, order_snapshot)
+            render_downloads_section(
+                tasks_snapshot, order_snapshot, self._section_config
+            )
         )
         lines.extend(
-            self._render_processing_section(tasks_snapshot, order_snapshot)
+            render_processing_section(
+                tasks_snapshot, order_snapshot, self._section_config
+            )
         )
         return "\n".join(lines)

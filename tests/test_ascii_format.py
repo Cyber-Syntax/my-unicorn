@@ -3,10 +3,7 @@
 Tests the pure formatting functions extracted from AsciiProgressBackend.
 """
 
-import time
 from unittest.mock import patch
-
-import pytest
 
 from my_unicorn.core.progress.progress_types import ProgressType, TaskState
 
@@ -54,7 +51,9 @@ class TestFormatApiTaskStatus:
             is_finished=True,
             description="Cached result",
         )
-        from my_unicorn.core.progress.ascii_format import format_api_task_status
+        from my_unicorn.core.progress.ascii_format import (
+            format_api_task_status,
+        )
 
         result = format_api_task_status(task)
         assert "Retrieved from cache" in result
@@ -69,7 +68,9 @@ class TestFormatApiTaskStatus:
             completed=2.0,
             is_finished=False,
         )
-        from my_unicorn.core.progress.ascii_format import format_api_task_status
+        from my_unicorn.core.progress.ascii_format import (
+            format_api_task_status,
+        )
 
         result = format_api_task_status(task)
         assert "Fetching..." in result
@@ -85,7 +86,9 @@ class TestFormatApiTaskStatus:
             is_finished=True,
             description="Retrieved successfully",
         )
-        from my_unicorn.core.progress.ascii_format import format_api_task_status
+        from my_unicorn.core.progress.ascii_format import (
+            format_api_task_status,
+        )
 
         result = format_api_task_status(task)
         assert "Retrieved" in result
@@ -96,8 +99,8 @@ class TestComputeSpinner:
 
     def test_compute_spinner_returns_valid_frame(self) -> None:
         """Test that compute_spinner returns a valid spinner frame."""
-        from my_unicorn.core.progress.progress_types import SPINNER_FRAMES
         from my_unicorn.core.progress.ascii_format import compute_spinner
+        from my_unicorn.core.progress.progress_types import SPINNER_FRAMES
 
         result = compute_spinner(fps=4)
         assert result in SPINNER_FRAMES
@@ -123,21 +126,27 @@ class TestComputeDownloadHeader:
 
     def test_compute_download_header_single(self) -> None:
         """Test header text for single download."""
-        from my_unicorn.core.progress.ascii_format import compute_download_header
+        from my_unicorn.core.progress.ascii_format import (
+            compute_download_header,
+        )
 
         result = compute_download_header(download_count=1)
         assert result == "Downloading:"
 
     def test_compute_download_header_multiple(self) -> None:
         """Test header text for multiple downloads."""
-        from my_unicorn.core.progress.ascii_format import compute_download_header
+        from my_unicorn.core.progress.ascii_format import (
+            compute_download_header,
+        )
 
         result = compute_download_header(download_count=3)
         assert result == "Downloading (3):"
 
     def test_compute_download_header_zero(self) -> None:
         """Test header text for zero downloads."""
-        from my_unicorn.core.progress.ascii_format import compute_download_header
+        from my_unicorn.core.progress.ascii_format import (
+            compute_download_header,
+        )
 
         result = compute_download_header(download_count=0)
         assert result == "Downloading:"

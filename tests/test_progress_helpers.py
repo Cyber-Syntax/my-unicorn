@@ -1,5 +1,6 @@
 import io
 
+from my_unicorn.core.progress.ascii_sections import format_download_lines
 from my_unicorn.core.progress.progress import (
     AsciiProgressBackend,
     ProgressConfig,
@@ -27,8 +28,6 @@ def test_compute_display_name_strips_appimage():
 
 
 def test_format_download_lines_success_and_error():
-    backend = make_backend()
-
     # Successful completed download
     total = 10 * 1024 * 1024
     task_ok = TaskState(
@@ -41,7 +40,7 @@ def test_format_download_lines_success_and_error():
         is_finished=True,
         success=True,
     )
-    lines = backend._format_download_lines(task_ok, max_name_width=20)
+    lines = format_download_lines(task_ok, max_name_width=20, bar_width=30)
     assert lines
     first = lines[0]
     assert "MiB" in first or "GiB" in first
@@ -59,5 +58,5 @@ def test_format_download_lines_success_and_error():
         success=False,
         error_message="Something went wrong while downloading",
     )
-    lines = backend._format_download_lines(task_fail, max_name_width=20)
+    lines = format_download_lines(task_fail, max_name_width=20, bar_width=30)
     assert any("Error:" in l for l in lines)
