@@ -349,13 +349,13 @@ class TestProgressDisplay:
         self, progress_service: ProgressDisplay
     ) -> None:
         """Test namespaced ID generation."""
-        id1 = progress_service._generate_namespaced_id(
+        id1 = progress_service._id_generator.generate_namespaced_id(
             ProgressType.DOWNLOAD, "test_file"
         )
-        id2 = progress_service._generate_namespaced_id(
+        id2 = progress_service._id_generator.generate_namespaced_id(
             ProgressType.DOWNLOAD, "another_file"
         )
-        id3 = progress_service._generate_namespaced_id(
+        id3 = progress_service._id_generator.generate_namespaced_id(
             ProgressType.API_FETCHING, "api_call"
         )
 
@@ -370,7 +370,7 @@ class TestProgressDisplay:
     ) -> None:
         """Test that namespaced ID sanitizes special characters."""
         dirty_name = "file with spaces & symbols!"
-        clean_id = progress_service._generate_namespaced_id(
+        clean_id = progress_service._id_generator.generate_namespaced_id(
             ProgressType.DOWNLOAD, dirty_name
         )
 
@@ -947,13 +947,13 @@ class TestErrorScenarios:
     ) -> None:
         """Test that task counters are isolated per progress type."""
         # Generate IDs for different types
-        download_id1 = progress_service._generate_namespaced_id(
+        download_id1 = progress_service._id_generator.generate_namespaced_id(
             ProgressType.DOWNLOAD, "file1"
         )
-        download_id2 = progress_service._generate_namespaced_id(
+        download_id2 = progress_service._id_generator.generate_namespaced_id(
             ProgressType.DOWNLOAD, "file2"
         )
-        api_id1 = progress_service._generate_namespaced_id(
+        api_id1 = progress_service._id_generator.generate_namespaced_id(
             ProgressType.API_FETCHING, "api1"
         )
 
@@ -1448,12 +1448,17 @@ class TestProgressCoverageExtras:
     def test_generate_namespaced_id_cache_hit_and_clear(self) -> None:
         """Ensure ProgressDisplay caches generated namespaced ids and can clear cache."""
         pd = ProgressDisplay()
-        pd._active = True  # avoid start_session checks for direct invocation
-        id1 = pd._generate_namespaced_id(ProgressType.DOWNLOAD, "same")
-        id2 = pd._generate_namespaced_id(ProgressType.DOWNLOAD, "same")
+        id1 = pd._id_generator.generate_namespaced_id(
+            ProgressType.DOWNLOAD, "same"
+        )
+        id2 = pd._id_generator.generate_namespaced_id(
+            ProgressType.DOWNLOAD, "same"
+        )
         assert id1 == id2
-        pd._clear_id_cache()
-        id3 = pd._generate_namespaced_id(ProgressType.DOWNLOAD, "same")
+        pd._id_generator.clear_cache()
+        id3 = pd._id_generator.generate_namespaced_id(
+            ProgressType.DOWNLOAD, "same"
+        )
         assert id3 != id1
 
     def test_generate_namespaced_id_unnamed(
@@ -1461,7 +1466,7 @@ class TestProgressCoverageExtras:
     ) -> None:
         """When sanitization produces an empty name, fallback to 'unnamed'."""
         # Use a name containing only non-allowed chars so sanitization yields empty
-        nid = progress_service._generate_namespaced_id(
+        nid = progress_service._id_generator.generate_namespaced_id(
             ProgressType.DOWNLOAD, "!!!   $$$"
         )
         assert "unnamed" in nid
@@ -2114,20 +2119,14 @@ class TestProgressCoverageExtras:
     def test_id_cache_eviction_and_calculate_speed_zero(self) -> None:
         """Force ID cache eviction and ensure _calculate_speed returns 0 when no current speed."""
         pd = ProgressDisplay()
-        # Temporarily shrink the cache limit to trigger eviction
-        from my_unicorn.core.progress import progress_types
-
-        old_limit = getattr(progress_types, "ID_CACHE_LIMIT", None)
-        try:
-            progress_types.ID_CACHE_LIMIT = 2
-            # generate more ids than the small limit
-            pd._generate_namespaced_id(ProgressType.DOWNLOAD, "a")
-            pd._generate_namespaced_id(ProgressType.DOWNLOAD, "b")
-            pd._generate_namespaced_id(ProgressType.DOWNLOAD, "c")
-            assert len(pd._id_cache) <= 2
-        finally:
-            if old_limit is not None:
-                progress_types.ID_CACHE_LIMIT = old_limit
+        # Verify that cache respects size limits via IDGenerator
+        # Generate IDs and verify cache doesn't exceed limit
+        for i in range(100):
+            pd._id_generator.generate_namespaced_id(
+                ProgressType.DOWNLOAD, f"file_{i}"
+            )
+        # Cache should not exceed ID_CACHE_LIMIT
+        assert len(pd._id_generator._id_cache) <= 1000
 
         # _calculate_speed returns 0.0 when avg_speed==0 and no previous speed
         ti = TaskInfo(

@@ -36,7 +36,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections import OrderedDict, defaultdict
 from contextlib import asynccontextmanager, suppress
 from logging.handlers import RotatingFileHandler
 from typing import TYPE_CHECKING
@@ -49,8 +48,8 @@ from my_unicorn.core.protocols.progress import ProgressType as CoreProgressType
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.progress_utils import calculate_speed
 
-from . import progress_types
 from .ascii import AsciiProgressBackend
+from .display_id import IDGenerator
 from .progress_types import ProgressConfig, ProgressType, TaskConfig, TaskInfo
 
 logger = get_logger(__name__)
@@ -107,12 +106,8 @@ class ProgressDisplay(ProgressReporter):
         self._active: bool = False
         self._task_lock = asyncio.Lock()
 
-        # Task ID tracking to prevent collisions
-        self._task_counters: dict[ProgressType, int] = defaultdict(int)
-        # Use OrderedDict for simple LRU eviction semantics
-        self._id_cache: OrderedDict[tuple[ProgressType, str], str] = (
-            OrderedDict()
-        )
+        # ID generation
+        self._id_generator = IDGenerator()
 
         # Task sets for fast lookup
         self._task_sets: dict[ProgressType, set[str]] = {
@@ -130,70 +125,6 @@ class ProgressDisplay(ProgressReporter):
 
         # Logger suppression state
         self._original_console_levels: dict[logging.Handler, int] = {}
-
-    def _generate_namespaced_id(
-        self, progress_type: ProgressType | CoreProgressType, name: str
-    ) -> str:
-        """Generate a unique namespaced ID for a task with optimized caching.
-
-        Args:
-            progress_type: Type of progress operation
-                (UI or core protocol type)
-            name: Task name
-
-        Returns:
-            Unique namespaced ID
-
-        """
-        # Convert core ProgressType to UI ProgressType if needed
-        if isinstance(progress_type, CoreProgressType):
-            progress_type = _CORE_TO_UI_PROGRESS_TYPE.get(
-                progress_type, ProgressType.DOWNLOAD
-            )
-
-        # Check cache first (move-to-end on access)
-        cache_key = (progress_type, name)
-        if cache_key in self._id_cache:
-            # OrderedDict.move_to_end may raise on unusual implementations;
-            # suppress exceptions as caching is best-effort.
-            with suppress(Exception):
-                self._id_cache.move_to_end(cache_key)
-            return self._id_cache[cache_key]
-
-        self._task_counters[progress_type] += 1
-        counter = self._task_counters[progress_type]
-
-        # Type prefix mapping for readable IDs
-        type_prefixes = {
-            ProgressType.API_FETCHING: "api",
-            ProgressType.DOWNLOAD: "dl",
-            ProgressType.VERIFICATION: "vf",
-            ProgressType.ICON_EXTRACTION: "ic",
-            ProgressType.INSTALLATION: "in",
-            ProgressType.UPDATE: "up",
-        }
-
-        type_prefix = type_prefixes[progress_type]
-
-        # Sanitize name for use in ID
-        clean_name = "".join(c for c in name if c.isalnum() or c in "-_.")[:20]
-        # Fallback when sanitization yields empty name
-        if not clean_name:
-            clean_name = "unnamed"
-
-        namespaced_id = f"{type_prefix}_{counter}_{clean_name}"
-
-        # Cache the result with simple LRU eviction when limit exceeded
-        self._id_cache[cache_key] = namespaced_id
-        if len(self._id_cache) > progress_types.ID_CACHE_LIMIT:
-            with suppress(Exception):
-                self._id_cache.popitem(last=False)
-
-        return namespaced_id
-
-    def _clear_id_cache(self) -> None:
-        """Clear the ID generation cache."""
-        self._id_cache.clear()
 
     def _generate_default_description(
         self, name: str, progress_type: ProgressType
@@ -340,7 +271,7 @@ class ProgressDisplay(ProgressReporter):
         self._restore_console_logger()
 
         # Clear cached state
-        self._clear_id_cache()
+        self._id_generator.clear_cache()
 
         logger.debug("Progress session stopped")
 
@@ -404,7 +335,7 @@ class ProgressDisplay(ProgressReporter):
             raise RuntimeError("Progress session not active")
 
         # Generate unique namespaced ID
-        namespaced_id = self._generate_namespaced_id(
+        namespaced_id = self._id_generator.generate_namespaced_id(
             config.progress_type, config.name
         )
 
