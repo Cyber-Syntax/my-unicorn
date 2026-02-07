@@ -33,6 +33,11 @@ from my_unicorn.utils.progress_utils import (
     truncate_text,
 )
 
+from .ascii_format import (
+    compute_display_name,
+    compute_download_header,
+    compute_spinner,
+)
 from .formatters import (
     TaskStatusInfo,
     determine_task_status_symbol,
@@ -43,7 +48,6 @@ from .progress_types import (
     DEFAULT_MIN_NAME_WIDTH,
     DEFAULT_SPINNER_FPS,
     OPERATION_NAMES,
-    SPINNER_FRAMES,
     ProgressConfig,
     ProgressType,
     TaskState,
@@ -117,13 +121,6 @@ class AsciiProgressBackend:
         self._written_sections: set[str] = set()
 
     # Helpers for downloads rendering (kept small and testable)
-    def _compute_display_name(self, task: TaskState) -> str:
-        """Return a condensed display name for a task (strip extension)."""
-        name = task.name
-        if name.endswith(".AppImage"):
-            return name[:-9]
-        return name
-
     def _compute_max_name_width(self, display_names: list[str]) -> int:
         """Compute maximum name width across downloads for alignment."""
         max_name_width = 0
@@ -142,7 +139,7 @@ class AsciiProgressBackend:
     ) -> list[str]:
         """Format lines for a single download task (main + optional error)."""
         lines: list[str] = []
-        display_name = self._compute_display_name(task)
+        display_name = compute_display_name(task)
         name = truncate_text(display_name, max_name_width)
 
         if task.total > 0:
@@ -385,25 +382,6 @@ class AsciiProgressBackend:
 
         return min(len(name), max_width)
 
-    def _format_api_task_status(self, task: TaskState) -> str:
-        """Return the status string for an API fetching task."""
-        if task.total > 0:
-            completed = int(task.completed)
-            total = int(task.total)
-            if task.is_finished or completed >= total:
-                if "cached" in task.description.lower():
-                    return f"{total}/{total}        Retrieved from cache"
-                return f"{total}/{total}        Retrieved"
-
-            return f"{completed}/{total}        Fetching..."
-
-        if task.is_finished:
-            if "cached" in task.description.lower():
-                return "Retrieved from cache"
-            return "Retrieved"
-
-        return "Fetching..."
-
     def _select_current_task(
         self, tasks_sorted: list[TaskState]
     ) -> TaskState | None:
@@ -422,20 +400,6 @@ class AsciiProgressBackend:
             ),
             tasks_sorted[-1] if tasks_sorted else None,
         )
-
-    def _compute_spinner(self) -> str:
-        """Compute the current spinner frame based on time and FPS."""
-        current_time = time.monotonic()
-        spinner_idx = int(current_time * self._spinner_fps) % len(
-            SPINNER_FRAMES
-        )
-        return SPINNER_FRAMES[spinner_idx]
-
-    def _compute_download_header(self, total: int, completed: int) -> str:
-        """Return the downloads section header string."""
-        if total > 1:
-            return f"Downloading ({completed}/{total}):"
-        return "Downloading:"
 
     def _format_processing_task_lines(
         self, current_task: TaskState, name_width: int, spinner: str
@@ -495,7 +459,7 @@ class AsciiProgressBackend:
             return []
 
         display_names = {
-            t: self._compute_display_name(tasks[t]) for t in download_tasks
+            t: compute_display_name(tasks[t]) for t in download_tasks
         }
 
         max_name_width = self._compute_max_name_width(
@@ -503,13 +467,8 @@ class AsciiProgressBackend:
         )
 
         total_downloads = len(download_tasks)
-        completed_downloads = sum(
-            1 for t in download_tasks if tasks[t].is_finished
-        )
 
-        header = self._compute_download_header(
-            total_downloads, completed_downloads
-        )
+        header = compute_download_header(total_downloads)
 
         lines = [header]
         for task_id in download_tasks:
@@ -566,7 +525,7 @@ class AsciiProgressBackend:
 
         lines = [section_header]
 
-        spinner = self._compute_spinner()
+        spinner = compute_spinner(self._spinner_fps)
 
         app_tasks: dict[str, list[TaskState]] = {}
         for task_id in post_tasks:

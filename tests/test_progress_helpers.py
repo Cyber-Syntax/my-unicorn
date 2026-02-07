@@ -16,13 +16,14 @@ def make_backend():
 
 
 def test_compute_display_name_strips_appimage():
-    backend = make_backend()
+    from my_unicorn.core.progress.ascii_format import compute_display_name
+
     task = TaskState(
         task_id="t1",
         name="example.AppImage",
         progress_type=ProgressType.DOWNLOAD,
     )
-    assert backend._compute_display_name(task) == "example"
+    assert compute_display_name(task) == "example"
 
 
 def test_format_download_lines_success_and_error():

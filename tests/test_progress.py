@@ -1291,12 +1291,14 @@ class TestProgressCoverageExtras:
             shutil.get_terminal_size = orig
 
         # Spinner deterministic value
-        with patch("time.time", return_value=1.23):
-            spin = backend._compute_spinner()
+        with patch("time.monotonic", return_value=0.25):
+            from my_unicorn.core.progress.ascii_format import compute_spinner
+            spin = compute_spinner(4)  # 4 FPS
             assert isinstance(spin, str) and len(spin) > 0
 
         # header
-        assert backend._compute_download_header(2, 1).startswith("Downloading")
+        from my_unicorn.core.progress.ascii_format import compute_download_header
+        assert compute_download_header(2).startswith("Downloading")
 
     def test_format_processing_task_lines(self) -> None:
         """Cover processing task formatting (spinner, finished, errors)."""
@@ -1352,8 +1354,8 @@ class TestProgressCoverageExtras:
         assert "Summary: All done" in out2.getvalue()
 
     def test_format_api_task_status_all_cases(self) -> None:
-        """Exercise different status outputs from _format_api_task_status."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
+        """Exercise different status outputs from format_api_task_status."""
+        from my_unicorn.core.progress.ascii_format import format_api_task_status
 
         # total > 0, unfinished
         t = TaskState(
@@ -1363,7 +1365,7 @@ class TestProgressCoverageExtras:
             total=10.0,
             completed=2.0,
         )
-        assert "Fetching" in backend._format_api_task_status(t)
+        assert "Fetching" in format_api_task_status(t)
 
         # total >0 finished, cached
         t2 = TaskState(
@@ -1375,7 +1377,7 @@ class TestProgressCoverageExtras:
             is_finished=True,
             description="Cached result",
         )
-        assert "Retrieved" in backend._format_api_task_status(t2)
+        assert "Retrieved" in format_api_task_status(t2)
 
         # no total, finished cached
         t3 = TaskState(
@@ -1385,7 +1387,7 @@ class TestProgressCoverageExtras:
             is_finished=True,
             description="cached",
         )
-        assert backend._format_api_task_status(t3).startswith("Retrieved")
+        assert format_api_task_status(t3).startswith("Retrieved")
 
     def test_select_current_task_variants(self) -> None:
         """Select current task from list with various finished/failed states."""
@@ -1795,8 +1797,8 @@ class TestProgressCoverageExtras:
         assert out.getvalue()
 
     def test_format_api_task_status_variants(self) -> None:
-        """Explicitly exercise all branches of _format_api_task_status."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
+        """Explicitly exercise all branches of format_api_task_status."""
+        from my_unicorn.core.progress.ascii_format import format_api_task_status
 
         # total > 0, finished, cached
         t1 = TaskState(
@@ -1808,7 +1810,7 @@ class TestProgressCoverageExtras:
             is_finished=True,
             description="Cached result",
         )
-        assert "Retrieved from cache" in backend._format_api_task_status(t1)
+        assert "Retrieved from cache" in format_api_task_status(t1)
 
         # total > 0, finished, not cached
         t2 = TaskState(
@@ -1820,7 +1822,7 @@ class TestProgressCoverageExtras:
             is_finished=True,
             description="OK",
         )
-        assert "Retrieved" in backend._format_api_task_status(t2)
+        assert "Retrieved" in format_api_task_status(t2)
 
         # total > 0, not finished
         t3 = TaskState(
@@ -1832,7 +1834,7 @@ class TestProgressCoverageExtras:
             is_finished=False,
             description="",
         )
-        assert "Fetching" in backend._format_api_task_status(t3)
+        assert "Fetching" in format_api_task_status(t3)
 
         # total == 0, finished, cached
         t4 = TaskState(
@@ -1844,7 +1846,7 @@ class TestProgressCoverageExtras:
             is_finished=True,
             description="cached",
         )
-        assert backend._format_api_task_status(t4) == "Retrieved from cache"
+        assert format_api_task_status(t4) == "Retrieved from cache"
 
         # total == 0, not finished
         t5 = TaskState(
@@ -1856,11 +1858,12 @@ class TestProgressCoverageExtras:
             is_finished=False,
             description="",
         )
-        assert backend._format_api_task_status(t5) == "Fetching..."
+        assert format_api_task_status(t5) == "Fetching..."
 
     def test_format_api_task_status_exact_retrieved(self) -> None:
         """Ensure exact formatting for total/total Retrieved branch."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
+        from my_unicorn.core.progress.ascii_format import format_api_task_status
+
         t = TaskState(
             task_id="x",
             name="n",
@@ -1870,7 +1873,7 @@ class TestProgressCoverageExtras:
             is_finished=True,
             description="ok",
         )
-        assert backend._format_api_task_status(t) == "7/7        Retrieved"
+        assert format_api_task_status(t) == "7/7        Retrieved"
 
     def test_processing_section_verifying_header(self) -> None:
         """When only verification tasks exist, header should be 'Verifying:'"""
@@ -1928,7 +1931,8 @@ class TestProgressCoverageExtras:
         assert any("Retrieved" in l for l in lines)
 
     def test_format_api_task_status_return_retrieved(self) -> None:
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
+        from my_unicorn.core.progress.ascii_format import format_api_task_status
+
         t = TaskState(
             task_id="x",
             name="n",
@@ -1938,7 +1942,7 @@ class TestProgressCoverageExtras:
             is_finished=True,
             description="done",
         )
-        assert backend._format_api_task_status(t) == "Retrieved"
+        assert format_api_task_status(t) == "Retrieved"
 
     def test_render_processing_section_headers_non_snapshot(self) -> None:
         """Non-snapshot rendering: verify all processing header branches."""
