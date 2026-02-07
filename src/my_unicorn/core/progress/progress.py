@@ -21,8 +21,11 @@ Usage (simple, recommended):
 
     async with progress_session() as progress:
         # create linked verification & installation tasks
+        from my_unicorn.core.progress.display_workflows import (
+            create_installation_workflow
+        )
         verification_id, installation_id = (
-        await progress.create_installation_workflow("App")
+            await create_installation_workflow(progress, "App")
         )
         # update/finish tasks as work proceeds
 
@@ -41,6 +44,7 @@ from my_unicorn.logger import get_logger
 # Import classes for re-export
 from .ascii import AsciiProgressBackend
 from .display import ProgressDisplay
+from .display_workflows import create_api_fetching_task
 from .progress_types import (
     ID_CACHE_LIMIT,
     OPERATION_NAMES,
@@ -104,7 +108,8 @@ async def github_api_progress_task(
         yield None
         return
 
-    task_id = await progress.create_api_fetching_task(
+    task_id = await create_api_fetching_task(
+        progress,
         name=task_name,
         description="🌐 Fetching release information...",
     )

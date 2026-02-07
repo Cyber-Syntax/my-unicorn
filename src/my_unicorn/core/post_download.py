@@ -309,11 +309,18 @@ class PostDownloadProcessor:
         if not self.progress_reporter.is_active():
             return None, None
 
-        # Protocol doesn't define create_installation_workflow,
-        # check if concrete implementation has it
-        if hasattr(self.progress_reporter, "create_installation_workflow"):
-            return await self.progress_reporter.create_installation_workflow(
-                app_name, with_verification=with_verification
+        # Use standalone workflow helper if available
+        # This requires the reporter to be a ProgressDisplay instance
+        from my_unicorn.core.progress.display import ProgressDisplay
+        from my_unicorn.core.progress.display_workflows import (
+            create_installation_workflow,
+        )
+
+        if isinstance(self.progress_reporter, ProgressDisplay):
+            return await create_installation_workflow(
+                self.progress_reporter,
+                app_name,
+                with_verification=with_verification,
             )
         return None, None
 

@@ -564,38 +564,6 @@ class TestProgressDisplay:
         await progress_service.stop_session()
 
     @pytest.mark.asyncio
-    async def test_create_api_fetching_task(
-        self, progress_service: ProgressDisplay
-    ) -> None:
-        """Test creating an API fetching task."""
-        await progress_service.start_session()
-
-        task_id = await progress_service.create_api_fetching_task(
-            "API Request"
-        )
-
-        assert task_id is not None
-        task = progress_service._task_registry.get_task_info_full_sync(task_id)
-        assert task.progress_type == ProgressType.API_FETCHING
-
-        await progress_service.stop_session()
-
-    @pytest.mark.asyncio
-    async def test_create_verification_task(
-        self, progress_service: ProgressDisplay
-    ) -> None:
-        """Test creating a verification task."""
-        await progress_service.start_session()
-
-        task_id = await progress_service.create_verification_task("file.zip")
-
-        assert task_id is not None
-        task = progress_service._task_registry.get_task_info_full_sync(task_id)
-        assert task.progress_type == ProgressType.VERIFICATION
-
-        await progress_service.stop_session()
-
-    @pytest.mark.asyncio
     async def test_create_icon_extraction_task(
         self, progress_service: ProgressDisplay
     ) -> None:
@@ -738,9 +706,13 @@ class TestProgressDisplay:
         self, progress_service: ProgressDisplay
     ) -> None:
         """Test handling verification error."""
+        from my_unicorn.core.progress.display_workflows import (
+            create_verification_task,
+        )
+
         await progress_service.start_session()
 
-        task_id = await progress_service.create_verification_task("file.zip")
+        task_id = await create_verification_task(progress_service, "file.zip")
 
         # Simulate verification failure
         await progress_service.finish_task(
@@ -981,10 +953,14 @@ class TestErrorScenarios:
         self, progress_service: ProgressDisplay
     ) -> None:
         """Test different progress update methods."""
+        from my_unicorn.core.progress.display_workflows import (
+            create_verification_task,
+        )
+
         await progress_service.start_session()
 
-        task_id = await progress_service.create_verification_task(
-            "test.AppImage"
+        task_id = await create_verification_task(
+            progress_service, "test.AppImage"
         )
 
         # Test absolute completion update
@@ -1035,60 +1011,6 @@ class TestErrorScenarios:
         # Test session cleanup
         await service.stop_session()
         assert not service.is_active()
-
-    @pytest.mark.asyncio
-    async def test_multi_phase_installation_workflow(self) -> None:
-        """Test multi-phase installation workflow creation."""
-        service = ProgressDisplay()
-
-        await service.start_session()
-
-        # Test with verification
-        verify_id, install_id = await service.create_installation_workflow(
-            "MyApp", with_verification=True
-        )
-
-        assert verify_id is not None
-        assert install_id is not None
-
-        # Check verification task - use get_task_info_full for full TaskInfo
-        verify_task = service.get_task_info_full(verify_id)
-        assert verify_task is not None
-        assert verify_task.phase == 1
-        assert verify_task.total_phases == 2
-        assert verify_task.progress_type == ProgressType.VERIFICATION
-
-        # Check installation task
-        install_task = service.get_task_info_full(install_id)
-        assert install_task is not None
-        assert install_task.phase == 2
-        assert install_task.total_phases == 2
-        assert install_task.parent_task_id == verify_id
-        assert install_task.progress_type == ProgressType.INSTALLATION
-
-        await service.stop_session()
-
-    @pytest.mark.asyncio
-    async def test_installation_workflow_without_verification(self) -> None:
-        """Test installation workflow without verification phase."""
-        service = ProgressDisplay()
-
-        await service.start_session()
-
-        verify_id, install_id = await service.create_installation_workflow(
-            "MyApp", with_verification=False
-        )
-
-        assert verify_id is None
-        assert install_id is not None
-
-        install_task = service.get_task_info_full(install_id)
-        assert install_task is not None
-        assert install_task.phase == 1
-        assert install_task.total_phases == 1
-        assert install_task.parent_task_id is None
-
-        await service.stop_session()
 
     @pytest.mark.asyncio
     async def test_speed_calculation_with_history(self) -> None:
@@ -1172,7 +1094,11 @@ class TestErrorScenarios:
             total=1000.0,
         )
 
-        api_task = await service.create_api_fetching_task("GitHub API")
+        from my_unicorn.core.progress.display_workflows import (
+            create_api_fetching_task,
+        )
+
+        api_task = await create_api_fetching_task(service, "GitHub API")
 
         # Verify tasks were created - use get_task_info_full to check existence
         assert service.get_task_info_full(dl_task) is not None

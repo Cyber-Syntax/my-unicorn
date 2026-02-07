@@ -1,7 +1,7 @@
 """Tests for progress workflow helper utilities."""
 
 from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -21,39 +21,50 @@ async def mock_session(_total_operations):
 async def test_github_api_progress_task_with_progress_success():
     """Test GitHub API progress task lifecycle with progress service and success."""
     mock_progress = AsyncMock()
-    mock_progress.create_api_fetching_task.return_value = "task-123"
 
-    async with github_api_progress_task(
-        mock_progress, task_name="Fetching releases", total=5
-    ) as task_id:
-        assert task_id == "task-123"
-        mock_progress.create_api_fetching_task.assert_called_once_with(
-            name="Fetching releases",
-            description="🌐 Fetching release information...",
-        )
-        mock_progress.update_task.assert_called_once_with(
-            "task-123", total=5.0, completed=0.0
-        )
+    with patch(
+        "my_unicorn.core.progress.progress.create_api_fetching_task"
+    ) as mock_create_api:
+        mock_create_api.return_value = "task-123"
 
-    mock_progress.finish_task.assert_called_once_with("task-123", success=True)
+        async with github_api_progress_task(
+            mock_progress, task_name="Fetching releases", total=5
+        ) as task_id:
+            assert task_id == "task-123"
+            mock_create_api.assert_called_once_with(
+                mock_progress,
+                name="Fetching releases",
+                description="🌐 Fetching release information...",
+            )
+            mock_progress.update_task.assert_called_once_with(
+                "task-123", total=5.0, completed=0.0
+            )
+
+        mock_progress.finish_task.assert_called_once_with(
+            "task-123", success=True
+        )
 
 
 @pytest.mark.asyncio
 async def test_github_api_progress_task_with_progress_failure():
     """Test GitHub API progress task lifecycle with progress service and failure."""
     mock_progress = AsyncMock()
-    mock_progress.create_api_fetching_task.return_value = "task-456"
 
-    with pytest.raises(ValueError, match="Test error"):
-        async with github_api_progress_task(
-            mock_progress, task_name="Fetching releases", total=3
-        ) as task_id:
-            assert task_id == "task-456"
-            raise ValueError("Test error")
+    with patch(
+        "my_unicorn.core.progress.progress.create_api_fetching_task"
+    ) as mock_create_api:
+        mock_create_api.return_value = "task-456"
 
-    mock_progress.finish_task.assert_called_once_with(
-        "task-456", success=False
-    )
+        with pytest.raises(ValueError, match="Test error"):
+            async with github_api_progress_task(
+                mock_progress, task_name="Fetching releases", total=3
+            ) as task_id:
+                assert task_id == "task-456"
+                raise ValueError("Test error")
+
+        mock_progress.finish_task.assert_called_once_with(
+            "task-456", success=False
+        )
 
 
 @pytest.mark.asyncio
@@ -69,15 +80,19 @@ async def test_github_api_progress_task_without_progress():
 async def test_github_api_progress_task_with_zero_total():
     """Test GitHub API progress task with zero total operations."""
     mock_progress = AsyncMock()
-    mock_progress.create_api_fetching_task.return_value = "task-789"
 
-    async with github_api_progress_task(
-        mock_progress, task_name="Empty task", total=0
-    ) as task_id:
-        assert task_id == "task-789"
-        mock_progress.update_task.assert_called_once_with(
-            "task-789", total=0.0, completed=0.0
-        )
+    with patch(
+        "my_unicorn.core.progress.progress.create_api_fetching_task"
+    ) as mock_create_api:
+        mock_create_api.return_value = "task-789"
+
+        async with github_api_progress_task(
+            mock_progress, task_name="Empty task", total=0
+        ) as task_id:
+            assert task_id == "task-789"
+            mock_progress.update_task.assert_called_once_with(
+                "task-789", total=0.0, completed=0.0
+            )
 
 
 @pytest.mark.asyncio
@@ -132,11 +147,8 @@ async def test_operation_progress_session_exception_handling():
 @pytest.mark.asyncio
 async def test_github_api_progress_task_async_context_manager():
     """Test that github_api_progress_task properly implements async context manager."""
-    mock_progress = AsyncMock()
-    mock_progress.create_api_fetching_task.return_value = "task-async"
-
     context_manager = github_api_progress_task(
-        mock_progress, task_name="Async test", total=1
+        None, task_name="Async test", total=1
     )
 
     assert hasattr(context_manager, "__aenter__")
@@ -160,18 +172,22 @@ async def test_operation_progress_session_async_context_manager():
 async def test_github_api_progress_task_multiple_operations():
     """Test GitHub API progress task with multiple simulated operations."""
     mock_progress = AsyncMock()
-    mock_progress.create_api_fetching_task.return_value = "task-multi"
 
-    async with github_api_progress_task(
-        mock_progress, task_name="Multi ops", total=3
-    ) as task_id:
-        assert task_id == "task-multi"
-        # Simulate multiple operations
-        for i in range(3):
-            # In real usage, progress would be updated here
-            pass
+    with patch(
+        "my_unicorn.core.progress.progress.create_api_fetching_task"
+    ) as mock_create_api:
+        mock_create_api.return_value = "task-multi"
 
-    # Verify finish was called with success
-    mock_progress.finish_task.assert_called_once_with(
-        "task-multi", success=True
-    )
+        async with github_api_progress_task(
+            mock_progress, task_name="Multi ops", total=3
+        ) as task_id:
+            assert task_id == "task-multi"
+            # Simulate multiple operations
+            for i in range(3):
+                # In real usage, progress would be updated here
+                pass
+
+        # Verify finish was called with success
+        mock_progress.finish_task.assert_called_once_with(
+            "task-multi", success=True
+        )
