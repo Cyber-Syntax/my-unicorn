@@ -24,10 +24,10 @@ class TerminalWriter:
         _last_output_lines: Number of lines written (interactive mode)
         _written_sections: Set of section signatures written (non-interactive)
         _last_noninteractive_output: Cached output (non-interactive)
-        _last_noninteractive_write_time: Timestamp of last write (non-interactive)
+        _last_noninteractive_write_time: Last write timestamp (non-interactive)
     """
 
-    def __init__(self, output: TextIO, interactive: bool) -> None:
+    def __init__(self, output: TextIO, interactive: bool) -> None:  # noqa: FBT001
         """Initialize terminal writer.
 
         Args:
@@ -64,7 +64,7 @@ class TerminalWriter:
         try:
             self.output.write(text)
             self.output.flush()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
     @staticmethod
@@ -116,7 +116,7 @@ class TerminalWriter:
             try:
                 self.output.write(output_text)
                 self.output.flush()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 # swallow IO errors
                 pass
 

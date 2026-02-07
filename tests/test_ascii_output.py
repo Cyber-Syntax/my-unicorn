@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import io
-import time
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from my_unicorn.core.progress.ascii_output import TerminalWriter
 
@@ -90,7 +87,7 @@ class TestWriteOutputSafe:
     def test_write_output_safe_io_error(self) -> None:
         """Test IO error suppression when writing fails."""
         output = MagicMock()
-        output.write.side_effect = IOError("write failed")
+        output.write.side_effect = OSError("write failed")
         writer = TerminalWriter(output, interactive=True)
 
         # Should not raise an exception
@@ -99,7 +96,7 @@ class TestWriteOutputSafe:
     def test_write_output_safe_flush_on_exception(self) -> None:
         """Test that flush exception is also suppressed."""
         output = MagicMock()
-        output.flush.side_effect = IOError("flush failed")
+        output.flush.side_effect = OSError("flush failed")
         writer = TerminalWriter(output, interactive=True)
 
         # Should not raise an exception
@@ -199,7 +196,7 @@ class TestWriteInteractive:
     def test_write_interactive_io_error(self) -> None:
         """Test IO error handling during write."""
         output = MagicMock()
-        output.write.side_effect = IOError("write failed")
+        output.write.side_effect = OSError("write failed")
         writer = TerminalWriter(output, interactive=True)
 
         # Should not raise an exception
@@ -244,7 +241,8 @@ class TestWriteNoninteractive:
         known_sections = {"Section A"}
 
         sections = writer.write_noninteractive(
-            "Section A\n\nSection B\n\nSection C", known_sections=known_sections
+            "Section A\n\nSection B\n\nSection C",
+            known_sections=known_sections,
         )
 
         assert "Section B" in sections
@@ -258,7 +256,8 @@ class TestWriteNoninteractive:
         known_sections = {"Section A", "Section B"}
 
         sections = writer.write_noninteractive(
-            "Section A\n\nSection B\n\nSection C", known_sections=known_sections
+            "Section A\n\nSection B\n\nSection C",
+            known_sections=known_sections,
         )
 
         assert len(sections) == 1
@@ -298,7 +297,7 @@ class TestWriteNoninteractive:
     def test_write_noninteractive_io_error(self) -> None:
         """Test IO error handling during write."""
         output = MagicMock()
-        output.write.side_effect = IOError("write failed")
+        output.write.side_effect = OSError("write failed")
         writer = TerminalWriter(output, interactive=False)
 
         # Should not raise an exception

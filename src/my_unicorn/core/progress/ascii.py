@@ -53,7 +53,7 @@ class AsciiProgressBackend:
     def __init__(
         self,
         output: TextIO | None = None,
-        interactive: bool | None = None,
+        interactive: bool | None = None,  # noqa: FBT001
         config: ProgressConfig | None = None,
     ) -> None:
         """Initialize ASCII progress backend.
@@ -73,7 +73,7 @@ class AsciiProgressBackend:
         is_tty = False
         try:
             is_tty = bool(getattr(self.output, "isatty", lambda: False)())
-        except Exception:
+        except Exception:  # noqa: BLE001
             is_tty = False
 
         if interactive is not None:
@@ -114,42 +114,42 @@ class AsciiProgressBackend:
     @property
     def _last_output_lines(self) -> int:
         """Get number of lines last written (interactive mode)."""
-        return self._writer._last_output_lines
+        return self._writer._last_output_lines  # noqa: SLF001
 
     @_last_output_lines.setter
     def _last_output_lines(self, value: int) -> None:
         """Set number of lines last written (interactive mode)."""
-        self._writer._last_output_lines = value
+        self._writer._last_output_lines = value  # noqa: SLF001
 
     @property
     def _written_sections(self) -> set[str]:
         """Get set of written section signatures (non-interactive mode)."""
-        return self._writer._written_sections
+        return self._writer._written_sections  # noqa: SLF001
 
     @_written_sections.setter
     def _written_sections(self, value: set[str]) -> None:
         """Set set of written section signatures (non-interactive mode)."""
-        self._writer._written_sections = value
+        self._writer._written_sections = value  # noqa: SLF001
 
     @property
     def _last_noninteractive_output(self) -> str:
         """Get cached non-interactive output."""
-        return self._writer._last_noninteractive_output
+        return self._writer._last_noninteractive_output  # noqa: SLF001
 
     @_last_noninteractive_output.setter
     def _last_noninteractive_output(self, value: str) -> None:
         """Set cached non-interactive output."""
-        self._writer._last_noninteractive_output = value
+        self._writer._last_noninteractive_output = value  # noqa: SLF001
 
     @property
     def _last_noninteractive_write_time(self) -> float:
         """Get timestamp of last non-interactive write."""
-        return self._writer._last_noninteractive_write_time
+        return self._writer._last_noninteractive_write_time  # noqa: SLF001
 
     @_last_noninteractive_write_time.setter
     def _last_noninteractive_write_time(self, value: float) -> None:
         """Set timestamp of last non-interactive write."""
-        self._writer._last_noninteractive_write_time = value
+        self._writer._last_noninteractive_write_time = value  # noqa: SLF001
 
     def add_task(  # noqa: PLR0913
         self,
@@ -230,7 +230,7 @@ class AsciiProgressBackend:
     def finish_task(
         self,
         task_id: str,
-        success: bool = True,
+        success: bool = True,  # noqa: FBT001, FBT002
         description: str | None = None,
     ) -> None:
         """Mark a task as finished.
@@ -272,7 +272,7 @@ class AsciiProgressBackend:
             with self._sync_lock:
                 tasks_snapshot = dict(self.tasks)
                 order_snapshot = list(self._task_order)
-        except Exception:
+        except Exception:  # noqa: BLE001
             tasks_snapshot = dict(self.tasks)
             order_snapshot = list(self._task_order)
 
@@ -283,7 +283,7 @@ class AsciiProgressBackend:
 
         Thin wrapper for backward compatibility; delegates to TerminalWriter.
         """
-        self._writer._clear_previous_output()
+        self._writer._clear_previous_output()  # noqa: SLF001
 
     def _write_interactive(self, output: str) -> int:
         """Write output in interactive mode with cursor control.
@@ -303,7 +303,7 @@ class AsciiProgressBackend:
 
         Thin wrapper for backward compatibility; delegates to TerminalWriter.
         """
-        self._writer._write_output_safe(text)
+        self._writer._write_output_safe(text)  # noqa: SLF001
 
     def _find_new_sections(
         self, output: str, known_sections: set[str]
@@ -319,7 +319,7 @@ class AsciiProgressBackend:
         Returns:
             Tuple of (new_sections_list, new_signatures_set)
         """
-        return self._writer._find_new_sections(output, known_sections)
+        return self._writer._find_new_sections(output, known_sections)  # noqa: SLF001
 
     def _write_noninteractive(
         self, output: str, known_sections: set[str] | None = None
@@ -350,7 +350,7 @@ class AsciiProgressBackend:
             with self._sync_lock:
                 tasks_snapshot = dict(self.tasks)
                 order_snapshot = list(self._task_order)
-                written_snapshot = set(self._writer._written_sections)
+                written_snapshot = set(self._writer._written_sections)  # noqa: SLF001
 
             # Build output from snapshot (pure function)
             output = self._build_output_from_snapshot(
@@ -364,16 +364,16 @@ class AsciiProgressBackend:
                 lines_written = self._writer.write_interactive(output)
                 # Update writer state under sync lock
                 with self._sync_lock:
-                    self._writer._last_output_lines = lines_written
+                    self._writer._last_output_lines = lines_written  # noqa: SLF001
             else:
                 added_sections = self._writer.write_noninteractive(
                     output, written_snapshot
                 )
                 with self._sync_lock:
                     if added_sections:
-                        self._writer._written_sections.update(added_sections)
-                        self._writer._last_noninteractive_output = output
-                        self._writer._last_noninteractive_write_time = (
+                        self._writer._written_sections.update(added_sections)  # noqa: SLF001
+                        self._writer._last_noninteractive_output = output  # noqa: SLF001
+                        self._writer._last_noninteractive_write_time = (  # noqa: SLF001
                             time.monotonic()
                         )
 
@@ -384,13 +384,13 @@ class AsciiProgressBackend:
                 # Final render with all completed tasks
                 output = self._build_output()
                 if output:
-                    self._writer._clear_previous_output()
+                    self._writer._clear_previous_output()  # noqa: SLF001
                     self.output.write(output + "\n")
                     self.output.flush()
-                self._writer._last_output_lines = 0
+                self._writer._last_output_lines = 0  # noqa: SLF001
 
             # Reset written sections for next session
-            self._writer._written_sections.clear()
+            self._writer._written_sections.clear()  # noqa: SLF001
 
     def _build_output_from_snapshot(
         self, tasks_snapshot: dict[str, TaskState], order_snapshot: list[str]

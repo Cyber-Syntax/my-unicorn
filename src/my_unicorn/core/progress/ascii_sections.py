@@ -75,7 +75,7 @@ def select_current_task(
 
 
 def calculate_dynamic_name_width(
-    interactive: bool,
+    interactive: bool,  # noqa: FBT001
     min_name_width: int,
 ) -> int:
     """Calculate dynamic name width based on terminal size.
@@ -111,7 +111,7 @@ def calculate_dynamic_name_width(
 
 def compute_max_name_width(
     display_names: list[str],
-    interactive: bool,
+    interactive: bool,  # noqa: FBT001
     min_name_width: int,
 ) -> int:
     """Compute maximum name width across items for alignment.
