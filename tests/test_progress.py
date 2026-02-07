@@ -437,8 +437,11 @@ class TestProgressDisplay:
         )
 
         assert task_id is not None
-        assert task_id in progress_service._tasks
-        task = progress_service._tasks[task_id]
+        assert (
+            progress_service._task_registry.get_task_info_full_sync(task_id)
+            is not None
+        )
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.name == "test_file"
         assert task.progress_type == ProgressType.DOWNLOAD
         assert task.total == 100.0
@@ -475,7 +478,7 @@ class TestProgressDisplay:
         # Update task progress
         await progress_service.update_task(task_id, completed=50.0)
 
-        task = progress_service._tasks[task_id]
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.completed == 50.0
 
         await progress_service.stop_session()
@@ -505,7 +508,7 @@ class TestProgressDisplay:
 
         await progress_service.finish_task(task_id, success=True)
 
-        task = progress_service._tasks[task_id]
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.success is True
         assert task.is_finished
 
@@ -528,7 +531,7 @@ class TestProgressDisplay:
             task_id, success=False, description="Download failed"
         )
 
-        task = progress_service._tasks[task_id]
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.success is False
         assert task.description == "Download failed"
 
@@ -554,7 +557,7 @@ class TestProgressDisplay:
         with patch("time.time", return_value=1001.0):  # 1 second later
             await progress_service.update_task(task_id, completed=50.0)
 
-        task = progress_service._tasks[task_id]
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         # Should calculate speed based on progress
         assert task.current_speed_mbps > 0
 
@@ -572,7 +575,7 @@ class TestProgressDisplay:
         )
 
         assert task_id is not None
-        task = progress_service._tasks[task_id]
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.progress_type == ProgressType.API_FETCHING
 
         await progress_service.stop_session()
@@ -587,7 +590,7 @@ class TestProgressDisplay:
         task_id = await progress_service.create_verification_task("file.zip")
 
         assert task_id is not None
-        task = progress_service._tasks[task_id]
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.progress_type == ProgressType.VERIFICATION
 
         await progress_service.stop_session()
@@ -606,12 +609,13 @@ class TestProgressDisplay:
         )
 
         assert task_id is not None
-        task = progress_service._tasks[task_id]
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.progress_type == ProgressType.ICON_EXTRACTION
 
         await progress_service.stop_session()
 
-    def test_get_task_info_existing(
+    @pytest.mark.asyncio
+    async def test_get_task_info_existing(
         self, progress_service: ProgressDisplay
     ) -> None:
         """Test getting info for an existing task returns dict."""
@@ -625,7 +629,9 @@ class TestProgressDisplay:
             total=100.0,
             description="Test description",
         )
-        progress_service._tasks["test_task"] = task_info
+        await progress_service._task_registry.add_task_info(
+            "test_task", task_info
+        )
 
         info = progress_service.get_task_info("test_task")
 
@@ -635,7 +641,8 @@ class TestProgressDisplay:
         assert info["total"] == 100.0
         assert info["description"] == "Test description"
 
-    def test_get_task_info_full_existing(
+    @pytest.mark.asyncio
+    async def test_get_task_info_full_existing(
         self, progress_service: ProgressDisplay
     ) -> None:
         """Test getting full TaskInfo for an existing task."""
@@ -646,7 +653,9 @@ class TestProgressDisplay:
             name="test_task",
             progress_type=ProgressType.DOWNLOAD,
         )
-        progress_service._tasks["test_task"] = task_info
+        await progress_service._task_registry.add_task_info(
+            "test_task", task_info
+        )
 
         info = progress_service.get_task_info_full("test_task")
 
@@ -719,7 +728,7 @@ class TestProgressDisplay:
         # Should update without error
         await progress_service.update_task(task_id, completed=50.0)
 
-        task = progress_service._tasks[task_id]
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.completed == 50.0
 
         await progress_service.stop_session()
@@ -740,7 +749,7 @@ class TestProgressDisplay:
             description="Checksum mismatch",
         )
 
-        task = progress_service._tasks[task_id]
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.success is False
         assert "Checksum mismatch" in task.description
 
@@ -766,7 +775,7 @@ class TestProgressDisplay:
             description="Failed to extract icon",
         )
 
-        task = progress_service._tasks[task_id]
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.success is False
         assert "Failed to extract icon" in task.description
 
@@ -795,7 +804,10 @@ class TestProgressDisplay:
         await asyncio.gather(*tasks, return_exceptions=True)
 
         # Task should still exist and be valid
-        assert task_id in progress_service._tasks
+        assert (
+            progress_service._task_registry.get_task_info_full_sync(task_id)
+            is not None
+        )
 
         await progress_service.stop_session()
 
@@ -815,7 +827,7 @@ class TestProgressDisplay:
         # Update total size mid-download
         await progress_service.update_task_total(task_id, 200.0)
 
-        task = progress_service._tasks[task_id]
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.total == 200.0
 
         await progress_service.stop_session()
@@ -916,7 +928,7 @@ class TestErrorScenarios:
         await progress_service.finish_task(task_id, success=False)
 
         # Second finish call updates the state
-        task = progress_service._tasks[task_id]
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.success is False
 
         await progress_service.stop_session()
@@ -937,7 +949,7 @@ class TestErrorScenarios:
         # Update beyond total - stores as-is, backend handles display
         await progress_service.update_task(task_id, completed=150.0)
 
-        task = progress_service._tasks[task_id]
+        task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.completed == 150.0
 
         await progress_service.stop_session()

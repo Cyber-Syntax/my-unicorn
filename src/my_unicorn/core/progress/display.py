@@ -50,6 +50,7 @@ from my_unicorn.utils.progress_utils import calculate_speed
 
 from .ascii import AsciiProgressBackend
 from .display_id import IDGenerator
+from .display_registry import TaskRegistry
 from .progress_types import ProgressConfig, ProgressType, TaskConfig, TaskInfo
 
 logger = get_logger(__name__)
@@ -102,22 +103,11 @@ class ProgressDisplay(ProgressReporter):
         )
 
         # State management
-        self._tasks: dict[str, TaskInfo] = {}  # Use namespaced IDs as keys
         self._active: bool = False
-        self._task_lock = asyncio.Lock()
+        self._task_registry = TaskRegistry()
 
         # ID generation
         self._id_generator = IDGenerator()
-
-        # Task sets for fast lookup
-        self._task_sets: dict[ProgressType, set[str]] = {
-            ProgressType.API_FETCHING: set(),
-            ProgressType.DOWNLOAD: set(),
-            ProgressType.VERIFICATION: set(),
-            ProgressType.ICON_EXTRACTION: set(),
-            ProgressType.INSTALLATION: set(),
-            ProgressType.UPDATE: set(),
-        }
 
         # Background rendering task
         self._render_task: asyncio.Task | None = None
@@ -343,12 +333,8 @@ class ProgressDisplay(ProgressReporter):
         current_time = time.monotonic()
         task_info = self._create_task_info(namespaced_id, config, current_time)
 
-        async with self._task_lock:
-            # Store task info in consolidated structure
-            self._tasks[namespaced_id] = task_info
-
-            # Add to appropriate task set for fast lookup
-            self._task_sets[config.progress_type].add(namespaced_id)
+        # Store task info in registry
+        await self._task_registry.add_task_info(namespaced_id, task_info)
 
         # Add task to backend
         self._backend.add_task(
@@ -430,34 +416,38 @@ class ProgressDisplay(ProgressReporter):
             description: Task description (if updating)
 
         """
-        async with self._task_lock:
-            if task_id not in self._tasks:
-                logger.warning("Task not found: %s", task_id)
-                return
+        # Get task info from registry
+        task_info = await self._task_registry.get_task_info_full(task_id)
+        if task_info is None:
+            logger.warning("Task not found: %s", task_id)
+            return
 
-            task_info = self._tasks[task_id]
-            current_time = time.monotonic()
+        current_time = time.monotonic()
 
-            # Calculate speed for download tasks
-            speed_bps = 0.0
-            if (
-                completed is not None
-                and task_info.progress_type == ProgressType.DOWNLOAD
-            ):
-                speed_bps = self._calculate_speed(
-                    task_info, completed, current_time
-                )
-                task_info.current_speed_mbps = speed_bps / (1024 * 1024)
-                task_info.last_speed_update = current_time
+        # Calculate speed for download tasks
+        speed_bps = 0.0
+        if (
+            completed is not None
+            and task_info.progress_type == ProgressType.DOWNLOAD
+        ):
+            speed_bps = self._calculate_speed(
+                task_info, completed, current_time
+            )
 
-            # Update task info
-            if completed is not None:
-                task_info.completed = completed
-            if total is not None:
-                task_info.total = total
-            if description is not None:
-                task_info.description = description
-            task_info.last_update = current_time
+        # Prepare updates dict
+        updates: dict[str, object] = {}
+        if completed is not None:
+            updates["completed"] = completed
+        if total is not None:
+            updates["total"] = total
+        if description is not None:
+            updates["description"] = description
+        if speed_bps > 0.0 and completed is not None:
+            updates["current_speed_mbps"] = speed_bps / (1024 * 1024)
+            updates["last_speed_update"] = current_time
+
+        # Apply updates to registry
+        await self._task_registry.update_task(task_id, **updates)
 
         # Update backend
         self._backend.update_task(
@@ -497,21 +487,16 @@ class ProgressDisplay(ProgressReporter):
             description: Final description
 
         """
-        async with self._task_lock:
-            if task_id not in self._tasks:
-                logger.warning("Task not found: %s", task_id)
-                return
+        # Get task info to check if it exists and has total
+        task_info = await self._task_registry.get_task_info_full(task_id)
+        if task_info is None:
+            logger.warning("Task not found: %s", task_id)
+            return
 
-            task_info = self._tasks[task_id]
-            task_info.is_finished = True
-            task_info.success = success
-
-            if description is not None:
-                task_info.description = description
-
-            # Mark as completed if successful
-            if success and task_info.total > 0:
-                task_info.completed = task_info.total
+        # Use registry finish_task method
+        await self._task_registry.finish_task(
+            task_id, success=success, description=description
+        )
 
         # Update backend
         self._backend.finish_task(
@@ -559,14 +544,7 @@ class ProgressDisplay(ProgressReporter):
             Returns empty defaults if task not found.
 
         """
-        task = self._tasks.get(task_id)
-        if task is None:
-            return {"completed": 0.0, "total": None, "description": ""}
-        return {
-            "completed": task.completed,
-            "total": task.total,
-            "description": task.description,
-        }
+        return self._task_registry.get_task_info_sync(task_id)
 
     def get_task_info_full(self, task_id: str) -> TaskInfo | None:
         """Get full task information by ID (internal use).
@@ -581,7 +559,7 @@ class ProgressDisplay(ProgressReporter):
             Full TaskInfo object or None if not found
 
         """
-        return self._tasks.get(task_id)
+        return self._task_registry.get_task_info_full_sync(task_id)
 
     def is_active(self) -> bool:
         """Check if progress session is active.
