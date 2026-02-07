@@ -33,7 +33,6 @@ Note:
 
 from __future__ import annotations
 
-import asyncio
 import time
 from contextlib import asynccontextmanager, suppress
 from typing import TYPE_CHECKING
@@ -50,6 +49,7 @@ from .ascii import AsciiProgressBackend
 from .display_id import IDGenerator
 from .display_logger import LoggerSuppression
 from .display_registry import TaskRegistry
+from .display_session import SessionManager
 from .progress_types import ProgressConfig, ProgressType, TaskConfig, TaskInfo
 
 logger = get_logger(__name__)
@@ -101,19 +101,22 @@ class ProgressDisplay(ProgressReporter):
             config=self.config, interactive=interactive
         )
 
-        # State management
-        self._active: bool = False
+        # Task management
         self._task_registry = TaskRegistry()
 
         # ID generation
         self._id_generator = IDGenerator()
 
-        # Background rendering task
-        self._render_task: asyncio.Task | None = None
-        self._stop_rendering: asyncio.Event = asyncio.Event()
-
         # Logger suppression
         self._logger_suppression = LoggerSuppression()
+
+        # Session management
+        self._session_manager = SessionManager(
+            config=self.config,
+            backend=self._backend,
+            logger_suppression=self._logger_suppression,
+            id_generator=self._id_generator,
+        )
 
     def _generate_default_description(
         self, name: str, progress_type: ProgressType
@@ -170,16 +173,7 @@ class ProgressDisplay(ProgressReporter):
 
     async def _render_loop(self) -> None:
         """Background loop for rendering progress updates."""
-        interval = 1.0 / self.config.refresh_per_second
-
-        while not self._stop_rendering.is_set():
-            try:
-                await self._backend.render_once()
-                await asyncio.sleep(interval)
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.debug("Error in render loop: %s", e)
+        await self._session_manager._render_loop()
 
     async def start_session(self, total_operations: int = 0) -> None:
         """Start a progress display session.
@@ -191,23 +185,7 @@ class ProgressDisplay(ProgressReporter):
             total_operations: Total number of operations (currently unused)
 
         """
-        if self._active:
-            logger.warning("Progress session already active")
-            return
-
-        self._active = True
-        self._stop_rendering.clear()
-
-        # Enter the context manager properly
-        await self._logger_suppression.__aenter__()
-
-        # Start background rendering loop
-        self._render_task = asyncio.create_task(self._render_loop())
-
-        logger.debug(
-            "Progress session started with %d total operations",
-            total_operations,
-        )
+        await self._session_manager.start_session(total_operations)
 
     async def stop_session(self) -> None:
         """Stop the progress display session.
@@ -215,29 +193,7 @@ class ProgressDisplay(ProgressReporter):
         Automatically restores logger.info() output after progress
         session ends.
         """
-        if not self._active:
-            return
-
-        self._active = False
-        self._stop_rendering.set()
-
-        # Stop rendering task
-        if self._render_task:
-            self._render_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await self._render_task
-            self._render_task = None
-
-        # Final cleanup render
-        await self._backend.cleanup()
-
-        # Exit the context manager properly
-        await self._logger_suppression.__aexit__(None, None, None)
-
-        # Clear cached state
-        self._id_generator.clear_cache()
-
-        logger.debug("Progress session stopped")
+        await self._session_manager.stop_session()
 
     async def add_task(
         self,
@@ -295,7 +251,7 @@ class ProgressDisplay(ProgressReporter):
             Unique namespaced task ID
 
         """
-        if not self._active:
+        if not self._session_manager._active:
             raise RuntimeError("Progress session not active")
 
         # Generate unique namespaced ID
@@ -499,11 +455,8 @@ class ProgressDisplay(ProgressReporter):
             None
 
         """
-        await self.start_session(total_operations)
-        try:
+        async with self._session_manager.session(total_operations):
             yield
-        finally:
-            await self.stop_session()
 
     def get_task_info(self, task_id: str) -> dict[str, object]:
         """Get task information by ID.
@@ -542,7 +495,7 @@ class ProgressDisplay(ProgressReporter):
             True if active, False otherwise
 
         """
-        return self._active
+        return self._session_manager._active
 
     async def create_api_fetching_task(
         self, name: str, description: str | None = None

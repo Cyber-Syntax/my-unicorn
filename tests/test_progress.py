@@ -185,7 +185,7 @@ class TestProgressConfig:
 def progress_service() -> ProgressDisplay:
     """Fixture providing a ProgressDisplay instance."""
     service = ProgressDisplay()
-    # Don't set _active=True here as some tests need to test inactive state
+    # Don't set _session_manager._active=True as some tests need to test inactive state
     return service
 
 
@@ -335,7 +335,7 @@ class TestProgressDisplay:
 
         assert service._backend is not None
         assert service.config is not None
-        assert not service._active
+        assert not service._session_manager._active
 
     def test_init_with_custom_values(self) -> None:
         """Test ProgressDisplay initialization with custom values."""
@@ -383,8 +383,8 @@ class TestProgressDisplay:
         """Test starting a progress session."""
         await progress_service.start_session()
 
-        assert progress_service._active
-        assert progress_service._render_task is not None
+        assert progress_service._session_manager._active
+        assert progress_service._session_manager._render_task is not None
 
     @pytest.mark.asyncio
     async def test_start_session_already_active(
@@ -392,12 +392,12 @@ class TestProgressDisplay:
     ) -> None:
         """Test starting session when already active does nothing."""
         await progress_service.start_session()
-        first_task = progress_service._render_task
+        first_task = progress_service._session_manager._render_task
 
         await progress_service.start_session()
 
         # Should still be the same render task
-        assert progress_service._render_task == first_task
+        assert progress_service._session_manager._render_task == first_task
 
     @pytest.mark.asyncio
     async def test_stop_session(
@@ -405,12 +405,12 @@ class TestProgressDisplay:
     ) -> None:
         """Test stopping a progress session."""
         await progress_service.start_session()
-        assert progress_service._active
+        assert progress_service._session_manager._active
 
         await progress_service.stop_session()
 
-        assert not progress_service._active
-        assert progress_service._render_task is None
+        assert not progress_service._session_manager._active
+        assert progress_service._session_manager._render_task is None
 
     @pytest.mark.asyncio
     async def test_stop_session_not_active(
@@ -419,8 +419,8 @@ class TestProgressDisplay:
         """Test stopping session when not active does nothing."""
         await progress_service.stop_session()
 
-        assert not progress_service._active
-        assert progress_service._render_task is None
+        assert not progress_service._session_manager._active
+        assert progress_service._session_manager._render_task is None
 
     @pytest.mark.asyncio
     async def test_add_download_task(
@@ -684,10 +684,10 @@ class TestProgressDisplay:
     def test_is_active(self, progress_service: ProgressDisplay) -> None:
         """Test checking if service is active."""
         # Start with inactive service
-        progress_service._active = False
+        progress_service._session_manager._active = False
         assert not progress_service.is_active()
 
-        progress_service._active = True
+        progress_service._session_manager._active = True
         assert progress_service.is_active()
 
     @pytest.mark.asyncio
@@ -871,13 +871,15 @@ class TestErrorScenarios:
     ) -> None:
         """Test starting multiple sessions doesn't break anything."""
         await progress_service.start_session()
-        first_render_task = progress_service._render_task
+        first_render_task = progress_service._session_manager._render_task
 
         await progress_service.start_session()  # Should be no-op
         await progress_service.start_session()  # Should be no-op
 
         # Should still have the same render task
-        assert progress_service._render_task == first_render_task
+        assert (
+            progress_service._session_manager._render_task == first_render_task
+        )
 
         await progress_service.stop_session()
 
@@ -891,7 +893,7 @@ class TestErrorScenarios:
         await progress_service.stop_session()  # Should be no-op
 
         # Should be inactive
-        assert not progress_service._active
+        assert not progress_service._session_manager._active
 
     @pytest.mark.asyncio
     async def test_task_operations_when_not_active(
@@ -1713,8 +1715,8 @@ class TestProgressCoverageExtras:
         pd = ProgressDisplay()
 
         class BrokenBackend:
-            def __init__(self, parent):
-                self.parent = parent
+            def __init__(self, session_manager):
+                self.session_manager = session_manager
                 self.called = 0
 
             async def render_once(self):
@@ -1723,11 +1725,12 @@ class TestProgressCoverageExtras:
                 if self.called == 1:
                     raise RuntimeError("boom")
                 # Stop the loop so the test completes
-                self.parent._stop_rendering.set()
+                self.session_manager._stop_rendering.set()
 
-        pd._backend = BrokenBackend(pd)
+        # Replace backend on SessionManager (not ProgressDisplay) since render loop now delegates
+        pd._session_manager._backend = BrokenBackend(pd._session_manager)
         # Ensure stop flag is cleared
-        pd._stop_rendering.clear()
+        pd._session_manager._stop_rendering.clear()
 
         # Run the render loop until it stops (should handle one exception)
         await pd._render_loop()
