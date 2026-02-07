@@ -348,7 +348,7 @@ class ProgressDisplay(ProgressReporter):
         self,
         name: str,
         progress_type: ProgressType | CoreProgressType,
-        total: float = 0.0,
+        total: float | None = None,
         description: str | None = None,
         parent_task_id: str | None = None,
         phase: int = 1,
@@ -360,7 +360,7 @@ class ProgressDisplay(ProgressReporter):
             name: Task name
             progress_type: Type of progress operation
                 (UI or core protocol type)
-            total: Total units for the task
+            total: Total units for the task (None for indeterminate)
             description: Task description
             parent_task_id: Parent task ID for multi-phase operations
             phase: Current phase number
@@ -382,7 +382,7 @@ class ProgressDisplay(ProgressReporter):
         config = TaskConfig(
             name=name,
             progress_type=ui_progress_type,
-            total=total,
+            total=total or 0.0,
             description=description,
             parent_task_id=parent_task_id,
             phase=phase,
@@ -554,6 +554,7 @@ class ProgressDisplay(ProgressReporter):
     async def finish_task(
         self,
         task_id: str,
+        *,
         success: bool = True,
         description: str | None = None,
     ) -> None:

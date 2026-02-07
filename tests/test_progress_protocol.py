@@ -10,6 +10,8 @@ These tests verify that:
 
 from __future__ import annotations
 
+import inspect
+
 import pytest
 
 from my_unicorn.core.protocols import (
@@ -148,8 +150,64 @@ class TestProgressReporterProtocol:
         reporter = NullProgressReporter()
         assert isinstance(reporter, ProgressReporter)
 
+    def test_protocol_methods_are_async(self) -> None:
+        """Protocol methods are async and return coroutines.
+
+        This test verifies that the ProgressReporter protocol defines
+        async methods for task management operations.
+        """
+        # Get the ProgressReporter protocol
+        reporter = NullProgressReporter()
+
+        # Verify add_task is a coroutine function
+        assert inspect.iscoroutinefunction(reporter.add_task)
+
+        # Verify update_task is a coroutine function
+        assert inspect.iscoroutinefunction(reporter.update_task)
+
+        # Verify finish_task is a coroutine function
+        assert inspect.iscoroutinefunction(reporter.finish_task)
+
+    @pytest.mark.asyncio
+    async def test_null_reporter_matches_protocol(
+        self,
+    ) -> None:
+        """NullProgressReporter has all protocol methods.
+
+        This test verifies that NullProgressReporter is properly aligned
+        with the ProgressReporter protocol in terms of method signatures,
+        including async methods and optional parameters.
+        """
+        reporter = NullProgressReporter()
+
+        # Test add_task with all optional parameters
+        task_id = await reporter.add_task(
+            name="Test",
+            progress_type=ProgressType.DOWNLOAD,
+            total=100.0,
+            description="Test description",
+            parent_task_id="parent-123",
+            phase=1,
+            total_phases=3,
+        )
+        assert task_id == "null-task"
+
+        # Test update_task with total parameter
+        await reporter.update_task(
+            task_id,
+            completed=50.0,
+            total=100.0,
+            description="Half done",
+        )
+
+        # Test finish_task returns None (not a coroutine)
+        result = await reporter.finish_task(
+            task_id, success=True, description="Finished"
+        )
+        assert result is None
+
     def test_custom_implementation_satisfies_protocol(self) -> None:
-        """Custom class implementing methods satisfies protocol."""
+        """Custom class implementing async methods satisfies protocol."""
 
         class CustomReporter:
             """Custom implementation for testing."""
@@ -157,23 +215,28 @@ class TestProgressReporterProtocol:
             def is_active(self) -> bool:
                 return True
 
-            def add_task(
+            async def add_task(  # noqa: PLR0913
                 self,
                 name: str,
                 progress_type: ProgressType,
                 total: float | None = None,
+                description: str | None = None,
+                parent_task_id: str | None = None,
+                phase: int = 1,
+                total_phases: int = 1,
             ) -> str:
                 return "custom-id"
 
-            def update_task(
+            async def update_task(
                 self,
                 task_id: str,
                 completed: float | None = None,
+                total: float | None = None,
                 description: str | None = None,
             ) -> None:
                 pass
 
-            def finish_task(
+            async def finish_task(
                 self,
                 task_id: str,
                 *,

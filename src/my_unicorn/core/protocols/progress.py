@@ -24,11 +24,11 @@ Usage in domain services::
             self.progress = progress_reporter or NullProgressReporter()
 
         async def download(self, url: str) -> Path:
-            task_id = self.progress.add_task(
+            task_id = await self.progress.add_task(
                 "Downloading", ProgressType.DOWNLOAD
             )
             # ... perform download with progress updates ...
-            self.progress.finish_task(task_id)
+            await self.progress.finish_task(task_id)
 
 """
 
@@ -88,26 +88,31 @@ class ProgressReporter(Protocol):
             def is_active(self) -> bool:
                 return True
 
-            def add_task(
+            async def add_task(
                 self,
                 name: str,
                 progress_type: ProgressType,
                 total: float | None = None,
+                description: str | None = None,
+                parent_task_id: str | None = None,
+                phase: int = 1,
+                total_phases: int = 1,
             ) -> str:
                 task_id = str(uuid.uuid4())
                 print(f"Starting: {name}")
                 return task_id
 
-            def update_task(
+            async def update_task(
                 self,
                 task_id: str,
                 completed: float | None = None,
+                total: float | None = None,
                 description: str | None = None,
             ) -> None:
                 if completed:
                     print(f"Progress: {completed}")
 
-            def finish_task(
+            async def finish_task(
                 self,
                 task_id: str,
                 *,
@@ -134,11 +139,15 @@ class ProgressReporter(Protocol):
         """
         ...
 
-    def add_task(
+    async def add_task(
         self,
         name: str,
         progress_type: ProgressType,
         total: float | None = None,
+        description: str | None = None,
+        parent_task_id: str | None = None,
+        phase: int = 1,
+        total_phases: int = 1,
     ) -> str:
         """Add a new progress task.
 
@@ -150,6 +159,10 @@ class ProgressReporter(Protocol):
             progress_type: Category of progress operation.
             total: Total units of work (bytes, items, etc.).
                 None indicates indeterminate progress.
+            description: Optional task description for additional context.
+            parent_task_id: Optional parent task identifier for task hierarchy.
+            phase: Current phase number (default 1).
+            total_phases: Total number of phases (default 1).
 
         Returns:
             Task identifier for use with update_task() and finish_task().
@@ -157,10 +170,11 @@ class ProgressReporter(Protocol):
         """
         ...
 
-    def update_task(
+    async def update_task(
         self,
         task_id: str,
         completed: float | None = None,
+        total: float | None = None,
         description: str | None = None,
     ) -> None:
         """Update progress for an existing task.
@@ -171,12 +185,13 @@ class ProgressReporter(Protocol):
         Args:
             task_id: Identifier returned from add_task().
             completed: Units of work completed (e.g., bytes downloaded).
+            total: Update the total units of work.
             description: Updated task description for status messages.
 
         """
         ...
 
-    def finish_task(
+    async def finish_task(
         self,
         task_id: str,
         *,
@@ -250,6 +265,10 @@ class NullProgressReporter:
         name: str,  # noqa: ARG002
         progress_type: ProgressType,  # noqa: ARG002
         total: float | None = None,  # noqa: ARG002
+        description: str | None = None,  # noqa: ARG002
+        parent_task_id: str | None = None,  # noqa: ARG002
+        phase: int = 1,  # noqa: ARG002
+        total_phases: int = 1,  # noqa: ARG002
     ) -> str:
         """Add a new progress task (no-op).
 
@@ -257,6 +276,10 @@ class NullProgressReporter:
             name: Task name (ignored).
             progress_type: Progress type (ignored).
             total: Total value (ignored).
+            description: Description (ignored).
+            parent_task_id: Parent task ID (ignored).
+            phase: Phase number (ignored).
+            total_phases: Total phases (ignored).
 
         Returns:
             Placeholder task identifier "null-task".
@@ -268,6 +291,7 @@ class NullProgressReporter:
         self,
         task_id: str,
         completed: float | None = None,
+        total: float | None = None,
         description: str | None = None,
     ) -> None:
         """Update task progress (no-op).
@@ -275,6 +299,7 @@ class NullProgressReporter:
         Args:
             task_id: Task identifier (ignored).
             completed: Completion value (ignored).
+            total: Total value (ignored).
             description: Description (ignored).
 
         """
