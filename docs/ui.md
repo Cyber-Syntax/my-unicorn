@@ -226,6 +226,58 @@ standard-notes            ✅ 0.1.0 → 3.201.10
 🎉 Successfully updated 5 app(s)
 ```
 
+### Example: Updating all installed apps
+
+```bash
+my-unicorn update
+```
+
+**Output:**
+
+```
+Fetching from API:
+GitHub Releases      3/3 Retrieved from cache
+
+Downloading (3/3):
+zen-x86_64                    110.6 MiB   3.3 MB/s 00:00 [==============================]   100% ✓
+tagspaces-linux-x86_64-6.9.0  149.4 MiB   8.6 MB/s 00:00 [==============================]   100% ✓
+superProductivity-x86_64      129.1 MiB   5.4 MB/s 00:00 [==============================]   100% ✓
+
+Installing:
+(1/2) Verifying zen-browser ✓
+(2/2) Installing zen-browser ✓
+(1/2) Verifying super-productivity ✓
+(2/2) Installing super-productivity ✓
+(1/2) Verifying tagspaces ✓
+(2/2) Installing tagspaces ✓
+
+
+📦 Update Summary:
+--------------------------------------------------
+tagspaces                 ✅ 6.8.2 → 6.9.0
+super-productivity        ✅ 17.1.2 → 17.1.3
+zen-browser               ✅ 1.18.4b → 1.18.5b
+neovim                    ℹ️  Already up to date (0.11.6)
+kdiskmark                 ℹ️  Already up to date (3.2.0)
+legcord                   ℹ️  Already up to date (1.2.1)
+obsidian                  ℹ️  Already up to date (1.11.7)
+qownnotes                 ℹ️  Already up to date (26.2.0)
+cherrytree                ℹ️  Already up to date (1.6.3)
+keepassxc                 ℹ️  Already up to date (2.7.11)
+heroicgameslauncher       ℹ️  Already up to date (2.19.1)
+weektodo                  ℹ️  Already up to date (2.2.0)
+endless-sky               ℹ️  Already up to date (0.10.16)
+nuclear                   ℹ️  Already up to date (0.6.48)
+flameshot                 ℹ️  Already up to date (13.3.0)
+beekeeper-studio          ℹ️  Already up to date (5.5.6)
+standard-notes            ℹ️  Already up to date (3.201.10)
+freetube                  ℹ️  Already up to date (0.23.13-beta)
+appflowy                  ℹ️  Already up to date (0.11.1)
+
+🎉 Successfully updated 3 app(s)
+ℹ️  16 app(s) already up to date
+```
+
 ## Understanding the Output
 
 ### API Fetching Phase
