@@ -15,6 +15,7 @@ License: Same as my-unicorn project
 import argparse
 import logging
 import os
+import shutil
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -35,7 +36,7 @@ TEST_VERSION = "0.1.0"
 # ======== Logging Setup ========
 
 
-def setup_logging(debug: bool = False) -> logging.Logger:
+def setup_logging(*, debug: bool = False) -> logging.Logger:
     """Set up logging configuration with console and file handlers.
 
     Args:
@@ -112,8 +113,8 @@ def is_container() -> bool:
                 ]
             ):
                 return True
-        except Exception:
-            pass
+        except OSError as exc:
+            logger.debug("Failed to read cgroup: %s", exc)
 
     # Check for QEMU/KVM virtual machine
     try:
@@ -162,23 +163,29 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
 
     # Determine command to use
     if is_container():
-        # Try installed my-unicorn first
-        try:
-            subprocess.run(
-                ["which", "my-unicorn"],
-                capture_output=True,
-                check=True,
-            )
+        # Prefer installed binary if available
+        if shutil.which("my-unicorn"):
             cmd = ["my-unicorn", *args]
-        except subprocess.CalledProcessError:
-            # Fallback to uv run if installed binary not found
+        else:
+            # Fallback to `uv run` in development/container without the binary
             cmd = ["uv", "run", "my-unicorn", *args]
     else:
         cmd = ["uv", "run", "my-unicorn", *args]
 
     logger.debug("Running command: %s", " ".join(cmd))
 
-    result = subprocess.run(
+    # Basic validation: ensure the command parts are simple strings and contain
+    # no obvious shell metacharacters to avoid executing untrusted input.
+    unsafe = {";", "|", "&", "`", "$", "\n", "\x00"}
+    if not all(
+        isinstance(part, str) and not any(ch in part for ch in unsafe)
+        for part in cmd
+    ):
+        logger.error("Refusing to run potentially unsafe command: %s", cmd)
+        return subprocess.CompletedProcess(cmd, 1)
+
+    # Command validated in the block above; safe to execute.
+    result = subprocess.run(  # nosec
         cmd,
         text=True,
         check=False,
@@ -224,7 +231,7 @@ def set_version(app_name: str, version: str) -> bool:
         logger.info(
             "Set %s version to %s (for update test)", app_name, version
         )
-    except Exception:
+    except (OSError, ValueError, KeyError):
         logger.exception("Failed to set version for %s", app_name)
         return False
     else:
@@ -285,6 +292,17 @@ def test_catalog_install(*app_names: str) -> bool:
     return result.returncode == 0
 
 
+def test_update_all_cmd() -> bool:
+    """Test updating all apps.
+
+    Returns:
+        True if successful, False otherwise
+    """
+    logger.info("Testing update for all apps")
+    result = run_cli("update")
+    return result.returncode == 0
+
+
 def test_update(*app_names: str) -> bool:
     """Test updating apps.
 
@@ -317,7 +335,7 @@ class TestTracker:
         self.failed = 0
         self.start_time = datetime.now(tz=UTC)
 
-    def record(self, test_name: str, success: bool) -> None:
+    def record(self, test_name: str, *, success: bool) -> None:
         """Record test result.
 
         Args:
@@ -368,7 +386,7 @@ def test_quick(tracker: TestTracker) -> None:
     # Step 1: Test update
     logger.info("Step 1/5: Testing qownnotes update")
     result = test_update("qownnotes")
-    tracker.record("QOwnNotes update", result)
+    tracker.record("QOwnNotes update", success=result)
 
     # Step 2: Remove qownnotes for clean state
     logger.info("Step 2/5: Removing qownnotes for clean URL install test")
@@ -377,7 +395,7 @@ def test_quick(tracker: TestTracker) -> None:
     # Step 3: Test URL install
     logger.info("Step 3/5: Testing qownnotes URL install")
     result = test_url_install("qownnotes", "https://github.com/pbek/QOwnNotes")
-    tracker.record("QOwnNotes URL install", result)
+    tracker.record("QOwnNotes URL install", success=result)
 
     # Step 4: Remove qownnotes for clean catalog test
     logger.info("Step 4/5: Removing qownnotes for clean catalog install test")
@@ -386,7 +404,7 @@ def test_quick(tracker: TestTracker) -> None:
     # Step 5: Test catalog install
     logger.info("Step 5/5: Testing qownnotes catalog install")
     result = test_catalog_install("qownnotes")
-    tracker.record("QOwnNotes catalog install", result)
+    tracker.record("QOwnNotes catalog install", success=result)
 
     logger.info("")
     logger.info("Quick tests completed")
@@ -410,12 +428,15 @@ def test_all(tracker: TestTracker) -> None:
     remove_apps("neovim", "keepassxc")
 
     logger.info("Step 2/2: Testing concurrent URL installs")
-    result = run_cli(
+    cp_result = run_cli(
         "install",
         "https://github.com/neovim/neovim",
         "https://github.com/keepassxreboot/keepassxc",
     )
-    tracker.record("URL installs (neovim + keepassxc)", result.returncode == 0)
+    tracker.record(
+        "URL installs (neovim + keepassxc)",
+        success=cp_result.returncode == 0,
+    )
 
     # Test catalog installs
     logger.info("")
@@ -427,21 +448,92 @@ def test_all(tracker: TestTracker) -> None:
     remove_apps("legcord", "flameshot")
 
     logger.info("Step 2/2: Testing multiple catalog install")
-    result = test_catalog_install(
+    success = test_catalog_install(
         "legcord", "flameshot", "appflowy", "standard-notes"
     )
-    tracker.record("Catalog installs (multiple apps)", result)
+    tracker.record("Catalog installs (multiple apps)", success=success)
 
     # Test updates
     logger.info("")
     logger.info("--- Testing updates for multiple apps ---")
-    result = test_update(
+    success = test_update(
         "legcord", "flameshot", "keepassxc", "appflowy", "standard-notes"
     )
-    tracker.record("Updates (multiple apps)", result)
+    tracker.record("Updates (multiple apps)", success=success)
 
     logger.info("")
     logger.info("All comprehensive tests completed")
+
+
+def test_update_all(tracker: TestTracker) -> None:
+    """Test 'update' (update all) focused on qownnotes and appflowy.
+
+    Args:
+        tracker: Test result tracker
+    """
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info(
+        "Testing 'update' (update all) Focused on QOwnNotes and AppFlowy"
+    )
+    logger.info("=" * 60)
+    logger.info("")
+
+    # Step 1: Ensure qownnotes and appflowy are installed
+    logger.info("Step 1/4: Installing qownnotes and appflowy for update test")
+    remove_apps("qownnotes", "appflowy")  # Clean start
+    result = test_catalog_install("qownnotes", "appflowy")
+    if not result:
+        tracker.record(
+            "'update' (qownnotes and appflowy focus) - install failed",
+            success=False,
+        )
+        return
+
+    # Step 2: Set old version for qownnotes and appflowy
+    logger.info("Step 2/4: Setting old version for qownnotes and appflowy")
+    set_version("qownnotes", TEST_VERSION)
+    set_version("appflowy", TEST_VERSION)
+
+    # Step 3: Run update (all)
+    logger.info("Step 3/4: Running 'update' (update all)")
+    success = test_update_all_cmd()
+
+    # Step 4: Verify qownnotes and appflowy were updated
+    if success:
+        logger.info(
+            "Step 4/4: Verifying qownnotes and appflowy versions changed"
+        )
+        apps_to_check = ["qownnotes", "appflowy"]
+        for app in apps_to_check:
+            config_file = CONFIG_DIR / f"{app}.json"
+            if config_file.exists():
+                try:
+                    config = orjson.loads(config_file.read_bytes())
+                    current_version = config["state"]["version"]
+                    if current_version != TEST_VERSION:
+                        logger.info(
+                            "%s version updated from %s to %s",
+                            app.capitalize(),
+                            TEST_VERSION,
+                            current_version,
+                        )
+                    else:
+                        logger.warning(
+                            "%s version did not change", app.capitalize()
+                        )
+                        success = False
+                except Exception:
+                    logger.exception("Failed to check %s config", app)
+                    success = False
+            else:
+                logger.error("%s config file not found", app.capitalize())
+                success = False
+
+    tracker.record("'update' (qownnotes and appflowy focus)", success=success)
+
+    logger.info("")
+    logger.info("'update' qownnotes and appflowy test completed")
 
 
 # ======== Main Function ========
@@ -473,9 +565,10 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 examples:
-  %(prog)s --quick          Run quick tests (qownnotes only)
-  %(prog)s --all            Run all comprehensive tests
-  %(prog)s --debug --quick  Run quick tests with debug logging
+  %(prog)s --quick                Run quick tests (qownnotes only)
+  %(prog)s --all                  Run all comprehensive tests
+  %(prog)s --update-all           Test update all (qownnotes & appflowy)
+  %(prog)s --debug --quick        Run quick tests with debug logging
         """,
     )
 
@@ -495,6 +588,12 @@ examples:
         help="Enable debug logging",
     )
 
+    parser.add_argument(
+        "--update-all",
+        action="store_true",
+        help="Test 'update' (update all) focusing on qownnotes & appflowy",
+    )
+
     args = parser.parse_args()
 
     # Set up logging
@@ -512,6 +611,8 @@ examples:
             test_quick(tracker)
         elif args.all:
             test_all(tracker)
+        elif args.update_all:
+            test_update_all(tracker)
         else:
             parser.print_help()
             return 0
