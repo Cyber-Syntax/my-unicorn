@@ -11,7 +11,13 @@ from my_unicorn.config.schemas import validate_cache_release
 @pytest.fixture
 def cache_examples_dir():
     """Return path to cache examples directory."""
-    return Path(__file__).parent.parent.parent / "examples" / "cache_releases"
+    return (
+        Path(__file__).parent.parent.parent.parent
+        / "docs"
+        / "dev"
+        / "data"
+        / "example_cache_configs"
+    )
 
 
 def test_all_example_cache_files_validate(cache_examples_dir):
@@ -35,9 +41,11 @@ def test_all_example_cache_files_validate(cache_examples_dir):
 @pytest.mark.parametrize(
     "cache_file",
     [
-        "obsidianmd_obsidian-releases.json",
-        "FreeTubeApp_FreeTube.json",
-        "standardnotes_app.json",
+        "beekeeper-studio_beekeeper-studio.json",
+        "Legcord_Legcord.json",
+        "pbek_QOwnNotes.json",
+        "FreeTubeApp_FreeTube_prerelease.json",
+        "keepassxreboot_keepassxc.json",
     ],
 )
 def test_specific_cache_files(cache_examples_dir, cache_file):
