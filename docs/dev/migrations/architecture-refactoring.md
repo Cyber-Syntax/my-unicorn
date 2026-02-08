@@ -40,7 +40,7 @@ Previously, core services directly imported `ProgressDisplay` from the `ui/` pac
 
 ```python
 # In core services (coupling to UI layer)
-from my_unicorn.ui.display import ProgressDisplay
+from my_unicorn.core.progress.display import ProgressDisplay
 
 class DownloadService:
     def __init__(
@@ -95,7 +95,7 @@ class DownloadService:
 
    ```python
    # Remove UI imports
-   # from my_unicorn.ui.display import ProgressDisplay  # DELETE
+   # from my_unicorn.core.progress.display import ProgressDisplay  # DELETE
 
    # Add protocol imports
    from my_unicorn.core.protocols.progress import (
@@ -205,7 +205,7 @@ class InstallCommandHandler:
 ```python
 # In CLI commands (container-based wiring)
 from my_unicorn.cli.container import ServiceContainer
-from my_unicorn.ui.display import ProgressDisplay
+from my_unicorn.core.progress.display import ProgressDisplay
 
 class InstallCommandHandler:
     async def execute(self, args: Namespace) -> int:
@@ -649,7 +649,7 @@ from my_unicorn.exceptions import (
 )
 
 # UI (CLI layer only)
-from my_unicorn.ui.display import ProgressDisplay
+from my_unicorn.core.progress.display import ProgressDisplay
 ```
 
 ### Testing Patterns
