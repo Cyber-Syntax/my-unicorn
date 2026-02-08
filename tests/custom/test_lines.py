@@ -21,9 +21,23 @@ def test_python_files_max_500_lines() -> None:
 
     """
     max_lines = 550
-    project_root = Path(__file__).parent.parent
+    # Determine project root robustly so the test works whether this file lives in
+    # `tests/` or `tests/custom/`. Prefer a parent that contains both `src` and
+    # `tests`. Fall back to two levels up (common when running from tests/custom).
+    current_file = Path(__file__).resolve()
+    project_root: Path | None = None
+    for parent in current_file.parents:
+        if (parent / "src").exists() and (parent / "tests").exists():
+            project_root = parent
+            break
+    if project_root is None:
+        project_root = (
+            current_file.parents[2]
+            if len(current_file.parents) >= 3
+            else current_file.parent
+        )
     violations = []
-    # Directories to check
+    # Directories to check (relative to project root)
     directories = ["tests", "src/my_unicorn"]
     for directory in directories:
         dir_path = project_root / directory
@@ -39,16 +53,18 @@ def test_python_files_max_500_lines() -> None:
                 continue
             # Count lines in the file
             try:
-                with open(py_file, encoding="utf-8") as f:
+                with py_file.open(encoding="utf-8") as f:
                     line_count = sum(1 for _ in f)
-                if line_count > max_lines:
-                    relative_path = py_file.relative_to(project_root)
-                    violations.append(
-                        f"{relative_path}: {line_count} lines (exceeds {max_lines})"
-                    )
-            except Exception:
+            except OSError:
                 # Skip files that can't be read
                 continue
+            if line_count > max_lines:
+                relative_path = py_file.relative_to(project_root)
+                violations.append(
+                    f"{relative_path}: {line_count} lines (exceeds {max_lines})"
+                )
     if violations:
         violation_list = "\n".join(violations)
-        assert False, f"Files exceeding {max_lines} lines:\n{violation_list}"
+        import pytest
+
+        pytest.fail(f"Files exceeding {max_lines} lines:\n{violation_list}")
