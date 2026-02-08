@@ -1264,8 +1264,10 @@ class TestUpdateWorkflowDomainExceptions:
                 "my_unicorn.core.update.manager.PostDownloadProcessor"
             ) as mock_processor_cls,
             patch("my_unicorn.core.update.manager.logger"),
-            patch("my_unicorn.core.update.manager.prepare_update_context",
-                  new=AsyncMock(return_value=(mock_context, None))),
+            patch(
+                "my_unicorn.core.update.manager.prepare_update_context",
+                new=AsyncMock(return_value=(mock_context, None)),
+            ),
         ):
             manager = UpdateManager(mock_config_manager)
 
@@ -1349,8 +1351,10 @@ class TestUpdateWorkflowDomainExceptions:
                 "my_unicorn.core.update.manager.PostDownloadProcessor"
             ) as mock_processor_cls,
             patch("my_unicorn.core.update.manager.logger"),
-            patch("my_unicorn.core.update.manager.prepare_update_context",
-                  new=AsyncMock(return_value=(mock_context, None))),
+            patch(
+                "my_unicorn.core.update.manager.prepare_update_context",
+                new=AsyncMock(return_value=(mock_context, None)),
+            ),
         ):
             manager = UpdateManager(mock_config_manager)
 
@@ -1447,8 +1451,10 @@ class TestUpdateWorkflowDomainExceptions:
                 "my_unicorn.core.update.manager.PostDownloadProcessor"
             ) as mock_processor_cls,
             patch("my_unicorn.core.update.manager.logger"),
-            patch("my_unicorn.core.update.manager.prepare_update_context",
-                  new=AsyncMock(return_value=(mock_context, None))),
+            patch(
+                "my_unicorn.core.update.manager.prepare_update_context",
+                new=AsyncMock(return_value=(mock_context, None)),
+            ),
         ):
             manager = UpdateManager(mock_config_manager)
 
