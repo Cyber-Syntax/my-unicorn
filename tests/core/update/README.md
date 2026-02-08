@@ -4,6 +4,8 @@
 
 This directory contains comprehensive unit tests for the `my_unicorn.core.update` module, which handles checking for updates, downloading new versions, and managing the update workflow for installed AppImages.
 
+> **Note**: Integration tests for end-to-end update workflows are located in [tests/integration/](../integration/) directory. See [Integration Tests](#integration-tests) section below for details on how unit tests and integration tests work together.
+
 ## Test Organization
 
 The test suite is organized into focused modules, each testing specific functionality:
@@ -384,3 +386,90 @@ The update module follows a layered architecture reflected in the tests:
 ```
 
 Each test module aligns with its respective layer, making it clear what each test validates.
+
+## Integration Tests
+
+### Overview
+
+While this README focuses on unit tests in `tests/core/update/`, the update workflows are also tested end-to-end in the integration test suite located in [`tests/integration/`](../integration/).
+
+### Integration Test Files
+
+#### [test_update_workflows_e2e_single.py](../integration/test_update_workflows_e2e_single.py) - Single App E2E Tests
+
+Tests complete update workflows for single applications with real filesystem operations:
+
+- **Test Cases**: 4
+- **What it covers**:
+    - `test_update_single_app_full_workflow_success` - Happy path: download → verify → replace
+    - `test_update_single_app_verification_failure` - Error handling when verification fails
+    - `test_force_update_already_uptodate` - Force flag bypasses version checks
+    - `test_cache_refresh_workflow` - Fresh data fetching from GitHub
+- **Lines of Code**: 394 (compliant with <500 limit)
+
+#### [test_update_workflows_e2e_batch.py](../integration/test_update_workflows_e2e_batch.py) - Batch Update E2E Tests
+
+Tests batch update workflows for multiple applications:
+
+- **Test Cases**: 1
+- **What it covers**:
+    - `test_update_multiple_apps_partial_success` - Partial success with mixed results
+- **Lines of Code**: 200 (compliant with <500 limit)
+
+### Integration Test Infrastructure
+
+#### [conftest.py](../integration/conftest.py) - Shared Fixtures
+
+Provides fixtures and helpers for integration tests:
+
+- `temp_workspace()` - Real temporary filesystem for testing
+- `mock_github_releases()` - Mock GitHub release data
+- `integration_update_manager()` - UpdateManager configured for testing
+- `create_mock_appimage_content()` - Helper to generate mock file content
+- `create_checksum()` - Helper to generate checksums
+- **Lines of Code**: 196 (compliant with <500 limit)
+
+### Unit vs Integration Tests
+
+| Aspect | Unit Tests | Integration Tests |
+|--------|-----------|-------------------|
+| **Scope** | Individual functions/classes | Complete workflows |
+| **Filesystem** | Mocked | Real temp directories |
+| **Network** | Mocked HTTP | Mocked GitHub API |
+| **Speed** | ~0.3 seconds | ~0.6 seconds (5 tests) |
+| **Isolation** | High (no side effects) | Medium (uses real files) |
+| **Test Count** | 149 unit tests | 5 integration tests |
+| **Coverage Focus** | Code paths | End-to-end scenarios |
+
+### Running Integration Tests
+
+```bash
+# Run all integration tests (includes update workflow tests)
+uv run pytest tests/integration/ -v
+
+# Run only update workflow integration tests
+uv run pytest tests/integration/test_update_workflows_e2e*.py -v
+
+# Run with coverage
+uv run pytest tests/integration/test_update_workflows_e2e*.py --cov=my_unicorn.core.update --cov-report=term-missing
+```
+
+### Test Organization Philosophy
+
+The split between unit and integration tests follows these principles:
+
+1. **Unit tests** (this directory): Validate individual components in isolation
+2. **Integration tests** (tests/integration/): Verify complete workflows work together
+3. **Complementary**: Integration tests don't duplicate unit test scenarios
+4. **Fast execution**: Unit tests run quickly; integration tests provide deeper verification
+5. **Clear boundaries**: File size limits (500 lines) keep tests focused and maintainable
+
+### Phase 6 Implementation
+
+In Phase 6, the large original `test_update_workflows_e2e.py` file (679 lines) was split for better maintainability:
+
+- **test_update_workflows_e2e_single.py** (394 lines): 4 single-app tests
+- **test_update_workflows_e2e_batch.py** (200 lines): 1 batch update test
+- **conftest.py** (196 lines): Shared fixtures and helpers
+
+This split maintains readability while keeping each file under the 500-line guideline.
