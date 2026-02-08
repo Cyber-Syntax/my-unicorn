@@ -1,0 +1,25 @@
+{
+  "cached_at": "2026-02-05T18:25:20.912213+03:00",
+  "ttl_hours": 24,
+  "release_data": {
+    "owner": "Legcord",
+    "repo": "Legcord",
+    "version": "1.2.1",
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "latest-linux.yml",
+        "size": 712,
+        "digest": "sha256:4417c9dc4f7d66f3a46880d1bc02f5b14a4941d4b962c0c520309d4eb1421923",
+        "browser_download_url": "https://github.com/Legcord/Legcord/releases/download/v1.2.1/latest-linux.yml"
+      },
+      {
+        "name": "Legcord-1.2.1-linux-x86_64.AppImage",
+        "size": 146322277,
+        "digest": "sha256:4ca2458cc0be26c7819547bc8adec835de6b5b603772a048637f90748f90cac8",
+        "browser_download_url": "https://github.com/Legcord/Legcord/releases/download/v1.2.1/Legcord-1.2.1-linux-x86_64.AppImage"
+      }
+    ],
+    "original_tag_name": "v1.2.1"
+  }
+}

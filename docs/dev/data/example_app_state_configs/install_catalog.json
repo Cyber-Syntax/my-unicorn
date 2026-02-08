@@ -1,0 +1,36 @@
+{
+  "catalog_ref": "tagspaces",
+  "config_version": "2.0.0",
+  "source": "catalog",
+  "state": {
+    "icon": {
+      "installed": true,
+      "method": "extraction",
+      "path": "/home/developer/Applications/icons/tagspaces.png"
+    },
+    "installed_date": "2026-02-07T15:59:10.176926+03:00",
+    "installed_path": "/home/developer/Applications/tagspaces.AppImage",
+    "verification": {
+      "methods": [
+        {
+          "algorithm": "SHA256",
+          "computed": "d96cb3416f38b1a23451867832e0f9ba121ddf1a9e594d42ac367a88ba3beaf3",
+          "expected": "sha256:d96cb3416f38b1a23451867832e0f9ba121ddf1a9e594d42ac367a88ba3beaf3",
+          "source": "github_api",
+          "status": "passed",
+          "type": "digest"
+        },
+        {
+          "algorithm": "SHA256",
+          "computed": "d96cb3416f38b1a23451867832e0f9ba121ddf1a9e594d42ac367a88ba3beaf3",
+          "expected": "d96cb3416f38b1a23451867832e0f9ba121ddf1a9e594d42ac367a88ba3beaf3",
+          "source": "https://github.com/tagspaces/tagspaces/releases/download/v6.9.0/SHA256SUMS.txt",
+          "status": "passed",
+          "type": "checksum_file"
+        }
+      ],
+      "passed": true
+    },
+    "version": "6.9.0"
+  }
+}
