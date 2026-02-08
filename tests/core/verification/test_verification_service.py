@@ -265,10 +265,8 @@ class TestVerificationService:
         )
         config = {"checksum_file": "manual-checksums.txt"}
 
-        has_digest, checksum_files = (
-            detect_available_methods(
-                asset, config, None, "owner", "repo", "v1.0.0"
-            )
+        has_digest, checksum_files = detect_available_methods(
+            asset, config, None, "owner", "repo", "v1.0.0"
         )
 
         assert has_digest is False
@@ -299,10 +297,8 @@ class TestVerificationService:
             }
         }
 
-        has_digest, checksum_files = (
-            detect_available_methods(
-                asset, config, None, "owner", "repo", "v1.0.0"
-            )
+        has_digest, checksum_files = detect_available_methods(
+            asset, config, None, "owner", "repo", "v1.0.0"
         )
 
         assert has_digest is False
@@ -324,9 +320,7 @@ class TestVerificationService:
         config = {"checksum_file": "checksums.txt"}
 
         # Without assets parameter (old behavior)
-        has_digest, checksum_files = (
-            detect_available_methods(asset, config)
-        )
+        has_digest, checksum_files = detect_available_methods(asset, config)
 
         assert has_digest is True
         assert len(checksum_files) == 0  # Can't detect without assets
@@ -334,28 +328,22 @@ class TestVerificationService:
     def test_should_skip_verification_logic(self, verification_service):
         """Test skip verification decision logic."""
         # Skip with no strong methods available
-        should_skip, updated_config = (
-            should_skip_verification(
-                {"skip": True}, has_digest=False, has_checksum_files=False
-            )
+        should_skip, updated_config = should_skip_verification(
+            {"skip": True}, has_digest=False, has_checksum_files=False
         )
         assert should_skip is True
         assert updated_config["skip"] is True
 
         # Override skip when strong methods available
-        should_skip, updated_config = (
-            should_skip_verification(
-                {"skip": True}, has_digest=True, has_checksum_files=False
-            )
+        should_skip, updated_config = should_skip_verification(
+            {"skip": True}, has_digest=True, has_checksum_files=False
         )
         assert should_skip is False
         assert updated_config["skip"] is False
 
         # No skip when not configured
-        should_skip, updated_config = (
-            should_skip_verification(
-                {"skip": False}, has_digest=False, has_checksum_files=True
-            )
+        should_skip, updated_config = should_skip_verification(
+            {"skip": False}, has_digest=False, has_checksum_files=True
         )
         assert should_skip is False
 
@@ -1168,9 +1156,7 @@ class TestSHA1MD5Verification:
 
     def test_build_checksum_url(self, verification_service):
         """Test checksum URL building."""
-        url = build_checksum_url(
-            "owner", "repo", "v1.0.0", "checksums.txt"
-        )
+        url = build_checksum_url("owner", "repo", "v1.0.0", "checksums.txt")
         expected = "https://github.com/owner/repo/releases/download/v1.0.0/checksums.txt"
         assert url == expected
 
@@ -1670,9 +1656,7 @@ class TestHashVerifierAsyncComputation:
         verifier = Verifier(small_test_file)
 
         sync_result = verifier.compute_hash("sha256")
-        async_result = asyncio.get_event_loop().run_until_complete(
-            verifier.compute_hash_async("sha256")
-        )
+        async_result = asyncio.run(verifier.compute_hash_async("sha256"))
 
         assert sync_result == async_result
 
