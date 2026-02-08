@@ -8,18 +8,22 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 
 from my_unicorn.constants import VERSION_UNKNOWN
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.post_download import OperationType, PostDownloadContext
-from my_unicorn.core.protocols.progress import ProgressReporter
 from my_unicorn.core.update.info import UpdateInfo
 from my_unicorn.exceptions import UpdateError, VerificationError
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.download_utils import extract_filename_from_url
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from my_unicorn.core.protocols.progress import ProgressReporter
 
 logger = get_logger(__name__)
 
@@ -79,7 +83,7 @@ async def update_single_app(
     force: bool,
     update_info: UpdateInfo | None,
     global_config: dict[str, Any],
-    prepare_context_func: callable,
+    prepare_context_func: Callable,
     backup_service: object,
     post_download_processor: object,
 ) -> tuple[bool, str | None]:
@@ -223,8 +227,8 @@ async def update_multiple_apps(
     update_infos: list[UpdateInfo] | None,
     api_task_id: str | None,
     global_config: dict[str, Any],
-    update_single_app_func: callable,
-    update_cached_progress_func: callable,
+    update_single_app_func: Callable,
+    update_cached_progress_func: Callable,
     progress_reporter: ProgressReporter,
 ) -> tuple[dict[str, bool], dict[str, str]]:
     """Update multiple apps.
