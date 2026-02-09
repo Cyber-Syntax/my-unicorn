@@ -6,19 +6,7 @@ from pathlib import Path
 import pytest
 
 
-@pytest.fixture
-def global_config_path():
-    """Return path to global settings.conf file."""
-    return (
-        Path(__file__).parent.parent.parent.parent
-        / "docs"
-        / "dev"
-        / "data"
-        / "settings.conf"
-    )
-
-
-def test_global_config_structure(global_config_path):
+def test_global_config_structure(global_config_path: Path) -> None:
     """Test that global settings.conf has correct structure.
 
     Validates:

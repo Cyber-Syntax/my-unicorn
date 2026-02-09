@@ -1,4 +1,12 @@
-"""Test app state validation against real production app state files."""
+"""Production data validation tests for app state files.
+
+This module contains tests that validate real production app state files
+against their JSON schema. Tests cover:
+- All production app state files validation
+- Dual verification file structure
+- Catalog vs URL source structure
+- Skip verification configuration
+"""
 
 from pathlib import Path
 
@@ -6,18 +14,6 @@ import orjson
 import pytest
 
 from my_unicorn.config.schemas import validate_app_state
-
-
-@pytest.fixture
-def app_state_dir():
-    """Return path to app state examples directory."""
-    return (
-        Path(__file__).parent.parent.parent.parent
-        / "docs"
-        / "dev"
-        / "data"
-        / "example_app_state_configs"
-    )
 
 
 @pytest.mark.parametrize(
@@ -36,8 +32,8 @@ def app_state_dir():
     ],
 )
 def test_all_production_app_state_files_validate(
-    app_state_dir, app_state_file
-):
+    app_state_dir: Path, app_state_file: str
+) -> None:
     """Test that all production app state files validate successfully.
 
     Validates:
@@ -80,8 +76,8 @@ def test_all_production_app_state_files_validate(
     ],
 )
 def test_dual_verification_files_have_multiple_methods(
-    app_state_dir, app_state_file
-):
+    app_state_dir: Path, app_state_file: str
+) -> None:
     """Test that dual-verification files have multiple verification methods.
 
     These 5 files demonstrate multiple verification methods:
@@ -135,7 +131,9 @@ def test_dual_verification_files_have_multiple_methods(
         "freetube.json",
     ],
 )
-def test_catalog_files_structure(app_state_dir, app_state_file):
+def test_catalog_files_structure(
+    app_state_dir: Path, app_state_file: str
+) -> None:
     """Test that catalog source files have correct structure.
 
     Catalog files (7 files):
@@ -189,7 +187,7 @@ def test_catalog_files_structure(app_state_dir, app_state_file):
         "install_url.json",
     ],
 )
-def test_url_files_structure(app_state_dir, app_state_file):
+def test_url_files_structure(app_state_dir: Path, app_state_file: str) -> None:
     """Test that URL source files have correct structure.
 
     URL files (3 files):
@@ -241,7 +239,9 @@ def test_url_files_structure(app_state_dir, app_state_file):
         "skipped_catalog.json",
     ],
 )
-def test_skip_verification_structure(app_state_dir, app_state_file):
+def test_skip_verification_structure(
+    app_state_dir: Path, app_state_file: str
+) -> None:
     """Test that skip verification files have correct structure.
 
     Skip verification file:

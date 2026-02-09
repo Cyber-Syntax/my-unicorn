@@ -8,19 +8,7 @@ import pytest
 from my_unicorn.config.schemas import validate_cache_release
 
 
-@pytest.fixture
-def cache_examples_dir():
-    """Return path to cache examples directory."""
-    return (
-        Path(__file__).parent.parent.parent.parent
-        / "docs"
-        / "dev"
-        / "data"
-        / "example_cache_configs"
-    )
-
-
-def test_all_example_cache_files_validate(cache_examples_dir):
+def test_all_example_cache_files_validate(cache_examples_dir: Path) -> None:
     """Test that all example cache files validate successfully."""
     if not cache_examples_dir.exists():
         pytest.skip(
@@ -48,7 +36,9 @@ def test_all_example_cache_files_validate(cache_examples_dir):
         "keepassxreboot_keepassxc.json",
     ],
 )
-def test_specific_cache_files(cache_examples_dir, cache_file):
+def test_specific_cache_files(
+    cache_examples_dir: Path, cache_file: str
+) -> None:
     """Test specific well-known cache files."""
     cache_path = cache_examples_dir / cache_file
     if not cache_path.exists():
