@@ -4,7 +4,7 @@ Tests the E2ERunner class for executing my-unicorn commands in
 sandboxed environments.
 """
 
-import json
+import orjson
 
 from tests.e2e.runner import E2ERunner
 from tests.e2e.sandbox import SandboxEnvironment
@@ -107,14 +107,17 @@ class TestConfigManipulation:
                     },
                 },
             }
-            config_path.write_text(json.dumps(initial_config))
+            config_text = orjson.dumps(
+                initial_config, option=orjson.OPT_INDENT_2
+            ).decode()
+            config_path.write_text(config_text)
 
             # Update the version
             new_version = "2.0.0"
             runner.set_version(app_name, new_version)
 
             # Read the config and verify version was updated
-            config = json.loads(config_path.read_text())
+            config = orjson.loads(config_path.read_text())
             assert config["state"]["version"] == new_version
 
     def test_set_version_preserves_other_fields(self) -> None:
@@ -162,13 +165,16 @@ class TestConfigManipulation:
                     },
                 },
             }
-            config_path.write_text(json.dumps(initial_config))
+            config_text = orjson.dumps(
+                initial_config, option=orjson.OPT_INDENT_2
+            ).decode()
+            config_path.write_text(config_text)
 
             # Update the version
             runner.set_version(app_name, "3.0.0")
 
             # Verify version was updated and other fields preserved
-            config = json.loads(config_path.read_text())
+            config = orjson.loads(config_path.read_text())
             assert config["state"]["version"] == "3.0.0"
             assert config["config_version"] == "2.0.0"
             assert config["source"] == "catalog"

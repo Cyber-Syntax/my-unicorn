@@ -10,8 +10,7 @@ Tests verify:
 - All operations complete without errors
 """
 
-import json
-
+import orjson
 import pytest
 
 from tests.e2e.runner import E2ERunner
@@ -58,7 +57,7 @@ class TestQuickFlow:
 
             # Step 3: Verify config structure
             config_text = config_path.read_text()
-            config = json.loads(config_text)
+            config = orjson.loads(config_text)
             assert "state" in config, "Config missing state field"
 
             # Step 4: Set old version for update test
@@ -70,7 +69,7 @@ class TestQuickFlow:
 
             # Step 6: Verify config was updated with new version
             config_text = config_path.read_text()
-            config = json.loads(config_text)
+            config = orjson.loads(config_text)
             updated_version = config.get("state", {}).get("version")
             assert updated_version is not None, (
                 "Config missing state.version after update"
@@ -115,7 +114,7 @@ class TestQuickFlow:
 
             # Step 3: Verify config structure
             config_text = config_path.read_text()
-            config = json.loads(config_text)
+            config = orjson.loads(config_text)
             assert "source" in config, (
                 "Config missing source field (install method)"
             )
@@ -161,7 +160,7 @@ class TestQuickFlow:
 
             # Step 3: Verify config structure
             config_text = config_path.read_text()
-            config = json.loads(config_text)
+            config = orjson.loads(config_text)
             assert "source" in config, (
                 "Config missing source field (install method)"
             )
@@ -225,7 +224,7 @@ class TestQuickFlow:
 
             # Verify config is valid
             config_text = config_path.read_text()
-            config = json.loads(config_text)
+            config = orjson.loads(config_text)
             assert "source" in config, "Config invalid after URL install"
 
             # Step 4: Remove for clean catalog test
@@ -243,7 +242,7 @@ class TestQuickFlow:
 
             # Verify config is valid
             config_text = config_path.read_text()
-            config = json.loads(config_text)
+            config = orjson.loads(config_text)
             assert "source" in config, "Config invalid after catalog install"
             assert "state" in config, (
                 "Config missing state after catalog install"

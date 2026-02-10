@@ -4,9 +4,11 @@ This module provides the E2ERunner class which executes my-unicorn CLI
 commands in a sandboxed environment, with utilities for config manipulation.
 """
 
-import json
 import os
 import subprocess
+from typing import Any, cast
+
+import orjson
 
 from tests.e2e.sandbox import SandboxEnvironment
 
@@ -108,7 +110,7 @@ class E2ERunner:
 
         Raises:
             FileNotFoundError: If app config file doesn't exist
-            json.JSONDecodeError: If config file is invalid JSON
+            orjson.JSONDecodeError: If config file is invalid JSON
         """
         config_path = (
             self.sandbox.temp_home
@@ -124,7 +126,7 @@ class E2ERunner:
 
         # Read the config
         config_text = config_path.read_text()
-        config = json.loads(config_text)
+        config = orjson.loads(config_text)
 
         # Update the version in state
         if "state" not in config:
@@ -132,4 +134,34 @@ class E2ERunner:
         config["state"]["version"] = version
 
         # Write back to file
-        config_path.write_text(json.dumps(config, indent=2))
+        config_path.write_text(
+            orjson.dumps(config, option=orjson.OPT_INDENT_2).decode()
+        )
+
+    def get_app_config(self, app_name: str) -> dict[str, Any]:
+        """Read app config JSON file.
+
+        Args:
+            app_name: Name of the app
+
+        Returns:
+            Parsed JSON config as dict
+
+        Raises:
+            FileNotFoundError: If app config file doesn't exist
+            orjson.JSONDecodeError: If config file is invalid JSON
+        """
+        config_path = (
+            self.sandbox.temp_home
+            / ".config"
+            / "my-unicorn"
+            / "apps"
+            / f"{app_name}.json"
+        )
+
+        if not config_path.exists():
+            msg = f"App config not found: {config_path}"
+            raise FileNotFoundError(msg)
+
+        config_text = config_path.read_text()
+        return cast("dict[str, Any]", orjson.loads(config_text))

@@ -12,8 +12,7 @@ Tests verify:
 - All operations complete without errors in sequence
 """
 
-import json
-
+import orjson
 import pytest
 
 from tests.e2e.runner import E2ERunner
@@ -64,7 +63,7 @@ class TestFullFlow:
 
             # Step 3: Verify neovim config structure
             neovim_config_text = neovim_config_path.read_text()
-            neovim_config = json.loads(neovim_config_text)
+            neovim_config = orjson.loads(neovim_config_text)
             assert "source" in neovim_config, (
                 "Neovim config missing source field"
             )
@@ -97,7 +96,7 @@ class TestFullFlow:
 
             # Step 6: Verify keepassxc config structure
             keepassxc_config_text = keepassxc_config_path.read_text()
-            keepassxc_config = json.loads(keepassxc_config_text)
+            keepassxc_config = orjson.loads(keepassxc_config_text)
             assert "source" in keepassxc_config, (
                 "KeePassXC config missing source field"
             )
@@ -152,7 +151,7 @@ class TestFullFlow:
 
                 # Step 3: Verify each config structure
                 config_text = config_path.read_text()
-                config = json.loads(config_text)
+                config = orjson.loads(config_text)
                 assert "source" in config, (
                     f"{app_name} config missing source field"
                 )
@@ -208,7 +207,7 @@ class TestFullFlow:
                 )
 
                 config_text = config_path.read_text()
-                config = json.loads(config_text)
+                config = orjson.loads(config_text)
                 updated_version = config.get("state", {}).get("version")
                 assert updated_version is not None, (
                     f"{app_name} missing state.version after update"
@@ -258,7 +257,7 @@ class TestFullFlow:
                     f"{app_name} config not created after URL install"
                 )
                 config_text = config_path.read_text()
-                config = json.loads(config_text)
+                config = orjson.loads(config_text)
                 assert "source" in config, (
                     f"{app_name} config missing source field"
                 )
@@ -288,7 +287,7 @@ class TestFullFlow:
                     f"{app_name} config not created after catalog install"
                 )
                 config_text = config_path.read_text()
-                config = json.loads(config_text)
+                config = orjson.loads(config_text)
                 assert "state" in config, (
                     f"{app_name} config missing state field"
                 )
@@ -320,7 +319,7 @@ class TestFullFlow:
                     f"{app_name} config missing after update"
                 )
                 config_text = config_path.read_text()
-                config = json.loads(config_text)
+                config = orjson.loads(config_text)
                 updated_version = config.get("state", {}).get("version")
                 assert updated_version is not None, (
                     f"{app_name} missing state.version after update"
