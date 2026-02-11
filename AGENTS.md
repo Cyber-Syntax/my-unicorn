@@ -8,31 +8,11 @@ My Unicorn is a Python 3.12+ CLI tool for managing AppImages on Linux
 **Core Features**: Install, update, and verify AppImages from GitHub with hash verification (SHA256/SHA512)
 **Package Manager**: uv (replaces pip/poetry)
 
-## Quick Start
-
-```bash
-# Clone and setup
-git clone https://github.com/Cyber-Syntax/my-unicorn
-cd my-unicorn
-
-# Install dependencies (uv creates virtual environment automatically)
-uv sync
-
-# Run CLI from source
-uv run my-unicorn --help
-
-# Run fast tests (excludes slow logger integration tests)
-uv run pytest -m "not slow"
-
-# Run all tests
-uv run pytest
-```
-
 ## Core Technologies
 
 - **Python**: 3.12+ with asyncio/aiohttp for async operations
 - **HTTP Client**: aiohttp for GitHub API interactions
-- **JSON**: orjson for fast config/cache file handling
+- **JSON**: orjson for fast config/cache file handling (in both production and test code)
 - **Event Loop**: uvloop for performance
 - **Security**: keyring for secure GitHub token storage
 - **Testing**: pytest with pytest-asyncio, pytest-mock, pytest-cov
@@ -47,11 +27,13 @@ src/my_unicorn/
 ├── types.py                # Type definitions and dataclasses
 ├── constants.py            # Application constants (versions, paths, defaults)
 ├── exceptions.py           # Custom exception classes
-├── logger.py               # Logging setup and configuration
+├── logger/                 # Logging setup and configuration
 ├── catalog/                # Application catalog JSON files
 ├── cli/                    # CLI parsing and command execution
+│   ├── container.py        # Dependency injection container
 │   ├── parser.py           # Argument parser setup
 │   ├── runner.py           # Command execution orchestration
+│   ├── upgrade.py          # Self-upgrade logic for my-unicorn
 │   └── commands/           # Command handlers (install, update, remove, list)
 ├── config/                 # Configuration management
 │   ├── global.py           # Global INI configuration
@@ -60,35 +42,28 @@ src/my_unicorn/
 │   ├── schemas/            # JSON schema validation
 │   └── migration/          # Config migration logic (v1→v2)
 ├── core/                   # Core functionality
-│   ├── auth.py             # Authentication handling
-│   ├── token.py            # Token storage via keyring
-│   ├── cache.py            # Release cache management
-│   ├── http_session.py     # HTTP session management
-│   ├── download.py         # File download logic
-│   ├── icon.py             # Icon extraction
-│   ├── desktop_entry.py    # Desktop file generation
+│   ├── backup/             # Backup management for appimages
+│   ├── desktop_entry/      # Desktop file generation
 │   ├── github/             # GitHub API client
+│   ├── install/            # Installation logic and workflows
+│   ├── progress/           # Progress bar management
+│   ├── protocols/          # Protocols and interfaces
+│   ├── services/           # Business services (install, update, remove)
 │   ├── verification/       # Hash verification (SHA256/SHA512)
-│   └── workflows/          # Business workflows (install, update, remove)
-├── ui/                     # User interface
-│   ├── progress.py         # Progress bar management
-│   └── display.py          # Output formatting
+│   ├── update/             # Update logic and workflows
+│   ├── auth.py             # Authentication handling
+│   ├── cache.py            # Release cache management
+│   ├── catalog.py          # Catalog loading and filtering
+│   ├── download.py         # File download logic
+│   ├── file_ops.py         # File operations (copy, move, delete)
+│   ├── http_session.py     # HTTP session management
+│   ├── icon.py             # Icon extraction
+│   ├── post_download.py    # Post-download helpers for install/update workflows
+│   ├── remove.py           # Remove logic for appimage, config, desktop entry...
+│   └── token.py            # Token storage via keyring
 └── utils/                  # Utility functions
 
-tests/                      # Test suite (mirrors src structure)
-├── conftest.py             # Pytest fixtures and configuration
-├── integration/            # Integration tests (network calls allowed)
-├── test_*.py               # Unit tests (no network calls)
-└── [subdirs mirror src/my_unicorn structure]
-
-docs/                       # Technical documentation
-└── dev/                    # Development guides (architecture, adr records)
-
 scripts/                    # Helper scripts
-├── test.py                 # UI testing script
-├── autocomplete.bash       # Shell autocomplete setup
-└── update.bash             # Self-update script
-
 autocomplete/               # Shell autocomplete scripts (bash, zsh)
 container/                  # Container configuration (Dockerfile, podman-compose.yml)
 ```
@@ -228,7 +203,7 @@ logger.debug("Token: %s", token)  # Security risk!
 
 ### File Organization
 
-**Target**: Keep files between 150-500 lines
+CRITICAL: Keep files between 150-500 lines for maintainability. If a file exceeds 550 lines, refactor by splitting into focused modules.
 
 ```bash
 # Check file line counts
@@ -242,6 +217,40 @@ uv run pytest tests/test_lines.py -v
 
 ## Testing Instructions
 
+### Test Folder Structure Principles
+
+Test fixtures follow a hierarchical organization principle:
+
+| Fixture Scope | Location | Purpose |
+|---------------|----------|---------|
+| **Module-specific fixtures** | `tests/<module>/conftest.py` | Fixtures used only by tests in that module (e.g., `tests/core/install/conftest.py`) |
+| **Module-group fixtures** | `tests/<group>/conftest.py` | Fixtures shared across submodules (e.g., `tests/core/conftest.py` for all core tests) |
+| **Global fixtures** | `tests/conftest.py` | Fixtures shared across all test modules (e.g., `enable_log_propagation`) |
+
+**Example Structure:**
+
+```
+tests/                             # Test suite (mirrors src structure)
+├── conftest.py             # Pytest fixtures and configuration
+├── integration/                   # Integration tests (network calls not allowed)
+├── custom/                 # Custom tests (e.g., GitHub Action CI test, line count test)
+├── e2e/                           # End-to-end tests
+├── fixtures/                      # Test fixtures
+│   └── checksums/                 # Real checksum data for integration tests
+├── test_*.py                      # Custom tests (e.g., test_lines.py for line count checks)
+├── core/
+│   ├── conftest.py                # Core module group fixtures
+│   ├── install/
+│   │   ├── conftest.py            # Install-specific fixtures (sample_asset, mock_download_service, etc.)
+│   │   └── test_*.py              # Install tests use fixtures from parent conftest files
+│   └── update/
+│       ├── conftest.py            # Update-specific fixtures
+│       └── test_*.py              # Update tests use fixtures from parent conftest files
+└── [other subdirs mirror src/my_unicorn structure]
+```
+
+**Fixture Discovery Order:** pytest automatically discovers fixtures by checking parent directories, so fixtures are available in child test modules without explicit imports.
+
 ### Writing Tests
 
 **CRITICAL**: Every new feature or bugfix MUST be covered by unit tests.
@@ -251,7 +260,7 @@ uv run pytest tests/test_lines.py -v
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from my_unicorn.core.workflows import InstallWorkflow
+from my_unicorn.core.services import InstallWorkflow
 from my_unicorn.exceptions import VerificationError
 
 
@@ -394,7 +403,7 @@ cat ~/.config/my-unicorn/settings.conf
     - `GLOBAL_CONFIG_VERSION` - Currently "1.1.0"
     - `APP_CONFIG_VERSION` - Currently "2.0.0"
 
-### 8.3 Documentation Principles
+### Documentation Principles
 
 | Principle | Description |
 |-----------|-------------|
@@ -408,5 +417,5 @@ cat ~/.config/my-unicorn/settings.conf
 
 - **Documentation:** See `docs/` directory for detailed design decisions, architecture diagrams, and API documentation
 - **Scripts:** Helper scripts in `scripts/` for development tasks
-- **Architecture Decision Records:** `docs/adr/` for major technical decisions
+- **Architecture Decision Records:** `docs/dev/adr/` for major technical decisions
 - **Development Guides:** `docs/dev/` for in-depth development patterns and best practices

@@ -13,7 +13,7 @@
 # log.1 rotated
 2026-01-25 16:03:09 - my_unicorn.main - DEBUG - async_main:28 - CLI completed successfully
 2026-01-25 16:03:09 - my_unicorn.main - DEBUG - async_main:25 - CLI started
-2026-01-25 16:03:09 - my_unicorn.ui.display - DEBUG - start_session:265 - Progress session started with 0 total operations
+2026-01-25 16:03:09 - my_unicorn.core.progress.display - DEBUG - start_session:265 - Progress session started with 0 total operations
 2026-01-25 16:03:09 - my_unicorn.core.update.update - INFO - check_updates:400 - 🔄 Checking 5 app(s) for updates...
 ...
 2026-01-25 16:03:10 - my_unicorn.core.token - DEBUG - get:131 - GitHub token retrieved from keyring (value hidden)
@@ -33,9 +33,84 @@
 
 ## in-progress
 
+- [ ] Improve testing
+    - [ ] write cli testing integration test for progress bar
+    - [ ] write ui integration test for progress bar
+    - [x] Write e2e testing (Seems like scripts/test.py belongs to there and can be work with pytest)
+    - [ ] Learn Schemathesis
+    - [ ] Learn <https://hypothesis.readthedocs.io/en/latest/stateful.html>
+    - [ ] Learn <https://realpython.com/python-cli-testing/#lo-fi-debugging-with-print>
+    - [ ] structure improve:
+
+```bash
+my_project/
+├── src/  # Your source code
+└── tests/
+├── unit/           # Fast, isolated tests
+├── integration/    # Tests with mocks
+├── stateful/       # Stateful hypothesis tests
+└── e2e/           # Slow, full system tests
+```
+
+- [ ] P1-Q8: add lock for one instance only to prevent multiple instance run at the same time via fcntl.flock and make sure it would work for asyncio
+    - [x] 16G error log, because of 2 instance running at the same time.(This solved by logger rotation fix but still better to add lock to prevent multiple instance run at the same time)
+
+- [ ] try git worktree, is it really can be good?
+- [ ] P1: Remove desktop_entry.py and other similar modules that only export things for backward compatbility.
+- [ ] P1: refactor core/update/update.py to better architecture for update all command and update with appimage names.
+    - [ ] Example; `my-unicorn update` would update all apps, `my-unicorn update appflowy qownnotes` would update only qownnotes and appflowy.
+- [ ] update all command issue:
+    - First, wrong ui handling
+
+```bash
+Fetching from API:
+GitHub Releases      3/3 Retrieved from cache
+
+Downloading (3/3):
+zen-x86_64                    110.6 MiB   3.3 MB/s 00:00 [==============================]   100% ✓
+tagspaces-linux-x86_64-6.9.0  149.4 MiB   8.6 MB/s 00:00 [==============================]   100% ✓
+superProductivity-x86_64      129.1 MiB   5.4 MB/s 00:00 [==============================]   100% ✓
+
+Installing:
+(1/2) Verifying zen-browser ✓
+(2/2) Installing zen-browser ✓
+(1/2) Verifying super-productivity ✓
+(2/2) Installing super-productivity ✓
+(1/2) Verifying tagspaces ✓
+(2/2) Installing tagspaces ✓
+
+
+📦 Update Summary:
+--------------------------------------------------
+tagspaces                 ✅ 6.8.2 → 6.9.0
+super-productivity        ✅ 17.1.2 → 17.1.3
+zen-browser               ✅ 1.18.4b → 1.18.5b
+neovim                    ℹ️  Already up to date (0.11.6)
+kdiskmark                 ℹ️  Already up to date (3.2.0)
+legcord                   ℹ️  Already up to date (1.2.1)
+obsidian                  ℹ️  Already up to date (1.11.7)
+qownnotes                 ℹ️  Already up to date (26.2.0)
+cherrytree                ℹ️  Already up to date (1.6.3)
+keepassxc                 ℹ️  Already up to date (2.7.11)
+heroicgameslauncher       ℹ️  Already up to date (2.19.1)
+weektodo                  ℹ️  Already up to date (2.2.0)
+endless-sky               ℹ️  Already up to date (0.10.16)
+nuclear                   ℹ️  Already up to date (0.6.48)
+flameshot                 ℹ️  Already up to date (13.3.0)
+beekeeper-studio          ℹ️  Already up to date (5.5.6)
+Successfully updated tagspaces
+standard-notes            ℹ️  Already up to date (3.201.10)
+freetube                  ℹ️  Already up to date (0.23.13-beta)
+appflowy                  ℹ️  Already up to date (0.11.1)
+
+🎉 Successfully updated 3 app(s)
+ℹ️  16 app(s) already up to date
+```
+
 - [ ] remove interactive argument on the AsciiProgressBackend when you understand what it's do which we don't use any kind of interactive mode on our progress bar, so we can remove that and just use the output.isatty() to detect the interactive mode if needed.
 
 - [ ] manual test improve:
+
     - [ ] add backup test to --quick flag on test.py
     - [ ] add --refresh-cache flag to --quick and --all flags to make sure cache also work after test passed without refresh cache flag.
     - [ ] Update container to test with this manual test script, so we don't need to test in our local machine.
@@ -43,21 +118,25 @@
         - [ ] add flag to close progress bar on cli for better support on ci tests.
 
 - [ ] Improve security
+
     - [ ] Verify checksum_file via digest verification provided from github_api to prevent tampered checksum_file attacks. Most of the new apps provide digest for their appimage and checksum_file on github api.
     - [ ] remove sha1/md5 support "“We recommend that anyone relying on SHA-1 for security migrate to SHA-2 or SHA-3 as soon as possible.” —Chris Celi, NIST computer scientist" + "MD5 is a deprecated hash algorithm that has practical known collision attacks. You are strongly discouraged from using it. Existing applications should strongly consider moving away." from <https://cryptography.io/en/latest/hazmat/primitives/cryptographic-hashes/#md5>
 
 - [ ] Improve schema
+
     - [ ] consider schema validation testing with hypothesis?
     - [ ] consider schema update v2.1.0 with optional fields for better backward compatibility?
     - [ ] remove schema one digest or use that instead of computed expected?
 
 - [ ] <https://github.com/carlosperate/awesome-pyproject?tab=readme-ov-file#testing>
 - [ ] Improve code quality with better practices:
+
     - [ ] learn dependency injection better which seems like protocol used for that to make better decoupling.
     - [ ] <https://github.com/ArjanCodes/betterpython/blob/main/1%20-%20coupling%20and%20cohesion/coupling-cohesion-after.py>
     - [ ] <https://docs.python-guide.org/writing/style/>
 
 - [ ] Improve agents.md
+
     - [x] <https://github.com/langchain-ai/langchain/blob/master/AGENTS.md>
     - [ ] <https://alexop.dev/posts/stop-bloating-your-claude-md-progressive-disclosure-ai-coding-tools/>
 
@@ -93,6 +172,7 @@ we probably need to define one correct example or we can just use the json schem
 
 - [ ] P1-Q3: Never use the real user config logs, app location on pytest unittests which current is use them! #p1 #important #q3
 - [ ] P1-Q2: deprecate my-unicorn package and repo directories (migrated to uv) #q2 #important #refactor
+
     - [x] Remove legacy cli tool install from install.sh
 
 - [ ] P2-Q4: fix all mypy issues #p2 #important #q4
@@ -104,10 +184,16 @@ we probably need to define one correct example or we can just use the json schem
     - [ ] move big tasks to issues if you need
     - [ ] get some issues to here with their #code like this
     - [ ] make a template for yourself to keep same template all of your other projects
-- [ ] P1-Q8: add lock for one instance only to prevent multiple instance run at the same time
-    - [x] 16G error log, because of 2 instance running at the same time.(This solved by logger rotation fix but still better to add lock to prevent multiple instance run at the same time)
 
 ## todo
+
+- [ ] Refresh cache flag is update the caches by request api again but github releases section seems not update it. It might be related with the our class get it from cache even we use api because of the way we implemented the cache, so we need to check that and make sure it is working as expected. Below is the log for that, we can see that github releases section is not updated but api section is updated.
+
+```bash
+uv run my-unicorn update --refresh-cache
+Fetching from API:
+GitHub Releases      1/1 Retrieved from cache
+```
 
 - [ ] P9: remove unused `"method": "extraction",` from icon app state which we only use extraction type now.
 - [ ] P2: redundant remove prints:
@@ -167,6 +253,7 @@ we probably need to define one correct example or we can just use the json schem
 - [ ] P2: update.bash check network connection
 - [ ] add autocompletion for the catalog apps to autocomplete app names (e.g: `super<tab>-productivity`)
 - [ ] #BUG: `/tmp/.mount_appflobIOEjI/AppFlowy: error while loading shared libraries: libkeybinder-3.0.so.0: cannot open shared object file: No such file or directory`
+
     - This is dependency issue, installing `keybinder3` solve the issue. I don't think I can do anything from my side, maybe document it on the docs.
 
 - [ ] TEST: test probably use AppImageKit, better to make sure it is only used for though.
@@ -213,12 +300,13 @@ Confirm your GitHub token:
       <https://clig.dev/>
       <https://www.amazon.com/UNIX-Programming-Addison-Wesley-Professional-Computng/dp/0131429019>
 
-    My advice as a user of CLI:
+  My advice as a user of CLI:
+
     - no emojis please, ever
-      Many people are more visually oriented, and are greatly aided by images and color.
-      A standard `NO_EMOJIS` environment variable could perhaps be used to help both camps, just like `NO_COLOR` is available today.
+    Many people are more visually oriented, and are greatly aided by images and color.
+    A standard `NO_EMOJIS` environment variable could perhaps be used to help both camps, just like `NO_COLOR` is available today.
     - if you want to make it look nice, use ANSI escape codes for color rather than emojis.
-      even then, don't use color alone to convey meaning because it will most likely get destroyed by whatever you're piping it to.
+    even then, don't use color alone to convey meaning because it will most likely get destroyed by whatever you're piping it to.
     - No, please don't use escape codes in your output. Use the library that is designed for this purpose: terminfo.
     - please take the time to write detailed man pages, not just a "--help" screen
     - implement "did you mean?" for typos (git style) and potentially dangerous commands
@@ -263,23 +351,23 @@ Confirm your GitHub token:
 
 ```json
 {
-    "cached_at": "2026-02-04T15:04:13.654171+03:00",
-    "ttl_hours": 24,
-    "release_data": {
-        "owner": "tagspaces",
-        "repo": "tagspaces",
-        "version": "6.8.2",
-        "prerelease": false,
-        "assets": [
-            {
-                "name": "tagspaces-linux-x86_64-6.8.2.AppImage",
-                "size": 159537674,
-                "digest": "sha256:3c8ca310ab79d09202b55c2a832d5d09c7caf81c5db2270821dc05e90172e2df",
-                "browser_download_url": "https://github.com/tagspaces/tagspaces/releases/download/v6.8.2/tagspaces-linux-x86_64-6.8.2.AppImage"
-            }
-        ],
-        "original_tag_name": "v6.8.2"
-    }
+  "cached_at": "2026-02-04T15:04:13.654171+03:00",
+  "ttl_hours": 24,
+  "release_data": {
+    "owner": "tagspaces",
+    "repo": "tagspaces",
+    "version": "6.8.2",
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "tagspaces-linux-x86_64-6.8.2.AppImage",
+        "size": 159537674,
+        "digest": "sha256:3c8ca310ab79d09202b55c2a832d5d09c7caf81c5db2270821dc05e90172e2df",
+        "browser_download_url": "https://github.com/tagspaces/tagspaces/releases/download/v6.8.2/tagspaces-linux-x86_64-6.8.2.AppImage"
+      }
+    ],
+    "original_tag_name": "v6.8.2"
+  }
 }
 ```
 
@@ -326,7 +414,7 @@ Confirm your GitHub token:
 - [x] remove writing commits to release desc
     - [x] removed commits
     - [x] make it work with keepachangelog template which that template not use v0.1.0 `v` prefix on its heading
-          so our github action bash script need to add itself when creating tags because conventional tags need v in front of them.
+        so our github action bash script need to add itself when creating tags because conventional tags need v in front of them.
 - [x] #BUG: Rotation error on logs... - Currently, implemented to custom rotation logic more simple and efficient
       and also increased 1MB log to 10MB to increase the log size. Manual and pytest
       succesfully passed.
@@ -349,7 +437,7 @@ Confirm your GitHub token:
 - [x] #BUG: digest not became true on catalog installs if its use checksum_file with digest verify both
 - [x] make sure skip not skip verification if there is verification option
     - [x] freetube test verify digest even it is skip: true on the catalog,
-          and I still keep it skip purposely
+        and I still keep it skip purposely
     - [x] obsidian test
 - [x] Clean up code
     - [x] general
