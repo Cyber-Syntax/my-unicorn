@@ -15,10 +15,6 @@ from my_unicorn.core.protocols import (
     ProgressType,
 )
 
-# ---------------------------------------------------------------------------
-# Fixtures and Helpers
-# ---------------------------------------------------------------------------
-
 
 @pytest_asyncio.fixture
 def tmp_file(tmp_path: Path) -> Path:
@@ -164,11 +160,6 @@ def test_download_error_exception():
         raise DownloadError("fail")
 
 
-# ---------------------------------------------------------------------------
-# MockProgressReporter for tracking progress calls
-# ---------------------------------------------------------------------------
-
-
 class MockProgressReporter(ProgressReporter):
     """Mock implementation of ProgressReporter for testing.
 
@@ -237,11 +228,6 @@ class MockProgressReporter(ProgressReporter):
         return {"completed": 0.0, "total": None, "description": ""}
 
 
-# ---------------------------------------------------------------------------
-# Protocol Usage Tests (Task 2.1)
-# ---------------------------------------------------------------------------
-
-
 class TestDownloadServiceProtocolUsage:
     """Test that DownloadService uses ProgressReporter protocol correctly."""
 
@@ -271,11 +257,6 @@ class TestDownloadServiceProtocolUsage:
         reporter = MockProgressReporter()
         service = DownloadService(mock_session, progress_reporter=reporter)
         assert service.progress_reporter.is_active() is True
-
-
-# ---------------------------------------------------------------------------
-# Async File I/O Tests (Task 2.2)
-# ---------------------------------------------------------------------------
 
 
 class TestDownloadServiceAsyncFileIO:
@@ -355,11 +336,6 @@ class TestDownloadServiceAsyncFileIO:
 
             mock_loop.run_in_executor.assert_called()
             assert mock_loop.run_in_executor.call_count >= 1
-
-
-# ---------------------------------------------------------------------------
-# Progress Reporting Tests
-# ---------------------------------------------------------------------------
 
 
 class TestDownloadServiceProgressReporting:
@@ -505,11 +481,6 @@ class TestDownloadServiceProgressReporting:
         assert tmp_file.exists()
 
 
-# ---------------------------------------------------------------------------
-# Sync Fallback with Progress Tests
-# ---------------------------------------------------------------------------
-
-
 class TestSyncFallbackWithProgress:
     """Test sync fallback behavior with progress tracking."""
 
@@ -563,11 +534,6 @@ class TestSyncFallbackWithProgress:
         )
 
         assert downloaded == len(content)
-
-
-# ---------------------------------------------------------------------------
-# HAS_AIOFILES Flag Tests
-# ---------------------------------------------------------------------------
 
 
 class TestHasAiofilesFlag:
@@ -639,8 +605,3 @@ class TestHasAiofilesFlag:
                 ProgressType.DOWNLOAD,
             )
             mock_fallback.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# Original Tests (preserved from before refactoring)
-# ---------------------------------------------------------------------------
