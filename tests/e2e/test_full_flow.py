@@ -19,12 +19,15 @@ from tests.e2e.runner import E2ERunner
 from tests.e2e.sandbox import SandboxEnvironment
 
 
+@pytest.mark.e2e
 @pytest.mark.slow
 @pytest.mark.network
 class TestFullFlow:
     """E2E full flow tests for comprehensive CLI operations."""
 
-    def test_url_installs_neovim_keepassxc(self) -> None:
+    def test_url_installs_neovim_keepassxc(
+        self, sandbox_env: SandboxEnvironment, e2e_runner: E2ERunner
+    ) -> None:
         """Test neovim and keepassxc URL direct installs.
 
         Flow:
@@ -38,20 +41,16 @@ class TestFullFlow:
         - Configs contain required fields (source, state)
         - state contains version field
         """
-        with SandboxEnvironment(
-            name="test_url_installs_neovim_keepassxc"
-        ) as sandbox:
-            runner = E2ERunner(sandbox)
-
+        with sandbox_env:
             # Step 1: Install neovim via GitHub URL
-            result = runner.install("https://github.com/neovim/neovim")
+            result = e2e_runner.install("https://github.com/neovim/neovim")
             assert result.returncode == 0, (
                 f"Neovim URL install failed: {result.stderr}"
             )
 
             # Step 2: Verify neovim config created
             neovim_config_path = (
-                sandbox.temp_home
+                sandbox_env.temp_home
                 / ".config"
                 / "my-unicorn"
                 / "apps"
@@ -75,7 +74,7 @@ class TestFullFlow:
             )
 
             # Step 4: Install keepassxc via GitHub URL
-            result = runner.install(
+            result = e2e_runner.install(
                 "https://github.com/keepassxreboot/keepassxc"
             )
             assert result.returncode == 0, (
@@ -84,7 +83,7 @@ class TestFullFlow:
 
             # Step 5: Verify keepassxc config created
             keepassxc_config_path = (
-                sandbox.temp_home
+                sandbox_env.temp_home
                 / ".config"
                 / "my-unicorn"
                 / "apps"
@@ -107,7 +106,9 @@ class TestFullFlow:
                 "KeePassXC config missing state.version field"
             )
 
-    def test_catalog_installs_multiple_apps(self) -> None:
+    def test_catalog_installs_multiple_apps(
+        self, sandbox_env: SandboxEnvironment, e2e_runner: E2ERunner
+    ) -> None:
         """Test catalog installs for multiple apps.
 
         Flow:
@@ -123,15 +124,11 @@ class TestFullFlow:
         - Configs contain required fields (source, state)
         - state contains version field
         """
-        with SandboxEnvironment(
-            name="test_catalog_installs_multiple_apps"
-        ) as sandbox:
-            runner = E2ERunner(sandbox)
-
+        with sandbox_env:
             app_names = ["legcord", "flameshot", "appflowy", "standard-notes"]
 
             # Step 1: Install multiple apps from catalog
-            result = runner.install(*app_names)
+            result = e2e_runner.install(*app_names)
             assert result.returncode == 0, (
                 f"Catalog install failed: {result.stderr}"
             )
@@ -139,7 +136,7 @@ class TestFullFlow:
             # Step 2: Verify all config files were created
             for app_name in app_names:
                 config_path = (
-                    sandbox.temp_home
+                    sandbox_env.temp_home
                     / ".config"
                     / "my-unicorn"
                     / "apps"
@@ -162,7 +159,9 @@ class TestFullFlow:
                     f"{app_name} config missing state.version field"
                 )
 
-    def test_updates_multiple_apps(self) -> None:
+    def test_updates_multiple_apps(
+        self, sandbox_env: SandboxEnvironment, e2e_runner: E2ERunner
+    ) -> None:
         """Test updating multiple installed apps.
 
         Flow:
@@ -176,27 +175,25 @@ class TestFullFlow:
         - Update succeeds (return code 0)
         - Version changed from test version (0.1.0)
         """
-        with SandboxEnvironment(name="test_updates_multiple_apps") as sandbox:
-            runner = E2ERunner(sandbox)
-
+        with sandbox_env:
             app_names = ["legcord", "flameshot", "appflowy", "standard-notes"]
 
             # Step 1: Install multiple apps
-            result = runner.install(*app_names)
+            result = e2e_runner.install(*app_names)
             assert result.returncode == 0, f"Install failed: {result.stderr}"
 
             # Step 2: Set old version for each app
             for app_name in app_names:
-                runner.set_version(app_name, "0.1.0")
+                e2e_runner.set_version(app_name, "0.1.0")
 
             # Step 3: Run update
-            result = runner.update(*app_names)
+            result = e2e_runner.update(*app_names)
             assert result.returncode == 0, f"Update failed: {result.stderr}"
 
             # Step 4: Verify versions changed
             for app_name in app_names:
                 config_path = (
-                    sandbox.temp_home
+                    sandbox_env.temp_home
                     / ".config"
                     / "my-unicorn"
                     / "apps"
@@ -216,7 +213,9 @@ class TestFullFlow:
                     f"{app_name} version not updated from test version"
                 )
 
-    def test_full_workflow_complete(self) -> None:
+    def test_full_workflow_complete(
+        self, sandbox_env: SandboxEnvironment, e2e_runner: E2ERunner
+    ) -> None:
         """Test complete full workflow in sequence.
 
         Flow (mirrors scripts/test.py all test):
@@ -232,11 +231,9 @@ class TestFullFlow:
         - All configs contain required fields
         - Versions updated from test version
         """
-        with SandboxEnvironment(name="test_full_workflow_complete") as sandbox:
-            runner = E2ERunner(sandbox)
-
+        with sandbox_env:
             # Phase 1: URL installs
-            result = runner.install(
+            result = e2e_runner.install(
                 "https://github.com/neovim/neovim",
                 "https://github.com/keepassxreboot/keepassxc",
             )
@@ -247,7 +244,7 @@ class TestFullFlow:
             # Verify URL installs
             for app_name in ["neovim", "keepassxc"]:
                 config_path = (
-                    sandbox.temp_home
+                    sandbox_env.temp_home
                     / ".config"
                     / "my-unicorn"
                     / "apps"
@@ -269,7 +266,7 @@ class TestFullFlow:
                 "appflowy",
                 "standard-notes",
             ]
-            result = runner.install(*catalog_apps)
+            result = e2e_runner.install(*catalog_apps)
             assert result.returncode == 0, (
                 f"Catalog installs failed: {result.stderr}"
             )
@@ -277,7 +274,7 @@ class TestFullFlow:
             # Verify catalog installs
             for app_name in catalog_apps:
                 config_path = (
-                    sandbox.temp_home
+                    sandbox_env.temp_home
                     / ".config"
                     / "my-unicorn"
                     / "apps"
@@ -301,15 +298,15 @@ class TestFullFlow:
                 "standard-notes",
             ]
             for app_name in all_apps:
-                runner.set_version(app_name, "0.1.0")
+                e2e_runner.set_version(app_name, "0.1.0")
 
-            result = runner.update(*all_apps)
+            result = e2e_runner.update(*all_apps)
             assert result.returncode == 0, f"Updates failed: {result.stderr}"
 
             # Phase 4: Verify all versions updated
             for app_name in all_apps:
                 config_path = (
-                    sandbox.temp_home
+                    sandbox_env.temp_home
                     / ".config"
                     / "my-unicorn"
                     / "apps"

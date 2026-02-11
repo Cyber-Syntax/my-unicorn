@@ -101,6 +101,7 @@ markers = [
   "slow: marks tests as slow (deselect with '-m \"not slow\"')",
   "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
   "network: marks tests that make network requests to external services",
+  "e2e: marks end-to-end integration tests",
 ]
 
 [tool.ruff]

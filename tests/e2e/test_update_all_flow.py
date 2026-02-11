@@ -19,12 +19,15 @@ from tests.e2e.runner import E2ERunner
 from tests.e2e.sandbox import SandboxEnvironment
 
 
+@pytest.mark.e2e
 @pytest.mark.slow
 @pytest.mark.network
 class TestUpdateAllFlow:
     """E2E update-all flow tests for multiple app updates."""
 
-    def test_install_qownnotes_appflowy(self) -> None:
+    def test_install_qownnotes_appflowy(
+        self, sandbox_env: SandboxEnvironment, e2e_runner: E2ERunner
+    ) -> None:
         """Test installing qownnotes and appflowy from catalog.
 
         Flow:
@@ -37,13 +40,9 @@ class TestUpdateAllFlow:
         - Both app config files created
         - Config files contain required fields
         """
-        with SandboxEnvironment(
-            name="test_install_qownnotes_appflowy"
-        ) as sandbox:
-            runner = E2ERunner(sandbox)
-
+        with sandbox_env:
             # Step 1: Install qownnotes from catalog
-            result = runner.install("qownnotes")
+            result = e2e_runner.install("qownnotes")
             assert result.returncode == 0, (
                 f"Qownnotes install failed: {result.stderr}"
             )
@@ -54,14 +53,15 @@ class TestUpdateAllFlow:
 
             # Step 2: Verify qownnotes config exists
             qownnotes_config = (
-                sandbox.temp_home / ".config/my-unicorn/apps/qownnotes.json"
+                sandbox_env.temp_home
+                / ".config/my-unicorn/apps/qownnotes.json"
             )
             assert qownnotes_config.exists(), (
                 f"Qownnotes config not created at {qownnotes_config}"
             )
 
             # Step 3: Install appflowy from catalog
-            result = runner.install("appflowy")
+            result = e2e_runner.install("appflowy")
             assert result.returncode == 0, (
                 f"AppFlowy install failed: {result.stderr}"
             )
@@ -72,13 +72,15 @@ class TestUpdateAllFlow:
 
             # Step 4: Verify appflowy config exists
             appflowy_config = (
-                sandbox.temp_home / ".config/my-unicorn/apps/appflowy.json"
+                sandbox_env.temp_home / ".config/my-unicorn/apps/appflowy.json"
             )
             assert appflowy_config.exists(), (
                 f"AppFlowy config not created at {appflowy_config}"
             )
 
-    def test_force_old_versions(self) -> None:
+    def test_force_old_versions(
+        self, sandbox_env: SandboxEnvironment, e2e_runner: E2ERunner
+    ) -> None:
         """Test forcing old versions in app configs for update testing.
 
         Flow:
@@ -93,20 +95,18 @@ class TestUpdateAllFlow:
         - get_app_config() returns dict with installed_version or version field
         - set_version() successfully changes versions
         """
-        with SandboxEnvironment(name="test_force_old_versions") as sandbox:
-            runner = E2ERunner(sandbox)
-
+        with sandbox_env:
             # Step 1: Install qownnotes
-            result = runner.install("qownnotes")
+            result = e2e_runner.install("qownnotes")
             assert result.returncode == 0, f"Install failed: {result.stderr}"
 
             # Step 2: Install appflowy
-            result = runner.install("appflowy")
+            result = e2e_runner.install("appflowy")
             assert result.returncode == 0, f"Install failed: {result.stderr}"
 
             # Step 3: Get original versions
-            qownnotes_config_before = runner.get_app_config("qownnotes")
-            appflowy_config_before = runner.get_app_config("appflowy")
+            qownnotes_config_before = e2e_runner.get_app_config("qownnotes")
+            appflowy_config_before = e2e_runner.get_app_config("appflowy")
 
             original_qownnotes_version = qownnotes_config_before.get(
                 "state", {}
@@ -122,12 +122,12 @@ class TestUpdateAllFlow:
             old_qownnotes = "v23.1.0"
             old_appflowy = "0.1.0"
 
-            runner.set_version("qownnotes", old_qownnotes)
-            runner.set_version("appflowy", old_appflowy)
+            e2e_runner.set_version("qownnotes", old_qownnotes)
+            e2e_runner.set_version("appflowy", old_appflowy)
 
             # Step 5: Verify versions changed
-            qownnotes_config_after = runner.get_app_config("qownnotes")
-            appflowy_config_after = runner.get_app_config("appflowy")
+            qownnotes_config_after = e2e_runner.get_app_config("qownnotes")
+            appflowy_config_after = e2e_runner.get_app_config("appflowy")
 
             assert (
                 qownnotes_config_after.get("state", {}).get("version")
@@ -141,7 +141,9 @@ class TestUpdateAllFlow:
             assert original_qownnotes_version != old_qownnotes
             assert original_appflowy_version != old_appflowy
 
-    def test_update_all_command(self) -> None:
+    def test_update_all_command(
+        self, sandbox_env: SandboxEnvironment, e2e_runner: E2ERunner
+    ) -> None:
         """Test running update --all to update all installed apps.
 
         Flow:
@@ -156,23 +158,21 @@ class TestUpdateAllFlow:
         - update --all succeeds (return code 0)
         - Output contains update-related messages
         """
-        with SandboxEnvironment(name="test_update_all_command") as sandbox:
-            runner = E2ERunner(sandbox)
-
+        with sandbox_env:
             # Step 1: Install qownnotes
-            result = runner.install("qownnotes")
+            result = e2e_runner.install("qownnotes")
             assert result.returncode == 0, f"Install failed: {result.stderr}"
 
             # Step 2: Install appflowy
-            result = runner.install("appflowy")
+            result = e2e_runner.install("appflowy")
             assert result.returncode == 0, f"Install failed: {result.stderr}"
 
             # Step 3: Force old versions
-            runner.set_version("qownnotes", "v23.1.0")
-            runner.set_version("appflowy", "0.1.0")
+            e2e_runner.set_version("qownnotes", "v23.1.0")
+            e2e_runner.set_version("appflowy", "0.1.0")
 
             # Step 4: Run update (all apps - no args means update all)
-            result = runner.update()
+            result = e2e_runner.update()
             assert result.returncode == 0, f"Update failed: {result.stderr}"
 
             # Step 5: Verify output indicates update operation
@@ -183,7 +183,9 @@ class TestUpdateAllFlow:
                 or "version" in output_lower
             ), f"Unexpected output: {result.stdout}"
 
-    def test_verify_versions_changed(self) -> None:
+    def test_verify_versions_changed(
+        self, sandbox_env: SandboxEnvironment, e2e_runner: E2ERunner
+    ) -> None:
         """Test that update --all actually changes versions in configs.
 
         Flow:
@@ -201,27 +203,23 @@ class TestUpdateAllFlow:
         - Versions in configs are different from old versions
         - Versions match or exceed original versions
         """
-        with SandboxEnvironment(
-            name="test_verify_versions_changed"
-        ) as sandbox:
-            runner = E2ERunner(sandbox)
-
+        with sandbox_env:
             # Step 1: Install qownnotes
-            result = runner.install("qownnotes")
+            result = e2e_runner.install("qownnotes")
             assert result.returncode == 0, f"Install failed: {result.stderr}"
 
             # Step 2: Install appflowy
-            result = runner.install("appflowy")
+            result = e2e_runner.install("appflowy")
             assert result.returncode == 0, f"Install failed: {result.stderr}"
 
             # Step 3: Get fresh versions after install
             qownnotes_latest = (
-                runner.get_app_config("qownnotes")
+                e2e_runner.get_app_config("qownnotes")
                 .get("state", {})
                 .get("version")
             )
             appflowy_latest = (
-                runner.get_app_config("appflowy")
+                e2e_runner.get_app_config("appflowy")
                 .get("state", {})
                 .get("version")
             )
@@ -233,35 +231,35 @@ class TestUpdateAllFlow:
             old_qownnotes = "v23.1.0"
             old_appflowy = "0.1.0"
 
-            runner.set_version("qownnotes", old_qownnotes)
-            runner.set_version("appflowy", old_appflowy)
+            e2e_runner.set_version("qownnotes", old_qownnotes)
+            e2e_runner.set_version("appflowy", old_appflowy)
 
             # Step 5: Verify old versions set
             assert (
-                runner.get_app_config("qownnotes")
+                e2e_runner.get_app_config("qownnotes")
                 .get("state", {})
                 .get("version")
                 == old_qownnotes
             )
             assert (
-                runner.get_app_config("appflowy")
+                e2e_runner.get_app_config("appflowy")
                 .get("state", {})
                 .get("version")
                 == old_appflowy
             )
 
             # Step 6: Run update (all apps - no args means update all)
-            result = runner.update()
+            result = e2e_runner.update()
             assert result.returncode == 0, f"Update failed: {result.stderr}"
 
             # Step 7: Verify versions updated
             qownnotes_after = (
-                runner.get_app_config("qownnotes")
+                e2e_runner.get_app_config("qownnotes")
                 .get("state", {})
                 .get("version")
             )
             appflowy_after = (
-                runner.get_app_config("appflowy")
+                e2e_runner.get_app_config("appflowy")
                 .get("state", {})
                 .get("version")
             )
