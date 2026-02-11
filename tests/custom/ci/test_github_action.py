@@ -38,7 +38,9 @@ class GitHubActionTester:
         """
         self.github_token = github_token or os.getenv("GITHUB_TOKEN")
         self.repo = self._get_repo_name()
-        self.changelog_path = Path("CHANGELOG.md")
+        self.changelog_path = (
+            Path(__file__).resolve().parents[3] / "CHANGELOG.md"
+        )
 
     def _get_repo_name(self) -> str:
         """Extract repository name from git remote.
@@ -455,7 +457,6 @@ def _display_results_summary(results: dict[str, Any]) -> None:
     """
     print("Test completed successfully!")
     print(f"Version: {results['version']}")
-
     print(f"Previous tag: {results['previous_tag'] or 'None'}")
     print(f"Tag to create: {results.get('tag_name', 'None')}")
 
@@ -473,10 +474,8 @@ def main() -> None:
     print("🚀 GitHub Actions Release Workflow Tester")
     print("=" * 50)
 
-    # Initialize tester
     tester = GitHubActionTester()
 
-    # Run tests
     try:
         results = tester.test_workflow()
 
@@ -484,7 +483,6 @@ def main() -> None:
         output_path = Path("test_github_release_desc.md")
         _write_test_results_to_file(results, output_path)
 
-        # Display summary
         _display_results_summary(results)
 
     except Exception as e:

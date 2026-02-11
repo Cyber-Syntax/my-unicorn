@@ -2,6 +2,7 @@
 
 import tempfile
 from argparse import Namespace
+from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -12,14 +13,14 @@ from my_unicorn.config import ConfigManager
 
 
 @pytest.fixture
-def temp_dir():
+def temp_dir() -> Generator[Path, None, None]:
     """Create a temporary directory for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
 
 
 @pytest.fixture
-def config_manager(temp_dir):
+def config_manager(temp_dir: Path) -> MagicMock:
     """Create a ConfigManager for testing."""
     config_dir = temp_dir / "config"
     config_dir.mkdir()
@@ -37,7 +38,7 @@ def config_manager(temp_dir):
 
 
 @pytest.fixture
-def handler(config_manager):
+def handler(config_manager: MagicMock) -> MigrateHandler:
     """Create MigrateHandler for testing."""
     auth_manager = MagicMock()
     update_manager = MagicMock()
@@ -49,8 +50,11 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_execute_no_apps_to_migrate(
-        self, handler, config_manager, caplog
-    ):
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test execute when no apps need migration."""
         # Setup: No apps installed
         config_manager.app_config_manager.list_installed_apps.return_value = []
@@ -68,8 +72,11 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_execute_with_apps_to_migrate(
-        self, handler, config_manager, caplog
-    ):
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test execute when apps need migration."""
         # Setup: One app needs migration
         config_manager.app_config_manager.list_installed_apps.return_value = [
@@ -109,7 +116,12 @@ class TestMigrateHandler:
                     assert "Migration complete" in caplog.text
 
     @pytest.mark.asyncio
-    async def test_execute_with_errors(self, handler, config_manager, caplog):
+    async def test_execute_with_errors(
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test execute when migration has errors."""
         config_manager.app_config_manager.list_installed_apps.return_value = [
             "testapp"
@@ -144,8 +156,11 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_execute_already_up_to_date(
-        self, handler, config_manager, caplog
-    ):
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test execute when all configs already up to date."""
         config_manager.app_config_manager.list_installed_apps.return_value = [
             "testapp"
@@ -179,8 +194,11 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_migrate_app_configs_no_apps(
-        self, handler, config_manager, caplog
-    ):
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test _migrate_app_configs when no apps installed."""
         config_manager.app_config_manager.list_installed_apps.return_value = []
 
@@ -191,8 +209,11 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_migrate_app_configs_success(
-        self, handler, config_manager, caplog
-    ):
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test _migrate_app_configs with successful migration."""
         config_manager.app_config_manager.list_installed_apps.return_value = [
             "testapp"
@@ -218,8 +239,11 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_migrate_app_configs_already_migrated(
-        self, handler, config_manager, caplog
-    ):
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test _migrate_app_configs when app already at target version."""
         config_manager.app_config_manager.list_installed_apps.return_value = [
             "testapp"
@@ -245,8 +269,11 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_migrate_app_configs_with_error(
-        self, handler, config_manager, caplog
-    ):
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test _migrate_app_configs when migration fails."""
         config_manager.app_config_manager.list_installed_apps.return_value = [
             "testapp"
@@ -269,8 +296,8 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_migrate_catalog_configs_no_files(
-        self, handler, config_manager, caplog
-    ):
+        self, handler: MigrateHandler, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test _migrate_catalog_configs when no catalog files found."""
         result = await handler._migrate_catalog_configs()
 
@@ -279,8 +306,11 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_migrate_catalog_configs_success(
-        self, handler, config_manager, caplog
-    ):
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test _migrate_catalog_configs with successful migration."""
         catalog_dir = config_manager.catalog_dir
         catalog_file = catalog_dir / "testapp.json"
@@ -319,8 +349,11 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_migrate_catalog_configs_already_migrated(
-        self, handler, config_manager, caplog
-    ):
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test _migrate_catalog_configs when catalog already at target version."""
         catalog_dir = config_manager.catalog_dir
         catalog_file = catalog_dir / "testapp.json"
@@ -345,8 +378,11 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_migrate_catalog_configs_with_error(
-        self, handler, config_manager, caplog
-    ):
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test _migrate_catalog_configs when migration fails."""
         catalog_dir = config_manager.catalog_dir
         catalog_file = catalog_dir / "testapp.json"
@@ -366,8 +402,11 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_migrate_catalog_configs_exception_handling(
-        self, handler, config_manager, caplog
-    ):
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test _migrate_catalog_configs handles general exceptions."""
         # Simulate directory access error
         config_manager.catalog_dir = None
@@ -378,7 +417,12 @@ class TestMigrateHandler:
         assert "failed" in caplog.text.lower()
 
     @pytest.mark.asyncio
-    async def test_execute_dry_run_mode(self, handler, config_manager, caplog):
+    async def test_execute_dry_run_mode(
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test execute with --dry-run flag shows what would be migrated."""
         # Setup: Create apps and catalogs that need migration
         apps_dir = config_manager.apps_dir
@@ -421,8 +465,11 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_execute_dry_run_nothing_to_migrate(
-        self, handler, config_manager, caplog
-    ):
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test execute with --dry-run when nothing needs migration."""
         # Setup: No apps or catalogs needing migration
         with patch(
@@ -439,8 +486,11 @@ class TestMigrateHandler:
 
     @pytest.mark.asyncio
     async def test_dry_run_migration_shows_apps_and_catalogs(
-        self, handler, config_manager, caplog
-    ):
+        self,
+        handler: MigrateHandler,
+        config_manager: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test _dry_run_migration displays both apps and catalogs."""
         # Setup: Create configs needing migration
         apps_dir = config_manager.apps_dir

@@ -58,14 +58,14 @@ def test_github_action_test_script_generates_expected_markdown() -> None:
     verifies the generated markdown contains the expected version and tag,
     and that a commits section is not present.
     """
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[3]
     changelog = repo_root / "CHANGELOG.md"
-    script = repo_root / "tests" / ".github" / "test_github_action.py"
+    script = repo_root / "tests" / "custom" / "ci" / "test_github_action.py"
     output = repo_root / "test_github_release_desc.md"
 
     assert changelog.exists(), "CHANGELOG.md not found in repo root"
     assert script.exists(), (
-        "Test script not found at tests/.github/test_github_action.py"
+        "Test script not found at tests/custom/ci/test_github_action.py"
     )
 
     # Remove previous output if present
