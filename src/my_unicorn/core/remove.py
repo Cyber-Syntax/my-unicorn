@@ -10,13 +10,15 @@ from __future__ import annotations
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import my_unicorn.core.desktop_entry as desktop_entry_module
 from my_unicorn.config import ConfigManager
 from my_unicorn.core.cache import ReleaseCacheManager
 from my_unicorn.logger import get_logger
-from my_unicorn.types import AppStateConfig, GlobalConfig
+
+if TYPE_CHECKING:
+    from my_unicorn.types import AppStateConfig, GlobalConfig
 
 logger = get_logger(__name__)
 

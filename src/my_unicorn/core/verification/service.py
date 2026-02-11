@@ -14,11 +14,9 @@ Logging Strategy:
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from my_unicorn.constants import VerificationMethod
-from my_unicorn.core.github import Asset
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
@@ -38,8 +36,11 @@ from my_unicorn.exceptions import VerificationError
 from my_unicorn.logger import get_logger
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from my_unicorn.core.cache import ReleaseCacheManager
     from my_unicorn.core.download import DownloadService
+    from my_unicorn.core.github import Asset
 
 logger = get_logger(__name__, enable_file_logging=True)
 

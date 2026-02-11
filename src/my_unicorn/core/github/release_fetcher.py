@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import aiohttp
-
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.github.client import ReleaseAPIClient
 
 if TYPE_CHECKING:
+    import aiohttp
+
     from my_unicorn.core.cache import ReleaseCacheManager
 from my_unicorn.core.github.models import Release
 from my_unicorn.core.protocols.progress import (

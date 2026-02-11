@@ -16,7 +16,6 @@ from my_unicorn.utils.asset_validation import (
 )
 
 
-# TODO: detect unused
 class Platform(Enum):
     """Supported platforms."""
 

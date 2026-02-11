@@ -10,7 +10,6 @@ import asyncio
 from typing import TYPE_CHECKING, Any
 
 from my_unicorn.constants import VerificationMethod
-from my_unicorn.core.github import ChecksumFileInfo
 from my_unicorn.core.verification.detection import prioritize_checksum_files
 from my_unicorn.core.verification.results import MethodResult
 from my_unicorn.core.verification.verification_methods import (
@@ -22,6 +21,7 @@ from my_unicorn.logger import get_logger
 if TYPE_CHECKING:
     from my_unicorn.core.cache import ReleaseCacheManager
     from my_unicorn.core.download import DownloadService
+    from my_unicorn.core.github import ChecksumFileInfo
     from my_unicorn.core.verification.context import VerificationContext
 
 logger = get_logger(__name__, enable_file_logging=True)

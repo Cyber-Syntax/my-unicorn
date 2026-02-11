@@ -6,16 +6,18 @@ resolving update info, loading configurations, and selecting assets.
 
 from __future__ import annotations
 
-from typing import Any
-
-import aiohttp
+from typing import TYPE_CHECKING, Any
 
 from my_unicorn.constants import ERROR_CATALOG_MISSING
 from my_unicorn.core.github import Asset, get_github_config
-from my_unicorn.core.update.info import UpdateInfo
 from my_unicorn.exceptions import ConfigurationError, UpdateError
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.appimage_utils import select_best_appimage_asset
+
+if TYPE_CHECKING:
+    import aiohttp
+
+    from my_unicorn.core.update.info import UpdateInfo
 
 logger = get_logger(__name__)
 

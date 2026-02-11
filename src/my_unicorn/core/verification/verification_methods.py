@@ -14,19 +14,19 @@ from my_unicorn.constants import (
     YAML_DEFAULT_HASH,
     HashType,
 )
-from my_unicorn.core.github import ChecksumFileInfo
 from my_unicorn.core.verification.checksum_parser import (
     ChecksumFileResult,
     parse_all_checksums,
 )
 from my_unicorn.core.verification.results import MethodResult
-from my_unicorn.core.verification.verifier import Verifier
 from my_unicorn.logger import get_logger
 
 if TYPE_CHECKING:
     from my_unicorn.core.cache import ReleaseCacheManager
     from my_unicorn.core.download import DownloadService
+    from my_unicorn.core.github import ChecksumFileInfo
     from my_unicorn.core.verification.context import VerificationContext
+    from my_unicorn.core.verification.verifier import Verifier
 
 logger = get_logger(__name__, enable_file_logging=True)
 

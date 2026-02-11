@@ -7,12 +7,14 @@ when multiple apps share the same catalog.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from my_unicorn.config import ConfigManager
 from my_unicorn.constants import ERROR_CATALOG_MISSING
 from my_unicorn.exceptions import UpdateError
 from my_unicorn.logger import get_logger
+
+if TYPE_CHECKING:
+    from my_unicorn.config import ConfigManager
 
 logger = get_logger(__name__)
 

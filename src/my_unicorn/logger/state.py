@@ -8,9 +8,12 @@ CRITICAL: This module uses a module-level singleton pattern.
 DO NOT modify without understanding threading and singleton implications.
 """
 
-import queue
 import threading
-from logging.handlers import QueueListener
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import queue
+    from logging.handlers import QueueListener
 
 
 class _LoggerState:
