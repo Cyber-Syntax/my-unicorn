@@ -165,7 +165,9 @@ def filter_unknown_users(users, known_users):
 - **PEP 8**: Enforced by ruff
 - **Datetime**: Use `astimezone()` for local time conversions
 - **Variable Names**: Use descriptive, self-explanatory names
+- **Functions**: Use functions over classes when state management is not needed
 - **Function Size**: Keep functions focused (<20 lines when possible)
+- **Pure Functions**: Prefer pure functions without side effects when possible
 - **Error Handling**: Use custom exceptions from `exceptions.py`
 - **Async Safe**:
     - All I/O operations must have async variants

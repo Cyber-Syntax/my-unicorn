@@ -34,27 +34,17 @@
 ## in-progress
 
 - [ ] Improve testing
-    - [ ] write cli testing integration test for progress bar
-    - [ ] write ui integration test for progress bar
-    - [x] Write e2e testing (Seems like scripts/test.py belongs to there and can be work with pytest)
     - [ ] Learn Schemathesis
     - [ ] Learn <https://hypothesis.readthedocs.io/en/latest/stateful.html>
     - [ ] Learn <https://realpython.com/python-cli-testing/#lo-fi-debugging-with-print>
-    - [ ] structure improve:
-
-```bash
-my_project/
-├── src/  # Your source code
-└── tests/
-├── unit/           # Fast, isolated tests
-├── integration/    # Tests with mocks
-├── stateful/       # Stateful hypothesis tests
-└── e2e/           # Slow, full system tests
-```
+    - [x] write ui integration test for progress bar
+    - [x] Write e2e testing (Seems like scripts/test.py belongs to there and can be work with pytest)
+    - [x] structure improve
 
 - [ ] P1-Q8: add lock for one instance only to prevent multiple instance run at the same time via fcntl.flock and make sure it would work for asyncio
     - [x] 16G error log, because of 2 instance running at the same time.(This solved by logger rotation fix but still better to add lock to prevent multiple instance run at the same time)
 
+- [ ] remove unused from types.py
 - [ ] try git worktree, is it really can be good?
 - [ ] P1: Remove desktop_entry.py and other similar modules that only export things for backward compatbility.
 - [ ] P1: refactor core/update/update.py to better architecture for update all command and update with appimage names.
