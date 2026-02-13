@@ -4,7 +4,6 @@ Tests cover all major functionality including edge cases for network errors,
 verification failures, icon extraction errors, and other progress bar issues.
 """
 
-import asyncio
 import io
 from unittest.mock import patch
 
@@ -22,7 +21,6 @@ from my_unicorn.core.progress.ascii_sections import (
 )
 from my_unicorn.core.progress.progress import (
     AsciiProgressBackend,
-    ProgressConfig,
     ProgressDisplay,
     ProgressType,
     TaskInfo,
