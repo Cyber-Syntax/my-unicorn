@@ -6,10 +6,15 @@ between logger and config modules by using late imports.
 """
 
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from my_unicorn.constants import DEFAULT_LOG_LEVEL
+
+if TYPE_CHECKING:
+    from my_unicorn.logger.state import _LoggerState
 
 
 def load_log_settings() -> tuple[str, str, Path]:
@@ -22,12 +27,27 @@ def load_log_settings() -> tuple[str, str, Path]:
     is provided. It returns safe defaults that will be overridden once the
     config module is fully initialized.
 
+    Environment Variable Override:
+        MY_UNICORN_LOG_DIR: Overrides the log directory path. This is used
+        during pytest test runs to isolate test logs from production logs.
+
+        When set: Logs are written to $MY_UNICORN_LOG_DIR/my-unicorn.log
+        When not set: Logs go to ~/.config/my-unicorn/logs/my-unicorn.log
+
+        Example (configured in pyproject.toml):
+            MY_UNICORN_LOG_DIR="/tmp/pytest-of-{USER}-logs"
+            → Test logs go to: /tmp/pytest-of-developer-logs/my-unicorn.log
+            → Production logs: ~/.config/my-unicorn/logs/my-unicorn.log
+
+        This ensures complete test isolation - tests never write to production
+        directories and test logs are automatically cleaned up by the system's
+        tmpdir cleanup mechanism.
+
     Returns:
         Tuple of (console_level, file_level, log_path) where:
             - console_level: Log level for console output (default: WARNING)
             - file_level: Log level for file output (default: INFO)
-            - log_path: Path to log file
-              (default: ~/.config/my-unicorn/logs/my-unicorn.log)
+            - log_path: Path to log file (overridable via MY_UNICORN_LOG_DIR)
 
     Note:
         These are bootstrap values only. The actual configuration is applied
@@ -36,14 +56,20 @@ def load_log_settings() -> tuple[str, str, Path]:
     """
     default_console_level = "WARNING"
     default_file_level = DEFAULT_LOG_LEVEL
-    default_path = (
-        Path.home() / ".config" / "my-unicorn" / "logs" / "my-unicorn.log"
-    )
+
+    # Check for test environment override
+    env_log_dir = os.getenv("MY_UNICORN_LOG_DIR")
+    if env_log_dir:
+        default_path = Path(env_log_dir).expanduser() / "my-unicorn.log"
+    else:
+        default_path = (
+            Path.home() / ".config" / "my-unicorn" / "logs" / "my-unicorn.log"
+        )
 
     return default_console_level, default_file_level, default_path
 
 
-def update_logger_from_config(state) -> None:
+def update_logger_from_config(state: "_LoggerState") -> None:
     """Update logger handler levels from global config.
 
     This should be called after both logger and config modules are
