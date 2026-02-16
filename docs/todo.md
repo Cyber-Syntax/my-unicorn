@@ -34,12 +34,16 @@
 ## in-progress
 
 - [ ] Improve testing
+    - [ ] Refactor folder e2e tmp files, move it to tmp/pytest-of-<user>-e2e/ for better structure
     - [ ] Learn Schemathesis
     - [ ] Learn <https://hypothesis.readthedocs.io/en/latest/stateful.html>
     - [ ] Learn <https://realpython.com/python-cli-testing/#lo-fi-debugging-with-print>
+    - [x] P1-Q3: Never use the real user config logs, app location on pytest unittests which current is use them! #p1 #important #q3
     - [x] write ui integration test for progress bar
     - [x] Write e2e testing (Seems like scripts/test.py belongs to there and can be work with pytest)
     - [x] structure improve
+
+- [ ] <https://github.com/jgamblin/PGP/blob/main/python/_common-sections.md>
 
 - [ ] P1-Q8: add lock for one instance only to prevent multiple instance run at the same time via fcntl.flock and make sure it would work for asyncio
     - [x] 16G error log, because of 2 instance running at the same time.(This solved by logger rotation fix but still better to add lock to prevent multiple instance run at the same time)
@@ -160,7 +164,6 @@ etc. all of the things to make sure everything is fine after the tests.
 
 we probably need to define one correct example or we can just use the json scheme
 
-- [ ] P1-Q3: Never use the real user config logs, app location on pytest unittests which current is use them! #p1 #important #q3
 - [ ] P1-Q2: deprecate my-unicorn package and repo directories (migrated to uv) #q2 #important #refactor
 
     - [x] Remove legacy cli tool install from install.sh
