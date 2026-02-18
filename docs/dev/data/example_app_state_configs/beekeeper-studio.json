@@ -1,0 +1,36 @@
+{
+  "catalog_ref": "beekeeper-studio",
+  "config_version": "2.0.0",
+  "source": "catalog",
+  "state": {
+    "icon": {
+      "installed": true,
+      "method": "extraction",
+      "path": "/home/developer/Applications/icons/beekeeper-studio.png"
+    },
+    "installed_date": "2026-02-05T18:29:22.851159+03:00",
+    "installed_path": "/home/developer/Applications/beekeeper-studio.AppImage",
+    "verification": {
+      "methods": [
+        {
+          "algorithm": "SHA256",
+          "computed": "b24017dfd5e7982cc0cedf05a79d9a2c9f8bfc80edbe24d3a86f6181aef84e6c",
+          "expected": "sha256:b24017dfd5e7982cc0cedf05a79d9a2c9f8bfc80edbe24d3a86f6181aef84e6c",
+          "source": "github_api",
+          "status": "passed",
+          "type": "digest"
+        },
+        {
+          "algorithm": "SHA512",
+          "computed": "18d895f877ba944b4e1b9e44ea1a74377759b259979389a2ed7b83bb520fc851efe2d1666841214951fb7c22951d2af0b9b17a4ed343624da94c8bc7c1e52211",
+          "expected": "18d895f877ba944b4e1b9e44ea1a74377759b259979389a2ed7b83bb520fc851efe2d1666841214951fb7c22951d2af0b9b17a4ed343624da94c8bc7c1e52211",
+          "source": "https://github.com/beekeeper-studio/beekeeper-studio/releases/download/v5.5.6/latest-linux.yml",
+          "status": "passed",
+          "type": "checksum_file"
+        }
+      ],
+      "passed": true
+    },
+    "version": "5.5.6"
+  }
+}

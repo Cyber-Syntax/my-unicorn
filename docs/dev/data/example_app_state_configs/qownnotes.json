@@ -1,0 +1,36 @@
+{
+  "catalog_ref": "qownnotes",
+  "config_version": "2.0.0",
+  "source": "catalog",
+  "state": {
+    "icon": {
+      "installed": true,
+      "method": "extraction",
+      "path": "/home/developer/Applications/icons/qownnotes.png"
+    },
+    "installed_date": "2026-02-08T15:39:22.907656+03:00",
+    "installed_path": "/home/developer/Applications/qownnotes.AppImage",
+    "verification": {
+      "methods": [
+        {
+          "algorithm": "SHA256",
+          "computed": "c628eb9b5165e3da52b8d5146e1612b04ceeb4e380014ebbdda13ef37c0c4c78",
+          "expected": "sha256:c628eb9b5165e3da52b8d5146e1612b04ceeb4e380014ebbdda13ef37c0c4c78",
+          "source": "github_api",
+          "status": "passed",
+          "type": "digest"
+        },
+        {
+          "algorithm": "SHA256",
+          "computed": "c628eb9b5165e3da52b8d5146e1612b04ceeb4e380014ebbdda13ef37c0c4c78",
+          "expected": "c628eb9b5165e3da52b8d5146e1612b04ceeb4e380014ebbdda13ef37c0c4c78",
+          "source": "https://github.com/pbek/QOwnNotes/releases/download/v26.2.0/QOwnNotes-x86_64.AppImage.sha256sum",
+          "status": "passed",
+          "type": "checksum_file"
+        }
+      ],
+      "passed": true
+    },
+    "version": "26.2.0"
+  }
+}

@@ -100,6 +100,49 @@
                     "type": "string",
                     "description": "Original Git tag name from GitHub (may include prefix like 'v')",
                     "minLength": 1
+                },
+                "checksum_files": {
+                    "type": "array",
+                    "description": "List of checksum files detected and parsed from the release",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "source",
+                            "filename",
+                            "algorithm",
+                            "hashes"
+                        ],
+                        "properties": {
+                            "source": {
+                                "type": "string",
+                                "description": "Download URL for the checksum file",
+                                "format": "uri"
+                            },
+                            "filename": {
+                                "type": "string",
+                                "description": "Filename of the checksum file (e.g., SHA256SUMS.txt)",
+                                "minLength": 1
+                            },
+                            "algorithm": {
+                                "type": "string",
+                                "description": "Hash algorithm used (SHA256, SHA512)",
+                                "enum": [
+                                    "SHA256",
+                                    "SHA512"
+                                ]
+                            },
+                            "hashes": {
+                                "type": "object",
+                                "description": "Mapping of asset filename to hash value",
+                                "additionalProperties": {
+                                    "type": "string",
+                                    "description": "Hash value for the asset",
+                                    "pattern": "^[a-f0-9]{64,128}$"
+                                }
+                            }
+                        },
+                        "additionalProperties": false
+                    }
                 }
             },
             "additionalProperties": false

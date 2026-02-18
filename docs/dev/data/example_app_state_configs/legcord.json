@@ -1,0 +1,36 @@
+{
+  "catalog_ref": "legcord",
+  "config_version": "2.0.0",
+  "source": "catalog",
+  "state": {
+    "icon": {
+      "installed": true,
+      "method": "extraction",
+      "path": "/home/developer/Applications/icons/legcord.png"
+    },
+    "installed_date": "2026-02-08T10:54:43.578431+03:00",
+    "installed_path": "/home/developer/Applications/legcord.AppImage",
+    "verification": {
+      "methods": [
+        {
+          "algorithm": "SHA256",
+          "computed": "4ca2458cc0be26c7819547bc8adec835de6b5b603772a048637f90748f90cac8",
+          "expected": "sha256:4ca2458cc0be26c7819547bc8adec835de6b5b603772a048637f90748f90cac8",
+          "source": "github_api",
+          "status": "passed",
+          "type": "digest"
+        },
+        {
+          "algorithm": "SHA512",
+          "computed": "c58fc5b92fcba049931da0ec434ef23aeb0dd8a052934de5ec98230e3f3d142ba6ad13132371e75d091865876acfcce7f53825a9614e6f53eaeb2509d9aa44fa",
+          "expected": "c58fc5b92fcba049931da0ec434ef23aeb0dd8a052934de5ec98230e3f3d142ba6ad13132371e75d091865876acfcce7f53825a9614e6f53eaeb2509d9aa44fa",
+          "source": "https://github.com/Legcord/Legcord/releases/download/v1.2.1/latest-linux.yml",
+          "status": "passed",
+          "type": "checksum_file"
+        }
+      ],
+      "passed": true
+    },
+    "version": "1.2.1"
+  }
+}

@@ -10,7 +10,7 @@ The tests use local project files to simulate git clone, and mock
 both current version and target version to test upgrade paths.
 
 Note: With uv tool install, files are installed in an isolated environment,
-not copied to a package_dir like the old setup.sh method.
+not copied to a package_dir like the old venv-wrapper method.
 """
 
 import contextlib

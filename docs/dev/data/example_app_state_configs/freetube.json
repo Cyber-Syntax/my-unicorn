@@ -1,0 +1,28 @@
+{
+  "catalog_ref": "freetube",
+  "config_version": "2.0.0",
+  "source": "catalog",
+  "state": {
+    "icon": {
+      "installed": true,
+      "method": "extraction",
+      "path": "/home/developer/Applications/icons/freetube.png"
+    },
+    "installed_date": "2026-02-03T21:37:24.964751+03:00",
+    "installed_path": "/home/developer/Applications/freetube.AppImage",
+    "verification": {
+      "methods": [
+        {
+          "algorithm": "sha256",
+          "computed": "2192afeea12f727f83044decbe0bdd92b0e98c78f6d22f9e613640419b16e44a",
+          "expected": "2192afeea12f727f83044decbe0bdd92b0e98c78f6d22f9e613640419b16e44a",
+          "source": "github_api",
+          "status": "passed",
+          "type": "digest"
+        }
+      ],
+      "passed": true
+    },
+    "version": "0.23.13-beta"
+  }
+}

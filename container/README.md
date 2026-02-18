@@ -77,7 +77,7 @@ cd container
 ./manage.sh shell
 # Inside the container:
 # cp -r /workspace ~/my-unicorn && cd ~/my-unicorn
-# sudo ./setup.sh -a
+# ./install.sh -i
 ```
 
 Stop and remove the container and its config volume:
@@ -101,7 +101,7 @@ If you need to run scripts that write files under the repo, copy the workspace i
 # inside the container
 cp -r /workspace ~/my-unicorn
 cd ~/my-unicorn
-sudo ./setup.sh -h
+./install.sh -h
 ```
 
 ## Notes and tips
@@ -124,7 +124,7 @@ To inspect or back up the config from the host, either use `podman volume inspec
 
 ## Troubleshooting
 
-- Permission denied when running `setup.sh`: remember `/workspace` is read-only — copy the workspace to your home before running scripts that write.
+- Permission denied when running `install.sh`: remember `/workspace` is read-only — copy the workspace to your home before running scripts that write.
 - `sudo` prompts for a password: check `/etc/sudoers.d/devuser` inside the container. The image is intended to include NOPASSWD for `devuser`.
 - Missing `podman-compose`: install it on the host and re-run `manage.sh`. The script will detect and inform you if it cannot find it.
 

@@ -120,8 +120,6 @@ class NetworkConfig(TypedDict):
 class DirectoryConfig(TypedDict):
     """Directory paths configuration."""
 
-    repo: Path
-    package: Path
     download: Path
     storage: Path
     backup: Path
@@ -129,7 +127,6 @@ class DirectoryConfig(TypedDict):
     settings: Path
     logs: Path
     cache: Path
-    tmp: Path
 
 
 class GlobalConfig(TypedDict):
@@ -145,84 +142,17 @@ class GlobalConfig(TypedDict):
 
 
 # =============================================================================
-# AppImage Configuration Types
+# V1 Configuration Types (DEPRECATED - Migration Only)
+# These types are only used for detecting and migrating v1 configs.
+# Do NOT use in new code.
 # =============================================================================
 
-
-class AppImageConfig(TypedDict):
-    """AppImage specific configuration."""
-
-    version: str
-    name: str
-    rename: str
-    name_template: str
-    characteristic_suffix: list[str]
-    installed_date: str
-    digest: str
-
-
-class GitHubConfig(TypedDict):
-    """GitHub API configuration options."""
-
-    repo: bool
-    prerelease: bool
-
-
-class VerificationConfig(TypedDict):
-    """Verification configuration options."""
-
-    digest: bool
-    skip: bool
-    checksum_file: str
-    checksum_hash_type: str
+# V1 types removed - see migration code if needed
 
 
 # =============================================================================
-# Icon Types (Note: Two different IconAsset types exist)
+# Icon Types
 # =============================================================================
-
-
-class ConfigIconAsset(TypedDict):
-    """Icon configuration in app/catalog config files."""
-
-    url: str
-    name: str
-    installed: bool
-
-
-# =============================================================================
-# Application Configuration Types
-# =============================================================================
-
-
-class AppConfig(TypedDict):
-    """Per-application configuration."""
-
-    owner: str
-    repo: str
-    config_version: str
-    appimage: AppImageConfig
-    github: GitHubConfig
-    verification: VerificationConfig
-    icon: ConfigIconAsset
-
-
-class CatalogAppImageConfig(TypedDict):
-    """AppImage configuration within catalog entry."""
-
-    rename: str
-    name_template: str
-    characteristic_suffix: list[str]
-
-
-class CatalogEntry(TypedDict):
-    """Catalog entry for an application."""
-
-    owner: str
-    repo: str
-    appimage: CatalogAppImageConfig
-    verification: VerificationConfig
-    icon: ConfigIconAsset | None
 
 
 # =============================================================================
@@ -275,20 +205,44 @@ class AppImageConfigV2(TypedDict):
 
 
 class VerificationMethod(TypedDict, total=False):
-    """Single verification method result."""
+    """Single verification method result.
+
+    Attributes:
+        type: Verification method type ("skip", "digest", "checksum_file")
+        status: Result status ("passed", "failed", "skipped")
+        algorithm: Hash algorithm used ("SHA256", "SHA512")
+        expected: Expected hash value with algorithm prefix
+        computed: Computed hash value without prefix
+        source: Source of expected hash ("github_api", "checksum_file")
+        filename: Checksum filename for checksum_file method
+        digest: Alternative single field for hash
+    """
 
     type: str  # "skip", "digest", "checksum_file"
     status: str  # "passed", "failed", "skipped"
-    algorithm: str  # "sha256", "sha512"
+    algorithm: str  # "SHA256", "SHA512"
     expected: str
     computed: str
-    source: str  # "github_api", "release_assets"
+    source: str  # "github_api", "checksum_file"
+    filename: str  # checksum filename (for checksum_file method)
+    digest: str  # alternative single field (instead of computed/expected)
 
 
-class StateVerification(TypedDict):
-    """Verification state tracking."""
+class StateVerification(TypedDict, total=False):
+    """Verification state tracking.
+
+    Attributes:
+        passed: Whether verification passed overall (required)
+        overall_passed: Same as passed, for backward compatibility
+        actual_method: Primary method used (digest/checksum_file/skip)
+        warning: Optional warning message from verification
+        methods: Array of verification method results (required)
+    """
 
     passed: bool
+    overall_passed: bool
+    actual_method: str  # "digest", "checksum_file", "skip"
+    warning: str
     methods: list[VerificationMethod]
 
 
@@ -334,8 +288,13 @@ class AppOverrides(TypedDict, total=False):
     icon: IconConfigV2
 
 
-class AppConfigV2(TypedDict):
-    """App configuration v2.0.0."""
+class AppStateConfig(TypedDict):
+    """App state configuration stored in apps/*.json files.
+
+    This represents the hybrid storage model:
+    - Catalog apps: state + catalog_ref + optional overrides
+    - URL apps: state + complete config in overrides
+    """
 
     config_version: str
     source: str  # "catalog" or "url"
@@ -344,8 +303,12 @@ class AppConfigV2(TypedDict):
     overrides: AppOverrides  # Optional for catalog, required for URL
 
 
-class CatalogEntryV2(TypedDict):
-    """Catalog entry v2.0.0."""
+class CatalogConfig(TypedDict):
+    """Catalog entry configuration from catalog/*.json files.
+
+    Defines the default configuration for applications in the catalog.
+    Used as base configuration that can be overridden by user settings.
+    """
 
     config_version: str
     metadata: AppMetadata
@@ -353,3 +316,124 @@ class CatalogEntryV2(TypedDict):
     appimage: AppImageConfigV2
     verification: VerificationConfigV2
     icon: IconConfigV2
+
+
+# =============================================================================
+# Workflow Result Types (Phase 2: Type Safety Improvements)
+# =============================================================================
+
+
+@dataclass
+class InstallResult:
+    """Result of an installation operation.
+
+    Provides type-safe alternative to dictionary return values
+    for install operations.
+    """
+
+    success: bool
+    app_name: str
+    version: str
+    message: str
+    source: str  # "catalog" or "url"
+    installed_path: str | None = None
+    desktop_entry: str | None = None
+    icon_path: str | None = None
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for backward compatibility.
+
+        Returns:
+            Dictionary representation of install result
+
+        """
+        result: dict[str, Any] = {
+            "success": self.success,
+            "app_name": self.app_name,
+            "version": self.version,
+            "message": self.message,
+            "source": self.source,
+        }
+
+        if self.installed_path:
+            result["installed_path"] = self.installed_path
+        if self.desktop_entry:
+            result["desktop"] = self.desktop_entry
+        if self.icon_path:
+            result["icon"] = self.icon_path
+        if self.error:
+            result["error"] = self.error
+
+        return result
+
+
+@dataclass
+class UpdateResult:
+    """Result of an update operation.
+
+    Provides type-safe alternative to dictionary return values
+    for update operations.
+    """
+
+    success: bool
+    app_name: str
+    old_version: str
+    new_version: str
+    message: str
+    updated_path: str | None = None
+    backup_path: str | None = None
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for backward compatibility.
+
+        Returns:
+            Dictionary representation of update result
+
+        """
+        result: dict[str, Any] = {
+            "success": self.success,
+            "app_name": self.app_name,
+            "old_version": self.old_version,
+            "new_version": self.new_version,
+            "message": self.message,
+        }
+
+        if self.updated_path:
+            result["updated_path"] = self.updated_path
+        if self.backup_path:
+            result["backup_path"] = self.backup_path
+        if self.error:
+            result["error"] = self.error
+
+        return result
+
+
+@dataclass
+class UpdateContext:
+    """Typed context for update operations.
+
+    Replaces dictionary-based context passing with type-safe dataclass.
+    Enables IDE autocomplete and compile-time type checking.
+    """
+
+    app_config: dict[str, Any]
+    update_info: "UpdateInfo"  # Forward reference from update.py
+    owner: str
+    repo: str
+    catalog_entry: dict[str, Any] | None
+    appimage_asset: Asset
+
+
+@dataclass
+class InstallPlan:
+    """Plan for installation operations.
+
+    Separates targets that need installation from those already installed.
+    This provides clear separation of concerns for the installation workflow.
+    """
+
+    urls_needing_work: list[str]
+    catalog_needing_work: list[str]
+    already_installed: list[str]

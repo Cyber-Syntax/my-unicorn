@@ -1,0 +1,13 @@
+# Affine - Base64 SHA512 in YAML format
+version: 0.25.7
+files:
+  - url: affine-0.25.7-stable-linux-x64.zip
+    sha512: wahwjzwIVowvxlBvIkps2UUTzYJvZUVhbQmvsHSgr6AkDsXETpJuLwZz2pzFcERYXJYKFFJXGS4BxefyvFNejg==
+    size: 200796543
+  - url: affine-0.25.7-stable-linux-x64.deb
+    sha512: ISn6WmrBx9AilrB55Zx0XP5I3HDH1pwXN8WVtMeMMgTBD0YHxAEIVaMKaKR5v3WXfkNNlc+2xbXy/xL7jnUeMQ==
+    size: 160967790
+  - url: affine-0.25.7-stable-linux-x64.appimage
+    sha512: MbXIm2CpRJBmSsawMlcdkJ+SXnIM5C17+9A+h3DhBhye564+1cbJD8hnPMV7JqoxTeC24a3426GZI3EI4YmW+Q==
+    size: 203093184
+releaseDate: 2025-12-09T04:24:47.059Z

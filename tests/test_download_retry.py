@@ -15,7 +15,7 @@ import aiohttp
 import pytest
 
 from my_unicorn.core.download import DownloadService
-from my_unicorn.ui.progress import ProgressType
+from my_unicorn.core.progress.progress import ProgressType
 
 # Test constants
 DEFAULT_RETRY_ATTEMPTS = 3
@@ -41,17 +41,18 @@ def mock_asyncio_sleep(monkeypatch):
 
 @pytest.fixture
 def mock_config(monkeypatch):
-    """Mock config_manager to return predictable test values."""
+    """Mock ConfigManager to return predictable test values."""
     mock_config_data = {
         "network": {"retry_attempts": "3", "timeout_seconds": "10"}
     }
 
-    def mock_load_global_config():
-        return mock_config_data
+    class MockConfigManager:
+        def load_global_config(self):
+            return mock_config_data
 
     monkeypatch.setattr(
-        "my_unicorn.core.download.config_manager.load_global_config",
-        mock_load_global_config,
+        "my_unicorn.core.download.ConfigManager",
+        MockConfigManager,
     )
     return mock_config_data
 
@@ -332,8 +333,8 @@ class TestDownloadRetryLogic:
         # Mock response with error status
         mock_response = AsyncMock()
         mock_response.status = 500
-        mock_response.raise_for_status.side_effect = aiohttp.ClientError(
-            "500 Server Error"
+        mock_response.raise_for_status = Mock(
+            side_effect=aiohttp.ClientError("500 Server Error")
         )
 
         mock_session.get.return_value.__aenter__.return_value = mock_response

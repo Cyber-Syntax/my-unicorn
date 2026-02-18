@@ -12,8 +12,8 @@ The migration process:
 
 import configparser
 import shutil
-from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from my_unicorn.config.migration.helpers import compare_versions
 
@@ -27,7 +27,6 @@ from my_unicorn.constants import (
     CONFIG_MIGRATION_PRINT_PREFIX,
     GLOBAL_CONFIG_VERSION,
     KEY_CONFIG_VERSION,
-    KEY_REPO,
     KEY_RETRY_ATTEMPTS,
     KEY_STORAGE,
     KEY_TIMEOUT_SECONDS,
@@ -36,6 +35,7 @@ from my_unicorn.constants import (
     SECTION_NETWORK,
 )
 from my_unicorn.logger import get_logger
+from my_unicorn.utils.datetime_utils import get_current_datetime_local
 
 logger = get_logger(__name__)
 
@@ -56,7 +56,7 @@ class ConfigMigration:
         # (level, message, args)
         self._messages: list[tuple[str, str, tuple]] = []
 
-    def _collect_message(self, level: str, message: str, *args) -> None:
+    def _collect_message(self, level: str, message: str, *args: Any) -> None:
         """Collect migration messages for later logging.
 
         Args:
@@ -207,8 +207,10 @@ class ConfigMigration:
             # No config to backup
             return self.settings_file
 
-        # Prepare backup filename with timestamp
-        timestamp = datetime.now().strftime(CONFIG_BACKUP_TIMESTAMP_FORMAT)
+        # Prepare backup filename with timestamp (use local time)
+        timestamp = get_current_datetime_local().strftime(
+            CONFIG_BACKUP_TIMESTAMP_FORMAT
+        )
         backup_path: Path = self.settings_file.with_suffix(
             CONFIG_BACKUP_SUFFIX_TEMPLATE.format(timestamp=timestamp)
         )
@@ -320,7 +322,6 @@ class ConfigMigration:
                 (SECTION_DEFAULT, "console_log_level"),
                 (SECTION_NETWORK, KEY_RETRY_ATTEMPTS),
                 (SECTION_NETWORK, KEY_TIMEOUT_SECONDS),
-                (SECTION_DIRECTORY, KEY_REPO),
                 (SECTION_DIRECTORY, KEY_STORAGE),
             ]
 
@@ -355,11 +356,6 @@ class ConfigMigration:
             return
 
         try:
-            # Import logger only when needed (after config is loaded)
-            from my_unicorn.logger import get_logger
-
-            logger = get_logger("my_unicorn.config_migration")
-
             for level, message, args in self._messages:
                 log_method = getattr(logger, level.lower())
                 if args:

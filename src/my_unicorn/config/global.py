@@ -161,8 +161,6 @@ class GlobalConfigManager:
             KEY_CONSOLE_LOG_LEVEL: DEFAULT_CONSOLE_LOG_LEVEL,
             SECTION_NETWORK: {"retry_attempts": "3", "timeout_seconds": "10"},
             SECTION_DIRECTORY: {
-                "repo": str(home / ".local" / "share" / "my-unicorn-repo"),
-                "package": str(home / ".local" / "share" / "my-unicorn"),
                 "download": str(home / "Downloads"),
                 "storage": str(home / "Applications"),
                 "backup": str(home / "Applications" / "backups"),
@@ -170,7 +168,6 @@ class GlobalConfigManager:
                 "settings": str(self.config_dir),
                 "logs": str(self.config_dir / "logs"),
                 "cache": str(self.config_dir / "cache"),
-                "tmp": str(self.config_dir / "tmp"),
             },
         }
 
@@ -383,13 +380,6 @@ class GlobalConfigManager:
             ),
             network=network_config,
             directory=DirectoryConfig(
-                repo=directory_config.get(
-                    "repo",
-                    Path.home() / ".local" / "share" / "my-unicorn-repo",
-                ),
-                package=directory_config.get(
-                    "package", Path.home() / ".local" / "share" / "my-unicorn"
-                ),
                 download=directory_config.get(
                     "download", Path.home() / "Downloads"
                 ),
@@ -405,6 +395,5 @@ class GlobalConfigManager:
                 settings=directory_config.get("settings", self.config_dir),
                 logs=directory_config.get("logs", self.config_dir / "logs"),
                 cache=directory_config.get("cache", self.config_dir / "cache"),
-                tmp=directory_config.get("tmp", self.config_dir / "tmp"),
             ),
         )

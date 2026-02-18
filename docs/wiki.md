@@ -34,10 +34,10 @@
 
 ## Helper scripts
 
-- setup.sh: A script to install my-unicorn and its dependencies.
+- install.sh: A script to install my-unicorn and its dependencies.
     - It sets up a virtual environment and installs the required Python packages.
-- venv-wrapper.bash: Wrapper script around my-unicorn using the python virtual environment
 - update.bash: A script to automate process of checking for updates and updating my-unicorn itself.
+- For more comprehensive details, see [scripts/README.md](../scripts/README.md).
 
 ## 🛠️ Usage Examples
 
@@ -181,7 +181,7 @@ pip uninstall my-unicorn
 ### Local Uninstallation
 
 > [!TIP]
-> This would remove the package if you installed via the setup.sh uv-install method.
+> This would remove the package if you installed via the install.sh -i method.
 
 ```bash
 uv tool uninstall my-unicorn

@@ -1,25 +1,20 @@
 """Install command coordinator.
 
 Thin coordinator that validates input and delegates to
-InstallApplicationService.
+InstallApplicationService via ServiceContainer for dependency injection.
 """
 
 from argparse import Namespace
 
-from my_unicorn.core.github import GitHubClient
-from my_unicorn.core.http_session import create_http_session
-from my_unicorn.core.workflows.services.install_service import (
-    InstallApplicationService,
-    InstallOptions,
-)
-from my_unicorn.ui.display_install import (
+from my_unicorn.cli.container import ServiceContainer
+from my_unicorn.core.install.display_install import (
     display_no_targets_error,
     print_install_summary,
 )
-from my_unicorn.ui.progress import ProgressDisplay
+from my_unicorn.core.progress.progress import ProgressDisplay
+from my_unicorn.core.services.install_service import InstallOptions
 
 from .base import BaseCommandHandler
-from .catalog_adapter import CatalogManagerAdapter
 from .helpers import ensure_app_directories, get_install_paths, parse_targets
 
 
@@ -27,7 +22,7 @@ class InstallCommandHandler(BaseCommandHandler):
     """Thin coordinator for install command."""
 
     async def execute(self, args: Namespace) -> None:
-        """Execute install command."""
+        """Execute install command using ServiceContainer for DI."""
         # Parse and validate
         targets = parse_targets(getattr(args, "targets", None))
         if not targets:
@@ -36,7 +31,7 @@ class InstallCommandHandler(BaseCommandHandler):
 
         # Setup
         ensure_app_directories(self.config_manager, self.global_config)
-        install_dir, download_dir = get_install_paths(self.global_config)
+        _, download_dir = get_install_paths(self.global_config)
 
         # Create options
         options = InstallOptions(
@@ -45,21 +40,23 @@ class InstallCommandHandler(BaseCommandHandler):
             download_dir=download_dir,
         )
 
-        # Execute via service
-        async with create_http_session(self.global_config) as session:
-            progress_service = ProgressDisplay()
+        # Create progress display for CLI
+        # Each target has 4 operations: download, verify, icon, install
+        total_operations = len(targets) * 4
+        progress_display = ProgressDisplay()
 
-            service = InstallApplicationService(
-                session=session,
-                github_client=GitHubClient(
-                    session, progress_service=progress_service
-                ),
-                catalog_manager=CatalogManagerAdapter(self.config_manager),
-                config_manager=self.config_manager,
-                install_dir=install_dir,
-                progress_service=progress_service,
-            )
-            results = await service.install(targets, options)
+        # Use ServiceContainer for dependency injection
+        container = ServiceContainer(
+            config_manager=self.config_manager,
+            progress_reporter=progress_display,
+        )
+
+        try:
+            async with progress_display.session(total_operations):
+                service = container.create_install_application_service()
+                results = await service.install(targets, options)
+        finally:
+            await container.cleanup()
 
         # Display
         print_install_summary(results)

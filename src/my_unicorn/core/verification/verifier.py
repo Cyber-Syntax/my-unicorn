@@ -2,10 +2,14 @@
 
 This module provides the core Verifier class that handles hash computation
 and digest verification for downloaded AppImages.
+
+Supports async hash computation with ThreadPoolExecutor for large files
+(>100MB) to keep the event loop responsive during CPU-intensive operations.
 """
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from typing import TYPE_CHECKING
 
@@ -30,6 +34,10 @@ logger = get_logger(__name__)
 
 BYTES_PER_UNIT = 1024.0
 
+# Threshold for offloading hash computation to ThreadPoolExecutor
+# Files larger than this are hashed in a separate thread to avoid blocking
+LARGE_FILE_THRESHOLD = 100 * 1024 * 1024  # 100MB
+
 
 def format_bytes(num_bytes: float) -> str:
     """Convert a byte count to a human-readable string.
@@ -53,6 +61,8 @@ def format_bytes(num_bytes: float) -> str:
     return f"{size:.1f} {units[unit_index]}"
 
 
+# TODO: Coupling-cohesion: Consider splitting hash computation and verification
+# into separate classes for better single responsibility adherence.
 class Verifier:
     """Handles verification of downloaded AppImage files."""
 
@@ -150,7 +160,78 @@ class Verifier:
         logger.debug("   Hash: %s", actual_hash)
 
     def compute_hash(self, hash_type: HashType) -> str:
-        """Compute a hash for the target file using the given algorithm."""
+        """Compute a hash for the target file using the given algorithm.
+
+        This is the synchronous version. For async workflows, use
+        `compute_hash_async()` which offloads large files to a thread pool.
+
+        Args:
+            hash_type: Hash algorithm to use (sha1, sha256, sha512, md5).
+
+        Returns:
+            Hexadecimal digest string.
+
+        Raises:
+            FileNotFoundError: If file doesn't exist.
+            ValueError: If hash_type is unsupported.
+        """
+        return self._compute_hash_sync(hash_type)
+
+    async def compute_hash_async(self, hash_type: HashType) -> str:
+        """Compute hash asynchronously, offloading large files to executor.
+
+        For files larger than LARGE_FILE_THRESHOLD (100MB), computation
+        runs in ThreadPoolExecutor to avoid blocking the event loop.
+        Smaller files use synchronous computation directly.
+
+        Args:
+            hash_type: Hash algorithm to use (sha1, sha256, sha512, md5).
+
+        Returns:
+            Hexadecimal digest string.
+
+        Raises:
+            FileNotFoundError: If file doesn't exist.
+            ValueError: If hash_type is unsupported.
+        """
+        if not self.file_path.exists():
+            message = f"File not found: {self.file_path}"
+            logger.error("❌ %s", message)
+            raise FileNotFoundError(message)
+
+        file_size = self.file_path.stat().st_size
+
+        if file_size < LARGE_FILE_THRESHOLD:
+            logger.debug(
+                "📁 File size %s < threshold, using sync hash computation",
+                format_bytes(file_size),
+            )
+            return self._compute_hash_sync(hash_type)
+
+        logger.debug(
+            "📁 File size %s >= threshold, offloading to ThreadPoolExecutor",
+            format_bytes(file_size),
+        )
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,  # Default ThreadPoolExecutor
+            self._compute_hash_sync,
+            hash_type,
+        )
+
+    def _compute_hash_sync(self, hash_type: HashType) -> str:
+        """Synchronous hash computation implementation.
+
+        Args:
+            hash_type: Hash algorithm to use (sha1, sha256, sha512, md5).
+
+        Returns:
+            Hexadecimal digest string.
+
+        Raises:
+            FileNotFoundError: If file doesn't exist.
+            ValueError: If hash_type is unsupported.
+        """
         if not self.file_path.exists():
             message = f"File not found: {self.file_path}"
             logger.error("❌ %s", message)

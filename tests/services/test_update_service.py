@@ -3,16 +3,14 @@
 Tests the update application service layer that orchestrates update workflows.
 """
 
-# ruff: noqa: ANN001, ANN201, SLF001, RUF059
+# ruff: noqa: RUF059
 
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from my_unicorn.core.workflows.services.update_service import (
-    UpdateApplicationService,
-)
-from my_unicorn.core.workflows.update import UpdateInfo
+from my_unicorn.core.services.update_service import UpdateApplicationService
+from my_unicorn.core.update.info import UpdateInfo
 
 
 @pytest.fixture
@@ -33,9 +31,18 @@ def mock_update_manager():
 
 @pytest.fixture
 def mock_progress_service():
-    """Create a mock progress service."""
-    progress = AsyncMock()
-    progress.create_api_fetching_task.return_value = "task-123"
+    """Create a mock progress reporter (ProgressReporter protocol)."""
+    progress = MagicMock()
+    # ProgressReporter protocol methods - now async
+    progress.is_active.return_value = True
+    progress.add_task = AsyncMock(return_value="task-123")
+    progress.update_task = AsyncMock()
+    progress.finish_task = AsyncMock()
+    progress.get_task_info.return_value = {
+        "completed": 0.0,
+        "total": None,
+        "description": "",
+    }
     return progress
 
 
@@ -47,7 +54,7 @@ def update_service(
     return UpdateApplicationService(
         config_manager=mock_config_manager,
         update_manager=mock_update_manager,
-        progress_service=mock_progress_service,
+        progress_reporter=mock_progress_service,
     )
 
 
@@ -198,10 +205,10 @@ class TestUpdateApplicationService:
         assert up_to_date == []
         assert infos == update_infos
 
-        # Verify progress management
-        mock_progress_service.create_api_fetching_task.assert_called_once()
-        mock_progress_service.update_task.assert_called_once()
-        mock_progress_service.finish_task.assert_called_once()
+        # Verify progress management (ProgressReporter protocol)
+        mock_progress_service.is_active.assert_called()
+        mock_progress_service.add_task.assert_called()
+        mock_progress_service.finish_task.assert_called()
 
     @pytest.mark.asyncio
     async def test_update_partial_success(
@@ -359,14 +366,13 @@ class TestUpdateApplicationService:
         # Act
         await update_service.update()
 
-        # Assert - verify progress task lifecycle
-        mock_progress_service.create_api_fetching_task.assert_called_once_with(
-            name="GitHub Releases",
-            description="🌐 Fetching release information...",
-        )
-        mock_progress_service.update_task.assert_called_once_with(
-            "task-123", total=1.0, completed=0.0
-        )
+        # Assert - verify progress task lifecycle (ProgressReporter protocol)
+        mock_progress_service.is_active.assert_called()
+        # add_task should be called with name and progress_type
+        mock_progress_service.add_task.assert_called_once()
+        # Check add_task was called with correct name
+        call_args = mock_progress_service.add_task.call_args
+        assert call_args.kwargs.get("name") == "GitHub Releases"
         mock_progress_service.finish_task.assert_called_once_with(
             "task-123", success=True
         )

@@ -1,6 +1,10 @@
 """GitHub infrastructure - API client and release fetching."""
 
 from my_unicorn.core.github.client import ReleaseAPIClient
+from my_unicorn.core.github.config_service import (
+    GitHubConfig,
+    get_github_config,
+)
 from my_unicorn.core.github.models import (
     Asset,
     AssetSelector,
@@ -18,9 +22,11 @@ __all__ = [
     "AssetSelector",
     "ChecksumFileInfo",
     "GitHubClient",
+    "GitHubConfig",
     "Release",
     "ReleaseAPIClient",
     "ReleaseFetcher",
     "extract_github_config",
+    "get_github_config",
     "parse_github_url",
 ]

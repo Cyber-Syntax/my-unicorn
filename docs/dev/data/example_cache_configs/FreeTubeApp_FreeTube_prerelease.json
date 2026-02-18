@@ -1,0 +1,19 @@
+{
+  "cached_at": "2026-02-08T12:35:06.756548+00:00",
+  "ttl_hours": 24,
+  "release_data": {
+    "owner": "FreeTubeApp",
+    "repo": "FreeTube",
+    "version": "0.23.13-beta",
+    "prerelease": true,
+    "assets": [
+      {
+        "name": "freetube-0.23.13-beta-amd64.AppImage",
+        "size": 99723768,
+        "digest": "sha256:3072b0e2a608b47a9569790f7e017001c76eddc3144186adea1faefa165a7b3c",
+        "browser_download_url": "https://github.com/FreeTubeApp/FreeTube/releases/download/v0.23.13-beta/freetube-0.23.13-beta-amd64.AppImage"
+      }
+    ],
+    "original_tag_name": "v0.23.13-beta"
+  }
+}

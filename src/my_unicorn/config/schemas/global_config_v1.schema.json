@@ -1,0 +1,130 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/Cyber-Syntax/my-unicorn/schemas/global_config_v1.schema.json",
+    "title": "My Unicorn Global Config Schema v1.1.0",
+    "description": "Schema for global settings.conf configuration file",
+    "type": "object",
+    "required": [
+        "config_version",
+        "max_concurrent_downloads",
+        "max_backup",
+        "log_level",
+        "console_log_level",
+        "network",
+        "directory"
+    ],
+    "additionalProperties": false,
+    "properties": {
+        "config_version": {
+            "type": "string",
+            "pattern": "^1\\.[0-9]+\\.[0-9]+$",
+            "description": "Configuration format version (semver)"
+        },
+        "max_concurrent_downloads": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "Maximum number of concurrent downloads"
+        },
+        "max_backup": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10,
+            "description": "Maximum number of backup files to keep"
+        },
+        "log_level": {
+            "type": "string",
+            "enum": [
+                "DEBUG",
+                "INFO",
+                "WARNING",
+                "ERROR",
+                "CRITICAL"
+            ],
+            "description": "File logging level"
+        },
+        "console_log_level": {
+            "type": "string",
+            "enum": [
+                "DEBUG",
+                "INFO",
+                "WARNING",
+                "ERROR",
+                "CRITICAL"
+            ],
+            "description": "Console logging level"
+        },
+        "network": {
+            "type": "object",
+            "required": [
+                "retry_attempts",
+                "timeout_seconds"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "retry_attempts": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "description": "Number of retry attempts for failed network requests"
+                },
+                "timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 300,
+                    "description": "Timeout for network requests in seconds"
+                }
+            }
+        },
+        "directory": {
+            "type": "object",
+            "required": [
+                "download",
+                "storage",
+                "backup",
+                "icon",
+                "settings",
+                "logs",
+                "cache"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "download": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Directory for downloaded files"
+                },
+                "storage": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Directory for storing AppImages"
+                },
+                "backup": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Directory for backup files"
+                },
+                "icon": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Directory for icon files"
+                },
+                "settings": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Directory for configuration files"
+                },
+                "logs": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Directory for log files"
+                },
+                "cache": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Directory for cache files"
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,45 @@
+# Beekeeper Studio - Base64 SHA512 in YAML format
+version: 5.5.6
+files:
+  - url: Beekeeper-Studio-5.5.6.AppImage
+    sha512: GNiV+He6lEtOG55E6hp0N3dZslmXk4mi7XuDu1IPyFHv4tFmaEEhSVH7fCKVHSrwubF6TtNDYk2pTIvHweUiEQ==
+    size: 162530672
+    blockMapSize: 260207
+  - url: beekeeper-studio_5.5.6_amd64.deb
+    sha512: pnq3MlyWZVbKz0mQSmmZ07aqwL8nyjYi5tPAhMfU5TN/OLD6D4xKoFqRHt5JJZ/9Cs/fUOpnEk6uHt35SUzsmA==
+    size: 162530672
+  - url: beekeeper-studio-5.5.6.x86_64.rpm
+    sha512: sssTEh9V6l9PTRw6sYxiWsKanFBQq5I2isvX9O3EnnvgC/gp7fjTlnNuNJq+TbL5PpSb07RmutYeznPMxdTPkQ==
+    size: 151046293
+path: Beekeeper-Studio-5.5.6.AppImage
+sha512: GNiV+He6lEtOG55E6hp0N3dZslmXk4mi7XuDu1IPyFHv4tFmaEEhSVH7fCKVHSrwubF6TtNDYk2pTIvHweUiEQ==
+releaseNotes: |
+  Using provided tag: v5.1.5
+  Using tag: v5.1.5
+  552aa7277 Merge pull request #2978 from therealrinku/fix/jsonb-boolean
+  58a83c918 Merge pull request #2971 from beekeeper-studio/fix/core-interface-split
+  d64de0113 Merge pull request #3013 from beekeeper-studio/fix/anywhere-form
+  6d11a7c59 Merge pull request #2992 from beekeeper-studio/feat/anywhere
+  b59774bda Merge pull request #3011 from beekeeper-studio/fix/vite-version
+  e608f0863 Merge pull request #3007 from beekeeper-studio/bugfix/2936_Copy-As-SQL
+  0e60794da Merge pull request #3008 from beekeeper-studio/bugfix/remove-uncalled-function
+  608534750 Merge pull request #2934 from thePeras/feat/streamer-mode
+  fe7c9dc22 Merge pull request #2946 from beekeeper-studio/feat/mongo-sql-editor
+  592cf2f49 Merge pull request #2996 from beekeeper-studio/fix/sqltexteditor-contextmenu
+  53130a8e9 Merge pull request #2998 from therealrinku/fix/quick-search-overflow
+  b65d2a4aa Merge pull request #2969 from beekeeper-studio/fix/status-bar
+  4358465af Merge pull request #2999 from beekeeper-studio/fix/config-keys
+  7de56e1e8 Merge pull request #2997 from beekeeper-studio/fix/mongo-ansi
+  1266f3de2 Merge pull request #2995 from beekeeper-studio/docs/ui-kit-sqltexteditor
+  bf9d7932c Merge pull request #2994 from beekeeper-studio/fix/vim-clipboard
+  30caebf0b Merge pull request #2988 from beekeeper-studio/fix/sqltexteditor-syntax-colors
+  157ceede9 Merge pull request #2989 from beekeeper-studio/fix/text-editor-vim
+  d27d7b0c7 Merge pull request #2979 from TomasSilv/development
+  645dbc8b1 Merge pull request #2975 from beekeeper-studio/dependabot/npm_and_yarn/apps/ui-kit/examples/react/vite-6.0.14
+  521dd6e3f Merge pull request #2960 from beekeeper-studio/fix/sass
+  c87d34520 Merge pull request #2986 from beekeeper-studio/fix/null-license
+  ef50e9697 Merge pull request #2860 from beekeeper-studio/oracle-client-fixes
+  708273dbb Merge pull request #2944 from therealrinku/fix/clear-table-search
+  0b1aee048 Merge pull request #2902 from beekeeper-studio/dependabot/npm_and_yarn/yargs-parser-20.2.9
+  0e308ad80 Merge pull request #2967 from beekeeper-studio/fix/mongo-shell
+releaseDate: '2026-01-31T19:21:31.721Z'

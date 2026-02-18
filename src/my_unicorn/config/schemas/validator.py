@@ -17,11 +17,18 @@ logger = get_logger(__name__)
 
 # Schema file paths
 SCHEMA_DIR = Path(__file__).parent
-CATALOG_V1_SCHEMA_PATH = SCHEMA_DIR / "catalog_v1.schema.json"
+
+# V2 Schemas - ACTIVE RUNTIME USE
 CATALOG_V2_SCHEMA_PATH = SCHEMA_DIR / "catalog_v2.schema.json"
-APP_STATE_V1_SCHEMA_PATH = SCHEMA_DIR / "app_state_v1.schema.json"
 APP_STATE_V2_SCHEMA_PATH = SCHEMA_DIR / "app_state_v2.schema.json"
 CACHE_RELEASE_SCHEMA_PATH = SCHEMA_DIR / "cache_release.schema.json"
+GLOBAL_CONFIG_V1_SCHEMA_PATH = SCHEMA_DIR / "global_config_v1.schema.json"
+
+# V1 Schemas - MIGRATION DETECTION ONLY
+# These schemas are only used for detecting and migrating v1 configs.
+# DO NOT use for runtime validation of active configurations.
+CATALOG_V1_SCHEMA_PATH = SCHEMA_DIR / "catalog_v1.schema.json"
+APP_STATE_V1_SCHEMA_PATH = SCHEMA_DIR / "app_state_v1.schema.json"
 
 
 class SchemaValidationError(Exception):
@@ -58,15 +65,35 @@ class SchemaValidationError(Exception):
 
 
 class ConfigValidator:
-    """Validates configuration files against JSON schemas."""
+    """Validates configuration files against JSON schemas.
+
+    Create instances as needed:
+        validator = ConfigValidator()
+        validator.validate_app_state(config, app_name)
+
+    Or use via dependency injection:
+        class MyService:
+            def __init__(self, validator: ConfigValidator):
+                self.validator = validator
+
+    Or use the module-level convenience functions:
+        validate_app_state(config, app_name)
+
+    Note:
+        This class no longer uses a singleton pattern. Create instances
+        explicitly or accept via dependency injection.
+    """
 
     def __init__(self) -> None:
         """Initialize validator with loaded schemas."""
-        # Load app state and cache schemas only (catalogs are bundled and trusted)
+        # Load app state, cache, and global config schemas
         self._app_state_v1_schema = self._load_schema(APP_STATE_V1_SCHEMA_PATH)
         self._app_state_v2_schema = self._load_schema(APP_STATE_V2_SCHEMA_PATH)
         self._cache_release_schema = self._load_schema(
             CACHE_RELEASE_SCHEMA_PATH
+        )
+        self._global_config_v1_schema = self._load_schema(
+            GLOBAL_CONFIG_V1_SCHEMA_PATH
         )
 
         # Create validators
@@ -78,6 +105,9 @@ class ConfigValidator:
         )
         self._cache_release_validator = Draft7Validator(
             self._cache_release_schema
+        )
+        self._global_config_v1_validator = Draft7Validator(
+            self._global_config_v1_schema
         )
 
     @staticmethod
@@ -255,51 +285,95 @@ class ConfigValidator:
 
         logger.debug("Cache validation passed: %s", cache_name or "unknown")
 
+    def validate_global_config(self, config: dict[str, Any]) -> None:
+        """Validate global configuration against schema.
 
-# Global validator instance
-_validator: ConfigValidator | None = None
+        Args:
+            config: Global configuration dictionary
 
+        Raises:
+            SchemaValidationError: If validation fails
 
-def get_validator() -> ConfigValidator:
-    """Get or create global validator instance.
+        """
+        errors = list(self._global_config_v1_validator.iter_errors(config))
+        if errors:
+            # Get the most relevant error
+            best_error = best_match(errors)
+            error_msg = self._format_validation_error(
+                best_error, "global_config"
+            )
 
-    Returns:
-        ConfigValidator instance
+            path = (
+                ".".join(str(p) for p in best_error.absolute_path)
+                if best_error.absolute_path
+                else None
+            )
+            raise SchemaValidationError(
+                error_msg, path=path, schema_type="global_config"
+            )
 
-    """
-    global _validator
-    if _validator is None:
-        _validator = ConfigValidator()
-    return _validator
+        logger.debug("Global config validation passed")
 
 
 def validate_app_state(
-    config: dict[str, Any], app_name: str | None = None
+    config: dict[str, Any],
+    app_name: str | None = None,
+    validator: ConfigValidator | None = None,
 ) -> None:
-    """Validate app state configuration (convenience function).
+    """Validate app state configuration.
 
     Args:
         config: App state configuration dictionary
         app_name: Optional app name for better error messages
+        validator: Optional ConfigValidator instance.
+            If not provided, a new instance is created.
 
     Raises:
         SchemaValidationError: If validation fails
 
     """
-    get_validator().validate_app_state(config, app_name)
+    if validator is None:
+        validator = ConfigValidator()
+    validator.validate_app_state(config, app_name)
 
 
 def validate_cache_release(
-    config: dict[str, Any], cache_name: str | None = None
+    config: dict[str, Any],
+    cache_name: str | None = None,
+    validator: ConfigValidator | None = None,
 ) -> None:
-    """Validate release cache entry (convenience function).
+    """Validate release cache entry.
 
     Args:
         config: Cache entry dictionary
         cache_name: Optional cache name for better error messages
+        validator: Optional ConfigValidator instance.
+            If not provided, a new instance is created.
 
     Raises:
         SchemaValidationError: If validation fails
 
     """
-    get_validator().validate_cache_release(config, cache_name)
+    if validator is None:
+        validator = ConfigValidator()
+    validator.validate_cache_release(config, cache_name)
+
+
+def validate_global_config(
+    config: dict[str, Any],
+    validator: ConfigValidator | None = None,
+) -> None:
+    """Validate global configuration.
+
+    Args:
+        config: Global configuration dictionary
+        validator: Optional ConfigValidator instance.
+            If not provided, a new instance is created.
+
+    Raises:
+        SchemaValidationError: If validation fails
+
+    """
+    if validator is None:
+        validator = ConfigValidator()
+    validator.validate_global_config(config)

@@ -5,7 +5,6 @@ with support for inline comments and user-friendly documentation.
 """
 
 import configparser
-from datetime import UTC, datetime
 from typing import Any
 
 from my_unicorn.constants import (
@@ -16,6 +15,7 @@ from my_unicorn.constants import (
     SECTION_DIRECTORY,
     SECTION_NETWORK,
 )
+from my_unicorn.utils.datetime_utils import get_current_datetime_local
 
 
 def _strip_inline_comment(value: str) -> str:
@@ -56,7 +56,7 @@ class ConfigCommentManager:
         Returns:
             Header comment string for the configuration file
         """
-        timestamp = datetime.now(tz=UTC).strftime(ISO_DATETIME_FORMAT)
+        timestamp = get_current_datetime_local().strftime(ISO_DATETIME_FORMAT)
         return f"""# My-Unicorn AppImage Installer Configuration
 # This file contains settings for the my-unicorn AppImage installer.
 # You can modify these values to customize the behavior of the application.
@@ -103,8 +103,6 @@ class ConfigCommentManager:
 # Customize where my-unicorn stores files and directories.
 # Use absolute paths or paths starting with ~ for home directory.
 #
-# repo: Source code repository for my-unicorn cli (e.g git cloned)
-# package: Installation directory for my-unicorn (necessary code files)
 # download: Temporary download location for AppImages
 # storage: Where installed AppImages are stored
 # backup: Backup location for old AppImage versions

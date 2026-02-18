@@ -9,7 +9,7 @@ Live) validation to ensure data freshness while minimizing API calls.
 """
 
 import contextlib
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +18,10 @@ import orjson
 from my_unicorn.config import ConfigManager
 from my_unicorn.logger import get_logger
 from my_unicorn.types import CacheEntry
+from my_unicorn.utils.datetime_utils import (
+    get_current_datetime_local,
+    get_current_datetime_local_iso,
+)
 
 logger = get_logger(__name__)
 
@@ -31,6 +35,18 @@ class ReleaseCacheManager:
     - Provides transparent fallback to API calls
     - Handles cache corruption gracefully
     - Uses atomic writes to prevent file corruption
+
+    Usage:
+        # Create explicitly:
+        config = ConfigManager()
+        cache = ReleaseCacheManager(config, ttl_hours=24)
+
+        # Or via dependency injection:
+        fetcher = GitHubReleaseFetcher(session, cache_manager=cache)
+
+    Note:
+        This class no longer uses a singleton pattern. Create instances
+        explicitly or accept via dependency injection.
     """
 
     def __init__(
@@ -87,7 +103,7 @@ class ReleaseCacheManager:
             cached_at = datetime.fromisoformat(cache_entry["cached_at"])
             ttl_hours = cache_entry.get("ttl_hours", self.ttl_hours)
             expiry = cached_at + timedelta(hours=ttl_hours)
-            return datetime.now(UTC) < expiry
+            return get_current_datetime_local() < expiry
         except (ValueError, KeyError) as e:
             logger.debug("Invalid cache timestamp format: %s", e)
             return False
@@ -176,7 +192,7 @@ class ReleaseCacheManager:
             # Note: No filtering here - data is pre-filtered by ReleaseFetcher
             cache_entry = CacheEntry(
                 {
-                    "cached_at": datetime.now(UTC).isoformat(),
+                    "cached_at": get_current_datetime_local_iso(),
                     "ttl_hours": self.ttl_hours,
                     "release_data": release_data,
                 }
@@ -238,7 +254,9 @@ class ReleaseCacheManager:
 
         """
         try:
-            cutoff = datetime.now(UTC) - timedelta(days=max_age_days)
+            cutoff = get_current_datetime_local() - timedelta(
+                days=max_age_days
+            )
             removed_count = 0
 
             for cache_file in self.cache_dir.glob("*.json"):
@@ -309,22 +327,169 @@ class ReleaseCacheManager:
                 "error": str(e),
             }
 
+    async def store_checksum_file(
+        self,
+        owner: str,
+        repo: str,
+        version: str,
+        file_data: dict[str, Any],
+        cache_type: str = "stable",
+    ) -> bool:
+        """Store a checksum file entry in the release cache.
 
-# Module-level cache manager instance
-_cache_manager: ReleaseCacheManager | None = None
+        Adds or updates a checksum file entry in the cached release data.
+        Avoids duplicates by matching on source URL.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            version: Release version (for validation)
+            file_data: Checksum file data dict (source, filename, etc.)
+            cache_type: Type of cache ("stable", "prerelease", "latest")
+
+        Returns:
+            True if successfully stored, False otherwise
+
+        """
+        try:
+            release_data = await self.get_cached_release(
+                owner, repo, ignore_ttl=True, cache_type=cache_type
+            )
+
+            if release_data is None:
+                logger.debug(
+                    "No cache entry for %s/%s to store checksum file",
+                    owner,
+                    repo,
+                )
+                return False
+
+            cached_version = release_data.get("version", "")
+            if cached_version != version:
+                logger.debug(
+                    "Cache version mismatch: cached=%s, requested=%s",
+                    cached_version,
+                    version,
+                )
+                return False
+
+            checksum_files = release_data.get("checksum_files", [])
+            source_url = file_data.get("source", "")
+
+            existing_idx = next(
+                (
+                    i
+                    for i, f in enumerate(checksum_files)
+                    if f.get("source") == source_url
+                ),
+                None,
+            )
+
+            if existing_idx is not None:
+                checksum_files[existing_idx] = file_data
+            else:
+                checksum_files.append(file_data)
+
+            release_data["checksum_files"] = checksum_files
+            await self.save_release_data(owner, repo, release_data, cache_type)
+            logger.debug(
+                "Stored checksum file %s for %s/%s",
+                file_data.get("filename"),
+                owner,
+                repo,
+            )
+            return True
+
+        except Exception as e:
+            logger.error(
+                "Failed to store checksum file for %s/%s: %s", owner, repo, e
+            )
+            return False
+
+    async def get_checksum_file(
+        self,
+        owner: str,
+        repo: str,
+        version: str,
+        source_url: str,
+        cache_type: str = "stable",
+    ) -> dict[str, Any] | None:
+        """Retrieve a specific checksum file from the release cache.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            version: Release version (for validation)
+            source_url: URL of the checksum file to retrieve
+            cache_type: Type of cache ("stable", "prerelease", "latest")
+
+        Returns:
+            Checksum file data dict if found, None otherwise
+
+        """
+        try:
+            release_data = await self.get_cached_release(
+                owner, repo, ignore_ttl=True, cache_type=cache_type
+            )
+
+            if release_data is None:
+                return None
+
+            cached_version = release_data.get("version", "")
+            if cached_version != version:
+                return None
+
+            checksum_files = release_data.get("checksum_files", [])
+            return next(
+                (f for f in checksum_files if f.get("source") == source_url),
+                None,
+            )
+
+        except Exception as e:
+            logger.error(
+                "Failed to get checksum file for %s/%s: %s", owner, repo, e
+            )
+            return None
+
+    async def has_checksum_file(
+        self,
+        owner: str,
+        repo: str,
+        version: str,
+        source_url: str,
+        cache_type: str = "stable",
+    ) -> bool:
+        """Check if a specific checksum file exists in the release cache.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            version: Release version (for validation)
+            source_url: URL of the checksum file to check
+            cache_type: Type of cache ("stable", "prerelease", "latest")
+
+        Returns:
+            True if checksum file exists and version matches, False otherwise
+
+        """
+        result = await self.get_checksum_file(
+            owner, repo, version, source_url, cache_type
+        )
+        return result is not None
 
 
 def get_cache_manager(ttl_hours: int = 24) -> ReleaseCacheManager:
-    """Get the global cache manager instance.
+    """Create a new ReleaseCacheManager instance.
+
+    .. deprecated::
+        This function is deprecated. Create ReleaseCacheManager directly
+        or accept it via dependency injection instead.
 
     Args:
         ttl_hours: Cache TTL in hours (default: 24)
 
     Returns:
-        ReleaseCacheManager instance
+        New ReleaseCacheManager instance
 
     """
-    global _cache_manager
-    if _cache_manager is None:
-        _cache_manager = ReleaseCacheManager(ttl_hours=ttl_hours)
-    return _cache_manager
+    return ReleaseCacheManager(ttl_hours=ttl_hours)

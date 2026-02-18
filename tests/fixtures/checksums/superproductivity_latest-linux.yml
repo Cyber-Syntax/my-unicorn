@@ -1,0 +1,35 @@
+# Super Productivity - Base64 SHA512 in YAML format
+version: 17.1.0
+files:
+  - url: superProductivity-x86_64.AppImage
+    sha512: J7Z4So31dqps06FATBrGKfYENLeM18O5s8tuy6P5qov1ObbY3hrQDinLpEfEEU8gG5I+OdBfUnai+XMhJ6KCuA==
+    size: 135416972
+    blockMapSize: 142496
+  - url: superProductivity-amd64.deb
+    sha512: jjqZBuxXbXwSxvbGcEzrEEg7sFI3SlC9s/stP4rhxLScOS28QOd//azSjhTmqDQQVdUh+sjJhBiHtf8lInDk+Q==
+    size: 106150828
+  - url: superProductivity-x86_64.rpm
+    sha512: oTCdL3e0zIchgV4zvJwxxJLgSZ9BxNjTmrvBbtwgxfAd3FheaG3+0tQNyY0QQsL+JUAxhX67yGUy/BzO5/iqIg==
+    size: 93017413
+path: superProductivity-x86_64.AppImage
+sha512: J7Z4So31dqps06FATBrGKfYENLeM18O5s8tuy6P5qov1ObbY3hrQDinLpEfEEU8gG5I+OdBfUnai+XMhJ6KCuA==
+releaseNotes: |
+  **Linux**:
+  `sudo snap install superproductivity`
+  (or download from below)
+
+  **Windows**:
+  [Download from Microsoft Store](https://www.microsoft.com/de-de/p/super-productivity/9nhfvg8361tw?cid=storebadge&ocid=badge&rtc=1&activetab=pivot:overviewtab)
+  (or download one of the exe files below)
+
+  **Mac OS**:
+  [Download from Mac App Store](https://apps.apple.com/de/app/super-productivity/id1482572463)
+  (or download the dmg file below)
+
+  **Android**:
+  [Download from Play Store](https://play.google.com/store/apps/details?id=com.superproductivity.superproductivity)
+  [Download from FDroid](https://f-droid.org/en/packages/com.superproductivity.superproductivity/)
+
+  **List of all Changes**:
+  [--Changelog--](https://github.com/super-productivity/super-productivity/blob/master/CHANGELOG.md)
+releaseDate: '2026-02-04T20:24:59.670Z'

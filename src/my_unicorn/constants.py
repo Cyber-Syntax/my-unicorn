@@ -16,7 +16,7 @@ from typing import Final, Literal
 
 # Global settings config version (settings.conf)
 # This is separate from app state and catalog config versions
-GLOBAL_CONFIG_VERSION: Final[str] = "1.0.2"
+GLOBAL_CONFIG_VERSION: Final[str] = "1.1.0"
 
 # App state config version (apps/*.json)
 # If actual version in file doesn't match, migration is needed
@@ -62,8 +62,6 @@ KEY_CONSOLE_LOG_LEVEL: Final[str] = "console_log_level"
 
 # Known directory keys expected in the directory section
 DIRECTORY_KEYS: Final[tuple[str, ...]] = (
-    "repo",
-    "package",
     "download",
     "storage",
     "backup",
@@ -71,7 +69,6 @@ DIRECTORY_KEYS: Final[tuple[str, ...]] = (
     "settings",
     "logs",
     "cache",
-    "tmp",
 )
 
 # =============================================================================
@@ -98,7 +95,6 @@ CONFIG_MIGRATION_PRINT_PREFIX: Final[str] = "Config Migration"
 KEY_RETRY_ATTEMPTS: Final[str] = "retry_attempts"
 KEY_TIMEOUT_SECONDS: Final[str] = "timeout_seconds"
 
-KEY_REPO: Final[str] = "repo"
 KEY_STORAGE: Final[str] = "storage"
 
 # =============================================================================
@@ -272,12 +268,64 @@ HashType = Literal["sha1", "sha256", "sha512", "md5"]
 DEFAULT_HASH_TYPE: Final[HashType] = "sha256"
 
 # Default hash to prefer for YAML checksum files
-YAML_DEFAULT_HASH: Final[str] = "sha512"
+YAML_DEFAULT_HASH: Final[HashType] = "sha512"
 
 # Preferred order when checking multiple hash types
-HASH_PREFERENCE_ORDER: Final[tuple[str, ...]] = (
+HASH_PREFERENCE_ORDER: Final[tuple[HashType, ...]] = (
     "sha512",
     "sha256",
     "sha1",
     "md5",
 )
+
+# =============================================================================
+# Installation and Update Constants
+# =============================================================================
+
+
+# Installation source identifiers
+class InstallSource:
+    """Constants for installation sources."""
+
+    CATALOG: Final[str] = "catalog"
+    URL: Final[str] = "url"
+
+
+# Verification method identifiers
+class VerificationMethod:
+    """Constants for verification methods."""
+
+    DIGEST: Final[str] = "digest"
+    SIGNATURE: Final[str] = "signature"
+    NONE: Final[str] = "none"
+
+
+# Version placeholder for unknown/missing versions
+VERSION_UNKNOWN: Final[str] = "unknown"
+
+# =============================================================================
+# Common Error Message Patterns
+# =============================================================================
+
+# Error message templates for consistency
+ERROR_NO_APPIMAGE_ASSET: Final[str] = "No suitable AppImage asset found"
+ERROR_NO_RELEASE_FOUND: Final[str] = "No release found for {owner}/{repo}"
+ERROR_INVALID_GITHUB_CONFIG: Final[str] = (
+    "Invalid GitHub configuration in catalog: {error}"
+)
+ERROR_INVALID_GITHUB_URL: Final[str] = "Invalid GitHub URL: {error}"
+ERROR_VERIFICATION_FAILED: Final[str] = "Verification failed: {error}"
+ERROR_CONFIGURATION_MISSING: Final[str] = (
+    "No configuration found for app: {app_name}"
+)
+ERROR_CATALOG_MISSING: Final[str] = (
+    "App '{app_name}' references catalog '{catalog_ref}', "
+    "but catalog entry is missing or invalid. Please reinstall."
+)
+ERROR_UNKNOWN_APPS_OR_URLS: Final[str] = (
+    "Unknown applications or invalid URLs: {targets}. "
+    "Use 'my-unicorn catalog --available' to see available apps."
+)
+ERROR_DESKTOP_ENTRY_FAILED: Final[str] = "Desktop entry creation failed"
+ERROR_CONFIGURATION_GENERIC: Final[str] = "Configuration error"
+ERROR_UNEXPECTED: Final[str] = "Unexpected error: {error}"

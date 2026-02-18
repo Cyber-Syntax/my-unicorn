@@ -2,6 +2,10 @@
 
 Orchestrates the execution of CLI commands by routing parsed
 arguments to the appropriate command handlers.
+
+Acts as the composition root for dependency injection, creating
+all shared dependencies (config, cache, validator) and injecting
+them into command handlers.
 """
 
 import logging
@@ -22,24 +26,65 @@ from my_unicorn.cli.commands.update import UpdateHandler
 from my_unicorn.cli.commands.upgrade import UpgradeHandler
 from my_unicorn.cli.parser import CLIParser
 from my_unicorn.config import ConfigManager
+from my_unicorn.config.schemas.validator import ConfigValidator
 from my_unicorn.core.auth import GitHubAuthManager
-from my_unicorn.core.workflows.update import UpdateManager
+from my_unicorn.core.cache import ReleaseCacheManager
+from my_unicorn.core.update.manager import UpdateManager
 from my_unicorn.logger import get_logger, update_logger_from_config
 
 logger = get_logger(__name__)
 
 
 class CLIRunner:
-    """CLI command runner and orchestrator."""
+    """CLI command runner and orchestrator.
+
+    Acts as the composition root for the application's dependency injection
+    pattern. Creates all shared dependencies (ConfigValidator, ConfigManager,
+    ReleaseCacheManager, GitHubAuthManager, UpdateManager) and injects them
+    into command handlers.
+
+    Usage:
+        # Standard usage (creates all dependencies internally):
+        runner = CLIRunner()
+        await runner.run()
+
+        # Dependencies created in __init__:
+        # 1. ConfigValidator() - no dependencies
+        # 2. ConfigManager(validator=validator)
+        # 3. ReleaseCacheManager(config_manager, ttl_hours=24)
+        # 4. GitHubAuthManager.create_default()
+        # 5. UpdateManager(config_manager, auth_manager)
+
+        # All handlers receive the same instances via _create_handler()
+
+    Note:
+        This class implements the composition root pattern. All dependency
+        creation happens here, making the dependency graph explicit and
+        testable. Handlers receive pre-configured instances rather than
+        creating their own or accessing global singletons.
+    """
 
     def __init__(self) -> None:
         """Initialize CLI runner with shared dependencies.
 
         Sets up configuration, authentication, update management,
         logging, and command handlers.
+
+        Acts as the composition root: creates ConfigValidator,
+        ConfigManager, ReleaseCacheManager, and other shared
+        dependencies, then injects them into command handlers.
         """
-        self.config_manager = ConfigManager()
+        # Create validator first (no dependencies)
+        self.validator = ConfigValidator()
+
+        # Create config manager with injected validator
+        self.config_manager = ConfigManager(validator=self.validator)
         self.global_config = self.config_manager.load_global_config()
+
+        # Create cache manager with injected config
+        self.cache_manager = ReleaseCacheManager(
+            self.config_manager, ttl_hours=24
+        )
 
         # Update logger with config-based log levels
         update_logger_from_config()
@@ -49,7 +94,9 @@ class CLIRunner:
 
         # Create update manager with injected dependencies
         self.update_manager = UpdateManager(
-            self.config_manager, self.auth_manager
+            self.config_manager,
+            self.auth_manager,
+            self.cache_manager,
         )
 
         # Initialize command handlers
@@ -69,9 +116,11 @@ class CLIRunner:
             return handler_class()
 
         return handler_class(
-            self.config_manager,
-            self.auth_manager,
-            self.update_manager,
+            config_manager=self.config_manager,
+            auth_manager=self.auth_manager,
+            update_manager=self.update_manager,
+            cache_manager=self.cache_manager,
+            validator=self.validator,
         )
 
     def _init_command_handlers(self) -> None:

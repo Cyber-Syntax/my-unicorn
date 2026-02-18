@@ -1,0 +1,25 @@
+{
+  "cached_at": "2026-02-05T18:28:53.684324+03:00",
+  "ttl_hours": 24,
+  "release_data": {
+    "owner": "beekeeper-studio",
+    "repo": "beekeeper-studio",
+    "version": "5.5.6",
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "Beekeeper-Studio-5.5.6.AppImage",
+        "size": 249337947,
+        "digest": "sha256:b24017dfd5e7982cc0cedf05a79d9a2c9f8bfc80edbe24d3a86f6181aef84e6c",
+        "browser_download_url": "https://github.com/beekeeper-studio/beekeeper-studio/releases/download/v5.5.6/Beekeeper-Studio-5.5.6.AppImage"
+      },
+      {
+        "name": "latest-linux.yml",
+        "size": 6775,
+        "digest": "sha256:8f92ce9af69d68d0c8b75f2552cff5728f52f5c1614ccfcb155dc477199fdfb2",
+        "browser_download_url": "https://github.com/beekeeper-studio/beekeeper-studio/releases/download/v5.5.6/latest-linux.yml"
+      }
+    ],
+    "original_tag_name": "v5.5.6"
+  }
+}

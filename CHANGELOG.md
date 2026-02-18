@@ -5,6 +5,106 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0-alpha] - 2026-02-18
+
+### Added
+
+- Created `ProgressReporter` protocol for UI decoupling from core modules
+- Introduced `ServiceContainer` for dependency injection and service lifecycle management
+- Implemented domain-specific exception hierarchy with `MyUnicornError` base class:
+    - `VerificationError` with `HashMismatchError`, `HashUnavailableError`, `HashComputationError`
+    - `WorkflowError` with `InstallError`, `UpdateError`, `PostProcessingError`
+    - `NetworkError` with `DownloadError`, `GitHubAPIError`
+    - Added `is_retryable` and `retry_after` attributes for retry logic
+- Added async file I/O support using `aiofiles` library for non-blocking downloads
+- Added `NullProgressReporter` implementing null object pattern for optional progress tracking
+- Added comprehensive Raises sections to all public method docstrings in workflow modules for better error documentation
+- Added async safety documentation to class docstrings explaining thread safety and concurrent access patterns
+- Enhanced in-memory caching documentation with performance metrics and thread safety notes
+- Extended `app_state_v2.schema.json` with new verification fields for enhanced state tracking:
+    - `overall_passed`: Boolean indicating if any verification method succeeded
+    - `actual_method`: Enum (`digest`|`checksum_file`|`skip`) indicating which method was used
+    - `warning`: Optional warning message for unverified installations
+    - `methods[].digest`: Alternative single hash field (replaces separate computed/expected)
+- Extended `cache_release.schema.json` with `checksum_files[]` array for caching downloaded checksum files:
+    - Stores source URL, filename, algorithm, and hash mappings
+    - Enables verification reuse without re-downloading checksum files
+- Added `get_checksum_files()`, `has_checksum_files()`, and `get_checksum_file_for_asset()` methods to `CacheManager`
+- Test support for bulk updates and stronger CLI coverage
+    - Added `test_update_all_cmd` and a `--update-all` test flag in `scripts/test.py` to validate "update all" workflows.
+- Significant test coverage increases and reorganization
+    - Dozens of focused unit tests added across progress, verification, update and utils (representative files: `tests/core/progress/test_ascii_format.py`, `test_ascii_sections.py`, `test_ascii_output.py`, `test_display_id.py`).
+    - Tests reorganized for clearer scopes and faster discovery (see `tests/cli/`, `tests/core/`, `tests/config/`, `tests/utils/`).
+    - Added 100+ tests covering schema validation, cache operations, and verification workflows
+
+### Changed
+
+- setup.sh script renamed to install.sh and updated installation commands:
+    - Production install command updated:
+        - Use `./install.sh -i` or `./install.sh --install` to perform a standard installation.
+    - Development install command updated:
+        - Use `./install.sh -e` or `./install.sh --editable` to install in editable mode.
+- Refactored core architecture to use dependency injection via `ServiceContainer`
+- Replaced UI dependencies in core modules with protocol-based abstractions (`ProgressReporter`)
+- Refactored `DownloadService` and `VerificationService` to use `ProgressReporter` protocol
+- Replaced generic exceptions with domain-specific error types across all workflow modules
+- Added retry logic for transient network errors using `is_retryable` exception attribute
+- Moved blocking I/O operations to executor threads for non-blocking async execution
+- Improved docstring quality across install.py and update.py workflow modules
+- Standardized exception documentation with detailed error conditions and scenarios
+- Implemented async file I/O for improved download performance with `aiofiles`
+- Reduced event loop blocking during downloads and verification operations
+- Moved hash computation to executor threads for large files (>100MB threshold)
+- Improved progress reporting smoothness with non-blocking updates
+- `VerificationService` now passes checksum file data to `CacheManager` for persistence
+- Update workflow recalculates verification state with fresh hashes instead of preserving stale data
+- Enhanced `StateVerification` and `VerificationMethod` TypedDicts with comprehensive docstrings
+- Large internal refactors to improve modularity and maintainability
+    - Verification: replaced the monolithic checksum parser with a `checksum_parser/` package (specialized parsers + detector/normalizer) and split the verification service into focused modules (detection, helpers, execution, verification methods).
+        - Result: `service.py` shrank from ~1322 → 437 lines; multiple mypy issues fixed.
+    - Update & logging subsystems decomposed into smaller modules:
+        - `update.py` split into `context.py`, `catalog_cache.py`, `manager.py`, `workflows.py`.
+        - `logger.py` split into 6 focused modules while preserving the singleton API via re-exports.
+        - Fixes and test updates made during the split (no behavioral changes to public CLI).
+    - Progress/display rework — moved from `ui` to `core/progress` and extracted many helpers (`ascii_format`, `ascii_sections`, `ascii_output`, `display_id`, `display_registry`, `display_logger`, `display_session`, `display_workflows`).
+        - Keeps prior public behavior while improving SRP, testability and code size.
+        - Import paths updated throughout CLI and tests.
+- Documentation & housekeeping
+    - UI docs clarified and examples expanded (`docs/ui.md`).
+    - Minor repo maintenance: `.gitignore` and `AGENTS.md` improved for clarity.
+
+### Fixed
+
+- **Critical Bug Fix: Hash Detection in Checksum Verification**
+    - Fixed a critical bug where hexadecimal checksums were incorrectly processed as base64, causing hash detection failure called `binascii.Error: Incorrect padding` during verification for certain apps (e.g., Heroic, QOwnNotes) that use latest-linux.yml file with hex hashes.
+    - This fix ensures that the normalization function correctly detects and processes both hex and base64 encodings, preventing corruption of hex hashes and allowing all verification methods to function properly.
+    - Hex hashes (e.g., from Heroic, QOwnNotes) are now preserved without corruption
+    - Base64 hashes (e.g., from Legcord, Superproductivity) continue to work correctly
+- Fixed update command not refreshing verification data when updating to new versions
+- Fixed `VerificationError` not being raised when all verification methods fail
+- Fixed checksum file references not persisting to cache JSON files
+- Corrected asynchronous and protocol issues in progress reporting
+    - `ProgressReporter` protocol methods made `async def`; `NullProgressReporter` and related callers updated; added protocol-compliance tests.
+- Reliability fixes in post-download and verification flows
+    - Guarded hash-retrieval in `PostDownloadProcessor` and improved null-safety checks.
+- Test and typing fixes uncovered by the refactors
+    - Multiple test failures resolved (including patched instantiation sites for `DownloadService` / `PostDownloadProcessor`); `test_update.py` suite fully passing after fixes.
+
+### Removed
+
+- Legacy venv-wrapper.bash script and install functionality removed from install.sh.
+- Removed legacy/monolithic and obsolete modules
+    - Deleted legacy `checksum_parser.py` (replaced by the new `checksum_parser/` package).
+    - Removed old monolithic `update.py` / `logger.py` implementations (functionality preserved in new modules).
+    - Deleted obsolete UI helper `src/my_unicorn/ui/display_common.py` and other unused legacy files.
+    - Removed several deprecated test-package `__init__` files as the test layout was modernized.
+
+### Notes
+
+- All new schema fields are optional for backward compatibility
+- Existing app state configurations continue to work without migration
+- Legacy verification format (passed + methods only) remains valid
+
 ## [2.2.1-alpha] - 2026-02-05
 
 ### Fixed

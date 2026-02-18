@@ -1,0 +1,10 @@
+# Legcord - Pure Base64 SHA512
+# This file contains base64-encoded SHA512 hashes that SHOULD be decoded
+version: 1.0.5
+files:
+  - url: Legcord-1.0.5.AppImage
+    sha512: JNmYBTG9lqXt/VXmes32pu3bnz/YaKMzfjFVL+0J+S8MSWl7nLmHolmUNLFAubpy1JWTUwEdlPW8UhRNxNiQuw==
+    size: 145312768
+path: Legcord-1.0.5.AppImage
+sha512: JNmYBTG9lqXt/VXmes32pu3bnz/YaKMzfjFVL+0J+S8MSWl7nLmHolmUNLFAubpy1JWTUwEdlPW8UhRNxNiQuw==
+releaseDate: '2024-02-20T14:00:00.000Z'

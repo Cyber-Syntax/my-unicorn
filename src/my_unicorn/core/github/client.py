@@ -9,10 +9,13 @@ from typing import Any
 
 import aiohttp
 
-from my_unicorn.config import config_manager
+from my_unicorn.config import ConfigManager
 from my_unicorn.core.auth import GitHubAuthManager
+from my_unicorn.core.protocols.progress import (
+    NullProgressReporter,
+    ProgressReporter,
+)
 from my_unicorn.logger import get_logger
-from my_unicorn.ui.progress import ProgressDisplay
 
 logger = get_logger(__name__)
 
@@ -20,8 +23,59 @@ logger = get_logger(__name__)
 HTTP_NOT_FOUND = 404
 
 
+def create_api_timeout(base_seconds: int) -> aiohttp.ClientTimeout:
+    """Create configured timeout for GitHub API requests.
+
+    Timeout multipliers based on typical API response patterns:
+    - sock_connect: 1x base - Initial connection should be fast
+    - sock_read: 2x base - Reading may take longer for large responses
+    - total: 3x base - Total budget includes potential retries
+
+    Args:
+        base_seconds: Base timeout from network configuration
+
+    Returns:
+        Configured ClientTimeout instance
+
+    Example:
+        >>> timeout = create_api_timeout(10)
+        >>> timeout.total
+        30.0
+
+    """
+    return aiohttp.ClientTimeout(
+        total=base_seconds * 3,
+        sock_read=base_seconds * 2,
+        sock_connect=base_seconds,
+    )
+
+
 class ReleaseAPIClient:
-    """Handles direct communication with GitHub API for release data."""
+    """Handles direct communication with GitHub API for release data.
+
+    This class is typically created by ReleaseFetcher and receives its
+    dependencies via constructor injection. It handles authentication,
+    rate limiting, and retry logic for GitHub API calls.
+
+    Usage:
+        # Create with injected dependencies:
+        auth = GitHubAuthManager.create_default()
+        api_client = ReleaseAPIClient(
+            owner="owner",
+            repo="repo",
+            session=session,
+            auth_manager=auth,
+        )
+
+        # Typically created internally by ReleaseFetcher:
+        fetcher = ReleaseFetcher(
+            owner="owner",
+            repo="repo",
+            session=session,
+            cache_manager=cache,
+        )
+        # fetcher.api_client is created automatically
+    """
 
     def __init__(
         self,
@@ -30,7 +84,7 @@ class ReleaseAPIClient:
         session: aiohttp.ClientSession,
         auth_manager: GitHubAuthManager,
         shared_api_task_id: str | None = None,
-        progress_service: ProgressDisplay | None = None,
+        progress_reporter: ProgressReporter | None = None,
     ) -> None:
         """Initialize the API client.
 
@@ -40,7 +94,7 @@ class ReleaseAPIClient:
             session: aiohttp session for making requests
             auth_manager: GitHub authentication manager
             shared_api_task_id: Optional shared API progress task ID
-            progress_service: Optional progress service for tracking
+            progress_reporter: Optional progress reporter for tracking
 
         """
         self.owner = owner
@@ -48,9 +102,9 @@ class ReleaseAPIClient:
         self.session = session
         self.auth_manager = auth_manager
         self.shared_api_task_id = shared_api_task_id
-        self.progress_service = progress_service
+        self.progress_reporter = progress_reporter or NullProgressReporter()
 
-    async def _update_shared_progress(self, description: str) -> None:
+    async def update_shared_progress(self, description: str) -> None:
         """Update shared API progress task.
 
         Args:
@@ -59,32 +113,29 @@ class ReleaseAPIClient:
         """
         if (
             not self.shared_api_task_id
-            or not self.progress_service
-            or not self.progress_service.is_active()
+            or not self.progress_reporter.is_active()
         ):
             return
 
         try:
-            task_info = self.progress_service.get_task_info(
+            task_info = self.progress_reporter.get_task_info(
                 self.shared_api_task_id
             )
             if task_info:
-                new_completed = int(task_info.completed) + 1
+                new_completed = int(task_info.get("completed", 0)) + 1
+                total_value = task_info.get("total")
                 total = (
-                    int(task_info.total)
-                    if task_info.total > 0
+                    int(total_value)
+                    if total_value and total_value > 0
                     else new_completed
                 )
-                await self.progress_service.update_task(
+                await self.progress_reporter.update_task(
                     self.shared_api_task_id,
                     completed=float(new_completed),
                     description=(
                         f"🌐 {description} ({new_completed}/{total})"
                     ),
                 )
-
-                if hasattr(self.progress_service, "_refresh_live_display"):
-                    self.progress_service._refresh_live_display()
         except Exception:
             pass
 
@@ -115,11 +166,10 @@ class ReleaseAPIClient:
                 )
                 if (
                     self.shared_api_task_id
-                    and self.progress_service
-                    and self.progress_service.is_active()
+                    and self.progress_reporter.is_active()
                 ):
                     # Update shared progress with a short message
-                    await self._update_shared_progress(
+                    await self.update_shared_progress(
                         f"Waiting for rate limit reset ({capped_wait}s)"
                     )
                 await asyncio.sleep(capped_wait)
@@ -128,17 +178,12 @@ class ReleaseAPIClient:
             pass
 
         # Load network configuration (retry and timeout)
-        network_cfg = config_manager.load_global_config()["network"]
+        config = ConfigManager()
+        network_cfg = config.load_global_config()["network"]
         retry_attempts = int(network_cfg.get("retry_attempts", 3))
         timeout_seconds = int(network_cfg.get("timeout_seconds", 10))
 
-        # Compose a ClientTimeout derived from configured base seconds.
-        # Use modest multipliers to keep behavior similar to prior defaults.
-        timeout = aiohttp.ClientTimeout(
-            total=timeout_seconds * 3,
-            sock_read=timeout_seconds * 2,
-            sock_connect=timeout_seconds,
-        )
+        timeout = create_api_timeout(timeout_seconds)
 
         last_exc: Exception | None = None
 
@@ -161,10 +206,9 @@ class ReleaseAPIClient:
 
                     if (
                         self.shared_api_task_id
-                        and self.progress_service
-                        and self.progress_service.is_active()
+                        and self.progress_reporter.is_active()
                     ):
-                        await self._update_shared_progress(description)
+                        await self.update_shared_progress(description)
 
                     return await response.json()
 

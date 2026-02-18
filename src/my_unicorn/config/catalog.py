@@ -11,7 +11,7 @@ import orjson
 
 from my_unicorn.config.paths import Paths
 from my_unicorn.logger import get_logger
-from my_unicorn.types import CatalogEntryV2
+from my_unicorn.types import CatalogConfig
 
 logger = get_logger(__name__)
 
@@ -28,7 +28,7 @@ class CatalogLoader:
         """
         self.catalog_dir = catalog_dir or Paths.CATALOG_DIR
 
-    def load(self, app_name: str) -> CatalogEntryV2:
+    def load(self, app_name: str) -> CatalogConfig:
         """Load catalog entry for app.
 
         Args:
@@ -49,11 +49,15 @@ class CatalogLoader:
 
         # Load JSON
         with path.open("rb") as f:
-            data = orjson.loads(f.read())
+            try:
+                data = orjson.loads(f.read())
+            except orjson.JSONDecodeError as e:
+                msg = f"Invalid JSON in catalog entry for '{app_name}': {e}"
+                raise ValueError(msg) from e
 
-        return cast("CatalogEntryV2", data)
+        return cast("CatalogConfig", data)
 
-    def load_all(self) -> tuple[dict[str, CatalogEntryV2], list[str]]:
+    def load_all(self) -> tuple[dict[str, CatalogConfig], list[str]]:
         """Load all catalog entries.
 
         Returns:

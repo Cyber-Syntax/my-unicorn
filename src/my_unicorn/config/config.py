@@ -15,11 +15,13 @@ Requirements:
 import importlib
 import logging
 from pathlib import Path
+from typing import cast
 
 from my_unicorn.config.app import AppConfigManager
 from my_unicorn.config.catalog import CatalogLoader
 from my_unicorn.config.paths import Paths
-from my_unicorn.types import AppConfig, CatalogEntryV2, GlobalConfig
+from my_unicorn.config.schemas.validator import ConfigValidator
+from my_unicorn.types import AppStateConfig, CatalogConfig, GlobalConfig
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +35,30 @@ class ConfigManager:
 
     This class provides a unified interface to the configuration system,
     delegating to specialized managers for different concerns.
+
+    Usage:
+        # Create explicitly:
+        config = ConfigManager()
+
+        # Or with custom validator:
+        validator = ConfigValidator()
+        config = ConfigManager(validator=validator)
+
+        # Or via dependency injection:
+        class MyService:
+            def __init__(self, config_manager: ConfigManager):
+                self.config = config_manager
+
+    Note:
+        This class supports dependency injection for the validator.
+        Create instances explicitly or accept via dependency injection.
     """
 
     def __init__(
-        self, config_dir: Path | None = None, catalog_dir: Path | None = None
+        self,
+        config_dir: Path | None = None,
+        catalog_dir: Path | None = None,
+        validator: ConfigValidator | None = None,
     ) -> None:
         """Initialize configuration manager.
 
@@ -45,10 +67,15 @@ class ConfigManager:
                 Defaults to Paths.CONFIG_DIR
             catalog_dir: Optional custom catalog directory.
                 Defaults to Paths.CATALOG_DIR
+            validator: Optional validator instance for config validation.
+                Creates new ConfigValidator if None.
         """
         # Use Paths class for directory management
         self._config_dir = config_dir or Paths.CONFIG_DIR
         self._catalog_dir = catalog_dir or Paths.CATALOG_DIR
+
+        # Store validator for config validation
+        self.validator = validator or ConfigValidator()
 
         # Initialize specialized managers
         self.global_config_manager = GlobalConfigManager(self._config_dir)
@@ -80,7 +107,7 @@ class ConfigManager:
     @property
     def settings_file(self) -> Path:
         """Get the settings file path."""
-        return self.global_config_manager.settings_file
+        return self.global_config_manager.settings_file  # type: ignore[no-any-return]
 
     @property
     def apps_dir(self) -> Path:
@@ -102,6 +129,7 @@ class ConfigManager:
             ValueError: If a configured path is a file or invalid
         """
         for key, directory in config["directory"].items():
+            directory = cast("Path", directory)
             if directory.exists() and directory.is_file():
                 msg = (
                     f"Configured {key} path '{directory}' is a file, "
@@ -113,20 +141,53 @@ class ConfigManager:
     # Global config manager delegates
     def load_global_config(self) -> GlobalConfig:
         """Load global configuration from INI file."""
-        return self.global_config_manager.load_global_config()
+        return self.global_config_manager.load_global_config()  # type: ignore[no-any-return]
 
     def save_global_config(self, config: GlobalConfig) -> None:
         """Save global configuration to INI file."""
         self.global_config_manager.save_global_config(config)
 
     # App config manager delegates
-    def load_app_config(self, app_name: str) -> AppConfig | None:
-        """Load app-specific configuration."""
+    def load_app_config(self, app_name: str) -> dict | None:
+        """Load merged effective app configuration (SINGLE SOURCE OF TRUTH).
+
+        Returns fully merged config: Catalog + State + Overrides.
+
+        Args:
+            app_name: Application name
+
+        Returns:
+            Merged configuration dictionary or None if not found
+
+        """
         return self.app_config_manager.load_app_config(app_name)
 
-    def save_app_config(self, app_name: str, config: AppConfig) -> None:
+    def load_raw_app_config(self, app_name: str) -> AppStateConfig | None:
+        """Load raw app state without merging (for updates).
+
+        Returns raw state structure: {source, catalog_ref, state, overrides}
+        Use when you need to modify and save the app state.
+
+        Args:
+            app_name: Name of the application
+
+        Returns:
+            Raw app state config or None if not found
+
+        """
+        return self.app_config_manager.load_raw_app_config(app_name)
+
+    def save_app_config(
+        self,
+        app_name: str,
+        config: AppStateConfig,
+        *,
+        skip_validation: bool = False,
+    ) -> None:
         """Save app-specific configuration."""
-        self.app_config_manager.save_app_config(app_name, config)
+        self.app_config_manager.save_app_config(
+            app_name, config, skip_validation=skip_validation
+        )
 
     def list_installed_apps(self) -> list[str]:
         """Get list of installed apps."""
@@ -137,7 +198,7 @@ class ConfigManager:
         return self.app_config_manager.remove_app_config(app_name)
 
     # Catalog loader delegates
-    def load_catalog(self, app_name: str) -> CatalogEntryV2:
+    def load_catalog(self, app_name: str) -> CatalogConfig:
         """Load catalog entry for an app from bundled catalog.
 
         Args:
@@ -166,7 +227,3 @@ class ConfigManager:
             True if catalog exists, False otherwise
         """
         return self.catalog_loader.exists(app_name)
-
-
-# Global instance for easy access
-config_manager = ConfigManager()

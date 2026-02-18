@@ -14,20 +14,20 @@ import importlib
 
 from my_unicorn.config.app import AppConfigManager
 from my_unicorn.config.catalog import CatalogLoader
-from my_unicorn.config.config import ConfigManager, config_manager
+from my_unicorn.config.config import ConfigManager
 from my_unicorn.config.parser import (
     CommentAwareConfigParser,
     ConfigCommentManager,
 )
 from my_unicorn.config.paths import Paths
-from my_unicorn.types import AppConfig, GlobalConfig
+from my_unicorn.types import AppStateConfig, GlobalConfig
 
 _global_module = importlib.import_module("my_unicorn.config.global")
 GlobalConfigManager = _global_module.GlobalConfigManager
 
 __all__ = [
-    "AppConfig",
     "AppConfigManager",
+    "AppStateConfig",
     "CatalogLoader",
     "CommentAwareConfigParser",
     "ConfigCommentManager",
@@ -35,5 +35,4 @@ __all__ = [
     "GlobalConfig",
     "GlobalConfigManager",
     "Paths",
-    "config_manager",
 ]

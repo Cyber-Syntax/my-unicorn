@@ -5,24 +5,213 @@
 - [ ] Big reviews
     - [ ] Network retry logic
     - [x] Logger rotation logic
-    - [ ] Logger rotation on production
     - [ ] Logger rotation on virtual machine
     - [ ] API rate limiting
+    - [ ] Logger rotation on production
 
-- [ ] Test new features
-    - [ ] github action for releases
-    - [ ] `my-unicorn upgrade` command now use uv package manager.
-    - [x] Test `migrate` command
-    - [x] Test `migrate` command on virtual machine.
+```bash
+# log.1 rotated
+2026-01-25 16:03:09 - my_unicorn.main - DEBUG - async_main:28 - CLI completed successfully
+2026-01-25 16:03:09 - my_unicorn.main - DEBUG - async_main:25 - CLI started
+2026-01-25 16:03:09 - my_unicorn.core.progress.display - DEBUG - start_session:265 - Progress session started with 0 total operations
+2026-01-25 16:03:09 - my_unicorn.core.update.update - INFO - check_updates:400 - 🔄 Checking 5 app(s) for updates...
+...
+2026-01-25 16:03:10 - my_unicorn.core.token - DEBUG - get:131 - GitHub token retrieved from keyring (value hidden)
+2026-01-25 16:03:10 - my_unicorn.core.auth - DEBUG - apply_auth:183 - Applied GitHub authentication (token present)
+2026-01-25 16:03:10 - my_unicorn.config.schemas.validator - DEBUG - validate_app_state:218 - App state validation passed (v2.0.0): appflowy
+2026-01-25 16:03:10 - my_unicorn.config.schemas.validator - DEBUG - validate_app_state:218 - App state validation passed (v2.0.0): appflowy
+
+# .log new created (continue with correct module which it is backup to save metadata after the validator)
+# So, this rotation work as expected.
+2026-01-25 16:03:10 - my_unicorn.core.backup - DEBUG - save:100 - Saved metadata to /home/developer/Applications/backups/appflowy/metadata.json
+2026-01-25 16:03:10 - my_unicorn.core.backup - DEBUG - add_version:127 - Added version 0.1.0 to metadata
+2026-01-25 16:03:10 - my_unicorn.core.backup - INFO - create_backup:459 - Backup created: /home/developer/Applications/backups/appflowy/appflowy-0.1.0.AppImage (v0.1.0)
+2026-01-25 16:03:10 - my_unicorn.core.update.update - DEBUG - update_single_app:570 - Backup created: /home/developer/Applications/backups/appflowy/appflowy-0.1.0.AppImage
+...
+2026-01-25 16:03:57 - my_unicorn.main - DEBUG - async_main:28 - CLI completed successfully
+```
 
 ## in-progress
 
-- [ ] Improve manual test script
+- [ ] Improve testing
+    - [ ] Refactor folder e2e tmp files, move it to tmp/pytest-of-<user>-e2e/ for better structure
+    - [ ] Learn Schemathesis
+    - [ ] Learn <https://hypothesis.readthedocs.io/en/latest/stateful.html>
+    - [ ] Learn <https://realpython.com/python-cli-testing/#lo-fi-debugging-with-print>
+    - [x] P1-Q3: Never use the real user config logs, app location on pytest unittests which current is use them! #p1 #important #q3
+    - [x] write ui integration test for progress bar
+    - [x] Write e2e testing (Seems like scripts/test.py belongs to there and can be work with pytest)
+    - [x] structure improve
+
+- [ ] <https://github.com/jgamblin/PGP/blob/main/python/_common-sections.md>
+
+- [ ] P1-Q8: add lock for one instance only to prevent multiple instance run at the same time via fcntl.flock and make sure it would work for asyncio
+    - [x] 16G error log, because of 2 instance running at the same time.(This solved by logger rotation fix but still better to add lock to prevent multiple instance run at the same time)
+
+- [ ] remove unused from types.py
+- [ ] try git worktree, is it really can be good?
+- [ ] P1: Remove desktop_entry.py and other similar modules that only export things for backward compatbility.
+- [ ] P1: refactor core/update/update.py to better architecture for update all command and update with appimage names.
+    - [ ] Example; `my-unicorn update` would update all apps, `my-unicorn update appflowy qownnotes` would update only qownnotes and appflowy.
+- [ ] update all command issue:
+    - First, wrong ui handling
+
+```bash
+Fetching from API:
+GitHub Releases      3/3 Retrieved from cache
+
+Downloading (3/3):
+zen-x86_64                    110.6 MiB   3.3 MB/s 00:00 [==============================]   100% ✓
+tagspaces-linux-x86_64-6.9.0  149.4 MiB   8.6 MB/s 00:00 [==============================]   100% ✓
+superProductivity-x86_64      129.1 MiB   5.4 MB/s 00:00 [==============================]   100% ✓
+
+Installing:
+(1/2) Verifying zen-browser ✓
+(2/2) Installing zen-browser ✓
+(1/2) Verifying super-productivity ✓
+(2/2) Installing super-productivity ✓
+(1/2) Verifying tagspaces ✓
+(2/2) Installing tagspaces ✓
+
+
+📦 Update Summary:
+--------------------------------------------------
+tagspaces                 ✅ 6.8.2 → 6.9.0
+super-productivity        ✅ 17.1.2 → 17.1.3
+zen-browser               ✅ 1.18.4b → 1.18.5b
+neovim                    ℹ️  Already up to date (0.11.6)
+kdiskmark                 ℹ️  Already up to date (3.2.0)
+legcord                   ℹ️  Already up to date (1.2.1)
+obsidian                  ℹ️  Already up to date (1.11.7)
+qownnotes                 ℹ️  Already up to date (26.2.0)
+cherrytree                ℹ️  Already up to date (1.6.3)
+keepassxc                 ℹ️  Already up to date (2.7.11)
+heroicgameslauncher       ℹ️  Already up to date (2.19.1)
+weektodo                  ℹ️  Already up to date (2.2.0)
+endless-sky               ℹ️  Already up to date (0.10.16)
+nuclear                   ℹ️  Already up to date (0.6.48)
+flameshot                 ℹ️  Already up to date (13.3.0)
+beekeeper-studio          ℹ️  Already up to date (5.5.6)
+Successfully updated tagspaces
+standard-notes            ℹ️  Already up to date (3.201.10)
+freetube                  ℹ️  Already up to date (0.23.13-beta)
+appflowy                  ℹ️  Already up to date (0.11.1)
+
+🎉 Successfully updated 3 app(s)
+ℹ️  16 app(s) already up to date
+```
+
+- [ ] remove interactive argument on the AsciiProgressBackend when you understand what it's do which we don't use any kind of interactive mode on our progress bar, so we can remove that and just use the output.isatty() to detect the interactive mode if needed.
+
+- [ ] manual test improve:
+
+    - [ ] add backup test to --quick flag on test.py
+    - [ ] add --refresh-cache flag to --quick and --all flags to make sure cache also work after test passed without refresh cache flag.
+    - [ ] Update container to test with this manual test script, so we don't need to test in our local machine.
+        - [ ] add env variable support for github token to use on container tests.
+        - [ ] add flag to close progress bar on cli for better support on ci tests.
+
+- [ ] Improve security
+
+    - [ ] Verify checksum_file via digest verification provided from github_api to prevent tampered checksum_file attacks. Most of the new apps provide digest for their appimage and checksum_file on github api.
+    - [ ] remove sha1/md5 support "“We recommend that anyone relying on SHA-1 for security migrate to SHA-2 or SHA-3 as soon as possible.” —Chris Celi, NIST computer scientist" + "MD5 is a deprecated hash algorithm that has practical known collision attacks. You are strongly discouraged from using it. Existing applications should strongly consider moving away." from <https://cryptography.io/en/latest/hazmat/primitives/cryptographic-hashes/#md5>
+
+- [ ] Improve schema
+
+    - [ ] consider schema validation testing with hypothesis?
+    - [ ] consider schema update v2.1.0 with optional fields for better backward compatibility?
+    - [ ] remove schema one digest or use that instead of computed expected?
+
+- [ ] <https://github.com/carlosperate/awesome-pyproject?tab=readme-ov-file#testing>
+- [ ] Improve code quality with better practices:
+
+    - [ ] learn dependency injection better which seems like protocol used for that to make better decoupling.
+    - [ ] <https://github.com/ArjanCodes/betterpython/blob/main/1%20-%20coupling%20and%20cohesion/coupling-cohesion-after.py>
+    - [ ] <https://docs.python-guide.org/writing/style/>
+
+- [ ] Improve agents.md
+
+    - [x] <https://github.com/langchain-ai/langchain/blob/master/AGENTS.md>
+    - [ ] <https://alexop.dev/posts/stop-bloating-your-claude-md-progressive-disclosure-ai-coding-tools/>
+
+- [x] Create architecture-blueprint file
+- [ ] Create code-exemplars-blueprint file
+
+- [ ] use functools.cache for reading json files, caches for performance?
+- [ ] learn Makefile
+- [ ] workflows and workflows/services folder structure refactor for better structure.
+      Currently install.py, update.py, appimage_setup.py(install and update use this, so I didn't move that to util folder which we might be make a new module to handle it there in class etc.) is work together.
+- [ ] Learn and add integration tests after workflows refactor.
+- [ ] learn testing trophy philosophy
+- [ ] progress_service written optional but we must make it required. Only upgrade module not use it currently and not need to use it because upgrade module only use uv package manager to handle the installation and update process.
+- [ ] P4-Q7: backup create command feature
+
+- [ ] p1-q1: load app config one time instead of loading on every function call like remove, backup, update... etc.
+- [ ] P1-Q2 decrease all the modules lines to less than 500 lines for better structure and maintainability.
+    - [ ] workflows/update.py
+    - [ ] workflows/install.py
+- [ ] P1-Q1: Improve manual test script #p1 #q1 #important #testing
     - [ ] make sure the api fetch install works (we do that by remove and install on manual test script but seems like remove didn't removed the cache and I couldn't able to detect the api bug correctly, so we need to make manual test to make sure remove did it's job correctly etc.)
     - [ ] add backup tests to make sure backup command also work as expected on tests etc.
     - [ ] add new command to manual test script like `--slow` for big apps like joplin.
     - [ ] add new command to test remove, upgrade, migrate commands.
 
+add a diagnose test after the test done to make sure everything is fine after all tests
+we can do a something like return a report at the end of the tests with diagnose output etc.
+current test summary couldn't detect the failed passed correctly but we can make
+comprehensive report by checking the appimage config, backup metedata, check appimage location, desktop entry
+etc. all of the things to make sure everything is fine after the tests.
+
+we probably need to define one correct example or we can just use the json scheme
+
+- [ ] P1-Q2: deprecate my-unicorn package and repo directories (migrated to uv) #q2 #important #refactor
+
+    - [x] Remove legacy cli tool install from install.sh
+
+- [ ] P2-Q4: fix all mypy issues #p2 #important #q4
+- [ ] P3-Q6: Correct comman design pattern with receiver and invoker, commands need to be thin and execute receivers only, learn from examples/patterns/Command/ folder
+
+- [ ] P4-Q7:Make a better todo.md structure with priorities, labels etc.
+    - [ ] clean this todo list, make priority to BUGS first.
+    - [ ] handle todos, in-progress better which we conflict all of them, keep in-progress to what you working on etc.
+    - [ ] move big tasks to issues if you need
+    - [ ] get some issues to here with their #code like this
+    - [ ] make a template for yourself to keep same template all of your other projects
+
+## todo
+
+- [ ] Refresh cache flag is update the caches by request api again but github releases section seems not update it. It might be related with the our class get it from cache even we use api because of the way we implemented the cache, so we need to check that and make sure it is working as expected. Below is the log for that, we can see that github releases section is not updated but api section is updated.
+
+```bash
+uv run my-unicorn update --refresh-cache
+Fetching from API:
+GitHub Releases      1/1 Retrieved from cache
+```
+
+- [ ] P9: remove unused `"method": "extraction",` from icon app state which we only use extraction type now.
+- [ ] P2: redundant remove prints:
+
+```
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _remove_appimage_files:276 - Removed AppImage: /home/developer/Applications/neovim.AppImage
+2026-01-28 13:22:47 - my_unicorn.core.cache - DEBUG - clear_cache:222 - Cleared cache for neovim/neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _clear_cache:300 - Removed cache for neovim/neovim
+2026-01-28 13:22:47 - my_unicorn.core.desktop_entry - DEBUG - remove_desktop_file:431 - Removed desktop file: /home/developer/.local/share/applications/neovim.desktop
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _remove_desktop_entry:354 - Removed desktop entry for neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _remove_icon:379 - Removed icon: /home/developer/Applications/icons/neovim.png
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _remove_config:399 - Removed config for neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:200 - ✅ Removed AppImage(s): /home/developer/Applications/neovim.AppImage
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:203 - ✅ Removed cache for neovim/neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:216 - ⚠️  No backups found at: /home/developer/Applications/backups/neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:219 - ✅ Removed desktop entry for neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:223 - ✅ Removed icon: /home/developer/Applications/icons/neovim.png
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:230 - ✅ Removed config for neovim
+```
+
+- [ ] P2-Q9: add cli upgrade command check for new version available in update command?
+- [ ] P4: Remove code smells: <https://refactoring.guru/refactoring/smells>
+    - [ ] contexts
+    - [ ] config
+    - [x] handle FIXME, TODO for duplicate functions
 - [ ] writing every test from scratch for better understanding of tests and make sure they work as expected
     - [ ] cli tests
     - [ ] commands tests
@@ -31,52 +220,16 @@
     - [ ] services tests
     - [ ] schemas tests
     - [ ] maybe TDT style tests later if possible
-
-- [ ] config --show is showing global config, better to name it --show-global-config for more clarity
-- [ ] move workflow folder modules to utils folder for better structure
-- [ ] Correct comman design pattern with receiver and invoker, commands need to be thin and execute receivers only, learn from examples/patterns/Command/ folder
-
-- [ ] Make a better todo.md structure with priorities, labels etc.
-    - [ ] clean this todo list, make priority to BUGS first.
-    - [ ] handle todos, in-progress better which we conflict all of them, keep in-progress to what you working on etc.
-    - [ ] move big tasks to issues if you need
-    - [ ] get some issues to here with their #code like this
-    - [ ] make a template for yourself to keep same template all of your other projects
-
-- [ ] P1: deprecate my-unicorn package and repo directories (migrated to uv)
-    - [ ] Move venv-wrapper.bash to archive to your lin-utils repo
-    - [ ] Remove legacy cli tool install from setup.sh
-
-- [ ] use space-separated to follow KISS principle?
-
-```bash
-  # Install from catalog (comma-separated or space-separated)
-  my-unicorn install appflowy,joplin,obsidian
-  my-unicorn install appflowy joplin obsidian
-```
-
-- [ ] P1: add INFO level logs for verification instead of DEBUG
 - [ ] add remove --all command
-- [ ] P2: add lock for one instance only to prevent multiple instance run at the same time
-    - [ ] 16G error log, because of 2 instance running at the same time.
-
-- [ ] P3: Never use the real user config logs, app location on pytest unittests which current is use them!
-
-- [ ] P4: Remove code smells: <https://refactoring.guru/refactoring/smells>
-    - [ ] contexts
-    - [ ] config
-    - [x] handle FIXME, TODO for duplicate functions
-
-## todo
-
+- [ ] config --show is showing global config, better to name it --show-global-config for more clarity
 - [ ] add token command and use it as token storage etc. keep auth command for authentication only.
 - [ ] performance improvements on api : <https://github.com/xbeat/Machine-Learning/blob/main/9%20Strategies%20to%20Boost%20API%20Performance.md>
     - [ ] APIGateway would be useful when we impemented gitlab support
     - [ ] GraphQL-like query system for REST APIs
 - [ ] Add command to migrate from URL installs to Catalog installs
-Example; `my-unicorn migrate --app appflowy` or `my-unicorn migrate --all`
-but we use migrate command to migrate old config to new config structure
-so we need to use flags like `--from-url-to-catalog` or something like that.
+      Example; `my-unicorn migrate --app appflowy` or `my-unicorn migrate --all`
+      but we use migrate command to migrate old config to new config structure
+      so we need to use flags like `--from-url-to-catalog` or something like that.
 
 - [ ] Add option in global config for [auth]
 - [ ] What about threading usage on logging? Example: <https://github.com/Roulbac/uv-func/blob/main/src/uv_func/logging.py>
@@ -93,6 +246,7 @@ so we need to use flags like `--from-url-to-catalog` or something like that.
 - [ ] P2: update.bash check network connection
 - [ ] add autocompletion for the catalog apps to autocomplete app names (e.g: `super<tab>-productivity`)
 - [ ] #BUG: `/tmp/.mount_appflobIOEjI/AppFlowy: error while loading shared libraries: libkeybinder-3.0.so.0: cannot open shared object file: No such file or directory`
+
     - This is dependency issue, installing `keybinder3` solve the issue. I don't think I can do anything from my side, maybe document it on the docs.
 
 - [ ] TEST: test probably use AppImageKit, better to make sure it is only used for though.
@@ -139,12 +293,13 @@ Confirm your GitHub token:
       <https://clig.dev/>
       <https://www.amazon.com/UNIX-Programming-Addison-Wesley-Professional-Computng/dp/0131429019>
 
-    My advice as a user of CLI:
+  My advice as a user of CLI:
+
     - no emojis please, ever
-      Many people are more visually oriented, and are greatly aided by images and color.
-      A standard `NO_EMOJIS` environment variable could perhaps be used to help both camps, just like `NO_COLOR` is available today.
+    Many people are more visually oriented, and are greatly aided by images and color.
+    A standard `NO_EMOJIS` environment variable could perhaps be used to help both camps, just like `NO_COLOR` is available today.
     - if you want to make it look nice, use ANSI escape codes for color rather than emojis.
-      even then, don't use color alone to convey meaning because it will most likely get destroyed by whatever you're piping it to.
+    even then, don't use color alone to convey meaning because it will most likely get destroyed by whatever you're piping it to.
     - No, please don't use escape codes in your output. Use the library that is designed for this purpose: terminfo.
     - please take the time to write detailed man pages, not just a "--help" screen
     - implement "did you mean?" for typos (git style) and potentially dangerous commands
@@ -157,6 +312,66 @@ Confirm your GitHub token:
 
 ## done
 
+- [x] P1: BUG: missing computed hashes on verified app when used checksum_file (example tagspace) this happens on update command, install command show the hashes computed etc.
+
+```json
+      "methods": [
+        {
+          "algorithm": "sha256",
+          "filename": "SHA256SUMS.txt",
+          "status": "passed",
+          "type": "checksum_file"
+        }
+      ],
+
+            "methods": [
+        {
+          "algorithm": "SHA256",
+          "source": "github_api",
+          "status": "passed",
+          "type": "digest"
+        },
+        {
+          "algorithm": "SHA256",
+          "source": "https://github.com/tagspaces/tagspaces/releases/download/v6.8.2/SHA256SUMS.txt",
+          "status": "passed",
+          "type": "checksum_file"
+        }
+      ],
+```
+
+- [x] P1:BUG: cache also won't save the checksum_file if digest exist?
+
+```json
+{
+  "cached_at": "2026-02-04T15:04:13.654171+03:00",
+  "ttl_hours": 24,
+  "release_data": {
+    "owner": "tagspaces",
+    "repo": "tagspaces",
+    "version": "6.8.2",
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "tagspaces-linux-x86_64-6.8.2.AppImage",
+        "size": 159537674,
+        "digest": "sha256:3c8ca310ab79d09202b55c2a832d5d09c7caf81c5db2270821dc05e90172e2df",
+        "browser_download_url": "https://github.com/tagspaces/tagspaces/releases/download/v6.8.2/tagspaces-linux-x86_64-6.8.2.AppImage"
+      }
+    ],
+    "original_tag_name": "v6.8.2"
+  }
+}
+```
+
+- [x] P3-Q5: move workflow folder modules to utils folder for better structure
+- [x] catalog_adapter.py is probably unnecessary because it just delegate the config manager...
+- [x] Test new features
+    - [x] github action for releases
+    - [x] `my-unicorn upgrade` command now use uv package manager.
+    - [x] Test `migrate` command
+    - [x] Test `migrate` command on virtual machine.
+- [x] use orjson for the migrate modules for better performance
 - [x] fix: remove service can't remove caches!
 - [x] unused comma seperate function on commands/base.py
 - [x] P2: #BUG: Cycle, circular import detected in import chain for cache.py
@@ -192,7 +407,7 @@ Confirm your GitHub token:
 - [x] remove writing commits to release desc
     - [x] removed commits
     - [x] make it work with keepachangelog template which that template not use v0.1.0 `v` prefix on its heading
-          so our github action bash script need to add itself when creating tags because conventional tags need v in front of them.
+        so our github action bash script need to add itself when creating tags because conventional tags need v in front of them.
 - [x] #BUG: Rotation error on logs... - Currently, implemented to custom rotation logic more simple and efficient
       and also increased 1MB log to 10MB to increase the log size. Manual and pytest
       succesfully passed.
@@ -215,7 +430,7 @@ Confirm your GitHub token:
 - [x] #BUG: digest not became true on catalog installs if its use checksum_file with digest verify both
 - [x] make sure skip not skip verification if there is verification option
     - [x] freetube test verify digest even it is skip: true on the catalog,
-          and I still keep it skip purposely
+        and I still keep it skip purposely
     - [x] obsidian test
 - [x] Clean up code
     - [x] general

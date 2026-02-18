@@ -40,12 +40,16 @@ def parse_github_url(url: str) -> dict[str, str]:
         {'owner': 'AppFlowy-IO', 'repo': 'AppFlowy', 'app_name': 'appflowy'}
 
     """
+
+    def _raise_invalid_url() -> None:
+        msg = f"Invalid GitHub URL format: {url}"
+        raise InstallationError(msg)
+
     try:
         # Parse owner/repo from URL
         parts = url.replace("https://github.com/", "").split("/")
         if len(parts) < MIN_GITHUB_PARTS:
-            msg = f"Invalid GitHub URL format: {url}"
-            raise InstallationError(msg)
+            _raise_invalid_url()
 
         owner, repo = parts[0], parts[1]
         app_name = repo.lower()

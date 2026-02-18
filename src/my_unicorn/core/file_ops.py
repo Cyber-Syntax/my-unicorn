@@ -5,6 +5,7 @@ executable, renaming, moving, creating backups, icon extraction, and other
 storage-related tasks.
 """
 
+import shutil
 from pathlib import Path
 
 from my_unicorn.core.icon import AppImageIconExtractor, IconExtractionError
@@ -60,7 +61,24 @@ class FileOperations:
 
         # Move file
         logger.debug("Moving file: %s -> %s", source.name, destination.name)
-        source.rename(destination)
+        # Integration tests run in /tmp/pytest-... (tmpfs filesystem) but the
+        # workspace is in /home/<user_name>... (different filesystem/partition)
+        # When trying to move files between these,
+        # Python's Path.rename() fails because it uses the OS rename() syscall
+        # which cannot move files across filesystem boundaries.
+        try:
+            source.rename(destination)
+        except OSError as e:
+            # Handle cross-device move (OSError: [Errno 18] Invalid cross-device link)
+            if getattr(e, "errno", None) == 18:
+                logger.debug(
+                    "Cross-device move detected, using shutil.move: %s -> %s",
+                    source,
+                    destination,
+                )
+                shutil.move(str(source), str(destination))
+            else:
+                raise
         return destination
 
     def move_to_install_dir(

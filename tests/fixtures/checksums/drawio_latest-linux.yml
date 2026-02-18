@@ -1,0 +1,16 @@
+# Draw.io - Base64 SHA512 in YAML format
+version: 29.3.6
+files:
+  - url: drawio-x86_64-29.3.6.AppImage
+    sha512: SQvi0aMyTviB/ZC7bAlspTzXkxyMp2ejSOuQ40ScCbbJfc5KpKjEh9HQESr8Iu1UUBppLfJjJ395mIminUSxIQ==
+    size: 157316143
+    blockMapSize: 164931
+  - url: drawio-amd64-29.3.6.deb
+    sha512: KBHahB4I7BuESXauzA5NpuTkyXB/PR8wt90WbVIaftPuX5X40fWbNew+72ILwrKY5+LtYjV+goRmEQXRRh4oSw==
+    size: 125609032
+  - url: drawio-x86_64-29.3.6.rpm
+    sha512: fDOPVUYCd2OAWTVKV4dTmyg4ZJxICtWM6pWjR/iVvRVelBl1ICcFk/p2ij/lcWXgjgb/VlhIQS5wsnWw4HYzDw==
+    size: 110031065
+path: drawio-x86_64-29.3.6.AppImage
+sha512: SQvi0aMyTviB/ZC7bAlspTzXkxyMp2ejSOuQ40ScCbbJfc5KpKjEh9HQESr8Iu1UUBppLfJjJ395mIminUSxIQ==
+releaseDate: '2026-01-29T21:10:04.586Z'

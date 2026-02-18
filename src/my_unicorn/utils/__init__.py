@@ -12,16 +12,6 @@ Note: Functions have been reorganized following DRY principles:
 - Desktop entry utils (sanitize_filename, create_desktop_entry_name) -> infrastructure/desktop_entry.py
 """
 
-# Import update display functions
-from my_unicorn.ui.display_update import (
-    display_update_details,
-    display_update_error,
-    display_update_progress,
-    display_update_success,
-    display_update_summary,
-    display_update_warning,
-)
-
 # Import asset validation utilities (truly shared across multiple layers)
 from my_unicorn.utils.asset_validation import (
     CHECKSUM_FILE_PATTERNS,
@@ -34,12 +24,6 @@ from my_unicorn.utils.asset_validation import (
 __all__ = [
     "CHECKSUM_FILE_PATTERNS",
     "SPECIFIC_CHECKSUM_EXTENSIONS",
-    "display_update_details",
-    "display_update_error",
-    "display_update_progress",
-    "display_update_success",
-    "display_update_summary",
-    "display_update_warning",
     "get_checksum_file_format_type",
     "is_appimage_file",
     "is_checksum_file",

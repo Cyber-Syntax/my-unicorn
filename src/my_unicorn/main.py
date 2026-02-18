@@ -21,8 +21,8 @@ async def async_main() -> None:
     Initialize the CLI runner and execute the main command loop
     asynchronously.
     """
+    logger.info("CLI started")
     runner = CLIRunner()
-    logger.debug("CLI started")
     try:
         await runner.run()
         logger.debug("CLI completed successfully")
