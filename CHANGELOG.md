@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.3.0-alpha] - 2026-02-18
 
 ### Added
 
@@ -20,11 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `NullProgressReporter` implementing null object pattern for optional progress tracking
 - Added comprehensive Raises sections to all public method docstrings in workflow modules for better error documentation
 - Added async safety documentation to class docstrings explaining thread safety and concurrent access patterns
-- Added 49 new tests for refactored service classes and domain types:
-    - 8 tests for TargetResolver (installation target separation logic)
-    - 8 tests for InstallStateChecker (installation planning logic)
-    - 16 tests for ConfigurationValidator (security-critical validation)
-    - 16 tests for workflow result types (InstallResult, UpdateResult, InstallPlan)
 - Enhanced in-memory caching documentation with performance metrics and thread safety notes
 - Extended `app_state_v2.schema.json` with new verification fields for enhanced state tracking:
     - `overall_passed`: Boolean indicating if any verification method succeeded
@@ -35,7 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Stores source URL, filename, algorithm, and hash mappings
     - Enables verification reuse without re-downloading checksum files
 - Added `get_checksum_files()`, `has_checksum_files()`, and `get_checksum_file_for_asset()` methods to `CacheManager`
-- Added 100+ tests covering schema validation, cache operations, and verification workflows
+- Test support for bulk updates and stronger CLI coverage
+    - Added `test_update_all_cmd` and a `--update-all` test flag in `scripts/test.py` to validate "update all" workflows.
+- Significant test coverage increases and reorganization
+    - Dozens of focused unit tests added across progress, verification, update and utils (representative files: `tests/core/progress/test_ascii_format.py`, `test_ascii_sections.py`, `test_ascii_output.py`, `test_display_id.py`).
+    - Tests reorganized for clearer scopes and faster discovery (see `tests/cli/`, `tests/core/`, `tests/config/`, `tests/utils/`).
+    - Added 100+ tests covering schema validation, cache operations, and verification workflows
 
 ### Changed
 
@@ -59,6 +59,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `VerificationService` now passes checksum file data to `CacheManager` for persistence
 - Update workflow recalculates verification state with fresh hashes instead of preserving stale data
 - Enhanced `StateVerification` and `VerificationMethod` TypedDicts with comprehensive docstrings
+- Large internal refactors to improve modularity and maintainability
+    - Verification: replaced the monolithic checksum parser with a `checksum_parser/` package (specialized parsers + detector/normalizer) and split the verification service into focused modules (detection, helpers, execution, verification methods).
+        - Result: `service.py` shrank from ~1322 → 437 lines; multiple mypy issues fixed.
+    - Update & logging subsystems decomposed into smaller modules:
+        - `update.py` split into `context.py`, `catalog_cache.py`, `manager.py`, `workflows.py`.
+        - `logger.py` split into 6 focused modules while preserving the singleton API via re-exports.
+        - Fixes and test updates made during the split (no behavioral changes to public CLI).
+    - Progress/display rework — moved from `ui` to `core/progress` and extracted many helpers (`ascii_format`, `ascii_sections`, `ascii_output`, `display_id`, `display_registry`, `display_logger`, `display_session`, `display_workflows`).
+        - Keeps prior public behavior while improving SRP, testability and code size.
+        - Import paths updated throughout CLI and tests.
+- Documentation & housekeeping
+    - UI docs clarified and examples expanded (`docs/ui.md`).
+    - Minor repo maintenance: `.gitignore` and `AGENTS.md` improved for clarity.
 
 ### Fixed
 
@@ -70,10 +83,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed update command not refreshing verification data when updating to new versions
 - Fixed `VerificationError` not being raised when all verification methods fail
 - Fixed checksum file references not persisting to cache JSON files
+- Corrected asynchronous and protocol issues in progress reporting
+    - `ProgressReporter` protocol methods made `async def`; `NullProgressReporter` and related callers updated; added protocol-compliance tests.
+- Reliability fixes in post-download and verification flows
+    - Guarded hash-retrieval in `PostDownloadProcessor` and improved null-safety checks.
+- Test and typing fixes uncovered by the refactors
+    - Multiple test failures resolved (including patched instantiation sites for `DownloadService` / `PostDownloadProcessor`); `test_update.py` suite fully passing after fixes.
 
 ### Removed
 
 - Legacy venv-wrapper.bash script and install functionality removed from install.sh.
+- Removed legacy/monolithic and obsolete modules
+    - Deleted legacy `checksum_parser.py` (replaced by the new `checksum_parser/` package).
+    - Removed old monolithic `update.py` / `logger.py` implementations (functionality preserved in new modules).
+    - Deleted obsolete UI helper `src/my_unicorn/ui/display_common.py` and other unused legacy files.
+    - Removed several deprecated test-package `__init__` files as the test layout was modernized.
 
 ### Notes
 
