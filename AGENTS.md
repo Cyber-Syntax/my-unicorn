@@ -112,26 +112,6 @@ uv run my-unicorn --help
 # 7. Test UI behavior (quick smoke test)
 uv run scripts/test.py --quick
 ```
-
-### Managing Dependencies
-
-```bash
-# Add a runtime dependency
-uv add <package-name>
-
-# Add a dev dependency
-uv add --dev <package-name>
-
-# Update all dependencies
-uv lock --upgrade
-
-# Sync dependencies after pulling changes
-uv sync
-
-# Remove a dependency
-uv remove <package-name>
-```
-
 ## Code Quality Standards
 
 ### Type Hints
@@ -239,7 +219,6 @@ tests/                             # Test suite (mirrors src structure)
 ├── e2e/                           # End-to-end tests
 ├── fixtures/                      # Test fixtures
 │   └── checksums/                 # Real checksum data for integration tests
-├── test_*.py                      # Custom tests (e.g., test_lines.py for line count checks)
 ├── core/
 │   ├── conftest.py                # Core module group fixtures
 │   ├── install/
@@ -405,19 +384,4 @@ cat ~/.config/my-unicorn/settings.conf
     - `GLOBAL_CONFIG_VERSION` - Currently "1.1.0"
     - `APP_CONFIG_VERSION` - Currently "2.0.0"
 
-### Documentation Principles
 
-| Principle | Description |
-|-----------|-------------|
-| **Beginner-friendly** | Non-developers should understand core concepts |
-| **Copy-paste success** | Code examples must run with minimal setup |
-| **Less text, more interaction** | Prefer components over long paragraphs |
-| **Show, don't tell** | Use diagrams, tabs, and accordions to explain |
-| **Few lines, big impact** | Examples should feel like "only 3 lines to do this" |
-
-## Additional Resources
-
-- **Documentation:** See `docs/` directory for detailed design decisions, architecture diagrams, and API documentation
-- **Scripts:** Helper scripts in `scripts/` for development tasks
-- **Architecture Decision Records:** `docs/dev/adr/` for major technical decisions
-- **Development Guides:** `docs/dev/` for in-depth development patterns and best practices

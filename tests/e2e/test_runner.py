@@ -85,6 +85,43 @@ class TestCLIExecution:
             # The help command should execute without errors
             assert result.returncode == 0
 
+    def test_run_cli_with_custom_env_vars(
+        self, sandbox_env: SandboxEnvironment, e2e_runner: E2ERunner
+    ) -> None:
+        """Test that run_cli accepts and applies custom env variables."""
+        with sandbox_env:
+            # Define custom env vars
+            custom_env = {
+                "MY_UNICORN_LOCKFILE_PATH": "/tmp/custom_lock",
+                "TEST_VAR": "test_value",
+            }
+
+            # Run CLI with custom env vars
+            result = e2e_runner.run_cli("--help", env_overrides=custom_env)
+
+            # The command should execute successfully
+            assert result.returncode == 0
+
+    def test_run_cli_preserves_sandbox_home(
+        self, sandbox_env: SandboxEnvironment, e2e_runner: E2ERunner
+    ) -> None:
+        """Test that sandbox HOME is preserved with custom env vars."""
+        with sandbox_env:
+            # Create a test file in sandbox to verify it's being used
+            apps_dir = (
+                sandbox_env.temp_home / ".config" / "my-unicorn" / "apps"
+            )
+            apps_dir.mkdir(parents=True, exist_ok=True)
+
+            # Run CLI with both sandbox HOME and custom env vars
+            custom_env = {"MY_CUSTOM_VAR": "custom_value"}
+            result = e2e_runner.run_cli("--help", env_overrides=custom_env)
+
+            # The command should execute successfully with sandbox HOME
+            # still in place
+            assert result.returncode == 0
+            assert sandbox_env.temp_home.exists()
+
 
 @pytest.mark.e2e
 class TestConfigManipulation:

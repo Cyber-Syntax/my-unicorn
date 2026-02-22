@@ -248,3 +248,11 @@ Test Coverage (estimated):
 - Report inaccuracies via GitHub issues with label `docs:architecture`
 - Suggest improvements to architecture via ADR process
 - Update this blueprint when making structural changes to CLI module
+
+## Single-Instance Feature (New)
+
+For a focused high-level architecture of the single-instance behavior,
+see `docs/dev/architecture/single-instance.md`.
+
+This companion doc covers the `CLIRunner` → `LockManager` boundary,
+locking contract, execution flow, and user-visible failure modes.

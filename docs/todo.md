@@ -35,6 +35,7 @@
 
 - [ ] Improve testing
     - [ ] Refactor folder e2e tmp files, move it to tmp/pytest-of-<user>-e2e/ for better structure
+    - [ ] Make pytest log level DEBUG, better to setup env for that for easy pytest changes without bothering the settings.conf. In real world cli tools priority; env > config file
     - [ ] Learn Schemathesis
     - [ ] Learn <https://hypothesis.readthedocs.io/en/latest/stateful.html>
     - [ ] Learn <https://realpython.com/python-cli-testing/#lo-fi-debugging-with-print>
@@ -250,11 +251,12 @@ GitHub Releases      1/1 Retrieved from cache
     - This is dependency issue, installing `keybinder3` solve the issue. I don't think I can do anything from my side, maybe document it on the docs.
 
 - [ ] TEST: test probably use AppImageKit, better to make sure it is only used for though.
-- [ ] #TEST: test.bash need another command --use-cache, --no-cache which remove and not remove
 - [ ] is it better to use functional programming?
 - [ ] dev(test): manual test script need network exception error handling
 - [ ] mv neovim to usr bin to use appimage neovim
       mv /tmp/nvim.appimage /usr/local/bin/nvim
+
+- [ ] add fish autocomplete support
 
 ## backlog
 
@@ -312,6 +314,7 @@ Confirm your GitHub token:
 
 ## done
 
+- [ ] #TEST: test.bash need another command --use-cache, --no-cache which remove and not remove
 - [x] P1: BUG: missing computed hashes on verified app when used checksum_file (example tagspace) this happens on update command, install command show the hashes computed etc.
 
 ```json
