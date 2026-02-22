@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Single‑instance support across the CLI by introducing a process‑level lock file.
+    - New `LockManager` class uses `fcntl.flock` for exclusive locking.
+    - `CLIRunner` now acquires/releases the lock around command execution.
+    - `LockError` exception added for lock acquisition failures.
+    - `LOCKFILE_PATH` constant defined in `constants.py`.
+
+- Comprehensive test coverage for the new locking feature.
+    - Unit tests verify `LOCKFILE_PATH` and `LockError` behavior.
+    - Integration tests exercise `LockManager` and `CLIRunner` under success and failure scenarios.
+    - End‑to‑end CLI tests confirm that only one process can run at a time.
+    - Exception tests updated to include lock‑related error messages.
+
+- Documentation for the single‑instance feature, including architecture details, flow diagrams, and failure modes.
+
 ## [2.3.0-alpha] - 2026-02-18
 
 ### Added
