@@ -31,13 +31,20 @@ class E2ERunner:
         """
         self.sandbox = sandbox
 
-    def run_cli(self, *args: str) -> subprocess.CompletedProcess[str]:
+    def run_cli(
+        self,
+        *args: str,
+        env_overrides: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         """Execute a my-unicorn CLI command in sandbox.
 
         Runs the command with the sandbox's HOME environment variable set.
+        Optional custom environment variables can be passed for testing.
 
         Args:
             *args: Command line arguments to pass to my-unicorn
+            env_overrides: Optional dict of environment variables to merge
+                with the sandbox environment. Custom vars override defaults.
 
         Returns:
             CompletedProcess instance with command result
@@ -48,6 +55,10 @@ class E2ERunner:
         # Set up environment with sandbox HOME
         env = os.environ.copy()
         env["HOME"] = str(self.sandbox.temp_home)
+
+        # Merge custom environment variables if provided
+        if env_overrides:
+            env.update(env_overrides)
 
         # Execute the command (nosec: cmd solely from arguments)
         return subprocess.run(  # noqa: S603
