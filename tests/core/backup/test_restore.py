@@ -225,3 +225,52 @@ class TestBackupServiceRestore:
         # v1.2.0 and v1.2.1 cleaned up AFTER successful restore
         assert "1.2.0" not in final_versions
         assert "1.2.1" not in final_versions
+
+
+class TestRestoreBackupValidation:
+    """Test that restore_backup validates on save."""
+
+    def test_restore_backup_validates_on_save(
+        self,
+        backup_service: Any,
+        dummy_config: Any,
+        sample_app_config: dict[str, Any],
+    ) -> None:
+        """Test save_app_config is called WITHOUT skip_validation=True.
+
+        This ensures validation runs at write time. The config_manager.
+        save_app_config must be called with either:
+        - No skip_validation keyword argument (default False)
+        - Or explicitly skip_validation=False
+        """
+        config_manager, _, backup_dir, storage_dir = dummy_config
+        config_manager.load_app_config.return_value = sample_app_config
+
+        app_name = "app1"
+        app_backup_dir = backup_dir / app_name
+        app_backup_dir.mkdir()
+
+        # Create backup file and metadata
+        backup_file = app_backup_dir / "app1-1.2.2.AppImage"
+        backup_file.write_text("backup content")
+
+        metadata = BackupMetadata(app_backup_dir)
+        metadata.add_version("1.2.2", "app1-1.2.2.AppImage", backup_file)
+
+        # Restore
+        restored_path = backup_service.restore_latest_backup(
+            app_name, storage_dir
+        )
+
+        assert restored_path is not None
+
+        # Verify save_app_config was called
+        assert config_manager.save_app_config.called
+        call_args = config_manager.save_app_config.call_args
+
+        # Verify skip_validation is NOT True
+        # The call should either have no skip_validation kwarg, or have False
+        if "skip_validation" in call_args.kwargs:
+            assert call_args.kwargs["skip_validation"] is False, (
+                "skip_validation must be False or omitted, not True"
+            )

@@ -229,7 +229,7 @@ class SandboxEnvironment:
                     new_path = self.temp_home / "Applications" / "icons"
                 elif key in ("storage", "download"):
                     # Use parent directory name if available
-                    subdir = old_path.name if old_path.name else key
+                    subdir = old_path.name or key
                     new_path = self.temp_home / subdir
                 else:
                     new_path = self.temp_home / key

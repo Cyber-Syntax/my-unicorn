@@ -134,8 +134,10 @@ class TestVerificationServiceOrchestration:
             app_name="test.AppImage",
         )
 
-        assert result.passed is True
-        assert result.methods == {}  # No methods attempted
+        assert result.passed is False
+        assert "skip" in result.methods
+        assert result.methods["skip"]["passed"] is False
+        assert result.methods["skip"]["status"] == "skipped"
 
     @pytest.mark.asyncio
     async def test_verify_file_backward_compatibility(
@@ -222,7 +224,7 @@ class TestVerificationServiceProtocolUsage:
 
         result = await service._prepare_verification(context)
         assert result is not None
-        assert result.passed is True
+        assert result.passed is False
 
 
 class TestVerificationServiceErrorHandling:
@@ -326,7 +328,72 @@ class TestVerificationServiceErrorHandling:
             assets=None,
         )
 
-        assert result.passed is True
+        # No exception raised, verification skipped but passed=False
+        assert result.passed is False
+
+    @pytest.mark.asyncio
+    async def test_verify_file_catalog_method_skip_format(
+        self, verification_service: VerificationService, test_file_path: Path
+    ) -> None:
+        """Catalog method=skip is honoured the same as skip=True."""
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url=(
+                "https://github.com/test/test/releases/download/v1.0.0/"
+                "test.AppImage"
+            ),
+            digest="",
+        )
+        config = {"method": "skip"}
+
+        result = await verification_service.verify_file(
+            file_path=test_file_path,
+            asset=asset,
+            config=config,
+            owner="test",
+            repo="test",
+            tag_name="v1.0.0",
+            app_name="weektodo",
+            assets=None,
+        )
+
+        assert result.passed is False
+        assert "skip" in result.methods
+        assert result.methods["skip"]["status"] == "skipped"
+
+    @pytest.mark.asyncio
+    async def test_verify_file_no_checksums_records_skip_method(
+        self, verification_service: VerificationService, test_file_path: Path
+    ) -> None:
+        """No checksums provided: skip entry appears in methods dict."""
+        asset = Asset(
+            name="test.AppImage",
+            size=12,
+            browser_download_url=(
+                "https://github.com/test/test/releases/download/v1.0.0/"
+                "test.AppImage"
+            ),
+            digest="",
+        )
+        config: dict = {}  # no skip, no digest, no checksum_file
+
+        result = await verification_service.verify_file(
+            file_path=test_file_path,
+            asset=asset,
+            config=config,
+            owner="test",
+            repo="test",
+            tag_name="v1.0.0",
+            app_name="weektodo",
+            assets=None,
+        )
+
+        # Installation is allowed, but methods dict is non-empty and passed=False
+        assert result.passed is False
+        assert "skip" in result.methods
+        assert result.methods["skip"]["passed"] is False
+        assert result.methods["skip"]["status"] == "skipped"
 
     @pytest.mark.asyncio
     async def test_verification_error_includes_context_fields(

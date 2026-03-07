@@ -497,7 +497,8 @@ class TestBuildVerificationStateBackwardCompat:
         assert state["passed"] is False
         assert state["overall_passed"] is False
         assert state["actual_method"] == "skip"
-        assert state["methods"] == []
+        assert len(state["methods"]) == 1
+        assert state["methods"][0] == {"type": "skip", "status": "skipped"}
 
     def test_new_state_validates_against_schema(self) -> None:
         """Newly built verification state should validate against schema."""

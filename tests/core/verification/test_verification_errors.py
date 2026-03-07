@@ -355,8 +355,8 @@ class TestWarningGeneration:
             assets=assets,
         )
 
-        # Should pass (cannot verify, but don't block)
-        assert result.passed is True
+        # Should fail (cannot verify - no strong methods available)
+        assert result.passed is False
 
         # Warning about no checksums provided
         assert result.warning is not None

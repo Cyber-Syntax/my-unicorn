@@ -451,3 +451,31 @@ class TestAppStateSchemaValidation:
         }
 
         validate_app_state(app_state, "obsidian")
+
+    def test_invalid_verification_empty_methods(self) -> None:
+        """Test that an empty methods list is rejected by the schema."""
+        app_state = {
+            "config_version": "2.0.0",
+            "source": "catalog",
+            "catalog_ref": "obsidian",
+            "state": {
+                "version": "1.10.6",
+                "installed_date": "2025-12-27T10:00:00.000000",
+                "installed_path": "/home/user/Applications/obsidian.AppImage",
+                "verification": {
+                    "passed": True,
+                    "methods": [],  # Empty list must be rejected
+                },
+                "icon": {"installed": True, "method": "extraction"},
+            },
+        }
+
+        with pytest.raises(SchemaValidationError) as exc_info:
+            validate_app_state(app_state, "obsidian")
+
+        error_message = str(exc_info.value)
+        assert (
+            "methods" in error_message
+            or "non-empty" in error_message
+            or "minItems" in error_message
+        )

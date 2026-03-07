@@ -160,7 +160,7 @@ class GitHubActionTester:
                 notes.append(line.rstrip())
 
         result = "\n".join(notes).strip()
-        return result if result else DEFAULT_NOTES
+        return result or DEFAULT_NOTES
 
     def _get_previous_tag(self) -> str:
         """Get the previous git tag.
@@ -282,7 +282,7 @@ class GitHubActionTester:
                 return username
 
         # Fallback: use part before @
-        return email.split("@")[0]
+        return email.split("@", maxsplit=1)[0]
 
     def _get_commits_with_usernames(
         self, previous_tag: str
