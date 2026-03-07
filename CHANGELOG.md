@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Documentation for the single‑instance feature, including architecture details, flow diagrams, and failure modes.
 
+### Fixed
+
+- Fixed empty methods issue on apps that don't provide checksums, ensuring `passed=False` and appropriate warnings are set in the verification result.
+
 ## [2.3.0-alpha] - 2026-02-18
 
 ### Added
