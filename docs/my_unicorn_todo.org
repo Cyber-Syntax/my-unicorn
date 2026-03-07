@@ -1,0 +1,441 @@
+#+title: Todo TODOS
+#+author: Cyber-Syntax
+
+* 📝 TEST
+** TESTING Big reviews
+- State "TESTING"    from "TODO"       [2026-03-05 Prş 22:15]
+**** TODO Network retry logic
+**** TODO API rate limiting
+**** DONE Logger rotation logic
+**** DONE Logger rotation on virtual machine
+**** DONE Logger rotation on production
+** DONE add --force option to uv tool install on all of your project to prevent issue
+* 🔁 DOING
+** BUG weektodo
+```
+2026-03-07 12:28:08 - my_unicorn.core.catalog - WARNING - display_installed_apps:104 - Failed to load config for app 'weektodo'
+```
+```bash
+➜ my-unicorn update --refresh-cache
+15:28:59 - my_unicorn.core.update.manager - ERROR - Failed to check updates for weektodo
+Traceback (most recent call last):
+  File "/home/developer/.local/share/uv/tools/my-unicorn/lib/python3.14/site-packages/my_unicorn/config/app.py", line 100, in load_raw_app_config
+    validate_app_state(config_data, app_name)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/developer/.local/share/uv/tools/my-unicorn/lib/python3.14/site-packages/my_unicorn/config/schemas/validator.py", line 337, in validate_app_state
+    validator.validate_app_state(config, app_name)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/developer/.local/share/uv/tools/my-unicorn/lib/python3.14/site-packages/my_unicorn/config/schemas/validator.py", line 244, in validate_app_state
+    raise SchemaValidationError(
+        error_msg, path=path, schema_type="app_state"
+    )
+my_unicorn.config.schemas.validator.SchemaValidationError: [app_state] at 'state.verification.methods': Invalid app state for 'weektodo': [] should be non-empty (at 'state.verification.methods')
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/developer/.local/share/uv/tools/my-unicorn/lib/python3.14/site-packages/my_unicorn/core/update/manager.py", line 308, in check_single_update
+    app_config = self._load_app_config_or_fail(
+        app_name, "check_update"
+    )
+  File "/home/developer/.local/share/uv/tools/my-unicorn/lib/python3.14/site-packages/my_unicorn/core/update/manager.py", line 431, in _load_app_config_or_fail
+    config = self.config_manager.load_app_config(app_name)
+  File "/home/developer/.local/share/uv/tools/my-unicorn/lib/python3.14/site-packages/my_unicorn/config/config.py", line 163, in load_app_config
+    return self.app_config_manager.load_app_config(app_name)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/home/developer/.local/share/uv/tools/my-unicorn/lib/python3.14/site-packages/my_unicorn/config/app.py", line 59, in load_app_config
+    raw_config = self.load_raw_app_config(app_name)
+  File "/home/developer/.local/share/uv/tools/my-unicorn/lib/python3.14/site-packages/my_unicorn/config/app.py", line 105, in load_raw_app_config
+    raise ValueError(msg) from e
+ValueError: Invalid app config for weektodo: [app_state] at 'state.verification.methods': Invalid app state for 'weektodo': [] should be non-empty (at 'state.verification.methods')
+```
+weektodo.json:
+```json
+{
+  "catalog_ref": "weektodo",
+  "config_version": "2.0.0",
+  "source": "catalog",
+  "state": {
+    "icon": {
+      "installed": true,
+      "method": "extraction",
+      "path": "/home/developer/Applications/icons/weektodo.png"
+    },
+    "installed_date": "2026-02-13T13:27:52.591432+03:00",
+    "installed_path": "/home/developer/Applications/weektodo.AppImage",
+    "verification": {
+      "methods": [],
+      "passed": false
+    },
+    "version": "2.2.0"
+  }
+}
+```
+
+** TODO P1-Q1: Open github issues
+- per big todo for all below, it is hard to follow big tasks, keep this todo.md only for simple stuff like learn this, review this, test this etc. use issues like directly implementing big stuff like improving tests, adding new feature etc.
+** TODO add remove --all command
+** TODO progress_service written optional but we must make it required.
+- cli/upgrade.py doesn't use progress bar, so it won't need it.
+** TODO make log console level is INFO and mandotory
+- because we use log.info as print
+** TODO move caches to local share?
+** TODO make jsonl database on ~/Applications location for app versions
+- with that approach we would solve version problem via config and applications and two location to sure about version
+- this would make sure config not corrupted with error
+** TODO add check for corruption/missing files
+- same for others like .desktop, icon etc. which if we switch to new distro and move our configs, we can't be able to install all of our apps via my-unicorn cli configs because we save the configs to save names, reference, version etc. and than use that version to compare is there any new app etc. we can't even check if appimage exist or not we just check the .json file stay on the config location, we don't check any other .desktop exist or not... so we need to check appimages installed or not for better error handling and we need to find out what we can do about installing more than one file from scratch via app config or another installed database via .jsonl to handle that and another share... location to use active installed ones etc. etc. For example; we can use another jsonl database but that's also make things more complicated and probably non-sense which we already have .json files for that, we need another solution to handle fast installation for all installed apps, maybe we can add export command to export all the installed ones to a jsonl file and than we can use that file to install via my-unicorn easily to make easy installs for new distros or when we switch to new distro etc. but exporting names of the apps is realy enough for the catalog installed ones which we can just write the `install <app-name> <app_name2> ...` to install all of them ones more simply without botherin jsonl, and for the url we can export urls to another file because we can't install url via catalog install, so we can export another and than we can install via cli later via `install <url1> <url2> ...` so that would be more easy to handle and we don't bother with jsonl.
+** SOMEDAY supported new catalog apps:
+- muffon, simpmusic, spotube(test), pear-desktop
+** DOING Improve testing
+- State "DOING"      from "TODO"       [2026-03-05 Prş 22:23]
+**** TODO Refactor folder e2e tmp files, move it to tmp/pytest-of-<user>-e2e/ for better structure
+**** TODO Make pytest log level DEBUG, better to setup env for that for easy pytest changes without bothering the settings.conf. In real world cli tools priority; env > config file
+**** DONE P1-Q3: Never use the real user config logs, app location on pytest unittests which current is use them! #p1 #important #q3
+**** DONE write ui integration test for progress bar
+**** DONE Write e2e testing (Seems like scripts/test.py belongs to there and can be work with pytest)
+**** DONE structure improve
+** DOING P1-Q1: improve e2e tests #p1 #q1 #important #testing
+- State "DOING"      from "TODO"       [2026-03-05 Prş 22:23]
+**** TODO add backup test to --quick flag on test.py
+**** TODO add --refresh-cache flag to --quick and --all flags to make sure cache also work after test passed without refresh cache flag.
+**** TODO Update container to test with this manual test script, so we don't need to test in our local machine.
+****** TODO add env variable support for github token to use on container tests.
+****** TODO add flag to close progress bar on cli for better support on ci tests.
+**** TODO make sure the api fetch install works (we do that by remove and install on manual test script but seems like remove didn't removed the cache and I couldn't able to detect the api bug correctly, so we need to make manual test to make sure remove did it's job correctly etc.)
+**** TODO add backup tests to make sure backup command also work as expected on tests etc.
+**** TODO add new command to manual test script like `--slow` for big apps like joplin.
+**** TODO add new command to test remove, upgrade, migrate commands.
+add a diagnose test after the test done to make sure everything is fine after all tests
+we can do a something like return a report at the end of the tests with diagnose output etc.
+current test summary couldn't detect the failed passed correctly but we can make
+comprehensive report by checking the appimage config, backup metedata, check appimage location, desktop entry etc. all of the things to make sure everything is fine after the tests.
+we probably need to define one correct example or we can just use the json scheme
+** TODO Not write computed when failed
+```json
+{
+  "catalog_ref": "super-productivity",
+  "config_version": "2.0.0",
+  "source": "catalog",
+  "state": {
+    "icon": {
+      "installed": true,
+      "method": "extraction",
+      "path": "/home/gamer/Applications/icons/super-productivity.png"
+    },
+    "installed_date": "2026-02-18T20:51:49.297441+03:00",
+    "installed_path": "/home/gamer/Applications/super-productivity.AppImage",
+    "verification": {
+      "methods": [
+        {
+          "algorithm": "SHA256",
+          "computed": "17949b253c93d004849b5bb04c0647cf4cf95d7f89ec66e59cd2b9bd08866b82",
+          "expected": "sha256:17949b253c93d004849b5bb04c0647cf4cf95d7f89ec66e59cd2b9bd08866b82",
+          "source": "github_api",
+          "status": "passed",
+          "type": "digest"
+        },
+        {
+          "algorithm": "SHA256",
+          "computed": "",
+          "expected": "sha512:8ca635e2956ef992780c9c45a1e10eedf5139cca6d0bff94699751f1590bbd9b58453e17ccb8e7d8d9dfe4ad086c26c4a593152eff60b25fd975a3ee03547c37",
+          "source": "",
+          "status": "failed",
+          "type": "checksum_file"
+        }
+      ],
+      "passed": true
+    },
+    "version": "17.1.8"
+  }
+}
+```
+** TODO LEARN: Learn more about testing;
+**** TODO Learn Schemathesis
+**** TODO Learn <https://hypothesis.readthedocs.io/en/latest/stateful.html>
+**** TODO Learn <https://realpython.com/python-cli-testing/#lo-fi-debugging-with-print>
+**** DONE Learn and add integration tests after workflows refactor.
+** TODO Refactor: Cleaning up dead codes;
+**** TODO remove unused from types.py
+**** TODO P1: Remove desktop_entry.py and other similar modules that only export things for backward compatbility.
+**** TODO P1-Q2: deprecate my-unicorn package and repo directories (migrated to uv) #q2 #important #refactor
+**** TODO P9: remove unused `"method": "extraction",` from icon app state which we only use extraction type now.
+** TODO P1: refactor core/update/update.py to better architecture for update all command and update with appimage names.
+**** TODO Example; `my-unicorn update` would update all apps, `my-unicorn update appflowy qownnotes` would update only qownnotes and appflowy.
+** TODO remove interactive argument on the AsciiProgressBackend when you understand what it's do which we don't use any kind of interactive mode on our progress bar, so we can remove that and just use the output.isatty() to detect the interactive mode if needed.
+** TODO LEARN: Improve code quality with better practices:
+**** TODO <https://github.com/carlosperate/awesome-pyproject?tab=readme-ov-file#testing>
+**** TODO learn dependency injection better which seems like protocol used for that to make better decoupling.
+**** TODO <https://github.com/ArjanCodes/betterpython/blob/main/1%20-%20coupling%20and%20cohesion/coupling-cohesion-after.py>
+**** TODO <https://docs.python-guide.org/writing/style/>
+**** TODO learn Makefile
+**** TODO learn testing trophy philosophy
+** DOING Improve agents.md
+- State "DOING"      from "TODO"       [2026-03-05 Prş 22:25]
+**** DONE <https://github.com/langchain-ai/langchain/blob/master/AGENTS.md>
+**** TODO <https://alexop.dev/posts/stop-bloating-your-claude-md-progressive-disclosure-ai-coding-tools/>
+** SOMEDAY use functools.cache for reading json files, caches for performance?
+** TODO P4-Q7: backup create command feature -> will make a backup directly from the command line `my-unicorn backup create appflowy` or `my-unicorn backup create --all` for all apps.
+** SOMEDAY p1-q1: load app config one time instead of loading on every function call like remove, backup, update... etc.
+** DOING P1-Q2 decrease all the modules lines to less than 500 lines for better structure and maintainability.
+- State "DOING"      from "TODO"       [2026-03-05 Prş 22:25]
+**** TODO workflows/update.py
+**** TODO workflows/install.py
+** DOING P2-Q4: fix all mypy issues #p2 #important #q4
+- State "DOING"      from "TODO"       [2026-03-05 Prş 22:25]
+** TODO P3-Q6: Correct comman design pattern with receiver and invoker, commands need to be thin and execute receivers only, learn from examples/patterns/Command/ folder
+* 🔲 TODO
+** TODO Refresh cache flag is update the caches by request api again but github releases section seems not update it. It might be related with the our class get it from cache even we use api because of the way we implemented the cache, so we need to check that and make sure it is working as expected. Below is the log for that, we can see that github releases section is not updated but api section is updated.
+```bash
+uv run my-unicorn update --refresh-cache
+Fetching from API:
+GitHub Releases      1/1 Retrieved from cache
+```
+** TODO P2: redundant remove prints:
+```
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _remove_appimage_files:276 - Removed AppImage: /home/developer/Applications/neovim.AppImage
+2026-01-28 13:22:47 - my_unicorn.core.cache - DEBUG - clear_cache:222 - Cleared cache for neovim/neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _clear_cache:300 - Removed cache for neovim/neovim
+2026-01-28 13:22:47 - my_unicorn.core.desktop_entry - DEBUG - remove_desktop_file:431 - Removed desktop file: /home/developer/.local/share/applications/neovim.desktop
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _remove_desktop_entry:354 - Removed desktop entry for neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _remove_icon:379 - Removed icon: /home/developer/Applications/icons/neovim.png
+2026-01-28 13:22:47 - my_unicorn.core.remove - DEBUG - _remove_config:399 - Removed config for neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:200 - ✅ Removed AppImage(s): /home/developer/Applications/neovim.AppImage
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:203 - ✅ Removed cache for neovim/neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:216 - ⚠️  No backups found at: /home/developer/Applications/backups/neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:219 - ✅ Removed desktop entry for neovim
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:223 - ✅ Removed icon: /home/developer/Applications/icons/neovim.png
+2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:230 - ✅ Removed config for neovim
+```
+** TODO P4: cli upgrade command need notification for itself, maybe update command would invoke upgrade command or check my-unicorn as repo?
+** TODO P4: Remove code smells: <https://refactoring.guru/refactoring/smells>
+**** TODO contexts
+**** TODO config
+**** DONE handle FIXME, TODO for duplicate functions
+** TODO config --show is showing global config, better to name it --show-global-config for more clarity
+** TODO performance improvements on api : <https://github.com/xbeat/Machine-Learning/blob/main/9%20Strategies%20to%20Boost%20API%20Performance.md>
+**** TODO APIGateway would be useful when we impemented gitlab support
+**** TODO GraphQL-like query system for REST APIs
+** TODO Add command to migrate from URL installs to Catalog installs
+      Example; `my-unicorn migrate --app appflowy` or `my-unicorn migrate --all`
+      but we use migrate command to migrate old config to new config structure
+      so we need to use flags like `--from-url-to-catalog` or something like that.
+** TODO Add option in global config for [auth]
+** TODO What about threading usage on logging? Example: <https://github.com/Roulbac/uv-func/blob/main/src/uv_func/logging.py>
+** TODO Script Tasks;
+**** TODO P2: update.bash check network connection
+**** TODO add fish autocomplete support
+** TODO add autocompletion for the catalog apps to autocomplete app names (e.g: `super<tab>-productivity`)
+** TODO mv neovim to usr bin to use appimage neovim
+      mv /tmp/nvim.appimage /usr/local/bin/nvim
+
+* 📥 BACKLOG
+** BACKLOG Add kde wallet support via dbus-python.(check plans/keyring-for-my-unicorn folder )
+      dbus-python used on kdewallet saves, so we can add that to auth later as a support.
+```python
+# Example kdewallet usage via keyring library
+import keyring
+import dbus
+from keyring.backends.kwallet import DBusKeyring  # explicit KWallet backend
+def store_password(service: str, username: str, password: str):
+    keyring.set_keyring(DBusKeyring())
+    keyring.set_password(service, username, password)
+    print(f"Stored password for {username}@{service} using KWallet.")
+def retrieve_password(service: str, username: str):
+    keyring.set_keyring(DBusKeyring())
+    pwd = keyring.get_password(service, username)
+    if pwd:
+        print(f"Retrieved password: {pwd!r}")
+    else:
+        print("No password found in KWallet.")
+if __name__ == "__main__":
+    svc = "myservice"
+    user = "demo"
+    pwd = "s3cr3t"
+    store_password(svc, user, pwd)
+    retrieve_password(svc, user)
+```
+** BACKLOG P4: Add progress bar for checksum file installations?
+** BACKLOG python security practices
+** BACKLOG might be better to use loguru
+** BACKLOG add my unicorn export path to fish shells
+** BACKLOG #TEST: bdd style tests
+** BACKLOG Simple video about cli tool workflow
+** BACKLOG good to use aiodns with aiohttp
+** BACKLOG add env variable support for github token to use on container tests.
+** BACKLOG good cli design princibles (WIP, LEARN MORE)
+      <https://clig.dev/>
+      <https://www.amazon.com/UNIX-Programming-Addison-Wesley-Professional-Computng/dp/0131429019>
+***** TODO Write man pages
+***** TODO Add env to disable emojis or directly remove emojis?
+***** TODO Implement did you mean? for typos and dangerous commands
+***** TODO Use subcommands for better structure (Go/Docker/AWS style) rather than a flat assortment of flags
+***** TODO If you are displaying tabular data, present an ncurses interface
+***** TODO Don't use escape codes in your output. Use the library that is designed for this purpose: terminfo??
+** BACKLOG Allow users to specify target architecture (ARM, x86_64, etc.)
+** BACKLOG Switch to stable releases only when we publish stable versions (currently using prereleases in upgrade module)
+
+* ✅ DONE
+** DONE workflows and workflows/services folder structure refactor for better structure.
+      Currently install.py, update.py, appimage_setup.py(install and update use this, so I didn't move that to util folder which we might be make a new module to handle it there in class etc.) is work together.
+** DONE #BUG: upgrade command get stable cache 1.2.3 version for my-unicorn repo
+** TODO #TEST: test.bash need another command --use-cache, --no-cache which remove and not remove
+** DONE P1: BUG: missing computed hashes on verified app when used checksum_file (example tagspace) this happens on update command, install command show the hashes computed etc.
+```json
+      "methods": [
+        {
+          "algorithm": "sha256",
+          "filename": "SHA256SUMS.txt",
+          "status": "passed",
+          "type": "checksum_file"
+        }
+      ],
+            "methods": [
+        {
+          "algorithm": "SHA256",
+          "source": "github_api",
+          "status": "passed",
+          "type": "digest"
+        },
+        {
+          "algorithm": "SHA256",
+          "source": "https://github.com/tagspaces/tagspaces/releases/download/v6.8.2/SHA256SUMS.txt",
+          "status": "passed",
+          "type": "checksum_file"
+        }
+      ],
+```
+** DONE P1:BUG: cache also won't save the checksum_file if digest exist?
+```json
+{
+  "cached_at": "2026-02-04T15:04:13.654171+03:00",
+  "ttl_hours": 24,
+  "release_data": {
+    "owner": "tagspaces",
+    "repo": "tagspaces",
+    "version": "6.8.2",
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "tagspaces-linux-x86_64-6.8.2.AppImage",
+        "size": 159537674,
+        "digest": "sha256:3c8ca310ab79d09202b55c2a832d5d09c7caf81c5db2270821dc05e90172e2df",
+        "browser_download_url": "https://github.com/tagspaces/tagspaces/releases/download/v6.8.2/tagspaces-linux-x86_64-6.8.2.AppImage"
+      }
+    ],
+    "original_tag_name": "v6.8.2"
+  }
+}
+```
+** DONE Remove legacy cli tool install from install.sh
+** DONE Create architecture-blueprint file
+** DONE try git worktree, is it really can be good?
+** DONE P3-Q5: move workflow folder modules to utils folder for better structure
+** DONE catalog_adapter.py is probably unnecessary because it just delegate the config manager...
+** DONE Test new features
+**** DONE github action for releases
+**** DONE `my-unicorn upgrade` command now use uv package manager.
+**** DONE Test `migrate` command
+**** DONE Test `migrate` command on virtual machine.
+** DONE use orjson for the migrate modules for better performance
+** DONE fix: remove service can't remove caches!
+** DONE unused comma seperate function on commands/base.py
+** DONE P2: #BUG: Cycle, circular import detected in import chain for cache.py
+** DONE we use logger.info so much, maybe we can disable logger.info on progress.py but keep logger info default on other modules for better user experience?
+**** DONE progress.py logger.info disable by default
+**** DONE other modules keep logger.info default
+** DONE Cleanup unused code lines
+**** DONE update.py unused progress task id lines
+**** DONE install.py and update.py module lines so much, better to move some of the functions to utils module. For example, creating_desktop_entry, parse_github_url etc.
+** DONE fix: integration test couldn't skipeable test
+**** DONE integration logger test is slow because of logger rotation, need to fix that
+** DONE cleanup folder structure for better structure
+**** DONE move asset and release.py from domain to correct folder
+** DONE token save, remove not work on zsh completion?
+** DONE remove unused autocomplete flags from auth for save remove token and backup --migrate flag
+** DONE P1: remove icon download logic because we extract icon from appimage now.
+** DONE beekeper-studio.png is wrong, extract manually and find the correct icon
+** DONE P3: Catalog and app state config structure refactor
+**** DONE Move owner, repo to github section
+**** DONE Better structure
+**** DONE Migration logic automatically on old config detected(decided to make a seperate command)
+****** DONE Make a new plan for more simple migration logic
+****** DONE via script?
+****** DONE via code on startup? Current one `class AppConfigV2(TypedDict):` used like this. Seems like violate DRY prenciple.
+**** DONE Update docs
+**** DONE add description to catalogs
+**** DONE show description on list --available command
+** DONE add verification passed or not to verification section on app-specific config
+** DONE dev(improve): rename list.py to catalog.py and all it's commands list to catalog
+** DONE fix the autocomplete zshrc local bin exporting
+** TODO janitor code cleanup in progress:
+**** DONE progress.py
+** DONE remove writing commits to release desc
+**** DONE removed commits
+**** DONE make it work with keepachangelog template which that template not use v0.1.0 `v` prefix on its heading
+        so our github action bash script need to add itself when creating tags because conventional tags need v in front of them.
+** DONE #BUG: Rotation error on logs... - Currently, implemented to custom rotation logic more simple and efficient
+      and also increased 1MB log to 10MB to increase the log size. Manual and pytest
+      succesfully passed.
+**** DONE Fixed rotation error on logs
+** TODO appimage build take times
+**** DONE install/update show installation error reasons(show appimage build takes times)
+** TODO #TEST: version command logic is deprecated, so testing to use **version** library
+** TODO network retry etc.
+**** DONE Attempt is work as expected, when network connection come back, it starts the download again.
+** TODO #BUG: progress bar ui artifact fix
+**** DONE Switch the text based progress bar to a more efficient one
+**** DONE After implementation text based, some other tests hangs, diagnose that and fix.
+**** DONE duplicate on ui progress bar not happens on alacritty and kitty but happens on the zed editor. Test the commited on other terminals and than test the current code changes on again in virt-manager
+**** DONE test on different terminals
+**** DONE update pytest to test the new progress bar implementation
+**** DONE Clean complexity and publish
+** TODO dev(improve): our logger use singleton
+** TODO #BUG: is backup folder not created after new feature? test qownnotes when there is update available
+** DONE move the src/ layout for better packaging and installation
+** DONE #BUG: digest not became true on catalog installs if its use checksum_file with digest verify both
+** DONE make sure skip not skip verification if there is verification option
+**** DONE freetube test verify digest even it is skip: true on the catalog,
+        and I still keep it skip purposely
+**** DONE obsidian test
+** DONE Clean up code
+**** DONE general
+**** DONE logger
+**** DONE scripts
+**** DONE service.progress already active
+**** DONE services
+**** DONE utils.py seperated folders
+**** DONE reading code from top to bottom
+**** DONE functions instead of comments
+**** DONE remove license, contribution from readme.md because there is already markdown files for them
+** DONE Remove overengineering
+**** DONE template
+** DONE clean unused code
+**** DONE locale, batch_mode on configs
+** DONE auth log info, validation
+** DONE #BUG: Token need to be optional (container error, it might be related to dbus issue which container based not use secretservice dbus?)
+**** DONE when there is correctly setup gnome-keyring, it works.
+** DONE Start source code readonly on container
+** DONE test.bash -> update test not available because we remove before catalog install or url install
+      so we need a better logic to handle this case
+** DONE BUG: two time installed print on new version
+** DONE read all the test from stratch with your examples to make sure they work as expected like examples not good current
+** DONE update docs with mermaid, use copilot to create them it seems copilot handles mermaid pretty well
+** DONE is it better to use functional programming?
+** DONE TEST: test probably use AppImageKit, better to make sure it is only used for though.
+** DONE P3: #BUG: when there is one fail(keepassxc fails on checksum because external
+      issue by devs) on verification but our ui not show when
+      there is one verification success, so it might be better to show the failed and success.
+      Also need to fix ui progress bar created two time because of this issue.
+** DONE P4: remove legacy upgrade command
+** DONE P1: png need priority one because kde not show .svg on its bar when pinned
+** DONE add token command and use it as token storage etc. keep auth command for authentication only.
+** DONE writing every test from scratch for better understanding of tests and make sure they work as expected
+**** DONE cli tests
+**** DONE commands tests
+**** DONE integration tests
+**** DONE migration tests
+**** DONE services tests
+**** DONE schemas tests
+** DONE P1-Q8: add lock for one instance only to prevent multiple instance run at the same time via fcntl.flock and make sure it would work for asyncio
+**** DONE 16G error log, because of 2 instance running at the same time.(This solved by logger rotation fix but still better to add lock to prevent multiple instance run at the same time)

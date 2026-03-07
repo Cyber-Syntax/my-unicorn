@@ -112,6 +112,7 @@ uv run my-unicorn --help
 # 7. Test UI behavior (quick smoke test)
 uv run scripts/test.py --quick
 ```
+
 ## Code Quality Standards
 
 ### Type Hints

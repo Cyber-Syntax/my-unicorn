@@ -1,157 +1,56 @@
 # TODO List
 
-## review
+- Use this for keeping simple todo stuff like;
+    - Manual reviews, tests
+    - Learn stuff
+    - Simple bugfixes
+    - Simple todo tasks like typos, restructure
+    - Developer tasks like design pattern, api, architecture
+
+- Use issues for big tasks like;
+    - Adding new features
+    - Refactoring big modules
+    - Fixing big bugs which require big code changes
+
+## testing
 
 - [ ] Big reviews
     - [ ] Network retry logic
-    - [x] Logger rotation logic
-    - [ ] Logger rotation on virtual machine
     - [ ] API rate limiting
-    - [ ] Logger rotation on production
+    - [x] Logger rotation logic
+    - [x] Logger rotation on virtual machine
+    - [x] Logger rotation on production
 
-```bash
-# log.1 rotated
-2026-01-25 16:03:09 - my_unicorn.main - DEBUG - async_main:28 - CLI completed successfully
-2026-01-25 16:03:09 - my_unicorn.main - DEBUG - async_main:25 - CLI started
-2026-01-25 16:03:09 - my_unicorn.core.progress.display - DEBUG - start_session:265 - Progress session started with 0 total operations
-2026-01-25 16:03:09 - my_unicorn.core.update.update - INFO - check_updates:400 - 🔄 Checking 5 app(s) for updates...
-...
-2026-01-25 16:03:10 - my_unicorn.core.token - DEBUG - get:131 - GitHub token retrieved from keyring (value hidden)
-2026-01-25 16:03:10 - my_unicorn.core.auth - DEBUG - apply_auth:183 - Applied GitHub authentication (token present)
-2026-01-25 16:03:10 - my_unicorn.config.schemas.validator - DEBUG - validate_app_state:218 - App state validation passed (v2.0.0): appflowy
-2026-01-25 16:03:10 - my_unicorn.config.schemas.validator - DEBUG - validate_app_state:218 - App state validation passed (v2.0.0): appflowy
-
-# .log new created (continue with correct module which it is backup to save metadata after the validator)
-# So, this rotation work as expected.
-2026-01-25 16:03:10 - my_unicorn.core.backup - DEBUG - save:100 - Saved metadata to /home/developer/Applications/backups/appflowy/metadata.json
-2026-01-25 16:03:10 - my_unicorn.core.backup - DEBUG - add_version:127 - Added version 0.1.0 to metadata
-2026-01-25 16:03:10 - my_unicorn.core.backup - INFO - create_backup:459 - Backup created: /home/developer/Applications/backups/appflowy/appflowy-0.1.0.AppImage (v0.1.0)
-2026-01-25 16:03:10 - my_unicorn.core.update.update - DEBUG - update_single_app:570 - Backup created: /home/developer/Applications/backups/appflowy/appflowy-0.1.0.AppImage
-...
-2026-01-25 16:03:57 - my_unicorn.main - DEBUG - async_main:28 - CLI completed successfully
-```
+- [x] add --force option to uv tool install on all of your project to prevent issue
 
 ## in-progress
 
+- [ ] P1-Q1: Open Issues per big todo for all below, it is hard to follow big tasks, keep this todo.md only for simple stuff like learn this, review this, test this etc. use issues like directly implementing big stuff like improving tests, adding new feature etc.
+
+- [ ] add remove --all command
+- [ ] progress_service written optional but we must make it required. Only upgrade module not use it currently and not need to use it because upgrade module only use uv package manager to handle the installation and update process.
+- [ ] make sure that user log console level is INFO and mandotory, like force user to use that on config, remove user configuration that option
+
+- [ ] Need to check appimages installed or corrupted, same for others like .desktop, icon etc. which if we switch to new distro and move our configs, we can't be able to install all of our apps via my-unicorn cli configs because we save the configs to save names, reference, version etc. and than use that version to compare is there any new app etc. we can't even check if appimage exist or not we just check the .json file stay on the config location, we don't check any other .desktop exist or not... so we need to check appimages installed or not for better error handling and we need to find out what we can do about installing more than one file from scratch via app config or another installed database via .jsonl to handle that and another share... location to use active installed ones etc. etc. For example; we can use another jsonl database but that's also make things more complicated and probably non-sense which we already have .json files for that, we need another solution to handle fast installation for all installed apps, maybe we can add export command to export all the installed ones to a jsonl file and than we can use that file to install via my-unicorn easily to make easy installs for new distros or when we switch to new distro etc. but exporting names of the apps is realy enough for the catalog installed ones which we can just write the `install <app-name> <app_name2> ...` to install all of them ones more simply without botherin jsonl, and for the url we can export urls to another file because we can't install url via catalog install, so we can export another and than we can install via cli later via `install <url1> <url2> ...` so that would be more easy to handle and we don't bother with jsonl.
+
+
+
+
+- [ ] supported catalog apps: muffon, simpmusic, spotube(test), pear-desktop
 - [ ] Improve testing
     - [ ] Refactor folder e2e tmp files, move it to tmp/pytest-of-<user>-e2e/ for better structure
     - [ ] Make pytest log level DEBUG, better to setup env for that for easy pytest changes without bothering the settings.conf. In real world cli tools priority; env > config file
-    - [ ] Learn Schemathesis
-    - [ ] Learn <https://hypothesis.readthedocs.io/en/latest/stateful.html>
-    - [ ] Learn <https://realpython.com/python-cli-testing/#lo-fi-debugging-with-print>
     - [x] P1-Q3: Never use the real user config logs, app location on pytest unittests which current is use them! #p1 #important #q3
     - [x] write ui integration test for progress bar
     - [x] Write e2e testing (Seems like scripts/test.py belongs to there and can be work with pytest)
     - [x] structure improve
 
-- [ ] <https://github.com/jgamblin/PGP/blob/main/python/_common-sections.md>
-
-- [ ] P1-Q8: add lock for one instance only to prevent multiple instance run at the same time via fcntl.flock and make sure it would work for asyncio
-    - [x] 16G error log, because of 2 instance running at the same time.(This solved by logger rotation fix but still better to add lock to prevent multiple instance run at the same time)
-
-- [ ] remove unused from types.py
-- [ ] try git worktree, is it really can be good?
-- [ ] P1: Remove desktop_entry.py and other similar modules that only export things for backward compatbility.
-- [ ] P1: refactor core/update/update.py to better architecture for update all command and update with appimage names.
-    - [ ] Example; `my-unicorn update` would update all apps, `my-unicorn update appflowy qownnotes` would update only qownnotes and appflowy.
-- [ ] update all command issue:
-    - First, wrong ui handling
-
-```bash
-Fetching from API:
-GitHub Releases      3/3 Retrieved from cache
-
-Downloading (3/3):
-zen-x86_64                    110.6 MiB   3.3 MB/s 00:00 [==============================]   100% ✓
-tagspaces-linux-x86_64-6.9.0  149.4 MiB   8.6 MB/s 00:00 [==============================]   100% ✓
-superProductivity-x86_64      129.1 MiB   5.4 MB/s 00:00 [==============================]   100% ✓
-
-Installing:
-(1/2) Verifying zen-browser ✓
-(2/2) Installing zen-browser ✓
-(1/2) Verifying super-productivity ✓
-(2/2) Installing super-productivity ✓
-(1/2) Verifying tagspaces ✓
-(2/2) Installing tagspaces ✓
-
-
-📦 Update Summary:
---------------------------------------------------
-tagspaces                 ✅ 6.8.2 → 6.9.0
-super-productivity        ✅ 17.1.2 → 17.1.3
-zen-browser               ✅ 1.18.4b → 1.18.5b
-neovim                    ℹ️  Already up to date (0.11.6)
-kdiskmark                 ℹ️  Already up to date (3.2.0)
-legcord                   ℹ️  Already up to date (1.2.1)
-obsidian                  ℹ️  Already up to date (1.11.7)
-qownnotes                 ℹ️  Already up to date (26.2.0)
-cherrytree                ℹ️  Already up to date (1.6.3)
-keepassxc                 ℹ️  Already up to date (2.7.11)
-heroicgameslauncher       ℹ️  Already up to date (2.19.1)
-weektodo                  ℹ️  Already up to date (2.2.0)
-endless-sky               ℹ️  Already up to date (0.10.16)
-nuclear                   ℹ️  Already up to date (0.6.48)
-flameshot                 ℹ️  Already up to date (13.3.0)
-beekeeper-studio          ℹ️  Already up to date (5.5.6)
-Successfully updated tagspaces
-standard-notes            ℹ️  Already up to date (3.201.10)
-freetube                  ℹ️  Already up to date (0.23.13-beta)
-appflowy                  ℹ️  Already up to date (0.11.1)
-
-🎉 Successfully updated 3 app(s)
-ℹ️  16 app(s) already up to date
-```
-
-- [ ] remove interactive argument on the AsciiProgressBackend when you understand what it's do which we don't use any kind of interactive mode on our progress bar, so we can remove that and just use the output.isatty() to detect the interactive mode if needed.
-
-- [ ] manual test improve:
-
+- [ ] P1-Q1: improve e2e tests #p1 #q1 #important #testing
     - [ ] add backup test to --quick flag on test.py
     - [ ] add --refresh-cache flag to --quick and --all flags to make sure cache also work after test passed without refresh cache flag.
     - [ ] Update container to test with this manual test script, so we don't need to test in our local machine.
         - [ ] add env variable support for github token to use on container tests.
         - [ ] add flag to close progress bar on cli for better support on ci tests.
-
-- [ ] Improve security
-
-    - [ ] Verify checksum_file via digest verification provided from github_api to prevent tampered checksum_file attacks. Most of the new apps provide digest for their appimage and checksum_file on github api.
-    - [ ] remove sha1/md5 support "“We recommend that anyone relying on SHA-1 for security migrate to SHA-2 or SHA-3 as soon as possible.” —Chris Celi, NIST computer scientist" + "MD5 is a deprecated hash algorithm that has practical known collision attacks. You are strongly discouraged from using it. Existing applications should strongly consider moving away." from <https://cryptography.io/en/latest/hazmat/primitives/cryptographic-hashes/#md5>
-
-- [ ] Improve schema
-
-    - [ ] consider schema validation testing with hypothesis?
-    - [ ] consider schema update v2.1.0 with optional fields for better backward compatibility?
-    - [ ] remove schema one digest or use that instead of computed expected?
-
-- [ ] <https://github.com/carlosperate/awesome-pyproject?tab=readme-ov-file#testing>
-- [ ] Improve code quality with better practices:
-
-    - [ ] learn dependency injection better which seems like protocol used for that to make better decoupling.
-    - [ ] <https://github.com/ArjanCodes/betterpython/blob/main/1%20-%20coupling%20and%20cohesion/coupling-cohesion-after.py>
-    - [ ] <https://docs.python-guide.org/writing/style/>
-
-- [ ] Improve agents.md
-
-    - [x] <https://github.com/langchain-ai/langchain/blob/master/AGENTS.md>
-    - [ ] <https://alexop.dev/posts/stop-bloating-your-claude-md-progressive-disclosure-ai-coding-tools/>
-
-- [x] Create architecture-blueprint file
-- [ ] Create code-exemplars-blueprint file
-
-- [ ] use functools.cache for reading json files, caches for performance?
-- [ ] learn Makefile
-- [ ] workflows and workflows/services folder structure refactor for better structure.
-      Currently install.py, update.py, appimage_setup.py(install and update use this, so I didn't move that to util folder which we might be make a new module to handle it there in class etc.) is work together.
-- [ ] Learn and add integration tests after workflows refactor.
-- [ ] learn testing trophy philosophy
-- [ ] progress_service written optional but we must make it required. Only upgrade module not use it currently and not need to use it because upgrade module only use uv package manager to handle the installation and update process.
-- [ ] P4-Q7: backup create command feature
-
-- [ ] p1-q1: load app config one time instead of loading on every function call like remove, backup, update... etc.
-- [ ] P1-Q2 decrease all the modules lines to less than 500 lines for better structure and maintainability.
-    - [ ] workflows/update.py
-    - [ ] workflows/install.py
-- [ ] P1-Q1: Improve manual test script #p1 #q1 #important #testing
     - [ ] make sure the api fetch install works (we do that by remove and install on manual test script but seems like remove didn't removed the cache and I couldn't able to detect the api bug correctly, so we need to make manual test to make sure remove did it's job correctly etc.)
     - [ ] add backup tests to make sure backup command also work as expected on tests etc.
     - [ ] add new command to manual test script like `--slow` for big apps like joplin.
@@ -160,24 +59,89 @@ appflowy                  ℹ️  Already up to date (0.11.1)
 add a diagnose test after the test done to make sure everything is fine after all tests
 we can do a something like return a report at the end of the tests with diagnose output etc.
 current test summary couldn't detect the failed passed correctly but we can make
-comprehensive report by checking the appimage config, backup metedata, check appimage location, desktop entry
-etc. all of the things to make sure everything is fine after the tests.
-
+comprehensive report by checking the appimage config, backup metedata, check appimage location, desktop entry etc. all of the things to make sure everything is fine after the tests.
 we probably need to define one correct example or we can just use the json scheme
 
-- [ ] P1-Q2: deprecate my-unicorn package and repo directories (migrated to uv) #q2 #important #refactor
+- [ ] Not write computed when failed
 
-    - [x] Remove legacy cli tool install from install.sh
+```json
+{
+  "catalog_ref": "super-productivity",
+  "config_version": "2.0.0",
+  "source": "catalog",
+  "state": {
+    "icon": {
+      "installed": true,
+      "method": "extraction",
+      "path": "/home/gamer/Applications/icons/super-productivity.png"
+    },
+    "installed_date": "2026-02-18T20:51:49.297441+03:00",
+    "installed_path": "/home/gamer/Applications/super-productivity.AppImage",
+    "verification": {
+      "methods": [
+        {
+          "algorithm": "SHA256",
+          "computed": "17949b253c93d004849b5bb04c0647cf4cf95d7f89ec66e59cd2b9bd08866b82",
+          "expected": "sha256:17949b253c93d004849b5bb04c0647cf4cf95d7f89ec66e59cd2b9bd08866b82",
+          "source": "github_api",
+          "status": "passed",
+          "type": "digest"
+        },
+        {
+          "algorithm": "SHA256",
+          "computed": "",
+          "expected": "sha512:8ca635e2956ef992780c9c45a1e10eedf5139cca6d0bff94699751f1590bbd9b58453e17ccb8e7d8d9dfe4ad086c26c4a593152eff60b25fd975a3ee03547c37",
+          "source": "",
+          "status": "failed",
+          "type": "checksum_file"
+        }
+      ],
+      "passed": true
+    },
+    "version": "17.1.8"
+  }
+}
+```
+
+- [ ] LEARN: Learn more about testing;
+    - [ ] Learn Schemathesis
+    - [ ] Learn <https://hypothesis.readthedocs.io/en/latest/stateful.html>
+    - [ ] Learn <https://realpython.com/python-cli-testing/#lo-fi-debugging-with-print>
+    - [x] Learn and add integration tests after workflows refactor.
+
+- [ ] Refactor: Cleaning up dead codes;
+    - [ ] remove unused from types.py
+    - [ ] P1: Remove desktop_entry.py and other similar modules that only export things for backward compatbility.
+    - [ ] P1-Q2: deprecate my-unicorn package and repo directories (migrated to uv) #q2 #important #refactor
+    - [ ] P9: remove unused `"method": "extraction",` from icon app state which we only use extraction type now.
+
+- [ ] P1: refactor core/update/update.py to better architecture for update all command and update with appimage names.
+    - [ ] Example; `my-unicorn update` would update all apps, `my-unicorn update appflowy qownnotes` would update only qownnotes and appflowy.
+- [ ] remove interactive argument on the AsciiProgressBackend when you understand what it's do which we don't use any kind of interactive mode on our progress bar, so we can remove that and just use the output.isatty() to detect the interactive mode if needed.
+
+- [ ] LEARN: Improve code quality with better practices:
+    - [ ] <https://github.com/carlosperate/awesome-pyproject?tab=readme-ov-file#testing>
+    - [ ] learn dependency injection better which seems like protocol used for that to make better decoupling.
+    - [ ] <https://github.com/ArjanCodes/betterpython/blob/main/1%20-%20coupling%20and%20cohesion/coupling-cohesion-after.py>
+    - [ ] <https://docs.python-guide.org/writing/style/>
+    - [ ] learn Makefile
+    - [ ] learn testing trophy philosophy
+
+- [ ] Improve agents.md
+    - [x] <https://github.com/langchain-ai/langchain/blob/master/AGENTS.md>
+    - [ ] <https://alexop.dev/posts/stop-bloating-your-claude-md-progressive-disclosure-ai-coding-tools/>
+
+- [ ] use functools.cache for reading json files, caches for performance?
+
+- [ ] P4-Q7: backup create command feature -> will make a backup directly from the command line `my-unicorn backup create appflowy` or `my-unicorn backup create --all` for all apps.
+- [ ] p1-q1: load app config one time instead of loading on every function call like remove, backup, update... etc.
+
+- [ ] P1-Q2 decrease all the modules lines to less than 500 lines for better structure and maintainability.
+    - [ ] workflows/update.py
+    - [ ] workflows/install.py
 
 - [ ] P2-Q4: fix all mypy issues #p2 #important #q4
 - [ ] P3-Q6: Correct comman design pattern with receiver and invoker, commands need to be thin and execute receivers only, learn from examples/patterns/Command/ folder
-
-- [ ] P4-Q7:Make a better todo.md structure with priorities, labels etc.
-    - [ ] clean this todo list, make priority to BUGS first.
-    - [ ] handle todos, in-progress better which we conflict all of them, keep in-progress to what you working on etc.
-    - [ ] move big tasks to issues if you need
-    - [ ] get some issues to here with their #code like this
-    - [ ] make a template for yourself to keep same template all of your other projects
 
 ## todo
 
@@ -189,7 +153,6 @@ Fetching from API:
 GitHub Releases      1/1 Retrieved from cache
 ```
 
-- [ ] P9: remove unused `"method": "extraction",` from icon app state which we only use extraction type now.
 - [ ] P2: redundant remove prints:
 
 ```
@@ -208,22 +171,12 @@ GitHub Releases      1/1 Retrieved from cache
 2026-01-28 13:22:47 - my_unicorn.core.remove - INFO - _log_removal_results:230 - ✅ Removed config for neovim
 ```
 
-- [ ] P2-Q9: add cli upgrade command check for new version available in update command?
+- [ ] P4: cli upgrade command need notification for itself, maybe update command would invoke upgrade command or check my-unicorn as repo?
 - [ ] P4: Remove code smells: <https://refactoring.guru/refactoring/smells>
     - [ ] contexts
     - [ ] config
     - [x] handle FIXME, TODO for duplicate functions
-- [ ] writing every test from scratch for better understanding of tests and make sure they work as expected
-    - [ ] cli tests
-    - [ ] commands tests
-    - [ ] integration tests
-    - [ ] migration tests
-    - [ ] services tests
-    - [ ] schemas tests
-    - [ ] maybe TDT style tests later if possible
-- [ ] add remove --all command
 - [ ] config --show is showing global config, better to name it --show-global-config for more clarity
-- [ ] add token command and use it as token storage etc. keep auth command for authentication only.
 - [ ] performance improvements on api : <https://github.com/xbeat/Machine-Learning/blob/main/9%20Strategies%20to%20Boost%20API%20Performance.md>
     - [ ] APIGateway would be useful when we impemented gitlab support
     - [ ] GraphQL-like query system for REST APIs
@@ -235,85 +188,75 @@ GitHub Releases      1/1 Retrieved from cache
 - [ ] Add option in global config for [auth]
 - [ ] What about threading usage on logging? Example: <https://github.com/Roulbac/uv-func/blob/main/src/uv_func/logging.py>
 
-- [ ] make wiki page
-- [ ] sphinx for docs?
-- [ ] P1: png need priority one because kde not show .svg on its bar when pinned
-- [ ] P4: remove legacy upgrade command
-- [ ] P3: #BUG: when there is one fail(keepassxc fails on checksum because external
-      issue by devs) on verification but our ui not show when
-      there is one verification success, so it might be better to show the failed and success.
-      Also need to fix ui progress bar created two time because of this issue.
+- [ ] Script Tasks;
+    - [ ] P2: update.bash check network connection
+    - [ ] add fish autocomplete support
 
-- [ ] P2: update.bash check network connection
 - [ ] add autocompletion for the catalog apps to autocomplete app names (e.g: `super<tab>-productivity`)
-- [ ] #BUG: `/tmp/.mount_appflobIOEjI/AppFlowy: error while loading shared libraries: libkeybinder-3.0.so.0: cannot open shared object file: No such file or directory`
 
-    - This is dependency issue, installing `keybinder3` solve the issue. I don't think I can do anything from my side, maybe document it on the docs.
-
-- [ ] TEST: test probably use AppImageKit, better to make sure it is only used for though.
-- [ ] is it better to use functional programming?
-- [ ] dev(test): manual test script need network exception error handling
 - [ ] mv neovim to usr bin to use appimage neovim
       mv /tmp/nvim.appimage /usr/local/bin/nvim
 
-- [ ] add fish autocomplete support
-
 ## backlog
 
-- [ ] Add kde wallet support via dbus-python.
+- [ ] Add kde wallet support via dbus-python.(check plans/keyring-for-my-unicorn folder )
       dbus-python used on kdewallet saves, so we can add that to auth later as a support.
-- [ ] dev(docs): libsecret also our prerequested dependency,
-- [ ] P4: upgrade need auto easy update and notify like appimages
+
+```python
+# Example kdewallet usage via keyring library
+import keyring
+import dbus
+from keyring.backends.kwallet import DBusKeyring  # explicit KWallet backend
+
+def store_password(service: str, username: str, password: str):
+    keyring.set_keyring(DBusKeyring())
+    keyring.set_password(service, username, password)
+    print(f"Stored password for {username}@{service} using KWallet.")
+
+def retrieve_password(service: str, username: str):
+    keyring.set_keyring(DBusKeyring())
+    pwd = keyring.get_password(service, username)
+    if pwd:
+        print(f"Retrieved password: {pwd!r}")
+    else:
+        print("No password found in KWallet.")
+
+if __name__ == "__main__":
+    svc = "myservice"
+    user = "demo"
+    pwd = "s3cr3t"
+
+    store_password(svc, user, pwd)
+    retrieve_password(svc, user)
+
+```
+
 - [ ] P4: Add progress bar for checksum file installations?
-- [ ] update docs with mermaid, use copilot to create them it seems copilot handles mermaid pretty well
 - [ ] python security practices
 - [ ] might be better to use loguru
 - [ ] add my unicorn export path to fish shells
-- [ ] #BUG: upgrade command get stable cache 1.2.3 version for my-unicorn repo
 - [ ] #TEST: bdd style tests
-- [ ] read all the test from stratch with your examples to make sure they work as expected like examples not good current
 - [ ] Simple video about cli tool workflow
 - [ ] good to use aiodns with aiohttp
-- [ ] Environment variable support
-
-```bash
-# log
-2025-10-31 12:04:00 - my_unicorn.backup - WARNING - warning:306 - Invalid version format detected, using lexicographic sorting
-2025-10-31 12:04:00 - my_unicorn.auth - ERROR - error:321 - Failed to retrieve GitHub token from keyring: Environment variable DBUS_SESSION_BUS_ADDRESS is unse
-
-# try to test it in container, and I confirm it is dbus issue
-github_pat_aXCvasdfbcasdfXZCXVA^Cdg1231asdfascvasd123 # example github pat, not real
-[devuser@arch-dev my-unicorn]$ my-unicorn auth --save-token
-Enter your GitHub token (input hidden):
-Confirm your GitHub token:
-15:37:15 - my_unicorn.auth - ERROR - Failed to save GitHub token to keyring: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
-15:37:15 - my_unicorn.cli.runner - ERROR - Unexpected error: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
-❌ Unexpected error: Environment variable DBUS_SESSION_BUS_ADDRESS is unset
-```
-
-- [ ] good cli design princibles
+- [ ] add env variable support for github token to use on container tests.
+- [ ] good cli design princibles (WIP, LEARN MORE)
       <https://clig.dev/>
       <https://www.amazon.com/UNIX-Programming-Addison-Wesley-Professional-Computng/dp/0131429019>
-
-  My advice as a user of CLI:
-
-    - no emojis please, ever
-    Many people are more visually oriented, and are greatly aided by images and color.
-    A standard `NO_EMOJIS` environment variable could perhaps be used to help both camps, just like `NO_COLOR` is available today.
-    - if you want to make it look nice, use ANSI escape codes for color rather than emojis.
-    even then, don't use color alone to convey meaning because it will most likely get destroyed by whatever you're piping it to.
-    - No, please don't use escape codes in your output. Use the library that is designed for this purpose: terminfo.
-    - please take the time to write detailed man pages, not just a "--help" screen
-    - implement "did you mean?" for typos (git style) and potentially dangerous commands
-    - separate the interface into a tree of subcommands (Go/Docker/AWS style) rather than a flat assortment of flags
-    - if you are displaying tabular data, present an ncurses interface
-    - (extremely important) shell completion for bash and zsh
+      - [ ] Write man pages
+      - [ ] Add env to disable emojis or directly remove emojis?
+      - [ ] Implement did you mean? for typos and dangerous commands
+      - [ ] Use subcommands for better structure (Go/Docker/AWS style) rather than a flat assortment of flags
+      - [ ] If you are displaying tabular data, present an ncurses interface
+      - [ ] Don't use escape codes in your output. Use the library that is designed for this purpose: terminfo??
 
 - [ ] Allow users to specify target architecture (ARM, x86_64, etc.)
 - [ ] Switch to stable releases only when we publish stable versions (currently using prereleases in upgrade module)
 
 ## done
 
+- [x] workflows and workflows/services folder structure refactor for better structure.
+      Currently install.py, update.py, appimage_setup.py(install and update use this, so I didn't move that to util folder which we might be make a new module to handle it there in class etc.) is work together.
+- [x] #BUG: upgrade command get stable cache 1.2.3 version for my-unicorn repo
 - [ ] #TEST: test.bash need another command --use-cache, --no-cache which remove and not remove
 - [x] P1: BUG: missing computed hashes on verified app when used checksum_file (example tagspace) this happens on update command, install command show the hashes computed etc.
 
@@ -367,6 +310,9 @@ Confirm your GitHub token:
 }
 ```
 
+- [x] Remove legacy cli tool install from install.sh
+- [x] Create architecture-blueprint file
+- [x] try git worktree, is it really can be good?
 - [x] P3-Q5: move workflow folder modules to utils folder for better structure
 - [x] catalog_adapter.py is probably unnecessary because it just delegate the config manager...
 - [x] Test new features
@@ -456,3 +402,24 @@ Confirm your GitHub token:
 - [x] test.bash -> update test not available because we remove before catalog install or url install
       so we need a better logic to handle this case
 - [x] BUG: two time installed print on new version
+- [x] read all the test from stratch with your examples to make sure they work as expected like examples not good current
+- [x] update docs with mermaid, use copilot to create them it seems copilot handles mermaid pretty well
+- [x] is it better to use functional programming?
+- [x] TEST: test probably use AppImageKit, better to make sure it is only used for though.
+- [x] P3: #BUG: when there is one fail(keepassxc fails on checksum because external
+      issue by devs) on verification but our ui not show when
+      there is one verification success, so it might be better to show the failed and success.
+      Also need to fix ui progress bar created two time because of this issue.
+
+- [x] P4: remove legacy upgrade command
+- [x] P1: png need priority one because kde not show .svg on its bar when pinned
+- [x] add token command and use it as token storage etc. keep auth command for authentication only.
+- [x] writing every test from scratch for better understanding of tests and make sure they work as expected
+    - [x] cli tests
+    - [x] commands tests
+    - [x] integration tests
+    - [x] migration tests
+    - [x] services tests
+    - [x] schemas tests
+- [x] P1-Q8: add lock for one instance only to prevent multiple instance run at the same time via fcntl.flock and make sure it would work for asyncio
+    - [x] 16G error log, because of 2 instance running at the same time.(This solved by logger rotation fix but still better to add lock to prevent multiple instance run at the same time)
