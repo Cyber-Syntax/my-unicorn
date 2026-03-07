@@ -95,7 +95,7 @@ class AssetSelector:
                 kw in app.name.lower() for kw in UNSTABLE_VERSION_KEYWORDS
             )
         ]
-        return stable if stable else appimages
+        return stable or appimages
 
     @staticmethod
     def _find_explicit_amd64(appimages: list[Asset]) -> Asset | None:

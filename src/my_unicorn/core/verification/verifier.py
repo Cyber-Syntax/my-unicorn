@@ -322,7 +322,7 @@ class Verifier:
     def detect_hash_type_from_filename(self, filename: str) -> HashType:
         """Infer hash type from checksum filename, defaulting when unknown."""
         detected = detect_hash_type_from_checksum_filename(filename)
-        return detected if detected else DEFAULT_HASH_TYPE
+        return detected or DEFAULT_HASH_TYPE
 
     def _convert_base64_to_hex(self, base64_hash: str) -> str:
         """Convert a base64-encoded digest into hexadecimal."""

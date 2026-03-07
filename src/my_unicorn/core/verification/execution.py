@@ -90,9 +90,7 @@ async def execute_checksum_file_verification(
 
     """
     # Use original asset name for checksum lookups
-    original_asset_name = (
-        context.asset.name if context.asset.name else context.file_path.name
-    )
+    original_asset_name = context.asset.name or context.file_path.name
 
     logger.debug(
         "Attempting checksum verification with: %s",
@@ -171,11 +169,7 @@ async def execute_all_verification_methods(
             )
 
         # Prioritize checksum files and select only the best match (YAGNI)
-        original_asset_name = (
-            context.asset.name
-            if context.asset.name
-            else context.file_path.name
-        )
+        original_asset_name = context.asset.name or context.file_path.name
         prioritized_files = prioritize_checksum_files(
             context.checksum_files, original_asset_name
         )
