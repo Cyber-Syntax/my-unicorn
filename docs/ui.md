@@ -126,6 +126,33 @@ qownnotes                 ✅ 0.1.0 → 26.2.0
 🎉 Successfully updated 1 app(s)
 ```
 
+#### Example may still building
+
+- This happens when the release is new and the AppImage asset hasn't finished building yet.
+
+```bash
+Fetching from API:
+GitHub Releases      2/2 Retrieved from cache
+
+Downloading:
+helium-0.10.2.1-x86_64  143.9 MiB  10.8 MB/s 00:00 [==============================]   100% ✓
+
+Installing:
+(1/2) Verifying helium-linux ✓
+(2/2) Installing helium-linux ✓
+
+
+📦 Update Summary:
+--------------------------------------------------
+helium-linux              ✅ 0.9.4.1 → 0.10.2.1
+nuclear                   ❌ Update failed
+                             → AppImage not found in release - may still be building
+
+🎉 Successfully updated 1 app(s)
+❌ 1 app(s) failed to update
+✓ All outdated apps updated successfully
+```
+
 ## Remove Examples
 
 Removing apps cleans up all associated files.
