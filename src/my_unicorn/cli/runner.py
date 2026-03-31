@@ -9,8 +9,11 @@ them into command handlers.
 """
 
 import logging
+import os
 import sys
 from argparse import Namespace
+from pathlib import Path
+from typing import Protocol
 
 from my_unicorn import __version__
 from my_unicorn.cli.commands.auth import AuthHandler
@@ -27,12 +30,30 @@ from my_unicorn.cli.commands.upgrade import UpgradeHandler
 from my_unicorn.cli.parser import CLIParser
 from my_unicorn.config import ConfigManager
 from my_unicorn.config.schemas.validator import ConfigValidator
+from my_unicorn.constants import LOCKFILE_PATH
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.cache import ReleaseCacheManager
+from my_unicorn.core.locking import LockManager
 from my_unicorn.core.update.manager import UpdateManager
+from my_unicorn.exceptions import LockError
 from my_unicorn.logger import get_logger, update_logger_from_config
 
 logger = get_logger(__name__)
+
+
+class CommandHandler(Protocol):
+    """Protocol for command handlers with execute method.
+
+    Defines the interface that all command handlers must implement.
+    """
+
+    async def execute(self, args: Namespace) -> None:
+        """Execute the command with the given arguments.
+
+        Args:
+            args: Parsed command-line arguments.
+        """
+        ...
 
 
 class CLIRunner:
@@ -102,7 +123,7 @@ class CLIRunner:
         # Initialize command handlers
         self._init_command_handlers()
 
-    def _create_handler(self, handler_class: type) -> object:
+    def _create_handler(self, handler_class: type) -> CommandHandler:
         """Create command handler with standard dependencies.
 
         Args:
@@ -113,9 +134,9 @@ class CLIRunner:
         """
         # UpgradeHandler doesn't need dependencies
         if handler_class is UpgradeHandler:
-            return handler_class()
+            return handler_class()  # type: ignore[no-any-return]
 
-        return handler_class(
+        return handler_class(  # type: ignore[no-any-return]
             config_manager=self.config_manager,
             auth_manager=self.auth_manager,
             update_manager=self.update_manager,
@@ -156,23 +177,34 @@ class CLIRunner:
         """
         try:
             # Parse command-line arguments
-            parser = CLIParser(self.global_config)
+            parser = CLIParser(self.global_config)  # type: ignore[arg-type]
             args = parser.parse_args()
 
             # Global: --version should print package version and exit early.
             if getattr(args, "version", False):
                 # Use __version__ from package which has proper fallback logic
-                print(__version__)
+                print(__version__)  # noqa: T201
                 return
 
-            # Validate command
-            if not args.command:
-                logger.error("No command specified")
-                sys.exit(1)
+            # Acquire lock for state-changing operations
+            lock_path = Path(
+                os.environ.get("MY_UNICORN_LOCKFILE_PATH", str(LOCKFILE_PATH))
+            )
+            async with LockManager(lock_path):
+                # Validate command
+                if not args.command:
+                    logger.error("No command specified")
+                    sys.exit(1)
 
-            # Route to appropriate command handler
-            await self._execute_command(args)
+                # Route to appropriate command handler
+                await self._execute_command(args)
 
+        except LockError:
+            logger.error(  # noqa: TRY400
+                "Another my-unicorn instance is already running. "
+                "Please wait or stop the other instance."
+            )
+            sys.exit(1)
         except KeyboardInterrupt:
             logger.info("Operation cancelled by user via KeyboardInterrupt")
             sys.exit(1)

@@ -181,7 +181,7 @@ def should_skip_verification(
         Tuple of (should_skip, updated_config)
 
     """
-    catalog_skip = config.get("skip", False)
+    catalog_skip = config.get("skip", False) or config.get("method") == "skip"
     updated_config = config.copy()
 
     # Only skip if configured AND no strong verification methods available

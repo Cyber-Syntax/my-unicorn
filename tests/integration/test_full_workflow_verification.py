@@ -828,8 +828,8 @@ class TestVerificationStateTransitions:
     ) -> None:
         """Test verification state built from skip method.
 
-        When skip method is provided with passed=False, the status is
-        set to 'failed' by build_method_entry (not 'skipped').
+        build_method_entry always returns status='skipped' for the skip type,
+        regardless of the passed field in the input data.
         """
         verification_result = {
             "passed": False,
@@ -849,8 +849,8 @@ class TestVerificationStateTransitions:
         assert state["actual_method"] == "skip"
         assert len(state["methods"]) == 1
         assert state["methods"][0]["type"] == "skip"
-        # Status is "failed" because passed=False in the method result
-        assert state["methods"][0]["status"] == "failed"
+        # build_method_entry always uses 'skipped' status for skip type
+        assert state["methods"][0]["status"] == "skipped"
 
     def test_verification_state_transition_on_update(
         self,

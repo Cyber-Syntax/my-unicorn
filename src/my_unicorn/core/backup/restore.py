@@ -246,7 +246,7 @@ def _update_config_after_restore(
 
     try:
         config_manager.save_app_config(
-            app_name, cast("AppStateConfig", app_config), skip_validation=True
+            app_name, cast("AppStateConfig", app_config)
         )
         logger.debug(
             "Updated app config for %s with version %s", app_name, version

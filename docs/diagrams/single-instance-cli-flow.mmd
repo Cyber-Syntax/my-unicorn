@@ -1,0 +1,30 @@
+---
+alt: "Single-instance gate for my-unicorn CLI execution"
+---
+
+sequenceDiagram
+    accTitle: Single-instance CLI execution flow
+    accDescr: Shows how CLIRunner acquires a process lock before dispatching commands, and how lock failures return a user-visible error.
+    autonumber
+    participant User as User/Shell
+    participant Runner as CLIRunner.run()
+    participant Lock as LockManager
+    participant FS as Lock File (/tmp/my-unicorn.lock)
+    participant Handler as Command Handler
+
+    User->>Runner: Invoke my-unicorn <command>
+    Runner->>Runner: Parse args + resolve lock path\n(default LOCKFILE_PATH or env override)
+    Runner->>Lock: async with LockManager(lock_path)
+    Lock->>FS: open lock file + flock(LOCK_EX | LOCK_NB)
+
+    alt Lock acquired
+        Lock-->>Runner: Enter critical section
+        Runner->>Handler: Execute validated command
+        Handler-->>Runner: Command result/side effects
+        Runner->>Lock: Exit async context
+        Lock->>FS: close fd (lock released)
+        Runner-->>User: Normal completion
+    else Lock busy / lock setup failure
+        Lock-->>Runner: raise LockError
+        Runner-->>User: "Another instance is running" + exit(1)
+    end

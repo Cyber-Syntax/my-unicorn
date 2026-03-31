@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from my_unicorn.utils.appimage_utils import verify_appimage_download
+
 
 @pytest.mark.asyncio
 class TestVerifyAppimageDownload:
@@ -12,8 +14,6 @@ class TestVerifyAppimageDownload:
 
     async def test_verify_appimage_download_from_catalog(self):
         """Test verify_appimage_download using catalog config."""
-        from my_unicorn.utils.appimage_utils import verify_appimage_download
-
         file_path = Path("/tmp/test.AppImage")
         asset = MagicMock(digest="sha256:abc123")
         release = MagicMock(original_tag_name="v1.0.0", assets=[])
@@ -180,8 +180,6 @@ class TestVerifyAppimageDownload:
 
     async def test_verify_appimage_download_tag_name_handling(self):
         """Test that tag_name is extracted correctly from release."""
-        from my_unicorn.utils.appimage_utils import verify_appimage_download
-
         file_path = Path("/tmp/test.AppImage")
         asset = MagicMock(digest=None)
         release = MagicMock(original_tag_name="v2.5.0", assets=[])
@@ -190,7 +188,7 @@ class TestVerifyAppimageDownload:
             return_value={"passed": True, "methods": {}, "updated_config": {}}
         )
 
-        result = await verify_appimage_download(
+        await verify_appimage_download(
             file_path=file_path,
             asset=asset,
             release=release,
@@ -205,8 +203,6 @@ class TestVerifyAppimageDownload:
 
     async def test_verify_appimage_download_unknown_tag(self):
         """Test handling of None tag_name in release."""
-        from my_unicorn.utils.appimage_utils import verify_appimage_download
-
         file_path = Path("/tmp/test.AppImage")
         asset = MagicMock(digest=None)
         release = MagicMock(original_tag_name=None, assets=[])
@@ -215,7 +211,7 @@ class TestVerifyAppimageDownload:
             return_value={"passed": True, "methods": {}, "updated_config": {}}
         )
 
-        result = await verify_appimage_download(
+        await verify_appimage_download(
             file_path=file_path,
             asset=asset,
             release=release,

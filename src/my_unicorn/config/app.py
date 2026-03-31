@@ -64,8 +64,8 @@ class AppConfigManager:
     def load_raw_app_config(self, app_name: str) -> AppStateConfig | None:
         """Load raw app state config without merging.
 
-        This loads the raw app state structure (source, catalog_ref, state, overrides)
-        without merging catalog or building effective config.
+        This loads the raw app state structure (source, catalog_ref,
+        state, overrides) without merging catalog or building effective config.
         Use this when you need to modify and save the state.
 
         Args:

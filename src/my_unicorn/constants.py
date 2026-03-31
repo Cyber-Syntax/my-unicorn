@@ -8,6 +8,7 @@ Usage:
     from my_unicorn.constants import GLOBAL_CONFIG_VERSION, APP_CONFIG_VERSION
 """
 
+from pathlib import Path
 from typing import Final, Literal
 
 # =============================================================================
@@ -34,6 +35,9 @@ DEFAULT_CONFIG_SUBDIR: Final[str] = ".config"
 
 # Application-specific subdirectory under the config directory
 CONFIG_DIR_NAME: Final[str] = "my-unicorn"
+
+# Lock file path for single-instance locking (uses /tmp for transient storage)
+LOCKFILE_PATH: Final[Path] = Path("/tmp/my-unicorn.lock")  # noqa: S108
 
 # Default apps dir name under config
 DEFAULT_APPS_DIR_NAME: Final[str] = "apps"

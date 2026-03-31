@@ -28,7 +28,7 @@ def _strip_inline_comment(value: str) -> str:
         Value with inline comment removed (anything after '  #')
     """
     if "  #" in value:
-        return value.split("  #")[0].strip()
+        return value.split("  #", maxsplit=1)[0].strip()
     return value
 
 

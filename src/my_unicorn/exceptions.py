@@ -434,3 +434,26 @@ class ConfigurationError(MyUnicornError):
         )
         self.config_path = config_path
         self.field = field
+
+
+# =============================================================================
+# Locking Exceptions
+# =============================================================================
+
+
+class LockError(MyUnicornError):
+    """Raised when lock acquisition fails.
+
+    Lock errors occur when the application attempts to acquire a process-level
+    lock but fails, typically because another instance is already running.
+
+    Example:
+        >>> try:
+        ...     async with LockManager(lock_path):
+        ...         pass
+        ... except LockError as e:
+        ...     logger.error("Cannot acquire lock: %s", e.message)
+
+    """
+
+    error_prefix = "Lock acquisition failed"

@@ -128,8 +128,8 @@ class TestDownloadRetryLogic:
             yield b"partial data"
             raise aiohttp.ClientError("Connection reset")
 
-        mock_response_fail.content.iter_chunked = (
-            lambda size: mock_chunks_fail()
+        mock_response_fail.content.iter_chunked = lambda size: (
+            mock_chunks_fail()
         )
 
         # Second attempt succeeds
@@ -141,8 +141,8 @@ class TestDownloadRetryLogic:
         async def mock_chunks_success():
             yield b"complete data"
 
-        mock_response_success.content.iter_chunked = (
-            lambda size: mock_chunks_success()
+        mock_response_success.content.iter_chunked = lambda size: (
+            mock_chunks_success()
         )
 
         # Configure session to fail first, then succeed
@@ -371,8 +371,8 @@ class TestDownloadRetryLogic:
             yield b"partial"
             raise aiohttp.ClientError("Connection lost")
 
-        mock_response_fail.content.iter_chunked = (
-            lambda size: mock_chunks_fail()
+        mock_response_fail.content.iter_chunked = lambda size: (
+            mock_chunks_fail()
         )
 
         # Second attempt succeeds
@@ -384,8 +384,8 @@ class TestDownloadRetryLogic:
         async def mock_chunks_success():
             yield b"complete data"
 
-        mock_response_success.content.iter_chunked = (
-            lambda size: mock_chunks_success()
+        mock_response_success.content.iter_chunked = lambda size: (
+            mock_chunks_success()
         )
 
         mock_session.get.return_value.__aenter__.side_effect = [

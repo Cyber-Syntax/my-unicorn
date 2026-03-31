@@ -153,15 +153,11 @@ class VerificationService:
         # Create progress task if needed
         is_active = self.progress_reporter.is_active()
         if context.progress_task_id is None and is_active:
-            task_id = self.progress_reporter.add_task(
+            task_id = await self.progress_reporter.add_task(
                 f"Verifying {context.app_name}",
                 ProgressType.VERIFICATION,
             )
-            # Handle both sync and async add_task
-            if asyncio.iscoroutine(task_id):
-                context.progress_task_id = await task_id
-            else:
-                context.progress_task_id = task_id
+            context.progress_task_id = task_id
 
         # Detect available methods
         context.has_digest, context.checksum_files = detect_available_methods(
@@ -195,9 +191,10 @@ class VerificationService:
                 context.progress_task_id, True, "verification skipped"
             )
             return VerificationResult(
-                passed=True,
-                methods={},
+                passed=False,
+                methods={"skip": {"passed": False, "status": "skipped"}},
                 updated_config=context.updated_config,
+                warning="Not verified - developer did not provide checksums",
             )
 
         # Create verifier
@@ -256,9 +253,14 @@ class VerificationService:
 
         # Determine overall result and warning message
         warning_message = None
-        overall_passed = not strong_methods_available or has_passing_method
+        overall_passed = strong_methods_available and has_passing_method
 
         if not strong_methods_available:
+            # Record explicit skip entry so methods dict is never empty
+            context.verification_methods["skip"] = {
+                "passed": False,
+                "status": "skipped",
+            }
             # No verification methods available - allow with warning
             warning_message = (
                 "Not verified - developer did not provide checksums"
@@ -322,7 +324,19 @@ class VerificationService:
         )
 
         # Update progress with appropriate message and status
-        if overall_passed and strong_methods_available and not warning_message:
+        if not strong_methods_available:
+            # No verification methods available - not verified but allow install
+            await self._finish_progress(
+                context.progress_task_id,
+                True,
+                "not verified (dev did not provide checksums)",
+            )
+            logger.info(
+                "Verification completed for %s: "
+                "skipped (no checksums provided)",
+                context.app_name,
+            )
+        elif overall_passed and not warning_message:
             # Complete success - all methods passed
             await self._finish_progress(
                 context.progress_task_id, True, "verification passed"
@@ -335,10 +349,7 @@ class VerificationService:
                 "Verification completed for %s: passed", context.app_name
             )
         elif (
-            overall_passed
-            and strong_methods_available
-            and warning_message
-            and "Partial" in warning_message
+            overall_passed and warning_message and "Partial" in warning_message
         ):
             # Partial success - some passed, some failed
             await self._finish_progress(
@@ -350,27 +361,15 @@ class VerificationService:
                 "Verification completed for %s: passed with warnings",
                 context.app_name,
             )
-        elif overall_passed and not strong_methods_available:
-            # No verification methods available
-            await self._finish_progress(
-                context.progress_task_id,
-                True,
-                "not verified (dev did not provide checksums)",
-            )
-            logger.info(
-                "Verification completed for %s: "
-                "skipped (no checksums provided)",
-                context.app_name,
-            )
         else:
-            # Should not reach here, but handle defensively
+            # Verification failed
             await self._finish_progress(
                 context.progress_task_id,
                 False,
-                "verification completed with warnings",
+                "verification failed",
             )
             logger.warning(
-                "Verification completed with warnings: app=%s",
+                "Verification completed with failures: app=%s",
                 context.app_name,
             )
             logger.info(

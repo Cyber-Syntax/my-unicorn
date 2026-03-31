@@ -105,9 +105,7 @@ def create_app_config_v2(
 
     # Save configuration
     try:
-        config_manager.save_app_config(
-            app_name, config_data, skip_validation=True
-        )
+        config_manager.save_app_config(app_name, config_data)
         return {
             "success": True,
             "config_path": str(config_manager.apps_dir / f"{app_name}.json"),
@@ -167,7 +165,7 @@ def _empty_verification_state() -> dict[str, Any]:
     return {
         "passed": False,
         "overall_passed": False,
-        "methods": [],
+        "methods": [{"type": "skip", "status": "skipped"}],
         "actual_method": "skip",
     }
 
@@ -266,6 +264,8 @@ def build_method_entry(method_type: str, method_result: Any) -> dict[str, Any]:
 
     """
     normalized_type = _normalize_method_type(method_type)
+    if normalized_type == "skip":
+        return {"type": "skip", "status": "skipped"}
     method_entry: dict[str, Any] = {"type": normalized_type}
 
     if not isinstance(method_result, dict):
@@ -437,7 +437,7 @@ def update_app_config(
         "methods": verification_state["methods"],
     }
 
-    config_manager.save_app_config(app_name, raw_state, skip_validation=True)
+    config_manager.save_app_config(app_name, raw_state)
 
 
 def get_stored_hash(

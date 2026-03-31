@@ -371,8 +371,8 @@ class TestConcurrentVerificationEdgeCases:
             assets=assets,
         )
 
-        # Should pass (cannot verify, but don't block)
-        assert result.passed is True
+        # Should fail (cannot verify - no strong methods available)
+        assert result.passed is False
 
         # Warning about no checksums provided
         assert result.warning is not None
@@ -409,11 +409,13 @@ class TestConcurrentVerificationEdgeCases:
             assets=assets,
         )
 
-        # Should pass (verification skipped)
-        assert result.passed is True
+        # Should fail (verification skipped - no strong methods available)
+        assert result.passed is False
 
-        # No methods recorded when skipped (no methods available)
-        assert result.methods == {}
+        # Skip entry recorded even when verification was explicitly skipped
+        assert "skip" in result.methods
+        assert result.methods["skip"]["passed"] is False
+        assert result.methods["skip"]["status"] == "skipped"
 
 
 class TestMethodResultRecording:
