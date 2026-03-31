@@ -89,6 +89,7 @@ weektodo.json:
 - muffon, simpmusic, spotube(test), pear-desktop
 ** DOING Improve testing
 - State "DOING"      from "TODO"       [2026-03-05 Prş 22:23]
+**** TODO add a test for cli commands like --verbose etc.
 **** TODO Refactor folder e2e tmp files, move it to tmp/pytest-of-<user>-e2e/ for better structure
 **** TODO Make pytest log level DEBUG, better to setup env for that for easy pytest changes without bothering the settings.conf. In real world cli tools priority; env > config file
 **** DONE P1-Q3: Never use the real user config logs, app location on pytest unittests which current is use them! #p1 #important #q3
@@ -185,6 +186,10 @@ we probably need to define one correct example or we can just use the json schem
 - State "DOING"      from "TODO"       [2026-03-05 Prş 22:25]
 ** TODO P3-Q6: Correct comman design pattern with receiver and invoker, commands need to be thin and execute receivers only, learn from examples/patterns/Command/ folder
 * 🔲 TODO
+** TODO kdiskmark need root priviledge to benchmark:
+- Maybe devs would add without root priviledge it future:
+  - https://github.com/JonMagon/KDiskMark/issues/181
+** TODO clear docs
 ** TODO Refresh cache flag is update the caches by request api again but github releases section seems not update it. It might be related with the our class get it from cache even we use api because of the way we implemented the cache, so we need to check that and make sure it is working as expected. Below is the log for that, we can see that github releases section is not updated but api section is updated.
 ```bash
 uv run my-unicorn update --refresh-cache
