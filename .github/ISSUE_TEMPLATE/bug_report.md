@@ -3,7 +3,6 @@ name: Bug report
 about: Create a report to help us improve
 title: "🐞 bug:   "
 labels: bug
-assignees: ""
 ---
 
 **Versions**
@@ -17,7 +16,7 @@ assignees: ""
 **Console Output**
 <!-- Place to output in the below in the quotes -->
 
-```
+```bash
 
 ```
 
@@ -25,10 +24,9 @@ assignees: ""
 <!-- A clear and concise description of what you expected to happen. -->
 
 **LOG**
-> Paste the log(`/home/<your_username>/.local/state/my-unicorn/my-unicorn.log`) here:
+> Paste the log(`/home/<your_username>/.config/my-unicorn/logs/my-unicorn.log`) here:
 
-```
-
+```log
 
 ```
 
