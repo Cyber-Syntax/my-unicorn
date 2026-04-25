@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from my_unicorn.core.backup.helpers import (
+from my_unicorn.core.backup import (
     delete_old_backups,
     group_backups_by_version,
     validate_backup_exists,
