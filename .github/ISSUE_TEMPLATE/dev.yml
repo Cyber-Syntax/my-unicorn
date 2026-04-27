@@ -1,0 +1,42 @@
+name: Development Tasks
+description: Tasks for development work such as refactoring, code cleanup, and other non-bugfix, non-feature work.
+title: '🛠️ '
+type: dev
+
+body:
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: Problem Statement
+      description: Describe the problem that these changes solve (links to issues are welcome).
+      placeholder: "e.g. The codebase has some technical debt that needs to be addressed to improve maintainability and readability."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution-approach
+    attributes:
+      label: Solution Approach
+      description: Describe the approach we should take to solve this problem. This can include high-level design decisions, specific refactoring techniques, or any other relevant information.
+      placeholder: "e.g. We should follow zen-of-python principles; flat is better than nested. So we should refactor backup modules to one backup.py module instead."
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation-details
+    attributes:
+      label: Implementation Details
+      description: Any additional details about the implementation that would be helpful for someone working on this task. This can include specific files or modules to focus on, any relevant code snippets, or any other information that would help guide the development work.
+      placeholder: "e.g. Any other details that would be helpful for someone working on this task..."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      description: A checklist of specific tasks that need to be completed as part of this development work. Dividing the work into smaller tasks can help make it more manageable and easier to track progress. We can also create sub-issues from below checklist items if needed.
+      options:
+        - label: refactor module
+        - label: add tests
+        - label: update docs
