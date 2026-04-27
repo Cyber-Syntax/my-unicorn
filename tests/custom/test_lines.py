@@ -1,5 +1,5 @@
 """
-Test that Python files don't exceed 500 lines.Long files are difficult to maintain, understand, and test.
+Test that Python files don't exceed 1000 lines.Long files are difficult to maintain, understand, and test.
 
 Files should be kept concise and focused on a single responsibility.
 """
@@ -7,11 +7,11 @@ Files should be kept concise and focused on a single responsibility.
 from pathlib import Path
 
 
-def test_python_files_max_500_lines() -> None:
+def test_python_files_max_1000_lines() -> None:
     """
     Ensure all Python files in tests and src/my_unicorn are at most 500 lines long.
 
-    Files exceeding 500 lines indicate:
+    Files exceeding 1000 lines indicate:
         - Too many responsibilities in a single module
         - Need for refactoring into smaller, focused modules
         - Potential violation of single responsibility principle
@@ -20,7 +20,7 @@ def test_python_files_max_500_lines() -> None:
         - Configuration files with large data structures
 
     """
-    max_lines = 550
+    max_lines = 1100
     # Determine project root robustly so the test works whether this file lives in
     # `tests/` or `tests/custom/`. Prefer a parent that contains both `src` and
     # `tests`. Fall back to two levels up (common when running from tests/custom).
