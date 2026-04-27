@@ -13,7 +13,7 @@ This reduces duplication and makes catalog apps easier to maintain.
 
 ## Global Config (settings.conf)
 
-**Version**: 1.1.0  
+**Version**: 1.1.0
 **Location**: `~/.config/my-unicorn/settings.conf`
 
 ```INI
@@ -44,9 +44,6 @@ timeout_seconds = 10
 # The CLI script uses this directory to store the latest code files for updating packages.
 repo = "~/.local/share/my-unicorn-repo/"
 
-# Directory for storing package-related files, including virtual environments (.venv).
-package = "~/.local/share/my-unicorn/"
-
 # Default directory for downloaded AppImages, checksum files, and icons.
 download = "~/Downloads"
 
@@ -64,7 +61,7 @@ tmp = "~/.config/my-unicorn/tmp"
 
 ## Catalog Configuration (v2)
 
-**Version**: 2.0.0  
+**Version**: 2.0.0
 **Location**: `src/my_unicorn/catalog/*.json` (bundled in package)
 
 Catalog entries define metadata for supported applications. These are maintained by the project and distributed with my-unicorn.
@@ -104,10 +101,7 @@ Catalog entries define metadata for supported applications. These are maintained
     ]
   },
   "icon": {
-    "method": "extraction",  // "extraction" or "download"
     "name": "appflowy.png",
-    // For download method:
-    "url": ""  // URL to icon file
   }
 }
 ```
@@ -123,7 +117,7 @@ Catalog entries define metadata for supported applications. These are maintained
 
 #### App State Configuration (v2)
 
-**Version**: 2.0.0  
+**Version**: 2.0.0
 **Location**: `~/.config/my-unicorn/apps/*.json`
 
 App state configs track installed applications. The structure differs based on installation source.
@@ -156,7 +150,6 @@ Apps installed from catalog store only state + reference to catalog file:
     },
     "icon": {
       "installed": true,
-      "method": "extraction",  // or "download"
       "path": "/home/developer/Applications/icons/appflowy.svg"
     }
   }
@@ -193,7 +186,6 @@ Apps installed via URL store complete configuration in overrides:
     },
     "icon": {
       "installed": true,
-      "method": "extraction",
       "path": "/home/developer/Applications/icons/nuclear.png"
     }
   },
@@ -321,7 +313,7 @@ My Unicorn validates all configs against JSON schemas:
 **Example error**:
 
 ```
-Config validation failed at '/state/verification/methods/0/type': 
+Config validation failed at '/state/verification/methods/0/type':
 'invalid_type' is not one of ['digest', 'checksum_file', 'skip']
 ```
 
@@ -420,5 +412,3 @@ When a release includes checksum files (SHA256SUMS.txt, SHA512SUMS.txt, latest-l
 2. Caches the parsed hashes in `checksum_files[]` for future use
 3. Uses cached hashes on subsequent operations without re-downloading
 4. Clears and re-fetches when `--refresh-cache` flag is used
-
-```

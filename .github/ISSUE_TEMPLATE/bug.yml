@@ -1,0 +1,75 @@
+name: 🐞 Bug Report
+description: Report a bug you encountered.
+title: '🐞 '
+type: bug
+
+body:
+  - type: input
+    id: environment-version
+    attributes:
+      label: Version Used
+      description: Version number
+      placeholder: "e.g. 'v2.1.0-alpha'"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: Tell us what should happen.
+      placeholder: "e.g. installing the latest version should work without schema warnings/errors."
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: Current Behavior
+      description: Tell us what happens instead of the expected behavior.
+      placeholder: "e.g. When I try to install the latest version, I get schema warnings/errors."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Provide a clear set of steps to reproduce this bug.
+      placeholder: |
+        1. `my-unicorn install <app_name>` (please provide app name and version if applicable)
+        2. Get schema warnings/errors in the console.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reliability
+    attributes:
+      label: Can you reproduce this reliably?
+      description: Was this a one-time occurrence, or can you make it happen every time by following the steps?
+      options:
+        - 'Yes, I can reproduce it reliably.'
+        - "Sometimes, it's intermittent."
+        - 'No, it only happened once.'
+    validations:
+      required: true
+
+  - type: textarea
+    id: console-output
+    attributes:
+      label: Console Output
+      description: Is there any output in the console? If so, please paste it here.
+      placeholder: 'Paste any relevant console logs here...'
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: log-output
+    attributes:
+      label: Log Output
+      description: Is there any output in the log file? Please paste it somewhere else if it's too long like in a gist and link it here. The log file is located at: `/home/<your_username>/.config/my-unicorn/logs/my-unicorn.log`
+      placeholder: 'Paste any relevant log output here or link to a gist...'
+      render: shell
+    validations:
+      required: false
