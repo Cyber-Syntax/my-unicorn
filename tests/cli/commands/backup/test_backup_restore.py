@@ -39,6 +39,7 @@ class TestBackupHandler:
 
         # Mock config manager
         mock_config_manager.load_app_config.return_value = sample_app_config
+        mock_config_manager.load_raw_app_config.return_value = sample_app_config
 
         args = MagicMock()
         args.app_name = app_name
@@ -87,6 +88,7 @@ class TestBackupHandler:
         )
 
         mock_config_manager.load_app_config.return_value = sample_app_config
+        mock_config_manager.load_raw_app_config.return_value = sample_app_config
 
         args = MagicMock()
         args.app_name = app_name
@@ -144,6 +146,7 @@ class TestBackupHandler:
         )
 
         mock_config_manager.load_app_config.return_value = current_config
+        mock_config_manager.load_raw_app_config.return_value = sample_app_config
 
         args = MagicMock()
         args.app_name = app_name

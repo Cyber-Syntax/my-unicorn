@@ -304,7 +304,7 @@ def _load_and_check_app_config(
         App configuration or None if validation fails
 
     """
-    app_config = config_manager.load_app_config(app_name)
+    app_config = config_manager.load_raw_app_config(app_name)
     if not app_config:
         logger.error("App configuration not found for %s", app_name)
         return None
