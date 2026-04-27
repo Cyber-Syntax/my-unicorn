@@ -1,13 +1,13 @@
 name: 🚀 Feature Request
 description: Suggest an idea for this project.
 title: '🚀 '
-type: enhancement
+labels: ["enhancement"]
 
 body:
   - type: markdown
     attributes:
       value: |
-
+        
         🤝 Thank you for taking the time to fill out this feature request fully! This will help a lot to communicate what this is about and focus the discussion.
 
         ⚠️ Please make sure that there is no similar feature request opened up already by searching the issues in this repository!
@@ -18,8 +18,10 @@ body:
     id: problem-statement
     attributes:
       label: Problem Statement
-      description: "A clear and concise description of what the problem is. E.g. I'm always frustrated when [...]"
-      placeholder: "Describe the problem you're facing or the limitation you've encountered."
+      description: "A clear and concise description of what the problem is. E.g. I'm
+        always frustrated when [...]"
+      placeholder: "Describe the problem you're facing or the limitation you've
+        encountered."
     validations:
       required: true
 
@@ -36,7 +38,8 @@ body:
     id: alternatives
     attributes:
       label: "Describe alternatives you've considered"
-      description: "A clear and concise description of any alternative solutions or features you've considered."
+      description: "A clear and concise description of any alternative solutions or
+        features you've considered."
       placeholder: 'Have you thought about other ways to solve the problem? What were they?'
     validations:
       required: false # Often optional, but good to prompt for
@@ -45,8 +48,10 @@ body:
     id: additional-context
     attributes:
       label: 'Additional context'
-      description: 'Add any other context about the problem here. e.g. related issues or existing pull requests.'
-      placeholder: 'Add links to related issues, screenshots, mockups, or any other relevant information.'
+      description: 'Add any other context about the problem here. e.g. related issues
+        or existing pull requests.'
+      placeholder: 'Add links to related issues, screenshots, mockups, or any other
+        relevant information.'
     validations:
       required: false
 
@@ -54,7 +59,10 @@ body:
     id: docs-impact
     attributes:
       label: documentation gap
-      description: Help us keep docs aligned with proposed changes. If this feature is implemented ...
+      description: Help us keep docs aligned with proposed changes. If this feature is
+        implemented ...
       options:
-        - label: ... related docs should be updated as part of the same PR whenever possible.
+        - label: ... related docs should be updated as part of the same PR whenever
+            possible.
         - label: ... I can help improve the documentation.
+

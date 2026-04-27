@@ -1,7 +1,7 @@
 name: 🐞 Bug Report
 description: Report a bug you encountered.
 title: '🐞 '
-type: bug
+labels: ["bug"]
 
 body:
   - type: input
@@ -18,7 +18,8 @@ body:
     attributes:
       label: Expected Behavior
       description: Tell us what should happen.
-      placeholder: "e.g. installing the latest version should work without schema warnings/errors."
+      placeholder: "e.g. installing the latest version should work without schema
+        warnings/errors."
     validations:
       required: true
 
@@ -27,7 +28,8 @@ body:
     attributes:
       label: Current Behavior
       description: Tell us what happens instead of the expected behavior.
-      placeholder: "e.g. When I try to install the latest version, I get schema warnings/errors."
+      placeholder: "e.g. When I try to install the latest version, I get schema
+        warnings/errors."
     validations:
       required: true
 
@@ -46,7 +48,8 @@ body:
     id: reliability
     attributes:
       label: Can you reproduce this reliably?
-      description: Was this a one-time occurrence, or can you make it happen every time by following the steps?
+      description: Was this a one-time occurrence, or can you make it happen every
+        time by following the steps?
       options:
         - 'Yes, I can reproduce it reliably.'
         - "Sometimes, it's intermittent."
@@ -68,7 +71,10 @@ body:
     id: log-output
     attributes:
       label: Log Output
-      description: Is there any output in the log file? Please paste it somewhere else if it's too long like in a gist and link it here. The log file is located at: `/home/<your_username>/.config/my-unicorn/logs/my-unicorn.log`
+      description: Is there any output in the log file? Please paste it somewhere else
+        if it's too long like in a gist and link it here. The log file is
+        located
+        at:(/home/<your_username>/.config/my-unicorn/logs/my-unicorn.log)
       placeholder: 'Paste any relevant log output here or link to a gist...'
       render: shell
     validations:
