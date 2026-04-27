@@ -5,6 +5,8 @@ This module provides the main service for:
 - Querying backup information
 - Cleaning up old backups
 - Delegating restore operations to restore module
+- Tracking backup metadata with versioning and integrity information
+- Ensuring atomic file operations for backup and restore processes
 """
 
 import hashlib
@@ -330,7 +332,7 @@ class BackupService:
         return sorted(apps)
 
 
-# TODO: add below here for one file instead of restore.py:
+# TODO: move these to backupservice class directly because they are okay to be used there?
 
 
 def restore_latest_backup(
@@ -763,18 +765,15 @@ def _restore_specific_version(
         return destination_path
 
 
-"""Backup metadata management for versioning and integrity verification.
-
-This module handles:
-- Loading and saving backup metadata JSON files
-- Tracking backup versions and checksums
-- SHA256 calculation for integrity verification
-- Version sorting with semantic versioning fallback
-"""
-
-
 class BackupMetadata:
-    """Manages backup metadata for version tracking and integrity."""
+    """Manages backup metadata for version tracking and integrity.
+
+    This module handles:
+    - Loading and saving backup metadata JSON files
+    - Tracking backup versions and checksums
+    - SHA256 calculation for integrity verification
+    - Version sorting with semantic versioning fallback
+    """
 
     def __init__(self, backup_dir: Path) -> None:
         """Initialize metadata manager.
@@ -1042,26 +1041,6 @@ def validate_backup_integrity(
         msg = f"Backup integrity check failed for version {version}"
         logger.error(msg)
         raise ValueError(msg)
-
-
-def group_backups_by_version(backups: list[Path]) -> dict[str, list[Path]]:
-    """Group backup files by version number.
-
-    Args:
-        backups: List of backup file paths
-
-    Returns:
-        Dictionary mapping version strings to lists of backup paths
-    """
-    min_version_parts = 2
-    version_groups: dict[str, list[Path]] = {}
-    for backup in backups:
-        # Extract version from backup filename (format: app-version.AppImage)
-        parts = backup.stem.split("-")
-        if len(parts) >= min_version_parts:
-            version = parts[-1]
-            version_groups.setdefault(version, []).append(backup)
-    return version_groups
 
 
 def delete_old_backups(

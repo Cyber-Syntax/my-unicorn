@@ -7,77 +7,9 @@ import pytest
 
 from my_unicorn.core.backup import (
     delete_old_backups,
-    group_backups_by_version,
     validate_backup_exists,
     validate_backup_integrity,
 )
-
-
-class TestGroupBackupsByVersion:
-    """Tests for group_backups_by_version function."""
-
-    def test_single_version(self, tmp_path: Path) -> None:
-        """Test grouping backups from a single version."""
-        backups = [
-            tmp_path / "app-1.0.0.AppImage",
-            tmp_path / "other-app-1.0.0.AppImage",
-        ]
-        result = group_backups_by_version(backups)
-        assert result == {"1.0.0": backups}
-
-    def test_multiple_versions(self, tmp_path: Path) -> None:
-        """Test grouping backups from multiple versions."""
-        backups = [
-            tmp_path / "app-1.0.0.AppImage",
-            tmp_path / "app-1.1.0.AppImage",
-            tmp_path / "app-2.0.0.AppImage",
-        ]
-        result = group_backups_by_version(backups)
-        assert len(result) == 3
-        assert result["1.0.0"] == [backups[0]]
-        assert result["1.1.0"] == [backups[1]]
-        assert result["2.0.0"] == [backups[2]]
-
-    def test_empty_list(self) -> None:
-        """Test handling of empty list."""
-        assert group_backups_by_version([]) == {}
-
-    def test_mixed_versions(self, tmp_path: Path) -> None:
-        """Test grouping with mixed versions."""
-        backups = [
-            tmp_path / "app-2.0.0.AppImage",
-            tmp_path / "app-1.0.0.AppImage",
-            tmp_path / "other-1.0.0.AppImage",
-            tmp_path / "app-2.0.0.AppImage.1",
-            tmp_path / "app-1.5.0.AppImage",
-            tmp_path / "myapp-1.0.0.AppImage",
-        ]
-        result = group_backups_by_version(backups)
-        assert len(result) == 4
-        assert len(result["1.0.0"]) == 3
-        assert len(result["1.5.0"]) == 1
-        assert len(result["2.0.0"]) == 1
-
-    def test_single_part_filename(self, tmp_path: Path) -> None:
-        """Test that single-part names (no version) are ignored."""
-        backups = [
-            tmp_path / "app.AppImage",
-            tmp_path / "valid-1.0.0.AppImage",
-        ]
-        result = group_backups_by_version(backups)
-        assert result == {"1.0.0": [backups[1]]}
-
-    def test_hyphenated_app_names(self, tmp_path: Path) -> None:
-        """Test grouping with hyphenated app names."""
-        backups = [
-            tmp_path / "my-awesome-app-1.0.0.AppImage",
-            tmp_path / "my-awesome-app-2.0.0.AppImage",
-            tmp_path / "another-app-1.0.0.AppImage",
-        ]
-        result = group_backups_by_version(backups)
-        assert len(result) == 2
-        assert len(result["1.0.0"]) == 2
-        assert len(result["2.0.0"]) == 1
 
 
 class TestValidateBackupExists:
