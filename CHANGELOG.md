@@ -5,12 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.4.2-alpha] - 2026-04-24
 
 ### Changed
 
+- Upgraded dependencies:
+
+```bash
+Updated aiohttp v3.13.4 -> v3.13.5
+Updated certifi v2026.2.25 -> v2026.4.22
+Updated charset-normalizer v3.4.6 -> v3.4.7
+Updated cryptography v46.0.6 -> v47.0.0
+Updated idna v3.11 -> v3.13
+Updated librt v0.8.1 -> v0.9.0
+Updated more-itertools v10.8.0 -> v11.0.2
+Updated mypy v1.19.1 -> v1.20.2
+Updated orjson v3.11.7 -> v3.11.8
+Updated packaging v26.0 -> v26.2
+Updated pathspec v1.0.4 -> v1.1.1
+Updated pytest v9.0.2 -> v9.0.3
+Updated ruff v0.15.8 -> v0.15.12
+Updated types-pyyaml v6.0.12.20250915 -> v6.0.12.20260408
+```
+
 - For developers:
     - Consolidated backup modules to one backup.py module for better organization and maintainability.
+
+### Fixed
+
+- Fixed a orphaned metadata issue in the backup service where metadata entries were not being removed when the backup file was already gone, leading to orphaned metadata entries.
 
 ## [2.4.1-alpha] - 2026-04-24
 
@@ -883,6 +906,11 @@ Please change your current configuration files to the new format. The new format
 - refactor: improve better error handling on verify.py
 - chore: add copilot instructions
 
+[2.4.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.4.1-alpha...v2.4.2-alpha
+[2.4.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.4.0-alpha...v2.4.1-alpha
+[2.4.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.3.0-alpha...v2.4.0-alpha
+[2.3.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.2.0-alpha...v2.3.0-alpha
+[2.2.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.2.0-alpha...v2.2.1-alpha
 [2.2.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.1.0-alpha...v2.2.0-alpha
 [2.1.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.0.0-alpha...v2.1.0-alpha
 [2.0.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v1.12.1-alpha...v2.0.0-alpha
