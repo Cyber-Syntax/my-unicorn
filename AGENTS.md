@@ -186,7 +186,7 @@ logger.debug("Token: %s", token)  # Security risk!
 
 ### File Organization
 
-CRITICAL: Keep files between 150-500 lines for maintainability. If a file exceeds 550 lines, refactor by splitting into focused modules.
+CRITICAL: Keep files between 800-1100 lines for maintainability. If a file exceeds 1100 lines, refactor by splitting into focused modules.
 
 ```bash
 # Check file line counts
