@@ -953,14 +953,27 @@ def delete_old_backups(
         version_info = metadata.get_version_info(version)
         if version_info:
             backup_path = app_backup_dir / version_info["filename"]
-            if backup_path.exists():
-                try:
-                    backup_path.unlink()
-                    metadata.remove_version(version)
-                    logger.info(
-                        "Removed old backup: %s (v%s)",
-                        backup_path,
-                        version,
-                    )
-                except OSError:
-                    logger.exception("Failed to remove backup %s", backup_path)
+            backup_removed = False
+            try:
+                backup_path.unlink()
+                backup_removed = True
+            except FileNotFoundError:
+                backup_removed = False
+            except OSError:
+                logger.exception("Failed to remove backup %s", backup_path)
+                continue
+
+            metadata.remove_version(version)
+
+            if backup_removed:
+                logger.info(
+                    "Removed old backup: %s (v%s)",
+                    backup_path,
+                    version,
+                )
+            else:
+                logger.info(
+                    "Pruned stale backup metadata for missing file: %s (v%s)",
+                    backup_path,
+                    version,
+                )

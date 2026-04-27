@@ -75,13 +75,13 @@ class TestDeleteOldBackups:
         metadata_mock.remove_version.assert_not_called()
 
     def test_file_not_exists(self, tmp_path: Path) -> None:
-        """Test deletion when backup file doesn't exist."""
+        """Test deletion prunes metadata when backup file doesn't exist."""
         metadata_mock = MagicMock()
         metadata_mock.get_version_info.return_value = {
             "filename": "nonexistent-1.0.0.AppImage"
         }
         delete_old_backups(["1.0.0"], metadata_mock, tmp_path)
-        metadata_mock.remove_version.assert_not_called()
+        metadata_mock.remove_version.assert_called_once_with("1.0.0")
 
     def test_deletion_error_handling(self, tmp_path: Path) -> None:
         """Test handling when file deletion raises OSError."""
