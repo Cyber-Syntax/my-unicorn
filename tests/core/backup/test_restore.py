@@ -19,7 +19,7 @@ class TestBackupServiceRestore:
     ) -> None:
         """Test restoring the latest backup."""
         config_manager, _, backup_dir, storage_dir = dummy_config
-        config_manager.load_app_config.return_value = sample_app_config
+        config_manager.load_raw_app_config.return_value = sample_app_config
 
         app_name = "app1"
         app_backup_dir = backup_dir / app_name
@@ -52,7 +52,7 @@ class TestBackupServiceRestore:
     ) -> None:
         """Test that current version is backed up before restore."""
         config_manager, _, backup_dir, storage_dir = dummy_config
-        config_manager.load_app_config.return_value = sample_app_config
+        config_manager.load_raw_app_config.return_value = sample_app_config
 
         app_name = "app1"
 
@@ -89,7 +89,7 @@ class TestBackupServiceRestore:
     ) -> None:
         """Test restore when app config is missing."""
         config_manager, _, _, storage_dir = dummy_config
-        config_manager.load_app_config.return_value = None
+        config_manager.load_raw_app_config.return_value = None
 
         result = backup_service.restore_latest_backup(
             "nonexistent", storage_dir
@@ -104,7 +104,7 @@ class TestBackupServiceRestore:
     ) -> None:
         """Test restore when backup integrity check fails."""
         config_manager, _, backup_dir, storage_dir = dummy_config
-        config_manager.load_app_config.return_value = sample_app_config
+        config_manager.load_raw_app_config.return_value = sample_app_config
 
         app_name = "app1"
         app_backup_dir = backup_dir / app_name
@@ -137,7 +137,7 @@ class TestBackupServiceRestore:
         config_manager, _, backup_dir, storage_dir = dummy_config
 
         # Use v1 config fixture
-        config_manager.load_app_config.return_value = sample_v1_app_config
+        config_manager.load_raw_app_config.return_value = sample_v1_app_config
 
         app_name = "app1"
         app_backup_dir = backup_dir / app_name
@@ -172,7 +172,7 @@ class TestBackupServiceRestore:
 
         # Configure max_backup=2 to trigger cleanup
         global_config["max_backup"] = 2
-        config_manager.load_app_config.return_value = sample_app_config
+        config_manager.load_raw_app_config.return_value = sample_app_config
 
         app_name = "app1"
         app_backup_dir = backup_dir / app_name
@@ -244,7 +244,7 @@ class TestRestoreBackupValidation:
         - Or explicitly skip_validation=False
         """
         config_manager, _, backup_dir, storage_dir = dummy_config
-        config_manager.load_app_config.return_value = sample_app_config
+        config_manager.load_raw_app_config.return_value = sample_app_config
 
         app_name = "app1"
         app_backup_dir = backup_dir / app_name

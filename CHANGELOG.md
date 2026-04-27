@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - For developers:
     - Consolidated backup modules to one backup.py module for better organization and maintainability.
 
+## [2.4.1-alpha] - 2026-04-24
+
+### Fixed
+
+- Fixed SchemaValidationError; Missing required field 'catalog_ref' #241 by changing the load_app_config function to load_raw_app_config function.
+
 ## [2.4.0-alpha] - 2026-03-31
 
 ### Added
