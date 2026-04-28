@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.4.2-alpha] - 2026-04-24
+## [2.4.3-alpha] - 2026-04-28
+
+### Fixed
+
+- Fixed upgrade unexpected keyword argument error.
+
+## [2.4.2-alpha] - 2026-04-27
 
 ### Changed
 
@@ -35,7 +41,7 @@ Updated types-pyyaml v6.0.12.20250915 -> v6.0.12.20260408
 
 - Fixed a orphaned metadata issue in the backup service where metadata entries were not being removed when the backup file was already gone, leading to orphaned metadata entries.
 
-## [2.4.1-alpha] - 2026-04-24
+## [2.4.1-alpha] - 2026-04-27
 
 ### Fixed
 
