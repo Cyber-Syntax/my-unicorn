@@ -245,14 +245,15 @@ class TestRemoveDesktopEntry:
     ) -> None:
         """Should remove desktop entry when present."""
         with patch(
-            "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
+            "my_unicorn.core.desktop_entry.DesktopEntry.remove_desktop_entry_for_app",
             return_value=True,
         ) as mock_remove:
             result = remove_service._remove_desktop_entry("test-app")
 
             assert result.success is True
             mock_remove.assert_called_once_with(
-                "test-app", mock_config_manager
+                "test-app",
+                config_manager=mock_config_manager,
             )
 
     def test_handles_no_desktop_entry(
@@ -260,7 +261,7 @@ class TestRemoveDesktopEntry:
     ) -> None:
         """Should handle gracefully when no desktop entry exists."""
         with patch(
-            "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
+            "my_unicorn.core.desktop_entry.DesktopEntry.remove_desktop_entry_for_app",
             return_value=False,
         ):
             result = remove_service._remove_desktop_entry("test-app")
@@ -272,7 +273,7 @@ class TestRemoveDesktopEntry:
     ) -> None:
         """Should handle desktop entry removal errors gracefully."""
         with patch(
-            "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
+            "my_unicorn.core.desktop_entry.DesktopEntry.remove_desktop_entry_for_app",
             side_effect=RuntimeError("Desktop entry error"),
         ):
             result = remove_service._remove_desktop_entry("test-app")
