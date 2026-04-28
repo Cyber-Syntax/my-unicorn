@@ -176,15 +176,17 @@ update_outdated() {
 
   echo "Updating ${#outdated_apps[@]} outdated app(s): ${outdated_apps[*]}"
 
-  # Update all outdated apps concurrently in a single command
+  # Update all outdated apps concurrently. The inner command already
+  # prints its own structured summary (per-app ✅/❌ lines + a count
+  # of failures). Don't print our own "all updated successfully"
+  # message here — `my-unicorn update` exits 0 even when some apps
+  # failed (e.g. the AppImage wasn't published yet), so an
+  # unconditional echo would contradict the per-app errors above.
+  # See Cyber-Syntax/my-unicorn#291.
   if ! "$UNICORN" update "${outdated_apps[@]}"; then
     echo "Error: Update failed for some apps. Check your network connection or logs."
     return 1
   fi
-
-
-
-  echo "✓ All outdated apps updated successfully"
 }
 
 # help for CLI
