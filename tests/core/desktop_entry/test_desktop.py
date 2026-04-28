@@ -4,10 +4,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from my_unicorn.constants import DESKTOP_BROWSER_MIME_TYPES
 from my_unicorn.core.desktop_entry import (
     DesktopEntry,
-    create_desktop_entry_for_app,
-    remove_desktop_entry_for_app,
+    is_browser_app,
+    should_update_desktop_file,
+    validate_desktop_file,
 )
 
 
@@ -76,9 +78,8 @@ def test_validate_desktop_file(desktop_entry, tmp_path):
 
 def test_browser_detection_and_mime_types(tmp_path):
     entry = DesktopEntry("firefox", tmp_path / "firefox.AppImage")
-    assert entry._is_browser_app() is True
-    mime_types = entry._get_browser_mime_types()
-    assert "text/html" in mime_types
+    assert is_browser_app(entry.app_name) is True
+    assert "text/html" in DESKTOP_BROWSER_MIME_TYPES
 
 
 def test_should_update_desktop_file_logic(desktop_entry):
@@ -111,15 +112,19 @@ def test_create_desktop_entry_for_app(tmp_path):
 
 
 def test_remove_desktop_entry_for_app(tmp_path):
+    """Removes a desktop entry via the instance method."""
     appimage_path = tmp_path / "testapp.AppImage"
     appimage_path.write_text("run")
     entry = DesktopEntry("testapp", appimage_path)
+    desktop_dir = tmp_path / "applications"
+    desktop_dir.mkdir()
+    entry.get_desktop_dirs = lambda: [desktop_dir]
     file_path = entry.create_desktop_file(
-        target_dir=tmp_path, comment="Test app"
+        target_dir=desktop_dir, comment="Test app"
     )
     assert file_path.exists()
-    # Remove using helper
-    assert remove_desktop_entry_for_app("testapp", config_manager=None) in [
-        True,
-        False,
-    ]
+    # Remove using instance method and verify it succeeded
+    assert entry.remove_desktop_file() is True
+    assert not file_path.exists()
+    # Verify removing again returns False (file already gone)
+    assert entry.remove_desktop_file() is False
