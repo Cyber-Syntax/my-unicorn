@@ -1,9 +1,11 @@
 """Unit tests for self-update helpers and upgrade flow."""
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
+import my_unicorn.cli.upgrade as upgrade_module
 from my_unicorn.cli.upgrade import (
     check_for_self_update,
     perform_self_update,
@@ -167,3 +169,40 @@ async def test_dev_installation_upgrade_same_version() -> None:
         # Dev installation should always upgrade to production
         assert should_upgrade is True
         assert latest_version == "2.0.0"
+
+
+@pytest.mark.asyncio
+async def test_fetch_latest_prerelease_version_disables_cache() -> None:
+    """Self-upgrade version check bypasses and disables caching."""
+
+    session_cm = AsyncMock()
+    session = AsyncMock()
+    session_cm.__aenter__.return_value = session
+    session_cm.__aexit__.return_value = False
+
+    release = SimpleNamespace(version="2.0.1", original_tag_name="v2.0.1")
+
+    with (
+        patch(
+            "my_unicorn.cli.upgrade.aiohttp.ClientSession",
+            return_value=session_cm,
+        ),
+        patch("my_unicorn.cli.upgrade.ReleaseFetcher") as mock_fetcher_cls,
+    ):
+        mock_fetcher_instance = mock_fetcher_cls.return_value
+        mock_fetcher_instance.fetch_latest_prerelease = AsyncMock(
+            return_value=release
+        )
+
+        latest = await upgrade_module._fetch_latest_prerelease_version()
+
+        assert latest == "2.0.1"
+        mock_fetcher_cls.assert_called_once_with(
+            owner="Cyber-Syntax",
+            repo="my-unicorn",
+            session=session,
+            cache_manager=None,
+        )
+        mock_fetcher_instance.fetch_latest_prerelease.assert_awaited_once_with(
+            ignore_cache=True
+        )
