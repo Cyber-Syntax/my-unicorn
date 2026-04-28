@@ -22,6 +22,7 @@ from my_unicorn.constants import (
     DESKTOP_BROWSER_EXEC_PARAM,
     DESKTOP_BROWSER_KEYWORDS,
     DESKTOP_BROWSER_MIME_TYPES,
+    DESKTOP_BROWSER_NAMES,
     DESKTOP_DEFAULT_CATEGORIES,
     DESKTOP_FILE_TYPE,
     DESKTOP_FILE_VERSION,
@@ -30,14 +31,6 @@ from my_unicorn.constants import (
     DESKTOP_SYSTEM_APPLICATION_DIRS,
     DESKTOP_USER_APPLICATIONS_SUBPATH,
 )
-from my_unicorn.core.desktop_entry.browser_detection import (
-    get_browser_mime_types,
-    is_browser_app,
-)
-from my_unicorn.core.desktop_entry.validation import (
-    should_update_desktop_file,
-    validate_desktop_file,
-)
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.desktop_utils import (
     create_desktop_entry_name,
@@ -45,6 +38,124 @@ from my_unicorn.utils.desktop_utils import (
 )
 
 logger = get_logger(__name__)
+
+
+def is_browser_app(app_name: str) -> bool:
+    """Check if an application is a browser based on its name.
+
+    Args:
+        app_name: Name of the application.
+
+    Returns:
+        True if the app is detected as a browser.
+
+    """
+    app_name_lower = app_name.lower()
+    return any(browser in app_name_lower for browser in DESKTOP_BROWSER_NAMES)
+
+
+def should_update_desktop_file(
+    existing_content: str, new_content: str
+) -> bool:
+    """Check if a desktop file should be updated by comparing key fields.
+
+    Args:
+        existing_content: Current desktop file content.
+        new_content: New desktop file content that would be written.
+
+    Returns:
+        True if the desktop file should be updated.
+
+    """
+
+    def parse_desktop_fields(content: str) -> dict[str, str]:
+        """Parse key fields from desktop file content."""
+        fields: dict[str, str] = {}
+        for line in content.split("\n"):
+            if "=" in line and not line.startswith("#"):
+                key, value = line.split("=", 1)
+                fields[key.strip()] = value.strip()
+        return fields
+
+    existing_fields = parse_desktop_fields(existing_content)
+    new_fields = parse_desktop_fields(new_content)
+
+    # Key fields that should trigger an update if changed
+    important_fields = [
+        "Exec",
+        "Icon",
+        "Name",
+        "Comment",
+        "Categories",
+        "MimeType",
+        "Keywords",
+        "StartupNotify",
+        "NoDisplay",
+        "Terminal",
+    ]
+
+    for field in important_fields:
+        if existing_fields.get(field) != new_fields.get(field):
+            logger.debug("Desktop file field changed: %s", field)
+            logger.debug("  Old: %s", existing_fields.get(field))
+            logger.debug("  New: %s", new_fields.get(field))
+            return True
+
+    return False
+
+
+def validate_desktop_file(desktop_file: Path) -> list[str]:
+    """Validate desktop file format and content.
+
+    Args:
+        desktop_file: Path to desktop file to validate.
+
+    Returns:
+        List of validation errors (empty if valid).
+
+    """
+    errors: list[str] = []
+
+    if not desktop_file.exists():
+        errors.append("Desktop file does not exist")
+        return errors
+
+    try:
+        with desktop_file.open(encoding="utf-8") as f:
+            content = f.read()
+
+        lines = content.split("\n")
+
+        # Check for required header
+        if not lines or lines[0] != "[Desktop Entry]":
+            errors.append("Missing or invalid [Desktop Entry] header")
+
+        # Check for required fields
+        required_fields = ["Name", "Exec", "Type"]
+        found_fields: set[str] = set()
+
+        for line in lines:
+            if "=" in line:
+                key = line.split("=", 1)[0].strip()
+                found_fields.add(key)
+
+        for field in required_fields:
+            if field not in found_fields:
+                errors.append(f"Missing required field: {field}")
+
+        # Check if the AppImage file referenced in Exec actually exists
+        for line in lines:
+            if line.startswith("Exec="):
+                # Strip any trailing arguments (e.g. %u)
+                exec_value = line.split("=", 1)[1].strip()
+                exec_path = exec_value.split()[0]
+                if not Path(exec_path).exists():
+                    errors.append(f"AppImage file does not exist: {exec_path}")
+
+    except OSError as e:
+        errors.append(f"Failed to read desktop file: {e}")
+
+    return errors
 
 
 class DesktopEntry:
@@ -56,14 +167,15 @@ class DesktopEntry:
         appimage_path: Path,
         icon_path: Path | None = None,
         config_manager: ConfigManager | None = None,
-    ):
+    ) -> None:
         """Initialize desktop entry manager.
 
         Args:
-            app_name: Name of the application
-            appimage_path: Path to the AppImage file (should be clean name without version)
-            icon_path: Optional path to icon file
-            config_manager: Configuration manager for directory paths
+            app_name: Name of the application.
+            appimage_path: Path to the AppImage file (should use a clean name
+                without a version suffix).
+            icon_path: Optional path to icon file.
+            config_manager: Configuration manager for directory paths.
 
         """
         self.app_name = app_name.lower()  # Normalize to lowercase
@@ -74,13 +186,13 @@ class DesktopEntry:
         self.global_config = self.config_manager.load_global_config()
 
     def get_desktop_dirs(self) -> list[Path]:
-        """Get list of desktop entry directories to check.
+        """Return desktop entry directories to check, highest priority first.
 
         Returns:
-            List of desktop directory paths in order of preference
+            List of desktop directory paths.
 
         """
-        dirs = []
+        dirs: list[Path] = []
 
         # User-specific directory (highest priority)
         user_dir = Path.home().joinpath(*DESKTOP_USER_APPLICATIONS_SUBPATH)
@@ -95,10 +207,10 @@ class DesktopEntry:
         return dirs
 
     def find_existing_desktop_file(self) -> Path | None:
-        """Find existing desktop file for this application.
+        """Find an existing desktop file for this application.
 
         Returns:
-            Path to existing desktop file or None if not found
+            Path to the existing desktop file, or None if not found.
 
         """
         for desktop_dir in self.get_desktop_dirs():
@@ -121,19 +233,18 @@ class DesktopEntry:
         """Generate desktop entry file content.
 
         Args:
-            comment: Application description
-            categories: List of application categories
-            mime_types: List of MIME types the app can handle
-            keywords: List of keywords for searching
-            startup_notify: Whether to show startup notification
-            no_display: Whether to hide from application menus
-            terminal: Whether app should run in terminal
+            comment: Application description.
+            categories: List of application categories.
+            mime_types: List of MIME types the app can handle.
+            keywords: List of keywords for searching.
+            startup_notify: Whether to show a startup notification.
+            no_display: Whether to hide the entry from application menus.
+            terminal: Whether the app should run in a terminal.
 
         Returns:
-            Desktop file content as string
+            Desktop file content as a string.
 
         """
-        # Auto-detect browser applications and set appropriate defaults
         is_browser = is_browser_app(self.app_name)
 
         if categories is None:
@@ -149,8 +260,7 @@ class DesktopEntry:
         if keywords is None:
             keywords = list(DESKTOP_BROWSER_KEYWORDS) if is_browser else []
 
-        # Sanitize values and use proper paths
-        # For browsers, keep the original name format; for others, format as title
+        # Build display name
         if is_browser:
             display_name = self.app_name
         else:
@@ -160,30 +270,27 @@ class DesktopEntry:
                 .replace("_", " ")
                 .title()
             )
+
         comment = comment or f"{display_name} AppImage Application"
 
-        # Use absolute paths for Exec and Icon
-        # Add %u parameter for browsers to handle URLs
+        # Exec path — browsers receive a %u URL argument
         exec_path = str(self.appimage_path.resolve())
         if is_browser:
             exec_path += f" {DESKTOP_BROWSER_EXEC_PARAM}"
 
-        # Determine icon path - prefer provided icon_path, fallback to configured icon directory
+        # Icon: prefer the provided icon_path, then fall back to the icon dir
         if self.icon_path and self.icon_path.exists():
             icon_value = str(self.icon_path.resolve())
         else:
-            # Try to find icon in configured icon directory
             icon_dir = self.global_config["directory"]["icon"]
-            potential_icon_extensions = list(DESKTOP_ICON_EXTENSIONS)
-            icon_value = display_name.lower()  # fallback to name
-
-            for ext in potential_icon_extensions:
+            icon_value = display_name.lower()  # ultimate fallback
+            for ext in list(DESKTOP_ICON_EXTENSIONS):
                 potential_icon = icon_dir / f"{self.app_name}{ext}"
                 if potential_icon.exists():
                     icon_value = str(potential_icon.resolve())
                     break
 
-        # Build desktop file content
+        # Assemble content
         content_lines = [
             DESKTOP_SECTION_HEADER,
             f"Version={DESKTOP_FILE_VERSION}",
@@ -210,9 +317,7 @@ class DesktopEntry:
         if terminal:
             content_lines.append("Terminal=true")
 
-        # Add newline at end
-        content_lines.append("")
-
+        content_lines.append("")  # trailing newline
         return "\n".join(content_lines)
 
     def create_desktop_file(
@@ -224,36 +329,34 @@ class DesktopEntry:
         keywords: list[str] | None = None,
         **kwargs: Any,
     ) -> Path:
-        """Create or update desktop entry file when content changes.
+        """Create or update a desktop entry file when content changes.
 
-        This method automatically detects when desktop files need updating by comparing
-        the existing content with what would be generated. Updates only when there are
-        actual changes to important fields like icon paths, exec paths, MIME types, etc.
+        Automatically detects whether the existing file differs from what
+        would be generated and only writes when there are real changes.
 
         Args:
-            target_dir: Directory to create desktop file in (defaults to user dir)
-            comment: Application description
-            categories: List of application categories
-            mime_types: List of MIME types the app can handle
-            keywords: List of keywords for searching
-            **kwargs: Additional desktop entry options
+            target_dir: Directory to create the desktop file in
+                (defaults to ``~/.local/share/applications``).
+            comment: Application description.
+            categories: List of application categories.
+            mime_types: List of MIME types the app can handle.
+            keywords: List of keywords for searching.
+            **kwargs: Additional desktop entry options passed to
+                :meth:`generate_desktop_content`.
 
         Returns:
-            Path to desktop file (existing, newly created, or updated)
+            Path to the desktop file (existing, newly created, or updated).
 
         Raises:
-            OSError: If file creation fails
+            OSError: If file creation fails.
 
         """
         if target_dir is None:
             target_dir = Path.home() / ".local" / "share" / "applications"
 
-        # Ensure target directory exists
         target_dir.mkdir(parents=True, exist_ok=True)
-
         desktop_file_path = target_dir / self.desktop_filename
 
-        # Generate new content
         new_content = self.generate_desktop_content(
             comment=comment,
             categories=categories,
@@ -262,18 +365,15 @@ class DesktopEntry:
             **kwargs,
         )
 
-        # Check if file exists and if update is needed
         needs_update = True
         if desktop_file_path.exists():
             try:
-                with desktop_file_path.open(encoding="utf-8") as f:
-                    existing_content = f.read()
-
-                # Compare key fields that matter for functionality
+                existing_content = desktop_file_path.read_text(
+                    encoding="utf-8"
+                )
                 needs_update = should_update_desktop_file(
                     existing_content, new_content
                 )
-
                 if needs_update:
                     logger.debug(
                         "Desktop file content changed, updating: %s",
@@ -286,28 +386,15 @@ class DesktopEntry:
                     )
                     return desktop_file_path
             except OSError:
-                # If we can't read the existing file, create a new one
                 needs_update = True
 
-        # Only write file if update is needed
         if needs_update:
             try:
-                with desktop_file_path.open("w", encoding="utf-8") as f:
-                    f.write(new_content)
-
-                # Make file executable
+                desktop_file_path.write_text(new_content, encoding="utf-8")
                 desktop_file_path.chmod(0o755)
-
-                if desktop_file_path.exists():
-                    logger.debug(
-                        "🖥️  Updated desktop entry: %s", desktop_file_path.name
-                    )
-                else:
-                    logger.debug(
-                        "🖥️  Created desktop entry: %s", desktop_file_path.name
-                    )
-                return desktop_file_path
-
+                logger.debug(
+                    "️Desktop entry written: %s", desktop_file_path.name
+                )
             except OSError as e:
                 logger.exception(
                     "Failed to write desktop file %s: %s",
@@ -315,9 +402,8 @@ class DesktopEntry:
                     e,
                 )
                 raise
-        else:
-            # File exists and is up to date, just return the path
-            return desktop_file_path
+
+        return desktop_file_path
 
     def update_desktop_file(
         self,
@@ -327,17 +413,18 @@ class DesktopEntry:
         keywords: list[str] | None = None,
         **kwargs: Any,
     ) -> Path | None:
-        """Update existing desktop entry file.
+        """Update an existing desktop entry file.
 
         Args:
-            comment: Application description
-            categories: List of application categories
-            mime_types: List of MIME types the app can handle
-            keywords: List of keywords for searching
-            **kwargs: Additional desktop entry options
+            comment: Application description.
+            categories: List of application categories.
+            mime_types: List of MIME types the app can handle.
+            keywords: List of keywords for searching.
+            **kwargs: Additional desktop entry options passed to
+                :meth:`generate_desktop_content`.
 
         Returns:
-            Path to updated desktop file or None if not found
+            Path to the updated desktop file, or None if no file was found.
 
         """
         existing_file = self.find_existing_desktop_file()
@@ -347,7 +434,6 @@ class DesktopEntry:
             )
             return None
 
-        # Update by recreating the file
         try:
             content = self.generate_desktop_content(
                 comment=comment,
@@ -356,13 +442,9 @@ class DesktopEntry:
                 keywords=keywords,
                 **kwargs,
             )
-
-            with existing_file.open("w", encoding="utf-8") as f:
-                f.write(content)
-
+            existing_file.write_text(content, encoding="utf-8")
             logger.debug("Updated desktop file: %s", existing_file)
             return existing_file
-
         except OSError as e:
             logger.exception(
                 "Failed to update desktop file %s: %s",
@@ -372,10 +454,10 @@ class DesktopEntry:
             return None
 
     def remove_desktop_file(self) -> bool:
-        """Remove desktop entry file.
+        """Remove the desktop entry file.
 
         Returns:
-            True if file was removed, False if not found
+            True if the file was removed, False if it was not found.
 
         """
         existing_file = self.find_existing_desktop_file()
@@ -396,40 +478,34 @@ class DesktopEntry:
             return False
 
     def is_installed(self) -> bool:
-        """Check if desktop entry is installed.
-
-        Returns:
-            True if desktop file exists
-
-        """
+        """Return True if a desktop entry file already exists."""
         return self.find_existing_desktop_file() is not None
 
-    def validate_desktop_file(self, desktop_file: Path) -> list[str]:
-        """Validate desktop file format and content.
+    def validate(self, desktop_file: Path) -> list[str]:
+        """Validate a desktop file's format and content.
 
         Args:
-            desktop_file: Path to desktop file to validate
+            desktop_file: Path to the desktop file to validate.
 
         Returns:
-            List of validation errors (empty if valid)
+            List of validation errors (empty if valid).
 
         """
         return validate_desktop_file(desktop_file)
 
     def refresh_desktop_database(self) -> bool:
-        """Refresh desktop database to make new entries available.
+        """Refresh the desktop database so new entries become available.
 
         Returns:
-            True if refresh was successful
+            True if the refresh succeeded.
 
         """
         try:
-            # Try to run update-desktop-database
-            result = shutil.which("update-desktop-database")
-            if result:
+            cmd = shutil.which("update-desktop-database")
+            if cmd:
                 user_dir = Path.home() / ".local" / "share" / "applications"
                 subprocess.run(
-                    ["update-desktop-database", str(user_dir)],
+                    [cmd, str(user_dir)],
                     check=False,
                     capture_output=True,
                 )
@@ -440,35 +516,25 @@ class DesktopEntry:
 
         return False
 
-    def _is_browser_app(self) -> bool:
-        """Check if this application is a browser based on its name.
-
-        Returns:
-            True if the app is detected as a browser
-
-        """
-        return is_browser_app(self.app_name)
-
-    def _get_browser_mime_types(self) -> list[str]:
-        """Get standard browser MIME types for web browsers.
-
-        Returns:
-            List of MIME types that browsers should handle
-
-        """
-        return get_browser_mime_types()
-
-    def _should_update_desktop_file(
-        self, existing_content: str, new_content: str
+    @staticmethod
+    def remove_desktop_entry_for_app(
+        app_name: str,
+        config_manager: ConfigManager | None = None,
     ) -> bool:
-        """Check if desktop file should be updated by comparing key fields.
+        """Remove the desktop entry for an AppImage application.
 
         Args:
-            existing_content: Current desktop file content
-            new_content: New desktop file content that would be written
+            app_name: Name of the application.
+            config_manager: Configuration manager for directory paths.
 
         Returns:
-            True if desktop file should be updated
+            True if the desktop file was removed.
 
         """
-        return should_update_desktop_file(existing_content, new_content)
+        dummy_path = Path("/dev/null")
+        desktop_entry = DesktopEntry(
+            app_name,
+            dummy_path,
+            config_manager=config_manager,
+        )
+        return desktop_entry.remove_desktop_file()

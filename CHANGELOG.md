@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.4-alpha] - 2026-04-28
+
+### Changed
+
+- Refactored desktop_entry modules to use a single module with a DesktopEntry class for better organization and maintainability. Also, added missing type annotations, improved docstrings and removed dead code in the desktop entry handling logic.
+
 ## [2.4.3-alpha] - 2026-04-28
 
 ### Fixed
@@ -912,6 +918,8 @@ Please change your current configuration files to the new format. The new format
 - refactor: improve better error handling on verify.py
 - chore: add copilot instructions
 
+[2.4.4-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.4.3-alpha...v2.4.4-alpha
+[2.4.3-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.4.2-alpha...v2.4.3-alpha
 [2.4.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.4.1-alpha...v2.4.2-alpha
 [2.4.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.4.0-alpha...v2.4.1-alpha
 [2.4.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.3.0-alpha...v2.4.0-alpha

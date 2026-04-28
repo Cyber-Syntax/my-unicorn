@@ -372,9 +372,11 @@ class RemoveService:
     def _remove_desktop_entry(self, app_name: str) -> RemovalOperation:
         """Attempt to remove a desktop entry for the app."""
         try:
-            removed = desktop_entry_module.remove_desktop_entry_for_app(
-                app_name,
-                self.config_manager,
+            removed = (
+                desktop_entry_module.DesktopEntry.remove_desktop_entry_for_app(
+                    app_name,
+                    config_manager=self.config_manager,
+                )
             )
             if removed:
                 logger.debug("Removed desktop entry for %s", app_name)

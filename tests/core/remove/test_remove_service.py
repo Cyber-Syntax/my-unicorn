@@ -34,7 +34,7 @@ class TestRemoveAppSuccess:
             patch("pathlib.Path.unlink"),
             patch("shutil.rmtree"),
             patch(
-                "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
+                "my_unicorn.core.desktop_entry.DesktopEntry.remove_desktop_entry_for_app",
                 return_value=True,
             ),
         ):
@@ -69,7 +69,7 @@ class TestRemoveAppSuccess:
             patch("pathlib.Path.unlink"),
             patch("shutil.rmtree"),
             patch(
-                "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
+                "my_unicorn.core.desktop_entry.DesktopEntry.remove_desktop_entry_for_app",
                 return_value=True,
             ),
         ):
@@ -96,7 +96,7 @@ class TestRemoveAppSuccess:
         with (
             patch("pathlib.Path.exists", return_value=False),
             patch(
-                "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
+                "my_unicorn.core.desktop_entry.DesktopEntry.remove_desktop_entry_for_app",
                 return_value=False,
             ),
         ):
@@ -130,7 +130,7 @@ class TestRemoveAppSuccess:
             patch("pathlib.Path.exists", return_value=True),
             patch("pathlib.Path.unlink"),
             patch(
-                "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
+                "my_unicorn.core.desktop_entry.DesktopEntry.remove_desktop_entry_for_app",
                 return_value=True,
             ),
         ):
@@ -169,7 +169,7 @@ class TestRemoveAppSuccess:
             patch("pathlib.Path.unlink"),
             patch("shutil.rmtree"),
             patch(
-                "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
+                "my_unicorn.core.desktop_entry.DesktopEntry.remove_desktop_entry_for_app",
                 return_value=True,
             ),
         ):
@@ -280,7 +280,7 @@ class TestRemovalResultConstruction:
             patch("pathlib.Path.unlink"),
             patch("shutil.rmtree"),
             patch(
-                "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
+                "my_unicorn.core.desktop_entry.DesktopEntry.remove_desktop_entry_for_app",
                 return_value=True,
             ),
         ):
@@ -308,7 +308,7 @@ class TestRemovalResultConstruction:
             patch("pathlib.Path.unlink"),
             patch("shutil.rmtree"),
             patch(
-                "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
+                "my_unicorn.core.desktop_entry.DesktopEntry.remove_desktop_entry_for_app",
                 return_value=True,
             ),
         ):
@@ -335,7 +335,7 @@ class TestRemovalResultConstruction:
             patch("pathlib.Path.unlink"),
             patch("shutil.rmtree"),
             patch(
-                "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
+                "my_unicorn.core.desktop_entry.DesktopEntry.remove_desktop_entry_for_app",
                 return_value=True,
             ),
         ):
@@ -367,7 +367,7 @@ class TestLoggingBehavior:
             patch("pathlib.Path.unlink"),
             patch("shutil.rmtree"),
             patch(
-                "my_unicorn.core.desktop_entry.remove_desktop_entry_for_app",
+                "my_unicorn.core.desktop_entry.DesktopEntry.remove_desktop_entry_for_app",
                 return_value=True,
             ),
         ):
