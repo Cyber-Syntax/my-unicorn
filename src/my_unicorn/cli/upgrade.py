@@ -208,10 +208,10 @@ async def _fetch_latest_prerelease_version() -> str | None:
 
     async with aiohttp.ClientSession() as session:
         fetcher = ReleaseFetcher(
-            GITHUB_OWNER,
-            GITHUB_REPO,
-            session,
-            use_cache=False,
+            owner=GITHUB_OWNER,
+            repo=GITHUB_REPO,
+            session=session,
+            cache_manager=None,
         )
         try:
             release = await fetcher.fetch_latest_prerelease(ignore_cache=True)
