@@ -150,7 +150,6 @@ nuclear                   ❌ Update failed
 
 🎉 Successfully updated 1 app(s)
 ❌ 1 app(s) failed to update
-✓ All outdated apps updated successfully
 ```
 
 ## Remove Examples
