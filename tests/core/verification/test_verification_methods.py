@@ -9,13 +9,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.core.github import Asset, ChecksumFileInfo
+from my_unicorn.core.github import Asset
 from my_unicorn.core.verification.context import VerificationContext
 from my_unicorn.core.verification.verification_methods import (
     cache_checksum_file_data,
     verify_checksum_file,
     verify_digest,
 )
+from my_unicorn.types import ChecksumFileInfo
 from tests.core.verification.conftest import (
     EXPECTED_MD5_HEX,
     EXPECTED_SHA1_HEX,

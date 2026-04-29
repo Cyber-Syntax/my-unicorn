@@ -10,11 +10,11 @@ import pytest_asyncio
 from my_unicorn.core.github import (
     Asset,
     AssetSelector,
-    ChecksumFileInfo,
     GitHubClient,
     ReleaseFetcher,
 )
 from my_unicorn.core.github.client import create_api_timeout
+from my_unicorn.types import ChecksumFileInfo
 
 
 def test_create_api_timeout():

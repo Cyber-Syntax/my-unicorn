@@ -6,12 +6,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from my_unicorn.constants import VerificationMethod
-from my_unicorn.core.github import Asset, ChecksumFileInfo
+from my_unicorn.core.github import Asset
 from my_unicorn.core.verification.context import (
     VerificationConfig,
     VerificationContext,
 )
 from my_unicorn.core.verification.verifier import Verifier
+from my_unicorn.types import ChecksumFileInfo
 
 
 class TestVerificationConfig:
