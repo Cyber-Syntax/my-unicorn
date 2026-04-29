@@ -127,7 +127,7 @@ async def test_should_perform_self_update_when_version_unknown() -> None:
         should_upgrade, latest_version = await should_perform_self_update(
             "2.0.0"
         )
-        assert should_upgrade is False
+        assert should_upgrade is None
         assert latest_version is None
 
 

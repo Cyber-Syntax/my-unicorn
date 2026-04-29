@@ -232,7 +232,7 @@ async def _fetch_latest_prerelease_version() -> str | None:
 
 async def should_perform_self_update(
     current_version: str,
-) -> tuple[bool, str | None]:
+) -> tuple[bool | None, str | None]:
     """Determine if a newer release is available.
 
     Checks for dev installation first. Dev installations always upgrade to
@@ -241,7 +241,8 @@ async def should_perform_self_update(
 
     Returns:
         A tuple of (should_upgrade, latest_version) where:
-        - should_upgrade: True if upgrade needed (dev install or newer version)
+        - should_upgrade: True if upgrade needed (dev install or newer version),
+          False if already up to date, or None if the check failed
         - latest_version: The latest version string, or None if unavailable
     """
     is_dev_install = await _run_uv_tool_list()
@@ -249,7 +250,7 @@ async def should_perform_self_update(
 
     if not latest_version or not latest_version.strip():
         logger.warning("Could not determine latest version; skipping upgrade.")
-        return False, None  # don't upgrade blindly without a tag
+        return None, None  # don't upgrade blindly without a tag
 
     if is_dev_install:
         logger.info("🔧 Development installation detected")
@@ -265,12 +266,13 @@ async def should_perform_self_update(
 
 
 async def check_for_self_update() -> tuple[
-    bool, str | None
+    bool | None, str | None
 ]:  # expose the version
     """Check if a newer my-unicorn release is available (cache disabled).
 
     Returns:
-        True if a newer version is available, False otherwise.
+        True if a newer version is available, False if up to date,
+        or None if the check failed.
     """
 
     return await should_perform_self_update(__version__)

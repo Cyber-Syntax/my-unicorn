@@ -46,6 +46,13 @@ class UpgradeHandler:
                 __version__
             )
 
+            if should_upgrade is None:
+                logger.warning(
+                    "Could not determine whether an update is available. Current: %s",
+                    __version__,
+                )
+                return
+
             if latest_version:
                 logger.info(
                     "Current: %s, Latest: %s",
@@ -79,6 +86,12 @@ class UpgradeHandler:
             should_upgrade, latest_version = await should_perform_self_update(
                 __version__
             )
+
+            if should_upgrade is None:
+                logger.warning(
+                    "Could not determine the latest version; upgrade skipped."
+                )
+                return
 
             if not should_upgrade:
                 logger.info(
