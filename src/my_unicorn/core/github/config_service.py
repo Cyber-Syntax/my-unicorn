@@ -9,7 +9,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from my_unicorn.config.validation import ConfigurationValidator
-from my_unicorn.core.github.operations import extract_github_config
+from my_unicorn.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -64,3 +66,37 @@ def get_github_config(app_config: dict[str, Any]) -> GitHubConfig:
     # Validate the config structure (includes GitHub identifier validation)
     ConfigurationValidator.validate_app_config(app_config)
     return GitHubConfig(owner=owner, repo=repo, prerelease=prerelease)
+
+
+def extract_github_config(
+    effective_config: dict[str, Any],
+) -> tuple[str, str, bool]:
+    """Extract GitHub repository configuration from effective config.
+
+    Args:
+        effective_config: Effective app configuration dictionary
+
+    Returns:
+        Tuple containing:
+            - owner: Repository owner
+            - repo: Repository name
+            - prerelease: Whether to use prereleases
+
+    Examples:
+        >>> config = {
+        ...     "source": {
+        ...         "owner": "AppFlowy-IO",
+        ...         "repo": "AppFlowy",
+        ...         "prerelease": False
+        ...     }
+        ... }
+        >>> extract_github_config(config)
+        ('AppFlowy-IO', 'AppFlowy', False)
+
+    """
+    source_config = effective_config.get("source", {})
+    owner = source_config.get("owner", "unknown")
+    repo = source_config.get("repo", "unknown")
+    prerelease = source_config.get("prerelease", False)
+
+    return owner, repo, prerelease

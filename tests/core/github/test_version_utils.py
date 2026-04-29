@@ -3,7 +3,7 @@
 Tests cover version extraction and validation for GitHub releases.
 """
 
-from my_unicorn.core.github.version_utils import extract_and_validate_version
+from my_unicorn.core.github.models import extract_and_validate_version
 
 
 class TestExtractAndValidateVersion:
