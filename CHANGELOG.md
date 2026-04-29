@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0-alpha] - 2026-04-29
+
+### Changed
+
+- Refactored cli self upgrade module to use tag base install. From now on, the self upgrade process will use the latest tag commit from the repository to perform the upgrade instead of using the latest commit from the main branch.
+
 ## [2.4.4-alpha] - 2026-04-28
 
 ### Changed
@@ -12,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored desktop_entry modules to use a single module with a DesktopEntry class for better organization and maintainability. Also, added missing type annotations, improved docstrings and removed dead code in the desktop entry handling logic.
 
 ### Fixed
+
 - Fixed update.bash script ui/ux issue (#292)
 
 ## [2.4.3-alpha] - 2026-04-28
@@ -342,7 +349,7 @@ Updated types-pyyaml v6.0.12.20250915 -> v6.0.12.20260408
     - Now extracts icons directly from AppImage files
     - Removed download_url entries from all catalog configurations
 - **Backup Migration**: Removed automatic migration from old flat backup format to folder-based structure
-    - Users with old backups (*.backup.AppImage) should manually reorganize them if needed
+    - Users with old backups (\*.backup.AppImage) should manually reorganize them if needed
     - New installations and users who already migrated are unaffected
     - Backup system now exclusively uses folder-based structure with metadata.json
 - **Show Progress Parameter**: Removed show_progress parameter from download methods
@@ -358,31 +365,31 @@ Updated types-pyyaml v6.0.12.20250915 -> v6.0.12.20260408
 1. **beekeeper-studio name**:
     - (Recommended) If you use beekeeper-studio, remove the app before migration to v2.0.0 and reinstall after migration to avoid issues.
     - You can manually rename your config and desktop files for Beekeeper Studio if you migrated before reinstalling:
-      1. Rename `~/.config/my-unicorn/apps/beekeper-studio.json` to `beekeeper-studio.json`.
-      2. Rename `~/.local/share/applications/beekeper-studio.desktop` to `beekeeper-studio.desktop`.
-      3. Update `catalog_ref` field in the config file to `beekeeper-studio`.
+        1. Rename `~/.config/my-unicorn/apps/beekeper-studio.json` to `beekeeper-studio.json`.
+        2. Rename `~/.local/share/applications/beekeper-studio.desktop` to `beekeeper-studio.desktop`.
+        3. Update `catalog_ref` field in the config file to `beekeeper-studio`.
 
 2. **Run migration command**:
 
-   ```bash
-   my-unicorn migrate
-   ```
+    ```bash
+    my-unicorn migrate
+    ```
 
 3. **Migration process**:
-   - Automatically detects v1 configs in `~/.config/my-unicorn/apps/`
-   - Creates `.json.backup` files before migration
-   - Converts to v2 format with appropriate structure
-   - Validates migrated configs against JSON schema
+    - Automatically detects v1 configs in `~/.config/my-unicorn/apps/`
+    - Creates `.json.backup` files before migration
+    - Converts to v2 format with appropriate structure
+    - Validates migrated configs against JSON schema
 
 4. **After migration**:
-   - Review migrated configs in `~/.config/my-unicorn/apps/`
-   - Backups available in `~/.config/my-unicorn/apps/backups/`
-   - Use `catalog` command instead of `list` (alias still works)
+    - Review migrated configs in `~/.config/my-unicorn/apps/`
+    - Backups available in `~/.config/my-unicorn/apps/backups/`
+    - Use `catalog` command instead of `list` (alias still works)
 
 5. **Config structure changes**:
-   - Catalog apps: Only state + catalog_ref stored (metadata from catalog)
-   - URL apps: Full config in overrides section
-   - See docs/config.md for detailed v2 format documentation
+    - Catalog apps: Only state + catalog_ref stored (metadata from catalog)
+    - URL apps: Full config in overrides section
+    - See docs/config.md for detailed v2 format documentation
 
 For detailed migration information, see [docs/config.md](docs/config.md).
 
