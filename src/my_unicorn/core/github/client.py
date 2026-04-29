@@ -10,6 +10,7 @@ from typing import Any
 import aiohttp
 
 from my_unicorn.config import ConfigManager
+from my_unicorn.constants import HTTP_NOT_FOUND
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
@@ -18,9 +19,6 @@ from my_unicorn.core.protocols.progress import (
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
-
-# Constants
-HTTP_NOT_FOUND = 404
 
 
 def create_api_timeout(base_seconds: int) -> aiohttp.ClientTimeout:

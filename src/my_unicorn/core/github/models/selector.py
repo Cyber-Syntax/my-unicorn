@@ -2,9 +2,9 @@
 
 import re
 
+from my_unicorn.constants import UNSTABLE_VERSION_KEYWORDS
 from my_unicorn.core.github.models.asset import Asset
 from my_unicorn.core.github.models.checksum import ChecksumFileInfo
-from my_unicorn.core.github.models.constants import UNSTABLE_VERSION_KEYWORDS
 from my_unicorn.core.github.models.release import Release
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.asset_validation import (

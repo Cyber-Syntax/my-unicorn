@@ -333,3 +333,20 @@ ERROR_UNKNOWN_APPS_OR_URLS: Final[str] = (
 ERROR_DESKTOP_ENTRY_FAILED: Final[str] = "Desktop entry creation failed"
 ERROR_CONFIGURATION_GENERIC: Final[str] = "Configuration error"
 ERROR_UNEXPECTED: Final[str] = "Unexpected error: {error}"
+
+# =============================================================================
+# Github API and related constants
+# ============================================================================
+
+UNSTABLE_VERSION_KEYWORDS = (
+    "experimental",
+    "beta",
+    "alpha",
+    "rc",
+    "pre",
+    "dev",
+    "test",
+    "nightly",
+)
+
+HTTP_NOT_FOUND = 404
