@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Refactored desktop_entry modules to use a single module with a DesktopEntry class for better organization and maintainability. Also, added missing type annotations, improved docstrings and removed dead code in the desktop entry handling logic.
 
+### Fixed
+- Fixed update.bash script ui/ux issue (#292)
+
 ## [2.4.3-alpha] - 2026-04-28
 
 ### Fixed
