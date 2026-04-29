@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 
 GITHUB_OWNER = "Cyber-Syntax"
 GITHUB_REPO = "my-unicorn"
-GITHUB_URL = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}"
+GITHUB_GIT_URL = f"git+https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}.git"
 
 # Map semver prerelease labels to PEP 440 equivalents
 _PRERELEASE_MAP = {
@@ -132,12 +132,15 @@ async def _run_uv_tool_list() -> bool:
         return False
 
 
-def perform_self_update() -> bool:
+def perform_self_update(version: str) -> bool:
     """Update my-unicorn using uv tool install --upgrade from git.
 
     This ensures a reliable update from the official repository,
     regardless of how it was originally installed. Uses os.execvp to replace
     the current process, ensuring the upgrade completes properly.
+
+    Args:
+        version: version to install (e.g., '2.3.0-alpha').
 
     Returns:
         False if upgrade could not be started.
@@ -149,9 +152,13 @@ def perform_self_update() -> bool:
 
     """
     logger.debug("Starting upgrade to my-unicorn...")
+
+    version_tag = version if version.startswith("v") else f"v{version}"
+    install_target = f"{GITHUB_GIT_URL}@{version_tag}"
+
     logger.debug(
-        "Executing: uv tool install --upgrade git+%s",
-        GITHUB_URL,
+        "Executing: uv tool install --upgrade %s",
+        install_target,
     )
 
     uv_executable = shutil.which("uv") or "uv"
@@ -166,17 +173,13 @@ def perform_self_update() -> bool:
                 "tool",
                 "install",
                 "--upgrade",
-                f"git+{GITHUB_URL}",
+                install_target,
             ],
         )
     except (OSError, FileNotFoundError) as e:
         logger.exception("Update failed")
         logger.info("❌ Update failed: %s", e)
         return False
-
-    logger.error("Failed to execute uv upgrade")
-    logger.info("❌ Failed to execute upgrade command")
-    return False
 
 
 def _is_candidate_newer(current_version: str, candidate_version: str) -> bool:
@@ -242,23 +245,18 @@ async def should_perform_self_update(
         - latest_version: The latest version string, or None if unavailable
     """
     is_dev_install = await _run_uv_tool_list()
+    latest_version = await _fetch_latest_prerelease_version()
+
+    if not latest_version or not latest_version.strip():
+        logger.warning("Could not determine latest version; skipping upgrade.")
+        return False, None  # don't upgrade blindly without a tag
 
     if is_dev_install:
         logger.info("🔧 Development installation detected")
-        latest_version = await _fetch_latest_prerelease_version()
-        return True, latest_version
-
-    latest_version = await _fetch_latest_prerelease_version()
-
-    if not latest_version:
-        logger.warning(
-            "Could not determine latest my-unicorn version; proceeding "
-            "with upgrade.",
-        )
-        return True, None
-
-    if not latest_version.strip():
-        return True, None
+        return (
+            True,
+            latest_version,
+        )  # dev installation should always upgrade to production
 
     if not _is_candidate_newer(current_version, latest_version):
         return False, latest_version
@@ -266,25 +264,29 @@ async def should_perform_self_update(
     return True, latest_version
 
 
-async def check_for_self_update() -> bool:
+async def check_for_self_update() -> tuple[
+    bool, str | None
+]:  # expose the version
     """Check if a newer my-unicorn release is available (cache disabled).
 
     Returns:
         True if a newer version is available, False otherwise.
     """
 
-    should_upgrade, _ = await should_perform_self_update(__version__)
-    return should_upgrade
+    return await should_perform_self_update(__version__)
 
 
-async def perform_self_update_async() -> bool:
+async def perform_self_update_async(version: str) -> bool:
     """Async wrapper for perform_self_update.
 
     Allows perform_self_update() to be called from async contexts.
+
+    Args:
+        version: release version to install (e.g., '2.3.0-alpha')
 
     Returns:
         False if update could not be started.
         Does not return on success (process replaced by execvp).
 
     """
-    return perform_self_update()
+    return perform_self_update(version)
