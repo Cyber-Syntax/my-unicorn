@@ -9,9 +9,10 @@ from __future__ import annotations
 from typing import Any
 
 from my_unicorn.constants import VerificationMethod
-from my_unicorn.core.github import Asset, AssetSelector, ChecksumFileInfo
+from my_unicorn.core.github import Asset, AssetSelector
 from my_unicorn.core.verification.helpers import resolve_manual_checksum_file
 from my_unicorn.logger import get_logger
+from my_unicorn.types import ChecksumFileInfo
 
 logger = get_logger(__name__, enable_file_logging=True)
 

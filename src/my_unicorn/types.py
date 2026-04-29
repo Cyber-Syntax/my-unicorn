@@ -4,77 +4,13 @@ This module contains pure domain types used in business logic without
 any IO or infrastructure dependencies.
 """
 
-import platform
+from __future__ import annotations
+
 from dataclasses import dataclass
-from enum import Enum
-from pathlib import Path
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
-from my_unicorn.utils.asset_validation import (
-    is_appimage_file,
-    is_checksum_file,
-)
-
-
-class Platform(Enum):
-    """Supported platforms."""
-
-    LINUX_X86_64 = "linux-x86_64"
-    LINUX_ARM64 = "linux-arm64"
-    LINUX_ARMV7 = "linux-armv7"
-    UNKNOWN = "unknown"
-
-    @classmethod
-    def current(cls) -> "Platform":
-        """Detect current platform."""
-        machine = platform.machine().lower()
-        system = platform.system().lower()
-
-        if system != "linux":
-            return cls.UNKNOWN
-
-        if machine in ("x86_64", "amd64"):
-            return cls.LINUX_X86_64
-        if machine in ("aarch64", "arm64"):
-            return cls.LINUX_ARM64
-        if machine.startswith("arm"):
-            return cls.LINUX_ARMV7
-
-        return cls.UNKNOWN
-
-
-class ChecksumType(Enum):
-    """Checksum algorithm types."""
-
-    SHA256 = "sha256"
-    SHA512 = "sha512"
-    UNKNOWN = "unknown"
-
-
-@dataclass(frozen=True)
-class Asset:
-    """Release asset information."""
-
-    name: str
-    url: str
-    size: int
-    content_type: str
-
-    @property
-    def is_appimage(self) -> bool:
-        """Check if asset is an AppImage.
-
-        Delegates to shared utility function for consistency across codebase.
-        """
-        return is_appimage_file(self.name)
-
-    @property
-    def is_checksum_file(self) -> bool:
-        """Check if asset is a checksum file.
-
-        Delegates to shared utility function for consistency across codebase.
-        """
-        return is_checksum_file(self.name)
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 # =============================================================================
@@ -295,3 +231,17 @@ class InstallPlan:
     urls_needing_work: list[str]
     catalog_needing_work: list[str]
     already_installed: list[str]
+
+
+# =============================================================================
+# GitHub API types
+# =============================================================================
+
+
+@dataclass(slots=True, frozen=True)
+class ChecksumFileInfo:
+    """Information about detected checksum file."""
+
+    filename: str
+    url: str
+    format_type: str  # 'yaml' or 'traditional'
