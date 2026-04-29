@@ -13,8 +13,8 @@ from my_unicorn.cli.commands.upgrade import UpgradeHandler
 
 
 @pytest.mark.asyncio
-async def test_execute_perform_update_success() -> None:
-    """Upgrade runs when a newer version is available."""
+async def test_execute_perform_update_calls_with_version() -> None:
+    """Upgrade calls perform_self_update with the resolved version tag."""
     handler = UpgradeHandler()
     with (
         patch(
@@ -25,16 +25,18 @@ async def test_execute_perform_update_success() -> None:
             AsyncMock(return_value=(True, "2.0.1")),
         ) as mock_check,
     ):
-        mock_perform.return_value = True
+        mock_perform.return_value = (
+            None  # execvp replaces process; never returns on success
+        )
         args = Namespace(check=False)
         await handler.execute(args)
         mock_check.assert_called_once()
-        mock_perform.assert_called_once()
+        mock_perform.assert_called_once_with("2.0.1")
 
 
 @pytest.mark.asyncio
 async def test_execute_perform_update_failure() -> None:
-    """Upgrade flow logs failure when exec does not start."""
+    """Upgrade flow logs failure when execvp returns (i.e. did not replace process)."""
     handler = UpgradeHandler()
     with (
         patch(
@@ -46,12 +48,11 @@ async def test_execute_perform_update_failure() -> None:
         ) as mock_check,
         patch("my_unicorn.cli.commands.upgrade.logger") as mock_logger,
     ):
-        mock_perform.return_value = False
+        mock_perform.return_value = False  # execvp failed, returned instead
         args = Namespace(check=False)
         await handler.execute(args)
         mock_check.assert_called_once()
-        mock_perform.assert_called_once()
-        # Check that the failure message was logged
+        mock_perform.assert_called_once_with("2.0.1")
         mock_logger.info.assert_any_call(
             "❌ Upgrade failed. Please try again or update manually."
         )
@@ -82,8 +83,27 @@ async def test_execute_skips_when_latest() -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_check_version() -> None:
-    """Check version displays current and latest versions."""
+async def test_execute_skips_when_version_unavailable() -> None:
+    """Upgrade is skipped when latest version cannot be determined."""
+    handler = UpgradeHandler()
+    with (
+        patch(
+            "my_unicorn.cli.commands.upgrade.should_perform_self_update",
+            AsyncMock(return_value=(False, None)),
+        ),
+        patch(
+            "my_unicorn.cli.commands.upgrade.perform_self_update"
+        ) as mock_perform,
+        patch("my_unicorn.cli.commands.upgrade.__version__", "2.0.0"),
+    ):
+        args = Namespace(check=False)
+        await handler.execute(args)
+        mock_perform.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_execute_check_version_newer_available() -> None:
+    """Check version displays current and latest versions when update is available."""
     handler = UpgradeHandler()
     with (
         patch(
@@ -102,3 +122,48 @@ async def test_execute_check_version() -> None:
             "2.0.1",
         )
         mock_logger.info.assert_any_call("✅ A newer version is available!")
+
+
+@pytest.mark.asyncio
+async def test_execute_check_version_already_latest() -> None:
+    """Check version reports up to date when on the latest release."""
+    handler = UpgradeHandler()
+    with (
+        patch(
+            "my_unicorn.cli.commands.upgrade.should_perform_self_update",
+            AsyncMock(return_value=(False, "2.0.0")),
+        ) as mock_check,
+        patch("my_unicorn.cli.commands.upgrade.logger") as mock_logger,
+        patch("my_unicorn.cli.commands.upgrade.__version__", "2.0.0"),
+    ):
+        args = Namespace(check=True)
+        await handler.execute(args)
+        mock_check.assert_called_once()
+        mock_logger.info.assert_any_call(
+            "Current: %s, Latest: %s",
+            "2.0.0",
+            "2.0.0",
+        )
+        mock_logger.info.assert_any_call(
+            "✨ You are running the latest version."
+        )
+
+
+@pytest.mark.asyncio
+async def test_execute_check_version_unavailable() -> None:
+    """Check version warns when GitHub is unreachable."""
+    handler = UpgradeHandler()
+    with (
+        patch(
+            "my_unicorn.cli.commands.upgrade.should_perform_self_update",
+            AsyncMock(return_value=(False, None)),
+        ),
+        patch("my_unicorn.cli.commands.upgrade.logger") as mock_logger,
+        patch("my_unicorn.cli.commands.upgrade.__version__", "2.0.0"),
+    ):
+        args = Namespace(check=True)
+        await handler.execute(args)
+        mock_logger.warning.assert_any_call(
+            "Could not determine the latest version. Current: %s",
+            "2.0.0",
+        )

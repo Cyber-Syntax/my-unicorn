@@ -46,6 +46,13 @@ class UpgradeHandler:
                 __version__
             )
 
+            if should_upgrade is None:
+                logger.warning(
+                    "Could not determine whether an update is available. Current: %s",
+                    __version__,
+                )
+                return
+
             if latest_version:
                 logger.info(
                     "Current: %s, Latest: %s",
@@ -80,6 +87,12 @@ class UpgradeHandler:
                 __version__
             )
 
+            if should_upgrade is None:
+                logger.warning(
+                    "Could not determine the latest version; upgrade skipped."
+                )
+                return
+
             if not should_upgrade:
                 logger.info(
                     "✨ You are already running the latest my-unicorn (%s).",
@@ -87,23 +100,24 @@ class UpgradeHandler:
                 )
                 return
 
-            if latest_version:
-                logger.info(
-                    "Updating my-unicorn from %s to %s",
-                    __version__,
-                    latest_version,
-                )
+            # Narrow the type: should_upgrade=True always comes with a version tag
+            if not latest_version:
+                logger.warning("No version tag available; cannot upgrade.")
+                return
 
-            if perform_self_update():
-                logger.info("✅ Upgrade completed successfully!")
-                logger.info(
-                    "Please restart your terminal to refresh "
-                    "the command cache."
-                )
-            else:
-                logger.info(
-                    "❌ Upgrade failed. Please try again or update manually."
-                )
+            # latest_version is now str, not str | None
+            logger.info(
+                "Updating my-unicorn from %s to %s",
+                __version__,
+                latest_version,
+            )
+            logger.info("Handing off to uv — terminal will update now...")
+            perform_self_update(latest_version)
+
+            # Only reached if execvp failed
+            logger.info(
+                "❌ Upgrade failed. Please try again or update manually."
+            )
         except Exception as e:
-            logger.exception("Upgrade failed")
+            logger.exception("Upgrade failed", exc_info=e)
             logger.info("❌ Upgrade failed: %s", e)
