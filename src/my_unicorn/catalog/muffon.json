@@ -1,0 +1,28 @@
+{
+    "config_version": "2.0.0",
+    "metadata": {
+        "description": "Advanced multi-source music streaming + discovery client for desktop. Free, clean, no login, no ads.",
+        "display_name": "muffon",
+        "name": "muffon"
+    },
+    "source": {
+        "owner": "staniel359",
+        "repo": "muffon",
+        "type": "github",
+        "prerelease": false
+    },
+    "appimage": {
+        "naming": {
+            "template": "",
+            "target_name": "muffon",
+            "architectures": ["amd64", "x86_64"]
+        }
+    },
+    "verification": {
+        "method": "digest"
+    },
+    "icon": {
+        "filename": "muffon.png",
+        "method": "extraction"
+    }
+}

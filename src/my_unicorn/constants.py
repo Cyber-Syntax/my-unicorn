@@ -194,6 +194,7 @@ DESKTOP_BROWSER_MIME_TYPES: Final[tuple[str, ...]] = (
 
 # Known browser executable names to help auto-detection
 DESKTOP_BROWSER_NAMES: Final[tuple[str, ...]] = (
+    "helium-linux",
     "zen-browser",
     "firefox",
     "chrome",
