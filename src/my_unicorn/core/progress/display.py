@@ -40,7 +40,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-from my_unicorn.core.protocols.progress import ProgressReporter
+from my_unicorn.core.protocols.progress import (
+    ProgressReporter,
+    ProgressTaskInfo,
+)
 from my_unicorn.core.protocols.progress import ProgressType as CoreProgressType
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.progress_utils import calculate_speed
@@ -458,7 +461,7 @@ class ProgressDisplay(ProgressReporter):
         async with self._session_manager.session(total_operations):
             yield
 
-    def get_task_info(self, task_id: str) -> dict[str, object]:
+    def get_task_info(self, task_id: str) -> ProgressTaskInfo:
         """Get task information by ID.
 
         Returns task info as a dict matching the ProgressReporter protocol.

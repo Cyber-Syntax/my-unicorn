@@ -36,10 +36,23 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, TypedDict, runtime_checkable
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+
+
+class ProgressTaskInfo(TypedDict):
+    """Protocol-safe task progress snapshot.
+
+    The values are intentionally narrow so callers can safely perform
+    numeric operations on ``completed`` and ``total`` without casting from
+    ``object``.
+    """
+
+    completed: float
+    total: float | None
+    description: str
 
 
 class ProgressType(Enum):
@@ -211,7 +224,7 @@ class ProgressReporter(Protocol):
         """
         ...
 
-    def get_task_info(self, task_id: str) -> dict[str, object]:
+    def get_task_info(self, task_id: str) -> ProgressTaskInfo:
         """Get current task information.
 
         Retrieve the current state of a task for inspection or coordination.
@@ -320,7 +333,7 @@ class NullProgressReporter:
 
         """
 
-    def get_task_info(self, task_id: str) -> dict[str, object]:  # noqa: ARG002
+    def get_task_info(self, task_id: str) -> ProgressTaskInfo:  # noqa: ARG002
         """Get task information.
 
         Args:

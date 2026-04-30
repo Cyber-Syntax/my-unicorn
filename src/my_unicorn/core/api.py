@@ -337,7 +337,7 @@ class ReleaseAPIClient:
                     e,
                 )
                 if attempt == self._retry_attempts:
-                    logger.error(
+                    logger.error(  # noqa: TRY400
                         "❌ API fetch failed after %d attempts: %s - %s",
                         self._retry_attempts,
                         url,
@@ -354,7 +354,7 @@ class ReleaseAPIClient:
                     e,
                 )
                 if attempt == self._retry_attempts:
-                    logger.error(
+                    logger.error(  # noqa: TRY400
                         "❌ API fetch failed after %d attempts: %s - %s",
                         self._retry_attempts,
                         url,
@@ -364,7 +364,9 @@ class ReleaseAPIClient:
 
             except Exception as e:
                 # Non-network/non-HTTP error: retrying is unlikely to help.
-                logger.error("Unexpected error fetching %s: %s", url, e)
+                logger.error(  # noqa: TRY400
+                    "Unexpected error fetching %s: %s", url, e
+                )
                 raise
 
             backoff = 2**attempt
@@ -567,7 +569,6 @@ class ReleaseFetcher:
             progress_reporter=self.progress_reporter,
         )
         self.shared_api_task_id = shared_api_task_id
-        # self.session = session
 
     async def _get_from_cache(
         self, cache_type: str = "stable"
@@ -652,9 +653,8 @@ class ReleaseFetcher:
 
         api_data = await self.api_client.fetch_stable_release()
         if api_data is None:
-            raise ValueError(
-                f"No stable release found for {self.owner}/{self.repo}"
-            )
+            msg = f"No stable release found for {self.owner}/{self.repo}"
+            raise ValueError(msg)
 
         release = Release.from_api_response(self.owner, self.repo, api_data)
 
@@ -693,9 +693,8 @@ class ReleaseFetcher:
 
         api_data = await self.api_client.fetch_prerelease()
         if api_data is None:
-            raise ValueError(
-                f"No prerelease found for {self.owner}/{self.repo}"
-            )
+            msg = f"No prerelease found for {self.owner}/{self.repo}"
+            raise ValueError(msg)
 
         release = Release.from_api_response(self.owner, self.repo, api_data)
 
@@ -733,7 +732,8 @@ class ReleaseFetcher:
                 f"No releases found for {self.owner}/{self.repo}"
             )
 
-        raise ValueError(f"No releases found for {self.owner}/{self.repo}")
+        msg = f"No releases found for {self.owner}/{self.repo}"
+        raise ValueError(msg)
 
     async def _try_prerelease_then_stable(
         self, ignore_cache: bool
@@ -821,9 +821,9 @@ class ReleaseFetcher:
         """
         api_data = await self.api_client.fetch_release_by_tag(tag)
         if api_data is None:
-            raise ValueError(
-                f"Release {tag} not found for {self.owner}/{self.repo}"
-            )
+            msg = f"Release {tag} not found for {self.owner}/{self.repo}"
+            raise ValueError(msg)
+
         return Release.from_api_response(self.owner, self.repo, api_data)
 
     async def get_default_branch(self) -> str:
@@ -912,7 +912,7 @@ class GitHubClient:
                 prefer_prerelease=False
             )
         except Exception as e:
-            logger.error(
+            logger.error(  # noqa: TRY400
                 "Failed to fetch latest release for %s/%s: %s",
                 owner,
                 repo,

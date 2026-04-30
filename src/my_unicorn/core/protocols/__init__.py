@@ -19,6 +19,7 @@ Usage:
 from .progress import (
     NullProgressReporter,
     ProgressReporter,
+    ProgressTaskInfo,
     ProgressType,
     github_api_progress_task,
     operation_progress_session,
@@ -27,6 +28,7 @@ from .progress import (
 __all__ = [
     "NullProgressReporter",
     "ProgressReporter",
+    "ProgressTaskInfo",
     "ProgressType",
     "github_api_progress_task",
     "operation_progress_session",

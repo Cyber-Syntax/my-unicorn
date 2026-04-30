@@ -8,10 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import time
+from typing import TYPE_CHECKING
 
 from my_unicorn.logger import get_logger
 
 from .progress_types import ProgressType, TaskInfo
+
+if TYPE_CHECKING:
+    from my_unicorn.core.protocols.progress import ProgressTaskInfo
 
 logger = get_logger(__name__)
 
@@ -80,7 +84,7 @@ class TaskRegistry:
 
             return task_info
 
-    async def get_task_info(self, task_id: str) -> dict[str, object]:
+    async def get_task_info(self, task_id: str) -> ProgressTaskInfo:
         """Get task information by ID in protocol-compliant format.
 
         Returns task info as a dict matching the ProgressReporter protocol.
@@ -158,7 +162,7 @@ class TaskRegistry:
         """
         return self._task_sets.get(progress_type, set()).copy()
 
-    def get_task_info_sync(self, task_id: str) -> dict[str, object]:
+    def get_task_info_sync(self, task_id: str) -> ProgressTaskInfo:
         """Get task info in protocol-compliant dict format (thread-safe sync).
 
         This is a synchronous accessor for use by protocol methods that
