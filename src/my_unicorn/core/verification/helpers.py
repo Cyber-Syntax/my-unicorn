@@ -6,7 +6,7 @@ expansion used in the verification process.
 
 from __future__ import annotations
 
-from my_unicorn.core.github import Asset
+from my_unicorn.core.api import Asset
 from my_unicorn.logger import get_logger
 from my_unicorn.types import ChecksumFileInfo
 

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from my_unicorn.core.github import Asset
+    from my_unicorn.core.api import Asset
     from my_unicorn.core.verification.verifier import Verifier
     from my_unicorn.types import ChecksumFileInfo
 

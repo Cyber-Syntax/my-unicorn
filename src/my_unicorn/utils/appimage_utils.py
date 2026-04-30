@@ -7,7 +7,7 @@ to eliminate code duplication.
 from pathlib import Path
 from typing import Any
 
-from my_unicorn.core.github import Asset, AssetSelector, Release
+from my_unicorn.core.api import Asset, AssetSelector, Release
 from my_unicorn.core.verification import VerificationService
 from my_unicorn.exceptions import InstallationError
 from my_unicorn.logger import get_logger

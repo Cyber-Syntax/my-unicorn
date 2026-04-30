@@ -122,13 +122,14 @@ class GitHubAuthManager:
         """Return the current rate limit status.
 
         Returns:
-            dict[str, int | None]: Mapping with keys 'remaining', 'reset_time',
-                and 'reset_in_seconds'. Values may be None when unknown.
-
+            dict with keys:
+                - ``remaining``: requests left in the current window, or None if unknown.
+                - ``reset_time``: Unix timestamp when the window resets, or None.
+                - ``reset_in_seconds``: seconds until reset, or None.
         """
         current_time = int(time.time())
 
-        # If reset time has passed, we can assume limits are reset
+        # If the reset window has already passed, treat limits as fully reset.
         if self._rate_limit_reset and current_time >= self._rate_limit_reset:
             self._remaining_requests = None
             self._rate_limit_reset = None
@@ -142,6 +143,16 @@ class GitHubAuthManager:
                 else None
             ),
         }
+
+    @property
+    def remaining_requests(self) -> int | None:
+        """Convenience accessor for the remaining request count.
+
+        Delegates to ``get_rate_limit_status()`` so that the expiry-reset
+        side effect is always applied consistently. Prefer
+        ``get_rate_limit_status()`` when you need the full picture.
+        """
+        return self.get_rate_limit_status()["remaining"]
 
     def should_wait_for_rate_limit(self) -> bool:
         """Return whether to wait due to rate limit exhaustion.

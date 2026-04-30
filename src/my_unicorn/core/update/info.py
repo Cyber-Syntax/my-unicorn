@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from my_unicorn.core.github import Release
+    from my_unicorn.core.api import Release
 
 
 @dataclass

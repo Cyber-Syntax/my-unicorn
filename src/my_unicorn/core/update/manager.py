@@ -17,12 +17,12 @@ from my_unicorn.constants import (
     ERROR_UNEXPECTED,
     VERSION_UNKNOWN,
 )
+from my_unicorn.core.api import Release, ReleaseFetcher, get_github_config
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.backup import BackupService
 from my_unicorn.core.cache import ReleaseCacheManager
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
-from my_unicorn.core.github import Release, ReleaseFetcher, get_github_config
 from my_unicorn.core.post_download import PostDownloadProcessor
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,

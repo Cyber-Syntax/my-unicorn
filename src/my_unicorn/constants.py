@@ -350,3 +350,42 @@ UNSTABLE_VERSION_KEYWORDS = (
 )
 
 HTTP_NOT_FOUND = 404
+
+
+INCOMPATIBLE_PLATFORM_PATTERNS = [
+    # Windows patterns
+    r"(?i)win(32|64)",
+    r"(?i)windows",
+    r"(?i)legacy.*win",
+    r"(?i)portable.*win",
+    # macOS patterns
+    r"(?i)mac(?!ro)",
+    r"(?i)darwin",
+    r"(?i)osx",
+    r"(?i)(?:^|[-_.])apple(?:[-_.]|$)",
+    # ARM-specific YAML files
+    r"(?i)latest.*arm.*\.ya?ml$",
+    r"(?i)arm.*latest.*\.ya?ml$",
+    # macOS-specific YAML files
+    r"(?i)latest.*mac.*\.ya?ml$",
+    r"(?i)mac.*latest.*\.ya?ml$",
+    # ARM architecture patterns
+    r"(?i)arm64",
+    r"(?i)aarch64",
+    r"(?i)armv7l?",
+    r"(?i)armhf",
+    r"(?i)armv6",
+    # Source archive patterns
+    r"(?i)[-_.]src[-_.]",
+    r"(?i)[-_.]source[-_.]",
+    # Experimental builds
+    r"(?i)experimental",
+    r"(?i)qt6.*experimental",
+]
+
+INCOMPATIBLE_PLATFORM_EXTENSIONS = (
+    ".msi",
+    ".exe",
+    ".dmg",
+    ".pkg",
+)

@@ -21,8 +21,8 @@ from urllib.parse import urlparse
 import aiohttp
 
 from my_unicorn.config import ConfigManager
+from my_unicorn.core.api import Asset
 from my_unicorn.core.auth import GitHubAuthManager
-from my_unicorn.core.github import Asset
 from my_unicorn.core.protocols import (
     NullProgressReporter,
     ProgressReporter,

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from my_unicorn.constants import APP_CONFIG_VERSION
-from my_unicorn.core.github import Asset, Release
+from my_unicorn.core.api import Asset, Release
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.datetime_utils import get_current_datetime_local_iso
 

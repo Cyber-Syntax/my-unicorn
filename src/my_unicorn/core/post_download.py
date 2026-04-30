@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from my_unicorn.config import ConfigManager
+from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.backup import BackupService
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
-from my_unicorn.core.github import Asset, Release
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
