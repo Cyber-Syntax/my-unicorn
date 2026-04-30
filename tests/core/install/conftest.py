@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from my_unicorn.core.github import Asset, Release
+from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.post_download import PostDownloadResult
 
 # =============================================================================

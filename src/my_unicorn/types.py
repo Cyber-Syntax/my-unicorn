@@ -4,109 +4,17 @@ This module contains pure domain types used in business logic without
 any IO or infrastructure dependencies.
 """
 
-import platform
+from __future__ import annotations
+
 from dataclasses import dataclass
-from enum import Enum
-from pathlib import Path
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
-from my_unicorn.utils.asset_validation import (
-    is_appimage_file,
-    is_checksum_file,
-)
-
-
-class Platform(Enum):
-    """Supported platforms."""
-
-    LINUX_X86_64 = "linux-x86_64"
-    LINUX_ARM64 = "linux-arm64"
-    LINUX_ARMV7 = "linux-armv7"
-    UNKNOWN = "unknown"
-
-    @classmethod
-    def current(cls) -> "Platform":
-        """Detect current platform."""
-        machine = platform.machine().lower()
-        system = platform.system().lower()
-
-        if system != "linux":
-            return cls.UNKNOWN
-
-        if machine in ("x86_64", "amd64"):
-            return cls.LINUX_X86_64
-        if machine in ("aarch64", "arm64"):
-            return cls.LINUX_ARM64
-        if machine.startswith("arm"):
-            return cls.LINUX_ARMV7
-
-        return cls.UNKNOWN
-
-
-class ChecksumType(Enum):
-    """Checksum algorithm types."""
-
-    SHA256 = "sha256"
-    SHA512 = "sha512"
-    UNKNOWN = "unknown"
-
-
-@dataclass(frozen=True)
-class Asset:
-    """Release asset information."""
-
-    name: str
-    url: str
-    size: int
-    content_type: str
-
-    @property
-    def is_appimage(self) -> bool:
-        """Check if asset is an AppImage.
-
-        Delegates to shared utility function for consistency across codebase.
-        """
-        return is_appimage_file(self.name)
-
-    @property
-    def is_checksum_file(self) -> bool:
-        """Check if asset is a checksum file.
-
-        Delegates to shared utility function for consistency across codebase.
-        """
-        return is_checksum_file(self.name)
-
-
-@dataclass(frozen=True)
-class Release:
-    """GitHub release information."""
-
-    tag_name: str
-    name: str
-    prerelease: bool
-    published_at: str
-    assets: list[Asset]
-
-    @property
-    def version(self) -> str:
-        """Extract version from tag name."""
-        # Remove 'v' prefix if present
-        return self.tag_name.lstrip("v")
-
-
-@dataclass(frozen=True)
-class ReleaseData:
-    """Structured release data from GitHub."""
-
-    owner: str
-    repo: str
-    release: Release
-    cached: bool = False
-    cached_at: str | None = None
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 # =============================================================================
-# Network and Configuration Types
+# Global Config Types
 # =============================================================================
 
 
@@ -142,20 +50,6 @@ class GlobalConfig(TypedDict):
 
 
 # =============================================================================
-# V1 Configuration Types (DEPRECATED - Migration Only)
-# These types are only used for detecting and migrating v1 configs.
-# Do NOT use in new code.
-# =============================================================================
-
-# V1 types removed - see migration code if needed
-
-
-# =============================================================================
-# Icon Types
-# =============================================================================
-
-
-# =============================================================================
 # Cache Types
 # =============================================================================
 
@@ -171,37 +65,6 @@ class CacheEntry(TypedDict):
 # =============================================================================
 # Config V2.0.0 Types
 # =============================================================================
-
-
-class AppMetadata(TypedDict, total=False):
-    """Application metadata for v2.0.0 configs."""
-
-    name: str
-    display_name: str
-    description: str
-
-
-class SourceConfig(TypedDict):
-    """Source configuration for app retrieval."""
-
-    type: str  # "github"
-    owner: str
-    repo: str
-    prerelease: bool
-
-
-class NamingConfig(TypedDict):
-    """AppImage naming configuration."""
-
-    template: str
-    target_name: str
-    architectures: list[str]
-
-
-class AppImageConfigV2(TypedDict):
-    """AppImage configuration v2."""
-
-    naming: NamingConfig
 
 
 class VerificationMethod(TypedDict, total=False):
@@ -246,6 +109,47 @@ class StateVerification(TypedDict, total=False):
     methods: list[VerificationMethod]
 
 
+class AppMetadata(TypedDict, total=False):
+    """Application metadata for v2.0.0 configs."""
+
+    name: str
+    display_name: str
+    description: str
+
+
+class SourceConfig(TypedDict):
+    """Source configuration for app retrieval."""
+
+    type: str  # "github"
+    owner: str
+    repo: str
+    prerelease: bool
+
+
+class NamingConfig(TypedDict):
+    """AppImage naming configuration."""
+
+    template: str
+    target_name: str
+    architectures: list[str]
+
+
+class AppImageConfigV2(TypedDict):
+    """AppImage configuration v2."""
+
+    naming: NamingConfig
+
+
+# TODO: url installation method is removed from method in last versions
+# extraction is the only method and it is going to be the only supported method
+# so remove the method field in both classes. issue #274
+class IconConfigV2(TypedDict, total=False):
+    """Icon configuration v2."""
+
+    method: str  # "extraction"
+    filename: str
+
+
 class StateIcon(TypedDict):
     """Icon state tracking."""
 
@@ -269,13 +173,6 @@ class VerificationConfigV2(TypedDict, total=False):
 
     method: str  # "skip", "digest", "checksum_file"
     checksum_file: dict[str, Any]  # Only if method == "checksum_file"
-
-
-class IconConfigV2(TypedDict, total=False):
-    """Icon configuration v2."""
-
-    method: str  # "extraction"
-    filename: str
 
 
 class AppOverrides(TypedDict, total=False):
@@ -319,111 +216,8 @@ class CatalogConfig(TypedDict):
 
 
 # =============================================================================
-# Workflow Result Types (Phase 2: Type Safety Improvements)
+# Workflow Result Types
 # =============================================================================
-
-
-@dataclass
-class InstallResult:
-    """Result of an installation operation.
-
-    Provides type-safe alternative to dictionary return values
-    for install operations.
-    """
-
-    success: bool
-    app_name: str
-    version: str
-    message: str
-    source: str  # "catalog" or "url"
-    installed_path: str | None = None
-    desktop_entry: str | None = None
-    icon_path: str | None = None
-    error: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for backward compatibility.
-
-        Returns:
-            Dictionary representation of install result
-
-        """
-        result: dict[str, Any] = {
-            "success": self.success,
-            "app_name": self.app_name,
-            "version": self.version,
-            "message": self.message,
-            "source": self.source,
-        }
-
-        if self.installed_path:
-            result["installed_path"] = self.installed_path
-        if self.desktop_entry:
-            result["desktop"] = self.desktop_entry
-        if self.icon_path:
-            result["icon"] = self.icon_path
-        if self.error:
-            result["error"] = self.error
-
-        return result
-
-
-@dataclass
-class UpdateResult:
-    """Result of an update operation.
-
-    Provides type-safe alternative to dictionary return values
-    for update operations.
-    """
-
-    success: bool
-    app_name: str
-    old_version: str
-    new_version: str
-    message: str
-    updated_path: str | None = None
-    backup_path: str | None = None
-    error: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for backward compatibility.
-
-        Returns:
-            Dictionary representation of update result
-
-        """
-        result: dict[str, Any] = {
-            "success": self.success,
-            "app_name": self.app_name,
-            "old_version": self.old_version,
-            "new_version": self.new_version,
-            "message": self.message,
-        }
-
-        if self.updated_path:
-            result["updated_path"] = self.updated_path
-        if self.backup_path:
-            result["backup_path"] = self.backup_path
-        if self.error:
-            result["error"] = self.error
-
-        return result
-
-
-@dataclass
-class UpdateContext:
-    """Typed context for update operations.
-
-    Replaces dictionary-based context passing with type-safe dataclass.
-    Enables IDE autocomplete and compile-time type checking.
-    """
-
-    app_config: dict[str, Any]
-    update_info: "UpdateInfo"  # Forward reference from update.py
-    owner: str
-    repo: str
-    catalog_entry: dict[str, Any] | None
-    appimage_asset: Asset
 
 
 @dataclass
@@ -437,3 +231,17 @@ class InstallPlan:
     urls_needing_work: list[str]
     catalog_needing_work: list[str]
     already_installed: list[str]
+
+
+# =============================================================================
+# GitHub API types
+# =============================================================================
+
+
+@dataclass(slots=True, frozen=True)
+class ChecksumFileInfo:
+    """Information about detected checksum file."""
+
+    filename: str
+    url: str
+    format_type: str  # 'yaml' or 'traditional'

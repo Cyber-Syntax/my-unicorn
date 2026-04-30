@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.constants import VerificationMethod
-from my_unicorn.core.github import Asset, ChecksumFileInfo
+from my_unicorn.core.api import Asset
 from my_unicorn.core.verification.context import VerificationContext
 from my_unicorn.core.verification.execution import (
     execute_all_verification_methods,
@@ -24,6 +24,7 @@ from my_unicorn.core.verification.execution import (
     execute_digest_verification,
 )
 from my_unicorn.core.verification.results import MethodResult
+from my_unicorn.types import ChecksumFileInfo
 
 
 @pytest.fixture

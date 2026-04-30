@@ -38,9 +38,9 @@ from my_unicorn.logger import get_logger
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from my_unicorn.core.api import Asset
     from my_unicorn.core.cache import ReleaseCacheManager
     from my_unicorn.core.download import DownloadService
-    from my_unicorn.core.github import Asset
 
 logger = get_logger(__name__, enable_file_logging=True)
 

@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from my_unicorn.core.github import Asset
+from my_unicorn.core.api import Asset
 from my_unicorn.core.protocols.progress import NullProgressReporter
 from my_unicorn.core.verification.context import VerificationContext
 from my_unicorn.core.verification.service import VerificationService

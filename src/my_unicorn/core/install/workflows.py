@@ -9,13 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from my_unicorn.constants import ERROR_NO_RELEASE_FOUND
+from my_unicorn.core.api import Asset, GitHubClient, Release, get_github_config
 from my_unicorn.core.download import DownloadService
-from my_unicorn.core.github import (
-    Asset,
-    GitHubClient,
-    Release,
-    get_github_config,
-)
 from my_unicorn.core.post_download import (
     OperationType,
     PostDownloadContext,

@@ -24,9 +24,9 @@ from my_unicorn.logger import get_logger
 if TYPE_CHECKING:
     from my_unicorn.core.cache import ReleaseCacheManager
     from my_unicorn.core.download import DownloadService
-    from my_unicorn.core.github import ChecksumFileInfo
     from my_unicorn.core.verification.context import VerificationContext
     from my_unicorn.core.verification.verifier import Verifier
+    from my_unicorn.types import ChecksumFileInfo
 
 logger = get_logger(__name__, enable_file_logging=True)
 

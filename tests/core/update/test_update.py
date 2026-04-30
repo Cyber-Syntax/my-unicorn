@@ -8,7 +8,7 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import aiohttp
 import pytest
 
-from my_unicorn.core.github import Asset, Release
+from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.post_download import OperationType, PostDownloadResult
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,

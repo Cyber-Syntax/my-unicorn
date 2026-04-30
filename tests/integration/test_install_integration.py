@@ -66,9 +66,9 @@ class AsyncContextManagerMock:
 import pytest
 
 from my_unicorn.config import ConfigManager
+from my_unicorn.core.api import Asset, GitHubClient, Release
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
-from my_unicorn.core.github import Asset, GitHubClient, Release
 from my_unicorn.core.install import InstallHandler
 from my_unicorn.core.post_download import PostDownloadProcessor
 from my_unicorn.core.protocols.progress import NullProgressReporter

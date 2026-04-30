@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from my_unicorn.core.github import Asset
+from my_unicorn.core.api import Asset
 from my_unicorn.core.verification.service import VerificationService
 
 

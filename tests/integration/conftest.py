@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from my_unicorn.config import ConfigManager
-from my_unicorn.core.github import Asset, Release
+from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.protocols.progress import NullProgressReporter
 from my_unicorn.core.update.manager import UpdateManager
 

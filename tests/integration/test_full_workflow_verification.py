@@ -22,8 +22,8 @@ from my_unicorn.config.schemas import (
     validate_cache_release,
 )
 from my_unicorn.constants import APP_CONFIG_VERSION
+from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.cache import ReleaseCacheManager
-from my_unicorn.core.github import Asset, Release
 from my_unicorn.utils.config_builders import build_verification_state
 from my_unicorn.utils.datetime_utils import get_current_datetime_local_iso
 

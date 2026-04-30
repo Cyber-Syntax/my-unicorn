@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import pytest
 
-from my_unicorn.core.github import Asset, ChecksumFileInfo
+from my_unicorn.core.api import Asset
 from my_unicorn.core.verification.helpers import (
     build_checksum_url,
     resolve_manual_checksum_file,
 )
+from my_unicorn.types import ChecksumFileInfo
 
 # =============================================================================
 # Task 1: build_checksum_url() Tests

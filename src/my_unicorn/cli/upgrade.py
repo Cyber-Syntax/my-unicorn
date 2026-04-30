@@ -15,7 +15,7 @@ import aiohttp
 from packaging.version import InvalidVersion, Version
 
 from my_unicorn import __version__
-from my_unicorn.core.github.release_fetcher import ReleaseFetcher
+from my_unicorn.core.api import ReleaseFetcher
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)

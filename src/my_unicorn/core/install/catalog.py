@@ -10,8 +10,8 @@ from typing import Any
 
 from my_unicorn.config import ConfigManager
 from my_unicorn.constants import ERROR_NO_APPIMAGE_ASSET, InstallSource
+from my_unicorn.core.api import get_github_config
 from my_unicorn.core.download import DownloadService
-from my_unicorn.core.github import get_github_config
 from my_unicorn.core.post_download import PostDownloadProcessor
 from my_unicorn.exceptions import (
     InstallationError,

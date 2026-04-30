@@ -31,12 +31,12 @@ from typing import TYPE_CHECKING
 import aiohttp
 
 from my_unicorn.config import ConfigManager
+from my_unicorn.core.api import GitHubClient
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.backup import BackupService
 from my_unicorn.core.cache import ReleaseCacheManager
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
-from my_unicorn.core.github import GitHubClient
 from my_unicorn.core.icon import AppImageIconExtractor
 from my_unicorn.core.install import InstallHandler
 from my_unicorn.core.post_download import PostDownloadProcessor

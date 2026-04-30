@@ -8,22 +8,19 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from my_unicorn.constants import ERROR_NO_APPIMAGE_ASSET, InstallSource
+from my_unicorn.core.api import GitHubClient, get_github_config
 from my_unicorn.core.download import DownloadService
-from my_unicorn.core.github import (
-    GitHubClient,
-    get_github_config,
-    parse_github_url,
-)
 from my_unicorn.core.post_download import PostDownloadProcessor
 from my_unicorn.exceptions import InstallError, VerificationError
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.appimage_utils import select_best_appimage_asset
 from my_unicorn.utils.error_formatters import build_install_error_result
+from my_unicorn.utils.github_utils import parse_github_url
 
 from .catalog import build_url_install_config
 
 if TYPE_CHECKING:
-    from my_unicorn.core.github import Asset, Release
+    from my_unicorn.core.api import Asset, Release
 
 logger = get_logger(__name__)
 

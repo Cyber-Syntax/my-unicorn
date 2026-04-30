@@ -12,9 +12,9 @@ import aiohttp
 
 from my_unicorn.config import ConfigManager
 from my_unicorn.constants import InstallSource
+from my_unicorn.core.api import GitHubClient
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.file_ops import FileOperations
-from my_unicorn.core.github import GitHubClient
 from my_unicorn.core.post_download import PostDownloadProcessor
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,

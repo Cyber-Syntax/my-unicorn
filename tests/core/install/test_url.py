@@ -9,12 +9,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.core.github import Asset, Release
+from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.install.url import (
     install_from_url,
     validate_and_fetch_release,
 )
 from my_unicorn.exceptions import InstallationError, VerificationError
+from my_unicorn.utils.github_utils import parse_github_url
 
 # =============================================================================
 # Fixtures
@@ -390,3 +391,54 @@ async def test_install_from_url_verification_error(
     # Assert
     assert result["success"] is False
     assert "error" in result
+
+
+class TestParseGitHubUrl:
+    """Tests for parse_github_url function."""
+
+    def test_parse_github_url_valid(self):
+        """Test parse_github_url with valid URL."""
+
+        result = parse_github_url("https://github.com/AppFlowy-IO/AppFlowy")
+
+        assert result["owner"] == "AppFlowy-IO"
+        assert result["repo"] == "AppFlowy"
+        assert result["app_name"] == "appflowy"
+
+    def test_parse_github_url_with_trailing_slash(self):
+        """Test parse_github_url with trailing slash."""
+
+        result = parse_github_url("https://github.com/owner/repo/")
+
+        assert result["owner"] == "owner"
+        assert result["repo"] == "repo"
+        assert result["app_name"] == "repo"
+
+    def test_parse_github_url_with_extra_path(self):
+        """Test parse_github_url with extra path components."""
+
+        result = parse_github_url("https://github.com/owner/repo/releases")
+
+        assert result["owner"] == "owner"
+        assert result["repo"] == "repo"
+        assert result["app_name"] == "repo"
+
+    def test_parse_github_url_invalid_format(self):
+        """Test parse_github_url with invalid format."""
+
+        with pytest.raises(
+            InstallationError, match="Invalid GitHub URL format"
+        ):
+            parse_github_url("https://github.com/owner")
+
+    def test_parse_github_url_empty(self):
+        """Test parse_github_url with empty URL."""
+
+        with pytest.raises(InstallationError):
+            parse_github_url("")
+
+    def test_parse_github_url_malformed(self):
+        """Test parse_github_url with malformed URL."""
+
+        with pytest.raises(InstallationError):
+            parse_github_url("not-a-valid-url")

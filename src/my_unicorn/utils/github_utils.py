@@ -9,8 +9,6 @@ Functions:
 
 """
 
-from typing import Any
-
 from my_unicorn.exceptions import InstallationError
 from my_unicorn.logger import get_logger
 
@@ -66,37 +64,3 @@ def parse_github_url(url: str) -> dict[str, str]:
             "repo": repo,
             "app_name": app_name,
         }
-
-
-def extract_github_config(
-    effective_config: dict[str, Any],
-) -> tuple[str, str, bool]:
-    """Extract GitHub repository configuration from effective config.
-
-    Args:
-        effective_config: Effective app configuration dictionary
-
-    Returns:
-        Tuple containing:
-            - owner: Repository owner
-            - repo: Repository name
-            - prerelease: Whether to use prereleases
-
-    Examples:
-        >>> config = {
-        ...     "source": {
-        ...         "owner": "AppFlowy-IO",
-        ...         "repo": "AppFlowy",
-        ...         "prerelease": False
-        ...     }
-        ... }
-        >>> extract_github_config(config)
-        ('AppFlowy-IO', 'AppFlowy', False)
-
-    """
-    source_config = effective_config.get("source", {})
-    owner = source_config.get("owner", "unknown")
-    repo = source_config.get("repo", "unknown")
-    prerelease = source_config.get("prerelease", False)
-
-    return owner, repo, prerelease
