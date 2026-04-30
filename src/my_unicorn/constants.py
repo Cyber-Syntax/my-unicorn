@@ -338,6 +338,28 @@ ERROR_UNEXPECTED: Final[str] = "Unexpected error: {error}"
 # Github API and related constants
 # ============================================================================
 
+# DEFAULT CONCURRENT DOWNLOAD LIMITS
+#
+# NOTE:
+#
+# GitHub enforces a secondary rate limit that allows a maximum of 100 concurrent requests.
+# This limit is shared across both the REST API and the GraphQL API.
+#
+# According to GitHub developers, this limit is not configurable and is subject to change
+# so we set a conservative default of 1-20 concurrent downloads for now
+# we may need to decrease or increase this limit based on GitHub's rate limit changes.
+# https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
+MIN_CONCURRENT_DOWNLOADS = 1
+MAX_CONCURRENT_DOWNLOADS = 20
+
+
+# API NETWORK RELATED
+HTTP_NOT_FOUND = 404
+
+# API ASSET FILTERING
+#
+# These keywords are used to filter out unstable
+# or incompatible assets from the API response.
 UNSTABLE_VERSION_KEYWORDS = (
     "experimental",
     "beta",
@@ -348,9 +370,6 @@ UNSTABLE_VERSION_KEYWORDS = (
     "test",
     "nightly",
 )
-
-HTTP_NOT_FOUND = 404
-
 
 INCOMPATIBLE_PLATFORM_PATTERNS = [
     # Windows patterns
