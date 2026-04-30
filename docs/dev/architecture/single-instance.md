@@ -15,7 +15,7 @@ Ensure only one `my-unicorn` process performs CLI command execution at a time, p
 
 ## High-Level Flow
 
-[single-instance-cli-flow.mmd](../../diagrams/single-instance-cli-flow.mmd)
+[single-instance-cli-flow.mmd](single-instance-cli-flow.mmd)
 
 ## Behavioral Contract
 
