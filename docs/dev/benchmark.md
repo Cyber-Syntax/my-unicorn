@@ -1,21 +1,11 @@
 # Benchmark Results
 
-## Integration tests
+## e2e tests
 
-```bash
-# Run the integration tests and measure the time taken
-time uv run pytest tests/integration
-# First
+### test_quick_flow.py
 
-# Second 
-uv run pytest tests/integration  30.92s user 2.66s system 96% cpu 34.812 total
-```
+4 passed in 154.57s (0:02:34)
 
-## 2.3.0a0 version
->
-> [!NOTE]
->
-> This is new work in progress test.py that includes benchmark feature.
+### test_full_flow.py
 
-- test.py --all: [2026-02-03 18:11:21] INFO: Time Elapsed: 0:01:33
-- test.py --quick: [2026-02-03 18:09:24] INFO: Time Elapsed: 0:00:20
+4 passed in 443.34s (0:07:23)

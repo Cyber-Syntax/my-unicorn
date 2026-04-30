@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.5.1-alpha] - 2026-04-30
+
+### Added
+
+- Improved concurrent download usage in global config by making it minumum 1 and maximum 20. GitHub max concurrent download is 100, so I made it max 20 because GitHub developers recommend it 20 and even more lower.
 
 ### Changed
 
@@ -13,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed install command wrong concurrent download implementation, it was forced to use max 3 concurrent, now it is able to use the user global setting.
 - Fixed type annotion issues.
 
 ## [2.5.0-alpha] - 2026-04-29
