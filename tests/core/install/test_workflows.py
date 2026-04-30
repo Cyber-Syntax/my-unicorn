@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.constants import ERROR_NO_RELEASE_FOUND
-from my_unicorn.core.github import Asset, Release
+from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.install.workflows import fetch_release, install_workflow
 from my_unicorn.core.post_download import PostDownloadResult
 from my_unicorn.exceptions import InstallError, VerificationError

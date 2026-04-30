@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.core.github import Asset
+from my_unicorn.core.api import Asset
 from my_unicorn.core.verification.context import VerificationContext
 from my_unicorn.core.verification.verification_methods import (
     cache_checksum_file_data,

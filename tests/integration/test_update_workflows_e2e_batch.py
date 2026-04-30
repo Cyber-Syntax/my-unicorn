@@ -27,7 +27,7 @@ from my_unicorn.core.update.manager import UpdateManager
 from tests.integration.conftest import create_mock_appimage_content
 
 if TYPE_CHECKING:
-    from my_unicorn.core.github import Release
+    from my_unicorn.core.api import Release
 
 
 @pytest.mark.integration

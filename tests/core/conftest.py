@@ -16,8 +16,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import pytest_asyncio
 
+from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.backup import BackupService
-from my_unicorn.core.github import Asset, Release
 from my_unicorn.core.protocols import ProgressReporter, ProgressType
 
 # =============================================================================

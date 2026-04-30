@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import aiohttp
 import pytest
 
-from my_unicorn.core.github import Release
+from my_unicorn.core.api import Release
 from my_unicorn.core.update.manager import UpdateManager
 
 

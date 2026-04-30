@@ -2,7 +2,7 @@
 
 import pytest
 
-from my_unicorn.core.github import Asset, Release
+from my_unicorn.core.api import Asset, Release
 from my_unicorn.exceptions import InstallationError
 from my_unicorn.utils.appimage_utils import select_best_appimage_asset
 

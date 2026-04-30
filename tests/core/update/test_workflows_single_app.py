@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.core.github import Release
+from my_unicorn.core.api import Release
 from my_unicorn.core.update.info import UpdateInfo
 from my_unicorn.core.update.workflows import update_single_app
 from my_unicorn.exceptions import UpdateError, VerificationError

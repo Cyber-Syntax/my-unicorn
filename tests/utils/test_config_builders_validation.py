@@ -8,7 +8,7 @@ immediately rather than being silently persisted.
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from my_unicorn.core.github import Release
+from my_unicorn.core.api import Release
 from my_unicorn.utils.config_builders import (
     create_app_config_v2,
     update_app_config,

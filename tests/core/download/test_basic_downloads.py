@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from my_unicorn.core.api import Asset
 from my_unicorn.core.download import DownloadError, DownloadService
-from my_unicorn.core.github import Asset
 from tests.core.conftest import async_chunk_gen
 
 

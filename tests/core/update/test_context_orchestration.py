@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from my_unicorn.core.github import Asset
+from my_unicorn.core.api import Asset
 from my_unicorn.core.update.context import prepare_update_context
 from my_unicorn.core.update.info import UpdateInfo
 from my_unicorn.exceptions import ConfigurationError, UpdateError

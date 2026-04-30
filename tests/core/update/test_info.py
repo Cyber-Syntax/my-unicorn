@@ -5,7 +5,7 @@ and metadata, including in-memory caching of release data and loaded config.
 """
 
 from my_unicorn.constants import VERSION_UNKNOWN
-from my_unicorn.core.github import Release
+from my_unicorn.core.api import Release
 from my_unicorn.core.update.info import UpdateInfo
 
 

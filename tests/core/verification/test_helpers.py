@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from my_unicorn.core.github import Asset
+from my_unicorn.core.api import Asset
 from my_unicorn.core.verification.helpers import (
     build_checksum_url,
     resolve_manual_checksum_file,

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from my_unicorn.constants import VerificationMethod
-from my_unicorn.core.github import Asset
+from my_unicorn.core.api import Asset
 from my_unicorn.core.verification.context import (
     VerificationConfig,
     VerificationContext,

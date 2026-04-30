@@ -10,7 +10,7 @@ from unittest.mock import Mock
 import pytest
 
 from my_unicorn.config.schemas import validate_app_state
-from my_unicorn.core.github import Release
+from my_unicorn.core.api import Release
 from my_unicorn.utils.config_builders import (
     build_verification_state,
     create_app_config_v2,
