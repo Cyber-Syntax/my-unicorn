@@ -34,3 +34,18 @@ __all__ = [
     "is_appimage_file",
     "is_checksum_file",
 ]
+
+
+# Clamp a value between a minimum and maximum (inclusive)
+# Returns the value if it is within the range,
+# otherwise returns the closest boundary
+#
+# Example:
+# >>> clamp(5, 1, 10)
+# 5
+# >>> clamp(15, 1, 10)
+# 10
+def clamp(value: int, minimum: int, maximum: int) -> int:
+    """Clamp a value between a minimum and maximum (inclusive)."""
+
+    return max(minimum, min(value, maximum))

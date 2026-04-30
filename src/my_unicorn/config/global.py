@@ -22,11 +22,14 @@ from my_unicorn.constants import (
     KEY_LOG_LEVEL,
     KEY_MAX_BACKUP,
     KEY_MAX_CONCURRENT_DOWNLOADS,
+    MAX_CONCURRENT_DOWNLOADS,
+    MIN_CONCURRENT_DOWNLOADS,
     SECTION_DEFAULT,
     SECTION_DIRECTORY,
     SECTION_NETWORK,
 )
 from my_unicorn.types import DirectoryConfig, GlobalConfig, NetworkConfig
+from my_unicorn.utils.utils import clamp
 
 logger = logging.getLogger(__name__)
 
@@ -368,8 +371,15 @@ class GlobalConfigManager:
             config_version=str(
                 get_scalar_config("config_version", GLOBAL_CONFIG_VERSION)
             ),
-            max_concurrent_downloads=int(
-                get_scalar_config("max_concurrent_downloads", 5)
+            max_concurrent_downloads=clamp(
+                int(
+                    get_scalar_config(
+                        "max_concurrent_downloads",
+                        DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                    )
+                ),
+                MIN_CONCURRENT_DOWNLOADS,
+                MAX_CONCURRENT_DOWNLOADS,
             ),
             max_backup=int(get_scalar_config("max_backup", 1)),
             log_level=str(get_scalar_config("log_level", "INFO")),

@@ -216,8 +216,14 @@ class InstallHandler:
             raising exceptions.
 
         """
-        concurrent = options.get("concurrent", 3)
-        semaphore = asyncio.Semaphore(concurrent)
+        global_config = self.config_manager.load_global_config()
+
+        concurrent = options.get(
+            "concurrent",
+            global_config["max_concurrent_downloads"],
+        )
+
+        semaphore = asyncio.Semaphore(int(concurrent))
 
         async def install_one(app_or_url: str, is_url: bool) -> dict[str, Any]:
             """Install a single app with semaphore control."""
