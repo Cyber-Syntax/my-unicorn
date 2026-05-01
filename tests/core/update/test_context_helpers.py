@@ -12,13 +12,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.core.api import Asset
-from my_unicorn.core.update.context import (
+from my_unicorn.core.update import (
+    UpdateInfo,
     load_catalog_for_update,
     load_update_config,
     resolve_update_info,
     select_asset_for_update,
 )
-from my_unicorn.core.update.info import UpdateInfo
 from my_unicorn.exceptions import ConfigurationError, UpdateError
 
 
@@ -314,7 +314,7 @@ class TestSelectAssetForUpdate:
 
         # Mock select_best_appimage_asset to return our asset
         with patch(
-            "my_unicorn.core.update.context.select_best_appimage_asset",
+            "my_unicorn.core.update.select_best_appimage_asset",
             return_value=sample_asset,
         ):
             asset, error = select_asset_for_update(
@@ -363,7 +363,7 @@ class TestSelectAssetForUpdate:
 
         # Mock select_best_appimage_asset to return None
         with patch(
-            "my_unicorn.core.update.context.select_best_appimage_asset",
+            "my_unicorn.core.update.select_best_appimage_asset",
             return_value=None,
         ):
             asset, error = select_asset_for_update(

@@ -23,7 +23,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.core.protocols.progress import NullProgressReporter
-from my_unicorn.core.update.manager import UpdateManager
+from my_unicorn.core.update import UpdateManager
 from tests.integration.conftest import create_mock_appimage_content
 
 if TYPE_CHECKING:
@@ -120,9 +120,7 @@ async def test_update_multiple_apps_partial_success(
         "zen",
     ]
 
-    with patch(
-        "my_unicorn.core.update.workflows.DownloadService"
-    ) as mock_download_cls:
+    with patch("my_unicorn.core.update.DownloadService") as mock_download_cls:
         mock_download = AsyncMock()
 
         async def async_download_wrapper(asset, download_path):
@@ -141,7 +139,7 @@ async def test_update_multiple_apps_partial_success(
         mock_download_cls.return_value = mock_download
 
         with patch(
-            "my_unicorn.core.update.manager.PostDownloadProcessor"
+            "my_unicorn.core.update.PostDownloadProcessor"
         ) as mock_processor_cls:
             mock_processor = AsyncMock()
 

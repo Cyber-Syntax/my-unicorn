@@ -11,8 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from my_unicorn.core.update.info import UpdateInfo
-from my_unicorn.core.update.workflows import update_multiple_apps
+from my_unicorn.core.update import UpdateInfo, update_multiple_apps
 from my_unicorn.exceptions import UpdateError
 
 

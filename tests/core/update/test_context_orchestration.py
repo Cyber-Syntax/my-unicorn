@@ -11,8 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.core.api import Asset
-from my_unicorn.core.update.context import prepare_update_context
-from my_unicorn.core.update.info import UpdateInfo
+from my_unicorn.core.update import UpdateInfo, prepare_update_context
 from my_unicorn.exceptions import ConfigurationError, UpdateError
 
 
@@ -74,7 +73,7 @@ class TestPrepareUpdateContext:
         load_catalog_func = AsyncMock(return_value=None)
 
         with patch(
-            "my_unicorn.core.update.context.select_best_appimage_asset",
+            "my_unicorn.core.update.select_best_appimage_asset",
             return_value=sample_asset,
         ):
             context, error = await prepare_update_context(
@@ -256,7 +255,7 @@ class TestPrepareUpdateContext:
         load_catalog_func = AsyncMock(return_value=None)
 
         with patch(
-            "my_unicorn.core.update.context.select_best_appimage_asset",
+            "my_unicorn.core.update.select_best_appimage_asset",
             return_value=None,
         ):
             context, error = await prepare_update_context(

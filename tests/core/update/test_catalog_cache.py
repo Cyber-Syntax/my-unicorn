@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from my_unicorn.core.update.catalog_cache import CatalogCache
+from my_unicorn.core.update import CatalogCache
 from my_unicorn.exceptions import UpdateError
 
 

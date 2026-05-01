@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from my_unicorn.core.update.workflows import update_cached_progress
+from my_unicorn.core.update import update_cached_progress
 
 
 class TestUpdateCachedProgress:
