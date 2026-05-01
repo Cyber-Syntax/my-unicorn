@@ -1,23 +1,27 @@
 """Unit tests for install display formatting functions.
 
 Tests the output formatting of installation results including success,
-failure, warnings, and various result combinations using capsys fixture.
+failure, warnings, and various result combinations using caplog fixture.
+
+Note on capsys vs caplog:
+    print()        → captured by capsys (stdout/stderr)
+    logger.info()  → captured by caplog (Python logging system)
+
+    Since the display helpers use logger.*, all assertions must check
+    caplog.text (or caplog.records), not capsys.readouterr().out.
 """
 
+import logging
 from typing import Any
 
 import pytest
 
-from my_unicorn.core.install.display_install import (
+from my_unicorn.core.install import (
     _categorize_results,
     _print_result_line,
     display_no_targets_error,
     print_install_summary,
 )
-
-# ============================================================================
-# Fixtures for various result dictionaries
-# ============================================================================
 
 
 @pytest.fixture
@@ -128,19 +132,15 @@ def mixed_results(
     ]
 
 
-# ============================================================================
-# Test 1: All successful installs
-# ============================================================================
-
-
 def test_print_install_summary_all_successful(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
     multiple_successful_results: list[dict[str, Any]],
 ) -> None:
     """Test display when all installations succeed."""
-    print_install_summary(multiple_successful_results)
-    captured = capsys.readouterr()
-    output = captured.out
+    with caplog.at_level(logging.INFO, logger="my_unicorn"):
+        print_install_summary(multiple_successful_results)
+
+    output = caplog.text
 
     # Verify header
     assert "Installation Summary:" in output
@@ -160,19 +160,15 @@ def test_print_install_summary_all_successful(
     assert "🎉 Successfully installed 3 app(s)" in output
 
 
-# ============================================================================
-# Test 2: All already installed
-# ============================================================================
-
-
 def test_print_install_summary_all_already_installed(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
     multiple_already_installed: list[dict[str, Any]],
 ) -> None:
     """Test display when all apps are already installed."""
-    print_install_summary(multiple_already_installed)
-    captured = capsys.readouterr()
-    output = captured.out
+    with caplog.at_level(logging.INFO, logger="my_unicorn"):
+        print_install_summary(multiple_already_installed)
+
+    output = caplog.text
 
     # Verify all already installed message
     assert "✅ All 2 specified app(s) are already installed:" in output
@@ -185,19 +181,15 @@ def test_print_install_summary_all_already_installed(
     assert "Installation Summary:" not in output
 
 
-# ============================================================================
-# Test 3: Mixed results (success, failure, already installed, warnings)
-# ============================================================================
-
-
 def test_print_install_summary_mixed_results(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
     mixed_results: list[dict[str, Any]],
 ) -> None:
     """Test display with mixed success, failure, and already installed."""
-    print_install_summary(mixed_results)
-    captured = capsys.readouterr()
-    output = captured.out
+    with caplog.at_level(logging.INFO, logger="my_unicorn"):
+        print_install_summary(mixed_results)
+
+    output = caplog.text
 
     # Verify header
     assert "Installation Summary:" in output
@@ -224,13 +216,8 @@ def test_print_install_summary_mixed_results(
     assert "ℹ️  1 app(s) already installed" in output  # noqa: RUF001
 
 
-# ============================================================================
-# Test 4: All failed
-# ============================================================================
-
-
 def test_print_install_summary_all_failed(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Test display when all installations fail."""
     results = [
@@ -245,9 +232,10 @@ def test_print_install_summary_all_failed(
             "error": "Hash verification failed",
         },
     ]
-    print_install_summary(results)
-    captured = capsys.readouterr()
-    output = captured.out
+    with caplog.at_level(logging.INFO, logger="my_unicorn"):
+        print_install_summary(results)
+
+    output = caplog.text
 
     # Verify header
     assert "Installation Summary:" in output
@@ -263,13 +251,8 @@ def test_print_install_summary_all_failed(
     assert "❌ 2 app(s) failed to install" in output
 
 
-# ============================================================================
-# Test 5: Some with warnings
-# ============================================================================
-
-
 def test_print_install_summary_with_warnings(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Test display with some apps installed with warnings."""
     results = [
@@ -294,9 +277,10 @@ def test_print_install_summary_with_warnings(
             "warning": "Custom warning message",
         },
     ]
-    print_install_summary(results)
-    captured = capsys.readouterr()
-    output = captured.out
+    with caplog.at_level(logging.INFO, logger="my_unicorn"):
+        print_install_summary(results)
+
+    output = caplog.text
 
     # Verify warnings are displayed
     assert "⚠️  Failed to create desktop entry" in output
@@ -306,26 +290,17 @@ def test_print_install_summary_with_warnings(
     assert "⚠️  2 app(s) installed with warnings" in output
 
 
-# ============================================================================
-# Test 6: Empty results
-# ============================================================================
-
-
 def test_print_install_summary_empty_results(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Test display with empty results list."""
-    print_install_summary([])
-    captured = capsys.readouterr()
-    output = captured.out
+    with caplog.at_level(logging.INFO, logger="my_unicorn"):
+        print_install_summary([])
+
+    output = caplog.text
 
     assert "No installations completed" in output
     assert "Installation Summary:" not in output
-
-
-# ============================================================================
-# Test 7: Categorize results logic
-# ============================================================================
 
 
 def test_categorize_results_logic(
@@ -365,19 +340,15 @@ def test_categorize_results_logic(
     assert failed_install_result in categories["failed"]
 
 
-# ============================================================================
-# Test 8: Print result line formatting
-# ============================================================================
-
-
 def test_print_result_line_formatting(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
     successful_install_result: dict[str, Any],
 ) -> None:
     """Test individual result line formatting."""
-    _print_result_line(successful_install_result)
-    captured = capsys.readouterr()
-    output = captured.out
+    with caplog.at_level(logging.INFO, logger="my_unicorn"):
+        _print_result_line(successful_install_result)
+
+    output = caplog.text
 
     # Verify formatting: name (left-aligned, 25 chars) + status
     assert "qownnotes" in output
@@ -385,13 +356,14 @@ def test_print_result_line_formatting(
 
 
 def test_print_result_line_with_warning(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
     result_with_warning: dict[str, Any],
 ) -> None:
     """Test result line formatting with warning."""
-    _print_result_line(result_with_warning)
-    captured = capsys.readouterr()
-    output = captured.out
+    with caplog.at_level(logging.INFO, logger="my_unicorn"):
+        _print_result_line(result_with_warning)
+
+    output = caplog.text
 
     # Verify app name and success
     assert "inkscape" in output
@@ -403,26 +375,28 @@ def test_print_result_line_with_warning(
 
 
 def test_print_result_line_already_installed(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
     already_installed_result: dict[str, Any],
 ) -> None:
     """Test result line for already installed app."""
-    _print_result_line(already_installed_result)
-    captured = capsys.readouterr()
-    output = captured.out
+    with caplog.at_level(logging.INFO, logger="my_unicorn"):
+        _print_result_line(already_installed_result)
+
+    output = caplog.text
 
     assert "brave" in output
     assert "ℹ️  Already installed" in output  # noqa: RUF001
 
 
 def test_print_result_line_failed(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
     failed_install_result: dict[str, Any],
 ) -> None:
     """Test result line for failed installation."""
-    _print_result_line(failed_install_result)
-    captured = capsys.readouterr()
-    output = captured.out
+    with caplog.at_level(logging.ERROR, logger="my_unicorn"):
+        _print_result_line(failed_install_result)
+
+    output = caplog.text
 
     # Verify failure indicator and error message
     assert "zen-browser" in output
@@ -430,14 +404,10 @@ def test_print_result_line_failed(
     assert "Download failed: Connection timeout" in output
 
 
-# ============================================================================
-# Test 9: Display no targets error
-# ============================================================================
-
-
 def test_display_no_targets_error(caplog: pytest.LogCaptureFixture) -> None:
     """Test error display when no installation targets specified."""
-    display_no_targets_error()
+    with caplog.at_level(logging.INFO, logger="my_unicorn"):
+        display_no_targets_error()
 
     # Verify error log entry
     assert any(
@@ -454,13 +424,8 @@ def test_display_no_targets_error(caplog: pytest.LogCaptureFixture) -> None:
     )
 
 
-# ============================================================================
-# Additional edge cases
-# ============================================================================
-
-
 def test_print_install_summary_result_without_name(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Test handling of result without name field."""
     results = [
@@ -470,9 +435,10 @@ def test_print_install_summary_result_without_name(
             "version": "v1.0.0",
         }
     ]
-    print_install_summary(results)
-    captured = capsys.readouterr()
-    output = captured.out
+    with caplog.at_level(logging.INFO, logger="my_unicorn"):
+        print_install_summary(results)
+
+    output = caplog.text
 
     # Should show "Unknown" as fallback
     assert "Unknown" in output
