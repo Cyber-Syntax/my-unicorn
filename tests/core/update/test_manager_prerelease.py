@@ -11,7 +11,7 @@ import aiohttp
 import pytest
 
 from my_unicorn.core.api import Release
-from my_unicorn.core.update.manager import UpdateManager
+from my_unicorn.core.update import UpdateManager
 
 
 class TestFetchReleaseDataPrereleaseLogic:
@@ -26,11 +26,11 @@ class TestFetchReleaseDataPrereleaseLogic:
 
         """
         with (
-            patch("my_unicorn.core.update.manager.ConfigManager"),
-            patch("my_unicorn.core.update.manager.GitHubAuthManager"),
-            patch("my_unicorn.core.update.manager.FileOperations"),
-            patch("my_unicorn.core.update.manager.BackupService"),
-            patch("my_unicorn.core.update.manager.ReleaseCacheManager"),
+            patch("my_unicorn.core.update.ConfigManager"),
+            patch("my_unicorn.core.update.GitHubAuthManager"),
+            patch("my_unicorn.core.update.FileOperations"),
+            patch("my_unicorn.core.update.BackupService"),
+            patch("my_unicorn.core.update.ReleaseCacheManager"),
         ):
             # Create a minimal config manager mock
             mock_config = MagicMock()
@@ -45,7 +45,7 @@ class TestFetchReleaseDataPrereleaseLogic:
                 },
             }
             with patch(
-                "my_unicorn.core.update.manager.ConfigManager"
+                "my_unicorn.core.update.ConfigManager"
             ) as mock_config_cls:
                 mock_config_cls.return_value = mock_config
                 return UpdateManager()
@@ -91,7 +91,7 @@ class TestFetchReleaseDataPrereleaseLogic:
         stable_release = self._create_mock_release("1.0.0", prerelease=False)
 
         with patch(
-            "my_unicorn.core.update.manager.ReleaseFetcher"
+            "my_unicorn.core.update.ReleaseFetcher"
         ) as mock_fetcher_cls:
             mock_fetcher = AsyncMock()
             mock_fetcher_cls.return_value = mock_fetcher
@@ -144,7 +144,7 @@ class TestFetchReleaseDataPrereleaseLogic:
         stable_release = self._create_mock_release("2.0.0", prerelease=False)
 
         with patch(
-            "my_unicorn.core.update.manager.ReleaseFetcher"
+            "my_unicorn.core.update.ReleaseFetcher"
         ) as mock_fetcher_cls:
             mock_fetcher = AsyncMock()
             mock_fetcher_cls.return_value = mock_fetcher
@@ -185,7 +185,7 @@ class TestFetchReleaseDataPrereleaseLogic:
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
 
         with patch(
-            "my_unicorn.core.update.manager.ReleaseFetcher"
+            "my_unicorn.core.update.ReleaseFetcher"
         ) as mock_fetcher_cls:
             mock_fetcher = AsyncMock()
             mock_fetcher_cls.return_value = mock_fetcher
@@ -222,7 +222,7 @@ class TestFetchReleaseDataPrereleaseLogic:
         stable_release = self._create_mock_release("1.5.0", prerelease=False)
 
         with patch(
-            "my_unicorn.core.update.manager.ReleaseFetcher"
+            "my_unicorn.core.update.ReleaseFetcher"
         ) as mock_fetcher_cls:
             mock_fetcher = AsyncMock()
             mock_fetcher_cls.return_value = mock_fetcher

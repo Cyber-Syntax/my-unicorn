@@ -11,8 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from my_unicorn.core.update.info import UpdateInfo
-from my_unicorn.core.update.workflows import update_multiple_apps
+from my_unicorn.core.update import UpdateInfo, update_multiple_apps
 from my_unicorn.exceptions import UpdateError
 
 
@@ -166,7 +165,44 @@ class TestUpdateMultipleApps:
         )
 
         assert results["app1"] is True
+        assert results["app2"] is False
         assert results["app3"] is True
+        assert _errors["app2"] == "Task failed: Update failed: Process failed"
+
+    @pytest.mark.asyncio
+    async def test_update_multiple_apps_cancelled_app_task(
+        self,
+        mock_progress_reporter: MagicMock,
+    ) -> None:
+        """Test one cancelled app task does not abort the full batch."""
+        global_config = {"max_concurrent_downloads": 3}
+        app_names = ["app1", "app2", "app3"]
+
+        async def side_effect_with_cancellation(
+            *args: Any, **kwargs: Any
+        ) -> tuple[bool, None]:
+            if args[0] == "app2":
+                raise asyncio.CancelledError
+            return True, None
+
+        update_single_mock = AsyncMock(
+            side_effect=side_effect_with_cancellation
+        )
+        update_cached_progress_mock = AsyncMock()
+
+        results, errors = await update_multiple_apps(
+            app_names=app_names,
+            force=False,
+            update_infos=None,
+            api_task_id=None,
+            global_config=global_config,
+            update_single_app_func=update_single_mock,
+            update_cached_progress_func=update_cached_progress_mock,
+            progress_reporter=mock_progress_reporter,
+        )
+
+        assert results == {"app1": True, "app2": False, "app3": True}
+        assert errors == {"app2": "Task cancelled"}
 
     @pytest.mark.asyncio
     async def test_update_multiple_apps_with_cached_info(

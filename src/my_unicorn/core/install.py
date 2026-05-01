@@ -124,7 +124,6 @@ def _print_result_line(result: dict[str, Any]) -> None:
 
 def _print_statistics(categories: dict[str, list]) -> None:
     """Print final installation statistics."""
-    print()
     if categories["newly_installed"]:
         count = len(categories["newly_installed"])
         logger.info("🎉 Successfully installed %s app(s)", count)
@@ -151,7 +150,6 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
         _print_all_already_installed(results)
         return
 
-    print()
     logger.info("📦 Installation Summary:")
     logger.info("-" * 50)
 

@@ -25,8 +25,7 @@ import aiohttp
 import pytest
 
 from my_unicorn.core.protocols.progress import NullProgressReporter
-from my_unicorn.core.update.info import UpdateInfo
-from my_unicorn.core.update.manager import UpdateManager
+from my_unicorn.core.update import UpdateInfo, UpdateManager
 from tests.integration.conftest import create_mock_appimage_content
 
 if TYPE_CHECKING:
@@ -138,7 +137,7 @@ async def test_update_single_app_full_workflow_success(
         mock_check.return_value = update_info
 
         with patch(
-            "my_unicorn.core.update.workflows.DownloadService"
+            "my_unicorn.core.update.DownloadService"
         ) as mock_download_cls:
             mock_download = AsyncMock()
 
@@ -153,7 +152,7 @@ async def test_update_single_app_full_workflow_success(
             mock_download_cls.return_value = mock_download
 
             with patch(
-                "my_unicorn.core.update.manager.PostDownloadProcessor"
+                "my_unicorn.core.update.PostDownloadProcessor"
             ) as mock_processor_cls:
                 mock_processor = AsyncMock()
                 mock_processor.process.side_effect = _create_success_processor(
@@ -208,7 +207,7 @@ async def test_update_single_app_verification_failure(
         mock_check.return_value = update_info
 
         with patch(
-            "my_unicorn.core.update.workflows.DownloadService"
+            "my_unicorn.core.update.DownloadService"
         ) as mock_download_cls:
             mock_download = AsyncMock()
 
@@ -225,7 +224,7 @@ async def test_update_single_app_verification_failure(
             mock_download_cls.return_value = mock_download
 
             with patch(
-                "my_unicorn.core.update.manager.PostDownloadProcessor"
+                "my_unicorn.core.update.PostDownloadProcessor"
             ) as mock_processor_cls:
                 mock_processor = AsyncMock()
                 mock_result = MagicMock()
@@ -289,7 +288,7 @@ async def test_force_update_already_uptodate(
         mock_check.return_value = update_info
 
         with patch(
-            "my_unicorn.core.update.workflows.DownloadService"
+            "my_unicorn.core.update.DownloadService"
         ) as mock_download_cls:
             mock_download = AsyncMock()
 
@@ -304,7 +303,7 @@ async def test_force_update_already_uptodate(
             mock_download_cls.return_value = mock_download
 
             with patch(
-                "my_unicorn.core.update.manager.PostDownloadProcessor"
+                "my_unicorn.core.update.PostDownloadProcessor"
             ) as mock_processor_cls:
                 mock_processor = AsyncMock()
                 mock_processor.process.side_effect = _create_success_processor(
@@ -358,7 +357,7 @@ async def test_cache_refresh_workflow(
         mock_check.return_value = update_info
 
         with patch(
-            "my_unicorn.core.update.workflows.DownloadService"
+            "my_unicorn.core.update.DownloadService"
         ) as mock_download_cls:
             mock_download = AsyncMock()
 
@@ -373,7 +372,7 @@ async def test_cache_refresh_workflow(
             mock_download_cls.return_value = mock_download
 
             with patch(
-                "my_unicorn.core.update.manager.PostDownloadProcessor"
+                "my_unicorn.core.update.PostDownloadProcessor"
             ) as mock_processor_cls:
                 mock_processor = AsyncMock()
                 mock_processor.process.side_effect = _create_success_processor(

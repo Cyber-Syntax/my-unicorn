@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
 from my_unicorn.core.update import (
+    _display_check_only_summary,
+    _find_update_info,
+    _format_update_version_info,
+    _get_update_status,
     display_check_results,
     display_invalid_apps,
     display_update_details,
@@ -13,12 +17,6 @@ from my_unicorn.core.update import (
     display_update_success,
     display_update_summary,
     display_update_warning,
-)
-from my_unicorn.core.update.display_update import (
-    _display_check_only_summary,
-    _find_update_info,
-    _format_update_version_info,
-    _get_update_status,
 )
 
 
@@ -32,18 +30,23 @@ class MockUpdateInfo:
     has_update: bool
     error_reason: str | None = None
 
+    @property
+    def is_success(self) -> bool:
+        """Return whether the mock represents a successful update check."""
+        return self.error_reason is None
+
 
 class TestDisplayUpdateSummary:
     """Tests for display_update_summary function."""
 
-    def test_display_update_summary_no_apps(self, capsys):
+    def test_display_update_summary_no_apps(self, caplog):
         """Test display_update_summary with no apps."""
         display_update_summary([], [], [], [], check_only=False)
 
-        captured = capsys.readouterr()
-        assert "No apps to process." in captured.out
+        captured = caplog.text
+        assert "No apps to process." in captured
 
-    def test_display_update_summary_check_only(self, capsys):
+    def test_display_update_summary_check_only(self, caplog):
         """Test display_update_summary in check-only mode."""
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -52,14 +55,14 @@ class TestDisplayUpdateSummary:
 
         display_update_summary([], [], [], update_infos, check_only=True)
 
-        captured = capsys.readouterr()
-        assert "Check Summary:" in captured.out
-        assert "Total apps checked: 2" in captured.out
-        assert "Updates available: 1" in captured.out
-        assert "Up to date: 1" in captured.out
-        assert "app1: 1.0.0 → 2.0.0" in captured.out
+        captured = caplog.text
+        assert "Check Summary:" in captured
+        assert "Total apps checked: 2" in captured
+        assert "Updates available: 1" in captured
+        assert "Up to date: 1" in captured
+        assert "app1: 1.0.0 → 2.0.0" in captured
 
-    def test_display_update_summary_update_operation(self, capsys):
+    def test_display_update_summary_update_operation(self, caplog):
         """Test display_update_summary for update operation."""
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -77,14 +80,14 @@ class TestDisplayUpdateSummary:
             check_only=False,
         )
 
-        captured = capsys.readouterr()
-        assert "Update Summary:" in captured.out
-        assert "app1" in captured.out
-        assert "✅" in captured.out
-        assert "1.0.0 → 2.0.0" in captured.out
-        assert "Successfully updated 1 app(s)" in captured.out
+        captured = caplog.text
+        assert "Update Summary:" in captured
+        assert "app1" in captured
+        assert "✅" in captured
+        assert "1.0.0 → 2.0.0" in captured
+        assert "Successfully updated 1 app(s)" in captured
 
-    def test_display_update_summary_with_failures(self, capsys):
+    def test_display_update_summary_with_failures(self, caplog):
         """Test display_update_summary with failed updates."""
         update_infos = [
             MockUpdateInfo(
@@ -107,25 +110,25 @@ class TestDisplayUpdateSummary:
             check_only=False,
         )
 
-        captured = capsys.readouterr()
-        assert "Update Summary:" in captured.out
-        assert "app1" in captured.out
-        assert "❌ Update failed" in captured.out
-        assert "Network error" in captured.out
-        assert "1 app(s) failed to update" in captured.out
+        captured = caplog.text
+        assert "Update Summary:" in captured
+        assert "app1" in captured
+        assert "❌ Update failed" in captured
+        assert "Network error" in captured
+        assert "1 app(s) failed to update" in captured
 
 
 class TestDisplayCheckOnlySummary:
     """Tests for _display_check_only_summary function."""
 
-    def test_display_check_only_summary_no_apps(self, capsys):
+    def test_display_check_only_summary_no_apps(self, caplog):
         """Test _display_check_only_summary with no apps."""
         _display_check_only_summary([])
 
-        captured = capsys.readouterr()
-        assert "No apps to check." in captured.out
+        captured = caplog.text
+        assert "No apps to check." in captured
 
-    def test_display_check_only_summary_with_updates(self, capsys):
+    def test_display_check_only_summary_with_updates(self, caplog):
         """Test _display_check_only_summary with apps having updates."""
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -135,16 +138,16 @@ class TestDisplayCheckOnlySummary:
 
         _display_check_only_summary(update_infos)
 
-        captured = capsys.readouterr()
-        assert "Check Summary:" in captured.out
-        assert "Total apps checked: 3" in captured.out
-        assert "Updates available: 2" in captured.out
-        assert "Up to date: 1" in captured.out
-        assert "Apps with updates available:" in captured.out
-        assert "app1: 1.0.0 → 2.0.0" in captured.out
-        assert "app2: 1.5.0 → 2.5.0" in captured.out
+        captured = caplog.text
+        assert "Check Summary:" in captured
+        assert "Total apps checked: 3" in captured
+        assert "Updates available: 2" in captured
+        assert "Up to date: 1" in captured
+        assert "Apps with updates available:" in captured
+        assert "app1: 1.0.0 → 2.0.0" in captured
+        assert "app2: 1.5.0 → 2.5.0" in captured
 
-    def test_display_check_only_summary_no_updates(self, capsys):
+    def test_display_check_only_summary_no_updates(self, caplog):
         """Test _display_check_only_summary with no updates available."""
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "1.0.0", has_update=False),
@@ -153,25 +156,25 @@ class TestDisplayCheckOnlySummary:
 
         _display_check_only_summary(update_infos)
 
-        captured = capsys.readouterr()
-        assert "Total apps checked: 2" in captured.out
-        assert "Updates available: 0" in captured.out
-        assert "Up to date: 2" in captured.out
+        captured = caplog.text
+        assert "Total apps checked: 2" in captured
+        assert "Updates available: 0" in captured
+        assert "Up to date: 2" in captured
         # Should not show "Apps with updates available" section
-        assert "Apps with updates available:" not in captured.out
+        assert "Apps with updates available:" not in captured
 
 
 class TestDisplayUpdateDetails:
     """Tests for display_update_details function."""
 
-    def test_display_update_details_no_info(self, capsys):
+    def test_display_update_details_no_info(self, caplog):
         """Test display_update_details with no information."""
         display_update_details([], [], [])
 
-        captured = capsys.readouterr()
-        assert "No update information available." in captured.out
+        captured = caplog.text
+        assert "No update information available." in captured
 
-    def test_display_update_details_with_data(self, capsys):
+    def test_display_update_details_with_data(self, caplog):
         """Test display_update_details with complete data."""
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -183,14 +186,14 @@ class TestDisplayUpdateDetails:
 
         display_update_details(updated_apps, failed_apps, update_infos)
 
-        captured = capsys.readouterr()
-        assert "Detailed Results:" in captured.out
-        assert "App Name" in captured.out
-        assert "Status" in captured.out
-        assert "Version Info" in captured.out
-        assert "app1" in captured.out
-        assert "app2" in captured.out
-        assert "app3" in captured.out
+        captured = caplog.text
+        assert "Detailed Results:" in captured
+        assert "App Name" in captured
+        assert "Status" in captured
+        assert "Version Info" in captured
+        assert "app1" in captured
+        assert "app2" in captured
+        assert "app3" in captured
 
 
 class TestGetUpdateStatus:
@@ -287,33 +290,33 @@ class TestFindUpdateInfo:
 class TestDisplayMessageFunctions:
     """Tests for display message functions."""
 
-    def test_display_update_progress(self, capsys):
+    def test_display_update_progress(self, caplog):
         """Test display_update_progress function."""
         display_update_progress("Processing app1...")
 
-        captured = capsys.readouterr()
-        assert "🔄 Processing app1..." in captured.out
+        captured = caplog.text
+        assert "🔄 Processing app1..." in captured
 
-    def test_display_update_success(self, capsys):
+    def test_display_update_success(self, caplog):
         """Test display_update_success function."""
         display_update_success("App updated successfully")
 
-        captured = capsys.readouterr()
-        assert "✅ App updated successfully" in captured.out
+        captured = caplog.text
+        assert "✅ App updated successfully" in captured
 
-    def test_display_update_error(self, capsys):
+    def test_display_update_error(self, caplog):
         """Test display_update_error function."""
         display_update_error("Update failed")
 
-        captured = capsys.readouterr()
-        assert "❌ Update failed" in captured.out
+        captured = caplog.text
+        assert "❌ Update failed" in captured
 
-    def test_display_update_warning(self, capsys):
+    def test_display_update_warning(self, caplog):
         """Test display_update_warning function."""
         display_update_warning("Low disk space")
 
-        captured = capsys.readouterr()
-        assert "⚠️  Low disk space" in captured.out
+        captured = caplog.text
+        assert "⚠️  Low disk space" in captured
 
 
 class TestDisplayCheckResults:
@@ -336,9 +339,7 @@ class TestDisplayCheckResults:
             ]
         }
 
-        with patch(
-            "my_unicorn.core.update.display_update.logger"
-        ) as mock_logger:
+        with patch("my_unicorn.core.update.logger") as mock_logger:
             display_check_results(results)
 
             assert mock_logger.info.call_count >= 3
@@ -351,9 +352,7 @@ class TestDisplayCheckResults:
         """Test display_check_results with no updates."""
         results = {"available_updates": []}
 
-        with patch(
-            "my_unicorn.core.update.display_update.logger"
-        ) as mock_logger:
+        with patch("my_unicorn.core.update.logger") as mock_logger:
             display_check_results(results)
 
             mock_logger.info.assert_called_once_with(
@@ -364,7 +363,7 @@ class TestDisplayCheckResults:
 class TestDisplayUpdateResults:
     """Tests for display_update_results function."""
 
-    def test_display_update_results_with_infos(self, capsys):
+    def test_display_update_results_with_infos(self, caplog):
         """Test display_update_results with update_infos."""
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -378,14 +377,14 @@ class TestDisplayUpdateResults:
 
         display_update_results(results)
 
-        captured = capsys.readouterr()
-        assert "📦 Update Summary:" in captured.out
-        assert "app1" in captured.out
-        assert "✅" in captured.out
-        assert "1.0.0 → 2.0.0" in captured.out
-        assert "Successfully updated 1 app(s)" in captured.out
+        captured = caplog.text
+        assert "📦 Update Summary:" in captured
+        assert "app1" in captured
+        assert "✅" in captured
+        assert "1.0.0 → 2.0.0" in captured
+        assert "Successfully updated 1 app(s)" in captured
 
-    def test_display_update_results_with_failures(self, capsys):
+    def test_display_update_results_with_failures(self, caplog):
         """Test display_update_results with failed updates."""
         update_infos = [
             MockUpdateInfo(
@@ -405,13 +404,13 @@ class TestDisplayUpdateResults:
 
         display_update_results(results)
 
-        captured = capsys.readouterr()
-        assert "app1" in captured.out
-        assert "❌ Update failed" in captured.out
-        assert "Network timeout" in captured.out
-        assert "1 app(s) failed to update" in captured.out
+        captured = caplog.text
+        assert "app1" in captured
+        assert "❌ Update failed" in captured
+        assert "Network timeout" in captured
+        assert "1 app(s) failed to update" in captured
 
-    def test_display_update_results_with_up_to_date(self, capsys):
+    def test_display_update_results_with_up_to_date(self, caplog):
         """Test display_update_results with up-to-date apps."""
         update_infos = [
             MockUpdateInfo("app1", "2.0.0", "2.0.0", has_update=False),
@@ -425,12 +424,12 @@ class TestDisplayUpdateResults:
 
         display_update_results(results)
 
-        captured = capsys.readouterr()
-        assert "app1" in captured.out
-        assert "Already up to date" in captured.out
-        assert "2.0.0" in captured.out
+        captured = caplog.text
+        assert "app1" in captured
+        assert "Already up to date" in captured
+        assert "2.0.0" in captured
 
-    def test_display_update_results_fallback_without_infos(self):
+    def test_display_update_results_fallback_without_infos(self, caplog):
         """Test display_update_results fallback when no update_infos."""
         results = {
             "updated": ["app1"],
@@ -439,9 +438,7 @@ class TestDisplayUpdateResults:
             "update_infos": [],
         }
 
-        with patch(
-            "my_unicorn.core.update.display_update.logger"
-        ) as mock_logger:
+        with patch("my_unicorn.core.update.logger") as mock_logger:
             display_update_results(results)
 
             mock_logger.info.assert_any_call(
@@ -452,7 +449,7 @@ class TestDisplayUpdateResults:
             )
             mock_logger.info.assert_any_call("Already up to date: %s", "app3")
 
-    def test_display_update_results_mixed(self, capsys):
+    def test_display_update_results_mixed(self, caplog):
         """Test display_update_results with mixed results."""
         update_infos = [
             MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
@@ -468,13 +465,13 @@ class TestDisplayUpdateResults:
 
         display_update_results(results)
 
-        captured = capsys.readouterr()
-        assert "app1" in captured.out
-        assert "✅" in captured.out
-        assert "app2" in captured.out
-        assert "❌" in captured.out
-        assert "app3" in captured.out
-        assert "Already up to date" in captured.out
+        captured = caplog.text
+        assert "app1" in captured
+        assert "✅" in captured
+        assert "app2" in captured
+        assert "❌" in captured
+        assert "app3" in captured
+        assert "Already up to date" in captured
 
 
 class TestDisplayInvalidApps:
@@ -488,9 +485,7 @@ class TestDisplayInvalidApps:
             "chrome",
         ]
 
-        with patch(
-            "my_unicorn.core.update.display_update.logger"
-        ) as mock_logger:
+        with patch("my_unicorn.core.update.logger") as mock_logger:
             display_invalid_apps(["unknown"], mock_config_manager)
 
             mock_logger.warning.assert_called_once_with(
@@ -505,9 +500,7 @@ class TestDisplayInvalidApps:
         mock_config_manager = MagicMock()
         mock_config_manager.list_installed_apps.return_value = []
 
-        with patch(
-            "my_unicorn.core.update.display_update.logger"
-        ) as mock_logger:
+        with patch("my_unicorn.core.update.logger") as mock_logger:
             display_invalid_apps(["unknown"], mock_config_manager)
 
             mock_logger.warning.assert_called_once()
@@ -517,9 +510,7 @@ class TestDisplayInvalidApps:
         """Test display_invalid_apps with empty list."""
         mock_config_manager = MagicMock()
 
-        with patch(
-            "my_unicorn.core.update.display_update.logger"
-        ) as mock_logger:
+        with patch("my_unicorn.core.update.logger") as mock_logger:
             display_invalid_apps([], mock_config_manager)
 
             mock_logger.warning.assert_not_called()

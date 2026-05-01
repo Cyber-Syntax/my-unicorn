@@ -214,10 +214,11 @@ class AppConfigManager:
         if overrides:
             effective = self._deep_merge(effective, overrides)
 
-        # Step 3: Inject runtime state (version, paths, etc.)
+        # Step 3: Inject runtime state and app-state metadata
         state = app_config.get("state", {})
         effective["state"] = state
         effective["config_version"] = app_config.get("config_version")
+        effective["catalog_ref"] = catalog_ref
 
         # Note: Do NOT copy the top-level "source" string field
         # ("catalog" or "url") to effective config. The effective config

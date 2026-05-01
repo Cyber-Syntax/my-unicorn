@@ -14,8 +14,7 @@ from typing import Any
 import pytest
 
 from my_unicorn.core.install import print_install_summary
-from my_unicorn.core.update.display_update import display_update_results
-from my_unicorn.core.update.info import UpdateInfo
+from my_unicorn.core.update import UpdateInfo, display_update_results
 
 from .test_ui_helpers import parse_output_sections
 from .test_ui_normalization import normalize_output_for_comparison
