@@ -316,13 +316,55 @@ class TestSelectAssetForUpdate:
         with patch(
             "my_unicorn.core.update.select_best_appimage_asset",
             return_value=sample_asset,
-        ):
+        ) as select_asset_mock:
             asset, error = select_asset_for_update(
                 app_name="test-app",
                 update_info=update_info,
                 catalog_entry=None,
             )
 
+        select_asset_mock.assert_called_once_with(
+            release_data,
+            catalog_entry=None,
+            installation_source="url",
+            raise_on_not_found=False,
+        )
+        assert asset == sample_asset
+        assert error is None
+
+    def test_select_asset_for_update_uses_catalog_source(
+        self,
+        sample_asset: Asset,
+        update_info_factory: Callable[..., UpdateInfo],
+    ) -> None:
+        """Test catalog entries use catalog-specific asset selection."""
+        release_data = MagicMock()
+        release_data.assets = [sample_asset]
+        update_info = update_info_factory(release_data=release_data)
+        catalog_entry = {
+            "appimage": {
+                "naming": {
+                    "architectures": ["x86_64"],
+                },
+            }
+        }
+
+        with patch(
+            "my_unicorn.core.update.select_best_appimage_asset",
+            return_value=sample_asset,
+        ) as select_asset_mock:
+            asset, error = select_asset_for_update(
+                app_name="test-app",
+                update_info=update_info,
+                catalog_entry=catalog_entry,
+            )
+
+        select_asset_mock.assert_called_once_with(
+            release_data,
+            catalog_entry=catalog_entry,
+            installation_source="catalog",
+            raise_on_not_found=False,
+        )
         assert asset == sample_asset
         assert error is None
 

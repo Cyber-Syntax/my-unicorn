@@ -165,7 +165,9 @@ class TestUpdateMultipleApps:
         )
 
         assert results["app1"] is True
+        assert results["app2"] is False
         assert results["app3"] is True
+        assert _errors["app2"] == "Task failed: Update failed: Process failed"
 
     @pytest.mark.asyncio
     async def test_update_multiple_apps_with_cached_info(

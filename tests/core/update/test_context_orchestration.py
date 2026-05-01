@@ -96,6 +96,55 @@ class TestPrepareUpdateContext:
         assert context["appimage_asset"] == sample_asset
 
     @pytest.mark.asyncio
+    async def test_prepare_update_context_loads_catalog_ref(
+        self,
+        mock_session: AsyncMock,
+        update_info_factory: Callable[..., UpdateInfo],
+        app_config_with_source: dict[str, Any],
+        sample_asset: Asset,
+    ) -> None:
+        """Test catalog references are loaded for update asset selection."""
+        release_data = MagicMock()
+        release_data.assets = [sample_asset]
+        update_info = update_info_factory(
+            release_data=release_data,
+            has_update=True,
+        )
+        app_config = app_config_with_source.copy()
+        app_config["catalog_ref"] = "test-app"
+        catalog_entry = {
+            "appimage": {
+                "naming": {
+                    "architectures": ["x86_64"],
+                },
+            }
+        }
+
+        check_func = AsyncMock(return_value=update_info)
+        load_config_func = MagicMock(return_value=app_config)
+        load_catalog_func = AsyncMock(return_value=catalog_entry)
+
+        with patch(
+            "my_unicorn.core.update.select_best_appimage_asset",
+            return_value=sample_asset,
+        ):
+            context, error = await prepare_update_context(
+                app_name="test-app",
+                session=mock_session,
+                force=False,
+                update_info=None,
+                check_single_update_func=check_func,
+                load_app_config_func=load_config_func,
+                load_catalog_cached_func=load_catalog_func,
+            )
+
+        assert error is None
+        assert context is not None
+        assert context["catalog_entry"] == catalog_entry
+        assert context["appimage_asset"] == sample_asset
+        load_catalog_func.assert_awaited_once_with("test-app")
+
+    @pytest.mark.asyncio
     async def test_prepare_update_context_skip_path(
         self,
         mock_session: AsyncMock,

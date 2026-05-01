@@ -55,6 +55,7 @@ def test_load_app_config_and_migration(config_manager: ConfigManager) -> None:
 
     # Should load v2.0.0 config successfully
     assert loaded["config_version"] == "2.0.0"
+    assert loaded["catalog_ref"] == "testapp"
     assert "state" in loaded
     assert loaded["state"]["verification"]["passed"] is True
 
@@ -340,6 +341,7 @@ def test_app_config_manager(config_dir: Path) -> None:
     assert loaded is not None
     # V2.0.0 format with state
     assert loaded["config_version"] == "2.0.0"
+    assert loaded["catalog_ref"] == "testapp"
     assert loaded["state"]["version"] == test_version
 
     # Test listing apps
