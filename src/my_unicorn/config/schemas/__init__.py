@@ -19,7 +19,7 @@ Usage:
         validate_app_state(app_config, "obsidian")
         validate_cache_release(cache_entry, "obsidianmd_obsidian-releases")
     except SchemaValidationError as e:
-        print(f"Validation failed: {e}")
+        logger.error("Validation failed: %s", e)
 
     # Or with explicit validator instance for dependency injection:
     validator = ConfigValidator()

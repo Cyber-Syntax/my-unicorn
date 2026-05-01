@@ -112,7 +112,7 @@ class ProgressReporter(Protocol):
                 total_phases: int = 1,
             ) -> str:
                 task_id = str(uuid.uuid4())
-                print(f"Starting: {name}")
+                logger.info("Starting: %s", name)
                 return task_id
 
             async def update_task(
@@ -123,7 +123,7 @@ class ProgressReporter(Protocol):
                 description: str | None = None,
             ) -> None:
                 if completed:
-                    print(f"Progress: {completed}")
+                    logger.info("Progress: %s", completed)
 
             async def finish_task(
                 self,
@@ -133,7 +133,7 @@ class ProgressReporter(Protocol):
                 description: str | None = None,
             ) -> None:
                 status = "✓" if success else "✗"
-                print(f"Finished: {status}")
+                logger.info("Finished: %s", status)
 
             def get_task_info(self, task_id: str) -> dict:
                 return {"completed": 0, "total": None, "description": ""}

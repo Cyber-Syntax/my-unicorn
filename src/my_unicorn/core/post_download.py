@@ -150,7 +150,7 @@ class PostDownloadProcessor:
         ... )
         >>> result = await processor.process(context)
         >>> if result.success:
-        ...     print(f"Installed to {result.install_path}")
+        ...     logger.info("Installed to %s", result.install_path)
 
     """
 
