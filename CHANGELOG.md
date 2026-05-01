@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Consolidated install modules to one module.
+- Consolidated update modules to one module.
+- Update and install modules use logger instead of print statements for better logging and debugging.
 
 ## [2.5.1-alpha] - 2026-04-30
 
