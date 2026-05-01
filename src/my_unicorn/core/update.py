@@ -874,7 +874,7 @@ async def resolve_update_info(
 
 
 def load_update_config(
-    app_name: str, update_info: UpdateInfo, load_app_config_func: callable
+    app_name: str, update_info: UpdateInfo, load_app_config_func: Callable
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Load app config from UpdateInfo cache or filesystem.
 
@@ -903,7 +903,7 @@ def load_update_config(
 async def load_catalog_for_update(
     app_name: str,
     app_config: dict[str, Any],
-    load_catalog_cached_func: callable,
+    load_catalog_cached_func: Callable,
 ) -> dict[str, Any] | None:
     """Load catalog entry if referenced in app config.
 
