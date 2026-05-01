@@ -53,9 +53,9 @@ from my_unicorn.utils.download_utils import extract_filename_from_url
 from my_unicorn.utils.version_utils import compare_versions
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable
 
-    from my_unicorn.core.protocols.progress import ProgressReporter
+    from my_unicorn.types import GlobalConfig
 
 logger = get_logger(__name__)
 
@@ -262,7 +262,7 @@ class UpdateManager:
     async def _build_update_info(
         self,
         app_name: str,
-        app_config: dict[str, object],
+        app_config: dict[str, Any],
         release_data: Release,
     ) -> UpdateInfo:
         """Build UpdateInfo from app config and release data.
@@ -276,8 +276,11 @@ class UpdateManager:
             UpdateInfo object with update status
 
         """
-        current_version = app_config.get("state", {}).get(
-            "version", VERSION_UNKNOWN
+        state = app_config.get("state", {})
+        current_version = (
+            str(state.get("version", VERSION_UNKNOWN))
+            if isinstance(state, dict)
+            else VERSION_UNKNOWN
         )
         github_config = get_github_config(app_config)
         owner = github_config.owner
@@ -426,7 +429,7 @@ class UpdateManager:
 
     def _load_app_config_or_fail(
         self, app_name: str, context: str = ""
-    ) -> dict[str, object]:
+    ) -> dict[str, Any]:
         """Load app config with consistent error handling.
 
         Centralizes config loading logic to eliminate duplication and
@@ -497,7 +500,7 @@ class UpdateManager:
             session: aiohttp.ClientSession,
             force: bool,
             update_info: UpdateInfo | None,
-        ) -> tuple[dict[str, object] | None, str | None]:
+        ) -> tuple[dict[str, Any] | None, str | None]:
             return await prepare_update_context(
                 app_name,
                 session,
@@ -610,10 +613,13 @@ async def update_single_app(
     session: aiohttp.ClientSession,
     force: bool,
     update_info: UpdateInfo | None,
-    global_config: dict[str, Any],
-    prepare_context_func: Callable,
-    backup_service: object,
-    post_download_processor: object,
+    global_config: GlobalConfig,
+    prepare_context_func: Callable[
+        [str, aiohttp.ClientSession, bool, UpdateInfo | None],
+        Awaitable[tuple[dict[str, Any] | None, str | None]],
+    ],
+    backup_service: BackupService,
+    post_download_processor: PostDownloadProcessor,
     download_service: DownloadService | None = None,
 ) -> tuple[bool, str | None]:
     """Update a single app using direct parameter passing.
@@ -756,9 +762,14 @@ async def update_multiple_apps(
     force: bool,
     update_infos: list[UpdateInfo] | None,
     api_task_id: str | None,
-    global_config: dict[str, Any],
-    update_single_app_func: Callable,
-    update_cached_progress_func: Callable,
+    global_config: GlobalConfig,
+    update_single_app_func: Callable[
+        [str, aiohttp.ClientSession, bool, UpdateInfo | None],
+        Awaitable[tuple[bool, str | None]],
+    ],
+    update_cached_progress_func: Callable[
+        [str, str | None, ProgressReporter], Awaitable[None]
+    ],
     progress_reporter: ProgressReporter,
 ) -> tuple[dict[str, bool], dict[str, str]]:
     """Update multiple apps.
@@ -822,12 +833,30 @@ async def update_multiple_apps(
                 return app_name, False, f"Task failed: {e}"
 
         tasks = [update_with_semaphore(app) for app in app_names]
-        task_results = await asyncio.gather(*tasks)
+        task_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        for app_name, success, error_reason in task_results:
-            results[app_name] = success
+        for app_name, result in zip(app_names, task_results, strict=True):
+            if isinstance(result, asyncio.CancelledError):
+                logger.warning("Update task cancelled for %s", app_name)
+                results[app_name] = False
+                error_reasons[app_name] = "Task cancelled"
+                continue
+
+            if isinstance(result, Exception):
+                logger.exception(
+                    "Update task failed for %s", app_name, exc_info=result
+                )
+                results[app_name] = False
+                error_reasons[app_name] = f"Task failed: {result}"
+                continue
+
+            if isinstance(result, BaseException):
+                raise result
+
+            result_app_name, success, error_reason = result
+            results[result_app_name] = success
             if not success and error_reason:
-                error_reasons[app_name] = error_reason
+                error_reasons[result_app_name] = error_reason
 
     return results, error_reasons
 
@@ -837,7 +866,9 @@ async def resolve_update_info(
     session: aiohttp.ClientSession,
     force: bool,
     update_info: UpdateInfo | None,
-    check_single_update_func: Callable,
+    check_single_update_func: Callable[
+        [str, aiohttp.ClientSession], Awaitable[UpdateInfo]
+    ],
 ) -> tuple[UpdateInfo | None, str | None]:
     """Resolve update info by using cached or checking for updates.
 
@@ -853,7 +884,7 @@ async def resolve_update_info(
 
     """
     # Use cached update info if provided, otherwise check for updates
-    if not update_info:
+    if update_info is None:
         update_info = await check_single_update_func(app_name, session)
 
     # Check if update info indicates an error
@@ -874,7 +905,9 @@ async def resolve_update_info(
 
 
 def load_update_config(
-    app_name: str, update_info: UpdateInfo, load_app_config_func: Callable
+    app_name: str,
+    update_info: UpdateInfo,
+    load_app_config_func: Callable[[str, str], dict[str, Any]],
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Load app config from UpdateInfo cache or filesystem.
 
@@ -980,9 +1013,13 @@ async def prepare_update_context(
     session: aiohttp.ClientSession,
     force: bool,
     update_info: UpdateInfo | None,
-    check_single_update_func: Callable,
-    load_app_config_func: Callable,
-    load_catalog_cached_func: Callable,
+    check_single_update_func: Callable[
+        [str, aiohttp.ClientSession], Awaitable[UpdateInfo]
+    ],
+    load_app_config_func: Callable[[str, str], dict[str, Any]],
+    load_catalog_cached_func: Callable[
+        [str], Awaitable[dict[str, Any] | None]
+    ],
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Prepare context for update operation.
 
