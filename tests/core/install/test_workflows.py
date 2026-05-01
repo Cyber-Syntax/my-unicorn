@@ -12,7 +12,7 @@ import pytest
 
 from my_unicorn.constants import ERROR_NO_RELEASE_FOUND
 from my_unicorn.core.api import Asset, Release
-from my_unicorn.core.install.workflows import fetch_release, install_workflow
+from my_unicorn.core.install import fetch_release, install_workflow
 from my_unicorn.core.post_download import PostDownloadResult
 from my_unicorn.exceptions import InstallError, VerificationError
 
@@ -47,7 +47,7 @@ async def test_install_workflow_success(  # noqa: PLR0913
 
     # Act
     with patch(
-        "my_unicorn.core.install.workflows.get_github_config",
+        "my_unicorn.core.install.get_github_config",
         return_value=mock_github_config,
     ):
         result = await install_workflow(
@@ -145,7 +145,7 @@ async def test_install_workflow_processor_failure(
     # Act & Assert
     with (
         patch(
-            "my_unicorn.core.install.workflows.get_github_config",
+            "my_unicorn.core.install.get_github_config",
             return_value=mock_github_config,
         ),
         pytest.raises(InstallError) as exc_info,
@@ -192,7 +192,7 @@ async def test_install_workflow_verification_disabled(  # noqa: PLR0913
 
     # Act
     with patch(
-        "my_unicorn.core.install.workflows.get_github_config",
+        "my_unicorn.core.install.get_github_config",
         return_value=mock_github_config,
     ):
         result = await install_workflow(
@@ -255,7 +255,7 @@ async def test_install_workflow_with_warnings(
 
     # Act
     with patch(
-        "my_unicorn.core.install.workflows.get_github_config",
+        "my_unicorn.core.install.get_github_config",
         return_value=mock_github_config,
     ):
         result = await install_workflow(
@@ -305,7 +305,7 @@ async def test_install_workflow_verification_error(
     # Act & Assert
     with (
         patch(
-            "my_unicorn.core.install.workflows.get_github_config",
+            "my_unicorn.core.install.get_github_config",
             return_value=mock_github_config,
         ),
         pytest.raises(VerificationError) as exc_info,

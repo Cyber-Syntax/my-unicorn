@@ -37,6 +37,8 @@ from my_unicorn.utils.asset_validation import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from my_unicorn.core.cache import ReleaseCacheManager
 
 logger = get_logger(__name__)
@@ -1536,7 +1538,7 @@ class GitHubConfig:
     prerelease: bool = False
 
 
-def get_github_config(app_config: dict[str, Any]) -> GitHubConfig:
+def get_github_config(app_config: Mapping[str, Any]) -> GitHubConfig:
     """Extract and validate GitHub configuration from app config.
 
     This function consolidates the pattern of extracting GitHub config
@@ -1544,7 +1546,7 @@ def get_github_config(app_config: dict[str, Any]) -> GitHubConfig:
     install and update workflows.
 
     Args:
-        app_config: Application configuration dictionary
+        app_config: Application configuration mapping
 
     Returns:
         GitHubConfig: Validated configuration object
@@ -1571,12 +1573,12 @@ def get_github_config(app_config: dict[str, Any]) -> GitHubConfig:
 
 
 def extract_github_config(
-    effective_config: dict[str, Any],
+    effective_config: Mapping[str, Any],
 ) -> tuple[str, str, bool]:
     """Extract GitHub repository configuration from effective config.
 
     Args:
-        effective_config: Effective app configuration dictionary
+        effective_config: Effective app configuration mapping
 
     Returns:
         Tuple containing:

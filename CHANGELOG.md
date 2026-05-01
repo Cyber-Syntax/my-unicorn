@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added new appimage supports; spotube, helium-linux, muffon, pear-desktop, simpmusic.
 
+### Changed
+
+- Consolidated install modules to one module.
+
 ## [2.5.1-alpha] - 2026-04-30
 
 ### Added

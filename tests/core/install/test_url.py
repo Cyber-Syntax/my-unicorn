@@ -5,12 +5,12 @@ functions with URL parsing, validation, and install workflow.
 """
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from my_unicorn.core.api import Asset, Release
-from my_unicorn.core.install.url import (
+from my_unicorn.core.install import (
     install_from_url,
     validate_and_fetch_release,
 )
@@ -156,7 +156,7 @@ async def test_install_from_url_success(  # noqa: PLR0913
         return_value=sample_install_result_success
     )
 
-    with patch("my_unicorn.core.install.url.parse_github_url") as mock_parse:
+    with patch("my_unicorn.core.install.parse_github_url") as mock_parse:
         mock_parse.return_value = {
             "owner": "pbek",
             "repo": "QOwnNotes",
@@ -165,17 +165,17 @@ async def test_install_from_url_success(  # noqa: PLR0913
         }
 
         with patch(
-            "my_unicorn.core.install.url.get_github_config"
+            "my_unicorn.core.install.get_github_config"
         ) as mock_get_config:
             mock_get_config.return_value = None
 
             with patch(
-                "my_unicorn.core.install.url.select_best_appimage_asset"
+                "my_unicorn.core.install.select_best_appimage_asset"
             ) as mock_select:
                 mock_select.return_value = sample_asset
 
                 with patch(
-                    "my_unicorn.core.install.url.build_url_install_config"
+                    "my_unicorn.core.install.build_url_install_config"
                 ) as mock_build_config:
                     mock_build_config.return_value = {
                         "config_version": "2.0.0",
@@ -189,7 +189,6 @@ async def test_install_from_url_success(  # noqa: PLR0913
                     result = await install_from_url(
                         valid_github_url,
                         mock_download_service,
-                        MagicMock(),  # github_client
                         mock_post_download_processor,
                         fetch_release_fn=mock_fetch_release,
                         install_workflow_fn=mock_install_workflow,
@@ -215,14 +214,13 @@ async def test_install_from_url_invalid_format() -> None:
     mock_fetch_release = AsyncMock()
     mock_install_workflow = AsyncMock()
 
-    with patch("my_unicorn.core.install.url.parse_github_url") as mock_parse:
+    with patch("my_unicorn.core.install.parse_github_url") as mock_parse:
         mock_parse.side_effect = ValueError("Invalid URL format")
 
         # Act
         result = await install_from_url(
             invalid_url,
             mock_download_service,
-            MagicMock(),  # github_client
             mock_post_download_processor,
             fetch_release_fn=mock_fetch_release,
             install_workflow_fn=mock_install_workflow,
@@ -247,7 +245,7 @@ async def test_install_from_url_validation_failure(
     mock_fetch_release = AsyncMock()
     mock_install_workflow = AsyncMock()
 
-    with patch("my_unicorn.core.install.url.parse_github_url") as mock_parse:
+    with patch("my_unicorn.core.install.parse_github_url") as mock_parse:
         mock_parse.return_value = {
             "owner": "pbek",
             "repo": "QOwnNotes",
@@ -256,12 +254,12 @@ async def test_install_from_url_validation_failure(
         }
 
         with patch(
-            "my_unicorn.core.install.url.get_github_config"
+            "my_unicorn.core.install.get_github_config"
         ) as mock_get_config:
             mock_get_config.return_value = None
 
             with patch(
-                "my_unicorn.core.install.url.select_best_appimage_asset"
+                "my_unicorn.core.install.select_best_appimage_asset"
             ) as mock_select:
                 mock_select.return_value = None  # No AppImage found
 
@@ -269,7 +267,6 @@ async def test_install_from_url_validation_failure(
                 result = await install_from_url(
                     valid_github_url,
                     mock_download_service,
-                    MagicMock(),  # github_client
                     mock_post_download_processor,
                     fetch_release_fn=mock_fetch_release,
                     install_workflow_fn=mock_install_workflow,
@@ -301,7 +298,7 @@ async def test_install_from_url_installation_error(
         side_effect=InstallationError(error_message)
     )
 
-    with patch("my_unicorn.core.install.url.parse_github_url") as mock_parse:
+    with patch("my_unicorn.core.install.parse_github_url") as mock_parse:
         mock_parse.return_value = {
             "owner": "pbek",
             "repo": "QOwnNotes",
@@ -310,15 +307,15 @@ async def test_install_from_url_installation_error(
         }
 
         with (
-            patch("my_unicorn.core.install.url.get_github_config"),
+            patch("my_unicorn.core.install.get_github_config"),
             patch(
-                "my_unicorn.core.install.url.select_best_appimage_asset"
+                "my_unicorn.core.install.select_best_appimage_asset"
             ) as mock_select,
         ):
             mock_select.return_value = sample_asset
 
             with patch(
-                "my_unicorn.core.install.url.build_url_install_config"
+                "my_unicorn.core.install.build_url_install_config"
             ) as mock_build_config:
                 mock_build_config.return_value = {}
 
@@ -326,7 +323,6 @@ async def test_install_from_url_installation_error(
                 result = await install_from_url(
                     valid_github_url,
                     mock_download_service,
-                    MagicMock(),  # github_client
                     mock_post_download_processor,
                     fetch_release_fn=mock_fetch_release,
                     install_workflow_fn=mock_install_workflow,
@@ -357,7 +353,7 @@ async def test_install_from_url_verification_error(
         side_effect=VerificationError(error_message)
     )
 
-    with patch("my_unicorn.core.install.url.parse_github_url") as mock_parse:
+    with patch("my_unicorn.core.install.parse_github_url") as mock_parse:
         mock_parse.return_value = {
             "owner": "pbek",
             "repo": "QOwnNotes",
@@ -366,15 +362,15 @@ async def test_install_from_url_verification_error(
         }
 
         with (
-            patch("my_unicorn.core.install.url.get_github_config"),
+            patch("my_unicorn.core.install.get_github_config"),
             patch(
-                "my_unicorn.core.install.url.select_best_appimage_asset"
+                "my_unicorn.core.install.select_best_appimage_asset"
             ) as mock_select,
         ):
             mock_select.return_value = sample_asset
 
             with patch(
-                "my_unicorn.core.install.url.build_url_install_config"
+                "my_unicorn.core.install.build_url_install_config"
             ) as mock_build_config:
                 mock_build_config.return_value = {}
 
@@ -382,7 +378,6 @@ async def test_install_from_url_verification_error(
                 result = await install_from_url(
                     valid_github_url,
                     mock_download_service,
-                    MagicMock(),  # github_client
                     mock_post_download_processor,
                     fetch_release_fn=mock_fetch_release,
                     install_workflow_fn=mock_install_workflow,

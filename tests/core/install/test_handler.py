@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import aiohttp
 import pytest
 
-from my_unicorn.core.install.handler import InstallHandler
+from my_unicorn.core.install import InstallHandler
 from my_unicorn.exceptions import (
     InstallationError,
     InstallError,
@@ -63,9 +63,7 @@ async def test_install_from_catalog_delegation(
     app_name = "qownnotes"
     expected_result = sample_install_result_success
 
-    with patch(
-        "my_unicorn.core.install.handler.install_from_catalog"
-    ) as mock_install:
+    with patch("my_unicorn.core.install.install_from_catalog") as mock_install:
         mock_install.return_value = expected_result
 
         # Act
@@ -101,9 +99,7 @@ async def test_install_from_url_delegation(
     github_url = "https://github.com/pbek/QOwnNotes"
     expected_result = sample_install_result_success
 
-    with patch(
-        "my_unicorn.core.install.handler.install_from_url"
-    ) as mock_install:
+    with patch("my_unicorn.core.install.install_from_url") as mock_install:
         mock_install.return_value = expected_result
 
         # Act
@@ -159,10 +155,8 @@ async def test_install_multiple_concurrent_success(
     ]
 
     with (
-        patch(
-            "my_unicorn.core.install.handler.install_from_catalog"
-        ) as mock_catalog,
-        patch("my_unicorn.core.install.handler.install_from_url") as mock_url,
+        patch("my_unicorn.core.install.install_from_catalog") as mock_catalog,
+        patch("my_unicorn.core.install.install_from_url") as mock_url,
     ):
         mock_catalog.side_effect = results[:2]
         mock_url.side_effect = results[2:]
@@ -206,10 +200,8 @@ async def test_install_multiple_mixed_targets(
     url_apps = ["https://github.com/pbek/QOwnNotes"]
 
     with (
-        patch(
-            "my_unicorn.core.install.handler.install_from_catalog"
-        ) as mock_catalog,
-        patch("my_unicorn.core.install.handler.install_from_url") as mock_url,
+        patch("my_unicorn.core.install.install_from_catalog") as mock_catalog,
+        patch("my_unicorn.core.install.install_from_url") as mock_url,
     ):
         mock_catalog.return_value = {"success": True, "source": "catalog"}
         mock_url.return_value = {"success": True, "source": "url"}
@@ -255,9 +247,7 @@ async def test_install_multiple_partial_failures(
     catalog_apps = ["success_app", "fail_app"]
     url_apps = []
 
-    with patch(
-        "my_unicorn.core.install.handler.install_from_catalog"
-    ) as mock_catalog:
+    with patch("my_unicorn.core.install.install_from_catalog") as mock_catalog:
         mock_catalog.side_effect = [
             {"success": True, "app_name": "success_app"},
             InstallError("App not found"),
@@ -305,10 +295,8 @@ async def test_install_multiple_all_failures(
     url_apps = ["https://github.com/fail/repo"]
 
     with (
-        patch(
-            "my_unicorn.core.install.handler.install_from_catalog"
-        ) as mock_catalog,
-        patch("my_unicorn.core.install.handler.install_from_url") as mock_url,
+        patch("my_unicorn.core.install.install_from_catalog") as mock_catalog,
+        patch("my_unicorn.core.install.install_from_url") as mock_url,
     ):
         mock_catalog.side_effect = InstallError("App not found")
         mock_url.side_effect = InstallError("Invalid URL")
@@ -356,9 +344,7 @@ async def test_install_multiple_exception_handling(
     ]
     url_apps = []
 
-    with patch(
-        "my_unicorn.core.install.handler.install_from_catalog"
-    ) as mock_catalog:
+    with patch("my_unicorn.core.install.install_from_catalog") as mock_catalog:
         mock_catalog.side_effect = [
             InstallationError("Installation failed"),
             InstallError("Install error"),
@@ -431,7 +417,7 @@ async def test_install_multiple_semaphore_limit() -> None:
         return {"success": True, "app_name": app_name}
 
     with patch(
-        "my_unicorn.core.install.handler.install_from_catalog",
+        "my_unicorn.core.install.install_from_catalog",
         side_effect=slow_install,
     ):
         # Act
@@ -464,14 +450,10 @@ async def test_create_default_factory() -> None:
 
     # Test with progress reporter
     with (
+        patch("my_unicorn.core.install.DownloadService") as mock_download_cls,
+        patch("my_unicorn.core.install.FileOperations") as mock_storage_cls,
         patch(
-            "my_unicorn.core.install.handler.DownloadService"
-        ) as mock_download_cls,
-        patch(
-            "my_unicorn.core.install.handler.FileOperations"
-        ) as mock_storage_cls,
-        patch(
-            "my_unicorn.core.install.handler.PostDownloadProcessor"
+            "my_unicorn.core.install.PostDownloadProcessor"
         ) as mock_processor_cls,
     ):
         mock_download_instance = AsyncMock()
@@ -509,13 +491,11 @@ async def test_create_default_factory() -> None:
     # Test without progress reporter (None)
     with (
         patch(
-            "my_unicorn.core.install.handler.DownloadService"
+            "my_unicorn.core.install.DownloadService"
         ) as mock_download_cls_2,
+        patch("my_unicorn.core.install.FileOperations") as mock_storage_cls_2,
         patch(
-            "my_unicorn.core.install.handler.FileOperations"
-        ) as mock_storage_cls_2,
-        patch(
-            "my_unicorn.core.install.handler.PostDownloadProcessor"
+            "my_unicorn.core.install.PostDownloadProcessor"
         ) as mock_processor_cls_2,
     ):
         mock_download_instance_2 = AsyncMock()

@@ -1,4 +1,4 @@
-from my_unicorn.core.install.display_install import (
+from my_unicorn.core.install import (
     display_no_targets_error,
     print_install_summary,
 )
@@ -8,9 +8,7 @@ def test_display_no_targets_error(capsys):
     """Test display_no_targets_error shows error and help message."""
     from unittest.mock import patch
 
-    with patch(
-        "my_unicorn.core.install.display_install.logger"
-    ) as mock_logger:
+    with patch("my_unicorn.core.install.logger") as mock_logger:
         display_no_targets_error()
 
         mock_logger.error.assert_called_once_with("❌ No targets specified.")

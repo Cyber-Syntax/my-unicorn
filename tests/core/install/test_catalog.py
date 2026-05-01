@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.core.api import Asset, Release
-from my_unicorn.core.install.catalog import (
+from my_unicorn.core.install import (
     build_url_install_config,
     install_from_catalog,
 )
@@ -46,11 +46,9 @@ async def test_install_from_catalog_success(  # noqa: PLR0913
     )
 
     with (
+        patch("my_unicorn.core.install.get_github_config") as mock_get_config,
         patch(
-            "my_unicorn.core.install.catalog.get_github_config"
-        ) as mock_get_config,
-        patch(
-            "my_unicorn.core.install.catalog.select_best_appimage_asset"
+            "my_unicorn.core.install.select_best_appimage_asset"
         ) as mock_select_asset,
     ):
         mock_get_config.return_value = MagicMock(
@@ -132,9 +130,7 @@ async def test_install_from_catalog_invalid_github_config(
     mock_fetch_release = AsyncMock()
     mock_install_workflow = AsyncMock()
 
-    with patch(
-        "my_unicorn.core.install.catalog.get_github_config"
-    ) as mock_get_config:
+    with patch("my_unicorn.core.install.get_github_config") as mock_get_config:
         mock_get_config.side_effect = ValueError(
             "Missing required GitHub configuration: owner"
         )
@@ -177,11 +173,9 @@ async def test_install_from_catalog_no_appimage_asset(
     mock_install_workflow = AsyncMock()
 
     with (
+        patch("my_unicorn.core.install.get_github_config") as mock_get_config,
         patch(
-            "my_unicorn.core.install.catalog.get_github_config"
-        ) as mock_get_config,
-        patch(
-            "my_unicorn.core.install.catalog.select_best_appimage_asset"
+            "my_unicorn.core.install.select_best_appimage_asset"
         ) as mock_select_asset,
     ):
         mock_get_config.return_value = MagicMock(
@@ -228,9 +222,7 @@ async def test_install_from_catalog_release_fetch_failure(
     )
     mock_install_workflow = AsyncMock()
 
-    with patch(
-        "my_unicorn.core.install.catalog.get_github_config"
-    ) as mock_get_config:
+    with patch("my_unicorn.core.install.get_github_config") as mock_get_config:
         mock_get_config.return_value = MagicMock(
             owner="pbek", repo="QOwnNotes"
         )
@@ -277,11 +269,9 @@ async def test_install_from_catalog_installation_error(  # noqa: PLR0913
     )
 
     with (
+        patch("my_unicorn.core.install.get_github_config") as mock_get_config,
         patch(
-            "my_unicorn.core.install.catalog.get_github_config"
-        ) as mock_get_config,
-        patch(
-            "my_unicorn.core.install.catalog.select_best_appimage_asset"
+            "my_unicorn.core.install.select_best_appimage_asset"
         ) as mock_select_asset,
     ):
         mock_get_config.return_value = MagicMock(
@@ -329,11 +319,9 @@ async def test_install_from_catalog_generic_exception(  # noqa: PLR0913
     mock_install_workflow = AsyncMock(side_effect=unexpected_error)
 
     with (
+        patch("my_unicorn.core.install.get_github_config") as mock_get_config,
         patch(
-            "my_unicorn.core.install.catalog.get_github_config"
-        ) as mock_get_config,
-        patch(
-            "my_unicorn.core.install.catalog.select_best_appimage_asset"
+            "my_unicorn.core.install.select_best_appimage_asset"
         ) as mock_select_asset,
     ):
         mock_get_config.return_value = MagicMock(
