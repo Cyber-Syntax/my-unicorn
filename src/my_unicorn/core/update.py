@@ -55,7 +55,6 @@ from my_unicorn.utils.version_utils import compare_versions
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from my_unicorn.core.api import Release
     from my_unicorn.core.protocols.progress import ProgressReporter
 
 logger = get_logger(__name__)
@@ -823,26 +822,14 @@ async def update_multiple_apps(
                 return app_name, False, f"Task failed: {e}"
 
         tasks = [update_with_semaphore(app) for app in app_names]
-        task_results = await asyncio.gather(*tasks, return_exceptions=True)
+        task_results = await asyncio.gather(*tasks)
 
-        for result in task_results:
-            if isinstance(result, tuple):
-                app_name, success, error_reason = result
-                results[app_name] = success
-                if not success and error_reason:
-                    error_reasons[app_name] = error_reason
-            elif isinstance(result, Exception):
-                logger.error("Update task failed: %s", result)
-                error_reasons[VERSION_UNKNOWN] = f"Task failed: {result}"
+        for app_name, success, error_reason in task_results:
+            results[app_name] = success
+            if not success and error_reason:
+                error_reasons[app_name] = error_reason
 
     return results, error_reasons
-
-
-"""Update context preparation functions.
-
-This module contains functions for preparing update contexts including
-resolving update info, loading configurations, and selecting assets.
-"""
 
 
 async def resolve_update_info(
@@ -850,7 +837,7 @@ async def resolve_update_info(
     session: aiohttp.ClientSession,
     force: bool,
     update_info: UpdateInfo | None,
-    check_single_update_func: callable,
+    check_single_update_func: Callable,
 ) -> tuple[UpdateInfo | None, str | None]:
     """Resolve update info by using cached or checking for updates.
 
@@ -993,9 +980,9 @@ async def prepare_update_context(
     session: aiohttp.ClientSession,
     force: bool,
     update_info: UpdateInfo | None,
-    check_single_update_func: callable,
-    load_app_config_func: callable,
-    load_catalog_cached_func: callable,
+    check_single_update_func: Callable,
+    load_app_config_func: Callable,
+    load_catalog_cached_func: Callable,
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Prepare context for update operation.
 
@@ -1059,13 +1046,6 @@ async def prepare_update_context(
         "catalog_entry": catalog_entry,
         "appimage_asset": appimage_asset,
     }, None
-
-
-"""In-memory catalog cache for update sessions.
-
-This module provides catalog caching functionality to reduce redundant file I/O
-when multiple apps share the same catalog.
-"""
 
 
 class CatalogCache:
@@ -1153,17 +1133,6 @@ class CatalogCache:
     def clear(self) -> None:
         """Clear the catalog cache."""
         self._cache.clear()
-
-
-"""Display utility functions for update results.
-
-This module provides functions for formatting and displaying update results
-in a consistent manner across all update operations.
-
-Note:
-    These functions use logger.info() for direct console output to ensure
-    messages are always visible to users regardless of logger configuration.
-"""
 
 
 def display_update_summary(
@@ -1447,7 +1416,7 @@ def display_update_results(results: dict) -> None:  # noqa: C901, PLR0912
         # Show updated apps with version info
         for app_name in updated:
             app_info = _find_update_info(app_name, update_infos)
-            if app_info:
+            if app_info.is_success:
                 version_info = (
                     f"{app_info.current_version} → {app_info.latest_version}"
                 )
@@ -1459,13 +1428,13 @@ def display_update_results(results: dict) -> None:  # noqa: C901, PLR0912
         for app_name in failed:
             app_info = _find_update_info(app_name, update_infos)
             logger.info("%-25s ❌ Update failed", app_name)
-            if app_info and app_info.error_reason:
+            if app_info.error_reason:
                 logger.info("%25s    → %s", app_name, app_info.error_reason)
 
         # Show up-to-date apps
         for app_name in up_to_date:
             app_info = _find_update_info(app_name, update_infos)
-            if app_info:
+            if app_info.is_success:
                 version = app_info.current_version
                 logger.info(
                     "%-25s ℹ️  Already up to date (%s)",  # noqa: RUF001
@@ -1512,9 +1481,6 @@ def display_invalid_apps(
             logger.info("   Installed apps: %s", ", ".join(installed))
 
 
-"""Update information types."""
-
-
 @dataclass
 class UpdateInfo:
     r"""Information about an available update for an installed application.
@@ -1559,7 +1525,6 @@ class UpdateInfo:
 
     def __post_init__(self) -> None:
         """Post-initialization processing."""
-        from my_unicorn.constants import VERSION_UNKNOWN  # noqa: PLC0415
 
         # Set default original_tag_name if not provided
         if (
