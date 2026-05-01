@@ -30,6 +30,11 @@ class MockUpdateInfo:
     has_update: bool
     error_reason: str | None = None
 
+    @property
+    def is_success(self) -> bool:
+        """Return whether the mock represents a successful update check."""
+        return self.error_reason is None
+
 
 class TestDisplayUpdateSummary:
     """Tests for display_update_summary function."""
