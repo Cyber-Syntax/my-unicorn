@@ -2,7 +2,7 @@
 
 import pytest
 
-from my_unicorn.core.verification.checksum_parser import (
+from my_unicorn.core.checksum_parser import (
     ChecksumFileResult,
     convert_base64_to_hex,
     find_checksum_entry,

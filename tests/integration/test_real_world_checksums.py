@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from my_unicorn.core.verification.checksum_parser import find_checksum_entry
+from my_unicorn.core.checksum_parser import find_checksum_entry
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures" / "checksums"
 

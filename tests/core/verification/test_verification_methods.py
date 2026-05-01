@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.core.api import Asset
-from my_unicorn.core.verification.context import VerificationContext
-from my_unicorn.core.verification.verification_methods import (
+from my_unicorn.core.verify import VerificationContext
+from my_unicorn.core.verify import (
     cache_checksum_file_data,
     verify_checksum_file,
     verify_digest,
@@ -408,7 +408,7 @@ class TestCacheChecksumFileData:
         mock_cache_manager.store_checksum_file = AsyncMock(return_value=True)
 
         with patch(
-            "my_unicorn.core.verification.verification_methods.parse_all_checksums"
+            "my_unicorn.core.verify.parse_all_checksums"
         ) as mock_parse:
             mock_parse.return_value = {"test.AppImage": "abc123def456"}
 
@@ -448,7 +448,7 @@ class TestCacheChecksumFileData:
         mock_cache_manager.reset_mock()
 
         with patch(
-            "my_unicorn.core.verification.verification_methods.parse_all_checksums"
+            "my_unicorn.core.verify.parse_all_checksums"
         ) as mock_parse:
             mock_parse.return_value = {}
 
@@ -468,7 +468,7 @@ class TestCacheChecksumFileData:
         )
 
         with patch(
-            "my_unicorn.core.verification.verification_methods.parse_all_checksums"
+            "my_unicorn.core.verify.parse_all_checksums"
         ) as mock_parse:
             mock_parse.return_value = {"test.AppImage": "abc123"}
 

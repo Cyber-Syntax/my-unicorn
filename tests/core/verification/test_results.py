@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from my_unicorn.core.verification.results import (
+from my_unicorn.core.verify import (
     MethodResult,
     VerificationResult,
 )

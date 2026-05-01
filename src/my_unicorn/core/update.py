@@ -41,7 +41,7 @@ from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
 )
-from my_unicorn.core.verification import VerificationService
+from my_unicorn.core.verify import VerificationService
 from my_unicorn.exceptions import (
     ConfigurationError,
     UpdateError,

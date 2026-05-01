@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from my_unicorn.core.verification.checksum_parser.normalizer import (
+from my_unicorn.core.checksum_parser import (
     _is_likely_base64,
     _is_likely_hex,
     _normalize_hash_value,
@@ -273,7 +273,7 @@ class TestCorruptionPrevention:
     def test_base64_decode_not_called_on_hex(self) -> None:
         """Verify base64 decode is never called for hex hashes."""
         with patch(
-            "my_unicorn.core.verification.checksum_parser.convert_base64_to_hex"
+            "my_unicorn.core.checksum_parser.convert_base64_to_hex"
         ) as mock_convert:
             hex_hash = (
                 "abc123def4567890abcdef1234567890"
