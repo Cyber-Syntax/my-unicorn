@@ -10,10 +10,14 @@ Developers ensure catalog correctness before release.
 
 Usage:
     from my_unicorn.config.schemas import (
+        ConfigValidator,
+        SchemaValidationError,
         validate_app_state,
         validate_cache_release,
-        SchemaValidationError,
     )
+    from my_unicorn.logger import get_logger
+
+    logger = get_logger(__name__)
 
     try:
         validate_app_state(app_config, "obsidian")

@@ -804,19 +804,23 @@ async def update_multiple_apps(
         async def update_with_semaphore(
             app_name: str,
         ) -> tuple[str, bool, str | None]:
-            cached_info = update_info_map.get(app_name)
+            try:
+                cached_info = update_info_map.get(app_name)
 
-            # Update progress for cached data outside semaphore
-            if cached_info:
-                await update_cached_progress_func(
-                    app_name, api_task_id, progress_reporter
-                )
+                # Update progress for cached data outside semaphore
+                if cached_info:
+                    await update_cached_progress_func(
+                        app_name, api_task_id, progress_reporter
+                    )
 
-            async with semaphore:
-                success, error_reason = await update_single_app_func(
-                    app_name, session, force, cached_info
-                )
-                return app_name, success, error_reason
+                async with semaphore:
+                    success, error_reason = await update_single_app_func(
+                        app_name, session, force, cached_info
+                    )
+                    return app_name, success, error_reason
+            except Exception as e:
+                logger.exception("Update task failed for %s", app_name)
+                return app_name, False, f"Task failed: {e}"
 
         tasks = [update_with_semaphore(app) for app in app_names]
         task_results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -970,7 +974,7 @@ def select_asset_for_update(
     appimage_asset = select_best_appimage_asset(
         update_info.release_data,
         catalog_entry=catalog_dict,
-        installation_source="url",
+        installation_source="catalog" if catalog_entry else "url",
         raise_on_not_found=False,
     )
 
@@ -1464,9 +1468,9 @@ def display_update_results(results: dict) -> None:  # noqa: C901, PLR0912
             if app_info:
                 version = app_info.current_version
                 logger.info(
-                    "%-25s ℹ️  Already up to date (%s)",
+                    "%-25s ℹ️  Already up to date (%s)",  # noqa: RUF001
                     app_name,
-                    version,  # noqa: RUF001
+                    version,
                 )
             else:
                 logger.info("%-25s ℹ️  Already up to date", app_name)  # noqa: RUF001
@@ -1477,7 +1481,10 @@ def display_update_results(results: dict) -> None:  # noqa: C901, PLR0912
         if failed:
             logger.info("❌ %s app(s) failed to update", len(failed))
         if up_to_date:
-            logger.info("ℹ️  %s app(s) already up to date", len(up_to_date))
+            info_icon = "ℹ️"  # noqa: RUF001
+            logger.info(
+                "%s  %s app(s) already up to date", info_icon, len(up_to_date)
+            )
     else:
         # Fallback to simple logger output
         if updated:
