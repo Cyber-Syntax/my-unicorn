@@ -34,7 +34,7 @@ from my_unicorn.constants import LOCKFILE_PATH
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.cache import ReleaseCacheManager
 from my_unicorn.core.locking import LockManager
-from my_unicorn.core.update.manager import UpdateManager
+from my_unicorn.core.update import UpdateManager
 from my_unicorn.exceptions import LockError
 from my_unicorn.logger import get_logger, update_logger_from_config
 
