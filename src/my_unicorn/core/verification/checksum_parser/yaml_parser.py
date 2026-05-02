@@ -175,8 +175,9 @@ def _parse_all_yaml_checksums(content: str) -> dict[str, str]:
 
     hashes: dict[str, str] = {}
 
-    # electron-builder: files is a list of {url, sha512, size}
     files = data.get("files")
+
+    # electron-builder format: files is a list of {url/name, sha512, size}
     if isinstance(files, list):
         for entry in files:
             if not isinstance(entry, dict):
@@ -189,7 +190,18 @@ def _parse_all_yaml_checksums(content: str) -> dict[str, str]:
                 hash_value, _ = result
                 hashes[filename] = hash_value
 
-    # Also capture root-level entry (primary file)
+    # Generic format: files is a dict of {filename: hash_str_or_dict}
+    elif isinstance(files, dict):
+        for filename, hash_data in files.items():
+            if isinstance(hash_data, str):
+                hashes[filename] = _normalize_hash_value(hash_data)
+            elif isinstance(hash_data, dict):
+                result = _extract_hash_from_dict(hash_data)
+                if result:
+                    hash_value, _ = result
+                    hashes[filename] = hash_value
+
+    # Capture root-level entry (electron-builder also has path/sha512 at root)
     root_path = data.get("path")
     if root_path:
         result = _extract_hash_from_dict(data)
@@ -197,15 +209,12 @@ def _parse_all_yaml_checksums(content: str) -> dict[str, str]:
             hash_value, _ = result
             hashes[root_path] = hash_value
 
-    # Fallback: generic {filename: hash_str} flat structure
+    # Fallback: flat {filename: hash} with no "files" key
     if not hashes:
         for key, value in data.items():
-            if isinstance(value, str) and key not in (
-                "version",
-                "path",
-                "releaseDate",
-                "releaseNotes",
-            ):
+            if key in ("version", "path", "releaseDate", "releaseNotes"):
+                continue
+            if isinstance(value, str):
                 hashes[key] = _normalize_hash_value(value)
             elif isinstance(value, dict):
                 result = _extract_hash_from_dict(value)
