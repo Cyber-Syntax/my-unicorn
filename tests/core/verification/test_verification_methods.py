@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.core.api import Asset
-from my_unicorn.core.verify import VerificationContext
 from my_unicorn.core.verify import (
+    VerificationContext,
     cache_checksum_file_data,
     verify_checksum_file,
     verify_digest,
@@ -19,7 +19,6 @@ from my_unicorn.core.verify import (
 from my_unicorn.types import ChecksumFileInfo
 from tests.core.verification.conftest import (
     EXPECTED_MD5_HEX,
-    EXPECTED_SHA1_HEX,
     LEGCORD_EXPECTED_HEX,
     LEGCORD_YAML_CONTENT,
     SIYUAN_SHA256SUMS_CONTENT,
@@ -200,42 +199,6 @@ class TestVerifyChecksumFile:
         mock_download_service.download_checksum_file.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_verify_checksum_file_bsd_format_success(
-        self, mock_download_service: MagicMock
-    ) -> None:
-        """Test successful BSD format checksum file verification."""
-        bsd_sha1_content = (
-            "SHA1 (test.AppImage) = abc123def4567890abcdef1234567890abcdef12"
-        )
-        mock_download_service.download_checksum_file = AsyncMock(
-            return_value=bsd_sha1_content
-        )
-
-        checksum_file = ChecksumFileInfo(
-            filename="SHA1SUMS",
-            url="https://example.com/SHA1SUMS",
-            format_type="bsd",
-        )
-
-        mock_verifier = MagicMock()
-        mock_verifier.detect_hash_type_from_filename.return_value = "sha1"
-        mock_verifier.parse_checksum_file.return_value = EXPECTED_SHA1_HEX
-        mock_verifier.compute_hash.return_value = EXPECTED_SHA1_HEX
-
-        result = await verify_checksum_file(
-            mock_verifier,
-            checksum_file,
-            "test.AppImage",
-            "testapp",
-            mock_download_service,
-        )
-
-        assert result is not None
-        assert result.passed is True
-        assert result.hash == EXPECTED_SHA1_HEX
-        assert result.hash_type == "sha1"
-
-    @pytest.mark.asyncio
     async def test_verify_checksum_file_failure_cases(
         self, mock_download_service: MagicMock
     ) -> None:
@@ -407,9 +370,7 @@ class TestCacheChecksumFileData:
         mock_cache_manager = MagicMock()
         mock_cache_manager.store_checksum_file = AsyncMock(return_value=True)
 
-        with patch(
-            "my_unicorn.core.verify.parse_all_checksums"
-        ) as mock_parse:
+        with patch("my_unicorn.core.verify.parse_all_checksums") as mock_parse:
             mock_parse.return_value = {"test.AppImage": "abc123def456"}
 
             await cache_checksum_file_data(
@@ -447,9 +408,7 @@ class TestCacheChecksumFileData:
         # Scenario 4: No hashes found (should skip caching)
         mock_cache_manager.reset_mock()
 
-        with patch(
-            "my_unicorn.core.verify.parse_all_checksums"
-        ) as mock_parse:
+        with patch("my_unicorn.core.verify.parse_all_checksums") as mock_parse:
             mock_parse.return_value = {}
 
             await cache_checksum_file_data(
@@ -467,9 +426,7 @@ class TestCacheChecksumFileData:
             side_effect=Exception("Cache write error")
         )
 
-        with patch(
-            "my_unicorn.core.verify.parse_all_checksums"
-        ) as mock_parse:
+        with patch("my_unicorn.core.verify.parse_all_checksums") as mock_parse:
             mock_parse.return_value = {"test.AppImage": "abc123"}
 
             # Should not raise exception despite cache error

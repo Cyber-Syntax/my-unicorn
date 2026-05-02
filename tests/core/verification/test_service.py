@@ -17,8 +17,7 @@ import pytest
 
 from my_unicorn.core.api import Asset
 from my_unicorn.core.protocols.progress import NullProgressReporter
-from my_unicorn.core.verify import VerificationContext
-from my_unicorn.core.verify import VerificationService
+from my_unicorn.core.verify import VerificationContext, VerificationService
 from my_unicorn.exceptions import VerificationError
 
 # Test data constant for YAML checksum

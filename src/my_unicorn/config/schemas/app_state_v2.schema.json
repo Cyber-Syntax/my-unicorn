@@ -4,12 +4,7 @@
     "title": "My Unicorn App State Schema v2.0.0",
     "description": "Schema for app state configuration files that track installed AppImages",
     "type": "object",
-    "required": [
-        "config_version",
-        "source",
-        "catalog_ref",
-        "state"
-    ],
+    "required": ["config_version", "source", "catalog_ref", "state"],
     "additionalProperties": false,
     "properties": {
         "config_version": {
@@ -19,10 +14,7 @@
         },
         "source": {
             "type": "string",
-            "enum": [
-                "catalog",
-                "url"
-            ],
+            "enum": ["catalog", "url"],
             "description": "Installation source: catalog (bundled) or url (user-provided)"
         },
         "catalog_ref": {
@@ -65,10 +57,7 @@
                 },
                 "verification": {
                     "type": "object",
-                    "required": [
-                        "passed",
-                        "methods"
-                    ],
+                    "required": ["passed", "methods"],
                     "additionalProperties": false,
                     "properties": {
                         "passed": {
@@ -81,11 +70,7 @@
                         },
                         "actual_method": {
                             "type": "string",
-                            "enum": [
-                                "digest",
-                                "checksum_file",
-                                "skip"
-                            ],
+                            "enum": ["digest", "checksum_file", "skip"],
                             "description": "Primary verification method used"
                         },
                         "warning": {
@@ -97,10 +82,7 @@
                             "minItems": 1,
                             "items": {
                                 "type": "object",
-                                "required": [
-                                    "type",
-                                    "status"
-                                ],
+                                "required": ["type", "status"],
                                 "additionalProperties": false,
                                 "properties": {
                                     "type": {
@@ -114,11 +96,7 @@
                                     },
                                     "status": {
                                         "type": "string",
-                                        "enum": [
-                                            "passed",
-                                            "failed",
-                                            "skipped"
-                                        ],
+                                        "enum": ["passed", "failed", "skipped"],
                                         "description": "Verification result status"
                                     },
                                     "algorithm": {
@@ -153,10 +131,7 @@
                 },
                 "icon": {
                     "type": "object",
-                    "required": [
-                        "installed",
-                        "method"
-                    ],
+                    "required": ["installed", "method"],
                     "additionalProperties": false,
                     "properties": {
                         "installed": {
@@ -165,10 +140,7 @@
                         },
                         "method": {
                             "type": "string",
-                            "enum": [
-                                "extraction",
-                                "none"
-                            ],
+                            "enum": ["extraction", "none"],
                             "description": "Method used to obtain icon (extraction or none)"
                         },
                         "path": {
@@ -193,10 +165,7 @@
             "properties": {
                 "metadata": {
                     "type": "object",
-                    "required": [
-                        "name",
-                        "display_name"
-                    ],
+                    "required": ["name", "display_name"],
                     "additionalProperties": false,
                     "properties": {
                         "name": {
@@ -214,19 +183,12 @@
                 },
                 "source": {
                     "type": "object",
-                    "required": [
-                        "type",
-                        "owner",
-                        "repo",
-                        "prerelease"
-                    ],
+                    "required": ["type", "owner", "repo", "prerelease"],
                     "additionalProperties": false,
                     "properties": {
                         "type": {
                             "type": "string",
-                            "enum": [
-                                "github"
-                            ]
+                            "enum": ["github"]
                         },
                         "owner": {
                             "type": "string",
@@ -243,17 +205,12 @@
                 },
                 "appimage": {
                     "type": "object",
-                    "required": [
-                        "naming"
-                    ],
+                    "required": ["naming"],
                     "additionalProperties": false,
                     "properties": {
                         "naming": {
                             "type": "object",
-                            "required": [
-                                "target_name",
-                                "architectures"
-                            ],
+                            "required": ["target_name", "architectures"],
                             "additionalProperties": false,
                             "properties": {
                                 "template": {
@@ -276,25 +233,16 @@
                 },
                 "verification": {
                     "type": "object",
-                    "required": [
-                        "method"
-                    ],
+                    "required": ["method"],
                     "additionalProperties": false,
                     "properties": {
                         "method": {
                             "type": "string",
-                            "enum": [
-                                "digest",
-                                "checksum_file",
-                                "skip"
-                            ]
+                            "enum": ["digest", "checksum_file", "skip"]
                         },
                         "checksum_file": {
                             "type": "object",
-                            "required": [
-                                "filename",
-                                "algorithm"
-                            ],
+                            "required": ["filename", "algorithm"],
                             "additionalProperties": false,
                             "properties": {
                                 "filename": {
@@ -303,12 +251,7 @@
                                 },
                                 "algorithm": {
                                     "type": "string",
-                                    "enum": [
-                                        "sha256",
-                                        "sha512",
-                                        "sha1",
-                                        "md5"
-                                    ]
+                                    "enum": ["sha256", "sha512"]
                                 }
                             }
                         }
@@ -316,18 +259,12 @@
                 },
                 "icon": {
                     "type": "object",
-                    "required": [
-                        "method",
-                        "filename"
-                    ],
+                    "required": ["method", "filename"],
                     "additionalProperties": false,
                     "properties": {
                         "method": {
                             "type": "string",
-                            "enum": [
-                                "extraction",
-                                "none"
-                            ]
+                            "enum": ["extraction", "none"]
                         },
                         "filename": {
                             "type": "string",
@@ -355,9 +292,7 @@
                     }
                 },
                 "not": {
-                    "required": [
-                        "overrides"
-                    ]
+                    "required": ["overrides"]
                 }
             }
         },
@@ -375,9 +310,7 @@
                         "type": "null"
                     }
                 },
-                "required": [
-                    "overrides"
-                ]
+                "required": ["overrides"]
             }
         }
     ]

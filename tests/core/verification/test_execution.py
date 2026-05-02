@@ -17,13 +17,13 @@ import pytest
 
 from my_unicorn.constants import VerificationMethod
 from my_unicorn.core.api import Asset
-from my_unicorn.core.verify import VerificationContext
 from my_unicorn.core.verify import (
+    MethodResult,
+    VerificationContext,
     execute_all_verification_methods,
     execute_checksum_file_verification,
     execute_digest_verification,
 )
-from my_unicorn.core.verify import MethodResult
 from my_unicorn.types import ChecksumFileInfo
 
 

@@ -11,6 +11,7 @@ from my_unicorn.constants import (
     DEFAULT_HASH_TYPE,
     HASH_PREFERENCE_ORDER,
     SUPPORTED_HASH_ALGORITHMS,
+    YAML_CHECKSUM_EXTENSIONS,
     YAML_DEFAULT_HASH,
 )
 from my_unicorn.logger import get_logger
@@ -256,17 +257,16 @@ def detect_hash_type_from_checksum_filename(
     hash_patterns: dict[HashType, Iterable[str]] = {
         "sha512": ["sha512", "sha-512"],
         "sha256": ["sha256", "sha-256"],
-        "sha1": ["sha1", "sha-1"],
-        "md5": ["md5"],
     }
 
     for hash_type, patterns in hash_patterns.items():
-        if any(pattern in filename_lower for pattern in patterns):
-            logger.debug("   Detected %s hash type from filename", hash_type)
+        if hash_type in SUPPORTED_HASH_ALGORITHMS and any(
+            pattern in filename_lower for pattern in patterns
+        ):
             return hash_type
 
     if filename_lower.endswith((".yml", ".yaml")):
-        return "sha256"
+        return YAML_DEFAULT_HASH
 
     return None
 
@@ -667,37 +667,54 @@ def convert_base64_to_hex(base64_hash: str) -> str:
 def _is_likely_hex(hash_value: str) -> bool:
     """Detect if a hash value is likely hexadecimal encoding.
 
-    Checks if the hash matches common hash algorithm lengths (MD5, SHA1,
-    SHA256, SHA512) and contains only valid hexadecimal characters.
+    Supported hexadecimal hash lengths:
+    - SHA256: 64 characters
+    - SHA512: 128 characters
+
+    Unsupported but detected:
+    - MD5: 32 characters
+    - SHA1: 40 characters
+
+    If MD5 or SHA1 is detected, a warning is logged and False is returned.
 
     Args:
         hash_value: The hash value to check.
 
     Returns:
-        True if the hash appears to be hexadecimal, False otherwise.
+        True if the hash appears to be a supported hexadecimal hash
+        (SHA256 or SHA512), False otherwise.
 
     Examples:
         >>> _is_likely_hex("abc123def4567890abcdef1234567890")  # MD5
-        True
+        False
+        >>> _is_likely_hex("a" * 40)  # SHA1
+        False
         >>> _is_likely_hex("deadbeef" * 8)  # SHA256
         True
         >>> _is_likely_hex("DEADBEEF" * 16)  # SHA512 uppercase
         True
-        >>> _is_likely_hex("JNmYBTG9lqXt")  # Base64 - wrong length
-        False
-        >>> _is_likely_hex("ghijklmn" * 8)  # Invalid hex characters
-        False
     """
     hash_value = hash_value.strip()
     hash_length = len(hash_value)
 
-    # Check if length matches known hash algorithms
-    # MD5: 32, SHA1: 40, SHA256: 64, SHA512: 128
-    if hash_length not in (32, 40, 64, 128):
+    # First ensure all characters are valid hexadecimal
+    if not all(c in "0123456789abcdefABCDEF" for c in hash_value):
         return False
 
-    # Check if all characters are valid hexadecimal
-    return all(c in "0123456789abcdefABCDEF" for c in hash_value)
+    # Detect unsupported legacy hashes
+    if hash_length == 32:
+        logger.warning("MD5 hashes are no longer supported.")
+        return False
+
+    if hash_length == 40:
+        logger.warning("SHA1 hashes are no longer supported.")
+        return False
+
+    # Supported hash algorithms
+    if hash_length in (64, 128):
+        return True
+
+    return False
 
 
 def _is_likely_base64(hash_value: str) -> bool:

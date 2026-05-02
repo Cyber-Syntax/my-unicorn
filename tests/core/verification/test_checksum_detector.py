@@ -206,8 +206,6 @@ def test_detect_hash_type_from_filename() -> None:
     assert (
         detect_hash_type_from_checksum_filename("SHA256SUMS.txt") == "sha256"
     )
-    assert detect_hash_type_from_checksum_filename("checksums.sha1") == "sha1"
-    assert detect_hash_type_from_checksum_filename("hashes.md5") == "md5"
     assert (
         detect_hash_type_from_checksum_filename("latest-linux.yml") == "sha512"
     )
@@ -219,7 +217,6 @@ def test_detect_hash_type_from_hyphenated_filename() -> None:
     assert (
         detect_hash_type_from_checksum_filename("SHA-256SUMS.txt") == "sha256"
     )
-    assert detect_hash_type_from_checksum_filename("checksums.sha-1") == "sha1"
 
 
 class TestParseAllChecksums:

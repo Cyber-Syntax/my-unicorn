@@ -1,5 +1,6 @@
 """Tests for hash normalization functions in checksum_parser.normalizer."""
 
+import logging
 from unittest.mock import patch
 
 from my_unicorn.core.checksum_parser import (
@@ -12,15 +13,22 @@ from my_unicorn.core.checksum_parser import (
 class TestIsLikelyHex:
     """Tests for _is_likely_hex() encoding detection."""
 
-    def test_is_likely_hex_md5(self) -> None:
+    def test_is_likely_hex_md5(self, caplog) -> None:
         """Test hex detection for MD5 (32 chars)."""
-        assert _is_likely_hex("abc123def4567890abcdef1234567890") is True
+        with caplog.at_level(logging.WARNING):
+            assert _is_likely_hex("abc123def4567890abcdef1234567890") is False
 
-    def test_is_likely_hex_sha1(self) -> None:
+        assert "MD5 hashes are no longer supported." in caplog.text
+
+    def test_is_likely_hex_sha1(self, caplog) -> None:
         """Test hex detection for SHA1 (40 chars)."""
-        assert (
-            _is_likely_hex("abc123def4567890abcdef1234567890abcdef12") is True
-        )
+        with caplog.at_level(logging.WARNING):
+            assert (
+                _is_likely_hex("abc123def4567890abcdef1234567890abcdef12")
+                is False
+            )
+
+        assert "SHA1 hashes are no longer supported." in caplog.text
 
     def test_is_likely_hex_sha256(self) -> None:
         """Test hex detection for SHA256 (64 chars)."""

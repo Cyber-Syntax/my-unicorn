@@ -36,26 +36,6 @@ def test_parse_bsd_checksum_sha256() -> None:
     assert entry.algorithm == "sha256"
 
 
-def test_parse_bsd_checksum_sha1() -> None:
-    """Test BSD checksum format parsing for SHA1."""
-    content = "SHA1 (test.AppImage) = abc123def4567890abcdef1234567890abcdef12"
-    entry = find_checksum_entry(content, "test.AppImage", "sha1")
-    assert entry is not None
-    assert entry.filename == "test.AppImage"
-    assert entry.hash_value == "abc123def4567890abcdef1234567890abcdef12"
-    assert entry.algorithm == "sha1"
-
-
-def test_parse_bsd_checksum_md5() -> None:
-    """Test BSD checksum format parsing for MD5."""
-    content = "MD5 (test.AppImage) = abc123def4567890abcdef1234567890"
-    entry = find_checksum_entry(content, "test.AppImage", "md5")
-    assert entry is not None
-    assert entry.filename == "test.AppImage"
-    assert entry.hash_value == "abc123def4567890abcdef1234567890"
-    assert entry.algorithm == "md5"
-
-
 def test_parse_bsd_checksum_wrong_filename() -> None:
     """Test BSD checksum format with wrong filename returns None."""
     content = "SHA256 (other.AppImage) = abc123def4567890abcdef1234567890abcdef1234567890abcdef1234567890"
@@ -76,57 +56,6 @@ MD5 (another.AppImage) = 1234567890abcdef1234567890abcdef"""
         == "abc123def4567890abcdef1234567890abcdef1234567890abcdef1234567890"
     )
     assert entry.algorithm == "sha256"
-
-
-def test_find_checksum_entry_yaml_sha1() -> None:
-    """Test YAML checksum parsing with SHA1 hash."""
-    content = """path: test.AppImage
-sha1: q8Ej3vRWeJCrze8SNFZ4kKvN7xI="""
-    entry = find_checksum_entry(content, "test.AppImage", "sha1")
-    assert entry is not None
-    assert entry.filename == "test.AppImage"
-    assert entry.hash_value == "abc123def4567890abcdef1234567890abcdef12"
-    assert entry.algorithm == "sha1"
-
-
-def test_find_checksum_entry_yaml_md5() -> None:
-    """Test YAML checksum parsing with MD5 hash."""
-    content = """path: test.AppImage
-md5: q8Ej3vRWeJCrze8SNFZ4kA=="""
-    entry = find_checksum_entry(content, "test.AppImage", "md5")
-    assert entry is not None
-    assert entry.filename == "test.AppImage"
-    assert entry.hash_value == "abc123def4567890abcdef1234567890"
-    assert entry.algorithm == "md5"
-
-
-def test_find_checksum_entry_yaml_sha1_files_array() -> None:
-    """Test YAML checksum parsing with SHA1 hash in files array."""
-    content = """files:
-  - url: test.AppImage
-    sha1: q8Ej3vRWeJCrze8SNFZ4kKvN7xI=
-  - url: other.AppImage
-    sha256: def4567890abcdef1234567890abcdef1234567890abcdef1234567890abc123"""
-    entry = find_checksum_entry(content, "test.AppImage", "sha1")
-    assert entry is not None
-    assert entry.filename == "test.AppImage"
-    assert entry.hash_value == "abc123def4567890abcdef1234567890abcdef12"
-    assert entry.algorithm == "sha1"
-
-
-def test_find_checksum_entry_yaml_md5_files_dict() -> None:
-    """Test YAML checksum parsing with MD5 hash in files dict."""
-    content = """files:
-  test.AppImage:
-    md5: q8Ej3vRWeJCrze8SNFZ4kA==
-  other.AppImage:
-    sha256: def4567890abcdef1234567890abcdef1234567890abcdef1234567890abc123"""
-    entry = find_checksum_entry(content, "test.AppImage", "md5")
-    assert entry is not None
-    assert entry.filename == "test.AppImage"
-    assert entry.hash_value == "abc123def4567890abcdef1234567890"
-    assert entry.algorithm == "md5"
-
 
 class TestChecksumFileResult:
     """Tests for ChecksumFileResult dataclass."""

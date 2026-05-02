@@ -17,6 +17,7 @@ import aiohttp
 from my_unicorn.config import ConfigManager
 from my_unicorn.config.validation import ConfigurationValidator
 from my_unicorn.constants import (
+    CHECKSUM_FILE_SUFFIXES,
     HTTP_NOT_FOUND,
     INCOMPATIBLE_PLATFORM_EXTENSIONS,
     INCOMPATIBLE_PLATFORM_PATTERNS,
@@ -1192,13 +1193,7 @@ class AssetSelector:
 
         # Also handle pattern-based checksums (e.g., .sha256, .sha512)
         if not is_appimage_specific:
-            checksum_suffixes = [
-                ".sha256",
-                ".sha512",
-                ".sha1",
-                ".md5",
-            ]
-            for suffix in checksum_suffixes:
+            for suffix in CHECKSUM_FILE_SUFFIXES:
                 if filename_lower.endswith(suffix):
                     base_name = filename[: -len(suffix)]
                     # Only consider AppImage-specific if base ends with

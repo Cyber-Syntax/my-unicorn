@@ -49,26 +49,6 @@ def test_verify_digest_unsupported_algo(tmp_path: Path) -> None:
         verifier.verify_digest("sha999:abcd")
 
 
-def test_verify_hash_success(tmp_path: Path) -> None:
-    """Hash verification succeeds for matching hashes."""
-    file = tmp_path / "file.bin"
-    data = b"xyz"
-    file.write_bytes(data)
-    verifier = Verifier(file)
-
-    expected_hash = hashlib.sha1(data).hexdigest()  # noqa: S324
-    verifier.verify_hash(expected_hash, "sha1")
-
-
-def test_verify_hash_mismatch(tmp_path: Path) -> None:
-    """Hash verification fails on mismatch."""
-    file = tmp_path / "file.bin"
-    file.write_bytes(b"xyz")
-    verifier = Verifier(file)
-    with pytest.raises(ValueError, match="SHA1 mismatch"):
-        verifier.verify_hash("deadbeef", "sha1")
-
-
 def test_compute_hash_all_types(tmp_path: Path) -> None:
     """Compute hashes across supported algorithms."""
     file = tmp_path / "file.bin"
@@ -76,10 +56,8 @@ def test_compute_hash_all_types(tmp_path: Path) -> None:
     file.write_bytes(data)
     verifier = Verifier(file)
 
-    assert verifier.compute_hash("sha1") == hashlib.sha1(data).hexdigest()  # noqa: S324
     assert verifier.compute_hash("sha256") == hashlib.sha256(data).hexdigest()
     assert verifier.compute_hash("sha512") == hashlib.sha512(data).hexdigest()
-    assert verifier.compute_hash("md5") == hashlib.md5(data).hexdigest()  # noqa: S324
 
 
 def test_compute_hash_unsupported(tmp_path: Path) -> None:
