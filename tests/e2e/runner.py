@@ -6,6 +6,7 @@ commands in a sandboxed environment, with utilities for config manipulation.
 
 import os
 import subprocess
+from pathlib import Path
 from typing import Any, cast
 
 import orjson
@@ -52,9 +53,12 @@ class E2ERunner:
         # Build the command using uv run (executing from source)
         cmd = ["uv", "run", "my-unicorn", *args]
 
-        # Set up environment with sandbox HOME
+        # Set up environment with sandbox HOME and sandbox-scoped logs.
+        # pytest sets MY_UNICORN_LOG_DIR globally, so override it here to
+        # keep each E2E subprocess isolated and make its logs inspectable.
         env = os.environ.copy()
         env["HOME"] = str(self.sandbox.temp_home)
+        env["MY_UNICORN_LOG_DIR"] = str(self.log_file_path().parent)
 
         # Merge custom environment variables if provided
         if env_overrides:
@@ -68,6 +72,23 @@ class E2ERunner:
             env=env,
             capture_output=True,
         )
+
+    def log_file_path(self) -> Path:
+        """Return the sandbox-scoped my-unicorn log file path."""
+        return (
+            self.sandbox.temp_home
+            / ".config"
+            / "my-unicorn"
+            / "logs"
+            / "my-unicorn.log"
+        )
+
+    def read_log(self) -> str:
+        """Read the sandbox-scoped my-unicorn log file if it exists."""
+        log_file = self.log_file_path()
+        if not log_file.exists():
+            return ""
+        return log_file.read_text(encoding="utf-8")
 
     def install(
         self, app_name: str, *args: str
